@@ -225,11 +225,13 @@ unsafe extern "system" fn convert_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "convert_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || convert_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "convert_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || convert_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

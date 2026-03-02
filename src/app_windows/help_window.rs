@@ -330,11 +330,13 @@ unsafe extern "system" fn help_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "help_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || help_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "help_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || help_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -596,11 +598,13 @@ unsafe extern "system" fn readonly_text_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "readonly_text_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || readonly_text_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "readonly_text_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || readonly_text_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

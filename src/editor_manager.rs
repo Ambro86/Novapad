@@ -123,11 +123,13 @@ unsafe extern "system" fn edit_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "edit_subclass_proc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || edit_subclass_proc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "edit_subclass_proc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || edit_subclass_proc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn edit_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

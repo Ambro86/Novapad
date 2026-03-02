@@ -274,11 +274,13 @@ unsafe extern "system" fn wiktionary_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "wiktionary_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || wiktionary_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "wiktionary_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || wiktionary_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn wiktionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -638,11 +640,13 @@ unsafe extern "system" fn tab_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "tab_subclass_proc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || tab_subclass_proc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "tab_subclass_proc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || tab_subclass_proc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

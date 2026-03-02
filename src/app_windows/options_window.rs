@@ -1815,11 +1815,13 @@ unsafe extern "system" fn options_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "options_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || options_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "options_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || options_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

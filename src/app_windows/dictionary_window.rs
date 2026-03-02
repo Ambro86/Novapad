@@ -185,11 +185,13 @@ unsafe extern "system" fn dictionary_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "dictionary_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || dictionary_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "dictionary_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || dictionary_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn dictionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -588,11 +590,13 @@ unsafe extern "system" fn dictionary_entry_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "dictionary_entry_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || dictionary_entry_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "dictionary_entry_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || dictionary_entry_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

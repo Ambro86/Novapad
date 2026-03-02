@@ -147,50 +147,52 @@ unsafe extern "C" fn stream_callback(
     length: Dword,
     user: *mut c_void,
 ) -> Dword {
-    if user.is_null() {
-        return BASS_STREAMPROC_END;
-    }
+    unsafe {
+        if user.is_null() {
+            return BASS_STREAMPROC_END;
+        }
 
-    // Get state from user pointer (don't take ownership)
-    let state = &*(user as *const StreamState);
+        // Get state from user pointer (don't take ownership)
+        let state = &*(user as *const StreamState);
 
-    // Calculate how many samples we need (length is in bytes, f32 = 4 bytes)
-    let samples_needed = length as usize / 4;
+        // Calculate how many samples we need (length is in bytes, f32 = 4 bytes)
+        let samples_needed = length as usize / 4;
 
-    let mut written = 0usize;
-    let out_buffer = std::slice::from_raw_parts_mut(buffer as *mut f32, samples_needed);
+        let mut written = 0usize;
+        let out_buffer = std::slice::from_raw_parts_mut(buffer as *mut f32, samples_needed);
 
-    // Try to get samples from buffer
-    {
-        let mut buf = state.buffer.lock().unwrap_or_else(|e| e.into_inner());
+        // Try to get samples from buffer
+        {
+            let mut buf = state.buffer.lock().unwrap_or_else(|e| e.into_inner());
 
-        while written < samples_needed {
-            if let Some(sample) = buf.pop_front() {
-                out_buffer[written] = sample;
-                written += 1;
-            } else if state.eof.load(Ordering::SeqCst) {
-                // No more data and EOF reached
-                break;
-            } else {
-                // Buffer empty but not EOF - fill with silence and wait for more
-                // This prevents blocking the audio thread
-                break;
+            while written < samples_needed {
+                if let Some(sample) = buf.pop_front() {
+                    out_buffer[written] = sample;
+                    written += 1;
+                } else if state.eof.load(Ordering::SeqCst) {
+                    // No more data and EOF reached
+                    break;
+                } else {
+                    // Buffer empty but not EOF - fill with silence and wait for more
+                    // This prevents blocking the audio thread
+                    break;
+                }
             }
         }
-    }
 
-    // Notify decoder we consumed data
-    state.data_ready.notify_one();
+        // Notify decoder we consumed data
+        state.data_ready.notify_one();
 
-    // Fill remaining with silence if needed
-    for sample in out_buffer.iter_mut().take(samples_needed).skip(written) {
-        *sample = 0.0;
-    }
+        // Fill remaining with silence if needed
+        for sample in out_buffer.iter_mut().take(samples_needed).skip(written) {
+            *sample = 0.0;
+        }
 
-    if written == 0 && state.eof.load(Ordering::SeqCst) {
-        BASS_STREAMPROC_END
-    } else {
-        length // Return requested length (we filled with silence if needed)
+        if written == 0 && state.eof.load(Ordering::SeqCst) {
+            BASS_STREAMPROC_END
+        } else {
+            length // Return requested length (we filled with silence if needed)
+        }
     }
 }
 

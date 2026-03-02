@@ -254,11 +254,13 @@ unsafe extern "system" fn find_in_files_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "find_in_files_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || find_in_files_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "find_in_files_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || find_in_files_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 pub(crate) fn focus_find_in_files_results() -> bool {

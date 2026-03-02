@@ -366,535 +366,545 @@ unsafe extern "system" fn batch_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    let result = std::panic::catch_unwind(|| match msg {
-        WM_CREATE => {
-            let cs = &*(lparam.0 as *const CREATESTRUCTW);
-            let parent = cs.hwndParent;
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let labels = labels(language);
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
+    unsafe {
+        let result = std::panic::catch_unwind(|| match msg {
+            WM_CREATE => {
+                let cs = &*(lparam.0 as *const CREATESTRUCTW);
+                let parent = cs.hwndParent;
+                let language =
+                    with_state(parent, |state| state.settings.language).unwrap_or_default();
+                let labels = labels(language);
+                let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let list = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("SysListView32"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(LVS_REPORT | LVS_SHOWSELALWAYS),
-                16,
-                16,
-                720,
-                190,
-                hwnd,
-                HMENU(BATCH_ID_LIST as isize),
-                HINSTANCE(0),
-                None,
-            );
-            SendMessageW(
-                list,
-                LVM_SETEXTENDEDLISTVIEWSTYLE,
-                WPARAM(0),
-                LPARAM((LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES) as isize),
-            );
+                let list = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("SysListView32"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE(LVS_REPORT | LVS_SHOWSELALWAYS),
+                    16,
+                    16,
+                    720,
+                    190,
+                    hwnd,
+                    HMENU(BATCH_ID_LIST as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(
+                    list,
+                    LVM_SETEXTENDEDLISTVIEWSTYLE,
+                    WPARAM(0),
+                    LPARAM((LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES) as isize),
+                );
 
-            insert_column(list, 0, &labels.col_input, 360);
-            insert_column(list, 1, &labels.col_status, 120);
-            insert_column(list, 2, &labels.col_output, 220);
+                insert_column(list, 0, &labels.col_input, 360);
+                insert_column(list, 1, &labels.col_status, 120);
+                insert_column(list, 2, &labels.col_output, 220);
 
-            let add_files = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.add_files).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                16,
-                214,
-                120,
-                26,
-                hwnd,
-                HMENU(BATCH_ID_ADD_FILES as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let add_folder = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.add_folder).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                144,
-                214,
-                120,
-                26,
-                hwnd,
-                HMENU(BATCH_ID_ADD_FOLDER as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let remove = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.remove_selected).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                272,
-                214,
-                140,
-                26,
-                hwnd,
-                HMENU(BATCH_ID_REMOVE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let clear = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.clear).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                420,
-                214,
-                100,
-                26,
-                hwnd,
-                HMENU(BATCH_ID_CLEAR as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let add_files = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.add_files).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    16,
+                    214,
+                    120,
+                    26,
+                    hwnd,
+                    HMENU(BATCH_ID_ADD_FILES as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let add_folder = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.add_folder).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    144,
+                    214,
+                    120,
+                    26,
+                    hwnd,
+                    HMENU(BATCH_ID_ADD_FOLDER as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let remove = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.remove_selected).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    272,
+                    214,
+                    140,
+                    26,
+                    hwnd,
+                    HMENU(BATCH_ID_REMOVE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let clear = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.clear).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    420,
+                    214,
+                    100,
+                    26,
+                    hwnd,
+                    HMENU(BATCH_ID_CLEAR as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let output_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.output_folder).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                246,
-                200,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let output_edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                16,
-                268,
-                540,
-                24,
-                hwnd,
-                HMENU(BATCH_ID_OUTPUT_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let browse = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.browse).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                564,
-                268,
-                172,
-                24,
-                hwnd,
-                HMENU(BATCH_ID_OUTPUT_BROWSE as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let output_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.output_folder).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    246,
+                    200,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let output_edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    16,
+                    268,
+                    540,
+                    24,
+                    hwnd,
+                    HMENU(BATCH_ID_OUTPUT_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let browse = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.browse).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    564,
+                    268,
+                    172,
+                    24,
+                    hwnd,
+                    HMENU(BATCH_ID_OUTPUT_BROWSE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let format_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.format).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                300,
-                80,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let format_combo = CreateWindowExW(
-                Default::default(),
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                96,
-                296,
-                120,
-                200,
-                hwnd,
-                HMENU(BATCH_ID_FORMAT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            SendMessageW(
-                format_combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.format_mp3).as_ptr() as isize),
-            );
-            SendMessageW(
-                format_combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.format_wav).as_ptr() as isize),
-            );
-            SendMessageW(format_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+                let format_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.format).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    300,
+                    80,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let format_combo = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    96,
+                    296,
+                    120,
+                    200,
+                    hwnd,
+                    HMENU(BATCH_ID_FORMAT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.format_mp3).as_ptr() as isize),
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.format_wav).as_ptr() as isize),
+                );
+                SendMessageW(format_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
 
-            let checkbox_subfolder = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.option_subfolder).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                16,
-                328,
-                300,
-                22,
-                hwnd,
-                HMENU(BATCH_ID_SUBFOLDER as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let checkbox_avoid_overwrite = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.option_avoid_overwrite).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                16,
-                352,
-                320,
-                22,
-                hwnd,
-                HMENU(BATCH_ID_AVOID_OVERWRITE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            SendMessageW(
-                checkbox_avoid_overwrite,
-                windows::Win32::UI::WindowsAndMessaging::BM_SETCHECK,
-                WPARAM(BST_CHECKED.0 as usize),
-                LPARAM(0),
-            );
+                let checkbox_subfolder = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.option_subfolder).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    16,
+                    328,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(BATCH_ID_SUBFOLDER as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let checkbox_avoid_overwrite = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.option_avoid_overwrite).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    16,
+                    352,
+                    320,
+                    22,
+                    hwnd,
+                    HMENU(BATCH_ID_AVOID_OVERWRITE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(
+                    checkbox_avoid_overwrite,
+                    windows::Win32::UI::WindowsAndMessaging::BM_SETCHECK,
+                    WPARAM(BST_CHECKED.0 as usize),
+                    LPARAM(0),
+                );
 
-            let progress_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.progress_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                380,
-                260,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let progress_bar = CreateWindowExW(
-                Default::default(),
-                PROGRESS_CLASSW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                402,
-                720,
-                18,
-                hwnd,
-                HMENU(BATCH_ID_PROGRESS as isize),
-                HINSTANCE(0),
-                None,
-            );
-            SendMessageW(
-                progress_bar,
-                PBM_SETRANGE,
-                WPARAM(0),
-                LPARAM(((0u16 as u32) | ((100u16 as u32) << 16)) as isize),
-            );
+                let progress_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.progress_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    380,
+                    260,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let progress_bar = CreateWindowExW(
+                    Default::default(),
+                    PROGRESS_CLASSW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    402,
+                    720,
+                    18,
+                    hwnd,
+                    HMENU(BATCH_ID_PROGRESS as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(
+                    progress_bar,
+                    PBM_SETRANGE,
+                    WPARAM(0),
+                    LPARAM(((0u16 as u32) | ((100u16 as u32) << 16)) as isize),
+                );
 
-            let start_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.start).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                16,
-                426,
-                120,
-                28,
-                hwnd,
-                HMENU(BATCH_ID_START as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let cancel_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.cancel).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                144,
-                426,
-                120,
-                28,
-                hwnd,
-                HMENU(BATCH_ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let close_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.close).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                616,
-                426,
-                120,
-                28,
-                hwnd,
-                HMENU(BATCH_ID_CLOSE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            EnableWindow(cancel_button, false);
+                let start_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.start).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    16,
+                    426,
+                    120,
+                    28,
+                    hwnd,
+                    HMENU(BATCH_ID_START as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let cancel_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.cancel).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    144,
+                    426,
+                    120,
+                    28,
+                    hwnd,
+                    HMENU(BATCH_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let close_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.close).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    616,
+                    426,
+                    120,
+                    28,
+                    hwnd,
+                    HMENU(BATCH_ID_CLOSE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                EnableWindow(cancel_button, false);
 
-            let log_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.log_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                462,
-                200,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let log_edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WS_VSCROLL
-                    | WINDOW_STYLE(ES_READONLY | (ES_MULTILINE as u32) | (ES_AUTOVSCROLL as u32)),
-                16,
-                484,
-                720,
-                112,
-                hwnd,
-                HMENU(BATCH_ID_LOG as isize),
-                HINSTANCE(0),
-                None,
-            );
-            SendMessageW(log_edit, EM_LIMITTEXT, WPARAM(0x7FFF_FFFEusize), LPARAM(0));
+                let log_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.log_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    462,
+                    200,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let log_edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WS_VSCROLL
+                        | WINDOW_STYLE(
+                            ES_READONLY | (ES_MULTILINE as u32) | (ES_AUTOVSCROLL as u32),
+                        ),
+                    16,
+                    484,
+                    720,
+                    112,
+                    hwnd,
+                    HMENU(BATCH_ID_LOG as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(log_edit, EM_LIMITTEXT, WPARAM(0x7FFF_FFFEusize), LPARAM(0));
 
-            for control in [
-                list,
-                add_files,
-                add_folder,
-                remove,
-                clear,
-                output_label,
-                output_edit,
-                browse,
-                format_label,
-                format_combo,
-                checkbox_subfolder,
-                checkbox_avoid_overwrite,
-                progress_label,
-                progress_bar,
-                start_button,
-                cancel_button,
-                close_button,
-                log_label,
-                log_edit,
-            ] {
-                if control.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                for control in [
+                    list,
+                    add_files,
+                    add_folder,
+                    remove,
+                    clear,
+                    output_label,
+                    output_edit,
+                    browse,
+                    format_label,
+                    format_combo,
+                    checkbox_subfolder,
+                    checkbox_avoid_overwrite,
+                    progress_label,
+                    progress_bar,
+                    start_button,
+                    cancel_button,
+                    close_button,
+                    log_label,
+                    log_edit,
+                ] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
                 }
+
+                let initial_folder = std::env::current_dir()
+                    .unwrap_or_else(|_| PathBuf::from("."))
+                    .to_string_lossy()
+                    .to_string();
+                if let Err(e) =
+                    SetWindowTextW(output_edit, PCWSTR(to_wide(&initial_folder).as_ptr()))
+                {
+                    crate::log_debug(&format!("Failed to set initial output folder: {}", e));
+                }
+                SetFocus(list);
+
+                let message_queue = Arc::new(Mutex::new(VecDeque::new()));
+
+                let state = Box::new(BatchState {
+                    hwnd,
+                    parent,
+                    list,
+                    add_files,
+                    add_folder,
+                    remove,
+                    clear,
+                    output_edit,
+                    browse,
+                    format_combo,
+                    checkbox_subfolder,
+                    checkbox_avoid_overwrite,
+                    start_button,
+                    cancel_button,
+                    close_button,
+                    log_edit,
+                    progress_label,
+                    progress_bar,
+                    language,
+                    items: Vec::new(),
+                    running: false,
+                    cancel_flag: None,
+                    message_queue,
+                });
+                SetWindowLongPtrW(
+                    hwnd,
+                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                    Box::into_raw(state) as isize,
+                );
+                if SetTimer(hwnd, BATCH_TIMER_ID, 200, None) == 0 {
+                    crate::log_debug("Failed to set BATCH_TIMER");
+                }
+
+                LRESULT(0)
             }
-
-            let initial_folder = std::env::current_dir()
-                .unwrap_or_else(|_| PathBuf::from("."))
-                .to_string_lossy()
-                .to_string();
-            if let Err(e) = SetWindowTextW(output_edit, PCWSTR(to_wide(&initial_folder).as_ptr())) {
-                crate::log_debug(&format!("Failed to set initial output folder: {}", e));
-            }
-            SetFocus(list);
-
-            let message_queue = Arc::new(Mutex::new(VecDeque::new()));
-
-            let state = Box::new(BatchState {
-                hwnd,
-                parent,
-                list,
-                add_files,
-                add_folder,
-                remove,
-                clear,
-                output_edit,
-                browse,
-                format_combo,
-                checkbox_subfolder,
-                checkbox_avoid_overwrite,
-                start_button,
-                cancel_button,
-                close_button,
-                log_edit,
-                progress_label,
-                progress_bar,
-                language,
-                items: Vec::new(),
-                running: false,
-                cancel_flag: None,
-                message_queue,
-            });
-            SetWindowLongPtrW(
-                hwnd,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                Box::into_raw(state) as isize,
-            );
-            if SetTimer(hwnd, BATCH_TIMER_ID, 200, None) == 0 {
-                crate::log_debug("Failed to set BATCH_TIMER");
-            }
-
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            match cmd_id {
-                BATCH_ID_ADD_FILES => {
-                    if with_batch_state(hwnd, |state| {
-                        add_files_to_queue(state);
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to access batch state");
-                    }
-                    LRESULT(0)
-                }
-                BATCH_ID_ADD_FOLDER => {
-                    if with_batch_state(hwnd, |state| {
-                        add_folder_to_queue(state);
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to access batch state");
-                    }
-                    LRESULT(0)
-                }
-                BATCH_ID_REMOVE => {
-                    if with_batch_state(hwnd, |state| {
-                        remove_selected_items(state);
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to access batch state");
-                    }
-                    LRESULT(0)
-                }
-                BATCH_ID_CLEAR => {
-                    if with_batch_state(hwnd, |state| {
-                        clear_items(state);
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to access batch state");
-                    }
-                    LRESULT(0)
-                }
-                BATCH_ID_OUTPUT_BROWSE => {
-                    if with_batch_state(hwnd, |state| {
-                        if let Some(folder) = browse_for_folder(hwnd, state.language) {
-                            let wide = to_wide(folder.to_string_lossy().as_ref());
-                            if let Err(e) = SetWindowTextW(state.output_edit, PCWSTR(wide.as_ptr()))
-                            {
-                                crate::log_debug(&format!("Failed to set output folder: {}", e));
-                            }
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                match cmd_id {
+                    BATCH_ID_ADD_FILES => {
+                        if with_batch_state(hwnd, |state| {
+                            add_files_to_queue(state);
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access batch state");
                         }
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to access batch state");
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                BATCH_ID_START => {
-                    if with_batch_state(hwnd, |state| {
-                        start_batch(state);
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to access batch state");
+                    BATCH_ID_ADD_FOLDER => {
+                        if with_batch_state(hwnd, |state| {
+                            add_folder_to_queue(state);
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access batch state");
+                        }
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                BATCH_ID_CANCEL => {
-                    if with_batch_state(hwnd, |state| {
-                        request_cancel(state);
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to access batch state");
+                    BATCH_ID_REMOVE => {
+                        if with_batch_state(hwnd, |state| {
+                            remove_selected_items(state);
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access batch state");
+                        }
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                BATCH_ID_CLOSE => {
-                    if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
-                        crate::log_debug(&format!(
-                            "Failed to post WM_CLOSE on cancellation: {}",
-                            e
-                        ));
+                    BATCH_ID_CLEAR => {
+                        if with_batch_state(hwnd, |state| {
+                            clear_items(state);
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access batch state");
+                        }
+                        LRESULT(0)
                     }
-                    LRESULT(0)
+                    BATCH_ID_OUTPUT_BROWSE => {
+                        if with_batch_state(hwnd, |state| {
+                            if let Some(folder) = browse_for_folder(hwnd, state.language) {
+                                let wide = to_wide(folder.to_string_lossy().as_ref());
+                                if let Err(e) =
+                                    SetWindowTextW(state.output_edit, PCWSTR(wide.as_ptr()))
+                                {
+                                    crate::log_debug(&format!(
+                                        "Failed to set output folder: {}",
+                                        e
+                                    ));
+                                }
+                            }
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access batch state");
+                        }
+                        LRESULT(0)
+                    }
+                    BATCH_ID_START => {
+                        if with_batch_state(hwnd, |state| {
+                            start_batch(state);
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access batch state");
+                        }
+                        LRESULT(0)
+                    }
+                    BATCH_ID_CANCEL => {
+                        if with_batch_state(hwnd, |state| {
+                            request_cancel(state);
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access batch state");
+                        }
+                        LRESULT(0)
+                    }
+                    BATCH_ID_CLOSE => {
+                        if let Err(e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                            crate::log_debug(&format!(
+                                "Failed to post WM_CLOSE on cancellation: {}",
+                                e
+                            ));
+                        }
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
             }
-        }
-        WM_CLOSE => {
-            let allow_close = with_batch_state(hwnd, |state| {
-                if state.running {
-                    request_cancel(state);
-                    false
-                } else {
-                    true
-                }
-            })
-            .unwrap_or(true);
-            if allow_close {
-                unsafe {
+            WM_CLOSE => {
+                let allow_close = with_batch_state(hwnd, |state| {
+                    if state.running {
+                        request_cancel(state);
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .unwrap_or(true);
+                if allow_close {
                     crate::log_if_err!(DestroyWindow(hwnd));
                 }
+                LRESULT(0)
             }
-            LRESULT(0)
-        }
-        WM_BATCH_EVENT => {
-            handle_batch_messages(hwnd);
-            LRESULT(0)
-        }
-        WM_TIMER => {
-            if wparam.0 == BATCH_TIMER_ID {
+            WM_BATCH_EVENT => {
                 handle_batch_messages(hwnd);
-                return LRESULT(0);
+                LRESULT(0)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_DESTROY => {
-            log_debug("Batch WM_DESTROY");
-            if let Err(e) = KillTimer(hwnd, BATCH_TIMER_ID) {
-                crate::log_debug(&format!("Failed to kill BATCH_TIMER: {}", e));
+            WM_TIMER => {
+                if wparam.0 == BATCH_TIMER_ID {
+                    handle_batch_messages(hwnd);
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            if with_batch_state(hwnd, |state| {
-                state.running = false;
-                state.cancel_flag = None;
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access batch state");
-            }
-            unsafe {
+            WM_DESTROY => {
+                log_debug("Batch WM_DESTROY");
+                if let Err(e) = KillTimer(hwnd, BATCH_TIMER_ID) {
+                    crate::log_debug(&format!("Failed to kill BATCH_TIMER: {}", e));
+                }
+                if with_batch_state(hwnd, |state| {
+                    state.running = false;
+                    state.cancel_flag = None;
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access batch state");
+                }
                 if with_state(
                     windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd),
                     |state| {
@@ -905,19 +915,16 @@ unsafe extern "system" fn batch_wndproc(
                 {
                     crate::log_debug("Failed to access parent state in WM_DESTROY");
                 }
+                let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+                crate::focus_editor(parent);
+                LRESULT(0)
             }
-            let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
-            crate::focus_editor(parent);
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            log_debug("Batch WM_NCDESTROY");
-            let ptr = unsafe {
-                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut BatchState
-            };
-            if !ptr.is_null() {
-                unsafe {
+            WM_NCDESTROY => {
+                log_debug("Batch WM_NCDESTROY");
+                let ptr =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut BatchState;
+                if !ptr.is_null() {
                     SetWindowLongPtrW(
                         hwnd,
                         windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
@@ -925,16 +932,16 @@ unsafe extern "system" fn batch_wndproc(
                     );
                     let _unused_box = Box::from_raw(ptr);
                 }
+                LRESULT(0)
             }
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-    });
-    match result {
-        Ok(res) => res,
-        Err(_) => {
-            log_debug("Batch window panic in wndproc.");
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        });
+        match result {
+            Ok(res) => res,
+            Err(_) => {
+                log_debug("Batch window panic in wndproc.");
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
         }
     }
 }

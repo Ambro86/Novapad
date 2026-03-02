@@ -141,11 +141,13 @@ unsafe extern "system" fn progress_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "progress_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || progress_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "progress_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || progress_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

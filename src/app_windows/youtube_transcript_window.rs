@@ -366,11 +366,13 @@ unsafe extern "system" fn import_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "import_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || import_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "import_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || import_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn import_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -1748,11 +1750,13 @@ unsafe extern "system" fn stream_dialog_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "stream_dialog_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || stream_dialog_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "stream_dialog_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || stream_dialog_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -2541,11 +2545,13 @@ unsafe extern "system" fn stream_track_dialog_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "stream_track_dialog_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || stream_track_dialog_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "stream_track_dialog_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || stream_track_dialog_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn stream_track_dialog_wndproc_inner(

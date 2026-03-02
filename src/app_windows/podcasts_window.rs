@@ -5711,11 +5711,13 @@ unsafe extern "system" fn description_control_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "description_control_subclass_proc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || description_control_subclass_proc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "description_control_subclass_proc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || description_control_subclass_proc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn description_control_subclass_proc_inner(
@@ -6113,11 +6115,13 @@ unsafe extern "system" fn reorder_control_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "reorder_control_subclass_proc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || reorder_control_subclass_proc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "reorder_control_subclass_proc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || reorder_control_subclass_proc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn reorder_control_subclass_proc_inner(
@@ -7245,11 +7249,13 @@ unsafe extern "system" fn podcast_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "podcast_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || podcast_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "podcast_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || podcast_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

@@ -2067,11 +2067,13 @@ unsafe extern "system" fn rss_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "rss_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || rss_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "rss_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || rss_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -5786,11 +5788,13 @@ unsafe extern "system" fn reorder_control_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "reorder_control_subclass_proc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || reorder_control_subclass_proc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "reorder_control_subclass_proc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || reorder_control_subclass_proc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn reorder_control_subclass_proc_inner(

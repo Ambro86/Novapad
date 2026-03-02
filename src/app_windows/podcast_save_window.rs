@@ -250,11 +250,13 @@ unsafe extern "system" fn save_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "save_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || save_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "save_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || save_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

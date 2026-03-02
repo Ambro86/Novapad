@@ -147,11 +147,13 @@ unsafe extern "system" fn bookmarks_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "bookmarks_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || bookmarks_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "bookmarks_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || bookmarks_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

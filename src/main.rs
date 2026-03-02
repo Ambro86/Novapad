@@ -1,5 +1,4 @@
 #![deny(warnings)]
-#![allow(unsafe_op_in_unsafe_fn)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(let_underscore_drop)]
@@ -2871,11 +2870,13 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
 }
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    crate::panic_guard::guard(
-        "wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 // Keep inner `unsafe { ... }` blocks untouched here to avoid behavioral refactors in message handling.
@@ -6747,50 +6748,52 @@ unsafe extern "system" fn voice_combo_subclass_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "voice_combo_subclass_proc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || {
-            if msg == WM_CONTEXTMENU {
-                let parent = GetParent(hwnd);
-                if parent.0 != 0 {
-                    show_voice_context_menu(parent, hwnd, lparam);
-                    return LRESULT(0);
-                }
-            }
-            if msg == WM_KEYDOWN
-                && wparam.0 as u32 == u32::from(VK_F10.0)
-                && GetKeyState(VK_SHIFT.0 as i32) < 0
-            {
-                let parent = GetParent(hwnd);
-                if parent.0 != 0 {
-                    show_voice_context_menu(parent, hwnd, LPARAM(-1));
-                    return LRESULT(0);
-                }
-            }
-
-            let parent = GetParent(hwnd);
-            let prev_proc = if parent.0 != 0 {
-                with_state(parent, |s| {
-                    if hwnd == s.voice_combo_voice {
-                        s.voice_combo_voice_proc
-                    } else if hwnd == s.voice_combo_favorites {
-                        s.voice_combo_favorites_proc
-                    } else {
-                        None
+    unsafe {
+        crate::panic_guard::guard(
+            "voice_combo_subclass_proc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || {
+                if msg == WM_CONTEXTMENU {
+                    let parent = GetParent(hwnd);
+                    if parent.0 != 0 {
+                        show_voice_context_menu(parent, hwnd, lparam);
+                        return LRESULT(0);
                     }
-                })
-                .unwrap_or(None)
-            } else {
-                None
-            };
-            if let Some(proc) = prev_proc {
-                CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam)
-            } else {
-                DefWindowProcW(hwnd, msg, wparam, lparam)
-            }
-        },
-    )
+                }
+                if msg == WM_KEYDOWN
+                    && wparam.0 as u32 == u32::from(VK_F10.0)
+                    && GetKeyState(VK_SHIFT.0 as i32) < 0
+                {
+                    let parent = GetParent(hwnd);
+                    if parent.0 != 0 {
+                        show_voice_context_menu(parent, hwnd, LPARAM(-1));
+                        return LRESULT(0);
+                    }
+                }
+
+                let parent = GetParent(hwnd);
+                let prev_proc = if parent.0 != 0 {
+                    with_state(parent, |s| {
+                        if hwnd == s.voice_combo_voice {
+                            s.voice_combo_voice_proc
+                        } else if hwnd == s.voice_combo_favorites {
+                            s.voice_combo_favorites_proc
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(None)
+                } else {
+                    None
+                };
+                if let Some(proc) = prev_proc {
+                    CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam)
+                } else {
+                    DefWindowProcW(hwnd, msg, wparam, lparam)
+                }
+            },
+        )
+    }
 }
 
 pub(crate) fn restart_tts_from_current_offset(hwnd: HWND) {
@@ -8755,26 +8758,28 @@ fn create_accelerators() -> HACCEL {
 }
 
 unsafe extern "system" fn enum_close_other_windows(hwnd: HWND, lparam: LPARAM) -> BOOL {
-    crate::panic_guard::guard(
-        "enum_close_other_windows",
-        || BOOL(1),
-        || {
-            let current = HWND(lparam.0);
-            if hwnd == current {
-                return BOOL(1);
-            }
-            let mut buf = [0u16; 64];
-            let len = GetClassNameW(hwnd, &mut buf);
-            if len == 0 {
-                return BOOL(1);
-            }
-            let name = String::from_utf16_lossy(&buf[..len as usize]);
-            if name == "SonarpadWin32" {
-                crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
-            }
-            BOOL(1)
-        },
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "enum_close_other_windows",
+            || BOOL(1),
+            || {
+                let current = HWND(lparam.0);
+                if hwnd == current {
+                    return BOOL(1);
+                }
+                let mut buf = [0u16; 64];
+                let len = GetClassNameW(hwnd, &mut buf);
+                if len == 0 {
+                    return BOOL(1);
+                }
+                let name = String::from_utf16_lossy(&buf[..len as usize]);
+                if name == "SonarpadWin32" {
+                    crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                }
+                BOOL(1)
+            },
+        )
+    }
 }
 
 fn close_other_windows(hwnd: HWND) {

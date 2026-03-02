@@ -132,11 +132,13 @@ unsafe extern "system" fn interpreter_select_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "interpreter_select_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || interpreter_select_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "interpreter_select_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || interpreter_select_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn interpreter_select_wndproc_inner(

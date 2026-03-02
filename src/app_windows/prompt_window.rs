@@ -315,11 +315,13 @@ unsafe extern "system" fn simple_prompt_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "simple_prompt_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || simple_prompt_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "simple_prompt_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || simple_prompt_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -693,11 +695,13 @@ unsafe extern "system" fn prompt_wndproc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    crate::panic_guard::guard(
-        "prompt_wndproc",
-        || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || prompt_wndproc_inner(hwnd, msg, wparam, lparam),
-    )
+    unsafe {
+        crate::panic_guard::guard(
+            "prompt_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || prompt_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
 }
 
 fn prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

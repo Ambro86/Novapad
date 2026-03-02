@@ -7383,317 +7383,322 @@ fn highlight_misspelled_word(hwnd_edit: HWND, start: i32, end: i32) {
     }
 }
 
-pub(crate) unsafe fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPARAM) {
-    let language_ui = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let labels = menu_labels(language_ui);
-    let dictionary_pref = with_state(hwnd, |state| {
-        state.settings.dictionary_translation_language.clone()
-    })
-    .unwrap_or_else(|| "auto".to_string());
-
-    let mut spell_status = None;
-    let mut spell_context = None;
-    let mut fallback_msg = None;
-
-    if let Some(word_ctx) = spellcheck_word_context_from_lparam(hwnd_edit, lparam) {
-        let (status, suggestions, language, fallback) = with_state(hwnd, |state| {
-            let settings = &state.settings;
-            let Some(resolution) = state.spellcheck_manager.resolve_language(settings) else {
-                return (None, Vec::new(), None, None);
-            };
-            let fallback_msg = if resolution.announce_fallback {
-                Some(i18n::tr_f(
-                    settings.language,
-                    "spellcheck.language_fallback",
-                    &[
-                        ("requested", &resolution.requested),
-                        ("language", &resolution.effective),
-                    ],
-                ))
-            } else {
-                None
-            };
-            let miss = state.spellcheck_manager.is_word_misspelled(
-                word_ctx.doc_id,
-                word_ctx.line_index,
-                &word_ctx.line_text,
-                word_ctx.word_range,
-                &resolution.effective,
-            );
-            if miss.is_some() {
-                let suggestions = state
-                    .spellcheck_manager
-                    .suggestions(&word_ctx.word, &resolution.effective);
-                (
-                    Some(true),
-                    suggestions,
-                    Some(resolution.effective.clone()),
-                    fallback_msg,
-                )
-            } else {
-                (
-                    Some(false),
-                    Vec::new(),
-                    Some(resolution.effective.clone()),
-                    fallback_msg,
-                )
-            }
+pub(crate) fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPARAM) {
+    unsafe {
+        let language_ui = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        let labels = menu_labels(language_ui);
+        let dictionary_pref = with_state(hwnd, |state| {
+            state.settings.dictionary_translation_language.clone()
         })
-        .unwrap_or((None, Vec::new(), None, None));
+        .unwrap_or_else(|| "auto".to_string());
 
-        spell_status = status;
-        fallback_msg = fallback;
-        if status == Some(true) {
-            let suggestions = suggestions
-                .into_iter()
-                .take(menu::IDM_SPELLCHECK_SUGGESTION_MAX)
-                .collect::<Vec<_>>();
-            if let Some(language) = language {
-                spell_context = Some(SpellcheckContextMenuState {
-                    hwnd_edit,
-                    line_start: word_ctx.line_start,
-                    language,
-                    word_range: word_ctx.word_range,
-                    word: word_ctx.word,
-                    line_text: word_ctx.line_text,
-                    suggestions,
-                });
-            }
-        }
-    }
+        let mut spell_status = None;
+        let mut spell_context = None;
+        let mut fallback_msg = None;
 
-    with_state(hwnd, |state| {
-        state.spellcheck_context = spell_context.clone();
-    });
-
-    if let Some(message) = fallback_msg {
-        log_debug(&format!("Spellcheck: {message}"));
-        nvda_speak(&message);
-    }
-
-    let menu = CreatePopupMenu().unwrap_or(HMENU(0));
-    if menu.0 == 0 {
-        return;
-    }
-
-    if let Some(word_ctx) = spellcheck_word_context_from_lparam(hwnd_edit, lparam)
-        && let Ok(submenu) = CreatePopupMenu()
-        && submenu.0 != 0
-    {
-        let placeholder = format!(" {}", i18n::tr(language_ui, "dictionary.menu_expand"));
-        crate::log_if_err!(AppendMenuW(
-            submenu,
-            MF_STRING | MF_GRAYED,
-            0,
-            PCWSTR(to_wide(&placeholder).as_ptr()),
-        ));
-        let label = i18n::tr(language_ui, "context_menu.dictionary");
-        crate::log_if_err!(AppendMenuW(
-            menu,
-            MF_POPUP,
-            submenu.0 as usize,
-            PCWSTR(to_wide(&label).as_ptr()),
-        ));
-        crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
-        let prefetch_info = with_state(hwnd, |state| {
-            state.dictionary_context_menu = submenu;
-            state.dictionary_context_word = word_ctx.word.clone();
-            state.dictionary_context_language = language_ui;
-            state.dictionary_context_pref = dictionary_pref.clone();
-            state.dictionary_context_loaded = false;
-            state.dictionary_prefetch_generation =
-                state.dictionary_prefetch_generation.wrapping_add(1);
-            let generation = state.dictionary_prefetch_generation;
-
-            let key = dictionary_cache_key(language_ui, &dictionary_pref, &word_ctx.word);
-            if let Some(lines) = state.dictionary_cache.get(&key).cloned() {
-                if is_dictionary_not_found_cache_entry(language_ui, &lines) {
-                    state.dictionary_cache.remove(&key);
-                    save_dictionary_cache(&state.dictionary_cache);
+        if let Some(word_ctx) = spellcheck_word_context_from_lparam(hwnd_edit, lparam) {
+            let (status, suggestions, language, fallback) = with_state(hwnd, |state| {
+                let settings = &state.settings;
+                let Some(resolution) = state.spellcheck_manager.resolve_language(settings) else {
+                    return (None, Vec::new(), None, None);
+                };
+                let fallback_msg = if resolution.announce_fallback {
+                    Some(i18n::tr_f(
+                        settings.language,
+                        "spellcheck.language_fallback",
+                        &[
+                            ("requested", &resolution.requested),
+                            ("language", &resolution.effective),
+                        ],
+                    ))
                 } else {
-                    return None;
+                    None
+                };
+                let miss = state.spellcheck_manager.is_word_misspelled(
+                    word_ctx.doc_id,
+                    word_ctx.line_index,
+                    &word_ctx.line_text,
+                    word_ctx.word_range,
+                    &resolution.effective,
+                );
+                if miss.is_some() {
+                    let suggestions = state
+                        .spellcheck_manager
+                        .suggestions(&word_ctx.word, &resolution.effective);
+                    (
+                        Some(true),
+                        suggestions,
+                        Some(resolution.effective.clone()),
+                        fallback_msg,
+                    )
+                } else {
+                    (
+                        Some(false),
+                        Vec::new(),
+                        Some(resolution.effective.clone()),
+                        fallback_msg,
+                    )
+                }
+            })
+            .unwrap_or((None, Vec::new(), None, None));
+
+            spell_status = status;
+            fallback_msg = fallback;
+            if status == Some(true) {
+                let suggestions = suggestions
+                    .into_iter()
+                    .take(menu::IDM_SPELLCHECK_SUGGESTION_MAX)
+                    .collect::<Vec<_>>();
+                if let Some(language) = language {
+                    spell_context = Some(SpellcheckContextMenuState {
+                        hwnd_edit,
+                        line_start: word_ctx.line_start,
+                        language,
+                        word_range: word_ctx.word_range,
+                        word: word_ctx.word,
+                        line_text: word_ctx.line_text,
+                        suggestions,
+                    });
                 }
             }
-            if state.dictionary_pending_lookup.as_ref() == Some(&key) {
-                return None;
-            }
-            state.dictionary_pending_lookup = Some(key.clone());
-            Some((word_ctx.word.clone(), key, generation))
-        })
-        .flatten();
-        if let Some((word, key, generation)) = prefetch_info {
-            start_dictionary_lookup(
-                hwnd.0,
-                word,
-                language_ui,
-                dictionary_pref.clone(),
-                key,
-                generation,
-            );
         }
-    }
 
-    if let Some(status) = spell_status {
-        if status {
-            let label = i18n::tr(language_ui, "context_menu.spelling_misspelled");
+        with_state(hwnd, |state| {
+            state.spellcheck_context = spell_context.clone();
+        });
+
+        if let Some(message) = fallback_msg {
+            log_debug(&format!("Spellcheck: {message}"));
+            nvda_speak(&message);
+        }
+
+        let menu = CreatePopupMenu().unwrap_or(HMENU(0));
+        if menu.0 == 0 {
+            return;
+        }
+
+        if let Some(word_ctx) = spellcheck_word_context_from_lparam(hwnd_edit, lparam)
+            && let Ok(submenu) = CreatePopupMenu()
+            && submenu.0 != 0
+        {
+            let placeholder = format!(" {}", i18n::tr(language_ui, "dictionary.menu_expand"));
             crate::log_if_err!(AppendMenuW(
-                menu,
+                submenu,
                 MF_STRING | MF_GRAYED,
                 0,
+                PCWSTR(to_wide(&placeholder).as_ptr()),
+            ));
+            let label = i18n::tr(language_ui, "context_menu.dictionary");
+            crate::log_if_err!(AppendMenuW(
+                menu,
+                MF_POPUP,
+                submenu.0 as usize,
                 PCWSTR(to_wide(&label).as_ptr()),
             ));
-            if let Ok(submenu) = CreatePopupMenu()
-                && submenu.0 != 0
-            {
-                let suggestions = spell_context
-                    .as_ref()
-                    .map(|ctx| ctx.suggestions.as_slice())
-                    .unwrap_or(&[]);
-                if suggestions.is_empty() {
-                    let none_label = i18n::tr(language_ui, "context_menu.spelling_no_suggestions");
-                    crate::log_if_err!(AppendMenuW(
-                        submenu,
-                        MF_STRING | MF_GRAYED,
-                        0,
-                        PCWSTR(to_wide(&none_label).as_ptr()),
-                    ));
-                } else {
-                    for (idx, suggestion) in suggestions.iter().enumerate() {
-                        let id = menu::IDM_SPELLCHECK_SUGGESTION_BASE + idx;
-                        crate::log_if_err!(AppendMenuW(
-                            submenu,
-                            MF_STRING,
-                            id,
-                            PCWSTR(to_wide(suggestion).as_ptr()),
-                        ));
+            crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
+            let prefetch_info = with_state(hwnd, |state| {
+                state.dictionary_context_menu = submenu;
+                state.dictionary_context_word = word_ctx.word.clone();
+                state.dictionary_context_language = language_ui;
+                state.dictionary_context_pref = dictionary_pref.clone();
+                state.dictionary_context_loaded = false;
+                state.dictionary_prefetch_generation =
+                    state.dictionary_prefetch_generation.wrapping_add(1);
+                let generation = state.dictionary_prefetch_generation;
+
+                let key = dictionary_cache_key(language_ui, &dictionary_pref, &word_ctx.word);
+                if let Some(lines) = state.dictionary_cache.get(&key).cloned() {
+                    if is_dictionary_not_found_cache_entry(language_ui, &lines) {
+                        state.dictionary_cache.remove(&key);
+                        save_dictionary_cache(&state.dictionary_cache);
+                    } else {
+                        return None;
                     }
                 }
-                crate::log_if_err!(AppendMenuW(submenu, MF_SEPARATOR, 0, PCWSTR::null()));
-                let add_label = i18n::tr(language_ui, "context_menu.spelling_add_to_dictionary");
-                let ignore_label = i18n::tr(language_ui, "context_menu.spelling_ignore_once");
-                crate::log_if_err!(AppendMenuW(
-                    submenu,
-                    MF_STRING,
-                    menu::IDM_SPELLCHECK_ADD_TO_DICTIONARY,
-                    PCWSTR(to_wide(&add_label).as_ptr()),
-                ));
-                crate::log_if_err!(AppendMenuW(
-                    submenu,
-                    MF_STRING,
-                    menu::IDM_SPELLCHECK_IGNORE_ONCE,
-                    PCWSTR(to_wide(&ignore_label).as_ptr()),
-                ));
-                let suggestions_label = i18n::tr(language_ui, "context_menu.spelling_suggestions");
+                if state.dictionary_pending_lookup.as_ref() == Some(&key) {
+                    return None;
+                }
+                state.dictionary_pending_lookup = Some(key.clone());
+                Some((word_ctx.word.clone(), key, generation))
+            })
+            .flatten();
+            if let Some((word, key, generation)) = prefetch_info {
+                start_dictionary_lookup(
+                    hwnd.0,
+                    word,
+                    language_ui,
+                    dictionary_pref.clone(),
+                    key,
+                    generation,
+                );
+            }
+        }
+
+        if let Some(status) = spell_status {
+            if status {
+                let label = i18n::tr(language_ui, "context_menu.spelling_misspelled");
                 crate::log_if_err!(AppendMenuW(
                     menu,
-                    MF_POPUP,
-                    submenu.0 as usize,
-                    PCWSTR(to_wide(&suggestions_label).as_ptr()),
+                    MF_STRING | MF_GRAYED,
+                    0,
+                    PCWSTR(to_wide(&label).as_ptr()),
+                ));
+                if let Ok(submenu) = CreatePopupMenu()
+                    && submenu.0 != 0
+                {
+                    let suggestions = spell_context
+                        .as_ref()
+                        .map(|ctx| ctx.suggestions.as_slice())
+                        .unwrap_or(&[]);
+                    if suggestions.is_empty() {
+                        let none_label =
+                            i18n::tr(language_ui, "context_menu.spelling_no_suggestions");
+                        crate::log_if_err!(AppendMenuW(
+                            submenu,
+                            MF_STRING | MF_GRAYED,
+                            0,
+                            PCWSTR(to_wide(&none_label).as_ptr()),
+                        ));
+                    } else {
+                        for (idx, suggestion) in suggestions.iter().enumerate() {
+                            let id = menu::IDM_SPELLCHECK_SUGGESTION_BASE + idx;
+                            crate::log_if_err!(AppendMenuW(
+                                submenu,
+                                MF_STRING,
+                                id,
+                                PCWSTR(to_wide(suggestion).as_ptr()),
+                            ));
+                        }
+                    }
+                    crate::log_if_err!(AppendMenuW(submenu, MF_SEPARATOR, 0, PCWSTR::null()));
+                    let add_label =
+                        i18n::tr(language_ui, "context_menu.spelling_add_to_dictionary");
+                    let ignore_label = i18n::tr(language_ui, "context_menu.spelling_ignore_once");
+                    crate::log_if_err!(AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        menu::IDM_SPELLCHECK_ADD_TO_DICTIONARY,
+                        PCWSTR(to_wide(&add_label).as_ptr()),
+                    ));
+                    crate::log_if_err!(AppendMenuW(
+                        submenu,
+                        MF_STRING,
+                        menu::IDM_SPELLCHECK_IGNORE_ONCE,
+                        PCWSTR(to_wide(&ignore_label).as_ptr()),
+                    ));
+                    let suggestions_label =
+                        i18n::tr(language_ui, "context_menu.spelling_suggestions");
+                    crate::log_if_err!(AppendMenuW(
+                        menu,
+                        MF_POPUP,
+                        submenu.0 as usize,
+                        PCWSTR(to_wide(&suggestions_label).as_ptr()),
+                    ));
+                }
+            } else {
+                let label = i18n::tr(language_ui, "context_menu.spelling_ok");
+                crate::log_if_err!(AppendMenuW(
+                    menu,
+                    MF_STRING | MF_GRAYED,
+                    0,
+                    PCWSTR(to_wide(&label).as_ptr()),
                 ));
             }
-        } else {
-            let label = i18n::tr(language_ui, "context_menu.spelling_ok");
+            crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        }
+
+        let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+        if selection.cpMin > selection.cpMax {
+            std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
+        }
+        let has_selection = selection.cpMin != selection.cpMax;
+        if has_selection {
+            let label = i18n::tr(language_ui, "context_menu.audiobook_selection");
             crate::log_if_err!(AppendMenuW(
                 menu,
-                MF_STRING | MF_GRAYED,
-                0,
+                MF_STRING,
+                menu::IDM_EDIT_AUDIOBOOK_SELECTION,
                 PCWSTR(to_wide(&label).as_ptr()),
             ));
+            crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
         }
-        crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    }
 
-    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXGETSEL,
-        WPARAM(0),
-        LPARAM(&mut selection as *mut _ as isize),
-    );
-    if selection.cpMin > selection.cpMax {
-        std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
-    }
-    let has_selection = selection.cpMin != selection.cpMax;
-    if has_selection {
-        let label = i18n::tr(language_ui, "context_menu.audiobook_selection");
+        let undo_flags = if can_undo_now(hwnd) {
+            MF_STRING
+        } else {
+            MF_STRING | MF_GRAYED
+        };
+        let cut_copy_flags = if has_selection {
+            MF_STRING
+        } else {
+            MF_STRING | MF_GRAYED
+        };
+        let paste_flags = if can_paste_now(hwnd) {
+            MF_STRING
+        } else {
+            MF_STRING | MF_GRAYED
+        };
+        let undo_label = build_undo_menu_label(hwnd, language_ui);
+        crate::log_if_err!(AppendMenuW(
+            menu,
+            undo_flags,
+            IDM_EDIT_UNDO,
+            PCWSTR(to_wide(&undo_label).as_ptr()),
+        ));
+        crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
+        crate::log_if_err!(AppendMenuW(
+            menu,
+            cut_copy_flags,
+            IDM_EDIT_CUT,
+            PCWSTR(to_wide(&labels.edit_cut).as_ptr()),
+        ));
+        crate::log_if_err!(AppendMenuW(
+            menu,
+            cut_copy_flags,
+            IDM_EDIT_COPY,
+            PCWSTR(to_wide(&labels.edit_copy).as_ptr()),
+        ));
+        crate::log_if_err!(AppendMenuW(
+            menu,
+            paste_flags,
+            IDM_EDIT_PASTE,
+            PCWSTR(to_wide(&labels.edit_paste).as_ptr()),
+        ));
+        crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
         crate::log_if_err!(AppendMenuW(
             menu,
             MF_STRING,
-            menu::IDM_EDIT_AUDIOBOOK_SELECTION,
-            PCWSTR(to_wide(&label).as_ptr()),
+            IDM_EDIT_SELECT_ALL,
+            PCWSTR(to_wide(&labels.edit_select_all).as_ptr()),
         ));
-        crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    }
 
-    let undo_flags = if can_undo_now(hwnd) {
-        MF_STRING
-    } else {
-        MF_STRING | MF_GRAYED
-    };
-    let cut_copy_flags = if has_selection {
-        MF_STRING
-    } else {
-        MF_STRING | MF_GRAYED
-    };
-    let paste_flags = if can_paste_now(hwnd) {
-        MF_STRING
-    } else {
-        MF_STRING | MF_GRAYED
-    };
-    let undo_label = build_undo_menu_label(hwnd, language_ui);
-    crate::log_if_err!(AppendMenuW(
-        menu,
-        undo_flags,
-        IDM_EDIT_UNDO,
-        PCWSTR(to_wide(&undo_label).as_ptr()),
-    ));
-    crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    crate::log_if_err!(AppendMenuW(
-        menu,
-        cut_copy_flags,
-        IDM_EDIT_CUT,
-        PCWSTR(to_wide(&labels.edit_cut).as_ptr()),
-    ));
-    crate::log_if_err!(AppendMenuW(
-        menu,
-        cut_copy_flags,
-        IDM_EDIT_COPY,
-        PCWSTR(to_wide(&labels.edit_copy).as_ptr()),
-    ));
-    crate::log_if_err!(AppendMenuW(
-        menu,
-        paste_flags,
-        IDM_EDIT_PASTE,
-        PCWSTR(to_wide(&labels.edit_paste).as_ptr()),
-    ));
-    crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
-    crate::log_if_err!(AppendMenuW(
-        menu,
-        MF_STRING,
-        IDM_EDIT_SELECT_ALL,
-        PCWSTR(to_wide(&labels.edit_select_all).as_ptr()),
-    ));
-
-    let mut x = (lparam.0 & 0xffff) as i32;
-    let mut y = ((lparam.0 >> 16) & 0xffff) as i32;
-    if x == -1 && y == -1 {
-        let mut pt = POINT::default();
-        crate::log_if_err!(GetCursorPos(&mut pt));
-        x = pt.x;
-        y = pt.y;
+        let mut x = (lparam.0 & 0xffff) as i32;
+        let mut y = ((lparam.0 >> 16) & 0xffff) as i32;
+        if x == -1 && y == -1 {
+            let mut pt = POINT::default();
+            crate::log_if_err!(GetCursorPos(&mut pt));
+            x = pt.x;
+            y = pt.y;
+        }
+        SetForegroundWindow(hwnd);
+        if !TrackPopupMenu(menu, TPM_RIGHTBUTTON, x, y, 0, hwnd, None).as_bool() {
+            crate::log_debug("TrackPopupMenu failed");
+        }
+        crate::log_if_err!(PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0)));
+        with_state(hwnd, |state| {
+            state.dictionary_context_menu = HMENU(0);
+            state.dictionary_context_word.clear();
+            state.dictionary_context_pref.clear();
+            state.dictionary_context_loaded = false;
+            state.dictionary_context_expanded = false;
+        });
     }
-    SetForegroundWindow(hwnd);
-    if !TrackPopupMenu(menu, TPM_RIGHTBUTTON, x, y, 0, hwnd, None).as_bool() {
-        crate::log_debug("TrackPopupMenu failed");
-    }
-    crate::log_if_err!(PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0)));
-    with_state(hwnd, |state| {
-        state.dictionary_context_menu = HMENU(0);
-        state.dictionary_context_word.clear();
-        state.dictionary_context_pref.clear();
-        state.dictionary_context_loaded = false;
-        state.dictionary_context_expanded = false;
-    });
 }
 
 fn open_dictionary_lookup(hwnd: HWND) {

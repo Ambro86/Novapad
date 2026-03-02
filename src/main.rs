@@ -2880,1389 +2880,557 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     crate::panic_guard::guard(
         "wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { wndproc_inner(hwnd, msg, wparam, lparam) },
+        || wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    if let Some(find_msg) = with_state(hwnd, |state| state.find_msg)
-        && msg == find_msg
-    {
-        handle_find_message(hwnd, lparam);
-        return LRESULT(0);
-    }
-
-    match msg {
-        WM_CREATE => {
-            let icc = INITCOMMONCONTROLSEX {
-                dwSize: size_of::<INITCOMMONCONTROLSEX>() as u32,
-                dwICC: ICC_TAB_CLASSES | ICC_BAR_CLASSES,
-            };
-            InitCommonControlsEx(&icc);
-
-            let hwnd_tab = CreateWindowExW(
-                Default::default(),
-                WC_TABCONTROLW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let hwnd_status = CreateWindowExW(
-                Default::default(),
-                STATUSCLASSNAMEW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(MAIN_STATUS_ID as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let find_msg = RegisterWindowMessageW(w!("commdlg_FindReplace"));
-            let settings = load_settings();
-            let hfont = create_ui_font(&settings.editor_font_face, None, settings.text_size)
-                .unwrap_or_else(|| HFONT(GetStockObject(DEFAULT_GUI_FONT).0));
-            let bookmarks = load_bookmarks();
-            let (_, recent_menu) = create_menus(hwnd, settings.language);
-            let recent_files = load_recent_files();
-            let panel_labels = voice_panel_labels(settings.language);
-            let _panel_labels = panel_labels;
-            let empty_label = to_wide("");
-            let label_engine = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(empty_label.as_ptr()),
-                WS_CHILD,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_engine = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                0,
-                0,
-                0,
-                140,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_ENGINE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let label_language = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(empty_label.as_ptr()),
-                WS_CHILD,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_language = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                0,
-                0,
-                0,
-                140,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_LANGUAGE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let label_voice = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(empty_label.as_ptr()),
-                WS_CHILD,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_voice = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                0,
-                0,
-                0,
-                160,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_VOICE as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let button_insert_tag = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(empty_label.as_ptr()),
-                WS_CHILD | WS_TABSTOP,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_INSERT_TAG as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let label_speed = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(empty_label.as_ptr()),
-                WS_CHILD,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_speed = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                0,
-                0,
-                0,
-                140,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_SPEED as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_speed = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_SPEED_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let label_pitch = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(empty_label.as_ptr()),
-                WS_CHILD,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_pitch = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                0,
-                0,
-                0,
-                140,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_PITCH as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_pitch = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_PITCH_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let label_volume = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(empty_label.as_ptr()),
-                WS_CHILD,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_volume = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                0,
-                0,
-                0,
-                140,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_VOLUME as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_volume = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_VOLUME_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let checkbox_multilingual = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(empty_label.as_ptr()),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_MULTILINGUAL as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let label_favorites = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(empty_label.as_ptr()),
-                WS_CHILD,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_favorites = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                0,
-                0,
-                0,
-                160,
-                hwnd,
-                HMENU(VOICE_PANEL_ID_FAVORITES as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_voice_proc = if combo_voice.0 != 0 {
-                let proc_ptr = voice_combo_subclass_proc as *const () as usize;
-                let old = SetWindowLongPtrW(combo_voice, GWLP_WNDPROC, proc_ptr as isize);
-                std::mem::transmute::<isize, WNDPROC>(old)
-            } else {
-                None
-            };
-            let combo_favorites_proc = if combo_favorites.0 != 0 {
-                let proc_ptr = voice_combo_subclass_proc as *const () as usize;
-                let old = SetWindowLongPtrW(combo_favorites, GWLP_WNDPROC, proc_ptr as isize);
-                std::mem::transmute::<isize, WNDPROC>(old)
-            } else {
-                None
-            };
-            for control in [
-                label_engine,
-                combo_engine,
-                label_language,
-                combo_language,
-                label_voice,
-                combo_voice,
-                button_insert_tag,
-                label_speed,
-                combo_speed,
-                edit_speed,
-                label_pitch,
-                combo_pitch,
-                edit_pitch,
-                label_volume,
-                combo_volume,
-                edit_volume,
-                checkbox_multilingual,
-                label_favorites,
-                combo_favorites,
-            ] {
-                if control.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-                }
-                ShowWindow(control, SW_HIDE);
-            }
-            let state = Box::new(AppState {
-                hwnd_tab,
-                hwnd_status,
-                docs: Vec::new(),
-                current: 0,
-                untitled_count: 0,
-                hfont,
-                hfont_custom: !settings.editor_font_face.trim().is_empty() && hfont.0 != 0,
-                hmenu_recent: recent_menu,
-                recent_files,
-                settings: settings.clone(),
-                bookmarks,
-                find_dialog: HWND(0),
-                replace_dialog: HWND(0),
-                options_dialog: HWND(0),
-                help_window: HWND(0),
-                changelog_window: HWND(0),
-                donations_window: HWND(0),
-                bookmarks_window: HWND(0),
-                dictionary_window: HWND(0),
-                dictionary_entry_dialog: HWND(0),
-                wiktionary_window: HWND(0),
-                wikipedia_window: HWND(0),
-                prompt_window: HWND(0),
-                podcast_window: HWND(0),
-                rss_window: HWND(0),
-                podcasts_window: HWND(0),
-                podcasts_add_dialog: HWND(0),
-                podcasts_categories_dialog: HWND(0),
-                podcasts_description_dialog: HWND(0),
-                rss_add_dialog: HWND(0),
-                go_to_time_dialog: HWND(0),
-                playback_menu: HMENU(0),
-                podcast_save_window: HWND(0),
-                update_progress_window: HWND(0),
-                batch_audiobooks_window: HWND(0),
-                convert_audio_window: HWND(0),
-
-                find_msg,
-                find_text: vec![0u16; 256],
-                replace_text: vec![0u16; 256],
-                find_replace: None,
-                replace_replace: None,
-                last_find_flags: FINDREPLACE_FLAGS(0),
-                find_use_regex: false,
-                find_dot_matches_newline: false,
-                find_wrap_around: true,
-                find_match_case: false,
-                find_whole_word: false,
-                find_replace_in_selection: false,
-                find_replace_in_all_docs: false,
-                pdf_loading: Vec::new(),
-                next_timer_id: 1,
-                tts_session: None,
-                tts_next_session_id: 1,
-                tts_last_offset: 0,
-                edge_voices: Vec::new(),
-                sapi_voices: Vec::new(),
-
-                audiobook_progress: HWND(0),
-                audiobook_cancel: None,
-                active_audiobook: None,
-                audiobook_session_id: 0,
-                last_stopped_audiobook: None,
-                active_podcast_episode_url: None,
-                active_podcast_episode_title: None,
-                active_podcast_episode_cache: None,
-                podcast_chapters_cache: HashMap::new(),
-                pending_podcast_chapters_key: None,
-                active_podcast_chapters_key: None,
-                active_podcast_chapters: Vec::new(),
-                last_announced_chapter_index: None,
-                available_audio_tracks: Vec::new(),
-                selected_audio_track: None,
-                audio_playlist: Vec::new(),
-                audio_playlist_index: None,
-                audio_ffmpeg_retry_for: None,
-                voice_panel_visible: false,
-                voice_label_engine: label_engine,
-                voice_combo_engine: combo_engine,
-                voice_label_language: label_language,
-                voice_combo_language: combo_language,
-                voice_language_codes: Vec::new(),
-                voice_label_voice: label_voice,
-                voice_combo_voice: combo_voice,
-                voice_button_insert_tag: button_insert_tag,
-                voice_label_speed: label_speed,
-                voice_combo_speed: combo_speed,
-                voice_edit_speed: edit_speed,
-                voice_label_pitch: label_pitch,
-                voice_combo_pitch: combo_pitch,
-                voice_edit_pitch: edit_pitch,
-                voice_label_volume: label_volume,
-                voice_combo_volume: combo_volume,
-                voice_edit_volume: edit_volume,
-                voice_checkbox_multilingual: checkbox_multilingual,
-                voice_favorites_visible: false,
-                voice_label_favorites: label_favorites,
-                voice_combo_favorites: combo_favorites,
-                voice_combo_voice_proc: combo_voice_proc,
-                voice_combo_favorites_proc: combo_favorites_proc,
-                voice_context_voice: None,
-                find_in_files_cache: None,
-                pending_find_in_files: None,
-                normalize_undo: None,
-                undo_action_label: None,
-                normalize_skip_change: false,
-                spellcheck_manager: spellcheck::SpellcheckManager::default(),
-                spellcheck_last_announce: None,
-                spellcheck_context: None,
-                spellcheck_space_trigger: None,
-                spellcheck_typing_in_progress: false,
-                spellcheck_highlight_pending: None,
-                spellcheck_last_highlighted_line: None,
-                dictionary_context_menu: HMENU(0),
-                dictionary_context_word: String::new(),
-                dictionary_context_language: Language::default(),
-                dictionary_context_pref: String::new(),
-                dictionary_context_loaded: false,
-                dictionary_context_expanded: false,
-                dictionary_cache: load_dictionary_cache(),
-                dictionary_pending_lookup: None,
-                dictionary_prefetch_generation: 0,
-                large_text_editors: HashSet::new(),
-            });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-            if SetTimer(hwnd, AUDIO_PLAYLIST_TIMER_ID, 700, None) == 0 {
-                log_debug("Failed to set AUDIO_PLAYLIST_TIMER");
-            }
-
-            update_recent_menu(hwnd, recent_menu);
-            if settings.show_voice_panel {
-                set_voice_panel_visible_internal(hwnd, true, false);
-            }
-            if settings.show_favorite_panel {
-                set_favorites_panel_visible_internal(hwnd, true, false);
-            }
-
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let lp_create_params = (*create_struct).lpCreateParams as *const Option<String>;
-            let file_to_open = if !lp_create_params.is_null() {
-                (*lp_create_params).as_ref()
-            } else {
-                None
-            };
-
-            if let Some(path_str) = file_to_open {
-                editor_manager::open_document(hwnd, Path::new(path_str));
-                ShowWindow(hwnd, SW_SHOWMAXIMIZED);
-                bring_window_to_foreground(hwnd);
-
-                notify_active_editor_focus(hwnd, true);
-                crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
-            } else {
-                editor_manager::new_document(hwnd);
-                crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
-            }
-
-            editor_manager::layout_children(hwnd);
-            editor_manager::apply_text_limit_to_all_edits(hwnd);
-            update_main_status_bar(hwnd);
-            DragAcceptFiles(hwnd, true);
-            LRESULT(0)
-        }
-        WM_SIZE => {
-            editor_manager::layout_children(hwnd);
-            LRESULT(0)
-        }
-        WM_SETFOCUS => {
-            force_active_editor_focus(hwnd);
-            LRESULT(0)
-        }
-        WM_ACTIVATE => {
-            let is_activating = (wparam.0 & 0xFFFF) != 0;
-            if is_activating && should_force_editor_focus_on_foreground(hwnd) {
-                force_active_editor_focus(hwnd);
-                schedule_editor_focus_retry(hwnd);
-            }
-            LRESULT(0)
-        }
-        WM_NOTIFY => {
-            let hdr = &*(lparam.0 as *const NMHDR);
-            if hdr.code == TCN_SELCHANGE && hdr.hwndFrom == editor_manager::get_tab(hwnd) {
-                // Cancel pending spellcheck highlight when switching tabs
-                kill_timer_best_effort(
-                    hwnd,
-                    SPELLCHECK_HIGHLIGHT_TIMER_ID,
-                    "KillTimer SPELLCHECK_HIGHLIGHT",
-                );
-                with_state(hwnd, |state| {
-                    state.spellcheck_highlight_pending = None;
-                    state.spellcheck_last_highlighted_line = None;
-                });
-                attempt_switch_to_selected_tab(hwnd);
-                return LRESULT(0);
-            }
-            if hdr.code == EN_CHANGE {
-                editor_manager::mark_dirty_from_edit(hwnd, hdr.hwndFrom);
-                let active_edit = get_active_edit(hwnd).unwrap_or(HWND(0));
-                if active_edit == hdr.hwndFrom {
-                    let language =
-                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-                    let label = i18n::tr(language, "undo.action.text");
-                    with_state(hwnd, |state| state.undo_action_label = Some(label));
-                    update_main_status_bar(hwnd);
-                }
-                return LRESULT(0);
-            }
-            if hdr.code == EN_SELCHANGE {
-                // Only process if editor has focus to avoid focus issues during file open etc.
-                if GetFocus() == hdr.hwndFrom {
-                    let is_large_editor = is_large_text_editor(hwnd, hdr.hwndFrom);
-                    if !is_large_editor {
-                        handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
-                        prefetch_dictionary_for_selection(hwnd, hdr.hwndFrom);
-                        trigger_spellcheck_highlight(hwnd, hdr.hwndFrom);
-                        update_main_status_bar(hwnd);
-                    }
-                }
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_TIMER => {
-            if wparam.0 == FOCUS_EDITOR_TIMER_ID
-                || wparam.0 == FOCUS_EDITOR_TIMER_ID2
-                || wparam.0 == FOCUS_EDITOR_TIMER_ID3
-                || wparam.0 == FOCUS_EDITOR_TIMER_ID4
-            {
-                kill_timer_best_effort(hwnd, wparam.0, "KillTimer FOCUS_EDITOR");
-                force_active_editor_focus(hwnd);
-                return LRESULT(0);
-            }
-            if wparam.0 == CHAPTER_ANNOUNCE_TIMER_ID {
-                update_chapter_announcement(hwnd);
-                return LRESULT(0);
-            }
-            if wparam.0 == SPELLCHECK_HIGHLIGHT_TIMER_ID {
-                kill_timer_best_effort(
-                    hwnd,
-                    SPELLCHECK_HIGHLIGHT_TIMER_ID,
-                    "KillTimer SPELLCHECK_HIGHLIGHT",
-                );
-                handle_spellcheck_highlight_timer(hwnd);
-                return LRESULT(0);
-            }
-            if wparam.0 == AUDIO_PLAYLIST_TIMER_ID {
-                handle_audio_playlist_timer(hwnd);
-                return LRESULT(0);
-            }
-            handle_pdf_loading_timer(hwnd, wparam.0);
-            LRESULT(0)
-        }
-        WM_PODCAST_CHAPTERS_READY => {
-            let ptr = lparam.0 as *mut PodcastChaptersReady;
-            if ptr.is_null() {
-                return LRESULT(0);
-            }
-            let msg = unsafe { Box::from_raw(ptr) };
-            let (apply_now, chapters, language, announce_unavailable, current_pos_ms) =
-                with_state(hwnd, |state| {
-                    let chapters = msg.chapters.clone();
-                    state
-                        .podcast_chapters_cache
-                        .insert(msg.key.clone(), chapters.clone());
-                    let apply_now = state
-                        .active_podcast_chapters_key
-                        .as_deref()
-                        .map(|k| k == msg.key.as_str())
-                        .unwrap_or(false);
-                    if apply_now {
-                        state.last_announced_chapter_index = None;
-                        if let Some(list) = chapters.clone() {
-                            state.active_podcast_chapters = list.clone();
-                            return (
-                                true,
-                                list,
-                                state.settings.language,
-                                false,
-                                audiobook_position_ms_from_state(state),
-                            );
-                        }
-                        state.active_podcast_chapters.clear();
-                        return (
-                            true,
-                            Vec::new(),
-                            state.settings.language,
-                            true,
-                            audiobook_position_ms_from_state(state),
-                        );
-                    }
-                    (
-                        false,
-                        Vec::new(),
-                        state.settings.language,
-                        false,
-                        audiobook_position_ms_from_state(state),
-                    )
-                })
-                .unwrap_or((false, Vec::new(), Language::default(), false, None));
-            if apply_now {
-                if !chapters.is_empty() {
-                    if SetTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID, 500, None) == 0 {
-                        crate::log_debug("Failed to set CHAPTER_ANNOUNCE_TIMER");
-                    }
-                    announce_current_chapter_on_start(hwnd, &chapters, current_pos_ms, language);
-                } else {
-                    kill_timer_best_effort(
-                        hwnd,
-                        CHAPTER_ANNOUNCE_TIMER_ID,
-                        "KillTimer CHAPTER_ANNOUNCE",
-                    );
-                }
-                if announce_unavailable {
-                    let message = i18n::tr(language, "playback.chapters_unavailable");
-                    nvda_speak(&message);
-                }
-                crate::menu::update_playback_menu(hwnd, true);
-            }
-            LRESULT(0)
-        }
-        WM_PODCAST_EPISODE_SAVE_RESULT => {
-            let ptr = lparam.0 as *mut PodcastEpisodeSaveResult;
-            if ptr.is_null() {
-                return LRESULT(0);
-            }
-            let payload = Box::from_raw(ptr);
-            if let Some(err) = payload.error {
-                let body = i18n::tr_f(
-                    payload.language,
-                    "podcasts.save_error_body",
-                    &[("err", &err)],
-                );
-                let title = i18n::tr(payload.language, "podcasts.save_error_title");
-                let body_w = to_wide(&body);
-                let title_w = to_wide(&title);
-                message_box_modal(
-                    hwnd,
-                    PCWSTR(body_w.as_ptr()),
-                    PCWSTR(title_w.as_ptr()),
-                    MB_OK | MB_ICONERROR,
-                );
-                return LRESULT(0);
-            }
-
-            let show_confirmation =
-                with_state(hwnd, |state| state.settings.show_media_save_confirmation)
-                    .unwrap_or(true);
-            if !show_confirmation {
-                return LRESULT(0);
-            }
-
-            let path_text = payload.target_path.to_string_lossy().to_string();
-            let saved_line = i18n::tr_f(
-                payload.language,
-                "podcasts.save_confirm_body",
-                &[("path", &path_text)],
-            );
-            let open_label = i18n::tr(payload.language, "podcasts.save_confirm_open_folder");
-            let body = format!("{saved_line}\n\n{open_label}?");
-            let title = i18n::tr(payload.language, "podcasts.save_confirm_title");
-            let body_w = to_wide(&body);
-            let title_w = to_wide(&title);
-            let response = message_box_modal(
-                hwnd,
-                PCWSTR(body_w.as_ptr()),
-                PCWSTR(title_w.as_ptr()),
-                MB_YESNO | MB_ICONINFORMATION,
-            );
-            if response == IDYES {
-                let folder = payload
-                    .target_path
-                    .parent()
-                    .map(Path::to_path_buf)
-                    .unwrap_or_else(|| payload.target_path.clone());
-                let folder_wide = to_wide(&folder.to_string_lossy());
-                let open_res = ShellExecuteW(
-                    hwnd,
-                    w!("open"),
-                    PCWSTR(folder_wide.as_ptr()),
-                    PCWSTR::null(),
-                    PCWSTR::null(),
-                    SW_SHOWNORMAL,
-                );
-                if open_res.0 as isize <= 32 {
-                    log_debug(&format!(
-                        "podcast_episode_save_open_folder_failed path={} code={}",
-                        folder.to_string_lossy(),
-                        open_res.0
-                    ));
-                }
-            }
-            LRESULT(0)
-        }
-        WM_DICTIONARY_LOADED => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            let result = unsafe { Box::from_raw(lparam.0 as *mut DictionaryLookupResult) };
-            let updated = with_state(hwnd, |state| {
-                let current_gen = state.dictionary_prefetch_generation;
-                if result.generation != current_gen {
-                    return false;
-                }
-                if result.cacheable {
-                    state
-                        .dictionary_cache
-                        .insert(result.key.clone(), result.lines.clone());
-                } else {
-                    state.dictionary_cache.remove(&result.key);
-                }
-                state.dictionary_pending_lookup = None;
-                save_dictionary_cache(&state.dictionary_cache);
-
-                if state.dictionary_context_menu.0 != 0 && !state.dictionary_context_loaded {
-                    let key = dictionary_cache_key(
-                        state.dictionary_context_language,
-                        &state.dictionary_context_pref,
-                        &state.dictionary_context_word,
-                    );
-                    if key == result.key {
-                        let hmenu = state.dictionary_context_menu;
-                        let count = GetMenuItemCount(hmenu);
-                        if count > 0 {
-                            for _ in 0..count {
-                                crate::log_if_err!(DeleteMenu(hmenu, 0, MF_BYPOSITION));
-                            }
-                        }
-                        for line in &result.lines {
-                            let display = format!(" {}", line);
-                            crate::log_if_err!(AppendMenuW(
-                                hmenu,
-                                MF_STRING | MF_GRAYED,
-                                0,
-                                PCWSTR(to_wide(&display).as_ptr()),
-                            ));
-                        }
-                        state.dictionary_context_loaded = true;
-                        return true;
-                    }
-                }
-                false
-            })
-            .unwrap_or(false);
-            if updated {
-                let (hmenu, expanded) = with_state(hwnd, |state| {
-                    (
-                        state.dictionary_context_menu,
-                        state.dictionary_context_expanded,
-                    )
-                })
-                .unwrap_or((HMENU(0), false));
-                if hmenu.0 != 0 && expanded {
-                    crate::log_if_err!(DrawMenuBar(hwnd));
-                    use windows::Win32::UI::Input::KeyboardAndMouse::{
-                        KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VK_LEFT, VK_RIGHT, keybd_event,
-                    };
-                    keybd_event(VK_LEFT.0 as u8, 0, KEYBD_EVENT_FLAGS(0), 0);
-                    keybd_event(VK_LEFT.0 as u8, 0, KEYEVENTF_KEYUP, 0);
-                    keybd_event(VK_RIGHT.0 as u8, 0, KEYBD_EVENT_FLAGS(0), 0);
-                    keybd_event(VK_RIGHT.0 as u8, 0, KEYEVENTF_KEYUP, 0);
-                }
-            }
-            LRESULT(0)
-        }
-        WM_UPDATE_DIALOG => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            crate::log_debug("UI: Received WM_UPDATE_DIALOG");
-            let req = unsafe { Box::from_raw(lparam.0 as *mut UpdateDialogRequest) };
-            let result = unsafe {
-                MessageBoxW(
-                    hwnd,
-                    &HSTRING::from(&req.text),
-                    &HSTRING::from(&req.title),
-                    req.flags,
-                )
-            };
-            crate::log_debug(&format!("UI: Update dialog result: {:?}", result));
-            if let Err(e) = req.response_tx.send(result.0) {
-                crate::log_debug(&format!("UI: Failed to send response to channel: {}", e));
-            } else {
-                crate::log_debug("UI: Response sent to channel successfully");
-            }
-            LRESULT(0)
-        }
-        WM_UPDATE_PROGRESS_OPEN => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            let req = unsafe { Box::from_raw(lparam.0 as *mut UpdateProgressOpenRequest) };
-            let labels = app_windows::podcast_save_window::SaveDialogLabels {
-                title: i18n::tr(req.language, "updater.title"),
-                in_progress: i18n::tr(req.language, "podcast.save.in_progress"),
-                cancel: i18n::tr(req.language, "podcast.save.cancel"),
-            };
-            let dialog = app_windows::podcast_save_window::open_with_labels(
-                hwnd,
-                req.language,
-                labels,
-                false,
-            );
-            with_state(hwnd, |state| {
-                state.update_progress_window = dialog;
-            });
-            if let Err(e) = req.response_tx.send(dialog.0) {
-                crate::log_debug(&format!(
-                    "UI: Failed to send update progress dialog handle: {}",
-                    e
-                ));
-            }
-            LRESULT(0)
-        }
-        WM_UPDATE_PROGRESS_SET => {
-            let pct = wparam.0.min(100);
-            let dialog = with_state(hwnd, |state| state.update_progress_window).unwrap_or(HWND(0));
-            if dialog.0 != 0 {
-                crate::log_if_err!(PostMessageW(
-                    dialog,
-                    app_windows::podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
-                    WPARAM(pct),
-                    LPARAM(0)
-                ));
-            }
-            LRESULT(0)
-        }
-        WM_UPDATE_PROGRESS_CLOSE => {
-            let dialog = with_state(hwnd, |state| state.update_progress_window).unwrap_or(HWND(0));
-            if dialog.0 != 0 {
-                crate::log_if_err!(PostMessageW(
-                    dialog,
-                    app_windows::podcast_save_window::WM_PODCAST_SAVE_DONE,
-                    WPARAM(0),
-                    LPARAM(0)
-                ));
-                with_state(hwnd, |state| {
-                    state.update_progress_window = HWND(0);
-                });
-            }
-            LRESULT(0)
-        }
-        app_windows::podcast_save_window::WM_PODCAST_SAVE_CLOSED => {
-            with_state(hwnd, |state| {
-                state.update_progress_window = HWND(0);
-            });
-            LRESULT(0)
-        }
-        WM_AUTO_UPDATE_CHECK => {
-            if !has_secondary_window_open(hwnd) {
-                updater::check_for_update(hwnd, false);
-            }
-            LRESULT(0)
-        }
-        WM_CHECK_PENDING_UPDATE => {
-            if !has_secondary_window_open(hwnd) {
-                updater::check_pending_update(hwnd, false);
-            }
-            LRESULT(0)
-        }
-        WM_SHOW_CHANGELOG => {
-            if !has_secondary_window_open(hwnd) {
-                app_windows::help_window::open_changelog(hwnd);
-            }
-            LRESULT(0)
-        }
-        WM_PDF_LOADED => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            let payload = unsafe { Box::from_raw(lparam.0 as *mut PdfLoadResult) };
-            handle_pdf_loaded(hwnd, *payload);
-            LRESULT(0)
-        }
-        WM_DOCUMENT_LOADED => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            let payload =
-                unsafe { Box::from_raw(lparam.0 as *mut editor_manager::DocumentLoadResult) };
-            handle_document_loaded(hwnd, *payload);
-            LRESULT(0)
-        }
-        WM_TTS_VOICES_LOADED => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            let payload = unsafe { Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>) };
-            let voices: Vec<VoiceInfo> = *payload;
-            with_state(hwnd, |state| {
-                state.edge_voices = voices.clone();
-            });
-            if let Some(dialog) = with_state(hwnd, |state| state.options_dialog)
-                && dialog.0 != 0
-            {
-                app_windows::options_window::refresh_voices(dialog);
-            }
-            refresh_voice_panel(hwnd);
-            LRESULT(0)
-        }
-        WM_TTS_SAPI_VOICES_LOADED => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            let payload = unsafe { Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>) };
-            let voices: Vec<VoiceInfo> = *payload;
-            with_state(hwnd, |state| {
-                state.sapi_voices = voices.clone();
-            });
-            if let Some(dialog) = with_state(hwnd, |state| state.options_dialog)
-                && dialog.0 != 0
-            {
-                app_windows::options_window::refresh_voices(dialog);
-            }
-            refresh_voice_panel(hwnd);
-            LRESULT(0)
-        }
-        WM_TTS_START => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            let payload = unsafe { Box::from_raw(lparam.0 as *mut tts_engine::TtsPlaybackOptions) };
-            tts_engine::start_tts_playback_with_chunks(*payload);
-            LRESULT(0)
+// Keep inner `unsafe { ... }` blocks untouched here to avoid behavioral refactors in message handling.
+fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        if let Some(find_msg) = with_state(hwnd, |state| state.find_msg)
+            && msg == find_msg
+        {
+            handle_find_message(hwnd, lparam);
+            return LRESULT(0);
         }
 
-        WM_TTS_PLAYBACK_DONE => {
-            let session_id = wparam.0 as u64;
-            with_state(hwnd, |state| {
-                if let Some(current) = &state.tts_session
-                    && current.id == session_id
-                {
-                    state.tts_session = None;
-                    state.tts_last_offset = 0;
-                    prevent_sleep(false);
-                }
-            });
-            LRESULT(0)
-        }
-        WM_TTS_CHUNK_START => {
-            let session_id = wparam.0 as u64;
-            let offset = lparam.0 as i32;
-            with_state(hwnd, |state| {
-                if let Some(current) = &state.tts_session
-                    && current.id == session_id
-                {
-                    let safe_offset = clamp_tts_chunk_offset(state.tts_last_offset, offset);
-                    if safe_offset != offset {
-                        log_debug(&format!(
-                            "TTS: normalized non-monotonic offset session={} prev={} new={} safe={}",
-                            session_id, state.tts_last_offset, offset, safe_offset
-                        ));
-                    }
-                    state.tts_last_offset = safe_offset;
-                    if state.settings.move_cursor_during_reading
-                        && let Some(doc) = state.docs.get(state.current)
-                    {
-                        let new_pos = current.initial_caret_pos + safe_offset;
-                        let mut cr = CHARRANGE {
-                            cpMin: new_pos,
-                            cpMax: new_pos,
-                        };
-                        unsafe {
-                            SendMessageW(
-                                doc.hwnd_edit,
-                                EM_EXSETSEL,
-                                WPARAM(0),
-                                LPARAM(&mut cr as *mut _ as isize),
-                            );
-                            SendMessageW(doc.hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-                        }
-                    }
-                }
-            });
-            LRESULT(0)
-        }
-        WM_TTS_PLAYBACK_ERROR => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            let payload = unsafe { Box::from_raw(lparam.0 as *mut String) };
-            let message: String = *payload;
-            let session_id = wparam.0 as u64;
-            let mut should_show = false;
-            with_state(hwnd, |state| {
-                if let Some(current) = &state.tts_session
-                    && current.id == session_id
-                {
-                    state.tts_session = None;
-                    state.tts_last_offset = 0;
-                    prevent_sleep(false);
-                    should_show = true;
-                }
-            });
-            if should_show {
-                let language =
-                    with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-                show_error(hwnd, language, &message);
-            } else {
-                log_debug(&format!(
-                    "TTS error ignored for session {session_id}: {message}"
-                ));
-            }
-            LRESULT(0)
-        }
-        WM_TTS_AUDIOBOOK_DONE => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-
-            with_state(hwnd, |state| {
-                if state.audiobook_progress.0 != 0 {
-                    crate::log_if_err!(DestroyWindow(state.audiobook_progress));
-                    state.audiobook_progress = HWND(0);
-                    state.audiobook_cancel = None;
-                }
-                if let Some(doc) = state.docs.get(state.current) {
-                    SetFocus(doc.hwnd_edit);
-                }
-            });
-
-            let payload = unsafe { Box::from_raw(lparam.0 as *mut AudiobookResult) };
-            let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-            let title = if payload.success {
-                audiobook_done_title(language)
-            } else {
-                error_title(language)
-            };
-            let title = to_wide(&title);
-            let message = to_wide(&payload.message);
-            let flags = if payload.success {
-                MB_OK | MB_ICONINFORMATION
-            } else {
-                MB_OK | MB_ICONERROR
-            };
-            MessageBoxW(
-                hwnd,
-                PCWSTR(message.as_ptr()),
-                PCWSTR(title.as_ptr()),
-                flags,
-            );
-            LRESULT(0)
-        }
-        WM_FOCUS_EDITOR => {
-            if should_force_editor_focus_on_foreground(hwnd) {
-                force_active_editor_focus(hwnd);
-                schedule_editor_focus_retry(hwnd);
-            } else if !has_secondary_window_open(hwnd) {
-                focus_editor(hwnd);
-            }
-            LRESULT(0)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == u32::from(VK_F9.0) {
-                cycle_favorite_voice(hwnd, -1);
-                return LRESULT(0);
-            }
-            if wparam.0 as u32 == u32::from(VK_F10.0) {
-                cycle_favorite_voice(hwnd, 1);
-                return LRESULT(0);
-            }
-            if wparam.0 as u32 == u32::from(VK_TAB.0)
-                && (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0
-            {
-                next_tab_with_prompt(hwnd);
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_INITMENUPOPUP => {
-            let hmenu = HMENU(wparam.0 as isize);
-            let main_menu = GetMenu(hwnd);
-            if main_menu.0 != 0 {
-                let edit_menu = GetSubMenu(main_menu, 1);
-                if edit_menu == hmenu {
-                    let can_undo = can_undo_now(hwnd);
-                    let flags = if can_undo {
-                        MF_BYCOMMAND | MF_ENABLED
-                    } else {
-                        MF_BYCOMMAND | MF_GRAYED
-                    };
-                    let _enabled = EnableMenuItem(hmenu, IDM_EDIT_UNDO as u32, flags);
-                    let language =
-                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-                    let undo_label = build_undo_menu_label(hwnd, language);
-                    let menu_flags = if can_undo {
-                        MF_BYCOMMAND | MF_STRING | MF_ENABLED
-                    } else {
-                        MF_BYCOMMAND | MF_STRING | MF_GRAYED
-                    };
-                    let _modified = ModifyMenuW(
-                        hmenu,
-                        IDM_EDIT_UNDO as u32,
-                        menu_flags,
-                        IDM_EDIT_UNDO,
-                        PCWSTR(to_wide(&undo_label).as_ptr()),
-                    );
-                    let can_cut_copy = has_active_text_selection(hwnd);
-                    let cut_copy_flags = if can_cut_copy {
-                        MF_BYCOMMAND | MF_ENABLED
-                    } else {
-                        MF_BYCOMMAND | MF_GRAYED
-                    };
-                    let _enabled = EnableMenuItem(hmenu, IDM_EDIT_CUT as u32, cut_copy_flags);
-                    let _enabled = EnableMenuItem(hmenu, IDM_EDIT_COPY as u32, cut_copy_flags);
-                    let paste_flags = if can_paste_now(hwnd) {
-                        MF_BYCOMMAND | MF_ENABLED
-                    } else {
-                        MF_BYCOMMAND | MF_GRAYED
-                    };
-                    let _enabled = EnableMenuItem(hmenu, IDM_EDIT_PASTE as u32, paste_flags);
-                }
-                let window_menu = GetSubMenu(main_menu, WINDOW_MENU_INDEX);
-                if window_menu == hmenu {
-                    refresh_window_open_documents_menu(hwnd, hmenu);
-                }
-            }
-            let ctx = with_state(hwnd, |state| {
-                if state.dictionary_context_menu != hmenu || state.dictionary_context_loaded {
-                    return None;
-                }
-                state.dictionary_context_expanded = true;
-                let key = dictionary_cache_key(
-                    state.dictionary_context_language,
-                    &state.dictionary_context_pref,
-                    &state.dictionary_context_word,
-                );
-                let not_found = i18n::tr(state.dictionary_context_language, "dictionary.not_found");
-                let cached = match state.dictionary_cache.get(&key) {
-                    Some(lines) if lines.len() == 1 && lines[0] == not_found => {
-                        state.dictionary_cache.remove(&key);
-                        save_dictionary_cache(&state.dictionary_cache);
-                        None
-                    }
-                    Some(lines) => Some(lines.clone()),
-                    None => None,
+        match msg {
+            WM_CREATE => {
+                let icc = INITCOMMONCONTROLSEX {
+                    dwSize: size_of::<INITCOMMONCONTROLSEX>() as u32,
+                    dwICC: ICC_TAB_CLASSES | ICC_BAR_CLASSES,
                 };
-                let pending = state.dictionary_pending_lookup.as_ref() == Some(&key);
-                Some((
-                    state.dictionary_context_word.clone(),
-                    state.dictionary_context_language,
-                    state.dictionary_context_pref.clone(),
-                    key,
-                    cached,
-                    pending,
-                    state.dictionary_prefetch_generation,
-                ))
-            })
-            .flatten();
-            let Some((word, language, pref, key, cached, pending, generation)) = ctx else {
-                return DefWindowProcW(hwnd, msg, wparam, lparam);
-            };
+                InitCommonControlsEx(&icc);
 
-            let count = GetMenuItemCount(hmenu);
-            if count > 0 {
-                for _ in 0..count {
-                    crate::log_if_err!(DeleteMenu(hmenu, 0, MF_BYPOSITION));
-                }
-            }
+                let hwnd_tab = CreateWindowExW(
+                    Default::default(),
+                    WC_TABCONTROLW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let hwnd_status = CreateWindowExW(
+                    Default::default(),
+                    STATUSCLASSNAMEW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(MAIN_STATUS_ID as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            match cached {
-                Some(lines) => {
-                    for line in lines {
-                        let display = line.replace('&', "");
-                        crate::log_if_err!(AppendMenuW(
-                            hmenu,
-                            MF_STRING | MF_GRAYED,
-                            0,
-                            PCWSTR(to_wide(&display).as_ptr()),
-                        ));
+                let find_msg = RegisterWindowMessageW(w!("commdlg_FindReplace"));
+                let settings = load_settings();
+                let hfont = create_ui_font(&settings.editor_font_face, None, settings.text_size)
+                    .unwrap_or_else(|| HFONT(GetStockObject(DEFAULT_GUI_FONT).0));
+                let bookmarks = load_bookmarks();
+                let (_, recent_menu) = create_menus(hwnd, settings.language);
+                let recent_files = load_recent_files();
+                let panel_labels = voice_panel_labels(settings.language);
+                let _panel_labels = panel_labels;
+                let empty_label = to_wide("");
+                let label_engine = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_engine = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    0,
+                    0,
+                    0,
+                    140,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_ENGINE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let label_language = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_language = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    0,
+                    0,
+                    0,
+                    140,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_LANGUAGE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let label_voice = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_voice = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    0,
+                    0,
+                    0,
+                    160,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_VOICE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let button_insert_tag = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD | WS_TABSTOP,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_INSERT_TAG as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let label_speed = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_speed = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    0,
+                    0,
+                    0,
+                    140,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_SPEED as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_speed = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_SPEED_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let label_pitch = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_pitch = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    0,
+                    0,
+                    0,
+                    140,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_PITCH as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_pitch = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_PITCH_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let label_volume = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_volume = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    0,
+                    0,
+                    0,
+                    140,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_VOLUME as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_volume = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_VOLUME_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let checkbox_multilingual = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_MULTILINGUAL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let label_favorites = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_favorites = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    0,
+                    0,
+                    0,
+                    160,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_FAVORITES as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_voice_proc = if combo_voice.0 != 0 {
+                    let proc_ptr = voice_combo_subclass_proc as *const () as usize;
+                    let old = SetWindowLongPtrW(combo_voice, GWLP_WNDPROC, proc_ptr as isize);
+                    std::mem::transmute::<isize, WNDPROC>(old)
+                } else {
+                    None
+                };
+                let combo_favorites_proc = if combo_favorites.0 != 0 {
+                    let proc_ptr = voice_combo_subclass_proc as *const () as usize;
+                    let old = SetWindowLongPtrW(combo_favorites, GWLP_WNDPROC, proc_ptr as isize);
+                    std::mem::transmute::<isize, WNDPROC>(old)
+                } else {
+                    None
+                };
+                for control in [
+                    label_engine,
+                    combo_engine,
+                    label_language,
+                    combo_language,
+                    label_voice,
+                    combo_voice,
+                    button_insert_tag,
+                    label_speed,
+                    combo_speed,
+                    edit_speed,
+                    label_pitch,
+                    combo_pitch,
+                    edit_pitch,
+                    label_volume,
+                    combo_volume,
+                    edit_volume,
+                    checkbox_multilingual,
+                    label_favorites,
+                    combo_favorites,
+                ] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                     }
-                    with_state(hwnd, |state| {
-                        state.dictionary_context_loaded = true;
-                    });
+                    ShowWindow(control, SW_HIDE);
                 }
-                None => {
-                    let loading_msg = i18n::tr(language, "dictionary.loading");
-                    crate::log_if_err!(AppendMenuW(
-                        hmenu,
-                        MF_STRING | MF_GRAYED,
-                        0,
-                        PCWSTR(to_wide(&loading_msg).as_ptr()),
-                    ));
-                    if !pending {
-                        with_state(hwnd, |state| {
-                            state.dictionary_pending_lookup = Some(key.clone());
-                        });
-                        start_dictionary_lookup(hwnd.0, word, language, pref, key, generation);
-                    }
-                }
-            }
-            LRESULT(0)
-        }
-        WM_CONTEXTMENU => {
-            let target = HWND(wparam.0 as isize);
-            let (combo_voice, combo_favorites) = with_state(hwnd, |state| {
-                (state.voice_combo_voice, state.voice_combo_favorites)
-            })
-            .unwrap_or((HWND(0), HWND(0)));
-            if (target == combo_voice && combo_voice.0 != 0)
-                || (target == combo_favorites && combo_favorites.0 != 0)
-            {
-                show_voice_context_menu(hwnd, target, lparam);
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            let notification = (wparam.0 >> 16) as u16;
-            if u32::from(notification) == EN_CHANGE {
-                if is_voice_panel_tuning_edit(hwnd, HWND(lparam.0)) {
-                    return LRESULT(0);
-                }
-                editor_manager::handle_normalize_edit_change(hwnd, HWND(lparam.0));
-                mark_dirty_from_edit(hwnd, HWND(lparam.0));
-                let active_edit = get_active_edit(hwnd).unwrap_or(HWND(0));
-                if active_edit == HWND(lparam.0) {
-                    let language =
-                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-                    let label = i18n::tr(language, "undo.action.text");
-                    with_state(hwnd, |state| state.undo_action_label = Some(label));
-                    update_main_status_bar(hwnd);
-                }
-                return LRESULT(0);
-            }
-            if cmd_id == VOICE_PANEL_ID_ENGINE && u32::from(notification) == CBN_SELCHANGE {
-                handle_voice_panel_engine_change(hwnd);
-                return LRESULT(0);
-            }
-            if cmd_id == VOICE_PANEL_ID_LANGUAGE && u32::from(notification) == CBN_SELCHANGE {
-                refresh_voice_panel_voice_list(hwnd);
-                return LRESULT(0);
-            }
-            if cmd_id == VOICE_PANEL_ID_VOICE && u32::from(notification) == CBN_SELCHANGE {
-                handle_voice_panel_voice_change(hwnd);
-                return LRESULT(0);
-            }
-            if cmd_id == VOICE_PANEL_ID_FAVORITES && u32::from(notification) == CBN_SELCHANGE {
-                handle_voice_panel_favorite_change(hwnd);
-                return LRESULT(0);
-            }
-            if cmd_id == VOICE_PANEL_ID_MULTILINGUAL {
-                handle_voice_panel_multilingual_toggle(hwnd);
-                return LRESULT(0);
-            }
-            if cmd_id == VOICE_PANEL_ID_INSERT_TAG {
-                insert_voice_tag_from_voice_panel(hwnd);
-                return LRESULT(0);
-            }
-            if (cmd_id == VOICE_PANEL_ID_SPEED
-                || cmd_id == VOICE_PANEL_ID_PITCH
-                || cmd_id == VOICE_PANEL_ID_VOLUME)
-                && u32::from(notification) == CBN_SELCHANGE
-            {
-                handle_voice_panel_tuning_combo_change(hwnd);
-                return LRESULT(0);
-            }
-            if (cmd_id == VOICE_PANEL_ID_SPEED_EDIT
-                || cmd_id == VOICE_PANEL_ID_PITCH_EDIT
-                || cmd_id == VOICE_PANEL_ID_VOLUME_EDIT)
-                && u32::from(notification) == EN_KILLFOCUS
-            {
-                handle_voice_panel_tuning_edit_change(hwnd);
-                return LRESULT(0);
-            }
-            if cmd_id == VOICE_MENU_ID_ADD_FAVORITE as usize {
-                handle_voice_context_favorite(hwnd, true);
-                return LRESULT(0);
-            }
-            if cmd_id == VOICE_MENU_ID_REMOVE_FAVORITE as usize {
-                handle_voice_context_favorite(hwnd, false);
-                return LRESULT(0);
-            }
-            if (IDM_SPELLCHECK_SUGGESTION_BASE
-                ..IDM_SPELLCHECK_SUGGESTION_BASE + IDM_SPELLCHECK_SUGGESTION_MAX)
-                .contains(&cmd_id)
-            {
-                let index = cmd_id - IDM_SPELLCHECK_SUGGESTION_BASE;
-                handle_spellcheck_suggestion(hwnd, index);
-                return LRESULT(0);
-            }
-            if cmd_id == IDM_SPELLCHECK_ADD_TO_DICTIONARY {
-                handle_spellcheck_add_to_dictionary(hwnd);
-                return LRESULT(0);
-            }
-            if cmd_id == IDM_SPELLCHECK_IGNORE_ONCE {
-                handle_spellcheck_ignore_once(hwnd);
-                return LRESULT(0);
-            }
+                let state = Box::new(AppState {
+                    hwnd_tab,
+                    hwnd_status,
+                    docs: Vec::new(),
+                    current: 0,
+                    untitled_count: 0,
+                    hfont,
+                    hfont_custom: !settings.editor_font_face.trim().is_empty() && hfont.0 != 0,
+                    hmenu_recent: recent_menu,
+                    recent_files,
+                    settings: settings.clone(),
+                    bookmarks,
+                    find_dialog: HWND(0),
+                    replace_dialog: HWND(0),
+                    options_dialog: HWND(0),
+                    help_window: HWND(0),
+                    changelog_window: HWND(0),
+                    donations_window: HWND(0),
+                    bookmarks_window: HWND(0),
+                    dictionary_window: HWND(0),
+                    dictionary_entry_dialog: HWND(0),
+                    wiktionary_window: HWND(0),
+                    wikipedia_window: HWND(0),
+                    prompt_window: HWND(0),
+                    podcast_window: HWND(0),
+                    rss_window: HWND(0),
+                    podcasts_window: HWND(0),
+                    podcasts_add_dialog: HWND(0),
+                    podcasts_categories_dialog: HWND(0),
+                    podcasts_description_dialog: HWND(0),
+                    rss_add_dialog: HWND(0),
+                    go_to_time_dialog: HWND(0),
+                    playback_menu: HMENU(0),
+                    podcast_save_window: HWND(0),
+                    update_progress_window: HWND(0),
+                    batch_audiobooks_window: HWND(0),
+                    convert_audio_window: HWND(0),
 
-            if (IDM_FILE_RECENT_BASE..IDM_FILE_RECENT_BASE + MAX_RECENT).contains(&cmd_id) {
-                let index = cmd_id - IDM_FILE_RECENT_BASE;
-                if let Some(path) =
-                    with_state(hwnd, |state| state.recent_files.get(index).cloned()).flatten()
-                {
-                    editor_manager::open_document(hwnd, &path);
-                }
-                return LRESULT(0);
-            }
-            if cmd_id == IDM_FILE_RECENT_CLEAR {
-                clear_recent_files(hwnd);
-                return LRESULT(0);
-            }
+                    find_msg,
+                    find_text: vec![0u16; 256],
+                    replace_text: vec![0u16; 256],
+                    find_replace: None,
+                    replace_replace: None,
+                    last_find_flags: FINDREPLACE_FLAGS(0),
+                    find_use_regex: false,
+                    find_dot_matches_newline: false,
+                    find_wrap_around: true,
+                    find_match_case: false,
+                    find_whole_word: false,
+                    find_replace_in_selection: false,
+                    find_replace_in_all_docs: false,
+                    pdf_loading: Vec::new(),
+                    next_timer_id: 1,
+                    tts_session: None,
+                    tts_next_session_id: 1,
+                    tts_last_offset: 0,
+                    edge_voices: Vec::new(),
+                    sapi_voices: Vec::new(),
 
-            match cmd_id {
-                IDM_FILE_NEW => {
-                    log_debug("Menu: New document");
+                    audiobook_progress: HWND(0),
+                    audiobook_cancel: None,
+                    active_audiobook: None,
+                    audiobook_session_id: 0,
+                    last_stopped_audiobook: None,
+                    active_podcast_episode_url: None,
+                    active_podcast_episode_title: None,
+                    active_podcast_episode_cache: None,
+                    podcast_chapters_cache: HashMap::new(),
+                    pending_podcast_chapters_key: None,
+                    active_podcast_chapters_key: None,
+                    active_podcast_chapters: Vec::new(),
+                    last_announced_chapter_index: None,
+                    available_audio_tracks: Vec::new(),
+                    selected_audio_track: None,
+                    audio_playlist: Vec::new(),
+                    audio_playlist_index: None,
+                    audio_ffmpeg_retry_for: None,
+                    voice_panel_visible: false,
+                    voice_label_engine: label_engine,
+                    voice_combo_engine: combo_engine,
+                    voice_label_language: label_language,
+                    voice_combo_language: combo_language,
+                    voice_language_codes: Vec::new(),
+                    voice_label_voice: label_voice,
+                    voice_combo_voice: combo_voice,
+                    voice_button_insert_tag: button_insert_tag,
+                    voice_label_speed: label_speed,
+                    voice_combo_speed: combo_speed,
+                    voice_edit_speed: edit_speed,
+                    voice_label_pitch: label_pitch,
+                    voice_combo_pitch: combo_pitch,
+                    voice_edit_pitch: edit_pitch,
+                    voice_label_volume: label_volume,
+                    voice_combo_volume: combo_volume,
+                    voice_edit_volume: edit_volume,
+                    voice_checkbox_multilingual: checkbox_multilingual,
+                    voice_favorites_visible: false,
+                    voice_label_favorites: label_favorites,
+                    voice_combo_favorites: combo_favorites,
+                    voice_combo_voice_proc: combo_voice_proc,
+                    voice_combo_favorites_proc: combo_favorites_proc,
+                    voice_context_voice: None,
+                    find_in_files_cache: None,
+                    pending_find_in_files: None,
+                    normalize_undo: None,
+                    undo_action_label: None,
+                    normalize_skip_change: false,
+                    spellcheck_manager: spellcheck::SpellcheckManager::default(),
+                    spellcheck_last_announce: None,
+                    spellcheck_context: None,
+                    spellcheck_space_trigger: None,
+                    spellcheck_typing_in_progress: false,
+                    spellcheck_highlight_pending: None,
+                    spellcheck_last_highlighted_line: None,
+                    dictionary_context_menu: HMENU(0),
+                    dictionary_context_word: String::new(),
+                    dictionary_context_language: Language::default(),
+                    dictionary_context_pref: String::new(),
+                    dictionary_context_loaded: false,
+                    dictionary_context_expanded: false,
+                    dictionary_cache: load_dictionary_cache(),
+                    dictionary_pending_lookup: None,
+                    dictionary_prefetch_generation: 0,
+                    large_text_editors: HashSet::new(),
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                if SetTimer(hwnd, AUDIO_PLAYLIST_TIMER_ID, 700, None) == 0 {
+                    log_debug("Failed to set AUDIO_PLAYLIST_TIMER");
+                }
+
+                update_recent_menu(hwnd, recent_menu);
+                if settings.show_voice_panel {
+                    set_voice_panel_visible_internal(hwnd, true, false);
+                }
+                if settings.show_favorite_panel {
+                    set_favorites_panel_visible_internal(hwnd, true, false);
+                }
+
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let lp_create_params = (*create_struct).lpCreateParams as *const Option<String>;
+                let file_to_open = if !lp_create_params.is_null() {
+                    (*lp_create_params).as_ref()
+                } else {
+                    None
+                };
+
+                if let Some(path_str) = file_to_open {
+                    editor_manager::open_document(hwnd, Path::new(path_str));
+                    ShowWindow(hwnd, SW_SHOWMAXIMIZED);
+                    bring_window_to_foreground(hwnd);
+
+                    notify_active_editor_focus(hwnd, true);
+                    crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
+                } else {
                     editor_manager::new_document(hwnd);
-                    LRESULT(0)
+                    crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
                 }
-                IDM_FILE_OPEN => {
-                    if unsafe { with_state(hwnd, |_| {}).is_none() } {
-                        log_debug("Menu: Open document ignored (not initialized)");
-                        return LRESULT(0);
-                    }
-                    log_debug("Menu: Open document");
-                    // Cancel spellcheck highlight to avoid focus issues
+
+                editor_manager::layout_children(hwnd);
+                editor_manager::apply_text_limit_to_all_edits(hwnd);
+                update_main_status_bar(hwnd);
+                DragAcceptFiles(hwnd, true);
+                LRESULT(0)
+            }
+            WM_SIZE => {
+                editor_manager::layout_children(hwnd);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                force_active_editor_focus(hwnd);
+                LRESULT(0)
+            }
+            WM_ACTIVATE => {
+                let is_activating = (wparam.0 & 0xFFFF) != 0;
+                if is_activating && should_force_editor_focus_on_foreground(hwnd) {
+                    force_active_editor_focus(hwnd);
+                    schedule_editor_focus_retry(hwnd);
+                }
+                LRESULT(0)
+            }
+            WM_NOTIFY => {
+                let hdr = &*(lparam.0 as *const NMHDR);
+                if hdr.code == TCN_SELCHANGE && hdr.hwndFrom == editor_manager::get_tab(hwnd) {
+                    // Cancel pending spellcheck highlight when switching tabs
                     kill_timer_best_effort(
                         hwnd,
                         SPELLCHECK_HIGHLIGHT_TIMER_ID,
@@ -4272,703 +3440,1556 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                         state.spellcheck_highlight_pending = None;
                         state.spellcheck_last_highlighted_line = None;
                     });
-                    if let Some(selected) = open_file_dialog_with_encoding(hwnd) {
-                        if selected.iter().all(|(path, _)| is_audio_path(path)) {
-                            let audio_paths = selected
-                                .into_iter()
-                                .map(|(path, _)| path)
-                                .collect::<Vec<_>>();
-                            queue_audio_files_and_play(hwnd, audio_paths);
-                        } else {
-                            for (path, encoding) in selected {
-                                open_document_with_encoding(hwnd, &path, encoding);
-                            }
-                        }
-                        if with_state(hwnd, |state| state.prompt_window.0 != 0).unwrap_or(false) {
-                            focus_editor(hwnd);
-                        }
-                    }
-                    LRESULT(0)
+                    attempt_switch_to_selected_tab(hwnd);
+                    return LRESULT(0);
                 }
-                IDM_FILE_SAVE => {
-                    log_debug("Menu: Save document");
-                    editor_manager::save_current_document(hwnd);
-                    editor_manager::refresh_current_editor_visual(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_SAVE_AS => {
-                    log_debug("Menu: Save document as");
-                    editor_manager::save_current_document_as(hwnd);
-                    editor_manager::refresh_current_editor_visual(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_SAVE_ALL => {
-                    log_debug("Menu: Save all documents");
-                    editor_manager::save_all_documents(hwnd);
-                    editor_manager::refresh_current_editor_visual(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_CLOSE => {
-                    log_debug("Menu: Close document");
-                    editor_manager::close_current_document(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_CLOSE_OTHERS => {
-                    log_debug("Menu: Close other files");
-                    if editor_manager::close_other_documents(hwnd) {
-                        close_other_windows(hwnd);
-                    }
-                    LRESULT(0)
-                }
-                IDM_FILE_EXIT => {
-                    log_debug("Menu: Exit");
-                    editor_manager::try_close_app(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_READ_START => {
-                    log_debug("Menu: Start reading");
-                    tts_engine::start_tts_from_caret(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_EXECUTE => {
-                    log_debug("Menu: Execute file");
-                    execute_current_file(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_READ_PAUSE => {
-                    log_debug("Menu: Pause/resume reading");
-                    tts_engine::toggle_tts_pause(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_READ_STOP => {
-                    log_debug("Menu: Stop reading");
-                    tts_engine::stop_tts_playback(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_AUDIOBOOK => {
-                    log_debug("Menu: Record audiobook");
-                    tts_engine::start_audiobook(hwnd);
-                    LRESULT(0)
-                }
-                IDM_EDIT_AUDIOBOOK_SELECTION => {
-                    log_debug("Menu: Record audiobook from selection");
-                    tts_engine::start_audiobook_from_selection(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_BATCH_AUDIOBOOK => {
-                    log_debug("Menu: Batch audiobooks");
-                    app_windows::batch_audiobooks_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_PODCAST => {
-                    log_debug("Menu: Record podcast");
-                    app_windows::podcast_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_FILE_CONVERT_AUDIO => {
-                    log_debug("Menu: Convert audio");
-                    app_windows::convert_audio_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_EDIT_UNDO => {
-                    log_debug("Menu: Undo");
-                    if !editor_manager::try_normalize_undo(hwnd) {
-                        editor_manager::undo_active_edit_skip_navigation(hwnd);
-                    }
-                    with_state(hwnd, |state| state.undo_action_label = None);
-                    LRESULT(0)
-                }
-                IDM_EDIT_CUT => {
-                    log_debug("Menu: Cut");
-                    editor_manager::send_to_active_edit(hwnd, WM_CUT);
-                    LRESULT(0)
-                }
-                IDM_EDIT_COPY => {
-                    log_debug("Menu: Copy");
-                    editor_manager::send_to_active_edit(hwnd, WM_COPY);
-                    LRESULT(0)
-                }
-                IDM_EDIT_PASTE => {
-                    log_debug("Menu: Paste");
-                    editor_manager::send_to_active_edit(hwnd, WM_PASTE);
-                    LRESULT(0)
-                }
-                IDM_EDIT_SELECT_ALL => {
-                    log_debug("Menu: Select All");
-                    editor_manager::select_all_active_edit(hwnd);
-                    announce_menu_action_screen_reader(hwnd, "edit.select_all");
-                    LRESULT(0)
-                }
-                IDM_EDIT_FIND => {
-                    log_debug("Menu: Find");
-                    search::open_find_dialog(hwnd);
-                    LRESULT(0)
-                }
-                IDM_EDIT_FIND_IN_FILES => {
-                    log_debug("Menu: Find in files");
-                    app_windows::find_in_files_window::open_find_in_files_dialog(hwnd);
-                    LRESULT(0)
-                }
-                IDM_EDIT_FIND_NEXT => {
-                    log_debug("Menu: Find next");
-                    search::find_next_from_state(hwnd);
-                    LRESULT(0)
-                }
-                IDM_EDIT_FIND_PREVIOUS => {
-                    log_debug("Menu: Find previous");
-                    search::find_previous_from_state(hwnd);
-                    LRESULT(0)
-                }
-                IDM_EDIT_REPLACE => {
-                    log_debug("Menu: Replace");
-                    search::open_replace_dialog(hwnd);
-                    LRESULT(0)
-                }
-                IDM_EDIT_GO_TO_LINE => {
-                    log_debug("Menu: Go to Line");
-                    if let Some(hwnd_edit) = get_active_edit(hwnd) {
+                if hdr.code == EN_CHANGE {
+                    editor_manager::mark_dirty_from_edit(hwnd, hdr.hwndFrom);
+                    let active_edit = get_active_edit(hwnd).unwrap_or(HWND(0));
+                    if active_edit == hdr.hwndFrom {
                         let language =
                             with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-                        let title = i18n::tr(language, "goto_line.prompt_title");
-                        let body = i18n::tr(language, "goto_line.prompt_body");
-                        if let Some(res) = app_windows::prompt_window::prompt_user(
-                            hwnd, &title, &body, "", language,
-                        ) && let Ok(line) = res.trim().parse::<usize>()
-                            && line > 0
-                        {
-                            let line_idx = line - 1;
-                            let char_idx =
-                                SendMessageW(hwnd_edit, EM_LINEINDEX, WPARAM(line_idx), LPARAM(0))
-                                    .0;
-                            if char_idx != -1 {
-                                SendMessageW(
-                                    hwnd_edit,
-                                    EM_SETSEL,
-                                    WPARAM(char_idx as usize),
-                                    LPARAM(char_idx as isize),
+                        let label = i18n::tr(language, "undo.action.text");
+                        with_state(hwnd, |state| state.undo_action_label = Some(label));
+                        update_main_status_bar(hwnd);
+                    }
+                    return LRESULT(0);
+                }
+                if hdr.code == EN_SELCHANGE {
+                    // Only process if editor has focus to avoid focus issues during file open etc.
+                    if GetFocus() == hdr.hwndFrom {
+                        let is_large_editor = is_large_text_editor(hwnd, hdr.hwndFrom);
+                        if !is_large_editor {
+                            handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
+                            prefetch_dictionary_for_selection(hwnd, hdr.hwndFrom);
+                            trigger_spellcheck_highlight(hwnd, hdr.hwndFrom);
+                            update_main_status_bar(hwnd);
+                        }
+                    }
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_TIMER => {
+                if wparam.0 == FOCUS_EDITOR_TIMER_ID
+                    || wparam.0 == FOCUS_EDITOR_TIMER_ID2
+                    || wparam.0 == FOCUS_EDITOR_TIMER_ID3
+                    || wparam.0 == FOCUS_EDITOR_TIMER_ID4
+                {
+                    kill_timer_best_effort(hwnd, wparam.0, "KillTimer FOCUS_EDITOR");
+                    force_active_editor_focus(hwnd);
+                    return LRESULT(0);
+                }
+                if wparam.0 == CHAPTER_ANNOUNCE_TIMER_ID {
+                    update_chapter_announcement(hwnd);
+                    return LRESULT(0);
+                }
+                if wparam.0 == SPELLCHECK_HIGHLIGHT_TIMER_ID {
+                    kill_timer_best_effort(
+                        hwnd,
+                        SPELLCHECK_HIGHLIGHT_TIMER_ID,
+                        "KillTimer SPELLCHECK_HIGHLIGHT",
+                    );
+                    handle_spellcheck_highlight_timer(hwnd);
+                    return LRESULT(0);
+                }
+                if wparam.0 == AUDIO_PLAYLIST_TIMER_ID {
+                    handle_audio_playlist_timer(hwnd);
+                    return LRESULT(0);
+                }
+                handle_pdf_loading_timer(hwnd, wparam.0);
+                LRESULT(0)
+            }
+            WM_PODCAST_CHAPTERS_READY => {
+                let ptr = lparam.0 as *mut PodcastChaptersReady;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let msg = Box::from_raw(ptr);
+                let (apply_now, chapters, language, announce_unavailable, current_pos_ms) =
+                    with_state(hwnd, |state| {
+                        let chapters = msg.chapters.clone();
+                        state
+                            .podcast_chapters_cache
+                            .insert(msg.key.clone(), chapters.clone());
+                        let apply_now = state
+                            .active_podcast_chapters_key
+                            .as_deref()
+                            .map(|k| k == msg.key.as_str())
+                            .unwrap_or(false);
+                        if apply_now {
+                            state.last_announced_chapter_index = None;
+                            if let Some(list) = chapters.clone() {
+                                state.active_podcast_chapters = list.clone();
+                                return (
+                                    true,
+                                    list,
+                                    state.settings.language,
+                                    false,
+                                    audiobook_position_ms_from_state(state),
                                 );
-                                SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
                             }
+                            state.active_podcast_chapters.clear();
+                            return (
+                                true,
+                                Vec::new(),
+                                state.settings.language,
+                                true,
+                                audiobook_position_ms_from_state(state),
+                            );
                         }
-                    }
-                    LRESULT(0)
-                }
-                IDM_EDIT_PREV_SPELLING_ERROR => {
-                    log_debug("Menu: Previous spelling error");
-                    go_to_spelling_error(hwnd, false);
-                    LRESULT(0)
-                }
-                IDM_EDIT_NEXT_SPELLING_ERROR => {
-                    log_debug("Menu: Next spelling error");
-                    go_to_spelling_error(hwnd, true);
-                    LRESULT(0)
-                }
-                IDM_EDIT_STRIP_MARKDOWN => {
-                    log_debug("Menu: Strip Markdown");
-                    if editor_manager::strip_markdown_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.strip_markdown");
-                        if let Some(hwnd_edit) = get_active_edit(hwnd) {
-                            SetFocus(hwnd_edit);
+                        (
+                            false,
+                            Vec::new(),
+                            state.settings.language,
+                            false,
+                            audiobook_position_ms_from_state(state),
+                        )
+                    })
+                    .unwrap_or((
+                        false,
+                        Vec::new(),
+                        Language::default(),
+                        false,
+                        None,
+                    ));
+                if apply_now {
+                    if !chapters.is_empty() {
+                        if SetTimer(hwnd, CHAPTER_ANNOUNCE_TIMER_ID, 500, None) == 0 {
+                            crate::log_debug("Failed to set CHAPTER_ANNOUNCE_TIMER");
                         }
-                    }
-                    LRESULT(0)
-                }
-                IDM_EDIT_AUTO_FORMAT_TTS => {
-                    log_debug("Menu: Auto format TTS");
-                    if editor_manager::auto_format_tts_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.auto_format_tts");
-                    }
-                    LRESULT(0)
-                }
-                IDM_EDIT_NORMALIZE_WHITESPACE => {
-                    log_debug("Menu: Normalize whitespace");
-                    if editor_manager::normalize_whitespace_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.normalize_whitespace");
-                    }
-                    LRESULT(0)
-                }
-                IDM_EDIT_HARD_LINE_BREAK => {
-                    log_debug("Menu: Hard line break");
-                    if editor_manager::hard_line_break_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.hard_line_break");
-                    }
-                    LRESULT(0)
-                }
-                IDM_EDIT_ORDER_ITEMS => {
-                    log_debug("Menu: Order items");
-                    if editor_manager::order_items_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.order_items");
-                    }
-                    LRESULT(0)
-                }
-                IDM_EDIT_KEEP_UNIQUE_ITEMS => {
-                    log_debug("Menu: Keep unique items");
-                    if editor_manager::keep_unique_items_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.keep_unique_items");
-                    }
-                    LRESULT(0)
-                }
-                IDM_EDIT_REVERSE_ITEMS => {
-                    log_debug("Menu: Reverse items");
-                    if editor_manager::reverse_items_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.reverse_items");
-                    }
-                    LRESULT(0)
-                }
-                IDM_EDIT_QUOTE_LINES => {
-                    log_debug("Menu: Quote lines");
-                    if editor_manager::quote_lines_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.quote_lines");
-                    }
-                    LRESULT(0)
-                }
-                IDM_EDIT_UNQUOTE_LINES => {
-                    log_debug("Menu: Unquote lines");
-                    if editor_manager::unquote_lines_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.unquote_lines");
-                    }
-                    LRESULT(0)
-                }
-                IDM_EDIT_INDENT => {
-                    log_debug("Menu: Indent");
-                    editor_manager::indent_active_edit(hwnd, false);
-                    LRESULT(0)
-                }
-                IDM_EDIT_OUTDENT => {
-                    log_debug("Menu: Outdent");
-                    editor_manager::indent_active_edit(hwnd, true);
-                    LRESULT(0)
-                }
-                IDM_EDIT_INSERT_ELLIPSIS => {
-                    log_debug("Menu: Insert ellipsis");
-                    if !editor_manager::is_current_audiobook(hwnd)
-                        && let Some(hwnd_edit) = get_active_edit(hwnd)
-                    {
-                        let text = to_wide("…");
-                        SendMessageW(
-                            hwnd_edit,
-                            EM_REPLACESEL,
-                            WPARAM(1),
-                            LPARAM(text.as_ptr() as isize),
+                        announce_current_chapter_on_start(
+                            hwnd,
+                            &chapters,
+                            current_pos_ms,
+                            language,
+                        );
+                    } else {
+                        kill_timer_best_effort(
+                            hwnd,
+                            CHAPTER_ANNOUNCE_TIMER_ID,
+                            "KillTimer CHAPTER_ANNOUNCE",
                         );
                     }
-                    LRESULT(0)
-                }
-                IDM_EDIT_TEXT_STATS => {
-                    log_debug("Menu: Text stats");
-                    editor_manager::text_stats_active_edit(hwnd);
-                    LRESULT(0)
-                }
-                IDM_EDIT_JOIN_LINES => {
-                    log_debug("Menu: Join lines");
-                    if editor_manager::join_lines_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.join_lines");
+                    if announce_unavailable {
+                        let message = i18n::tr(language, "playback.chapters_unavailable");
+                        nvda_speak(&message);
                     }
-                    LRESULT(0)
+                    crate::menu::update_playback_menu(hwnd, true);
                 }
-                IDM_EDIT_CLEAN_EOL_HYPHENS => {
-                    log_debug("Menu: Clean EOL hyphens");
-                    if editor_manager::clean_end_of_line_hyphens_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.clean_eol_hyphens");
+                LRESULT(0)
+            }
+            WM_PODCAST_EPISODE_SAVE_RESULT => {
+                let ptr = lparam.0 as *mut PodcastEpisodeSaveResult;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let payload = Box::from_raw(ptr);
+                if let Some(err) = payload.error {
+                    let body = i18n::tr_f(
+                        payload.language,
+                        "podcasts.save_error_body",
+                        &[("err", &err)],
+                    );
+                    let title = i18n::tr(payload.language, "podcasts.save_error_title");
+                    let body_w = to_wide(&body);
+                    let title_w = to_wide(&title);
+                    message_box_modal(
+                        hwnd,
+                        PCWSTR(body_w.as_ptr()),
+                        PCWSTR(title_w.as_ptr()),
+                        MB_OK | MB_ICONERROR,
+                    );
+                    return LRESULT(0);
+                }
+
+                let show_confirmation =
+                    with_state(hwnd, |state| state.settings.show_media_save_confirmation)
+                        .unwrap_or(true);
+                if !show_confirmation {
+                    return LRESULT(0);
+                }
+
+                let path_text = payload.target_path.to_string_lossy().to_string();
+                let saved_line = i18n::tr_f(
+                    payload.language,
+                    "podcasts.save_confirm_body",
+                    &[("path", &path_text)],
+                );
+                let open_label = i18n::tr(payload.language, "podcasts.save_confirm_open_folder");
+                let body = format!("{saved_line}\n\n{open_label}?");
+                let title = i18n::tr(payload.language, "podcasts.save_confirm_title");
+                let body_w = to_wide(&body);
+                let title_w = to_wide(&title);
+                let response = message_box_modal(
+                    hwnd,
+                    PCWSTR(body_w.as_ptr()),
+                    PCWSTR(title_w.as_ptr()),
+                    MB_YESNO | MB_ICONINFORMATION,
+                );
+                if response == IDYES {
+                    let folder = payload
+                        .target_path
+                        .parent()
+                        .map(Path::to_path_buf)
+                        .unwrap_or_else(|| payload.target_path.clone());
+                    let folder_wide = to_wide(&folder.to_string_lossy());
+                    let open_res = ShellExecuteW(
+                        hwnd,
+                        w!("open"),
+                        PCWSTR(folder_wide.as_ptr()),
+                        PCWSTR::null(),
+                        PCWSTR::null(),
+                        SW_SHOWNORMAL,
+                    );
+                    if open_res.0 as isize <= 32 {
+                        log_debug(&format!(
+                            "podcast_episode_save_open_folder_failed path={} code={}",
+                            folder.to_string_lossy(),
+                            open_res.0
+                        ));
                     }
-                    LRESULT(0)
                 }
-                IDM_EDIT_REMOVE_DUPLICATE_LINES => {
-                    log_debug("Menu: Remove duplicate lines");
-                    if editor_manager::remove_duplicate_lines_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.remove_duplicate_lines");
+                LRESULT(0)
+            }
+            WM_DICTIONARY_LOADED => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
+                }
+                let result = Box::from_raw(lparam.0 as *mut DictionaryLookupResult);
+                let updated = with_state(hwnd, |state| {
+                    let current_gen = state.dictionary_prefetch_generation;
+                    if result.generation != current_gen {
+                        return false;
                     }
-                    LRESULT(0)
-                }
-                IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES => {
-                    log_debug("Menu: Remove duplicate consecutive lines");
-                    if editor_manager::remove_duplicate_consecutive_lines_active_edit(hwnd) {
-                        confirm_menu_action(hwnd, "edit.remove_duplicate_consecutive_lines");
+                    if result.cacheable {
+                        state
+                            .dictionary_cache
+                            .insert(result.key.clone(), result.lines.clone());
+                    } else {
+                        state.dictionary_cache.remove(&result.key);
                     }
-                    LRESULT(0)
+                    state.dictionary_pending_lookup = None;
+                    save_dictionary_cache(&state.dictionary_cache);
+
+                    if state.dictionary_context_menu.0 != 0 && !state.dictionary_context_loaded {
+                        let key = dictionary_cache_key(
+                            state.dictionary_context_language,
+                            &state.dictionary_context_pref,
+                            &state.dictionary_context_word,
+                        );
+                        if key == result.key {
+                            let hmenu = state.dictionary_context_menu;
+                            let count = GetMenuItemCount(hmenu);
+                            if count > 0 {
+                                for _ in 0..count {
+                                    crate::log_if_err!(DeleteMenu(hmenu, 0, MF_BYPOSITION));
+                                }
+                            }
+                            for line in &result.lines {
+                                let display = format!(" {}", line);
+                                crate::log_if_err!(AppendMenuW(
+                                    hmenu,
+                                    MF_STRING | MF_GRAYED,
+                                    0,
+                                    PCWSTR(to_wide(&display).as_ptr()),
+                                ));
+                            }
+                            state.dictionary_context_loaded = true;
+                            return true;
+                        }
+                    }
+                    false
+                })
+                .unwrap_or(false);
+                if updated {
+                    let (hmenu, expanded) = with_state(hwnd, |state| {
+                        (
+                            state.dictionary_context_menu,
+                            state.dictionary_context_expanded,
+                        )
+                    })
+                    .unwrap_or((HMENU(0), false));
+                    if hmenu.0 != 0 && expanded {
+                        crate::log_if_err!(DrawMenuBar(hwnd));
+                        use windows::Win32::UI::Input::KeyboardAndMouse::{
+                            KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VK_LEFT, VK_RIGHT, keybd_event,
+                        };
+                        keybd_event(VK_LEFT.0 as u8, 0, KEYBD_EVENT_FLAGS(0), 0);
+                        keybd_event(VK_LEFT.0 as u8, 0, KEYEVENTF_KEYUP, 0);
+                        keybd_event(VK_RIGHT.0 as u8, 0, KEYBD_EVENT_FLAGS(0), 0);
+                        keybd_event(VK_RIGHT.0 as u8, 0, KEYEVENTF_KEYUP, 0);
+                    }
                 }
-                IDM_PLAYBACK_PLAY_PAUSE => {
-                    handle_player_command(hwnd, PlayerCommand::TogglePause);
-                    LRESULT(0)
+                LRESULT(0)
+            }
+            WM_UPDATE_DIALOG => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
                 }
-                IDM_PLAYBACK_STOP => {
-                    handle_player_command(hwnd, PlayerCommand::Stop);
-                    LRESULT(0)
+                crate::log_debug("UI: Received WM_UPDATE_DIALOG");
+                let req = Box::from_raw(lparam.0 as *mut UpdateDialogRequest);
+                let result = MessageBoxW(
+                    hwnd,
+                    &HSTRING::from(&req.text),
+                    &HSTRING::from(&req.title),
+                    req.flags,
+                );
+                crate::log_debug(&format!("UI: Update dialog result: {:?}", result));
+                if let Err(e) = req.response_tx.send(result.0) {
+                    crate::log_debug(&format!("UI: Failed to send response to channel: {}", e));
+                } else {
+                    crate::log_debug("UI: Response sent to channel successfully");
                 }
-                IDM_PLAYBACK_SEEK_FORWARD => {
-                    let skip_seconds =
-                        with_state(hwnd, |state| state.settings.audiobook_skip_seconds)
-                            .unwrap_or(0);
-                    handle_player_command(hwnd, PlayerCommand::Seek(skip_seconds as i64));
-                    LRESULT(0)
+                LRESULT(0)
+            }
+            WM_UPDATE_PROGRESS_OPEN => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
                 }
-                IDM_PLAYBACK_SEEK_BACKWARD => {
-                    let skip_seconds =
-                        with_state(hwnd, |state| state.settings.audiobook_skip_seconds)
-                            .unwrap_or(0);
-                    handle_player_command(hwnd, PlayerCommand::Seek(-(skip_seconds as i64)));
-                    LRESULT(0)
+                let req = Box::from_raw(lparam.0 as *mut UpdateProgressOpenRequest);
+                let labels = app_windows::podcast_save_window::SaveDialogLabels {
+                    title: i18n::tr(req.language, "updater.title"),
+                    in_progress: i18n::tr(req.language, "podcast.save.in_progress"),
+                    cancel: i18n::tr(req.language, "podcast.save.cancel"),
+                };
+                let dialog = app_windows::podcast_save_window::open_with_labels(
+                    hwnd,
+                    req.language,
+                    labels,
+                    false,
+                );
+                with_state(hwnd, |state| {
+                    state.update_progress_window = dialog;
+                });
+                if let Err(e) = req.response_tx.send(dialog.0) {
+                    crate::log_debug(&format!(
+                        "UI: Failed to send update progress dialog handle: {}",
+                        e
+                    ));
                 }
-                IDM_PLAYBACK_SEEK_TO_START => {
-                    handle_player_command(hwnd, PlayerCommand::SeekToStart);
-                    LRESULT(0)
+                LRESULT(0)
+            }
+            WM_UPDATE_PROGRESS_SET => {
+                let pct = wparam.0.min(100);
+                let dialog =
+                    with_state(hwnd, |state| state.update_progress_window).unwrap_or(HWND(0));
+                if dialog.0 != 0 {
+                    crate::log_if_err!(PostMessageW(
+                        dialog,
+                        app_windows::podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
+                        WPARAM(pct),
+                        LPARAM(0)
+                    ));
                 }
-                IDM_PLAYBACK_SEEK_TO_END => {
-                    handle_player_command(hwnd, PlayerCommand::SeekToEnd);
-                    LRESULT(0)
+                LRESULT(0)
+            }
+            WM_UPDATE_PROGRESS_CLOSE => {
+                let dialog =
+                    with_state(hwnd, |state| state.update_progress_window).unwrap_or(HWND(0));
+                if dialog.0 != 0 {
+                    crate::log_if_err!(PostMessageW(
+                        dialog,
+                        app_windows::podcast_save_window::WM_PODCAST_SAVE_DONE,
+                        WPARAM(0),
+                        LPARAM(0)
+                    ));
+                    with_state(hwnd, |state| {
+                        state.update_progress_window = HWND(0);
+                    });
                 }
-                IDM_PLAYBACK_TRACK_PREV => {
-                    handle_player_command(hwnd, PlayerCommand::TrackPrev);
-                    LRESULT(0)
+                LRESULT(0)
+            }
+            app_windows::podcast_save_window::WM_PODCAST_SAVE_CLOSED => {
+                with_state(hwnd, |state| {
+                    state.update_progress_window = HWND(0);
+                });
+                LRESULT(0)
+            }
+            WM_AUTO_UPDATE_CHECK => {
+                if !has_secondary_window_open(hwnd) {
+                    updater::check_for_update(hwnd, false);
                 }
-                IDM_PLAYBACK_TRACK_NEXT => {
-                    handle_player_command(hwnd, PlayerCommand::TrackNext);
-                    LRESULT(0)
+                LRESULT(0)
+            }
+            WM_CHECK_PENDING_UPDATE => {
+                if !has_secondary_window_open(hwnd) {
+                    updater::check_pending_update(hwnd, false);
                 }
-                IDM_PLAYBACK_CHAPTER_PREV => {
-                    handle_chapter_navigation(hwnd, -1);
-                    LRESULT(0)
+                LRESULT(0)
+            }
+            WM_SHOW_CHANGELOG => {
+                if !has_secondary_window_open(hwnd) {
+                    app_windows::help_window::open_changelog(hwnd);
                 }
-                IDM_PLAYBACK_CHAPTER_NEXT => {
-                    handle_chapter_navigation(hwnd, 1);
-                    LRESULT(0)
+                LRESULT(0)
+            }
+            WM_PDF_LOADED => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
                 }
-                IDM_PLAYBACK_CHAPTER_LIST => {
-                    handle_chapter_list(hwnd);
-                    LRESULT(0)
+                let payload = Box::from_raw(lparam.0 as *mut PdfLoadResult);
+                handle_pdf_loaded(hwnd, *payload);
+                LRESULT(0)
+            }
+            WM_DOCUMENT_LOADED => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
                 }
-                IDM_PLAYBACK_DOWNLOAD_EPISODE => {
-                    download_active_podcast_episode(hwnd);
-                    LRESULT(0)
+                let payload = Box::from_raw(lparam.0 as *mut editor_manager::DocumentLoadResult);
+                handle_document_loaded(hwnd, *payload);
+                LRESULT(0)
+            }
+            WM_TTS_VOICES_LOADED => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
                 }
-                IDM_PLAYBACK_GO_TO_TIME => {
-                    handle_player_command(hwnd, PlayerCommand::GoToTime);
-                    LRESULT(0)
+                let payload = Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>);
+                let voices: Vec<VoiceInfo> = *payload;
+                with_state(hwnd, |state| {
+                    state.edge_voices = voices.clone();
+                });
+                if let Some(dialog) = with_state(hwnd, |state| state.options_dialog)
+                    && dialog.0 != 0
+                {
+                    app_windows::options_window::refresh_voices(dialog);
                 }
-                IDM_PLAYBACK_ANNOUNCE_TIME => {
-                    handle_player_command(hwnd, PlayerCommand::AnnounceTime);
-                    LRESULT(0)
+                refresh_voice_panel(hwnd);
+                LRESULT(0)
+            }
+            WM_TTS_SAPI_VOICES_LOADED => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
                 }
-                IDM_PLAYBACK_ADD_SUBTITLES => {
-                    if let Some(path) = open_subtitle_file_dialog(hwnd) {
+                let payload = Box::from_raw(lparam.0 as *mut Vec<VoiceInfo>);
+                let voices: Vec<VoiceInfo> = *payload;
+                with_state(hwnd, |state| {
+                    state.sapi_voices = voices.clone();
+                });
+                if let Some(dialog) = with_state(hwnd, |state| state.options_dialog)
+                    && dialog.0 != 0
+                {
+                    app_windows::options_window::refresh_voices(dialog);
+                }
+                refresh_voice_panel(hwnd);
+                LRESULT(0)
+            }
+            WM_TTS_START => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
+                }
+                let payload = Box::from_raw(lparam.0 as *mut tts_engine::TtsPlaybackOptions);
+                tts_engine::start_tts_playback_with_chunks(*payload);
+                LRESULT(0)
+            }
+
+            WM_TTS_PLAYBACK_DONE => {
+                let session_id = wparam.0 as u64;
+                with_state(hwnd, |state| {
+                    if let Some(current) = &state.tts_session
+                        && current.id == session_id
+                    {
+                        state.tts_session = None;
+                        state.tts_last_offset = 0;
+                        prevent_sleep(false);
+                    }
+                });
+                LRESULT(0)
+            }
+            WM_TTS_CHUNK_START => {
+                let session_id = wparam.0 as u64;
+                let offset = lparam.0 as i32;
+                with_state(hwnd, |state| {
+                    if let Some(current) = &state.tts_session
+                        && current.id == session_id
+                    {
+                        let safe_offset = clamp_tts_chunk_offset(state.tts_last_offset, offset);
+                        if safe_offset != offset {
+                            log_debug(&format!(
+                                "TTS: normalized non-monotonic offset session={} prev={} new={} safe={}",
+                                session_id, state.tts_last_offset, offset, safe_offset
+                            ));
+                        }
+                        state.tts_last_offset = safe_offset;
+                        if state.settings.move_cursor_during_reading
+                            && let Some(doc) = state.docs.get(state.current)
+                        {
+                            let new_pos = current.initial_caret_pos + safe_offset;
+                            let mut cr = CHARRANGE {
+                                cpMin: new_pos,
+                                cpMax: new_pos,
+                            };
+                            SendMessageW(
+                                doc.hwnd_edit,
+                                EM_EXSETSEL,
+                                WPARAM(0),
+                                LPARAM(&mut cr as *mut _ as isize),
+                            );
+                            SendMessageW(doc.hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+                        }
+                    }
+                });
+                LRESULT(0)
+            }
+            WM_TTS_PLAYBACK_ERROR => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
+                }
+                let payload = Box::from_raw(lparam.0 as *mut String);
+                let message: String = *payload;
+                let session_id = wparam.0 as u64;
+                let mut should_show = false;
+                with_state(hwnd, |state| {
+                    if let Some(current) = &state.tts_session
+                        && current.id == session_id
+                    {
+                        state.tts_session = None;
+                        state.tts_last_offset = 0;
+                        prevent_sleep(false);
+                        should_show = true;
+                    }
+                });
+                if should_show {
+                    let language =
+                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                    show_error(hwnd, language, &message);
+                } else {
+                    log_debug(&format!(
+                        "TTS error ignored for session {session_id}: {message}"
+                    ));
+                }
+                LRESULT(0)
+            }
+            WM_TTS_AUDIOBOOK_DONE => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
+                }
+
+                with_state(hwnd, |state| {
+                    if state.audiobook_progress.0 != 0 {
+                        crate::log_if_err!(DestroyWindow(state.audiobook_progress));
+                        state.audiobook_progress = HWND(0);
+                        state.audiobook_cancel = None;
+                    }
+                    if let Some(doc) = state.docs.get(state.current) {
+                        SetFocus(doc.hwnd_edit);
+                    }
+                });
+
+                let payload = Box::from_raw(lparam.0 as *mut AudiobookResult);
+                let language =
+                    with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                let title = if payload.success {
+                    audiobook_done_title(language)
+                } else {
+                    error_title(language)
+                };
+                let title = to_wide(&title);
+                let message = to_wide(&payload.message);
+                let flags = if payload.success {
+                    MB_OK | MB_ICONINFORMATION
+                } else {
+                    MB_OK | MB_ICONERROR
+                };
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(message.as_ptr()),
+                    PCWSTR(title.as_ptr()),
+                    flags,
+                );
+                LRESULT(0)
+            }
+            WM_FOCUS_EDITOR => {
+                if should_force_editor_focus_on_foreground(hwnd) {
+                    force_active_editor_focus(hwnd);
+                    schedule_editor_focus_retry(hwnd);
+                } else if !has_secondary_window_open(hwnd) {
+                    focus_editor(hwnd);
+                }
+                LRESULT(0)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == u32::from(VK_F9.0) {
+                    cycle_favorite_voice(hwnd, -1);
+                    return LRESULT(0);
+                }
+                if wparam.0 as u32 == u32::from(VK_F10.0) {
+                    cycle_favorite_voice(hwnd, 1);
+                    return LRESULT(0);
+                }
+                if wparam.0 as u32 == u32::from(VK_TAB.0)
+                    && (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0
+                {
+                    next_tab_with_prompt(hwnd);
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_INITMENUPOPUP => {
+                let hmenu = HMENU(wparam.0 as isize);
+                let main_menu = GetMenu(hwnd);
+                if main_menu.0 != 0 {
+                    let edit_menu = GetSubMenu(main_menu, 1);
+                    if edit_menu == hmenu {
+                        let can_undo = can_undo_now(hwnd);
+                        let flags = if can_undo {
+                            MF_BYCOMMAND | MF_ENABLED
+                        } else {
+                            MF_BYCOMMAND | MF_GRAYED
+                        };
+                        let _enabled = EnableMenuItem(hmenu, IDM_EDIT_UNDO as u32, flags);
                         let language =
                             with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-                        match audio_player::set_audiobook_subtitle_override(hwnd, &path) {
+                        let undo_label = build_undo_menu_label(hwnd, language);
+                        let menu_flags = if can_undo {
+                            MF_BYCOMMAND | MF_STRING | MF_ENABLED
+                        } else {
+                            MF_BYCOMMAND | MF_STRING | MF_GRAYED
+                        };
+                        let _modified = ModifyMenuW(
+                            hmenu,
+                            IDM_EDIT_UNDO as u32,
+                            menu_flags,
+                            IDM_EDIT_UNDO,
+                            PCWSTR(to_wide(&undo_label).as_ptr()),
+                        );
+                        let can_cut_copy = has_active_text_selection(hwnd);
+                        let cut_copy_flags = if can_cut_copy {
+                            MF_BYCOMMAND | MF_ENABLED
+                        } else {
+                            MF_BYCOMMAND | MF_GRAYED
+                        };
+                        let _enabled = EnableMenuItem(hmenu, IDM_EDIT_CUT as u32, cut_copy_flags);
+                        let _enabled = EnableMenuItem(hmenu, IDM_EDIT_COPY as u32, cut_copy_flags);
+                        let paste_flags = if can_paste_now(hwnd) {
+                            MF_BYCOMMAND | MF_ENABLED
+                        } else {
+                            MF_BYCOMMAND | MF_GRAYED
+                        };
+                        let _enabled = EnableMenuItem(hmenu, IDM_EDIT_PASTE as u32, paste_flags);
+                    }
+                    let window_menu = GetSubMenu(main_menu, WINDOW_MENU_INDEX);
+                    if window_menu == hmenu {
+                        refresh_window_open_documents_menu(hwnd, hmenu);
+                    }
+                }
+                let ctx = with_state(hwnd, |state| {
+                    if state.dictionary_context_menu != hmenu || state.dictionary_context_loaded {
+                        return None;
+                    }
+                    state.dictionary_context_expanded = true;
+                    let key = dictionary_cache_key(
+                        state.dictionary_context_language,
+                        &state.dictionary_context_pref,
+                        &state.dictionary_context_word,
+                    );
+                    let not_found =
+                        i18n::tr(state.dictionary_context_language, "dictionary.not_found");
+                    let cached = match state.dictionary_cache.get(&key) {
+                        Some(lines) if lines.len() == 1 && lines[0] == not_found => {
+                            state.dictionary_cache.remove(&key);
+                            save_dictionary_cache(&state.dictionary_cache);
+                            None
+                        }
+                        Some(lines) => Some(lines.clone()),
+                        None => None,
+                    };
+                    let pending = state.dictionary_pending_lookup.as_ref() == Some(&key);
+                    Some((
+                        state.dictionary_context_word.clone(),
+                        state.dictionary_context_language,
+                        state.dictionary_context_pref.clone(),
+                        key,
+                        cached,
+                        pending,
+                        state.dictionary_prefetch_generation,
+                    ))
+                })
+                .flatten();
+                let Some((word, language, pref, key, cached, pending, generation)) = ctx else {
+                    return DefWindowProcW(hwnd, msg, wparam, lparam);
+                };
+
+                let count = GetMenuItemCount(hmenu);
+                if count > 0 {
+                    for _ in 0..count {
+                        crate::log_if_err!(DeleteMenu(hmenu, 0, MF_BYPOSITION));
+                    }
+                }
+
+                match cached {
+                    Some(lines) => {
+                        for line in lines {
+                            let display = line.replace('&', "");
+                            crate::log_if_err!(AppendMenuW(
+                                hmenu,
+                                MF_STRING | MF_GRAYED,
+                                0,
+                                PCWSTR(to_wide(&display).as_ptr()),
+                            ));
+                        }
+                        with_state(hwnd, |state| {
+                            state.dictionary_context_loaded = true;
+                        });
+                    }
+                    None => {
+                        let loading_msg = i18n::tr(language, "dictionary.loading");
+                        crate::log_if_err!(AppendMenuW(
+                            hmenu,
+                            MF_STRING | MF_GRAYED,
+                            0,
+                            PCWSTR(to_wide(&loading_msg).as_ptr()),
+                        ));
+                        if !pending {
+                            with_state(hwnd, |state| {
+                                state.dictionary_pending_lookup = Some(key.clone());
+                            });
+                            start_dictionary_lookup(hwnd.0, word, language, pref, key, generation);
+                        }
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_CONTEXTMENU => {
+                let target = HWND(wparam.0 as isize);
+                let (combo_voice, combo_favorites) = with_state(hwnd, |state| {
+                    (state.voice_combo_voice, state.voice_combo_favorites)
+                })
+                .unwrap_or((HWND(0), HWND(0)));
+                if (target == combo_voice && combo_voice.0 != 0)
+                    || (target == combo_favorites && combo_favorites.0 != 0)
+                {
+                    show_voice_context_menu(hwnd, target, lparam);
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                let notification = (wparam.0 >> 16) as u16;
+                if u32::from(notification) == EN_CHANGE {
+                    if is_voice_panel_tuning_edit(hwnd, HWND(lparam.0)) {
+                        return LRESULT(0);
+                    }
+                    editor_manager::handle_normalize_edit_change(hwnd, HWND(lparam.0));
+                    mark_dirty_from_edit(hwnd, HWND(lparam.0));
+                    let active_edit = get_active_edit(hwnd).unwrap_or(HWND(0));
+                    if active_edit == HWND(lparam.0) {
+                        let language =
+                            with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                        let label = i18n::tr(language, "undo.action.text");
+                        with_state(hwnd, |state| state.undo_action_label = Some(label));
+                        update_main_status_bar(hwnd);
+                    }
+                    return LRESULT(0);
+                }
+                if cmd_id == VOICE_PANEL_ID_ENGINE && u32::from(notification) == CBN_SELCHANGE {
+                    handle_voice_panel_engine_change(hwnd);
+                    return LRESULT(0);
+                }
+                if cmd_id == VOICE_PANEL_ID_LANGUAGE && u32::from(notification) == CBN_SELCHANGE {
+                    refresh_voice_panel_voice_list(hwnd);
+                    return LRESULT(0);
+                }
+                if cmd_id == VOICE_PANEL_ID_VOICE && u32::from(notification) == CBN_SELCHANGE {
+                    handle_voice_panel_voice_change(hwnd);
+                    return LRESULT(0);
+                }
+                if cmd_id == VOICE_PANEL_ID_FAVORITES && u32::from(notification) == CBN_SELCHANGE {
+                    handle_voice_panel_favorite_change(hwnd);
+                    return LRESULT(0);
+                }
+                if cmd_id == VOICE_PANEL_ID_MULTILINGUAL {
+                    handle_voice_panel_multilingual_toggle(hwnd);
+                    return LRESULT(0);
+                }
+                if cmd_id == VOICE_PANEL_ID_INSERT_TAG {
+                    insert_voice_tag_from_voice_panel(hwnd);
+                    return LRESULT(0);
+                }
+                if (cmd_id == VOICE_PANEL_ID_SPEED
+                    || cmd_id == VOICE_PANEL_ID_PITCH
+                    || cmd_id == VOICE_PANEL_ID_VOLUME)
+                    && u32::from(notification) == CBN_SELCHANGE
+                {
+                    handle_voice_panel_tuning_combo_change(hwnd);
+                    return LRESULT(0);
+                }
+                if (cmd_id == VOICE_PANEL_ID_SPEED_EDIT
+                    || cmd_id == VOICE_PANEL_ID_PITCH_EDIT
+                    || cmd_id == VOICE_PANEL_ID_VOLUME_EDIT)
+                    && u32::from(notification) == EN_KILLFOCUS
+                {
+                    handle_voice_panel_tuning_edit_change(hwnd);
+                    return LRESULT(0);
+                }
+                if cmd_id == VOICE_MENU_ID_ADD_FAVORITE as usize {
+                    handle_voice_context_favorite(hwnd, true);
+                    return LRESULT(0);
+                }
+                if cmd_id == VOICE_MENU_ID_REMOVE_FAVORITE as usize {
+                    handle_voice_context_favorite(hwnd, false);
+                    return LRESULT(0);
+                }
+                if (IDM_SPELLCHECK_SUGGESTION_BASE
+                    ..IDM_SPELLCHECK_SUGGESTION_BASE + IDM_SPELLCHECK_SUGGESTION_MAX)
+                    .contains(&cmd_id)
+                {
+                    let index = cmd_id - IDM_SPELLCHECK_SUGGESTION_BASE;
+                    handle_spellcheck_suggestion(hwnd, index);
+                    return LRESULT(0);
+                }
+                if cmd_id == IDM_SPELLCHECK_ADD_TO_DICTIONARY {
+                    handle_spellcheck_add_to_dictionary(hwnd);
+                    return LRESULT(0);
+                }
+                if cmd_id == IDM_SPELLCHECK_IGNORE_ONCE {
+                    handle_spellcheck_ignore_once(hwnd);
+                    return LRESULT(0);
+                }
+
+                if (IDM_FILE_RECENT_BASE..IDM_FILE_RECENT_BASE + MAX_RECENT).contains(&cmd_id) {
+                    let index = cmd_id - IDM_FILE_RECENT_BASE;
+                    if let Some(path) =
+                        with_state(hwnd, |state| state.recent_files.get(index).cloned()).flatten()
+                    {
+                        editor_manager::open_document(hwnd, &path);
+                    }
+                    return LRESULT(0);
+                }
+                if cmd_id == IDM_FILE_RECENT_CLEAR {
+                    clear_recent_files(hwnd);
+                    return LRESULT(0);
+                }
+
+                match cmd_id {
+                    IDM_FILE_NEW => {
+                        log_debug("Menu: New document");
+                        editor_manager::new_document(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_OPEN => {
+                        if with_state(hwnd, |_| {}).is_none() {
+                            log_debug("Menu: Open document ignored (not initialized)");
+                            return LRESULT(0);
+                        }
+                        log_debug("Menu: Open document");
+                        // Cancel spellcheck highlight to avoid focus issues
+                        kill_timer_best_effort(
+                            hwnd,
+                            SPELLCHECK_HIGHLIGHT_TIMER_ID,
+                            "KillTimer SPELLCHECK_HIGHLIGHT",
+                        );
+                        with_state(hwnd, |state| {
+                            state.spellcheck_highlight_pending = None;
+                            state.spellcheck_last_highlighted_line = None;
+                        });
+                        if let Some(selected) = open_file_dialog_with_encoding(hwnd) {
+                            if selected.iter().all(|(path, _)| is_audio_path(path)) {
+                                let audio_paths = selected
+                                    .into_iter()
+                                    .map(|(path, _)| path)
+                                    .collect::<Vec<_>>();
+                                queue_audio_files_and_play(hwnd, audio_paths);
+                            } else {
+                                for (path, encoding) in selected {
+                                    open_document_with_encoding(hwnd, &path, encoding);
+                                }
+                            }
+                            if with_state(hwnd, |state| state.prompt_window.0 != 0).unwrap_or(false)
+                            {
+                                focus_editor(hwnd);
+                            }
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_FILE_SAVE => {
+                        log_debug("Menu: Save document");
+                        editor_manager::save_current_document(hwnd);
+                        editor_manager::refresh_current_editor_visual(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_SAVE_AS => {
+                        log_debug("Menu: Save document as");
+                        editor_manager::save_current_document_as(hwnd);
+                        editor_manager::refresh_current_editor_visual(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_SAVE_ALL => {
+                        log_debug("Menu: Save all documents");
+                        editor_manager::save_all_documents(hwnd);
+                        editor_manager::refresh_current_editor_visual(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_CLOSE => {
+                        log_debug("Menu: Close document");
+                        editor_manager::close_current_document(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_CLOSE_OTHERS => {
+                        log_debug("Menu: Close other files");
+                        if editor_manager::close_other_documents(hwnd) {
+                            close_other_windows(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_FILE_EXIT => {
+                        log_debug("Menu: Exit");
+                        editor_manager::try_close_app(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_READ_START => {
+                        log_debug("Menu: Start reading");
+                        tts_engine::start_tts_from_caret(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_EXECUTE => {
+                        log_debug("Menu: Execute file");
+                        execute_current_file(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_READ_PAUSE => {
+                        log_debug("Menu: Pause/resume reading");
+                        tts_engine::toggle_tts_pause(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_READ_STOP => {
+                        log_debug("Menu: Stop reading");
+                        tts_engine::stop_tts_playback(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_AUDIOBOOK => {
+                        log_debug("Menu: Record audiobook");
+                        tts_engine::start_audiobook(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_AUDIOBOOK_SELECTION => {
+                        log_debug("Menu: Record audiobook from selection");
+                        tts_engine::start_audiobook_from_selection(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_BATCH_AUDIOBOOK => {
+                        log_debug("Menu: Batch audiobooks");
+                        app_windows::batch_audiobooks_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_PODCAST => {
+                        log_debug("Menu: Record podcast");
+                        app_windows::podcast_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_CONVERT_AUDIO => {
+                        log_debug("Menu: Convert audio");
+                        app_windows::convert_audio_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_UNDO => {
+                        log_debug("Menu: Undo");
+                        if !editor_manager::try_normalize_undo(hwnd) {
+                            editor_manager::undo_active_edit_skip_navigation(hwnd);
+                        }
+                        with_state(hwnd, |state| state.undo_action_label = None);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_CUT => {
+                        log_debug("Menu: Cut");
+                        editor_manager::send_to_active_edit(hwnd, WM_CUT);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_COPY => {
+                        log_debug("Menu: Copy");
+                        editor_manager::send_to_active_edit(hwnd, WM_COPY);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_PASTE => {
+                        log_debug("Menu: Paste");
+                        editor_manager::send_to_active_edit(hwnd, WM_PASTE);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_SELECT_ALL => {
+                        log_debug("Menu: Select All");
+                        editor_manager::select_all_active_edit(hwnd);
+                        announce_menu_action_screen_reader(hwnd, "edit.select_all");
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_FIND => {
+                        log_debug("Menu: Find");
+                        search::open_find_dialog(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_FIND_IN_FILES => {
+                        log_debug("Menu: Find in files");
+                        app_windows::find_in_files_window::open_find_in_files_dialog(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_FIND_NEXT => {
+                        log_debug("Menu: Find next");
+                        search::find_next_from_state(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_FIND_PREVIOUS => {
+                        log_debug("Menu: Find previous");
+                        search::find_previous_from_state(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_REPLACE => {
+                        log_debug("Menu: Replace");
+                        search::open_replace_dialog(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_GO_TO_LINE => {
+                        log_debug("Menu: Go to Line");
+                        if let Some(hwnd_edit) = get_active_edit(hwnd) {
+                            let language = with_state(hwnd, |state| state.settings.language)
+                                .unwrap_or_default();
+                            let title = i18n::tr(language, "goto_line.prompt_title");
+                            let body = i18n::tr(language, "goto_line.prompt_body");
+                            if let Some(res) = app_windows::prompt_window::prompt_user(
+                                hwnd, &title, &body, "", language,
+                            ) && let Ok(line) = res.trim().parse::<usize>()
+                                && line > 0
+                            {
+                                let line_idx = line - 1;
+                                let char_idx = SendMessageW(
+                                    hwnd_edit,
+                                    EM_LINEINDEX,
+                                    WPARAM(line_idx),
+                                    LPARAM(0),
+                                )
+                                .0;
+                                if char_idx != -1 {
+                                    SendMessageW(
+                                        hwnd_edit,
+                                        EM_SETSEL,
+                                        WPARAM(char_idx as usize),
+                                        LPARAM(char_idx as isize),
+                                    );
+                                    SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+                                }
+                            }
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_PREV_SPELLING_ERROR => {
+                        log_debug("Menu: Previous spelling error");
+                        go_to_spelling_error(hwnd, false);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_NEXT_SPELLING_ERROR => {
+                        log_debug("Menu: Next spelling error");
+                        go_to_spelling_error(hwnd, true);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_STRIP_MARKDOWN => {
+                        log_debug("Menu: Strip Markdown");
+                        if editor_manager::strip_markdown_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.strip_markdown");
+                            if let Some(hwnd_edit) = get_active_edit(hwnd) {
+                                SetFocus(hwnd_edit);
+                            }
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_AUTO_FORMAT_TTS => {
+                        log_debug("Menu: Auto format TTS");
+                        if editor_manager::auto_format_tts_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.auto_format_tts");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_NORMALIZE_WHITESPACE => {
+                        log_debug("Menu: Normalize whitespace");
+                        if editor_manager::normalize_whitespace_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.normalize_whitespace");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_HARD_LINE_BREAK => {
+                        log_debug("Menu: Hard line break");
+                        if editor_manager::hard_line_break_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.hard_line_break");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_ORDER_ITEMS => {
+                        log_debug("Menu: Order items");
+                        if editor_manager::order_items_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.order_items");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_KEEP_UNIQUE_ITEMS => {
+                        log_debug("Menu: Keep unique items");
+                        if editor_manager::keep_unique_items_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.keep_unique_items");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_REVERSE_ITEMS => {
+                        log_debug("Menu: Reverse items");
+                        if editor_manager::reverse_items_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.reverse_items");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_QUOTE_LINES => {
+                        log_debug("Menu: Quote lines");
+                        if editor_manager::quote_lines_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.quote_lines");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_UNQUOTE_LINES => {
+                        log_debug("Menu: Unquote lines");
+                        if editor_manager::unquote_lines_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.unquote_lines");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_INDENT => {
+                        log_debug("Menu: Indent");
+                        editor_manager::indent_active_edit(hwnd, false);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_OUTDENT => {
+                        log_debug("Menu: Outdent");
+                        editor_manager::indent_active_edit(hwnd, true);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_INSERT_ELLIPSIS => {
+                        log_debug("Menu: Insert ellipsis");
+                        if !editor_manager::is_current_audiobook(hwnd)
+                            && let Some(hwnd_edit) = get_active_edit(hwnd)
+                        {
+                            let text = to_wide("…");
+                            SendMessageW(
+                                hwnd_edit,
+                                EM_REPLACESEL,
+                                WPARAM(1),
+                                LPARAM(text.as_ptr() as isize),
+                            );
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_TEXT_STATS => {
+                        log_debug("Menu: Text stats");
+                        editor_manager::text_stats_active_edit(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_JOIN_LINES => {
+                        log_debug("Menu: Join lines");
+                        if editor_manager::join_lines_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.join_lines");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_CLEAN_EOL_HYPHENS => {
+                        log_debug("Menu: Clean EOL hyphens");
+                        if editor_manager::clean_end_of_line_hyphens_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.clean_eol_hyphens");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_REMOVE_DUPLICATE_LINES => {
+                        log_debug("Menu: Remove duplicate lines");
+                        if editor_manager::remove_duplicate_lines_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.remove_duplicate_lines");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_EDIT_REMOVE_DUPLICATE_CONSECUTIVE_LINES => {
+                        log_debug("Menu: Remove duplicate consecutive lines");
+                        if editor_manager::remove_duplicate_consecutive_lines_active_edit(hwnd) {
+                            confirm_menu_action(hwnd, "edit.remove_duplicate_consecutive_lines");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_PLAY_PAUSE => {
+                        handle_player_command(hwnd, PlayerCommand::TogglePause);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_STOP => {
+                        handle_player_command(hwnd, PlayerCommand::Stop);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_SEEK_FORWARD => {
+                        let skip_seconds =
+                            with_state(hwnd, |state| state.settings.audiobook_skip_seconds)
+                                .unwrap_or(0);
+                        handle_player_command(hwnd, PlayerCommand::Seek(skip_seconds as i64));
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_SEEK_BACKWARD => {
+                        let skip_seconds =
+                            with_state(hwnd, |state| state.settings.audiobook_skip_seconds)
+                                .unwrap_or(0);
+                        handle_player_command(hwnd, PlayerCommand::Seek(-(skip_seconds as i64)));
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_SEEK_TO_START => {
+                        handle_player_command(hwnd, PlayerCommand::SeekToStart);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_SEEK_TO_END => {
+                        handle_player_command(hwnd, PlayerCommand::SeekToEnd);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_TRACK_PREV => {
+                        handle_player_command(hwnd, PlayerCommand::TrackPrev);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_TRACK_NEXT => {
+                        handle_player_command(hwnd, PlayerCommand::TrackNext);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_CHAPTER_PREV => {
+                        handle_chapter_navigation(hwnd, -1);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_CHAPTER_NEXT => {
+                        handle_chapter_navigation(hwnd, 1);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_CHAPTER_LIST => {
+                        handle_chapter_list(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_DOWNLOAD_EPISODE => {
+                        download_active_podcast_episode(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_GO_TO_TIME => {
+                        handle_player_command(hwnd, PlayerCommand::GoToTime);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_ANNOUNCE_TIME => {
+                        handle_player_command(hwnd, PlayerCommand::AnnounceTime);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_ADD_SUBTITLES => {
+                        if let Some(path) = open_subtitle_file_dialog(hwnd) {
+                            let language = with_state(hwnd, |state| state.settings.language)
+                                .unwrap_or_default();
+                            match audio_player::set_audiobook_subtitle_override(hwnd, &path) {
+                                Ok(()) => {}
+                                Err(code) => {
+                                    let key = match code.as_str() {
+                                        "invalid_subtitle" => "playback.add_subtitles_invalid",
+                                        "no_media" => "playback.add_subtitles_no_media",
+                                        _ => "playback.add_subtitles_state",
+                                    };
+                                    let message = i18n::tr(language, key);
+                                    show_error(hwnd, language, &message);
+                                }
+                            }
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_REMOVE_SUBTITLES => {
+                        let language =
+                            with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                        match audio_player::clear_audiobook_subtitle_override(hwnd) {
                             Ok(()) => {}
                             Err(code) => {
                                 let key = match code.as_str() {
-                                    "invalid_subtitle" => "playback.add_subtitles_invalid",
-                                    "no_media" => "playback.add_subtitles_no_media",
-                                    _ => "playback.add_subtitles_state",
+                                    "no_media" => "playback.remove_subtitles_no_media",
+                                    _ => "playback.remove_subtitles_state",
                                 };
                                 let message = i18n::tr(language, key);
                                 show_error(hwnd, language, &message);
                             }
                         }
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_REMOVE_SUBTITLES => {
-                    let language =
-                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-                    match audio_player::clear_audiobook_subtitle_override(hwnd) {
-                        Ok(()) => {}
-                        Err(code) => {
-                            let key = match code.as_str() {
-                                "no_media" => "playback.remove_subtitles_no_media",
-                                _ => "playback.remove_subtitles_state",
-                            };
-                            let message = i18n::tr(language, key);
-                            show_error(hwnd, language, &message);
+                    IDM_PLAYBACK_VOLUME_UP => {
+                        handle_player_command(hwnd, PlayerCommand::Volume(0.1));
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_VOLUME_DOWN => {
+                        handle_player_command(hwnd, PlayerCommand::Volume(-0.1));
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_VOLUME_RESET => {
+                        handle_player_command(hwnd, PlayerCommand::VolumeReset);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_SPEED_UP => {
+                        handle_player_command(hwnd, PlayerCommand::Speed(0.1));
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_SPEED_DOWN => {
+                        handle_player_command(hwnd, PlayerCommand::Speed(-0.1));
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_SPEED_RESET => {
+                        handle_player_command(hwnd, PlayerCommand::SpeedReset);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_PITCH_UP => {
+                        handle_player_command(hwnd, PlayerCommand::Pitch(1.0));
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_PITCH_DOWN => {
+                        handle_player_command(hwnd, PlayerCommand::Pitch(-1.0));
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_PITCH_RESET => {
+                        handle_player_command(hwnd, PlayerCommand::PitchReset);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_MUTE_TOGGLE => {
+                        handle_player_command(hwnd, PlayerCommand::MuteToggle);
+                        LRESULT(0)
+                    }
+                    cmd_id
+                        if (IDM_PLAYBACK_AUDIO_TRACK_BASE
+                            ..IDM_PLAYBACK_AUDIO_TRACK_BASE + IDM_PLAYBACK_AUDIO_TRACK_MAX)
+                            .contains(&cmd_id) =>
+                    {
+                        let track_menu_index = cmd_id - IDM_PLAYBACK_AUDIO_TRACK_BASE;
+                        let track_index = with_state(hwnd, |state| {
+                            state
+                                .available_audio_tracks
+                                .get(track_menu_index)
+                                .map(|t| t.index)
+                        })
+                        .flatten();
+                        if let Some(idx) = track_index {
+                            audio_player::switch_audio_track(hwnd, idx);
                         }
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_VOLUME_UP => {
-                    handle_player_command(hwnd, PlayerCommand::Volume(0.1));
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_VOLUME_DOWN => {
-                    handle_player_command(hwnd, PlayerCommand::Volume(-0.1));
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_VOLUME_RESET => {
-                    handle_player_command(hwnd, PlayerCommand::VolumeReset);
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_SPEED_UP => {
-                    handle_player_command(hwnd, PlayerCommand::Speed(0.1));
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_SPEED_DOWN => {
-                    handle_player_command(hwnd, PlayerCommand::Speed(-0.1));
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_SPEED_RESET => {
-                    handle_player_command(hwnd, PlayerCommand::SpeedReset);
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_PITCH_UP => {
-                    handle_player_command(hwnd, PlayerCommand::Pitch(1.0));
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_PITCH_DOWN => {
-                    handle_player_command(hwnd, PlayerCommand::Pitch(-1.0));
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_PITCH_RESET => {
-                    handle_player_command(hwnd, PlayerCommand::PitchReset);
-                    LRESULT(0)
-                }
-                IDM_PLAYBACK_MUTE_TOGGLE => {
-                    handle_player_command(hwnd, PlayerCommand::MuteToggle);
-                    LRESULT(0)
-                }
-                cmd_id
-                    if (IDM_PLAYBACK_AUDIO_TRACK_BASE
-                        ..IDM_PLAYBACK_AUDIO_TRACK_BASE + IDM_PLAYBACK_AUDIO_TRACK_MAX)
-                        .contains(&cmd_id) =>
-                {
-                    let track_menu_index = cmd_id - IDM_PLAYBACK_AUDIO_TRACK_BASE;
-                    let track_index = with_state(hwnd, |state| {
-                        state
-                            .available_audio_tracks
-                            .get(track_menu_index)
-                            .map(|t| t.index)
-                    })
-                    .flatten();
-                    if let Some(idx) = track_index {
-                        audio_player::switch_audio_track(hwnd, idx);
+                    IDM_VIEW_SHOW_VOICES => {
+                        log_debug("Menu: Toggle voice panel");
+                        toggle_voice_panel(hwnd);
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                IDM_VIEW_SHOW_VOICES => {
-                    log_debug("Menu: Toggle voice panel");
-                    toggle_voice_panel(hwnd);
-                    LRESULT(0)
-                }
-                IDM_VIEW_SHOW_FAVORITES => {
-                    log_debug("Menu: Toggle favorite voices panel");
-                    toggle_favorites_panel(hwnd);
-                    LRESULT(0)
-                }
-                IDM_VIEW_READ_ONLY => {
-                    let new_read_only = with_state(hwnd, |state| {
-                        state.settings.editor_read_only = !state.settings.editor_read_only;
-                        state.settings.editor_read_only
-                    })
-                    .unwrap_or(false);
-                    editor_manager::apply_read_only_to_all_edits(hwnd, new_read_only);
-                    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-                        save_settings(settings);
+                    IDM_VIEW_SHOW_FAVORITES => {
+                        log_debug("Menu: Toggle favorite voices panel");
+                        toggle_favorites_panel(hwnd);
+                        LRESULT(0)
                     }
-                    update_voice_panel_menu_check(hwnd);
-                    LRESULT(0)
-                }
-                IDM_VIEW_WORD_WRAP => {
-                    let new_word_wrap = with_state(hwnd, |state| {
-                        state.settings.word_wrap = !state.settings.word_wrap;
-                        state.settings.word_wrap
-                    })
-                    .unwrap_or(true);
-                    editor_manager::apply_word_wrap_to_all_edits(hwnd, new_word_wrap);
-                    if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-                        save_settings(settings);
-                    }
-                    update_voice_panel_menu_check(hwnd);
-                    LRESULT(0)
-                }
-                cmd_id if font_face_from_menu_id(cmd_id).is_some() => {
-                    let face = font_face_from_menu_id(cmd_id).unwrap_or("Segoe UI");
-                    apply_ui_font(hwnd, face.to_string());
-                    LRESULT(0)
-                }
-                cmd_id if text_color_from_menu_id(cmd_id).is_some() => {
-                    let color = text_color_from_menu_id(cmd_id);
-                    update_text_preferences(hwnd, color, None);
-                    LRESULT(0)
-                }
-                cmd_id if text_size_from_menu_id(cmd_id).is_some() => {
-                    let size = text_size_from_menu_id(cmd_id);
-                    update_text_preferences(hwnd, None, size);
-                    LRESULT(0)
-                }
-                IDM_INSERT_BOOKMARK => {
-                    log_debug("Menu: Insert Bookmark");
-                    insert_bookmark(hwnd);
-                    LRESULT(0)
-                }
-                IDM_GOTO_NEXT_BOOKMARK => {
-                    log_debug("Menu: Go to next bookmark");
-                    goto_relative_bookmark(hwnd, true);
-                    LRESULT(0)
-                }
-                IDM_GOTO_PREV_BOOKMARK => {
-                    log_debug("Menu: Go to previous bookmark");
-                    goto_relative_bookmark(hwnd, false);
-                    LRESULT(0)
-                }
-                IDM_INSERT_CLEAR_BOOKMARKS => {
-                    log_debug("Menu: Clear Current Bookmarks");
-                    if clear_current_bookmarks(hwnd) {
-                        confirm_menu_action(hwnd, "insert.clear_bookmarks");
-                    }
-                    LRESULT(0)
-                }
-                IDM_MANAGE_BOOKMARKS => {
-                    log_debug("Menu: Manage Bookmarks");
-                    app_windows::bookmarks_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_NEXT_TAB => {
-                    next_tab_with_prompt(hwnd);
-                    LRESULT(0)
-                }
-                IDM_WINDOW_OPEN_DOCUMENTS => {
-                    open_documents_popup(hwnd);
-                    LRESULT(0)
-                }
-                cmd_id if window_doc_menu_index_from_command(cmd_id).is_some() => {
-                    if let Some(index) = window_doc_menu_index_from_command(cmd_id) {
-                        select_tab(hwnd, index);
-                    }
-                    LRESULT(0)
-                }
-                IDM_WINDOW_CLOSE_ALL => {
-                    log_debug("Menu: Close all documents");
-                    editor_manager::close_all_documents(hwnd);
-                    LRESULT(0)
-                }
-                IDM_TOOLS_OPTIONS => {
-                    log_debug("Menu: Options");
-                    app_windows::options_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_TOOLS_DICTIONARY => {
-                    log_debug("Menu: Dictionary");
-                    app_windows::dictionary_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_TOOLS_DICTIONARY_LOOKUP => {
-                    log_debug("Menu: Dictionary lookup");
-                    open_dictionary_lookup(hwnd);
-                    LRESULT(0)
-                }
-                IDM_TOOLS_WIKIPEDIA_IMPORT => {
-                    log_debug("Menu: Wikipedia import");
-                    app_windows::wikipedia_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_TOOLS_IMPORT_YOUTUBE => {
-                    log_debug("Menu: Import YouTube transcript");
-                    app_windows::youtube_transcript_window::import_youtube_transcript(hwnd);
-                    LRESULT(0)
-                }
-                IDM_TOOLS_STREAM_AUDIO => {
-                    log_debug("Menu: Stream audio from URL");
-                    app_windows::youtube_transcript_window::play_streaming_audio_from_url(hwnd);
-                    LRESULT(0)
-                }
-                IDM_TOOLS_PROMPT => {
-                    log_debug("Menu: Prompt");
-                    app_windows::prompt_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_TOOLS_RSS => {
-                    log_debug("Menu: RSS");
-                    app_windows::rss_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_TOOLS_PODCASTS => {
-                    log_debug("Menu: Podcasts");
-                    app_windows::podcasts_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_HELP_GUIDE => {
-                    log_debug("Menu: Guide");
-                    app_windows::help_window::open(hwnd);
-                    LRESULT(0)
-                }
-                IDM_HELP_CHANGELOG => {
-                    log_debug("Menu: Changelog");
-                    app_windows::help_window::open_changelog(hwnd);
-                    LRESULT(0)
-                }
-                IDM_HELP_DONATIONS => {
-                    log_debug("Menu: Donations");
-                    app_windows::help_window::open_donations(hwnd);
-                    LRESULT(0)
-                }
-                IDM_HELP_CHECK_UPDATES => {
-                    log_debug("Menu: Check updates");
-                    updater::check_for_update(hwnd, true);
-                    LRESULT(0)
-                }
-                IDM_HELP_ABOUT => {
-                    log_debug("Menu: About");
-                    app_windows::about_window::show(hwnd);
-                    LRESULT(0)
-                }
-                IDM_HELP_EXPORT_DIAGNOSTICS => {
-                    log_debug("Menu: Export diagnostics");
-                    export_diagnostics_dialog(hwnd);
-                    LRESULT(0)
-                }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-            }
-        }
-        WM_CLOSE => {
-            try_close_app(hwnd);
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            PostQuitMessage(0);
-            LRESULT(0)
-        }
-        WM_DROPFILES => {
-            handle_drop_files(hwnd, HDROP(wparam.0 as isize));
-            focus_editor(hwnd);
-            LRESULT(0)
-        }
-        WM_COPYDATA => {
-            let cds = &*(lparam.0 as *const COPYDATASTRUCT);
-            if cds.dwData == COPYDATA_OPEN_FILE && !cds.lpData.is_null() {
-                let len_u16 = (cds.cbData as usize) / 2;
-                let slice = std::slice::from_raw_parts(cds.lpData as *const u16, len_u16);
-                let len = if len_u16 > 0 && slice[len_u16 - 1] == 0 {
-                    len_u16 - 1
-                } else {
-                    len_u16
-                };
-                let joined_paths = String::from_utf16_lossy(&slice[..len]);
-                if !joined_paths.is_empty() {
-                    for path_str in joined_paths.split('|') {
-                        if !path_str.is_empty() {
-                            editor_manager::open_document_from_copydata(hwnd, Path::new(path_str));
+                    IDM_VIEW_READ_ONLY => {
+                        let new_read_only = with_state(hwnd, |state| {
+                            state.settings.editor_read_only = !state.settings.editor_read_only;
+                            state.settings.editor_read_only
+                        })
+                        .unwrap_or(false);
+                        editor_manager::apply_read_only_to_all_edits(hwnd, new_read_only);
+                        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+                            save_settings(settings);
                         }
+                        update_voice_panel_menu_check(hwnd);
+                        LRESULT(0)
                     }
-                    ShowWindow(hwnd, SW_SHOWMAXIMIZED);
-                    bring_window_to_foreground(hwnd);
-                    focus_editor(hwnd);
+                    IDM_VIEW_WORD_WRAP => {
+                        let new_word_wrap = with_state(hwnd, |state| {
+                            state.settings.word_wrap = !state.settings.word_wrap;
+                            state.settings.word_wrap
+                        })
+                        .unwrap_or(true);
+                        editor_manager::apply_word_wrap_to_all_edits(hwnd, new_word_wrap);
+                        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+                            save_settings(settings);
+                        }
+                        update_voice_panel_menu_check(hwnd);
+                        LRESULT(0)
+                    }
+                    cmd_id if font_face_from_menu_id(cmd_id).is_some() => {
+                        let face = font_face_from_menu_id(cmd_id).unwrap_or("Segoe UI");
+                        apply_ui_font(hwnd, face.to_string());
+                        LRESULT(0)
+                    }
+                    cmd_id if text_color_from_menu_id(cmd_id).is_some() => {
+                        let color = text_color_from_menu_id(cmd_id);
+                        update_text_preferences(hwnd, color, None);
+                        LRESULT(0)
+                    }
+                    cmd_id if text_size_from_menu_id(cmd_id).is_some() => {
+                        let size = text_size_from_menu_id(cmd_id);
+                        update_text_preferences(hwnd, None, size);
+                        LRESULT(0)
+                    }
+                    IDM_INSERT_BOOKMARK => {
+                        log_debug("Menu: Insert Bookmark");
+                        insert_bookmark(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_GOTO_NEXT_BOOKMARK => {
+                        log_debug("Menu: Go to next bookmark");
+                        goto_relative_bookmark(hwnd, true);
+                        LRESULT(0)
+                    }
+                    IDM_GOTO_PREV_BOOKMARK => {
+                        log_debug("Menu: Go to previous bookmark");
+                        goto_relative_bookmark(hwnd, false);
+                        LRESULT(0)
+                    }
+                    IDM_INSERT_CLEAR_BOOKMARKS => {
+                        log_debug("Menu: Clear Current Bookmarks");
+                        if clear_current_bookmarks(hwnd) {
+                            confirm_menu_action(hwnd, "insert.clear_bookmarks");
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_MANAGE_BOOKMARKS => {
+                        log_debug("Menu: Manage Bookmarks");
+                        app_windows::bookmarks_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_NEXT_TAB => {
+                        next_tab_with_prompt(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_WINDOW_OPEN_DOCUMENTS => {
+                        open_documents_popup(hwnd);
+                        LRESULT(0)
+                    }
+                    cmd_id if window_doc_menu_index_from_command(cmd_id).is_some() => {
+                        if let Some(index) = window_doc_menu_index_from_command(cmd_id) {
+                            select_tab(hwnd, index);
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_WINDOW_CLOSE_ALL => {
+                        log_debug("Menu: Close all documents");
+                        editor_manager::close_all_documents(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_OPTIONS => {
+                        log_debug("Menu: Options");
+                        app_windows::options_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_DICTIONARY => {
+                        log_debug("Menu: Dictionary");
+                        app_windows::dictionary_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_DICTIONARY_LOOKUP => {
+                        log_debug("Menu: Dictionary lookup");
+                        open_dictionary_lookup(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_WIKIPEDIA_IMPORT => {
+                        log_debug("Menu: Wikipedia import");
+                        app_windows::wikipedia_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_IMPORT_YOUTUBE => {
+                        log_debug("Menu: Import YouTube transcript");
+                        app_windows::youtube_transcript_window::import_youtube_transcript(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_STREAM_AUDIO => {
+                        log_debug("Menu: Stream audio from URL");
+                        app_windows::youtube_transcript_window::play_streaming_audio_from_url(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_PROMPT => {
+                        log_debug("Menu: Prompt");
+                        app_windows::prompt_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_RSS => {
+                        log_debug("Menu: RSS");
+                        app_windows::rss_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_PODCASTS => {
+                        log_debug("Menu: Podcasts");
+                        app_windows::podcasts_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_HELP_GUIDE => {
+                        log_debug("Menu: Guide");
+                        app_windows::help_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_HELP_CHANGELOG => {
+                        log_debug("Menu: Changelog");
+                        app_windows::help_window::open_changelog(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_HELP_DONATIONS => {
+                        log_debug("Menu: Donations");
+                        app_windows::help_window::open_donations(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_HELP_CHECK_UPDATES => {
+                        log_debug("Menu: Check updates");
+                        updater::check_for_update(hwnd, true);
+                        LRESULT(0)
+                    }
+                    IDM_HELP_ABOUT => {
+                        log_debug("Menu: About");
+                        app_windows::about_window::show(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_HELP_EXPORT_DIAGNOSTICS => {
+                        log_debug("Menu: Export diagnostics");
+                        export_diagnostics_dialog(hwnd);
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
-                return LRESULT(1);
             }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AppState;
-            if !ptr.is_null() {
-                let state_box = unsafe { Box::from_raw(ptr) };
-                if state_box.hfont_custom
-                    && state_box.hfont.0 != 0
-                    && !DeleteObject(state_box.hfont).as_bool()
-                {
-                    log_debug("DeleteObject failed for AppState font on destroy");
+            WM_CLOSE => {
+                try_close_app(hwnd);
+                LRESULT(0)
+            }
+            WM_DESTROY => {
+                PostQuitMessage(0);
+                LRESULT(0)
+            }
+            WM_DROPFILES => {
+                handle_drop_files(hwnd, HDROP(wparam.0 as isize));
+                focus_editor(hwnd);
+                LRESULT(0)
+            }
+            WM_COPYDATA => {
+                let cds = &*(lparam.0 as *const COPYDATASTRUCT);
+                if cds.dwData == COPYDATA_OPEN_FILE && !cds.lpData.is_null() {
+                    let len_u16 = (cds.cbData as usize) / 2;
+                    let slice = std::slice::from_raw_parts(cds.lpData as *const u16, len_u16);
+                    let len = if len_u16 > 0 && slice[len_u16 - 1] == 0 {
+                        len_u16 - 1
+                    } else {
+                        len_u16
+                    };
+                    let joined_paths = String::from_utf16_lossy(&slice[..len]);
+                    if !joined_paths.is_empty() {
+                        for path_str in joined_paths.split('|') {
+                            if !path_str.is_empty() {
+                                editor_manager::open_document_from_copydata(
+                                    hwnd,
+                                    Path::new(path_str),
+                                );
+                            }
+                        }
+                        ShowWindow(hwnd, SW_SHOWMAXIMIZED);
+                        bring_window_to_foreground(hwnd);
+                        focus_editor(hwnd);
+                    }
+                    return LRESULT(1);
                 }
+                LRESULT(0)
             }
-            LRESULT(0)
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AppState;
+                if !ptr.is_null() {
+                    let state_box = Box::from_raw(ptr);
+                    if state_box.hfont_custom
+                        && state_box.hfont.0 != 0
+                        && !DeleteObject(state_box.hfont).as_bool()
+                    {
+                        log_debug("DeleteObject failed for AppState font on destroy");
+                    }
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

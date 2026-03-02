@@ -188,204 +188,202 @@ unsafe extern "system" fn dictionary_wndproc(
     crate::panic_guard::guard(
         "dictionary_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { dictionary_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || dictionary_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn dictionary_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let parent = HWND((*create_struct).lpCreateParams as isize);
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let labels = dictionary_labels(language);
+fn dictionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let parent = HWND((*create_struct).lpCreateParams as isize);
+                let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
+                let language =
+                    with_state(parent, |state| state.settings.language).unwrap_or_default();
+                let labels = dictionary_labels(language);
 
-            let hwnd_list = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_LISTBOXW,
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_VSCROLL
-                    | WS_TABSTOP
-                    | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS) as u32),
-                10,
-                10,
-                480,
-                270,
-                hwnd,
-                HMENU(DICT_ID_LIST as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let hwnd_list = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_LISTBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_VSCROLL
+                        | WS_TABSTOP
+                        | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS) as u32),
+                    10,
+                    10,
+                    480,
+                    270,
+                    hwnd,
+                    HMENU(DICT_ID_LIST as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let hwnd_add = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.add).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                10,
-                290,
-                240,
-                30,
-                hwnd,
-                HMENU(DICT_ID_ADD as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let hwnd_add = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.add).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    10,
+                    290,
+                    240,
+                    30,
+                    hwnd,
+                    HMENU(DICT_ID_ADD as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let hwnd_edit = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.edit).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                260,
-                290,
-                230,
-                30,
-                hwnd,
-                HMENU(DICT_ID_EDIT as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let hwnd_edit = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.edit).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    260,
+                    290,
+                    230,
+                    30,
+                    hwnd,
+                    HMENU(DICT_ID_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let hwnd_remove = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.remove).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                10,
-                330,
-                240,
-                30,
-                hwnd,
-                HMENU(DICT_ID_REMOVE as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let hwnd_remove = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.remove).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    10,
+                    330,
+                    240,
+                    30,
+                    hwnd,
+                    HMENU(DICT_ID_REMOVE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let hwnd_close = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.close).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                260,
-                330,
-                230,
-                30,
-                hwnd,
-                HMENU(DICT_ID_CLOSE as isize),
-                HINSTANCE(0),
-                None,
-            );
+                let hwnd_close = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.close).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    260,
+                    330,
+                    230,
+                    30,
+                    hwnd,
+                    HMENU(DICT_ID_CLOSE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            for ctrl in [hwnd_list, hwnd_add, hwnd_edit, hwnd_remove, hwnd_close] {
-                if ctrl.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-                }
-            }
-
-            let state = Box::new(DictionaryWindowState {
-                parent,
-                hwnd_list,
-                hwnd_edit,
-                hwnd_remove,
-            });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-
-            refresh_dictionary_list(hwnd);
-            update_button_states(hwnd);
-            SetFocus(hwnd_list);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            let notify = (wparam.0 >> 16) as u16;
-            match cmd_id {
-                DICT_ID_ADD => {
-                    open_entry_dialog(hwnd, None);
-                    LRESULT(0)
-                }
-                DICT_ID_EDIT => {
-                    if let Some(index) = selected_dictionary_index(hwnd) {
-                        open_entry_dialog(hwnd, Some(index));
+                for ctrl in [hwnd_list, hwnd_add, hwnd_edit, hwnd_remove, hwnd_close] {
+                    if ctrl.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                     }
-                    LRESULT(0)
                 }
-                DICT_ID_REMOVE => {
-                    remove_selected_entry(hwnd);
-                    LRESULT(0)
-                }
-                DICT_ID_CLOSE => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
-                }
-                DICT_ID_LIST if notify == LBN_SELCHANGE as u16 => {
-                    update_button_states(hwnd);
-                    LRESULT(0)
-                }
-                cmd if cmd == IDCANCEL.0 as usize || cmd == 2 => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
-                }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+
+                let state = Box::new(DictionaryWindowState {
+                    parent,
+                    hwnd_list,
+                    hwnd_edit,
+                    hwnd_remove,
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+
+                refresh_dictionary_list(hwnd);
+                update_button_states(hwnd);
+                SetFocus(hwnd_list);
+                LRESULT(0)
             }
-        }
-        DICT_FOCUS_LIST_MSG => {
-            let list = with_dictionary_state(hwnd, |s| s.hwnd_list).unwrap_or(HWND(0));
-            if list.0 != 0 {
-                SetForegroundWindow(hwnd);
-                SetFocus(list);
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                let notify = (wparam.0 >> 16) as u16;
+                match cmd_id {
+                    DICT_ID_ADD => {
+                        open_entry_dialog(hwnd, None);
+                        LRESULT(0)
+                    }
+                    DICT_ID_EDIT => {
+                        if let Some(index) = selected_dictionary_index(hwnd) {
+                            open_entry_dialog(hwnd, Some(index));
+                        }
+                        LRESULT(0)
+                    }
+                    DICT_ID_REMOVE => {
+                        remove_selected_entry(hwnd);
+                        LRESULT(0)
+                    }
+                    DICT_ID_CLOSE => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    DICT_ID_LIST if notify == LBN_SELCHANGE as u16 => {
+                        update_button_states(hwnd);
+                        LRESULT(0)
+                    }
+                    cmd if cmd == IDCANCEL.0 as usize || cmd == 2 => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                }
             }
-            LRESULT(0)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+            DICT_FOCUS_LIST_MSG => {
+                let list = with_dictionary_state(hwnd, |s| s.hwnd_list).unwrap_or(HWND(0));
+                if list.0 != 0 {
+                    SetForegroundWindow(hwnd);
+                    SetFocus(list);
+                }
+                LRESULT(0)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_CLOSE => {
                 crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
+                LRESULT(0)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            let parent = with_dictionary_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                EnableWindow(parent, true);
-                SetForegroundWindow(parent);
-                // Only focus editor if not in player mode (audiobook)
-                if !crate::editor_manager::is_current_audiobook(parent) {
-                    SetFocus(parent);
-                    if let Some(edit) = crate::get_active_edit(parent) {
-                        SetFocus(edit);
+            WM_DESTROY => {
+                let parent = with_dictionary_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                if parent.0 != 0 {
+                    EnableWindow(parent, true);
+                    SetForegroundWindow(parent);
+                    // Only focus editor if not in player mode (audiobook)
+                    if !crate::editor_manager::is_current_audiobook(parent) {
+                        SetFocus(parent);
+                        if let Some(edit) = crate::get_active_edit(parent) {
+                            SetFocus(edit);
+                        }
+                    }
+                    if with_state(parent, |state| {
+                        state.dictionary_window = HWND(0);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access dictionary state");
                     }
                 }
-                if with_state(parent, |state| {
-                    state.dictionary_window = HWND(0);
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access dictionary state");
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryWindowState;
+                if !ptr.is_null() {
+                    let _unused_box = Box::from_raw(ptr);
                 }
+                LRESULT(0)
             }
-            LRESULT(0)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryWindowState;
-            if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
-            }
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

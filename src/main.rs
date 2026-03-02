@@ -10627,7 +10627,7 @@ pub(crate) unsafe fn show_error(hwnd: HWND, language: Language, message: &str) {
     show_error_with_id(hwnd, language, message, None);
 }
 
-pub(crate) unsafe fn show_error_with_id(
+pub(crate) fn show_error_with_id(
     hwnd: HWND,
     language: Language,
     message: &str,
@@ -10642,12 +10642,14 @@ pub(crate) unsafe fn show_error_with_id(
     let wide = to_wide(&full_message);
     let title = to_wide(&error_title(language));
     watchdog::enter_modal_dialog();
-    MessageBoxW(
-        hwnd,
-        PCWSTR(wide.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        MB_OK | MB_ICONERROR,
-    );
+    unsafe {
+        MessageBoxW(
+            hwnd,
+            PCWSTR(wide.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONERROR,
+        );
+    }
     watchdog::exit_modal_dialog();
 }
 

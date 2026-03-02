@@ -11029,123 +11029,125 @@ pub(crate) fn open_subtitle_file_dialog(hwnd: HWND) -> Option<PathBuf> {
     Some(PathBuf::from(String::from_utf16_lossy(&buffer[..len])))
 }
 
-pub(crate) unsafe fn save_file_dialog_with_encoding(
+pub(crate) fn save_file_dialog_with_encoding(
     hwnd: HWND,
     suggested_name: Option<&str>,
     initial_encoding: TextEncoding,
 ) -> Option<(PathBuf, TextEncoding)> {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    unsafe {
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
 
-    let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
+        let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
 
-    let filter_raw = i18n::tr(language, "dialog.save_filter");
-    let parts: Vec<&str> = filter_raw.split("\\0").collect();
-    let mut spec = Vec::new();
-    let mut pattern_wides = Vec::new();
-    let mut name_wides = Vec::new();
-    for i in (0..parts.len().saturating_sub(1)).step_by(2) {
-        if parts[i].is_empty() {
-            break;
-        }
-        name_wides.push(to_wide(parts[i]));
-        pattern_wides.push(to_wide(parts[i + 1]));
-    }
-    for i in 0..name_wides.len() {
-        spec.push(COMDLG_FILTERSPEC {
-            pszName: PCWSTR(name_wides[i].as_ptr()),
-            pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
-        });
-    }
-    pfd.SetFileTypes(&spec).ok()?;
-    pfd.SetFileTypeIndex(1).ok()?; // Default to TXT
-    pfd.SetDefaultExtension(w!("txt")).ok()?;
-    let initial_dir = settings::default_documents_save_folder();
-    crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
-    let initial_dir_w = to_wide(&initial_dir);
-    if let Ok(shell_folder) =
-        SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(initial_dir_w.as_ptr()), None)
-    {
-        let _unused = pfd.SetDefaultFolder(&shell_folder);
-        let _unused = pfd.SetFolder(&shell_folder);
-    }
-
-    if let Some(name) = suggested_name {
-        pfd.SetFileName(PCWSTR(to_wide(name).as_ptr())).ok()?;
-    }
-
-    let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
-    let encoding_label = i18n::tr(language, "dialog.encoding_label");
-    let encodings = vec![
-        i18n::tr(language, "encoding.ansi"),
-        i18n::tr(language, "encoding.utf8"),
-        i18n::tr(language, "encoding.utf8bom"),
-        i18n::tr(language, "encoding.utf16le"),
-        i18n::tr(language, "encoding.utf16be"),
-    ];
-
-    // Use ComboBox with "Codifica: " prefix in each item for NVDA
-    pfdc.AddComboBox(101).ok()?;
-
-    for (i, enc_name) in encodings.iter().enumerate() {
-        let item_text = format!("{} {}", encoding_label, enc_name);
-        pfdc.AddControlItem(101, i as u32, PCWSTR(to_wide(&item_text).as_ptr()))
-            .ok()?;
-    }
-    pfdc.SetSelectedControlItem(101, encoding_to_index(initial_encoding))
-        .ok()?;
-
-    let handler: IFileDialogEvents = CustomFileDialogEventHandler {
-        _encoding_label: encoding_label,
-        _encodings: encodings,
-        _initial_encoding: initial_encoding,
-        _is_save_dialog: true,
-    }
-    .into();
-    let cookie = pfd.Advise(&handler).ok()?;
-
-    // Trigger OnTypeChange to set initial visibility (filter index 1 = TXT for save dialog)
-    crate::log_if_err!(pfd.SetFileTypeIndex(1));
-
-    if pfd.Show(hwnd).is_ok() {
-        let item = pfd.GetResult().ok()?;
-        let path_ptr = item
-            .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
-            .ok()?;
-        let path_str = path_ptr.to_string().unwrap_or_default();
-        CoTaskMemFree(Some(path_ptr.0 as *const _));
-
-        let selected_encoding_idx = pfdc.GetSelectedControlItem(101).ok()?;
-        let filter_index = pfd.GetFileTypeIndex().ok()?;
-
-        let mut path = PathBuf::from(path_str);
-        if path.extension().is_none() {
-            match filter_index {
-                1 => {
-                    path.set_extension("txt");
-                }
-                2 => {
-                    path.set_extension("pdf");
-                }
-                3 => {
-                    path.set_extension("docx");
-                }
-                4 => {
-                    path.set_extension("xlsx");
-                }
-                5 => {
-                    path.set_extension("rtf");
-                }
-                7 => {
-                    path.set_extension("html");
-                }
-                _ => {}
+        let filter_raw = i18n::tr(language, "dialog.save_filter");
+        let parts: Vec<&str> = filter_raw.split("\\0").collect();
+        let mut spec = Vec::new();
+        let mut pattern_wides = Vec::new();
+        let mut name_wides = Vec::new();
+        for i in (0..parts.len().saturating_sub(1)).step_by(2) {
+            if parts[i].is_empty() {
+                break;
             }
+            name_wides.push(to_wide(parts[i]));
+            pattern_wides.push(to_wide(parts[i + 1]));
+        }
+        for i in 0..name_wides.len() {
+            spec.push(COMDLG_FILTERSPEC {
+                pszName: PCWSTR(name_wides[i].as_ptr()),
+                pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
+            });
+        }
+        pfd.SetFileTypes(&spec).ok()?;
+        pfd.SetFileTypeIndex(1).ok()?; // Default to TXT
+        pfd.SetDefaultExtension(w!("txt")).ok()?;
+        let initial_dir = settings::default_documents_save_folder();
+        crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
+        let initial_dir_w = to_wide(&initial_dir);
+        if let Ok(shell_folder) =
+            SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(initial_dir_w.as_ptr()), None)
+        {
+            let _unused = pfd.SetDefaultFolder(&shell_folder);
+            let _unused = pfd.SetFolder(&shell_folder);
         }
 
-        pfd.Unadvise(cookie).ok()?;
-        Some((path, index_to_encoding(selected_encoding_idx)))
-    } else {
-        pfd.Unadvise(cookie).ok()?;
-        None
+        if let Some(name) = suggested_name {
+            pfd.SetFileName(PCWSTR(to_wide(name).as_ptr())).ok()?;
+        }
+
+        let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
+        let encoding_label = i18n::tr(language, "dialog.encoding_label");
+        let encodings = vec![
+            i18n::tr(language, "encoding.ansi"),
+            i18n::tr(language, "encoding.utf8"),
+            i18n::tr(language, "encoding.utf8bom"),
+            i18n::tr(language, "encoding.utf16le"),
+            i18n::tr(language, "encoding.utf16be"),
+        ];
+
+        // Use ComboBox with "Codifica: " prefix in each item for NVDA
+        pfdc.AddComboBox(101).ok()?;
+
+        for (i, enc_name) in encodings.iter().enumerate() {
+            let item_text = format!("{} {}", encoding_label, enc_name);
+            pfdc.AddControlItem(101, i as u32, PCWSTR(to_wide(&item_text).as_ptr()))
+                .ok()?;
+        }
+        pfdc.SetSelectedControlItem(101, encoding_to_index(initial_encoding))
+            .ok()?;
+
+        let handler: IFileDialogEvents = CustomFileDialogEventHandler {
+            _encoding_label: encoding_label,
+            _encodings: encodings,
+            _initial_encoding: initial_encoding,
+            _is_save_dialog: true,
+        }
+        .into();
+        let cookie = pfd.Advise(&handler).ok()?;
+
+        // Trigger OnTypeChange to set initial visibility (filter index 1 = TXT for save dialog)
+        crate::log_if_err!(pfd.SetFileTypeIndex(1));
+
+        if pfd.Show(hwnd).is_ok() {
+            let item = pfd.GetResult().ok()?;
+            let path_ptr = item
+                .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
+                .ok()?;
+            let path_str = path_ptr.to_string().unwrap_or_default();
+            CoTaskMemFree(Some(path_ptr.0 as *const _));
+
+            let selected_encoding_idx = pfdc.GetSelectedControlItem(101).ok()?;
+            let filter_index = pfd.GetFileTypeIndex().ok()?;
+
+            let mut path = PathBuf::from(path_str);
+            if path.extension().is_none() {
+                match filter_index {
+                    1 => {
+                        path.set_extension("txt");
+                    }
+                    2 => {
+                        path.set_extension("pdf");
+                    }
+                    3 => {
+                        path.set_extension("docx");
+                    }
+                    4 => {
+                        path.set_extension("xlsx");
+                    }
+                    5 => {
+                        path.set_extension("rtf");
+                    }
+                    7 => {
+                        path.set_extension("html");
+                    }
+                    _ => {}
+                }
+            }
+
+            pfd.Unadvise(cookie).ok()?;
+            Some((path, index_to_encoding(selected_encoding_idx)))
+        } else {
+            pfd.Unadvise(cookie).ok()?;
+            None
+        }
     }
 }

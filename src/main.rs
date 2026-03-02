@@ -10671,14 +10671,14 @@ pub(crate) unsafe fn show_info(hwnd: HWND, language: Language, message: &str) {
 
 /// Mostra un MessageBox generico sospendendo il watchdog durante la visualizzazione.
 /// Usare per i MessageBox diretti che non passano da show_error/show_info.
-pub(crate) unsafe fn message_box_modal(
+pub(crate) fn message_box_modal(
     hwnd: HWND,
     message: PCWSTR,
     title: PCWSTR,
     flags: MESSAGEBOX_STYLE,
 ) -> MESSAGEBOX_RESULT {
     watchdog::enter_modal_dialog();
-    let result = MessageBoxW(hwnd, message, title, flags);
+    let result = unsafe { MessageBoxW(hwnd, message, title, flags) };
     watchdog::exit_modal_dialog();
     result
 }

@@ -1161,14 +1161,12 @@ fn replace_all_regex(
     if total_count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        unsafe {
-            crate::message_box_modal(
-                hwnd,
-                PCWSTR(message.as_ptr()),
-                PCWSTR(title.as_ptr()),
-                MB_OK | MB_ICONWARNING,
-            );
-        }
+        crate::message_box_modal(
+            hwnd,
+            PCWSTR(message.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONWARNING,
+        );
     } else {
         let message = replaced_count_message(language, total_count);
         unsafe { show_info(hwnd, language, &message) };
@@ -1194,14 +1192,12 @@ fn replace_all_in_all_docs(hwnd: HWND, search: &str, replace: &str, flags: FINDR
     if total_count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        unsafe {
-            crate::message_box_modal(
-                hwnd,
-                PCWSTR(message.as_ptr()),
-                PCWSTR(title.as_ptr()),
-                MB_OK | MB_ICONWARNING,
-            );
-        }
+        crate::message_box_modal(
+            hwnd,
+            PCWSTR(message.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONWARNING,
+        );
     } else {
         let message = replaced_count_message(language, total_count);
         unsafe { show_info(hwnd, language, &message) };
@@ -1232,14 +1228,12 @@ fn replace_all_in_selection(
     if count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
-        unsafe {
-            crate::message_box_modal(
-                hwnd,
-                PCWSTR(message.as_ptr()),
-                PCWSTR(title.as_ptr()),
-                MB_OK | MB_ICONWARNING,
-            );
-        }
+        crate::message_box_modal(
+            hwnd,
+            PCWSTR(message.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONWARNING,
+        );
     } else {
         let message = replaced_count_message(language, count);
         unsafe { show_info(hwnd, language, &message) };

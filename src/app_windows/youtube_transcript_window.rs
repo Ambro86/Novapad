@@ -2548,208 +2548,210 @@ unsafe extern "system" fn stream_track_dialog_wndproc(
     crate::panic_guard::guard(
         "stream_track_dialog_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { stream_track_dialog_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || stream_track_dialog_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn stream_track_dialog_wndproc_inner(
+fn stream_track_dialog_wndproc_inner(
     hwnd: HWND,
     msg: u32,
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*create_struct).lpCreateParams as *mut StreamTrackDialogInit;
-            if init_ptr.is_null() {
-                return LRESULT(0);
-            }
-            let init = Box::from_raw(init_ptr);
-            let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
-
-            let label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(
-                    to_wide(&plain_label(&i18n::tr(
-                        init.language,
-                        "playback.audio_track",
-                    )))
-                    .as_ptr(),
-                ),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                18,
-                120,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                140,
-                16,
-                300,
-                220,
-                hwnd,
-                HMENU(STREAM_TRACK_ID_COMBO as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let ok_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                260,
-                56,
-                88,
-                28,
-                hwnd,
-                HMENU(STREAM_TRACK_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let cancel_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                352,
-                56,
-                88,
-                28,
-                hwnd,
-                HMENU(STREAM_TRACK_ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            for control in [label, combo, ok_button, cancel_button] {
-                if control.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*create_struct).lpCreateParams as *mut StreamTrackDialogInit;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
                 }
-            }
+                let init = Box::from_raw(init_ptr);
+                let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let auto_label = i18n::tr(init.language, "stream_audio.track.auto");
-            let auto_w = to_wide(&auto_label);
-            SendMessageW(
-                combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(auto_w.as_ptr() as isize),
-            );
-            for track in &init.tracks {
-                let w = to_wide(&track.label);
-                SendMessageW(combo, CB_ADDSTRING, WPARAM(0), LPARAM(w.as_ptr() as isize));
-            }
-            SendMessageW(combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-
-            let state = Box::new(StreamTrackDialogState {
-                parent: init.parent,
-                language: init.language,
-                combo,
-                ok_button,
-                tracks: init.tracks,
-                result: init.result,
-            });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-            SetFocus(combo);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            if cmd_id == STREAM_TRACK_ID_OK || cmd_id == 1 {
-                if with_stream_track_dialog_state(hwnd, |state| {
-                    let msg = i18n::tr(state.language, "podcasts.loading");
-                    if !screen_reader_speak(&msg) {
-                        crate::log_debug("Screen reader speak failed");
-                    }
-                    let idx = SendMessageW(state.combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                    let selected: Option<Option<String>> = if idx <= 0 {
-                        Some(None)
-                    } else {
-                        state
-                            .tracks
-                            .get((idx - 1) as usize)
-                            .map(|t| Some(t.format_id.clone()))
-                    };
-                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = selected;
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access stream track dialog state");
-                }
-                crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
-                return LRESULT(0);
-            }
-            if cmd_id == STREAM_TRACK_ID_CANCEL || cmd_id == 2 {
-                if with_stream_track_dialog_state(hwnd, |state| {
-                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access stream track dialog state");
-                }
-                crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                crate::log_if_err!(PostMessageW(
+                let label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(
+                        to_wide(&plain_label(&i18n::tr(
+                            init.language,
+                            "playback.audio_track",
+                        )))
+                        .as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    18,
+                    120,
+                    20,
                     hwnd,
-                    WM_COMMAND,
-                    WPARAM(STREAM_TRACK_ID_CANCEL),
-                    LPARAM(0)
-                ));
-                return LRESULT(0);
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    140,
+                    16,
+                    300,
+                    220,
+                    hwnd,
+                    HMENU(STREAM_TRACK_ID_COMBO as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let ok_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    260,
+                    56,
+                    88,
+                    28,
+                    hwnd,
+                    HMENU(STREAM_TRACK_ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let cancel_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    352,
+                    56,
+                    88,
+                    28,
+                    hwnd,
+                    HMENU(STREAM_TRACK_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                for control in [label, combo, ok_button, cancel_button] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
+                }
+
+                let auto_label = i18n::tr(init.language, "stream_audio.track.auto");
+                let auto_w = to_wide(&auto_label);
+                SendMessageW(
+                    combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(auto_w.as_ptr() as isize),
+                );
+                for track in &init.tracks {
+                    let w = to_wide(&track.label);
+                    SendMessageW(combo, CB_ADDSTRING, WPARAM(0), LPARAM(w.as_ptr() as isize));
+                }
+                SendMessageW(combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+
+                let state = Box::new(StreamTrackDialogState {
+                    parent: init.parent,
+                    language: init.language,
+                    combo,
+                    ok_button,
+                    tracks: init.tracks,
+                    result: init.result,
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                SetFocus(combo);
+                LRESULT(0)
             }
-            if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                let ok = with_stream_track_dialog_state(hwnd, |state| state.ok_button)
-                    .unwrap_or(HWND(0));
-                if GetFocus() == ok {
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                if cmd_id == STREAM_TRACK_ID_OK || cmd_id == 1 {
+                    if with_stream_track_dialog_state(hwnd, |state| {
+                        let msg = i18n::tr(state.language, "podcasts.loading");
+                        if !screen_reader_speak(&msg) {
+                            crate::log_debug("Screen reader speak failed");
+                        }
+                        let idx = SendMessageW(state.combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                        let selected: Option<Option<String>> = if idx <= 0 {
+                            Some(None)
+                        } else {
+                            state
+                                .tracks
+                                .get((idx - 1) as usize)
+                                .map(|t| Some(t.format_id.clone()))
+                        };
+                        *state.result.lock().unwrap_or_else(|e| e.into_inner()) = selected;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access stream track dialog state");
+                    }
+                    crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                    return LRESULT(0);
+                }
+                if cmd_id == STREAM_TRACK_ID_CANCEL || cmd_id == 2 {
+                    if with_stream_track_dialog_state(hwnd, |state| {
+                        *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access stream track dialog state");
+                    }
+                    crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
                     crate::log_if_err!(PostMessageW(
                         hwnd,
                         WM_COMMAND,
-                        WPARAM(STREAM_TRACK_ID_OK),
+                        WPARAM(STREAM_TRACK_ID_CANCEL),
                         LPARAM(0)
                     ));
                     return LRESULT(0);
                 }
+                if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                    let ok = with_stream_track_dialog_state(hwnd, |state| state.ok_button)
+                        .unwrap_or(HWND(0));
+                    if GetFocus() == ok {
+                        crate::log_if_err!(PostMessageW(
+                            hwnd,
+                            WM_COMMAND,
+                            WPARAM(STREAM_TRACK_ID_OK),
+                            LPARAM(0)
+                        ));
+                        return LRESULT(0);
+                    }
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            if with_stream_track_dialog_state(hwnd, |state| {
-                EnableWindow(state.parent, true);
-                SetForegroundWindow(state.parent);
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access stream track dialog state");
+            WM_CLOSE => {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
             }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamTrackDialogState;
-            if !ptr.is_null() {
-                let _unused = Box::from_raw(ptr);
+            WM_DESTROY => {
+                if with_stream_track_dialog_state(hwnd, |state| {
+                    EnableWindow(state.parent, true);
+                    SetForegroundWindow(state.parent);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access stream track dialog state");
+                }
+                LRESULT(0)
             }
-            LRESULT(0)
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamTrackDialogState;
+                if !ptr.is_null() {
+                    let _unused = Box::from_raw(ptr);
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

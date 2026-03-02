@@ -319,7 +319,7 @@ fn handle_indent_tab_key(
 }
 
 pub fn indent_active_edit(hwnd: HWND, shift_down: bool) -> bool {
-    unsafe {
+    {
         let Some(hwnd_edit) = crate::get_active_edit(hwnd) else {
             return false;
         };
@@ -778,7 +778,7 @@ fn apply_indent_settings_to_edit(hwnd_edit: HWND, settings: &AppSettings) {
 }
 
 pub(crate) fn apply_indent_settings_to_all_edits(hwnd: HWND, settings: &AppSettings) {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             for doc in &state.docs {
                 if doc.hwnd_edit.0 != 0 {
@@ -798,7 +798,7 @@ fn apply_text_limit(hwnd_edit: HWND) {
 }
 
 pub fn apply_text_limit_to_all_edits(hwnd: HWND) {
-    let edits = unsafe {
+    let edits = {
         with_state(hwnd, |state| {
             state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
         })
@@ -1357,7 +1357,7 @@ fn get_text_range(hwnd_edit: HWND, range: CHARRANGE) -> String {
 }
 
 pub fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
-    let edits = unsafe {
+    let edits = {
         with_state(hwnd, |state| {
             state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
         })
@@ -1377,7 +1377,7 @@ pub fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
 }
 
 pub fn apply_text_appearance_to_all_edits(hwnd: HWND, text_color: u32, text_size: i32) {
-    let edits = unsafe {
+    let edits = {
         with_state(hwnd, |state| {
             state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
         })
@@ -1393,7 +1393,7 @@ pub fn apply_text_appearance_to_all_edits(hwnd: HWND, text_color: u32, text_size
 }
 
 pub fn apply_font_to_all_edits(hwnd: HWND, hfont: HFONT) {
-    let edits = unsafe {
+    let edits = {
         with_state(hwnd, |state| {
             state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>()
         })
@@ -1408,7 +1408,7 @@ pub fn apply_font_to_all_edits(hwnd: HWND, hfont: HFONT) {
 }
 
 pub fn apply_read_only_to_all_edits(hwnd: HWND, read_only: bool) {
-    let edit_targets = unsafe {
+    let edit_targets = {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -1481,7 +1481,7 @@ fn end_single_undo_action(hwnd_edit: HWND) {
 
 pub fn try_normalize_undo(hwnd: HWND) -> bool {
     let mut undo = None;
-    if unsafe {
+    if {
         with_state(hwnd, |state| {
             undo = state.normalize_undo.clone();
         })
@@ -1494,7 +1494,7 @@ pub fn try_normalize_undo(hwnd: HWND) -> bool {
         return false;
     };
     if undo.hwnd_edit.0 == 0 {
-        if unsafe { with_state(hwnd, |state| state.normalize_undo = None) }.is_none() {
+        if { with_state(hwnd, |state| state.normalize_undo = None) }.is_none() {
             crate::log_debug("Failed to access editor state");
         }
         return false;
@@ -1502,13 +1502,13 @@ pub fn try_normalize_undo(hwnd: HWND) -> bool {
     let current_text = get_edit_text(undo.hwnd_edit);
     if current_text == undo.text {
         // Stale snapshot: do not consume Ctrl+Z, let normal editor undo run.
-        if unsafe { with_state(hwnd, |state| state.normalize_undo = None) }.is_none() {
+        if { with_state(hwnd, |state| state.normalize_undo = None) }.is_none() {
             crate::log_debug("Failed to access editor state");
         }
         return false;
     }
 
-    if unsafe {
+    if {
         with_state(hwnd, |state| {
             state.normalize_undo = None;
         })
@@ -1531,7 +1531,7 @@ pub fn try_normalize_undo(hwnd: HWND) -> bool {
             LPARAM(&mut cr as *mut _ as isize),
         );
     }
-    if unsafe {
+    if {
         with_state(hwnd, |state| {
             for (idx, doc) in state.docs.iter_mut().enumerate() {
                 if doc.hwnd_edit == undo.hwnd_edit {
@@ -1576,7 +1576,7 @@ pub fn undo_active_edit_skip_navigation(hwnd: HWND) -> bool {
 }
 
 pub fn handle_normalize_edit_change(hwnd: HWND, hwnd_edit: HWND) {
-    if unsafe {
+    if {
         with_state(hwnd, |state| {
             if state.normalize_skip_change {
                 state.normalize_skip_change = false;
@@ -1604,8 +1604,7 @@ pub fn strip_markdown_active_edit(hwnd: HWND) -> bool {
         return false;
     }
     let keep_bullets =
-        unsafe { with_state(hwnd, |state| state.settings.strip_markdown_keep_bullets) }
-            .unwrap_or(false);
+        { with_state(hwnd, |state| state.settings.strip_markdown_keep_bullets) }.unwrap_or(false);
     let cleaned = strip_markdown_text(&text, keep_bullets);
     if cleaned == text {
         return false;
@@ -1723,7 +1722,7 @@ pub fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
     if normalized == affected {
         return false;
     }
-    let was_dirty = unsafe {
+    let was_dirty = {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -1756,7 +1755,7 @@ pub fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
     }
     // Single-undo guarantee.
     unsafe { SendMessageW(hwnd_edit, EM_STOPGROUPTYPING, WPARAM(0), LPARAM(0)) };
-    let result = unsafe {
+    let result = {
         with_state(hwnd, |state| {
             state.normalize_undo = Some(NormalizeUndo {
                 hwnd_edit,
@@ -2418,7 +2417,7 @@ pub fn text_stats_active_edit(hwnd: HWND) {
         return;
     };
     let text = get_edit_text(hwnd_edit);
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if text.is_empty() {
         let message = build_text_stats_message(language, 0, 0, 0, 0);
         crate::show_info(hwnd, language, &message);
@@ -3023,7 +3022,7 @@ fn collect_bracket_text<I: Iterator<Item = char>>(
 // --- Document Management ---
 
 pub fn new_document(hwnd: HWND) {
-    unsafe {
+    {
         let new_index = with_state(hwnd, |state| {
             state.untitled_count += 1;
             let language = state.settings.language;
@@ -3325,7 +3324,7 @@ pub fn open_document_from_copydata(hwnd: HWND, path: &Path) {
 /// Returns true if the current document is an audiobook (player mode).
 /// Use this to avoid showing/focusing the editor when in player mode.
 pub fn is_current_audiobook(hwnd: HWND) -> bool {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -3338,7 +3337,7 @@ pub fn is_current_audiobook(hwnd: HWND) -> bool {
 }
 
 pub fn mark_current_document_from_rss(hwnd: HWND, from_rss: bool) {
-    let result = unsafe {
+    let result = {
         with_state(hwnd, |state| {
             if let Some(doc) = state.docs.get_mut(state.current) {
                 doc.from_rss = from_rss;
@@ -3351,7 +3350,7 @@ pub fn mark_current_document_from_rss(hwnd: HWND, from_rss: bool) {
 }
 
 pub fn current_document_is_from_rss(hwnd: HWND) -> bool {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -3364,7 +3363,7 @@ pub fn current_document_is_from_rss(hwnd: HWND) -> bool {
 }
 
 pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
-    unsafe {
+    {
         let (index, hwnd_edit) = with_state(hwnd, |state| {
             if let Some((idx, doc)) = state
                 .docs
@@ -3489,7 +3488,7 @@ pub fn update_tab_title(hwnd_tab: HWND, index: usize, title: &str, dirty: bool) 
 }
 
 pub fn mark_dirty_from_edit(hwnd: HWND, hwnd_edit: HWND) {
-    unsafe {
+    {
         if with_state(hwnd, |state| {
             for (i, doc) in state.docs.iter_mut().enumerate() {
                 if doc.hwnd_edit == hwnd_edit && !doc.dirty {
@@ -3975,7 +3974,7 @@ pub fn save_current_document_as(hwnd: HWND) -> bool {
 }
 
 pub fn save_all_documents(hwnd: HWND) -> bool {
-    let doc_count = unsafe { with_state(hwnd, |state| state.docs.len()) }.unwrap_or(0);
+    let doc_count = { with_state(hwnd, |state| state.docs.len()) }.unwrap_or(0);
     let mut dirty_indices = Vec::new();
     for index in 0..doc_count {
         if sync_dirty_from_edit(hwnd, index) {
@@ -4199,7 +4198,7 @@ pub fn refresh_current_editor_visual(hwnd: HWND) {
 }
 
 pub fn close_current_document(hwnd: HWND) {
-    let index = match unsafe { with_state(hwnd, |state| state.current) } {
+    let index = match with_state(hwnd, |state| state.current) {
         Some(i) => i,
         None => return,
     };
@@ -4210,11 +4209,10 @@ pub fn close_current_document(hwnd: HWND) {
 
 pub fn close_other_documents(hwnd: HWND) -> bool {
     loop {
-        let (current, total) =
-            match unsafe { with_state(hwnd, |state| (state.current, state.docs.len())) } {
-                Some(values) => values,
-                None => return true,
-            };
+        let (current, total) = match with_state(hwnd, |state| (state.current, state.docs.len())) {
+            Some(values) => values,
+            None => return true,
+        };
         if total <= 1 {
             return true;
         }
@@ -4226,7 +4224,7 @@ pub fn close_other_documents(hwnd: HWND) -> bool {
 }
 
 pub fn close_all_documents(hwnd: HWND) -> bool {
-    let initial_total = unsafe { with_state(hwnd, |state| state.docs.len()) }.unwrap_or(0);
+    let initial_total = { with_state(hwnd, |state| state.docs.len()) }.unwrap_or(0);
     for _ in 0..initial_total {
         if !close_document_at(hwnd, 0) {
             return false;
@@ -4456,11 +4454,11 @@ pub fn confirm_save_if_dirty_entry(hwnd: HWND, index: usize, title: &str) -> boo
 }
 
 pub fn get_current_index(hwnd: HWND) -> usize {
-    unsafe { with_state(hwnd, |state| state.current) }.unwrap_or(0)
+    { with_state(hwnd, |state| state.current) }.unwrap_or(0)
 }
 
 pub fn get_tab(hwnd: HWND) -> HWND {
-    unsafe { with_state(hwnd, |state| state.hwnd_tab) }.unwrap_or(HWND(0))
+    { with_state(hwnd, |state| state.hwnd_tab) }.unwrap_or(HWND(0))
 }
 
 #[cfg(test)]

@@ -154,7 +154,7 @@ fn interpreter_select_wndproc_inner(
             }
             let init = unsafe { Box::from_raw(init_ptr) };
             let parent = init.parent;
-            let hfont = unsafe { with_state(parent, |state| state.hfont) }.unwrap_or(HFONT(0));
+            let hfont = { with_state(parent, |state| state.hfont) }.unwrap_or(HFONT(0));
 
             let list = unsafe {
                 CreateWindowExW(

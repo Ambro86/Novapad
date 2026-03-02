@@ -223,7 +223,7 @@ fn labels(language: Language) -> PodcastLabels {
 }
 
 pub fn open(parent: HWND) {
-    let existing = unsafe { with_state(parent, |state| state.podcast_window) }.unwrap_or(HWND(0));
+    let existing = { with_state(parent, |state| state.podcast_window) }.unwrap_or(HWND(0));
     if existing.0 != 0 {
         unsafe {
             SetForegroundWindow(existing);
@@ -247,8 +247,7 @@ pub fn open(parent: HWND) {
         RegisterClassW(&wc);
     }
 
-    let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let title = to_wide(&labels(language).title);
 
     let window = unsafe {
@@ -1893,7 +1892,7 @@ fn stop_recording_action(state: &mut PodcastState, hwnd: HWND) {
         let dialog = podcast_save_window::open(hwnd);
         if dialog.0 != 0 {
             state.saving_dialog = dialog;
-            unsafe {
+            {
                 if with_state(state.parent, |app| {
                     app.podcast_save_window = dialog;
                 })
@@ -1981,7 +1980,7 @@ fn persist_settings(state: &PodcastState) {
     let output_format = selected_format(state);
     let bitrate = selected_bitrate(state);
     let save_folder = selected_save_folder(state).to_string_lossy().to_string();
-    unsafe {
+    {
         if with_state(state.parent, |app| {
             app.settings.podcast_include_microphone = include_mic;
             app.settings.podcast_microphone_device_id = mic_device_id;

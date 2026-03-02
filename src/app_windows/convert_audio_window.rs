@@ -152,11 +152,10 @@ pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessagi
 }
 
 pub fn open(parent: HWND) {
-    let existing =
-        unsafe { with_state(parent, |state| state.convert_audio_window).unwrap_or(HWND(0)) };
+    let existing = { with_state(parent, |state| state.convert_audio_window).unwrap_or(HWND(0)) };
     if existing.0 != 0 {
         if unsafe { !IsWindow(existing).as_bool() } {
-            let result = unsafe {
+            let result = {
                 with_state(parent, |state| {
                     state.convert_audio_window = HWND(0);
                 })
@@ -172,8 +171,7 @@ pub fn open(parent: HWND) {
         }
     }
 
-    let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let class_name = to_wide(CONVERT_CLASS_NAME);
     let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
     let wc = WNDCLASSW {
@@ -211,7 +209,7 @@ pub fn open(parent: HWND) {
         return;
     }
 
-    if unsafe {
+    if {
         with_state(parent, |state| {
             state.convert_audio_window = hwnd;
         })
@@ -860,7 +858,7 @@ fn map_format(format: AudioFormat) -> ConvertAudioFormat {
 }
 
 fn current_media_path(parent: HWND) -> Option<PathBuf> {
-    unsafe {
+    {
         with_state(parent, |state| {
             if let Some(player) = &state.active_audiobook {
                 return Some(player.path.clone());

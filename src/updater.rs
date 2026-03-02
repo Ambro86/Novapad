@@ -52,7 +52,7 @@ const EXIT_REPLACE_FAILED: i32 = 6;
 const EXIT_REBOOT_REQUIRED: i32 = 10;
 
 fn app_language(hwnd: HWND) -> Language {
-    unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() }
+    with_state(hwnd, |state| state.settings.language).unwrap_or_default()
 }
 
 #[derive(Deserialize)]

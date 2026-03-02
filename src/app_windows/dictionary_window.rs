@@ -424,8 +424,8 @@ pub fn refresh_dictionary_list(hwnd: HWND) {
     let selected = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0;
     unsafe { SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
 
-    let entries = unsafe { with_state(parent, |state| state.settings.dictionary.clone()) }
-        .unwrap_or_default();
+    let entries =
+        { with_state(parent, |state| state.settings.dictionary.clone()) }.unwrap_or_default();
     for (idx, entry) in entries.iter().enumerate() {
         let label = format!("{} -> {}", entry.original, entry.replacement);
         let lb_idx = unsafe {
@@ -487,7 +487,7 @@ fn remove_selected_entry(hwnd: HWND) {
     let Some(index) = selected_dictionary_index(hwnd) else {
         return;
     };
-    if unsafe {
+    if {
         with_state(parent, |state| {
             if index < state.settings.dictionary.len() {
                 state.settings.dictionary.remove(index);
@@ -525,8 +525,7 @@ fn open_entry_dialog(owner: HWND, index: Option<usize>) {
     };
     unsafe { RegisterClassW(&wc) };
 
-    let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let labels = dictionary_labels(language);
     let title = if index.is_some() {
         &labels.entry_title_edit
@@ -567,7 +566,7 @@ fn open_entry_dialog(owner: HWND, index: Option<usize>) {
     };
 
     if dialog.0 != 0 {
-        if unsafe {
+        if {
             with_state(parent, |state| {
                 state.dictionary_entry_dialog = dialog;
             })
@@ -981,7 +980,7 @@ fn apply_entry_dialog(hwnd: HWND) {
     let custom_engine = None;
     let custom_voice = None;
 
-    if unsafe {
+    if {
         with_state(parent, |state| {
             let entry = DictionaryEntry {
                 original,
@@ -1071,7 +1070,7 @@ fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
         _ => TtsEngine::Edge,
     };
 
-    let voices: Vec<VoiceInfo> = unsafe {
+    let voices: Vec<VoiceInfo> = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
@@ -1081,7 +1080,7 @@ fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
     };
 
     let language =
-        unsafe { with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian) };
+        { with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian) };
     let labels = dictionary_labels(language);
 
     unsafe {
@@ -1163,7 +1162,7 @@ fn preview_entry_voice(hwnd: HWND) {
         };
 
     let language =
-        unsafe { with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian) };
+        { with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian) };
 
     // Use the replacement text if available, otherwise use the original word
     let replacement = get_window_text(edit_replacement);
@@ -1189,7 +1188,7 @@ fn preview_entry_voice(hwnd: HWND) {
         _ => TtsEngine::Edge,
     };
 
-    let voices: Vec<VoiceInfo> = unsafe {
+    let voices: Vec<VoiceInfo> = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
@@ -1251,7 +1250,7 @@ fn preview_entry_voice(hwnd: HWND) {
             };
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if unsafe {
+            if {
                 with_state(parent, |state| {
                     state.tts_session = Some(tts_engine::TtsSession {
                         id: state.tts_next_session_id,
@@ -1275,7 +1274,7 @@ fn preview_entry_voice(hwnd: HWND) {
             tts_engine::stop_tts_playback(parent);
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if unsafe {
+            if {
                 with_state(parent, |state| {
                     state.tts_session = Some(tts_engine::TtsSession {
                         id: state.tts_next_session_id,

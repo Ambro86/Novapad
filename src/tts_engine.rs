@@ -405,39 +405,38 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     let Some(hwnd_edit) = get_active_edit(hwnd) else {
         return;
     };
-    let (language, split_on_newline, tts_engine, dictionary, tts_rate, tts_pitch, tts_volume) =
-        unsafe {
-            with_state(hwnd, |state| {
-                (
-                    state.settings.language,
-                    state.settings.split_on_newline,
-                    state.settings.tts_engine,
-                    state.settings.dictionary.clone(),
-                    state.settings.tts_rate,
-                    state.settings.tts_pitch,
-                    state.settings.tts_volume,
-                )
-            })
-        }
-        .unwrap_or((
-            Language::Italian,
-            true,
-            TtsEngine::Edge,
-            Vec::new(),
-            0,
-            0,
-            100,
-        ));
+    let (language, split_on_newline, tts_engine, dictionary, tts_rate, tts_pitch, tts_volume) = {
+        with_state(hwnd, |state| {
+            (
+                state.settings.language,
+                state.settings.split_on_newline,
+                state.settings.tts_engine,
+                state.settings.dictionary.clone(),
+                state.settings.tts_rate,
+                state.settings.tts_pitch,
+                state.settings.tts_volume,
+            )
+        })
+    }
+    .unwrap_or((
+        Language::Italian,
+        true,
+        TtsEngine::Edge,
+        Vec::new(),
+        0,
+        0,
+        100,
+    ));
 
     let (mut text, initial_caret_pos) = get_text_from_caret(hwnd_edit);
     let dialogue_settings =
-        unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
+        { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
     text = crate::dialogue_voice::apply_dialogue_tags_from_settings(&text, &dialogue_settings);
     if text.trim().is_empty() {
         show_error(hwnd, language, &settings::tts_no_text_message(language));
         return;
     }
-    let voice = unsafe {
+    let voice = {
         with_state(hwnd, |state| state.settings.tts_voice.clone())
             .unwrap_or_else(|| "it-IT-IsabellaNeural".to_string())
     };
@@ -486,7 +485,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             };
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if unsafe {
+            if {
                 with_state(hwnd, |state| {
                     state.tts_session = Some(TtsSession {
                         id: state.tts_next_session_id,
@@ -511,7 +510,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             stop_tts_playback(hwnd);
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if unsafe {
+            if {
                 with_state(hwnd, |state| {
                     state.tts_session = Some(TtsSession {
                         id: state.tts_next_session_id,
@@ -582,7 +581,7 @@ fn queue_tts_playback_from_text(options: TtsQueuedPlayback) {
 }
 
 pub fn toggle_tts_pause(hwnd: HWND) {
-    if unsafe {
+    if {
         with_state(hwnd, |state| {
             let Some(session) = &mut state.tts_session else {
                 return;
@@ -611,7 +610,7 @@ pub fn toggle_tts_pause(hwnd: HWND) {
 pub fn stop_tts_playback(hwnd: HWND) {
     crate::telemetry::set_tts_active(false);
     prevent_sleep(false);
-    if unsafe {
+    if {
         with_state(hwnd, |state| {
             if let Some(session) = &state.tts_session {
                 session.cancel.store(true, Ordering::SeqCst);
@@ -852,11 +851,11 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
     }
 
     let language =
-        unsafe { with_state(options.hwnd, |state| state.settings.language) }.unwrap_or_default();
+        { with_state(options.hwnd, |state| state.settings.language) }.unwrap_or_default();
     let (tx, rx) = mpsc::unbounded_channel::<TtsCommand>();
     let cancel = Arc::new(AtomicBool::new(false));
     let cancel_flag = cancel.clone();
-    let session_id = unsafe {
+    let session_id = {
         with_state(options.hwnd, |state| {
             let id = state.tts_next_session_id;
             state.tts_next_session_id = state.tts_next_session_id.saturating_add(1);
@@ -3965,7 +3964,7 @@ fn start_audiobook_with_text(
     is_unsaved_doc: bool,
     _doc_path: Option<&Path>,
 ) {
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if text.trim().is_empty() {
         show_error(hwnd, language, &settings::tts_no_text_message(language));
         return;
@@ -3988,7 +3987,7 @@ fn start_audiobook_with_text(
         tts_rate,
         tts_pitch,
         tts_volume,
-    ) = unsafe {
+    ) = {
         with_state(hwnd, |state| {
             (
                 state.settings.tts_voice.clone(),
@@ -4029,7 +4028,7 @@ fn start_audiobook_with_text(
         100,
     ));
     let dialogue_settings =
-        unsafe { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
+        { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
     text = crate::dialogue_voice::apply_dialogue_tags_from_settings(&text, &dialogue_settings);
 
     let base_split_option_visible = audiobook_split_by_time
@@ -4230,7 +4229,7 @@ fn start_audiobook_with_text(
     };
     let mut output = save_result.path;
     let create_parts_folder = save_result.create_parts_folder;
-    let audiobook_m4b_bitrate = unsafe {
+    let audiobook_m4b_bitrate = {
         with_state(hwnd, |state| state.settings.audiobook_m4b_bitrate)
             .unwrap_or(initial_audiobook_m4b_bitrate)
     };
@@ -4304,7 +4303,7 @@ fn start_audiobook_with_text(
     let progress_total = chunks_len.saturating_add(extra_progress_steps);
 
     let cancel_token = Arc::new(AtomicBool::new(false));
-    let progress_hwnd = unsafe {
+    let progress_hwnd = {
         let h = crate::app_windows::audiobook_window::open(hwnd, progress_total);
         if with_state(hwnd, |state| {
             state.audiobook_progress = h;
@@ -4643,7 +4642,7 @@ pub fn start_audiobook(hwnd: HWND) {
         return;
     };
     let text = get_edit_text(hwnd_edit);
-    let (suggested_name, doc_path, split_epub, language, is_unsaved_doc) = unsafe {
+    let (suggested_name, doc_path, split_epub, language, is_unsaved_doc) = {
         with_state(hwnd, |state| {
             state.docs.get(state.current).map(|doc| {
                 let p = Path::new(&doc.title);
@@ -4700,12 +4699,11 @@ pub fn start_audiobook_from_selection(hwnd: HWND) {
     };
     let text = crate::editor_manager::get_selected_text(hwnd_edit);
     let Some(text) = text else {
-        let language =
-            unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+        let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         show_error(hwnd, language, &settings::tts_no_text_message(language));
         return;
     };
-    let suggested_name = unsafe {
+    let suggested_name = {
         with_state(hwnd, |state| {
             state.docs.get(state.current).map(|doc| {
                 let p = Path::new(&doc.title);

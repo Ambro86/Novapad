@@ -218,7 +218,7 @@ pub fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
 }
 
 pub fn find_next_from_state(hwnd: HWND) {
-    unsafe {
+    {
         let (search, flags, language): (String, FINDREPLACE_FLAGS, Language) =
             with_state(hwnd, |state| {
                 let len = state
@@ -259,7 +259,7 @@ pub fn find_next_from_state(hwnd: HWND) {
 }
 
 pub fn find_previous_from_state(hwnd: HWND) {
-    unsafe {
+    {
         let (search, mut flags, language): (String, FINDREPLACE_FLAGS, Language) =
             with_state(hwnd, |state| {
                 let len = state
@@ -553,7 +553,7 @@ pub fn replace_all(
 }
 
 fn get_find_options(hwnd: HWND) -> FindOptions {
-    unsafe {
+    {
         with_state(hwnd, |state| FindOptions {
             use_regex: state.find_use_regex,
             dot_matches_newline: state.find_dot_matches_newline,
@@ -594,7 +594,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
             let fr = unsafe { &*(lparam.0 as *const FINDREPLACEW) };
             let parent = fr.hwndOwner;
             let language =
-                unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+                { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
             let is_replace = fr.lCustData.0 == REPLACE_DIALOG_ID;
             let (width, height, client_bottom) = dialog_metrics(hdlg);
 
@@ -729,7 +729,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
             match cmd_id {
                 FIND_ID_REGEX => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_REGEX);
-                    unsafe {
+                    {
                         with_state(parent, |state| {
                             state.find_use_regex = checked;
                         });
@@ -737,7 +737,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 }
                 FIND_ID_DOT_MATCHES_NEWLINE => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_DOT_MATCHES_NEWLINE);
-                    unsafe {
+                    {
                         with_state(parent, |state| {
                             state.find_dot_matches_newline = checked;
                         });
@@ -745,7 +745,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 }
                 FIND_ID_WRAP_AROUND => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_WRAP_AROUND);
-                    unsafe {
+                    {
                         with_state(parent, |state| {
                             state.find_wrap_around = checked;
                         });
@@ -753,7 +753,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 }
                 FIND_ID_MATCH_CASE => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_MATCH_CASE);
-                    unsafe {
+                    {
                         with_state(parent, |state| {
                             state.find_match_case = checked;
                         });
@@ -761,7 +761,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 }
                 FIND_ID_WHOLE_WORD => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_WHOLE_WORD);
-                    unsafe {
+                    {
                         with_state(parent, |state| {
                             state.find_whole_word = checked;
                         });
@@ -769,7 +769,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 }
                 REPLACE_ID_IN_SELECTION => {
                     let checked = is_checkbox_checked(hdlg, REPLACE_ID_IN_SELECTION);
-                    unsafe {
+                    {
                         with_state(parent, |state| {
                             state.find_replace_in_selection = checked;
                             if checked {
@@ -783,7 +783,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 }
                 REPLACE_ID_IN_ALL_DOCS => {
                     let checked = is_checkbox_checked(hdlg, REPLACE_ID_IN_ALL_DOCS);
-                    unsafe {
+                    {
                         with_state(parent, |state| {
                             state.find_replace_in_all_docs = checked;
                             if checked {
@@ -912,7 +912,7 @@ fn find_next_regex(
     wrap: bool,
     options: &FindOptions,
 ) -> bool {
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let regex = match build_regex(search, flags, options) {
         Ok(regex) => regex,
         Err(err) => {
@@ -1032,7 +1032,7 @@ fn replace_selection_if_match_regex(
     flags: FINDREPLACE_FLAGS,
     options: &FindOptions,
 ) -> bool {
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let regex = match build_regex(search, flags, options) {
         Ok(regex) => regex,
         Err(err) => {
@@ -1089,7 +1089,7 @@ fn replace_all_regex(
     if search.is_empty() {
         return;
     }
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let regex = match build_regex(search, flags, options) {
         Ok(regex) => regex,
         Err(err) => {
@@ -1102,7 +1102,7 @@ fn replace_all_regex(
     let mut total_count = 0usize;
 
     if options.replace_in_all_docs {
-        let edits = unsafe {
+        let edits = {
             with_state(hwnd, |state| {
                 state
                     .docs
@@ -1174,7 +1174,7 @@ fn replace_all_regex(
 }
 
 fn replace_all_in_all_docs(hwnd: HWND, search: &str, replace: &str, flags: FINDREPLACE_FLAGS) {
-    let edits = unsafe {
+    let edits = {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -1188,7 +1188,7 @@ fn replace_all_in_all_docs(hwnd: HWND, search: &str, replace: &str, flags: FINDR
     for hwnd_doc in edits {
         total_count += replace_all_in_range(hwnd_doc, search, replace, flags, 0, -1);
     }
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if total_count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));
@@ -1224,7 +1224,7 @@ fn replace_all_in_selection(
         return;
     }
     let count = replace_all_in_range(hwnd_edit, search, replace, flags, cr.cpMin, cr.cpMax);
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if count == 0 {
         let message = to_wide(&text_not_found_message(language));
         let title = to_wide(&find_title(language));

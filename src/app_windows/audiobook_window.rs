@@ -154,7 +154,7 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
             let create_struct = lparam.0 as *const CREATESTRUCTW;
             let parent = unsafe { HWND((*create_struct).lpCreateParams as isize) };
             let language =
-                unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+                { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
             let label_text = progress_text(language, 0);
             let cancel_text = i18n::tr(language, "audiobook.cancel");
 
@@ -328,7 +328,7 @@ pub fn request_cancel(hwnd: HWND) {
         return;
     }
 
-    let already_cancelled = unsafe {
+    let already_cancelled = {
         with_state(parent, |state| {
             state
                 .audiobook_cancel
@@ -343,8 +343,7 @@ pub fn request_cancel(hwnd: HWND) {
         return;
     }
 
-    let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let msg = i18n::tr(language, "audiobook.cancel_confirm");
     let title = i18n::tr(language, "app.confirm_title");
 
@@ -360,7 +359,7 @@ pub fn request_cancel(hwnd: HWND) {
         )
     } == IDYES
     {
-        if unsafe {
+        if {
             with_state(parent, |state| {
                 if let Some(cancel) = &state.audiobook_cancel {
                     cancel.store(true, Ordering::Relaxed);

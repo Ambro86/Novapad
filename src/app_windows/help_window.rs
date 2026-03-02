@@ -236,7 +236,7 @@ pub fn open_readonly_text(parent: HWND, title: &str, content: &str) {
 }
 
 fn open_window(parent: HWND, kind: HelpWindowKind) {
-    let existing = unsafe {
+    let existing = {
         with_state(parent, |state| match kind {
             HelpWindowKind::Guide => state.help_window,
             HelpWindowKind::Changelog => state.changelog_window,
@@ -263,8 +263,7 @@ fn open_window(parent: HWND, kind: HelpWindowKind) {
     };
     unsafe { RegisterClassW(&wc) };
 
-    let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let title = to_wide(&help_title(language, kind));
     let init = Box::new(HelpWindowInit {
         parent,
@@ -290,7 +289,7 @@ fn open_window(parent: HWND, kind: HelpWindowKind) {
     };
 
     if window.0 != 0 {
-        if unsafe {
+        if {
             with_state(parent, |state| match kind {
                 HelpWindowKind::Guide => state.help_window = window,
                 HelpWindowKind::Changelog => state.changelog_window = window,

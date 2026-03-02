@@ -550,7 +550,7 @@ fn import_podcast_sources_from_file(hwnd: HWND, path: &Path) -> Option<usize> {
         return None;
     }
     let mut added = 0usize;
-    unsafe {
+    {
         if with_state(parent, |state| {
             let mut existing: HashSet<String> = state
                 .settings
@@ -614,8 +614,8 @@ fn export_podcast_sources_to_file(hwnd: HWND, path: &Path) -> Result<usize, Stri
     if parent.0 == 0 {
         return Err("missing parent".to_string());
     }
-    let sources = unsafe { with_state(parent, |state| state.settings.podcast_sources.clone()) }
-        .unwrap_or_default();
+    let sources =
+        { with_state(parent, |state| state.settings.podcast_sources.clone()) }.unwrap_or_default();
     if sources.is_empty() {
         return Ok(0);
     }
@@ -815,7 +815,7 @@ fn announce_status(message: &str) {
 }
 
 fn ensure_rss_http(parent: HWND) {
-    let config = unsafe {
+    let config = {
         with_state(parent, |s| rss::config_from_settings(&s.settings))
             .unwrap_or_else(rss::RssHttpConfig::default)
     };
@@ -825,7 +825,7 @@ fn ensure_rss_http(parent: HWND) {
 }
 
 fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
-    unsafe {
+    {
         with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
             .unwrap_or_else(rss::RssFetchConfig::default)
     }
@@ -1016,7 +1016,7 @@ fn selected_source_name(hwnd: HWND) -> Option<String> {
     if parent.0 == 0 {
         return None;
     }
-    unsafe {
+    {
         with_state(parent, |ps| {
             ps.settings.podcast_sources.get(index).map(|src| {
                 if src.title.trim().is_empty() {
@@ -1065,7 +1065,7 @@ fn show_selected_properties(hwnd: HWND) {
     let mut lines: Vec<String> = Vec::new();
     match node {
         Some(NodeData::Source(index)) => {
-            let source = unsafe {
+            let source = {
                 with_state(parent_hwnd, |ps| {
                     ps.settings.podcast_sources.get(index).cloned()
                 })
@@ -1213,7 +1213,7 @@ fn source_removed_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<String> 
     let Some(idx) = source_index else {
         return HashSet::new();
     };
-    unsafe {
+    {
         with_state(parent, |ps| {
             ps.settings
                 .podcast_sources
@@ -1238,7 +1238,7 @@ fn source_read_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<String> {
     let Some(idx) = source_index else {
         return HashSet::new();
     };
-    unsafe {
+    {
         with_state(parent, |ps| {
             ps.settings
                 .podcast_sources
@@ -1272,7 +1272,7 @@ fn prune_persisted_played_keys_for_source(hwnd: HWND, hitem: HTREEITEM) {
     if parent.0 == 0 {
         return;
     }
-    unsafe {
+    {
         with_state(parent, |ps| {
             if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
                 let before = src.read_item_keys.len();
@@ -1298,7 +1298,7 @@ fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, node: NodeData, force: bo
             .map(|state| state.items.is_empty())
             .unwrap_or(true);
         let (url, cache) = match node {
-            NodeData::Source(idx) => unsafe {
+            NodeData::Source(idx) => {
                 with_state(parent, |ps| {
                     ps.settings
                         .podcast_sources
@@ -1438,7 +1438,7 @@ fn update_source_cache(
     cache: rss::RssFeedCache,
     last_updated: Option<i64>,
 ) {
-    if unsafe {
+    if {
         with_state(parent, |ps| {
             if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
                 src.cache = cache;
@@ -1483,7 +1483,7 @@ fn start_background_unheard_check(hwnd: HWND) {
         return;
     }
 
-    let sources: Vec<(usize, String, rss::RssFeedCache)> = unsafe {
+    let sources: Vec<(usize, String, rss::RssFeedCache)> = {
         with_state(parent, |ps| {
             ps.settings
                 .podcast_sources
@@ -1500,7 +1500,7 @@ fn start_background_unheard_check(hwnd: HWND) {
     }
 
     let fetch_config = rss_fetch_config(parent);
-    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     ensure_rss_http(parent);
 
     let hwnd_raw = hwnd.0;
@@ -1580,7 +1580,7 @@ fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
         return;
     };
 
-    let should_mark_unheard = unsafe {
+    let should_mark_unheard = {
         with_state(parent, |ps| {
             ps.settings
                 .podcast_sources
@@ -1622,9 +1622,9 @@ fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize, feed_t
     if parent.0 == 0 {
         return;
     }
-    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     let mut updated = None;
-    let did_access = unsafe {
+    let did_access = {
         with_state(parent, |ps| {
             if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
                 let looks_auto = src.title.trim().is_empty() || src.title == src.url;
@@ -1733,7 +1733,7 @@ fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<PodcastEpisode
 
     let (language, announce_unread, unread_label_position, podcast_date_mode, podcast_time_mode) =
         with_podcast_state(hwnd, |s| {
-            unsafe {
+            {
                 with_state(s.parent, |ps| {
                     (
                         ps.settings.language,
@@ -1854,7 +1854,7 @@ fn create_tree_item(hwnd_tree: HWND, title: &str, index: usize) -> HTREEITEM {
 fn reload_tree(hwnd: HWND) {
     let (hwnd_tree, sources, language, announce_unread, unread_label_position) =
         with_podcast_state(hwnd, |s| {
-            let (sources, language, announce_unread, unread_label_position) = unsafe {
+            let (sources, language, announce_unread, unread_label_position) = {
                 with_state(s.parent, |ps| {
                     (
                         ps.settings.podcast_sources.clone(),
@@ -1995,7 +1995,7 @@ fn mark_episode_played_with_ui_delay(
             if let Some(NodeData::Source(source_index)) = s.node_data.get(&source_hitem.0)
                 && parent.0 != 0
             {
-                unsafe {
+                {
                     with_state(parent, |ps| {
                         if let Some(src) = ps.settings.podcast_sources.get_mut(*source_index)
                             && !src.read_item_keys.iter().any(|k| k == &episode_key_value)
@@ -2027,7 +2027,7 @@ fn mark_episode_played_with_ui_delay(
 
 fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
     let Some(url) = episode.enclosure_url.as_ref() else {
-        let language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
+        let language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
         announce_status(&i18n::tr(language, "podcasts.no_audio_url"));
         return;
     };
@@ -2090,7 +2090,7 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
     }
 
     // Show loading message immediately so user knows action was triggered
-    let language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
     announce_status(&i18n::tr(language, "podcasts.loading"));
 
     if parent.0 != 0 {
@@ -2129,7 +2129,7 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
 
     let hwnd_copy = hwnd;
     let cache_limit_mb =
-        unsafe { with_state(parent, |s| s.settings.podcast_cache_limit_mb) }.unwrap_or(500);
+        { with_state(parent, |s| s.settings.podcast_cache_limit_mb) }.unwrap_or(500);
     let cache_dir = podcast_cache_dir();
     with_podcast_state(hwnd, |s| {
         s.download_in_progress = true;
@@ -2489,8 +2489,8 @@ fn set_source_unheard(hwnd: HWND, hitem: HTREEITEM, unheard: bool) {
         let Some(idx) = source_idx else {
             return (hwnd_tree, None);
         };
-        let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
-        let title_opt = unsafe {
+        let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+        let title_opt = {
             with_state(parent, |ps| {
                 if let Some(src) = ps.settings.podcast_sources.get_mut(idx) {
                     let mut changed = false;
@@ -2532,7 +2532,7 @@ fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Option<usize
     if normalized.is_empty() {
         return None;
     }
-    unsafe {
+    {
         with_state(parent, |ps| {
             if ps
                 .settings
@@ -3342,8 +3342,7 @@ fn apply_category_selection(hwnd: HWND) {
 
 fn show_categories_dialog(parent_hwnd: HWND) {
     let main_hwnd = with_podcast_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let existing =
-        unsafe { with_state(main_hwnd, |s| s.podcasts_categories_dialog) }.unwrap_or(HWND(0));
+    let existing = { with_state(main_hwnd, |s| s.podcasts_categories_dialog) }.unwrap_or(HWND(0));
     if existing.0 != 0 {
         unsafe { SetForegroundWindow(existing) };
         return;
@@ -3401,7 +3400,7 @@ fn show_categories_dialog(parent_hwnd: HWND) {
         return;
     }
     if main_hwnd.0 != 0 {
-        unsafe { with_state(main_hwnd, |s| s.podcasts_categories_dialog = hwnd) };
+        with_state(main_hwnd, |s| s.podcasts_categories_dialog = hwnd);
     }
 }
 
@@ -4082,7 +4081,7 @@ fn subscribe_selected_result(hwnd: HWND) {
     let result = &results[idx as usize];
     let new_index = add_podcast_source(parent, &result.feed_url, &result.title);
     if let Some(index) = new_index {
-        let language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
+        let language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
         announce_status(&i18n::tr(language, "podcasts.added"));
 
         // Show confirmation dialog
@@ -4099,7 +4098,7 @@ fn subscribe_selected_result(hwnd: HWND) {
 
         let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
         if hwnd_tree.0 != 0 {
-            let display = unsafe {
+            let display = {
                 with_state(parent, |ps| {
                     ps.settings.podcast_sources.get(index).map(|src| {
                         podcast_source_display_title(
@@ -4144,7 +4143,7 @@ fn subscribe_selected_result(hwnd: HWND) {
 
 fn show_add_dialog(parent_hwnd: HWND) {
     let main_hwnd = with_podcast_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let existing = unsafe { with_state(main_hwnd, |s| s.podcasts_add_dialog) }.unwrap_or(HWND(0));
+    let existing = { with_state(main_hwnd, |s| s.podcasts_add_dialog) }.unwrap_or(HWND(0));
     if existing.0 != 0 {
         unsafe { SetForegroundWindow(existing) };
         return;
@@ -4191,7 +4190,7 @@ fn show_add_dialog(parent_hwnd: HWND) {
         }
         return;
     }
-    unsafe { with_state(main_hwnd, |s| s.podcasts_add_dialog = hwnd) };
+    with_state(main_hwnd, |s| s.podcasts_add_dialog = hwnd);
 }
 
 unsafe extern "system" fn add_wndproc(
@@ -5024,14 +5023,14 @@ fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                 load_episode_children(hwnd, hitem, NodeData::Source(source_index), true);
                 if parent.0 != 0 {
                     let language =
-                        unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
+                        { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
                     announce_status(&i18n::tr(language, "podcasts.updated"));
                 }
             }
         }
         SourceAction::Remove => {
             let confirm = if parent.0 != 0 {
-                let (language, require_confirm) = unsafe {
+                let (language, require_confirm) = {
                     with_state(parent, |s| {
                         (
                             s.settings.language,
@@ -5069,13 +5068,13 @@ fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                 update_delete_button_state(hwnd);
                 return;
             }
-            let removed_source = unsafe {
+            let removed_source = {
                 with_state(parent, |ps| {
                     ps.settings.podcast_sources.get(source_index).cloned()
                 })
             }
             .flatten();
-            let removed = unsafe {
+            let removed = {
                 with_state(parent, |ps| {
                     if source_index < ps.settings.podcast_sources.len() {
                         ps.settings.podcast_sources.remove(source_index);
@@ -5096,8 +5095,7 @@ fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                         });
                     });
                 }
-                let language =
-                    unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
+                let language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
                 announce_status(&i18n::tr(language, "podcasts.removed"));
                 reload_tree(hwnd);
                 update_delete_button_state(hwnd);
@@ -5134,7 +5132,7 @@ fn handle_source_action(hwnd: HWND, verb: SourceAction) {
             }
         }
         SourceAction::CopyUrl => {
-            let url = unsafe {
+            let url = {
                 with_state(parent, |ps| {
                     ps.settings
                         .podcast_sources
@@ -5149,7 +5147,7 @@ fn handle_source_action(hwnd: HWND, verb: SourceAction) {
             }
         }
         SourceAction::OpenFeed => {
-            let url = unsafe {
+            let url = {
                 with_state(parent, |ps| {
                     ps.settings
                         .podcast_sources
@@ -5212,7 +5210,7 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                 Some(url),
                 Some(item.title.clone()),
                 Some(cache_path),
-                unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default(),
+                { with_state(parent, |s| s.settings.language) }.unwrap_or_default(),
             );
         }
         EpisodeAction::ViewDescription => {
@@ -5223,7 +5221,7 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
         EpisodeAction::Remove => {
             let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
             let selected_hitem = selected_tree_item(hwnd);
-            let (language, require_confirm) = unsafe {
+            let (language, require_confirm) = {
                 with_state(parent, |s| {
                     (
                         s.settings.language,
@@ -5305,7 +5303,7 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                     .flatten();
                 if let Some(source_idx) = source_index {
                     source_idx_for_undo = Some(source_idx);
-                    unsafe {
+                    {
                         with_state(parent, |ps| {
                             if let Some(src) = ps.settings.podcast_sources.get_mut(source_idx)
                                 && !src.removed_item_keys.iter().any(|k| k == &key)
@@ -5698,7 +5696,7 @@ fn show_description_dialog(parent: HWND, title: &str, content: &str) {
     if hwnd.0 != 0 {
         let main_hwnd = with_podcast_state(parent, |s| s.parent).unwrap_or(HWND(0));
         if main_hwnd.0 != 0 {
-            unsafe { with_state(main_hwnd, |s| s.podcasts_description_dialog = hwnd) };
+            with_state(main_hwnd, |s| s.podcasts_description_dialog = hwnd);
         }
     } else {
         unsafe {
@@ -5981,7 +5979,7 @@ fn apply_reorder_action(
     if source_index >= root_items.len() {
         return None;
     }
-    let new_index = unsafe {
+    let new_index = {
         with_state(parent, |ps| {
             let moved = match action {
                 ReorderAction::Up => settings::move_podcast_feed_up(&mut ps.settings, source_index),
@@ -6019,8 +6017,8 @@ fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
         return;
     };
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
-    let total = unsafe { with_state(parent, |ps| ps.settings.podcast_sources.len()) }.unwrap_or(0);
+    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let total = { with_state(parent, |ps| ps.settings.podcast_sources.len()) }.unwrap_or(0);
     if total == 0 {
         return;
     }
@@ -6046,7 +6044,7 @@ fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
 
 fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    unsafe {
+    {
         with_state(parent, |ps| {
             crate::settings::sort_podcast_sources(&mut ps.settings, order);
             crate::settings::save_settings(ps.settings.clone());
@@ -10738,7 +10736,7 @@ fn apple_lookup_by_ids(ids: &[u64], country: &str) -> Option<String> {
 }
 
 fn podcastindex_credentials_or_prompt(hwnd: HWND, parent: HWND) -> Option<(String, String)> {
-    let (user_key, user_secret) = unsafe {
+    let (user_key, user_secret) = {
         with_state(parent, |ps| {
             (
                 ps.settings.podcast_index_api_key.clone(),
@@ -10752,7 +10750,7 @@ fn podcastindex_credentials_or_prompt(hwnd: HWND, parent: HWND) -> Option<(Strin
     let secret = user_secret.unwrap_or_default();
     let missing = key.trim().is_empty() || secret.trim().is_empty();
     if missing {
-        let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+        let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
         let title = i18n::tr(language, "podcasts.podcastindex.missing_title");
         let body = i18n::tr(language, "podcasts.podcastindex.missing_body");
         let response = unsafe {

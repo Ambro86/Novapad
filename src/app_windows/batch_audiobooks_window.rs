@@ -292,11 +292,10 @@ fn status_text(labels: &BatchLabels, status: BatchStatusCode) -> &str {
 }
 
 pub fn open(parent: HWND) {
-    let existing =
-        unsafe { with_state(parent, |state| state.batch_audiobooks_window).unwrap_or(HWND(0)) };
+    let existing = { with_state(parent, |state| state.batch_audiobooks_window).unwrap_or(HWND(0)) };
     if existing.0 != 0 {
         if unsafe { !IsWindow(existing).as_bool() } {
-            let result = unsafe {
+            let result = {
                 with_state(parent, |state| {
                     state.batch_audiobooks_window = HWND(0);
                 })
@@ -312,8 +311,7 @@ pub fn open(parent: HWND) {
         }
     }
 
-    let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let class_name = to_wide(BATCH_CLASS_NAME);
     let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
     let wc = WNDCLASSW {
@@ -351,7 +349,7 @@ pub fn open(parent: HWND) {
         return;
     }
 
-    if unsafe {
+    if {
         with_state(parent, |state| {
             state.batch_audiobooks_window = hwnd;
         })
@@ -1144,7 +1142,7 @@ fn start_batch(state: &mut BatchState) {
     } else {
         AudioFormat::Mp3
     };
-    let (tts_engine, tts_voice) = unsafe {
+    let (tts_engine, tts_voice) = {
         with_state(state.parent, |app| {
             (app.settings.tts_engine, app.settings.tts_voice.clone())
         })
@@ -1523,7 +1521,7 @@ fn read_control_text(hwnd: HWND) -> String {
 }
 
 fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSettings {
-    unsafe {
+    {
         with_state(parent, |state| TtsSettings {
             voice,
             split_on_newline: state.settings.split_on_newline,

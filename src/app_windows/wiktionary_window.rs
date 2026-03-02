@@ -780,8 +780,8 @@ fn run_lookup(hwnd: HWND) {
     }) else {
         return;
     };
-    let ui_language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
-    let pref = unsafe {
+    let ui_language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
+    let pref = {
         with_state(parent, |s| {
             s.settings.dictionary_translation_language.clone()
         })
@@ -839,7 +839,7 @@ fn run_lookup(hwnd: HWND) {
 
     unsafe { SetFocus(output) };
 
-    let history = unsafe {
+    let history = {
         with_state(parent, |state| {
             let history = &mut state.settings.dictionary_search_history;
             history.retain(|item| !item.eq_ignore_ascii_case(&trimmed));
@@ -853,14 +853,13 @@ fn run_lookup(hwnd: HWND) {
     }
     .unwrap_or_default();
     refresh_history_combo(input, &history);
-    if let Some(settings_clone) = unsafe { with_state(parent, |state| state.settings.clone()) } {
+    if let Some(settings_clone) = { with_state(parent, |state| state.settings.clone()) } {
         crate::settings::save_settings(settings_clone);
     }
 
     let key = dictionary_cache_key(lookup_language, &pref, &trimmed);
     let cached_lines =
-        unsafe { with_state(parent, |state| state.dictionary_cache.get(&key).cloned()) }
-            .unwrap_or(None);
+        { with_state(parent, |state| state.dictionary_cache.get(&key).cloned()) }.unwrap_or(None);
     if let Some(lines) = cached_lines {
         if is_dictionary_not_found_cache_entry(lookup_language, &lines) {
             remove_dictionary_cache(parent, &key);

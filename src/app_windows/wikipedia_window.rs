@@ -617,8 +617,8 @@ fn run_search(hwnd: HWND) {
     }) else {
         return;
     };
-    let language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
-    let pref = unsafe { with_state(parent, |s| s.settings.wikipedia_language.clone()) }
+    let language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
+    let pref = { with_state(parent, |s| s.settings.wikipedia_language.clone()) }
         .unwrap_or_else(|| "auto".to_string());
     let label_set = labels(language);
 
@@ -714,8 +714,8 @@ fn start_import(hwnd: HWND) {
     }
     let (language, pref, selection) = with_window_state(hwnd, |state| {
         (
-            unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default(),
-            unsafe { with_state(parent, |s| s.settings.wikipedia_language.clone()) }
+            { with_state(parent, |s| s.settings.language) }.unwrap_or_default(),
+            { with_state(parent, |s| s.settings.wikipedia_language.clone()) }
                 .unwrap_or_else(|| "auto".to_string()),
             state.results_data.get(sel as usize).cloned(),
         )

@@ -487,7 +487,7 @@ fn show_selected_properties(hwnd: HWND) {
     }
 
     let language = with_rss_state(hwnd, |s| {
-        unsafe { with_state(s.parent, |ps| ps.settings.language) }.unwrap_or_default()
+        { with_state(s.parent, |ps| ps.settings.language) }.unwrap_or_default()
     })
     .unwrap_or_default();
 
@@ -495,8 +495,7 @@ fn show_selected_properties(hwnd: HWND) {
         let node = s.node_data.get(&hitem.0).cloned();
         let source = match &node {
             Some(NodeData::Source(idx)) => {
-                unsafe { with_state(s.parent, |ps| ps.settings.rss_sources.get(*idx).cloned()) }
-                    .flatten()
+                { with_state(s.parent, |ps| ps.settings.rss_sources.get(*idx).cloned()) }.flatten()
             }
             _ => None,
         };
@@ -816,8 +815,8 @@ fn export_sources_to_opml_file(hwnd: HWND, path: &Path) -> Result<usize, String>
     if parent.0 == 0 {
         return Err("missing parent".to_string());
     }
-    let sources = unsafe { with_state(parent, |state| state.settings.rss_sources.clone()) }
-        .unwrap_or_default();
+    let sources =
+        { with_state(parent, |state| state.settings.rss_sources.clone()) }.unwrap_or_default();
     if sources.is_empty() {
         return Ok(0);
     }
@@ -877,40 +876,39 @@ fn import_sources_from_file(hwnd: HWND, path: &Path) {
         return;
     }
     let mut added = 0;
-    if unsafe {
-        with_state(parent, |state| {
-            let mut existing: std::collections::HashSet<String> = state
-                .settings
-                .rss_sources
-                .iter()
-                .map(|s| s.url.clone())
-                .collect();
-            for (title, url) in opml_sources {
-                let key = url.clone();
-                if existing.contains(&key) {
-                    continue;
-                }
-                state.settings.rss_sources.push(RssSource {
-                    title: title.clone(),
-                    url: url.clone(),
-                    kind: RssSourceType::Feed,
-                    user_title: title.trim() != url.trim(),
-                    unread: false,
-                    cache: RssFeedCache::default(),
-                    last_seen_guid: None,
-                    last_updated: None,
-                    removed_item_keys: Vec::new(),
-                    read_item_keys: Vec::new(),
-                });
-                existing.insert(key);
-                added += 1;
+    if with_state(parent, |state| {
+        let mut existing: std::collections::HashSet<String> = state
+            .settings
+            .rss_sources
+            .iter()
+            .map(|s| s.url.clone())
+            .collect();
+        for (title, url) in opml_sources {
+            let key = url.clone();
+            if existing.contains(&key) {
+                continue;
             }
-            if added > 0 {
-                crate::settings::save_settings(state.settings.clone());
-            }
-        })
-        .is_none()
-    } {
+            state.settings.rss_sources.push(RssSource {
+                title: title.clone(),
+                url: url.clone(),
+                kind: RssSourceType::Feed,
+                user_title: title.trim() != url.trim(),
+                unread: false,
+                cache: RssFeedCache::default(),
+                last_seen_guid: None,
+                last_updated: None,
+                removed_item_keys: Vec::new(),
+                read_item_keys: Vec::new(),
+            });
+            existing.insert(key);
+            added += 1;
+        }
+        if added > 0 {
+            crate::settings::save_settings(state.settings.clone());
+        }
+    })
+    .is_none()
+    {
         crate::log_debug("Failed to access state in import_opml_file");
     }
     if added > 0 {
@@ -986,7 +984,7 @@ fn source_removed_keys_for_tree_item(
     let Some(idx) = source_index else {
         return HashSet::new();
     };
-    unsafe {
+    {
         with_state(parent, |ps| {
             ps.settings
                 .rss_sources
@@ -1036,7 +1034,7 @@ fn prune_persisted_read_keys_for_source(
         return;
     }
 
-    unsafe {
+    {
         with_state(parent, |ps| {
             if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
                 let before = src.read_item_keys.len();
@@ -1183,7 +1181,7 @@ fn announce_rss_status(message: &str) {
 }
 
 fn rss_page_sizes(parent: HWND) -> (usize, usize) {
-    unsafe {
+    {
         with_state(parent, |s| {
             (
                 s.settings.rss_initial_page_size,
@@ -1195,7 +1193,7 @@ fn rss_page_sizes(parent: HWND) -> (usize, usize) {
 }
 
 fn ensure_rss_http(parent: HWND) {
-    let config = unsafe {
+    let config = {
         with_state(parent, |s| rss::config_from_settings(&s.settings))
             .unwrap_or_else(rss::RssHttpConfig::default)
     };
@@ -1205,7 +1203,7 @@ fn ensure_rss_http(parent: HWND) {
 }
 
 fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
-    unsafe {
+    {
         with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
             .unwrap_or_else(rss::RssFetchConfig::default)
     }
@@ -1466,12 +1464,12 @@ fn apply_default_sources(
 }
 
 fn ensure_default_sources(parent: HWND) {
-    let language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
     let defaults = load_default_feeds(language);
     if defaults.is_empty() {
         return;
     }
-    unsafe {
+    {
         with_state(parent, |s| {
             let changed = match language {
                 crate::settings::Language::Ukrainian
@@ -3257,10 +3255,10 @@ fn reload_tree(hwnd: HWND) {
         match with_rss_state(hwnd, |s| {
             (
                 s.hwnd_tree,
-                unsafe { with_state(s.parent, |ps| ps.settings.rss_sources.clone()) },
-                unsafe { with_state(s.parent, |ps| ps.settings.language) },
-                unsafe { with_state(s.parent, |ps| ps.settings.announce_unread_rss_podcast_items) },
-                unsafe { with_state(s.parent, |ps| ps.settings.rss_podcast_unread_label_position) },
+                { with_state(s.parent, |ps| ps.settings.rss_sources.clone()) },
+                { with_state(s.parent, |ps| ps.settings.language) },
+                { with_state(s.parent, |ps| ps.settings.announce_unread_rss_podcast_items) },
+                { with_state(s.parent, |ps| ps.settings.rss_podcast_unread_label_position) },
             )
         }) {
             Some((
@@ -3415,8 +3413,8 @@ fn set_source_unread(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM,
         let Some(idx) = source_idx else {
             return (hwnd_tree, None);
         };
-        let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
-        let title_opt = unsafe {
+        let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+        let title_opt = {
             with_state(parent, |ps| {
                 if let Some(src) = ps.settings.rss_sources.get_mut(idx) {
                     let mut changed = false;
@@ -3475,7 +3473,7 @@ fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
     // in process_fetch_result after items are loaded
     let item_info_opt = with_rss_state(hwnd, |s| {
         if let Some(NodeData::Source(idx)) = s.node_data.get(&(hitem.0)) {
-            unsafe {
+            {
                 with_state(s.parent, |ps| {
                     ps.settings
                         .rss_sources
@@ -3581,7 +3579,7 @@ fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
     } else {
         rss::RssFetchConfig::default()
     };
-    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
@@ -3645,7 +3643,7 @@ fn start_background_unread_check(hwnd: HWND) {
         rss::RssSourceType,
         rss::RssFeedCache,
         HashSet<String>,
-    )> = unsafe {
+    )> = {
         with_state(parent, |ps| {
             ps.settings
                 .rss_sources
@@ -3670,7 +3668,7 @@ fn start_background_unread_check(hwnd: HWND) {
     }
 
     let fetch_config = rss_fetch_config(parent);
-    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     ensure_rss_http(parent);
 
     let hwnd_raw = hwnd.0;
@@ -3746,7 +3744,7 @@ fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
     };
 
     // Check if this is a new article compared to last_seen_guid
-    let should_mark_unread = unsafe {
+    let should_mark_unread = {
         with_state(parent, |ps| {
             ps.settings
                 .rss_sources
@@ -4202,7 +4200,7 @@ fn load_more_items(
     }
     let (language, announce_unread, unread_label_position, rss_date_mode, rss_time_mode) =
         with_rss_state(hwnd, |s| {
-            unsafe {
+            {
                 with_state(s.parent, |ps| {
                     (
                         ps.settings.language,
@@ -4346,7 +4344,7 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
             if parent.0 != 0
                 && let Some(NodeData::Source(source_index)) = s.node_data.get(&parent.0)
             {
-                unsafe {
+                {
                     with_state(s.parent, |ps| {
                         if let Some(src) = ps.settings.rss_sources.get_mut(*source_index)
                             && !src.read_item_keys.iter().any(|k| k == &item_key)
@@ -5023,7 +5021,7 @@ fn handle_edit_source(hwnd: HWND) {
     };
 
     let source_info = with_rss_state(hwnd, |s| {
-        unsafe {
+        {
             with_state(s.parent, |ps| {
                 ps.settings
                     .rss_sources
@@ -5040,7 +5038,7 @@ fn handle_edit_source(hwnd: HWND) {
     }
 
     let main_hwnd = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let existing = unsafe { with_state(main_hwnd, |s| s.rss_add_dialog) }.unwrap_or(HWND(0));
+    let existing = { with_state(main_hwnd, |s| s.rss_add_dialog) }.unwrap_or(HWND(0));
     if existing.0 != 0 {
         unsafe { SetForegroundWindow(existing) };
         return;
@@ -5068,7 +5066,7 @@ fn handle_retry_now(hwnd: HWND) {
     }
 
     let source_info = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
-        Some(NodeData::Source(idx)) => unsafe {
+        Some(NodeData::Source(idx)) => {
             with_state(s.parent, |ps| {
                 ps.settings
                     .rss_sources
@@ -5103,7 +5101,7 @@ fn handle_retry_now(hwnd: HWND) {
     } else {
         rss::RssFetchConfig::default()
     };
-    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
@@ -5200,7 +5198,7 @@ fn apply_reorder_action(
     if source_index >= root_items.len() {
         return None;
     }
-    let new_index = unsafe {
+    let new_index = {
         with_state(parent, |ps| {
             let moved = match action {
                 ReorderAction::Up => {
@@ -5240,8 +5238,8 @@ fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
         return;
     };
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
-    let total = unsafe { with_state(parent, |ps| ps.settings.rss_sources.len()) }.unwrap_or(0);
+    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let total = { with_state(parent, |ps| ps.settings.rss_sources.len()) }.unwrap_or(0);
     if total == 0 {
         return;
     }
@@ -5267,7 +5265,7 @@ fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
 
 fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    unsafe {
+    {
         with_state(parent, |ps| {
             crate::settings::sort_rss_sources(&mut ps.settings, order);
             crate::settings::save_settings(ps.settings.clone());
@@ -5365,7 +5363,7 @@ fn fetch_full_article_text_for_quick_copy(parent: HWND, item: &RssItem) -> Strin
         return clean_html_for_quick_copy(&item.description);
     }
     ensure_rss_http(parent);
-    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -5459,9 +5457,8 @@ fn handle_rss_quick_copy(hwnd: HWND) -> bool {
         return false;
     };
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let mode =
-        unsafe { with_state(parent, |ps| ps.settings.rss_quick_copy_mode) }.unwrap_or_default();
-    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let mode = { with_state(parent, |ps| ps.settings.rss_quick_copy_mode) }.unwrap_or_default();
+    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     let text = rss_quick_copy_text(parent, &item, mode);
     if text.trim().is_empty() {
         return false;
@@ -5508,7 +5505,7 @@ fn handle_article_action(hwnd: HWND, action: ArticleAction) {
     }
     let title = item.title.trim().to_string();
     let language = with_rss_state(hwnd, |s| {
-        unsafe { with_state(s.parent, |ps| ps.settings.language) }.unwrap_or_default()
+        { with_state(s.parent, |ps| ps.settings.language) }.unwrap_or_default()
     })
     .unwrap_or_default();
     let share_url = match action {
@@ -5639,7 +5636,7 @@ fn import_item(hwnd: HWND, item: RssItem) {
 
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     let language = if parent.0 != 0 {
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default()
+        { with_state(parent, |state| state.settings.language) }.unwrap_or_default()
     } else {
         crate::settings::Language::default()
     };
@@ -5751,7 +5748,7 @@ fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
     unsafe { RegisterClassW(&wc) };
 
     let language = with_rss_state(parent_hwnd, |s| {
-        unsafe { with_state(s.parent, |ps| ps.settings.language) }.unwrap_or_default()
+        { with_state(s.parent, |ps| ps.settings.language) }.unwrap_or_default()
     })
     .unwrap_or_default();
     let title = i18n::tr(language, "rss.context.reorder");
@@ -5918,7 +5915,7 @@ fn show_rss_search_dialog(parent_hwnd: HWND) {
     unsafe { RegisterClassW(&wc) };
 
     let main_hwnd = with_rss_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let language = unsafe { with_state(main_hwnd, |s| s.settings.language) }.unwrap_or_default();
+    let language = { with_state(main_hwnd, |s| s.settings.language) }.unwrap_or_default();
     let title = tr_or(language, "rss.search_dialog.title", "Search RSS by keyword");
     let init_ptr = Box::into_raw(Box::new(SearchDialogInit {
         parent: parent_hwnd,
@@ -6133,7 +6130,7 @@ fn show_add_dialog_with_prefill_options(
     unsafe { RegisterClassW(&wc) };
 
     let main_hwnd = with_rss_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let language = unsafe { with_state(main_hwnd, |s| s.settings.language) }.unwrap_or_default();
+    let language = { with_state(main_hwnd, |s| s.settings.language) }.unwrap_or_default();
     let init_ptr = Box::into_raw(Box::new(AddDialogInit {
         parent: parent_hwnd,
         prefill_title: title,
@@ -6162,7 +6159,7 @@ fn show_add_dialog_with_prefill_options(
     }
 
     let main_window = with_rss_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
-    unsafe { with_state(main_window, |s| s.rss_add_dialog = hwnd) };
+    with_state(main_window, |s| s.rss_add_dialog = hwnd);
 }
 
 unsafe extern "system" fn input_wndproc(

@@ -87,7 +87,7 @@ impl AudiobookPlayer {
 }
 
 pub fn set_audiobook_subtitle_override(hwnd: HWND, subtitle_path: &Path) -> Result<(), String> {
-    unsafe {
+    {
         let ext_ok = subtitle_path
             .extension()
             .and_then(|s| s.to_str())
@@ -224,7 +224,7 @@ pub fn set_audiobook_subtitle_override(hwnd: HWND, subtitle_path: &Path) -> Resu
 }
 
 pub fn clear_audiobook_subtitle_override(hwnd: HWND) -> Result<(), String> {
-    unsafe {
+    {
         let mut active = None;
         let mut current_media = None;
         let mut new_cancel = None;
@@ -586,7 +586,7 @@ fn start_audiobook_at_with_options(
     let hwnd_main = hwnd;
     std::thread::spawn(move || {
         let settings =
-            unsafe { with_state(hwnd_main, |state| state.settings.clone()) }.unwrap_or_default();
+            { with_state(hwnd_main, |state| state.settings.clone()) }.unwrap_or_default();
         let want_mix = (settings.subtitle_read_mode == SubtitleReadMode::Record
             || options.mix_export)
             && crate::subtitles::find_subtitle_for_media(&path).is_some();
@@ -651,9 +651,8 @@ fn start_audiobook_at_with_options(
             path.display()
         ));
         log_debug(&format!("Audio player: Opening file {}", path.display()));
-        let subtitle_mode =
-            unsafe { with_state(hwnd_main, |state| state.settings.subtitle_read_mode) }
-                .unwrap_or(SubtitleReadMode::Off);
+        let subtitle_mode = { with_state(hwnd_main, |state| state.settings.subtitle_read_mode) }
+            .unwrap_or(SubtitleReadMode::Off);
         let effective_subtitle_mode = if subtitle_mode == SubtitleReadMode::Record {
             SubtitleReadMode::Off
         } else {
@@ -683,7 +682,7 @@ fn start_audiobook_at_with_options(
             force_ffmpeg_stream = matches!(extension.as_str(), "m4a" | "aac" | "mp4");
         }
         if !force_ffmpeg_stream {
-            force_ffmpeg_stream = unsafe {
+            force_ffmpeg_stream = {
                 with_state(hwnd_main, |state| {
                     state
                         .audio_ffmpeg_retry_for
@@ -769,7 +768,7 @@ fn start_audiobook_at_with_options(
                         options.audio_track,
                     ) {
                         Ok(output) => {
-                            unsafe {
+                            {
                                 if with_state(hwnd_main, |state| {
                                     state.audio_ffmpeg_retry_for = Some(path.clone());
                                 })
@@ -821,7 +820,7 @@ fn start_audiobook_at_with_options(
 
         log_debug("Audio player: Playback started");
 
-        let session_id = unsafe {
+        let session_id = {
             with_state(hwnd_main, |state| {
                 state.audiobook_session_id = state.audiobook_session_id.wrapping_add(1);
                 state.audiobook_session_id
@@ -855,7 +854,7 @@ fn start_audiobook_at_with_options(
             session_id,
         };
 
-        unsafe {
+        {
             if with_state(hwnd_main, |state| {
                 state.active_audiobook = Some(player);
             })
@@ -869,7 +868,7 @@ fn start_audiobook_at_with_options(
 }
 
 pub fn start_audiobook_playback(hwnd: HWND, path: &Path) {
-    unsafe {
+    {
         // Record telemetry
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("audio");
         crate::telemetry::record_action("audio_play", ext);
@@ -980,7 +979,7 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
         },
     }
 
-    unsafe {
+    {
         crate::log_debug("Audio player: toggle_audiobook_pause triggered");
         let action = with_state(hwnd, |state| {
             if let Some(mut player) = state.active_audiobook.take() {
@@ -1123,7 +1122,7 @@ pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
         },
     }
 
-    unsafe {
+    {
         let result = with_state(hwnd, |state| {
             if let Some(player) = state.active_audiobook.take() {
                 stop_shared_subtitle_speech(
@@ -1221,7 +1220,7 @@ pub fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
         Direct,
         Restart(PathBuf),
     }
-    unsafe {
+    {
         let action = with_state(hwnd, |state| {
             if let Some(player) = &mut state.active_audiobook {
                 stop_shared_subtitle_speech(
@@ -1269,7 +1268,7 @@ pub fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
 
 #[track_caller]
 pub fn stop_audiobook_playback(hwnd: HWND) {
-    unsafe {
+    {
         crate::telemetry::set_audio_playing(false);
         let caller = std::panic::Location::caller();
         crate::log_debug(&format!(
@@ -1301,7 +1300,7 @@ pub fn stop_audiobook_playback(hwnd: HWND) {
 }
 
 pub fn retry_current_with_ffmpeg_stream(hwnd: HWND) -> bool {
-    unsafe {
+    {
         let restart = with_state(hwnd, |state| {
             let player = state.active_audiobook.take()?;
             let path = player.path.clone();
@@ -1368,7 +1367,7 @@ pub fn retry_current_with_ffmpeg_stream(hwnd: HWND) -> bool {
 }
 
 pub fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
-    unsafe {
+    {
         crate::log_debug(&format!(
             "Audio player: start_audiobook_at called for {} at {}s",
             path.display(),
@@ -1412,7 +1411,7 @@ pub fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
 }
 
 pub fn change_audiobook_volume(hwnd: HWND, delta: f32) {
-    unsafe {
+    {
         let new_volume = with_state(hwnd, |state| {
             if let Some(player) = &mut state.active_audiobook {
                 if player.muted {
@@ -1442,7 +1441,7 @@ pub fn change_audiobook_volume(hwnd: HWND, delta: f32) {
 }
 
 pub fn reset_audiobook_volume(hwnd: HWND) -> Option<f32> {
-    unsafe {
+    {
         let new_volume = with_state(hwnd, |state| {
             if let Some(player) = &mut state.active_audiobook {
                 player.volume = 1.0;
@@ -1471,7 +1470,7 @@ pub fn reset_audiobook_volume(hwnd: HWND) -> Option<f32> {
 }
 
 pub fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
-    unsafe {
+    {
         // We allow speed change even with subtitles now, relying on BASS tempo.
         let result = with_state(hwnd, |state| {
             if let Some(player) = state.active_audiobook.take() {
@@ -1529,7 +1528,7 @@ pub fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
 }
 
 pub fn change_audiobook_pitch(hwnd: HWND, delta: f32) -> Option<f32> {
-    unsafe {
+    {
         // Pitch change via BASS tempo
         let result = with_state(hwnd, |state| {
             if let Some(player) = state.active_audiobook.take() {
@@ -1587,7 +1586,7 @@ pub fn change_audiobook_pitch(hwnd: HWND, delta: f32) -> Option<f32> {
 }
 
 pub fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
-    unsafe {
+    {
         let result = with_state(hwnd, |state| {
             if let Some(player) = state.active_audiobook.take() {
                 let current = audiobook_position_secs(&player).floor() as u64;
@@ -1644,7 +1643,7 @@ pub fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
 }
 
 pub fn reset_audiobook_pitch(hwnd: HWND) -> Option<f32> {
-    unsafe {
+    {
         let result = with_state(hwnd, |state| {
             if let Some(player) = state.active_audiobook.take() {
                 let current = audiobook_position_secs(&player).floor() as u64;
@@ -1701,7 +1700,7 @@ pub fn reset_audiobook_pitch(hwnd: HWND) -> Option<f32> {
 }
 
 pub fn audiobook_volume_level(hwnd: HWND) -> Option<f32> {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state
                 .active_audiobook
@@ -1713,7 +1712,7 @@ pub fn audiobook_volume_level(hwnd: HWND) -> Option<f32> {
 }
 
 pub fn audiobook_output_stopped(hwnd: HWND) -> Option<bool> {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state
                 .active_audiobook
@@ -1726,7 +1725,7 @@ pub fn audiobook_output_stopped(hwnd: HWND) -> Option<bool> {
 
 /// Switch to a different audio track and restart playback.
 pub fn switch_audio_track(hwnd: HWND, track_index: i32) {
-    unsafe {
+    {
         let result = with_state(hwnd, |state| {
             // Verify the track exists
             let valid = state
@@ -1789,7 +1788,7 @@ pub fn switch_audio_track(hwnd: HWND, track_index: i32) {
 }
 
 pub fn toggle_audiobook_mute(hwnd: HWND) {
-    if unsafe {
+    if {
         with_state(hwnd, |state| {
             if let Some(player) = &mut state.active_audiobook {
                 if player.muted {
@@ -1979,7 +1978,7 @@ pub(crate) fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
 }
 
 fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackState> {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.path.as_path() != path {
@@ -1997,7 +1996,7 @@ fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackSt
 
 /// Get the main audio output for subtitle mixing.
 fn get_main_audio_output(hwnd: HWND, path: &Path) -> Option<Arc<BassOutput>> {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.path.as_path() != path {
@@ -2010,7 +2009,7 @@ fn get_main_audio_output(hwnd: HWND, path: &Path) -> Option<Arc<BassOutput>> {
 }
 
 fn subtitle_speech_handles(hwnd: HWND, path: &Path) -> Option<SubtitleSpeechHandles> {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.path.as_path() != path {
@@ -2046,7 +2045,7 @@ fn stop_shared_subtitle_speech(
 }
 
 fn subtitle_hold_state(hwnd: HWND, path: &Path) -> Option<bool> {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.path.as_path() != path {
@@ -2059,7 +2058,7 @@ fn subtitle_hold_state(hwnd: HWND, path: &Path) -> Option<bool> {
 }
 
 fn clear_subtitle_hold(hwnd: HWND, path: &Path) -> bool {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             let player = match state.active_audiobook.as_mut() {
                 Some(player) => player,
@@ -2081,7 +2080,7 @@ fn clear_subtitle_hold(hwnd: HWND, path: &Path) -> bool {
 }
 
 fn pause_active_backend(hwnd: HWND, path: &Path) -> bool {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.path.as_path() != path {
@@ -2098,7 +2097,7 @@ fn pause_active_backend(hwnd: HWND, path: &Path) -> bool {
 }
 
 fn resume_active_backend(hwnd: HWND, path: &Path) -> bool {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.path.as_path() != path {
@@ -2121,7 +2120,7 @@ fn parse_sapi4_voice_index(voice: &str) -> Option<i32> {
 }
 
 fn should_hold_for_edge_subtitles(hwnd: HWND, media_path: &Path) -> bool {
-    let settings = match unsafe { with_state(hwnd, |state| state.settings.clone()) } {
+    let settings = match with_state(hwnd, |state| state.settings.clone()) {
         Some(settings) => settings,
         None => return false,
     };
@@ -2242,7 +2241,7 @@ fn start_subtitle_reader(
         if let Err(e) = unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST) } {
             log_debug(&format!("Subtitle: SetThreadPriority failed: {}", e));
         }
-        let settings = match unsafe { with_state(hwnd, |state| state.settings.clone()) } {
+        let settings = match with_state(hwnd, |state| state.settings.clone()) {
             Some(settings) => settings,
             None => {
                 log_debug("Subtitle: Failed to access settings.");

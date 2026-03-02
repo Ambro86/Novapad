@@ -6980,7 +6980,7 @@ fn update_shortcut_binding_text(hwnd: HWND) {
     let action = selected_shortcut_action(hwnd);
     let (edit, binding, waiting, language) = with_options_state(hwnd, |state| {
         let language =
-            unsafe { with_state(state.parent, |app| app.settings.language) }.unwrap_or_default();
+            { with_state(state.parent, |app| app.settings.language) }.unwrap_or_default();
         (
             state.edit_shortcut_value,
             shortcut_binding_for_action(&state.shortcut_draft, action),
@@ -7690,7 +7690,7 @@ fn preview_voice(hwnd: HWND) {
         None => return,
     };
 
-    let (language, split_on_newline, dictionary) = unsafe {
+    let (language, split_on_newline, dictionary) = {
         with_state(parent, |state| {
             (
                 state.settings.language,
@@ -7713,7 +7713,7 @@ fn preview_voice(hwnd: HWND) {
         2 => TtsEngine::Sapi4,
         _ => TtsEngine::Edge,
     };
-    let voices = unsafe {
+    let voices = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
@@ -7789,7 +7789,7 @@ fn preview_voice(hwnd: HWND) {
             };
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if unsafe {
+            if {
                 with_state(parent, |state| {
                     state.tts_session = Some(tts_engine::TtsSession {
                         id: state.tts_next_session_id,
@@ -7813,7 +7813,7 @@ fn preview_voice(hwnd: HWND) {
             tts_engine::stop_tts_playback(parent);
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if unsafe {
+            if {
                 with_state(parent, |state| {
                     state.tts_session = Some(tts_engine::TtsSession {
                         id: state.tts_next_session_id,
@@ -7881,7 +7881,7 @@ fn insert_voice_tag_from_options(hwnd: HWND) {
         2 => TtsEngine::Sapi4,
         _ => TtsEngine::Edge,
     };
-    let voices = unsafe {
+    let voices = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
@@ -7964,7 +7964,7 @@ fn preview_dialogue_voice(hwnd: HWND) {
     };
 
     let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or(Language::Italian);
+        { with_state(parent, |state| state.settings.language) }.unwrap_or(Language::Italian);
 
     let text = i18n::tr(language, "tts.preview_text");
     if text.trim().is_empty() {
@@ -7978,7 +7978,7 @@ fn preview_dialogue_voice(hwnd: HWND) {
         2 => TtsEngine::Sapi4,
         _ => TtsEngine::Edge,
     };
-    let voices = unsafe {
+    let voices = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
@@ -8060,7 +8060,7 @@ fn preview_dialogue_voice(hwnd: HWND) {
             };
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if unsafe {
+            if {
                 with_state(parent, |state| {
                     state.tts_session = Some(tts_engine::TtsSession {
                         id: state.tts_next_session_id,
@@ -8084,7 +8084,7 @@ fn preview_dialogue_voice(hwnd: HWND) {
             tts_engine::stop_tts_playback(parent);
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if unsafe {
+            if {
                 with_state(parent, |state| {
                     state.tts_session = Some(tts_engine::TtsSession {
                         id: state.tts_next_session_id,
@@ -8146,7 +8146,7 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
     };
 
     let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or(Language::Italian);
+        { with_state(parent, |state| state.settings.language) }.unwrap_or(Language::Italian);
 
     let text = i18n::tr(language, "tts.preview_text");
     if text.trim().is_empty() {
@@ -8167,7 +8167,7 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
         2 => TtsEngine::Sapi4,
         _ => TtsEngine::Edge,
     };
-    let voices = unsafe {
+    let voices = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
@@ -8266,7 +8266,7 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
             };
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if unsafe {
+            if {
                 with_state(parent, |state| {
                     state.tts_session = Some(tts_engine::TtsSession {
                         id: state.tts_next_session_id,
@@ -8290,7 +8290,7 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
             tts_engine::stop_tts_playback(parent);
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if unsafe {
+            if {
                 with_state(parent, |state| {
                     state.tts_session = Some(tts_engine::TtsSession {
                         id: state.tts_next_session_id,
@@ -10940,7 +10940,7 @@ fn focus_tab_first(hwnd: HWND, index: i32) {
 }
 
 pub(crate) fn ensure_voice_lists_loaded(hwnd: HWND, language: Language) {
-    let (has_edge, has_sapi) = unsafe {
+    let (has_edge, has_sapi) = {
         with_state(hwnd, |state| {
             (!state.edge_voices.is_empty(), !state.sapi_voices.is_empty())
         })
@@ -11032,7 +11032,7 @@ fn fetch_voice_list() -> Result<Vec<VoiceInfo>, String> {
 
 fn browse_for_interpreter(hwnd: HWND) {
     let mut buffer = [0u16; 1024];
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let executables_label = i18n::tr(language, "dialog.executables");
     let all_files_label = i18n::tr(language, "dialog.all_files");
     let filter = to_wide(&format!(
@@ -11060,7 +11060,7 @@ fn browse_for_interpreter(hwnd: HWND) {
 
 fn browse_for_audiobook_folder(hwnd: HWND) {
     let language = with_options_state(hwnd, |state| {
-        unsafe { with_state(state.parent, |app| app.settings.language) }.unwrap_or_default()
+        { with_state(state.parent, |app| app.settings.language) }.unwrap_or_default()
     })
     .unwrap_or_default();
     if let Some(folder) =
@@ -11090,8 +11090,7 @@ fn search_for_interpreter(hwnd: HWND) {
     };
 
     let parent = with_options_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
-    let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
 
     if query.trim().is_empty() {
         let msg = i18n::tr(language, "options.interpreter_search.empty_query");

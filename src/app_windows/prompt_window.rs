@@ -343,7 +343,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             // Get language from parent or default
             let parent = unsafe { GetParent(hwnd) };
             let language =
-                unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+                { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
 
             let _label = unsafe {
                 CreateWindowExW(
@@ -1397,7 +1397,7 @@ fn start_prompt_session(
         Ok(spawn) => Some(spawn),
         Err(err) => {
             log_debug(&format!("Prompt spawn failed: {err}"));
-            unsafe {
+            {
                 let language =
                     with_state(state.parent, |state| state.settings.language).unwrap_or_default();
                 let err_text = i18n::tr_f(language, "prompt.error", &[("err", &err.to_string())]);
@@ -1517,7 +1517,7 @@ fn update_prompt_settings<F>(parent: HWND, update: F)
 where
     F: FnOnce(&mut crate::settings::AppSettings),
 {
-    let settings = unsafe {
+    let settings = {
         with_state(parent, |state| {
             update(&mut state.settings);
             state.settings.clone()
@@ -1623,8 +1623,7 @@ fn apply_prevent_sleep(enabled: bool) -> bool {
 }
 
 fn confirm_clear_output(hwnd: HWND, parent: HWND) -> bool {
-    let language =
-        unsafe { with_state(parent, |state| state.settings.language).unwrap_or_default() };
+    let language = { with_state(parent, |state| state.settings.language).unwrap_or_default() };
     let labels = prompt_labels(language);
     let title = to_wide(&confirm_title(language));
     let message = to_wide(&labels.clear_confirm);

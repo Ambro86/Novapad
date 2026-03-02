@@ -144,8 +144,7 @@ pub fn open_find_in_files_dialog(parent: HWND) {
         return;
     }
 
-    let language =
-        unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
@@ -291,7 +290,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             }
             let init = unsafe { Box::from_raw(init_ptr) };
             let labels = labels(init.language);
-            let hfont = unsafe { with_state(init.parent, |state| state.hfont) }.unwrap_or(HFONT(0));
+            let hfont = { with_state(init.parent, |state| state.hfont) }.unwrap_or(HFONT(0));
 
             let term_label = unsafe {
                 CreateWindowExW(
@@ -790,11 +789,11 @@ fn read_control_text(hwnd: HWND) -> String {
 }
 
 fn load_cache(parent: HWND) -> Option<FindInFilesCache> {
-    unsafe { with_state(parent, |state| state.find_in_files_cache.clone()) }.unwrap_or(None)
+    { with_state(parent, |state| state.find_in_files_cache.clone()) }.unwrap_or(None)
 }
 
 fn save_cache(parent: HWND, cache: FindInFilesCache) {
-    unsafe {
+    {
         if with_state(parent, |state| {
             state.find_in_files_cache = Some(cache);
         })

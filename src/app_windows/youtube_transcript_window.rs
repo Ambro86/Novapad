@@ -189,7 +189,7 @@ fn post_focus_editor(parent: HWND) {
 }
 
 pub fn import_youtube_transcript(parent: HWND) {
-    let (language, include_timestamps) = unsafe {
+    let (language, include_timestamps) = {
         with_state(parent, |state| {
             (
                 state.settings.language,
@@ -202,7 +202,7 @@ pub fn import_youtube_transcript(parent: HWND) {
         post_focus_editor(parent);
         return;
     };
-    unsafe {
+    {
         if with_state(parent, |state| {
             state.settings.youtube_include_timestamps = result.include_timestamps;
             save_settings(state.settings.clone());
@@ -2827,7 +2827,7 @@ fn choose_stream_audio_track(
 }
 
 pub fn play_streaming_audio_from_url(parent: HWND) {
-    let (language, default_format) = unsafe {
+    let (language, default_format) = {
         with_state(parent, |state| {
             (
                 state.settings.language,
@@ -2842,7 +2842,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         post_focus_editor(parent);
         return;
     };
-    let saved = unsafe {
+    let saved = {
         with_state(parent, |state| {
             let new_value = dialog_data.format.settings_value().to_string();
             if state.settings.stream_audio_default_format != new_value {

@@ -268,7 +268,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             let labels = params.labels;
             let show_cancel = params.show_cancel;
             let main = unsafe { GetParent(parent) };
-            let hfont = unsafe { with_state(main, |state| state.hfont) }.unwrap_or(HFONT(0));
+            let hfont = { with_state(main, |state| state.hfont) }.unwrap_or(HFONT(0));
             let label_text = format!("{} 0%", labels.in_progress);
 
             let label = unsafe {

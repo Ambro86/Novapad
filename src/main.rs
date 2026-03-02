@@ -1,8 +1,8 @@
 #![deny(warnings)]
+#![allow(unsafe_op_in_unsafe_fn)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(let_underscore_drop)]
-#![allow(unsafe_op_in_unsafe_fn)]
 #![windows_subsystem = "windows"]
 
 mod accessibility;
@@ -241,7 +241,7 @@ fn bring_window_to_foreground(hwnd: HWND) {
 }
 
 fn notify_active_editor_focus(hwnd: HWND, notify_when_audiobook: bool) {
-    let is_audiobook = unsafe {
+    let is_audiobook = {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -256,7 +256,7 @@ fn notify_active_editor_focus(hwnd: HWND, notify_when_audiobook: bool) {
         if !notify_when_audiobook {
             return;
         }
-        let tab_hwnd = unsafe { with_state(hwnd, |state| state.hwnd_tab) }.unwrap_or(HWND(0));
+        let tab_hwnd = { with_state(hwnd, |state| state.hwnd_tab) }.unwrap_or(HWND(0));
         if tab_hwnd.0 != 0 {
             // SAFETY: `tab_hwnd` is owned by this process and used only for an accessibility focus event.
             unsafe {
@@ -326,7 +326,7 @@ pub(crate) fn focus_editor(hwnd: HWND) {
 }
 
 pub(crate) fn reset_spellcheck_state(hwnd: HWND) {
-    unsafe {
+    {
         if with_state(hwnd, |state| {
             state.spellcheck_manager.clear_cache();
             state.spellcheck_last_announce = None;
@@ -550,12 +550,12 @@ fn clean_menu_label(label: &str) -> String {
 }
 
 fn confirm_menu_action(hwnd: HWND, key: &str) {
-    let language = unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
+    let language = { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
     let label = i18n::tr(language, key);
     let cleaned = clean_menu_label(&label);
     if !cleaned.is_empty() {
         if key.starts_with("edit.") {
-            unsafe {
+            {
                 with_state(hwnd, |state| {
                     state.undo_action_label = Some(cleaned.clone())
                 });
@@ -567,7 +567,7 @@ fn confirm_menu_action(hwnd: HWND, key: &str) {
 }
 
 fn announce_menu_action_screen_reader(hwnd: HWND, key: &str) {
-    let language = unsafe { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
+    let language = { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
     let label = i18n::tr(language, key);
     let cleaned = clean_menu_label(&label);
     if !cleaned.is_empty() {
@@ -627,7 +627,7 @@ pub(crate) fn is_dictionary_not_found_cache_entry(language: Language, lines: &[S
 }
 
 pub(crate) fn update_dictionary_cache(hwnd: HWND, key: String, lines: Vec<String>) {
-    unsafe {
+    {
         if with_state(hwnd, |state| {
             state.dictionary_cache.insert(key, lines);
             save_dictionary_cache(&state.dictionary_cache);
@@ -640,7 +640,7 @@ pub(crate) fn update_dictionary_cache(hwnd: HWND, key: String, lines: Vec<String
 }
 
 pub(crate) fn remove_dictionary_cache(hwnd: HWND, key: &str) {
-    unsafe {
+    {
         if with_state(hwnd, |state| {
             let removed = state.dictionary_cache.remove(key).is_some();
             if removed {
@@ -745,7 +745,7 @@ fn prefetch_dictionary_for_selection(hwnd: HWND, hwnd_edit: HWND) {
     }
     let word = trimmed.to_string();
 
-    let prefetch_info = unsafe {
+    let prefetch_info = {
         with_state(hwnd, |state| {
             let language = state.settings.language;
             let pref = state.settings.dictionary_translation_language.clone();
@@ -799,7 +799,7 @@ fn audiobook_position_ms_from_state(state: &AppState) -> Option<u64> {
 }
 
 fn update_chapter_announcement(hwnd: HWND) {
-    let (current_pos_ms, chapters, last_idx, language) = unsafe {
+    let (current_pos_ms, chapters, last_idx, language) = {
         with_state(hwnd, |state| {
             (
                 audiobook_position_ms_from_state(state),
@@ -814,8 +814,7 @@ fn update_chapter_announcement(hwnd: HWND) {
         return;
     };
     if chapters.is_empty() {
-        if unsafe { with_state(hwnd, |state| state.last_announced_chapter_index = None) }.is_none()
-        {
+        if { with_state(hwnd, |state| state.last_announced_chapter_index = None) }.is_none() {
             crate::log_debug("Failed to clear last announced chapter index");
         }
         return;
@@ -824,7 +823,7 @@ fn update_chapter_announcement(hwnd: HWND) {
     if current_idx == last_idx {
         return;
     }
-    if unsafe {
+    if {
         with_state(hwnd, |state| {
             state.last_announced_chapter_index = current_idx
         })
@@ -858,14 +857,12 @@ fn announce_current_chapter_on_start(
     let current_idx = current_pos_ms
         .and_then(|pos| crate::podcast::chapters::current_chapter_index(pos, chapters))
         .or(Some(0));
-    unsafe {
-        if with_state(hwnd, |state| {
-            state.last_announced_chapter_index = current_idx
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to update last announced chapter index");
-        }
+    if with_state(hwnd, |state| {
+        state.last_announced_chapter_index = current_idx
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to update last announced chapter index");
     };
     let Some(idx) = current_idx else {
         return;
@@ -881,7 +878,7 @@ fn announce_current_chapter_on_start(
 }
 
 pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
-    unsafe {
+    {
         if with_state(hwnd, |state| {
             state.active_podcast_chapters_key = None;
             state.active_podcast_chapters.clear();
@@ -903,7 +900,7 @@ pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
 }
 
 pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
-    let (has_pending, has_active) = unsafe {
+    let (has_pending, has_active) = {
         with_state(hwnd, |state| {
             (
                 state.pending_podcast_chapters_key.is_some(),
@@ -913,7 +910,7 @@ pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
         .unwrap_or((false, false))
     };
     if has_pending {
-        unsafe {
+        {
             with_state(hwnd, |state| {
                 state.active_podcast_chapters_key = None;
                 state.active_podcast_chapters.clear();
@@ -936,11 +933,11 @@ pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
 }
 
 pub(crate) fn set_pending_podcast_chapters_key(hwnd: HWND, key: Option<String>) {
-    unsafe { with_state(hwnd, |state| state.pending_podcast_chapters_key = key) };
+    with_state(hwnd, |state| state.pending_podcast_chapters_key = key);
 }
 
 pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
-    let (chapters, language, should_announce_unavailable, current_pos_ms) = unsafe {
+    let (chapters, language, should_announce_unavailable, current_pos_ms) = {
         with_state(hwnd, |state| {
             let key = state.pending_podcast_chapters_key.take();
             state.active_podcast_chapters_key = key.clone();
@@ -1007,7 +1004,7 @@ pub(crate) fn set_active_podcast_episode_info(
     cache_path: Option<PathBuf>,
 ) {
     if let Some(url_value) = url {
-        unsafe {
+        {
             let has_pending_chapters =
                 with_state(hwnd, |state| state.pending_podcast_chapters_key.is_some())
                     .unwrap_or(false);
@@ -1036,7 +1033,7 @@ pub(crate) fn set_active_podcast_episode_info(
 }
 
 pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
-    let (url, title, cache_path, language) = unsafe {
+    let (url, title, cache_path, language) = {
         with_state(hwnd, |state| {
             (
                 state.active_podcast_episode_url.clone(),
@@ -1273,7 +1270,7 @@ fn save_podcast_episode_dialog(
     Some(PathBuf::from(String::from_utf16_lossy(&buffer[..end])))
 }
 pub(crate) fn prefetch_podcast_chapters(hwnd: HWND, key: String, url: String) {
-    let should_fetch = unsafe {
+    let should_fetch = {
         with_state(hwnd, |state| {
             !state.podcast_chapters_cache.contains_key(&key)
         })
@@ -1282,7 +1279,7 @@ pub(crate) fn prefetch_podcast_chapters(hwnd: HWND, key: String, url: String) {
     if !should_fetch {
         return;
     }
-    let config = unsafe {
+    let config = {
         with_state(hwnd, |state| {
             crate::tools::rss::config_from_settings(&state.settings)
         })
@@ -1291,7 +1288,7 @@ pub(crate) fn prefetch_podcast_chapters(hwnd: HWND, key: String, url: String) {
     if let Err(err) = crate::tools::rss::init_http(config) {
         log_debug(&format!("rss_http_init_error: {}", err));
     }
-    let fetch_config = unsafe {
+    let fetch_config = {
         with_state(hwnd, |state| {
             crate::tools::rss::fetch_config_from_settings(&state.settings)
         })
@@ -1324,11 +1321,9 @@ pub(crate) fn prefetch_podcast_chapters(hwnd: HWND, key: String, url: String) {
 }
 
 pub(crate) fn cache_podcast_chapters(hwnd: HWND, key: String, chapters: Vec<Chapter>) {
-    unsafe {
-        with_state(hwnd, |state| {
-            state.podcast_chapters_cache.insert(key, Some(chapters));
-        })
-    };
+    with_state(hwnd, |state| {
+        state.podcast_chapters_cache.insert(key, Some(chapters));
+    });
 }
 
 fn fetch_chapters_with_fallback(
@@ -1413,7 +1408,7 @@ pub(crate) fn extract_buzzsprout_chapters_url(url: &str) -> Option<String> {
 fn announce_player_time(hwnd: HWND) {
     const END_STOP_TOLERANCE_SECS: u64 = 1;
 
-    let (current_raw, path, fallback_total, fallback_is_stopped_same_path, language) = unsafe {
+    let (current_raw, path, fallback_total, fallback_is_stopped_same_path, language) = {
         with_state(hwnd, |state| {
             let current = state
                 .active_audiobook
@@ -1515,7 +1510,7 @@ fn announce_player_pitch(language: Language, pitch: f32) {
 
 fn announce_player_volume(hwnd: HWND) {
     let volume = crate::audio_player::audiobook_volume_level(hwnd);
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let Some(volume) = volume else {
         return;
     };
@@ -1553,7 +1548,7 @@ fn seek_to_chapter_index(hwnd: HWND, chapters: &[Chapter], index: usize) {
         index, chapter.start_ms, chapter.title
     ));
     let target_secs = chapter.start_ms.saturating_add(999) / 1000;
-    unsafe {
+    {
         match seek_audiobook_to(hwnd, target_secs) {
             Ok(()) => {
                 let language = if let Some(lang) = with_state(hwnd, |state| {
@@ -1580,7 +1575,7 @@ fn seek_to_chapter_index(hwnd: HWND, chapters: &[Chapter], index: usize) {
 }
 
 fn handle_chapter_navigation(hwnd: HWND, direction: i32) {
-    let (chapters, language, current_pos_ms, last_idx) = unsafe {
+    let (chapters, language, current_pos_ms, last_idx) = {
         with_state(hwnd, |state| {
             (
                 state.active_podcast_chapters.clone(),
@@ -1599,7 +1594,7 @@ fn handle_chapter_navigation(hwnd: HWND, direction: i32) {
         .and_then(|pos| crate::podcast::chapters::current_chapter_index(pos, &chapters))
         .or(last_idx);
     if direction < 0 && matches!(current_idx, Some(0)) {
-        unsafe {
+        {
             match seek_audiobook_to(hwnd, 0) {
                 Ok(()) => {
                     if with_state(hwnd, |state| {
@@ -1637,7 +1632,7 @@ fn handle_chapter_navigation(hwnd: HWND, direction: i32) {
 }
 
 fn handle_chapter_list(hwnd: HWND) {
-    let (chapters, language) = unsafe {
+    let (chapters, language) = {
         with_state(hwnd, |state| {
             (
                 state.active_podcast_chapters.clone(),
@@ -1685,7 +1680,7 @@ fn is_stream_cache_media(path: &Path) -> bool {
 }
 
 fn is_direct_stream_playback_active(hwnd: HWND) -> bool {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             if let Some(player) = state.active_audiobook.as_ref()
                 && is_direct_stream_url_path(&player.path)
@@ -1721,8 +1716,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             | PlayerCommand::PitchReset
     ) && is_direct_stream_playback_active(hwnd);
     if disable_seek_rate_pitch {
-        let language =
-            unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+        let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         let message = i18n::tr(language, "playback.direct_stream_command_disabled");
         if !message.is_empty() {
             crate::accessibility::screen_reader_speak(&message);
@@ -1739,7 +1733,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         PlayerCommand::Seek(amount) => {
             seek_audiobook(hwnd, amount);
         }
-        PlayerCommand::SeekToStart => unsafe {
+        PlayerCommand::SeekToStart => {
             if let Err(err) = seek_audiobook_to(hwnd, 0) {
                 if err == "No active audiobook" {
                     let restart_path = with_state(hwnd, |state| {
@@ -1758,8 +1752,8 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
                     log_debug(&format!("Seek to start failed: {}", err));
                 }
             }
-        },
-        PlayerCommand::SeekToEnd => unsafe {
+        }
+        PlayerCommand::SeekToEnd => {
             if let Some(result) = with_state(hwnd, |state| {
                 let player = state.active_audiobook.as_ref()?;
                 let live_total = player.duration_secs().map(|s| s.max(0.0).floor() as u64);
@@ -1780,7 +1774,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             {
                 log_debug(&format!("Seek to end failed: {}", err));
             }
-        },
+        }
         PlayerCommand::Volume(delta) => {
             change_audiobook_volume(hwnd, delta);
             announce_player_volume(hwnd);
@@ -1791,7 +1785,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         }
         PlayerCommand::Speed(delta) => {
             let language =
-                unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+                { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
             let speed = change_audiobook_speed(hwnd, delta);
             if let Some(speed) = speed {
                 announce_player_speed(language, speed);
@@ -1799,7 +1793,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         }
         PlayerCommand::Pitch(delta) => {
             let language =
-                unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+                { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
             let pitch = change_audiobook_pitch(hwnd, delta);
             if let Some(pitch) = pitch {
                 announce_player_pitch(language, pitch);
@@ -1807,7 +1801,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         }
         PlayerCommand::SpeedReset => {
             let language =
-                unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+                { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
             let speed = reset_audiobook_speed(hwnd);
             if let Some(speed) = speed {
                 announce_player_speed(language, speed);
@@ -1815,7 +1809,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         }
         PlayerCommand::PitchReset => {
             let language =
-                unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+                { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
             let pitch = reset_audiobook_pitch(hwnd);
             if let Some(pitch) = pitch {
                 announce_player_pitch(language, pitch);
@@ -1854,7 +1848,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
 }
 
 fn has_secondary_window_open(hwnd: HWND) -> bool {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state.find_dialog.0 != 0
                 || state.replace_dialog.0 != 0
@@ -2155,7 +2149,7 @@ fn print_cli_help() {
 }
 
 fn is_large_text_editor(hwnd: HWND, hwnd_edit: HWND) -> bool {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state.large_text_editors.contains(&hwnd_edit.0)
         })
@@ -4994,7 +4988,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
 }
 
 fn cycle_favorite_voice(hwnd: HWND, direction: i32) {
-    let (favorites, current_engine, current_voice) = unsafe {
+    let (favorites, current_engine, current_voice) = {
         with_state(hwnd, |state| {
             (
                 state.settings.favorite_voices.clone(),
@@ -5031,23 +5025,23 @@ fn cycle_favorite_voice(hwnd: HWND, direction: i32) {
     if next_fav.engine == current_engine && next_fav.short_name == current_voice {
         return;
     }
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state.settings.tts_engine = next_fav.engine;
             state.settings.tts_voice = next_fav.short_name.clone();
         });
     }
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
     refresh_voice_panel(hwnd);
-    if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
+    if let Some(settings) = { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
     restart_tts_from_current_offset(hwnd);
 }
 
 fn is_tts_active(hwnd: HWND) -> bool {
-    unsafe { with_state(hwnd, |state| state.tts_session.is_some()).unwrap_or(false) }
+    with_state(hwnd, |state| state.tts_session.is_some()).unwrap_or(false)
 }
 
 struct VoicePanelLabels {
@@ -5362,7 +5356,7 @@ fn create_ui_font(
 
 fn apply_ui_font(hwnd: HWND, face_name: String) {
     let (base_font, text_size) =
-        unsafe { with_state(hwnd, |state| (state.hfont, state.settings.text_size)) }
+        { with_state(hwnd, |state| (state.hfont, state.settings.text_size)) }
             .unwrap_or((HFONT(0), 12));
     let custom_font = create_ui_font(
         &face_name,
@@ -5376,7 +5370,7 @@ fn apply_ui_font(hwnd: HWND, face_name: String) {
     let is_custom = custom_font.is_some() && !face_name.trim().is_empty();
     let new_font_resolved =
         custom_font.unwrap_or_else(|| unsafe { HFONT(GetStockObject(DEFAULT_GUI_FONT).0) });
-    let Some((new_font, old_font, old_custom)) = unsafe {
+    let Some((new_font, old_font, old_custom)) = {
         with_state(hwnd, |state| {
             let old_font = state.hfont;
             let old_custom = state.hfont_custom;
@@ -5398,7 +5392,7 @@ fn apply_ui_font(hwnd: HWND, face_name: String) {
         log_debug("DeleteObject failed for previous UI font");
     }
 
-    let controls = unsafe {
+    let controls = {
         with_state(hwnd, |state| {
             vec![
                 state.hwnd_tab,
@@ -5433,7 +5427,7 @@ fn apply_ui_font(hwnd: HWND, face_name: String) {
         }
     }
     editor_manager::apply_font_to_all_edits(hwnd, new_font);
-    if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
+    if let Some(settings) = { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
 }
@@ -5442,7 +5436,7 @@ fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size: Optio
     let mut changed = false;
     let mut next_color = None;
     let mut next_size = None;
-    unsafe {
+    {
         with_state(hwnd, |state| {
             if let Some(color) = text_color {
                 if state.settings.text_color != color {
@@ -5469,7 +5463,7 @@ fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size: Optio
         (Some(c), Some(s)) => (c, s),
         _ => return,
     };
-    if changed && let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
+    if changed && let Some(settings) = { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
     editor_manager::apply_text_appearance_to_all_edits(hwnd, color, size);
@@ -5477,7 +5471,7 @@ fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size: Optio
 }
 
 fn update_voice_panel_menu_check(hwnd: HWND) {
-    let (visible, favorites_visible, text_color, text_size, read_only, word_wrap) = unsafe {
+    let (visible, favorites_visible, text_color, text_size, read_only, word_wrap) = {
         with_state(hwnd, |state| {
             (
                 state.voice_panel_visible,
@@ -5575,7 +5569,7 @@ fn update_voice_panel_menu_check(hwnd: HWND) {
 }
 
 fn toggle_voice_panel(hwnd: HWND) {
-    let visible = unsafe { with_state(hwnd, |state| state.voice_panel_visible) }.unwrap_or(false);
+    let visible = { with_state(hwnd, |state| state.voice_panel_visible) }.unwrap_or(false);
     set_voice_panel_visible(hwnd, !visible);
 }
 
@@ -5603,33 +5597,31 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
         edit_volume,
         checkbox_multilingual,
         changed,
-    ) = match unsafe {
-        with_state(hwnd, |state| {
-            let changed = state.settings.show_voice_panel != visible;
-            state.voice_panel_visible = visible;
-            state.settings.show_voice_panel = visible;
-            (
-                state.voice_label_engine,
-                state.voice_combo_engine,
-                state.voice_label_language,
-                state.voice_combo_language,
-                state.voice_label_voice,
-                state.voice_combo_voice,
-                state.voice_button_insert_tag,
-                state.voice_label_speed,
-                state.voice_combo_speed,
-                state.voice_edit_speed,
-                state.voice_label_pitch,
-                state.voice_combo_pitch,
-                state.voice_edit_pitch,
-                state.voice_label_volume,
-                state.voice_combo_volume,
-                state.voice_edit_volume,
-                state.voice_checkbox_multilingual,
-                changed,
-            )
-        })
-    } {
+    ) = match with_state(hwnd, |state| {
+        let changed = state.settings.show_voice_panel != visible;
+        state.voice_panel_visible = visible;
+        state.settings.show_voice_panel = visible;
+        (
+            state.voice_label_engine,
+            state.voice_combo_engine,
+            state.voice_label_language,
+            state.voice_combo_language,
+            state.voice_label_voice,
+            state.voice_combo_voice,
+            state.voice_button_insert_tag,
+            state.voice_label_speed,
+            state.voice_combo_speed,
+            state.voice_edit_speed,
+            state.voice_label_pitch,
+            state.voice_combo_pitch,
+            state.voice_edit_pitch,
+            state.voice_label_volume,
+            state.voice_combo_volume,
+            state.voice_edit_volume,
+            state.voice_checkbox_multilingual,
+            changed,
+        )
+    }) {
         Some(values) => values,
         None => return,
     };
@@ -5662,14 +5654,13 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
     }
     update_voice_panel_menu_check(hwnd);
     if visible {
-        let language =
-            unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+        let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
         refresh_voice_panel(hwnd);
     }
     if persist
         && changed
-        && let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) }
+        && let Some(settings) = { with_state(hwnd, |state| state.settings.clone()) }
     {
         save_settings(settings);
     }
@@ -5678,8 +5669,7 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
 }
 
 fn toggle_favorites_panel(hwnd: HWND) {
-    let visible =
-        unsafe { with_state(hwnd, |state| state.voice_favorites_visible) }.unwrap_or(false);
+    let visible = { with_state(hwnd, |state| state.voice_favorites_visible) }.unwrap_or(false);
     set_favorites_panel_visible(hwnd, !visible);
 }
 
@@ -5688,18 +5678,16 @@ fn set_favorites_panel_visible(hwnd: HWND, visible: bool) {
 }
 
 fn set_favorites_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
-    let (label_favorites, combo_favorites, changed) = match unsafe {
-        with_state(hwnd, |state| {
-            let changed = state.settings.show_favorite_panel != visible;
-            state.voice_favorites_visible = visible;
-            state.settings.show_favorite_panel = visible;
-            (
-                state.voice_label_favorites,
-                state.voice_combo_favorites,
-                changed,
-            )
-        })
-    } {
+    let (label_favorites, combo_favorites, changed) = match with_state(hwnd, |state| {
+        let changed = state.settings.show_favorite_panel != visible;
+        state.voice_favorites_visible = visible;
+        state.settings.show_favorite_panel = visible;
+        (
+            state.voice_label_favorites,
+            state.voice_combo_favorites,
+            changed,
+        )
+    }) {
         Some(values) => values,
         None => return,
     };
@@ -5713,14 +5701,13 @@ fn set_favorites_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool
     }
     update_voice_panel_menu_check(hwnd);
     if visible {
-        let language =
-            unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+        let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
         refresh_voice_panel(hwnd);
     }
     if persist
         && changed
-        && let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) }
+        && let Some(settings) = { with_state(hwnd, |state| state.settings.clone()) }
     {
         save_settings(settings);
     }
@@ -6471,7 +6458,7 @@ fn handle_voice_panel_engine_change(hwnd: HWND) {
 }
 
 fn handle_voice_panel_voice_change(hwnd: HWND) {
-    unsafe {
+    {
         let engine = with_state(hwnd, |state| state.settings.tts_engine).unwrap_or_default();
         if let Some(voice_name) = current_voice_selection(hwnd, engine) {
             let old_voice =
@@ -6517,7 +6504,7 @@ fn handle_voice_panel_multilingual_toggle(hwnd: HWND) {
 }
 
 fn insert_voice_tag_from_voice_panel(hwnd: HWND) {
-    unsafe {
+    {
         let (engine, rate, pitch, volume) = with_state(hwnd, |state| {
             (
                 state.settings.tts_engine,
@@ -6553,7 +6540,7 @@ fn is_voice_panel_tuning_edit(hwnd: HWND, target: HWND) -> bool {
     if target.0 == 0 {
         return false;
     }
-    unsafe {
+    {
         with_state(hwnd, |state| {
             target == state.voice_edit_speed
                 || target == state.voice_edit_pitch
@@ -6564,7 +6551,7 @@ fn is_voice_panel_tuning_edit(hwnd: HWND, target: HWND) -> bool {
 }
 
 fn handle_voice_panel_tuning_combo_change(hwnd: HWND) {
-    unsafe {
+    {
         let (combo_speed, combo_pitch, combo_volume, was_active, old_rate, old_pitch, old_volume) =
             with_state(hwnd, |state| {
                 (
@@ -6610,7 +6597,7 @@ fn handle_voice_panel_tuning_combo_change(hwnd: HWND) {
 }
 
 fn handle_voice_panel_tuning_edit_change(hwnd: HWND) {
-    unsafe {
+    {
         let (edit_speed, edit_pitch, edit_volume, was_active, old_rate, old_pitch, old_volume) =
             with_state(hwnd, |state| {
                 (
@@ -6703,7 +6690,7 @@ fn handle_voice_panel_favorite_change(hwnd: HWND) {
 }
 
 fn current_voice_selection(hwnd: HWND, engine: TtsEngine) -> Option<String> {
-    let (combo_voice, voices) = unsafe {
+    let (combo_voice, voices) = {
         with_state(hwnd, |state| {
             let list = match engine {
                 TtsEngine::Edge => state.edge_voices.clone(),
@@ -6727,7 +6714,7 @@ fn current_voice_selection(hwnd: HWND, engine: TtsEngine) -> Option<String> {
 }
 
 fn current_favorite_selection(hwnd: HWND) -> Option<FavoriteVoice> {
-    let (combo_favorites, favorites) = unsafe {
+    let (combo_favorites, favorites) = {
         with_state(hwnd, |state| {
             (
                 state.voice_combo_favorites,
@@ -7042,7 +7029,7 @@ fn spellcheck_word_context_from_lparam(
 }
 
 fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
-    let announce_allowed = unsafe {
+    let announce_allowed = {
         with_state(hwnd, |state| {
             if state.spellcheck_space_trigger == Some(hwnd_edit) {
                 // Force re-highlight of current line when space/punctuation is pressed.
@@ -7056,19 +7043,19 @@ fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
     }
     .unwrap_or(false);
     let Some(caret_index) = spellcheck_caret_char_index(hwnd_edit) else {
-        unsafe {
+        {
             with_state(hwnd, |state| state.spellcheck_last_announce = None);
         }
         return;
     };
     let Some(word_ctx) = spellcheck_word_context_from_char_index(hwnd_edit, caret_index) else {
-        unsafe {
+        {
             with_state(hwnd, |state| state.spellcheck_last_announce = None);
         }
         return;
     };
 
-    let (announce_msg, fallback_msg) = unsafe {
+    let (announce_msg, fallback_msg) = {
         with_state(hwnd, |state| {
             let settings = &state.settings;
             let Some(resolution) = state.spellcheck_manager.resolve_language(settings) else {
@@ -7133,7 +7120,7 @@ fn handle_spellcheck_selection_change(hwnd: HWND, hwnd_edit: HWND) {
 
 /// Triggers the debounced spellcheck highlight timer
 fn trigger_spellcheck_highlight(hwnd: HWND, hwnd_edit: HWND) {
-    let should_start_timer = unsafe {
+    let should_start_timer = {
         with_state(hwnd, |state| {
             if !state.settings.spellcheck_enabled {
                 return false;
@@ -7160,7 +7147,7 @@ fn trigger_spellcheck_highlight(hwnd: HWND, hwnd_edit: HWND) {
 /// Called when the debounce timer fires - highlights misspellings on current line
 fn handle_spellcheck_highlight_timer(hwnd: HWND) {
     let Some(hwnd_edit) =
-        (unsafe { with_state(hwnd, |state| state.spellcheck_highlight_pending.take()).flatten() })
+        ({ with_state(hwnd, |state| state.spellcheck_highlight_pending.take()).flatten() })
     else {
         return;
     };
@@ -7182,7 +7169,7 @@ fn handle_spellcheck_highlight_timer(hwnd: HWND) {
     let doc_id = hwnd_edit.0;
 
     // Check if we're on the same line as before - no need to re-highlight
-    let should_highlight = unsafe {
+    let should_highlight = {
         with_state(hwnd, |state| {
             let last = state.spellcheck_last_highlighted_line;
             if last == Some((doc_id, line_index)) {
@@ -7199,7 +7186,7 @@ fn handle_spellcheck_highlight_timer(hwnd: HWND) {
     }
 
     // Get misspellings for this line
-    let misspellings = unsafe {
+    let misspellings = {
         with_state(hwnd, |state| {
             let settings = &state.settings;
             let resolution = state.spellcheck_manager.resolve_language(settings)?;
@@ -7725,7 +7712,7 @@ fn open_dictionary_lookup(hwnd: HWND) {
 }
 
 fn can_undo_now(hwnd: HWND) -> bool {
-    if unsafe { with_state(hwnd, |state| state.normalize_undo.is_some()).unwrap_or(false) } {
+    if with_state(hwnd, |state| state.normalize_undo.is_some()).unwrap_or(false) {
         return true;
     }
     let Some(hwnd_edit) = get_active_edit(hwnd) else {
@@ -7737,7 +7724,7 @@ fn can_undo_now(hwnd: HWND) -> bool {
 
 pub(crate) fn update_main_status_bar(hwnd: HWND) {
     let (hwnd_status, language) =
-        unsafe { with_state(hwnd, |state| (state.hwnd_status, state.settings.language)) }
+        { with_state(hwnd, |state| (state.hwnd_status, state.settings.language)) }
             .unwrap_or((HWND(0), Language::default()));
     if hwnd_status.0 == 0 {
         return;
@@ -7806,7 +7793,7 @@ pub(crate) fn update_main_status_bar(hwnd: HWND) {
 
 fn build_undo_menu_label(hwnd: HWND, language: Language) -> String {
     let base = i18n::tr(language, "edit.undo");
-    let action = unsafe { with_state(hwnd, |state| state.undo_action_label.clone()).flatten() };
+    let action = { with_state(hwnd, |state| state.undo_action_label.clone()).flatten() };
     let Some(action) = action else {
         return base;
     };
@@ -7852,7 +7839,7 @@ fn can_paste_now(hwnd: HWND) -> bool {
 }
 
 fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
-    let (combo_voice, combo_favorites, engine, language) = unsafe {
+    let (combo_voice, combo_favorites, engine, language) = {
         with_state(hwnd, |state| {
             (
                 state.voice_combo_voice,
@@ -7879,7 +7866,7 @@ fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {
         let Some(voice_name) = current_voice_selection(hwnd, engine) else {
             return;
         };
-        let is_favorite = unsafe {
+        let is_favorite = {
             with_state(hwnd, |state| {
                 state
                     .settings
@@ -7979,7 +7966,7 @@ fn replace_spellcheck_word(hwnd_edit: HWND, ctx: &SpellcheckContextMenuState, re
 }
 
 fn handle_spellcheck_suggestion(hwnd: HWND, index: usize) {
-    let ctx = unsafe { with_state(hwnd, |state| state.spellcheck_context.clone()) }.unwrap_or(None);
+    let ctx = { with_state(hwnd, |state| state.spellcheck_context.clone()) }.unwrap_or(None);
     let Some(ctx) = ctx else {
         return;
     };
@@ -7989,7 +7976,7 @@ fn handle_spellcheck_suggestion(hwnd: HWND, index: usize) {
     if ctx.hwnd_edit.0 != 0 {
         replace_spellcheck_word(ctx.hwnd_edit, &ctx, &replacement);
     }
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state.spellcheck_manager.clear_cache();
             state.spellcheck_last_announce = None;
@@ -7999,11 +7986,11 @@ fn handle_spellcheck_suggestion(hwnd: HWND, index: usize) {
 }
 
 fn handle_spellcheck_add_to_dictionary(hwnd: HWND) {
-    let ctx = unsafe { with_state(hwnd, |state| state.spellcheck_context.clone()) }.unwrap_or(None);
+    let ctx = { with_state(hwnd, |state| state.spellcheck_context.clone()) }.unwrap_or(None);
     let Some(ctx) = ctx else {
         return;
     };
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state
                 .spellcheck_manager
@@ -8015,11 +8002,11 @@ fn handle_spellcheck_add_to_dictionary(hwnd: HWND) {
 }
 
 fn handle_spellcheck_ignore_once(hwnd: HWND) {
-    let ctx = unsafe { with_state(hwnd, |state| state.spellcheck_context.clone()) }.unwrap_or(None);
+    let ctx = { with_state(hwnd, |state| state.spellcheck_context.clone()) }.unwrap_or(None);
     let Some(ctx) = ctx else {
         return;
     };
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state
                 .spellcheck_manager
@@ -8039,7 +8026,7 @@ fn go_to_spelling_error(hwnd: HWND, forward: bool) {
     };
 
     // Get spellcheck language
-    let resolution = unsafe {
+    let resolution = {
         with_state(hwnd, |state| {
             state.spellcheck_manager.resolve_language(&state.settings)
         })
@@ -8063,7 +8050,7 @@ fn go_to_spelling_error(hwnd: HWND, forward: bool) {
     let current_pos = if forward { cr.cpMax } else { cr.cpMin };
 
     // Get document info
-    let doc_id = unsafe {
+    let doc_id = {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -8085,7 +8072,7 @@ fn go_to_spelling_error(hwnd: HWND, forward: bool) {
 
     let mut line_start_utf16 = 0i32;
     for (line_idx, line) in text.lines().enumerate() {
-        let misspellings = unsafe {
+        let misspellings = {
             with_state(hwnd, |state| {
                 state.spellcheck_manager.check_line(
                     doc_id,
@@ -8154,8 +8141,7 @@ fn go_to_spelling_error(hwnd: HWND, forward: bool) {
 }
 
 fn handle_voice_context_favorite(hwnd: HWND, add: bool) {
-    let ctx =
-        unsafe { with_state(hwnd, |state| state.voice_context_voice.clone()) }.unwrap_or(None);
+    let ctx = { with_state(hwnd, |state| state.voice_context_voice.clone()) }.unwrap_or(None);
     let Some(fav) = ctx else {
         return;
     };
@@ -8164,7 +8150,7 @@ fn handle_voice_context_favorite(hwnd: HWND, add: bool) {
     } else {
         remove_favorite_voice(hwnd, fav.engine, &fav.short_name);
     }
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state.voice_context_voice = None;
         });
@@ -8172,7 +8158,7 @@ fn handle_voice_context_favorite(hwnd: HWND, add: bool) {
 }
 
 fn add_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             if state
                 .settings
@@ -8188,14 +8174,14 @@ fn add_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
             });
         });
     }
-    if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
+    if let Some(settings) = { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
     refresh_voice_panel(hwnd);
 }
 
 fn remove_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state
                 .settings
@@ -8203,7 +8189,7 @@ fn remove_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
                 .retain(|fav| !(fav.engine == engine && fav.short_name == voice_name));
         });
     }
-    if let Some(settings) = unsafe { with_state(hwnd, |state| state.settings.clone()) } {
+    if let Some(settings) = { with_state(hwnd, |state| state.settings.clone()) } {
         save_settings(settings);
     }
     refresh_voice_panel(hwnd);
@@ -8478,14 +8464,14 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN {
         return false;
     }
-    let options_hwnd = unsafe { with_state(hwnd, |state| state.options_dialog) }.unwrap_or(HWND(0));
+    let options_hwnd = { with_state(hwnd, |state| state.options_dialog) }.unwrap_or(HWND(0));
     if options_hwnd.0 != 0
         && (msg.hwnd == options_hwnd || unsafe { IsChild(options_hwnd, msg.hwnd).as_bool() })
     {
         return false;
     }
 
-    let shortcuts = unsafe { with_state(hwnd, |state| state.settings.shortcuts.clone()) }
+    let shortcuts = { with_state(hwnd, |state| state.settings.shortcuts.clone()) }
         .unwrap_or_else(ShortcutSettings::default);
 
     // Dedicated shortcut requested for streaming audio.
@@ -8798,7 +8784,7 @@ fn close_other_windows(hwnd: HWND) {
 }
 
 pub(crate) fn get_active_edit(hwnd: HWND) -> Option<HWND> {
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state.docs.get(state.current).map(|doc| doc.hwnd_edit)
         })
@@ -8968,7 +8954,7 @@ fn audio_bookmark_position_and_snippet(position_secs: f64) -> (i32, String) {
 }
 
 fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
-    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) = unsafe {
+    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) = {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -8983,7 +8969,7 @@ fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
     }
 
     let (storage_key, _) = bookmark_storage_key(path.as_deref(), hwnd_edit);
-    let Some(bookmarks) = unsafe {
+    let Some(bookmarks) = {
         with_state(hwnd, |state| {
             state.bookmarks.files.get(&storage_key).cloned()
         })
@@ -8996,7 +8982,7 @@ fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
     }
 
     let current_pos = if matches!(format, FileFormat::Audiobook) {
-        unsafe {
+        {
             with_state(hwnd, |state| {
                 let active = state.active_audiobook.as_ref()?;
                 let current_path = path.as_ref()?;
@@ -9126,7 +9112,7 @@ fn announce_bookmark_target_line(hwnd_edit: HWND, position: i32, fallback: &str)
 }
 
 fn clear_current_bookmarks(hwnd: HWND) -> bool {
-    let (path, hwnd_edit) = unsafe {
+    let (path, hwnd_edit) = {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -9141,7 +9127,7 @@ fn clear_current_bookmarks(hwnd: HWND) -> bool {
     }
     let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
-    let (removed, bookmarks_window) = unsafe {
+    let (removed, bookmarks_window) = {
         with_state(hwnd, |state| {
             let removed = state.bookmarks.files.remove(&storage_key).is_some();
             if removed && persist_to_disk {
@@ -9189,9 +9175,9 @@ pub(crate) fn goto_first_bookmark(
 }
 
 pub(crate) fn rebuild_menus(hwnd: HWND) {
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let (_, recent_menu) = create_menus(hwnd, language);
-    unsafe {
+    {
         with_state(hwnd, |state| {
             state.hmenu_recent = recent_menu;
         });
@@ -9201,16 +9187,14 @@ pub(crate) fn rebuild_menus(hwnd: HWND) {
 }
 
 pub(crate) fn push_recent_file(hwnd: HWND, path: &Path) {
-    let (hmenu_recent, files) = match unsafe {
-        with_state(hwnd, |state| {
-            state.recent_files.retain(|p| p != path);
-            state.recent_files.insert(0, path.to_path_buf());
-            if state.recent_files.len() > MAX_RECENT {
-                state.recent_files.truncate(MAX_RECENT);
-            }
-            (state.hmenu_recent, state.recent_files.clone())
-        })
-    } {
+    let (hmenu_recent, files) = match with_state(hwnd, |state| {
+        state.recent_files.retain(|p| p != path);
+        state.recent_files.insert(0, path.to_path_buf());
+        if state.recent_files.len() > MAX_RECENT {
+            state.recent_files.truncate(MAX_RECENT);
+        }
+        (state.hmenu_recent, state.recent_files.clone())
+    }) {
         Some(values) => values,
         None => return,
     };
@@ -9219,7 +9203,7 @@ pub(crate) fn push_recent_file(hwnd: HWND, path: &Path) {
 }
 
 pub(crate) fn clear_recent_files(hwnd: HWND) {
-    let hmenu_recent = unsafe {
+    let hmenu_recent = {
         with_state(hwnd, |state| {
             state.recent_files.clear();
             state.hmenu_recent
@@ -9279,8 +9263,8 @@ mod tests {
 }
 
 fn open_document_with_encoding(hwnd: HWND, path: &Path, encoding: Option<TextEncoding>) {
-    let behavior = unsafe { with_state(hwnd, |state| state.settings.open_behavior) }
-        .unwrap_or(OpenBehavior::NewTab);
+    let behavior =
+        { with_state(hwnd, |state| state.settings.open_behavior) }.unwrap_or(OpenBehavior::NewTab);
     if behavior == OpenBehavior::NewWindow && spawn_new_window_with_path(path) {
         return;
     }
@@ -9288,7 +9272,7 @@ fn open_document_with_encoding(hwnd: HWND, path: &Path, encoding: Option<TextEnc
 }
 
 fn play_audio_playlist_item(hwnd: HWND, index: usize) {
-    let path = unsafe {
+    let path = {
         with_state(hwnd, |state| {
             if index >= state.audio_playlist.len() {
                 return None;
@@ -9312,7 +9296,7 @@ fn play_audio_playlist_item(hwnd: HWND, index: usize) {
 }
 
 pub(crate) fn queue_audio_files_and_play(hwnd: HWND, paths: Vec<PathBuf>) {
-    unsafe {
+    {
         if paths.is_empty() {
             return;
         }
@@ -9368,7 +9352,7 @@ pub(crate) fn queue_audio_files_and_play(hwnd: HWND, paths: Vec<PathBuf>) {
 }
 
 fn switch_audio_playlist_relative(hwnd: HWND, delta: i32) -> bool {
-    let target = unsafe {
+    let target = {
         with_state(hwnd, |state| {
             if state.audio_playlist.is_empty() {
                 return None;
@@ -9394,7 +9378,7 @@ fn switch_audio_playlist_relative(hwnd: HWND, delta: i32) -> bool {
 }
 
 fn handle_audio_playlist_timer(hwnd: HWND) {
-    let (is_paused, should_advance, current_seconds, elapsed_since_start) = unsafe {
+    let (is_paused, should_advance, current_seconds, elapsed_since_start) = {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.is_paused {
@@ -9447,7 +9431,7 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
     // If output stops mid-file (e.g. transient backend failure), recover by restarting
     // from the current position instead of stopping playback entirely.
     if !should_advance && output_stopped {
-        let is_stream_cache = unsafe {
+        let is_stream_cache = {
             with_state(hwnd, |state| {
                 state
                     .active_audiobook
@@ -9460,7 +9444,7 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
         if is_stream_cache {
             log_debug("Audio player: stream cache output stopped, skipping mid-file auto-restart");
         } else {
-            let restart = unsafe {
+            let restart = {
                 with_state(hwnd, |state| {
                     let player = state.active_audiobook.as_ref()?;
                     let position_secs = audio_player::audiobook_position_secs(player)
@@ -9490,15 +9474,17 @@ fn open_path_with_behavior(hwnd: HWND, path: &Path) {
     open_document_with_encoding(hwnd, path, None);
 }
 
-pub(crate) unsafe fn with_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+pub(crate) fn with_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut AppState) -> R,
 {
-    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AppState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(f(&mut *ptr))
+    unsafe {
+        let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AppState;
+        if ptr.is_null() {
+            None
+        } else {
+            Some(f(&mut *ptr))
+        }
     }
 }
 
@@ -9722,7 +9708,7 @@ fn handle_pdf_loaded(hwnd: HWND, payload: PdfLoadResult) {
 }
 
 fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResult) {
-    unsafe {
+    {
         let editor_manager::DocumentLoadResult { path, result } = payload;
         let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
         const LARGE_FILE_NO_WRAP_THRESHOLD_BYTES: u64 = 15 * 1024 * 1024;
@@ -9835,7 +9821,7 @@ fn start_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND, ocr_timeout_secs: u6
 }
 
 fn stop_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND) {
-    unsafe {
+    {
         let mut timer_id = None;
         with_state(hwnd, |state| {
             if let Some(pos) = state
@@ -9854,7 +9840,7 @@ fn stop_pdf_loading_animation(hwnd: HWND, hwnd_edit: HWND) {
 }
 
 fn handle_pdf_loading_timer(hwnd: HWND, timer_id: usize) {
-    unsafe {
+    {
         let mut target = None;
         let mut should_timeout = false;
         with_state(hwnd, |state| {
@@ -9943,15 +9929,13 @@ fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
 }
 
 fn next_tab_with_prompt(hwnd: HWND) {
-    let (current, count) = match unsafe {
-        with_state(hwnd, |state| {
-            if state.docs.is_empty() {
-                return None;
-            }
-            let current = state.current;
-            Some((current, state.docs.len()))
-        })
-    } {
+    let (current, count) = match with_state(hwnd, |state| {
+        if state.docs.is_empty() {
+            return None;
+        }
+        let current = state.current;
+        Some((current, state.docs.len()))
+    }) {
         Some(Some(values)) => values,
         _ => return,
     };
@@ -9963,7 +9947,7 @@ fn next_tab_with_prompt(hwnd: HWND) {
 }
 
 fn open_documents_popup(hwnd: HWND) {
-    let docs = unsafe {
+    let docs = {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -10044,7 +10028,7 @@ fn refresh_window_open_documents_menu(hwnd: HWND, window_menu: HMENU) {
         }
     }
 
-    let docs = unsafe {
+    let docs = {
         with_state(hwnd, |state| {
             state
                 .docs
@@ -10120,16 +10104,14 @@ fn suggest_extension_for_interpreter(interpreter: &str) -> &'static str {
 }
 
 fn execute_current_file(hwnd: HWND) {
-    let (path, content, interpreter) = match unsafe {
-        with_state(hwnd, |state| {
-            let doc = state.docs.get(state.current)?;
-            let path = doc.path.clone();
-            let hwnd_edit = doc.hwnd_edit;
-            let content = editor_manager::get_edit_text(hwnd_edit);
-            let interpreter = state.settings.interpreter_path.clone();
-            Some((path, content, interpreter))
-        })
-    } {
+    let (path, content, interpreter) = match with_state(hwnd, |state| {
+        let doc = state.docs.get(state.current)?;
+        let path = doc.path.clone();
+        let hwnd_edit = doc.hwnd_edit;
+        let content = editor_manager::get_edit_text(hwnd_edit);
+        let interpreter = state.settings.interpreter_path.clone();
+        Some((path, content, interpreter))
+    }) {
         Some(Some(v)) => v,
         _ => return,
     };
@@ -10176,15 +10158,13 @@ fn execute_current_file(hwnd: HWND) {
 }
 
 fn attempt_switch_to_selected_tab(hwnd: HWND) {
-    let (current, hwnd_tab, count) = match unsafe {
-        with_state(hwnd, |state| {
-            if state.docs.is_empty() {
-                return None;
-            }
-            let current = state.current;
-            Some((current, state.hwnd_tab, state.docs.len()))
-        })
-    } {
+    let (current, hwnd_tab, count) = match with_state(hwnd, |state| {
+        if state.docs.is_empty() {
+            return None;
+        }
+        let current = state.current;
+        Some((current, state.hwnd_tab, state.docs.len()))
+    }) {
         Some(Some(values)) => values,
         _ => return,
     };
@@ -11013,7 +10993,7 @@ pub(crate) fn open_file_dialog_with_encoding(
 }
 
 pub(crate) fn open_subtitle_file_dialog(hwnd: HWND) -> Option<PathBuf> {
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let title = i18n::tr(language, "dialog.open_subtitles_title");
     let filter_label = i18n::tr(language, "dialog.subtitles_filter");
     let all_files_label = i18n::tr(language, "dialog.all_files");

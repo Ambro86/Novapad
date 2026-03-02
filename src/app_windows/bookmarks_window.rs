@@ -159,9 +159,9 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;
             let parent = unsafe { HWND((*create_struct).lpCreateParams as isize) };
-            let hfont = unsafe { with_state(parent, |state| state.hfont) }.unwrap_or(HFONT(0));
+            let hfont = { with_state(parent, |state| state.hfont) }.unwrap_or(HFONT(0));
             let language =
-                unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+                { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
 
             let hwnd_list = unsafe {
                 CreateWindowExW(
@@ -296,7 +296,7 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
             if parent.0 != 0 {
                 unsafe { EnableWindow(parent, true) };
                 force_focus_editor_on_parent(parent);
-                if unsafe {
+                if {
                     with_state(parent, |state| {
                         state.bookmarks_window = HWND(0);
                     })
@@ -340,7 +340,7 @@ pub fn refresh_bookmarks_list(hwnd: HWND) {
         None => return,
     };
 
-    let (path, hwnd_edit) = unsafe {
+    let (path, hwnd_edit) = {
         with_state(parent, |state| {
             state
                 .docs
@@ -397,7 +397,7 @@ pub fn goto_selected(hwnd: HWND) {
         return;
     }
 
-    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) = unsafe {
+    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) = {
         with_state(parent, |state| {
             state
                 .docs
@@ -456,7 +456,7 @@ pub fn delete_selected(hwnd: HWND) {
         return;
     }
 
-    let (path, hwnd_edit) = unsafe {
+    let (path, hwnd_edit) = {
         with_state(parent, |state| {
             state
                 .docs
@@ -471,7 +471,7 @@ pub fn delete_selected(hwnd: HWND) {
     }
     let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
-    if unsafe {
+    if {
         with_state(parent, |state| {
             if let Some(list) = state.bookmarks.files.get_mut(&storage_key)
                 && sel < list.len() as i32

@@ -7,7 +7,7 @@ use windows::Win32::UI::WindowsAndMessaging::{MB_ICONINFORMATION, MB_OK, Message
 use windows::core::PCWSTR;
 
 pub fn show(hwnd: HWND) {
-    let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     let message = to_wide(&about_message(language));
     let title = to_wide(&about_title(language));
     unsafe {

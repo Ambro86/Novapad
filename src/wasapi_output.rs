@@ -755,46 +755,48 @@ fn update_clock(clock: &IAudioClock, position_units: &AtomicU64, last_qpc: &Atom
     }
 }
 
-unsafe fn parse_mix_format(
+fn parse_mix_format(
     mix_ptr: *mut WAVEFORMATEX,
 ) -> (Option<MixFormat>, Option<WasapiSampleFormat>) {
-    let fmt_ptr = mix_ptr as *const WAVEFORMATEX;
-    if fmt_ptr.is_null() {
-        return (None, None);
-    }
-    let fmt = *fmt_ptr;
-    if fmt.wFormatTag == WAVE_FORMAT_EXTENSIBLE {
-        let ext_ptr = mix_ptr as *const WAVEFORMATEXTENSIBLE;
-        if ext_ptr.is_null() {
+    unsafe {
+        let fmt_ptr = mix_ptr as *const WAVEFORMATEX;
+        if fmt_ptr.is_null() {
             return (None, None);
         }
-        let ext = *ext_ptr;
-        let sub = ext.SubFormat;
-        if sub == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT {
+        let fmt = *fmt_ptr;
+        if fmt.wFormatTag == WAVE_FORMAT_EXTENSIBLE {
+            let ext_ptr = mix_ptr as *const WAVEFORMATEXTENSIBLE;
+            if ext_ptr.is_null() {
+                return (None, None);
+            }
+            let ext = *ext_ptr;
+            let sub = ext.SubFormat;
+            if sub == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT {
+                (
+                    Some(MixFormat::Extensible(ext)),
+                    Some(WasapiSampleFormat::Float32),
+                )
+            } else if sub == KSDATAFORMAT_SUBTYPE_PCM {
+                (
+                    Some(MixFormat::Extensible(ext)),
+                    Some(WasapiSampleFormat::Pcm16),
+                )
+            } else {
+                (None, None)
+            }
+        } else if fmt.wFormatTag == WAVE_FORMAT_IEEE_FLOAT {
             (
-                Some(MixFormat::Extensible(ext)),
+                Some(MixFormat::Standard(fmt)),
                 Some(WasapiSampleFormat::Float32),
             )
-        } else if sub == KSDATAFORMAT_SUBTYPE_PCM {
+        } else if fmt.wFormatTag == WAVE_FORMAT_PCM {
             (
-                Some(MixFormat::Extensible(ext)),
+                Some(MixFormat::Standard(fmt)),
                 Some(WasapiSampleFormat::Pcm16),
             )
         } else {
             (None, None)
         }
-    } else if fmt.wFormatTag == WAVE_FORMAT_IEEE_FLOAT {
-        (
-            Some(MixFormat::Standard(fmt)),
-            Some(WasapiSampleFormat::Float32),
-        )
-    } else if fmt.wFormatTag == WAVE_FORMAT_PCM {
-        (
-            Some(MixFormat::Standard(fmt)),
-            Some(WasapiSampleFormat::Pcm16),
-        )
-    } else {
-        (None, None)
     }
 }
 

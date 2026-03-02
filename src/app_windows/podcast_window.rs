@@ -290,1009 +290,902 @@ unsafe extern "system" fn podcast_wndproc(
     crate::panic_guard::guard(
         "podcast_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { podcast_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || podcast_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let parent = HWND((*create_struct).lpCreateParams as isize);
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let labels = labels(language);
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
+fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let parent = HWND((*create_struct).lpCreateParams as isize);
+                let language =
+                    with_state(parent, |state| state.settings.language).unwrap_or_default();
+                let labels = labels(language);
+                let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let group_input = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.input_group).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
-                10,
-                10,
-                600,
-                285,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let group_input = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.input_group).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
+                    10,
+                    10,
+                    600,
+                    285,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let include_mic = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.include_mic).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                20,
-                35,
-                220,
-                22,
-                hwnd,
-                HMENU(PODCAST_ID_INCLUDE_MIC as isize),
-                None,
-                None,
-            );
+                let include_mic = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.include_mic).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    20,
+                    35,
+                    220,
+                    22,
+                    hwnd,
+                    HMENU(PODCAST_ID_INCLUDE_MIC as isize),
+                    None,
+                    None,
+                );
 
-            let label_mic = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.mic_device).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                40,
-                62,
-                180,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let label_mic = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.mic_device).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    40,
+                    62,
+                    180,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let mic_device = CreateWindowExW(
-                Default::default(),
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                230,
-                58,
-                350,
-                200,
-                hwnd,
-                HMENU(PODCAST_ID_MIC_DEVICE as isize),
-                None,
-                None,
-            );
+                let mic_device = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    230,
+                    58,
+                    350,
+                    200,
+                    hwnd,
+                    HMENU(PODCAST_ID_MIC_DEVICE as isize),
+                    None,
+                    None,
+                );
 
-            let label_mic_gain = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.mic_gain_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                40,
-                85,
-                180,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let label_mic_gain = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.mic_gain_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    40,
+                    85,
+                    180,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let mic_gain = CreateWindowExW(
-                Default::default(),
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                230,
-                81,
-                140,
-                200,
-                hwnd,
-                HMENU(PODCAST_ID_MIC_GAIN as isize),
-                None,
-                None,
-            );
+                let mic_gain = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    230,
+                    81,
+                    140,
+                    200,
+                    hwnd,
+                    HMENU(PODCAST_ID_MIC_GAIN as isize),
+                    None,
+                    None,
+                );
 
-            let monitor_check = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.monitor_mic).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                40,
-                108,
-                220,
-                22,
-                hwnd,
-                HMENU(PODCAST_ID_MONITOR_CHECK as isize),
-                None,
-                None,
-            );
+                let monitor_check = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.monitor_mic).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    40,
+                    108,
+                    220,
+                    22,
+                    hwnd,
+                    HMENU(PODCAST_ID_MONITOR_CHECK as isize),
+                    None,
+                    None,
+                );
 
-            let include_system = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.include_system).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                20,
-                135,
-                220,
-                22,
-                hwnd,
-                HMENU(PODCAST_ID_INCLUDE_SYSTEM as isize),
-                None,
-                None,
-            );
+                let include_system = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.include_system).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    20,
+                    135,
+                    220,
+                    22,
+                    hwnd,
+                    HMENU(PODCAST_ID_INCLUDE_SYSTEM as isize),
+                    None,
+                    None,
+                );
 
-            let label_system = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.system_device).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                40,
-                162,
-                180,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let label_system = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.system_device).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    40,
+                    162,
+                    180,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let system_device = CreateWindowExW(
-                Default::default(),
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                230,
-                158,
-                350,
-                200,
-                hwnd,
-                HMENU(PODCAST_ID_SYSTEM_DEVICE as isize),
-                None,
-                None,
-            );
+                let system_device = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    230,
+                    158,
+                    350,
+                    200,
+                    hwnd,
+                    HMENU(PODCAST_ID_SYSTEM_DEVICE as isize),
+                    None,
+                    None,
+                );
 
-            let label_system_gain = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.system_gain_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                40,
-                185,
-                180,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let label_system_gain = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.system_gain_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    40,
+                    185,
+                    180,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let system_gain = CreateWindowExW(
-                Default::default(),
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                230,
-                181,
-                140,
-                200,
-                hwnd,
-                HMENU(PODCAST_ID_SYSTEM_GAIN as isize),
-                None,
-                None,
-            );
+                let system_gain = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    230,
+                    181,
+                    140,
+                    200,
+                    hwnd,
+                    HMENU(PODCAST_ID_SYSTEM_GAIN as isize),
+                    None,
+                    None,
+                );
 
-            let system_unavailable_text = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.system_unavailable).as_ptr()),
-                WS_CHILD,
-                40,
-                206,
-                540,
-                18,
-                hwnd,
-                HMENU(PODCAST_ID_SYSTEM_UNAVAILABLE as isize),
-                None,
-                None,
-            );
+                let system_unavailable_text = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.system_unavailable).as_ptr()),
+                    WS_CHILD,
+                    40,
+                    206,
+                    540,
+                    18,
+                    hwnd,
+                    HMENU(PODCAST_ID_SYSTEM_UNAVAILABLE as isize),
+                    None,
+                    None,
+                );
 
-            // VIDEO REMOVED: All video controls completely removed
+                // VIDEO REMOVED: All video controls completely removed
 
-            let group_output = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.output_group).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
-                10,
-                300,
-                600,
-                170,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let group_output = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.output_group).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
+                    10,
+                    300,
+                    600,
+                    170,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let label_format = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.format).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                290,
-                100,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let label_format = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.format).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    290,
+                    100,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let format_combo = CreateWindowExW(
-                Default::default(),
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                140,
-                286,
-                140,
-                200,
-                hwnd,
-                HMENU(PODCAST_ID_FORMAT as isize),
-                None,
-                None,
-            );
+                let format_combo = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    140,
+                    286,
+                    140,
+                    200,
+                    hwnd,
+                    HMENU(PODCAST_ID_FORMAT as isize),
+                    None,
+                    None,
+                );
 
-            let label_bitrate = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.bitrate).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                300,
-                290,
-                100,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let label_bitrate = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.bitrate).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    300,
+                    290,
+                    100,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let bitrate_combo = CreateWindowExW(
-                Default::default(),
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                420,
-                286,
-                140,
-                200,
-                hwnd,
-                HMENU(PODCAST_ID_BITRATE as isize),
-                None,
-                None,
-            );
+                let bitrate_combo = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    420,
+                    286,
+                    140,
+                    200,
+                    hwnd,
+                    HMENU(PODCAST_ID_BITRATE as isize),
+                    None,
+                    None,
+                );
 
-            let label_save = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.save_path).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                320,
-                220,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let label_save = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.save_path).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    320,
+                    220,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let save_path = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_EDIT,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                20,
-                342,
-                430,
-                24,
-                hwnd,
-                HMENU(PODCAST_ID_SAVE_PATH as isize),
-                None,
-                None,
-            );
+                let save_path = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    20,
+                    342,
+                    430,
+                    24,
+                    hwnd,
+                    HMENU(PODCAST_ID_SAVE_PATH as isize),
+                    None,
+                    None,
+                );
 
-            let browse_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.browse).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                460,
-                340,
-                100,
-                26,
-                hwnd,
-                HMENU(PODCAST_ID_BROWSE as isize),
-                None,
-                None,
-            );
+                let browse_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.browse).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    460,
+                    340,
+                    100,
+                    26,
+                    hwnd,
+                    HMENU(PODCAST_ID_BROWSE as isize),
+                    None,
+                    None,
+                );
 
-            let label_filename = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.filename).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                372,
-                220,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let label_filename = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.filename).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    372,
+                    220,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let filename_preview = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                394,
-                540,
-                18,
-                hwnd,
-                HMENU(PODCAST_ID_FILENAME_PREVIEW as isize),
-                None,
-                None,
-            );
+                let filename_preview = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    394,
+                    540,
+                    18,
+                    hwnd,
+                    HMENU(PODCAST_ID_FILENAME_PREVIEW as isize),
+                    None,
+                    None,
+                );
 
-            let group_controls = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.controls_group).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
-                10,
-                440,
-                600,
-                100,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let group_controls = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.controls_group).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
+                    10,
+                    440,
+                    600,
+                    100,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let start_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.start).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                20,
-                465,
-                90,
-                28,
-                hwnd,
-                HMENU(PODCAST_ID_START as isize),
-                None,
-                None,
-            );
+                let start_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.start).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    20,
+                    465,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(PODCAST_ID_START as isize),
+                    None,
+                    None,
+                );
 
-            let pause_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.pause).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                120,
-                465,
-                90,
-                28,
-                hwnd,
-                HMENU(PODCAST_ID_PAUSE as isize),
-                None,
-                None,
-            );
+                let pause_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.pause).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    120,
+                    465,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(PODCAST_ID_PAUSE as isize),
+                    None,
+                    None,
+                );
 
-            let resume_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.resume).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                220,
-                465,
-                90,
-                28,
-                hwnd,
-                HMENU(PODCAST_ID_RESUME as isize),
-                None,
-                None,
-            );
+                let resume_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.resume).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    220,
+                    465,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(PODCAST_ID_RESUME as isize),
+                    None,
+                    None,
+                );
 
-            let stop_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.stop).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                320,
-                465,
-                110,
-                28,
-                hwnd,
-                HMENU(PODCAST_ID_STOP as isize),
-                None,
-                None,
-            );
+                let stop_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.stop).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    320,
+                    465,
+                    110,
+                    28,
+                    hwnd,
+                    HMENU(PODCAST_ID_STOP as isize),
+                    None,
+                    None,
+                );
 
-            let close_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.close).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                440,
-                465,
-                90,
-                28,
-                hwnd,
-                HMENU(PODCAST_ID_CLOSE as isize),
-                None,
-                None,
-            );
+                let close_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.close).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    440,
+                    465,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(PODCAST_ID_CLOSE as isize),
+                    None,
+                    None,
+                );
 
-            let group_status = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.status_group).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
-                10,
-                550,
-                600,
-                130,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let group_status = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.status_group).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
+                    10,
+                    550,
+                    600,
+                    130,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let status_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.status_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                575,
-                80,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let status_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.status_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    575,
+                    80,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let status_text = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.status_idle).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                110,
-                575,
-                180,
-                18,
-                hwnd,
-                HMENU(PODCAST_ID_STATUS as isize),
-                None,
-                None,
-            );
+                let status_text = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.status_idle).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    110,
+                    575,
+                    180,
+                    18,
+                    hwnd,
+                    HMENU(PODCAST_ID_STATUS as isize),
+                    None,
+                    None,
+                );
 
-            let source_text = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.hint_select_source).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                595,
-                560,
-                18,
-                hwnd,
-                HMENU(PODCAST_ID_SOURCE as isize),
-                None,
-                None,
-            );
+                let source_text = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.hint_select_source).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    595,
+                    560,
+                    18,
+                    hwnd,
+                    HMENU(PODCAST_ID_SOURCE as isize),
+                    None,
+                    None,
+                );
 
-            let elapsed_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.elapsed_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                300,
-                575,
-                120,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let elapsed_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.elapsed_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    300,
+                    575,
+                    120,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let elapsed_text = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide("00:00:00").as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                430,
-                575,
-                120,
-                18,
-                hwnd,
-                HMENU(PODCAST_ID_ELAPSED as isize),
-                None,
-                None,
-            );
+                let elapsed_text = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide("00:00:00").as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    430,
+                    575,
+                    120,
+                    18,
+                    hwnd,
+                    HMENU(PODCAST_ID_ELAPSED as isize),
+                    None,
+                    None,
+                );
 
-            let level_mic_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.level_mic).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                20,
-                605,
-                150,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let level_mic_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.level_mic).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    605,
+                    150,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let level_mic_text = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide("0").as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                180,
-                605,
-                80,
-                18,
-                hwnd,
-                HMENU(PODCAST_ID_LEVEL_MIC as isize),
-                None,
-                None,
-            );
+                let level_mic_text = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide("0").as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    180,
+                    605,
+                    80,
+                    18,
+                    hwnd,
+                    HMENU(PODCAST_ID_LEVEL_MIC as isize),
+                    None,
+                    None,
+                );
 
-            let level_system_label = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.level_system).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                300,
-                605,
-                150,
-                18,
-                hwnd,
-                HMENU(0),
-                None,
-                None,
-            );
+                let level_system_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.level_system).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    300,
+                    605,
+                    150,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
 
-            let level_system_text = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide("0").as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                460,
-                605,
-                80,
-                18,
-                hwnd,
-                HMENU(PODCAST_ID_LEVEL_SYSTEM as isize),
-                None,
-                None,
-            );
+                let level_system_text = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide("0").as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    460,
+                    605,
+                    80,
+                    18,
+                    hwnd,
+                    HMENU(PODCAST_ID_LEVEL_SYSTEM as isize),
+                    None,
+                    None,
+                );
 
-            let hint_text = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.hint_select_source).as_ptr()),
-                WS_CHILD,
-                20,
-                628,
-                540,
-                18,
-                hwnd,
-                HMENU(PODCAST_ID_HINT as isize),
-                None,
-                None,
-            );
+                let hint_text = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.hint_select_source).as_ptr()),
+                    WS_CHILD,
+                    20,
+                    628,
+                    540,
+                    18,
+                    hwnd,
+                    HMENU(PODCAST_ID_HINT as isize),
+                    None,
+                    None,
+                );
 
-            let controls = [
-                group_input,
-                include_mic,
-                label_mic,
-                mic_device,
-                label_mic_gain,
-                mic_gain,
-                monitor_check,
-                include_system,
-                label_system,
-                system_device,
-                label_system_gain,
-                system_gain,
-                system_unavailable_text,
-                // VIDEO REMOVED: include_video, label_monitor, monitor_combo, video_unavailable_text removed
-                group_output,
-                label_format,
-                format_combo,
-                label_bitrate,
-                bitrate_combo,
-                label_save,
-                save_path,
-                browse_button,
-                label_filename,
-                filename_preview,
-                group_controls,
-                start_button,
-                pause_button,
-                resume_button,
-                stop_button,
-                close_button,
-                group_status,
-                status_label,
-                status_text,
-                elapsed_label,
-                elapsed_text,
-                level_mic_label,
-                level_mic_text,
-                level_system_label,
-                level_system_text,
-                hint_text,
-            ];
-            for control in controls {
-                SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            }
-
-            populate_combos(
-                format_combo,
-                bitrate_combo,
-                mic_device,
-                mic_gain,
-                system_device,
-                system_gain,
-                language,
-            );
-
-            let (mic_devices, system_devices, system_available) = load_devices(language);
-            // VIDEO REMOVED: monitors loading removed
-            let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
-            let mut state = PodcastState {
-                parent,
-                language,
-                include_mic,
-                mic_device,
-                mic_gain,
-                include_system,
-                system_device,
-                system_gain,
-                monitor_check,
-                // VIDEO REMOVED: include_video, monitor_combo, video_unavailable_text removed
-                format_combo,
-                bitrate_combo,
-                save_path,
-                filename_preview,
-                start_button,
-                pause_button,
-                resume_button,
-                stop_button,
-                status_text,
-                source_text,
-                elapsed_text,
-                level_mic_text,
-                level_system_text,
-                hint_text,
-                system_unavailable_text,
-                // VIDEO REMOVED: video_unavailable_text removed
-                mic_devices,
-                system_devices,
-                // VIDEO REMOVED: monitors removed
-                recorder: None,
-                monitor_handle: None,
-                system_available,
-                saving_dialog: HWND(0),
-                save_cancel: None,
-            };
-
-            // VIDEO REMOVED: populate_monitors removed
-            apply_settings_to_ui(&mut state, &settings);
-            update_source_controls(&state);
-            update_format_controls(&state);
-            update_filename_preview(&state);
-            update_recording_controls(&state);
-            update_status_text(&state, RecorderStatus::Idle);
-
-            let boxed = Box::new(state);
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(boxed) as isize);
-
-            if SetTimer(hwnd, PODCAST_TIMER_ID, 500, None) == 0 {
-                crate::log_debug("Failed to set PODCAST_TIMER");
-            }
-            SetFocus(include_mic);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            let code = (wparam.0 >> 16) as u16;
-            let mut handled = false;
-            if with_podcast_state(hwnd, |state| match id {
-                PODCAST_ID_INCLUDE_MIC | PODCAST_ID_INCLUDE_SYSTEM | PODCAST_ID_INCLUDE_VIDEO => {
-                    update_source_controls(state);
-                    update_recording_controls(state);
-                    persist_settings(state);
-                    // Stop monitor if mic is disabled
-                    if !is_checked(state.include_mic) && state.monitor_handle.is_some() {
-                        if let Some(handle) = state.monitor_handle.take() {
-                            handle.stop();
-                        }
-                        SendMessageW(
-                            state.monitor_check,
-                            BM_SETCHECK,
-                            WPARAM(BST_UNCHECKED.0 as usize),
-                            LPARAM(0),
-                        );
-                    }
-                    handled = true;
+                let controls = [
+                    group_input,
+                    include_mic,
+                    label_mic,
+                    mic_device,
+                    label_mic_gain,
+                    mic_gain,
+                    monitor_check,
+                    include_system,
+                    label_system,
+                    system_device,
+                    label_system_gain,
+                    system_gain,
+                    system_unavailable_text,
+                    // VIDEO REMOVED: include_video, label_monitor, monitor_combo, video_unavailable_text removed
+                    group_output,
+                    label_format,
+                    format_combo,
+                    label_bitrate,
+                    bitrate_combo,
+                    label_save,
+                    save_path,
+                    browse_button,
+                    label_filename,
+                    filename_preview,
+                    group_controls,
+                    start_button,
+                    pause_button,
+                    resume_button,
+                    stop_button,
+                    close_button,
+                    group_status,
+                    status_label,
+                    status_text,
+                    elapsed_label,
+                    elapsed_text,
+                    level_mic_label,
+                    level_mic_text,
+                    level_system_label,
+                    level_system_text,
+                    hint_text,
+                ];
+                for control in controls {
+                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
-                PODCAST_ID_MONITOR_CHECK => {
-                    let checked = is_checked(state.monitor_check);
-                    if checked {
-                        if state.monitor_handle.is_none() {
-                            let device_id = selected_device_id(state, true);
-                            let device_name = selected_device_name(state, true);
-                            let gain = selected_mic_gain(state);
-                            match start_monitoring(device_id, device_name, gain) {
-                                Ok(handle) => state.monitor_handle = Some(handle),
-                                Err(e) => {
-                                    SendMessageW(
-                                        state.monitor_check,
-                                        BM_SETCHECK,
-                                        WPARAM(BST_UNCHECKED.0 as usize),
-                                        LPARAM(0),
-                                    );
-                                    unsafe {
+
+                populate_combos(
+                    format_combo,
+                    bitrate_combo,
+                    mic_device,
+                    mic_gain,
+                    system_device,
+                    system_gain,
+                    language,
+                );
+
+                let (mic_devices, system_devices, system_available) = load_devices(language);
+                // VIDEO REMOVED: monitors loading removed
+                let settings =
+                    with_state(parent, |state| state.settings.clone()).unwrap_or_default();
+                let mut state = PodcastState {
+                    parent,
+                    language,
+                    include_mic,
+                    mic_device,
+                    mic_gain,
+                    include_system,
+                    system_device,
+                    system_gain,
+                    monitor_check,
+                    // VIDEO REMOVED: include_video, monitor_combo, video_unavailable_text removed
+                    format_combo,
+                    bitrate_combo,
+                    save_path,
+                    filename_preview,
+                    start_button,
+                    pause_button,
+                    resume_button,
+                    stop_button,
+                    status_text,
+                    source_text,
+                    elapsed_text,
+                    level_mic_text,
+                    level_system_text,
+                    hint_text,
+                    system_unavailable_text,
+                    // VIDEO REMOVED: video_unavailable_text removed
+                    mic_devices,
+                    system_devices,
+                    // VIDEO REMOVED: monitors removed
+                    recorder: None,
+                    monitor_handle: None,
+                    system_available,
+                    saving_dialog: HWND(0),
+                    save_cancel: None,
+                };
+
+                // VIDEO REMOVED: populate_monitors removed
+                apply_settings_to_ui(&mut state, &settings);
+                update_source_controls(&state);
+                update_format_controls(&state);
+                update_filename_preview(&state);
+                update_recording_controls(&state);
+                update_status_text(&state, RecorderStatus::Idle);
+
+                let boxed = Box::new(state);
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(boxed) as isize);
+
+                if SetTimer(hwnd, PODCAST_TIMER_ID, 500, None) == 0 {
+                    crate::log_debug("Failed to set PODCAST_TIMER");
+                }
+                SetFocus(include_mic);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                let code = (wparam.0 >> 16) as u16;
+                let mut handled = false;
+                if with_podcast_state(hwnd, |state| match id {
+                    PODCAST_ID_INCLUDE_MIC
+                    | PODCAST_ID_INCLUDE_SYSTEM
+                    | PODCAST_ID_INCLUDE_VIDEO => {
+                        update_source_controls(state);
+                        update_recording_controls(state);
+                        persist_settings(state);
+                        // Stop monitor if mic is disabled
+                        if !is_checked(state.include_mic) && state.monitor_handle.is_some() {
+                            if let Some(handle) = state.monitor_handle.take() {
+                                handle.stop();
+                            }
+                            SendMessageW(
+                                state.monitor_check,
+                                BM_SETCHECK,
+                                WPARAM(BST_UNCHECKED.0 as usize),
+                                LPARAM(0),
+                            );
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_MONITOR_CHECK => {
+                        let checked = is_checked(state.monitor_check);
+                        if checked {
+                            if state.monitor_handle.is_none() {
+                                let device_id = selected_device_id(state, true);
+                                let device_name = selected_device_name(state, true);
+                                let gain = selected_mic_gain(state);
+                                match start_monitoring(device_id, device_name, gain) {
+                                    Ok(handle) => state.monitor_handle = Some(handle),
+                                    Err(e) => {
+                                        SendMessageW(
+                                            state.monitor_check,
+                                            BM_SETCHECK,
+                                            WPARAM(BST_UNCHECKED.0 as usize),
+                                            LPARAM(0),
+                                        );
                                         show_error(state.parent, state.language, &e);
                                     }
                                 }
                             }
+                        } else if let Some(handle) = state.monitor_handle.take() {
+                            handle.stop();
                         }
-                    } else if let Some(handle) = state.monitor_handle.take() {
-                        handle.stop();
+                        handled = true;
                     }
-                    handled = true;
-                }
-                PODCAST_ID_MIC_DEVICE => {
-                    if code == CBN_SELCHANGE as u16 {
-                        persist_settings(state);
-                        restart_mic_monitor(state);
-                    }
-                    handled = true;
-                }
-                PODCAST_ID_MIC_GAIN => {
-                    if code == CBN_SELCHANGE as u16 {
-                        persist_settings(state);
-                        // Restart monitor with new gain if active
-                        restart_mic_monitor(state);
-                    }
-                    handled = true;
-                }
-                PODCAST_ID_SYSTEM_DEVICE | PODCAST_ID_SYSTEM_GAIN | PODCAST_ID_MONITOR => {
-                    if code == CBN_SELCHANGE as u16 {
-                        persist_settings(state);
-                    }
-                    handled = true;
-                }
-                PODCAST_ID_FORMAT => {
-                    if code == CBN_SELCHANGE as u16 {
-                        update_format_controls(state);
-                        update_filename_preview(state);
-                        persist_settings(state);
-                    }
-                    handled = true;
-                }
-                PODCAST_ID_BITRATE => {
-                    if code == CBN_SELCHANGE as u16 {
-                        persist_settings(state);
-                    }
-                    handled = true;
-                }
-                PODCAST_ID_SAVE_PATH => {
-                    if code == EN_CHANGE as u16 {
-                        update_filename_preview(state);
-                        persist_settings(state);
-                    }
-                    handled = true;
-                }
-                PODCAST_ID_BROWSE => {
-                    if let Some(folder) = browse_for_folder(hwnd, state.language) {
-                        let path = folder.to_string_lossy().to_string();
-                        let wide = to_wide(&path);
-                        if let Err(_e) = SetWindowTextW(state.save_path, PCWSTR(wide.as_ptr())) {
-                            crate::log_debug(&format!("Error: {:?}", _e));
+                    PODCAST_ID_MIC_DEVICE => {
+                        if code == CBN_SELCHANGE as u16 {
+                            persist_settings(state);
+                            restart_mic_monitor(state);
                         }
-                        update_filename_preview(state);
-                        persist_settings(state);
+                        handled = true;
                     }
-                    handled = true;
-                }
-                PODCAST_ID_START => {
-                    handled = true;
-                    start_recording_action(state, hwnd);
-                }
-                PODCAST_ID_PAUSE => {
-                    if let Some(recorder) = state.recorder.as_ref() {
-                        if recorder.status() == RecorderStatus::Recording {
-                            recorder.pause();
-                            update_recording_controls(state);
-                            update_status_text(state, RecorderStatus::Paused);
-                        } else if recorder.status() == RecorderStatus::Paused {
+                    PODCAST_ID_MIC_GAIN => {
+                        if code == CBN_SELCHANGE as u16 {
+                            persist_settings(state);
+                            // Restart monitor with new gain if active
+                            restart_mic_monitor(state);
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_SYSTEM_DEVICE | PODCAST_ID_SYSTEM_GAIN | PODCAST_ID_MONITOR => {
+                        if code == CBN_SELCHANGE as u16 {
+                            persist_settings(state);
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_FORMAT => {
+                        if code == CBN_SELCHANGE as u16 {
+                            update_format_controls(state);
+                            update_filename_preview(state);
+                            persist_settings(state);
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_BITRATE => {
+                        if code == CBN_SELCHANGE as u16 {
+                            persist_settings(state);
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_SAVE_PATH => {
+                        if code == EN_CHANGE as u16 {
+                            update_filename_preview(state);
+                            persist_settings(state);
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_BROWSE => {
+                        if let Some(folder) = browse_for_folder(hwnd, state.language) {
+                            let path = folder.to_string_lossy().to_string();
+                            let wide = to_wide(&path);
+                            if let Err(_e) = SetWindowTextW(state.save_path, PCWSTR(wide.as_ptr()))
+                            {
+                                crate::log_debug(&format!("Error: {:?}", _e));
+                            }
+                            update_filename_preview(state);
+                            persist_settings(state);
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_START => {
+                        handled = true;
+                        start_recording_action(state, hwnd);
+                    }
+                    PODCAST_ID_PAUSE => {
+                        if let Some(recorder) = state.recorder.as_ref() {
+                            if recorder.status() == RecorderStatus::Recording {
+                                recorder.pause();
+                                update_recording_controls(state);
+                                update_status_text(state, RecorderStatus::Paused);
+                            } else if recorder.status() == RecorderStatus::Paused {
+                                recorder.resume();
+                                update_recording_controls(state);
+                                update_status_text(state, RecorderStatus::Recording);
+                            }
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_RESUME => {
+                        if let Some(recorder) = state.recorder.as_ref() {
                             recorder.resume();
                             update_recording_controls(state);
                             update_status_text(state, RecorderStatus::Recording);
                         }
+                        handled = true;
                     }
-                    handled = true;
-                }
-                PODCAST_ID_RESUME => {
-                    if let Some(recorder) = state.recorder.as_ref() {
-                        recorder.resume();
-                        update_recording_controls(state);
-                        update_status_text(state, RecorderStatus::Recording);
-                    }
-                    handled = true;
-                }
-                PODCAST_ID_STOP => {
-                    handled = true;
-                    stop_recording_action(state, hwnd);
-                }
-                PODCAST_ID_CLOSE => {
-                    SendMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
-                    handled = true;
-                }
-                _ => {}
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access podcast state");
-            }
-            if handled {
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_TIMER => {
-            if wparam.0 == PODCAST_TIMER_ID {
-                if with_podcast_state(hwnd, |state| {
-                    update_status_from_recorder(state);
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access podcast state");
-                }
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        podcast_save_window::WM_PODCAST_SAVE_CLOSED => {
-            if with_podcast_state(hwnd, |state| {
-                state.saving_dialog = HWND(0);
-                state.save_cancel = None;
-                if with_state(state.parent, |app| {
-                    app.podcast_save_window = HWND(0);
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access podcast state");
-                }
-                if state.start_button.0 != 0 {
-                    SetFocus(state.start_button);
-                }
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access podcast state");
-            }
-            LRESULT(0)
-        }
-        podcast_save_window::WM_PODCAST_SAVE_CANCEL => {
-            if with_podcast_state(hwnd, |state| {
-                if let Some(cancel) = state.save_cancel.as_ref() {
-                    cancel.store(true, Ordering::Relaxed);
-                }
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access podcast state");
-            }
-            LRESULT(0)
-        }
-        WM_PODCAST_SAVE_RESULT => {
-            if lparam.0 == 0 {
-                return LRESULT(0);
-            }
-            let result = unsafe { Box::from_raw(lparam.0 as *mut PodcastSaveResult) };
-            if with_podcast_state(hwnd, |state| {
-                let title = if result.success {
-                    i18n::tr(state.language, "podcast.done_title")
-                } else {
-                    crate::settings::error_title(state.language)
-                };
-                let title_w = to_wide(&title);
-                let msg_w = to_wide(&result.message);
-                let flags = if result.success {
-                    MB_OK | MB_ICONINFORMATION
-                } else {
-                    MB_OK | MB_ICONERROR
-                };
-                unsafe {
-                    MessageBoxW(
-                        hwnd,
-                        PCWSTR(msg_w.as_ptr()),
-                        PCWSTR(title_w.as_ptr()),
-                        flags,
-                    );
-                    SetFocus(state.start_button);
-                }
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access podcast state");
-            }
-            LRESULT(0)
-        }
-        WM_CLOSE => {
-            let mut should_close = true;
-            if with_podcast_state(hwnd, |state| {
-                if let Some(recorder) = state.recorder.as_ref()
-                    && matches!(
-                        recorder.status(),
-                        RecorderStatus::Recording | RecorderStatus::Paused
-                    )
-                {
-                    let labels = labels(state.language);
-                    let text = to_wide(&labels.confirm_close_recording);
-                    let title = to_wide(&confirm_title(state.language));
-                    let result = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
-                        hwnd,
-                        PCWSTR(text.as_ptr()),
-                        PCWSTR(title.as_ptr()),
-                        MB_OKCANCEL | MB_ICONWARNING,
-                    );
-                    if result == IDOK {
+                    PODCAST_ID_STOP => {
+                        handled = true;
                         stop_recording_action(state, hwnd);
-                    } else {
-                        should_close = false;
                     }
-                }
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access podcast state");
-            }
-            if should_close {
-                crate::log_if_err!(DestroyWindow(hwnd));
-            }
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            if with_podcast_state(hwnd, |state| {
-                if let Some(handle) = state.monitor_handle.take() {
-                    handle.stop();
-                }
-                if let Some(recorder) = state.recorder.take()
-                    && let Err(e) = recorder.stop()
+                    PODCAST_ID_CLOSE => {
+                        SendMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
+                        handled = true;
+                    }
+                    _ => {}
+                })
+                .is_none()
                 {
-                    crate::log_debug(&format!("Failed to stop recorder: {}", e));
+                    crate::log_debug("Failed to access podcast state");
                 }
-                if state.saving_dialog.0 != 0 {
-                    crate::log_if_err!(DestroyWindow(state.saving_dialog));
+                if handled {
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_TIMER => {
+                if wparam.0 == PODCAST_TIMER_ID {
+                    if with_podcast_state(hwnd, |state| {
+                        update_status_from_recorder(state);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access podcast state");
+                    }
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            podcast_save_window::WM_PODCAST_SAVE_CLOSED => {
+                if with_podcast_state(hwnd, |state| {
                     state.saving_dialog = HWND(0);
                     state.save_cancel = None;
                     if with_state(state.parent, |app| {
@@ -1302,40 +1195,146 @@ unsafe fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     {
                         crate::log_debug("Failed to access podcast state");
                     }
+                    if state.start_button.0 != 0 {
+                        SetFocus(state.start_button);
+                    }
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access podcast state");
                 }
-                unsafe {
+                LRESULT(0)
+            }
+            podcast_save_window::WM_PODCAST_SAVE_CANCEL => {
+                if with_podcast_state(hwnd, |state| {
+                    if let Some(cancel) = state.save_cancel.as_ref() {
+                        cancel.store(true, Ordering::Relaxed);
+                    }
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access podcast state");
+                }
+                LRESULT(0)
+            }
+            WM_PODCAST_SAVE_RESULT => {
+                if lparam.0 == 0 {
+                    return LRESULT(0);
+                }
+                let result = Box::from_raw(lparam.0 as *mut PodcastSaveResult);
+                if with_podcast_state(hwnd, |state| {
+                    let title = if result.success {
+                        i18n::tr(state.language, "podcast.done_title")
+                    } else {
+                        crate::settings::error_title(state.language)
+                    };
+                    let title_w = to_wide(&title);
+                    let msg_w = to_wide(&result.message);
+                    let flags = if result.success {
+                        MB_OK | MB_ICONINFORMATION
+                    } else {
+                        MB_OK | MB_ICONERROR
+                    };
+                    MessageBoxW(
+                        hwnd,
+                        PCWSTR(msg_w.as_ptr()),
+                        PCWSTR(title_w.as_ptr()),
+                        flags,
+                    );
+                    SetFocus(state.start_button);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access podcast state");
+                }
+                LRESULT(0)
+            }
+            WM_CLOSE => {
+                let mut should_close = true;
+                if with_podcast_state(hwnd, |state| {
+                    if let Some(recorder) = state.recorder.as_ref()
+                        && matches!(
+                            recorder.status(),
+                            RecorderStatus::Recording | RecorderStatus::Paused
+                        )
+                    {
+                        let labels = labels(state.language);
+                        let text = to_wide(&labels.confirm_close_recording);
+                        let title = to_wide(&confirm_title(state.language));
+                        let result = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
+                            hwnd,
+                            PCWSTR(text.as_ptr()),
+                            PCWSTR(title.as_ptr()),
+                            MB_OKCANCEL | MB_ICONWARNING,
+                        );
+                        if result == IDOK {
+                            stop_recording_action(state, hwnd);
+                        } else {
+                            should_close = false;
+                        }
+                    }
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access podcast state");
+                }
+                if should_close {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                }
+                LRESULT(0)
+            }
+            WM_DESTROY => {
+                if with_podcast_state(hwnd, |state| {
+                    if let Some(handle) = state.monitor_handle.take() {
+                        handle.stop();
+                    }
+                    if let Some(recorder) = state.recorder.take()
+                        && let Err(e) = recorder.stop()
+                    {
+                        crate::log_debug(&format!("Failed to stop recorder: {}", e));
+                    }
+                    if state.saving_dialog.0 != 0 {
+                        crate::log_if_err!(DestroyWindow(state.saving_dialog));
+                        state.saving_dialog = HWND(0);
+                        state.save_cancel = None;
+                        if with_state(state.parent, |app| {
+                            app.podcast_save_window = HWND(0);
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access podcast state");
+                        }
+                    }
                     if let Err(e) =
                         PostMessageW(state.parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
                     {
                         crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
                     }
-                }
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access podcast state");
-            }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let parent = with_podcast_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
-            if parent.0 != 0
-                && with_state(parent, |state| {
-                    state.podcast_window = HWND(0);
                 })
                 .is_none()
-            {
-                crate::log_debug("Failed to access podcast state");
+                {
+                    crate::log_debug("Failed to access podcast state");
+                }
+                LRESULT(0)
             }
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
-            if ptr != 0 {
-                unsafe {
+            WM_NCDESTROY => {
+                let parent = with_podcast_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+                if parent.0 != 0
+                    && with_state(parent, |state| {
+                        state.podcast_window = HWND(0);
+                    })
+                    .is_none()
+                {
+                    crate::log_debug("Failed to access podcast state");
+                }
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+                if ptr != 0 {
                     let _unused_box = Box::from_raw(ptr as *mut PodcastState);
                 }
+                LRESULT(0)
             }
-            LRESULT(0)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

@@ -126,142 +126,140 @@ unsafe extern "system" fn edit_subclass_proc(
     crate::panic_guard::guard(
         "edit_subclass_proc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { edit_subclass_proc_inner(hwnd, msg, wparam, lparam) },
+        || edit_subclass_proc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn edit_subclass_proc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    if msg == WM_KEYDOWN && wparam.0 as u32 == VK_TAB.0 as u32 {
-        let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
-        let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
-        let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
-        if !ctrl_down && !alt_down {
-            let parent = GetParent(hwnd);
-            let (mode, space_width, tab_width) = with_state(parent, |state| {
-                (
-                    state.settings.indentation_mode,
-                    state.settings.indent_space_width,
-                    state.settings.indent_tab_width,
-                )
-            })
-            .unwrap_or((IndentationMode::Default, 4, 4));
-            if handle_indent_tab_key(hwnd, mode, space_width, tab_width, shift_down) {
-                return LRESULT(0);
-            }
-        }
-    }
-    if msg == WM_KEYDOWN {
-        let vk = wparam.0 as u32;
-        if matches!(
-            vk,
-            v if v == VK_LEFT.0 as u32
-                || v == VK_RIGHT.0 as u32
-                || v == VK_UP.0 as u32
-                || v == VK_DOWN.0 as u32
-                || v == VK_HOME.0 as u32
-                || v == VK_END.0 as u32
-                || v == VK_PRIOR.0 as u32
-                || v == VK_NEXT.0 as u32
-        ) {
-            let parent = GetParent(hwnd);
-            if with_state(parent, |state| {
-                state.spellcheck_typing_in_progress = false;
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access editor state");
-            }
-        }
-    }
-    if msg == WM_CHAR {
-        let ch = wparam.0 as u32;
-        if ch == VK_TAB.0 as u32 {
+fn edit_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        if msg == WM_KEYDOWN && wparam.0 as u32 == VK_TAB.0 as u32 {
             let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+            let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
             let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
             if !ctrl_down && !alt_down {
-                return LRESULT(0);
+                let parent = GetParent(hwnd);
+                let (mode, space_width, tab_width) = with_state(parent, |state| {
+                    (
+                        state.settings.indentation_mode,
+                        state.settings.indent_space_width,
+                        state.settings.indent_tab_width,
+                    )
+                })
+                .unwrap_or((IndentationMode::Default, 4, 4));
+                if handle_indent_tab_key(hwnd, mode, space_width, tab_width, shift_down) {
+                    return LRESULT(0);
+                }
             }
         }
-        if matches!(
-            ch,
-            9 | 13 | 32 | 44 | 46 | 58 | 59 | 33 | 63 | 41 | 93 | 125
-        ) {
+        if msg == WM_KEYDOWN {
+            let vk = wparam.0 as u32;
+            if matches!(
+                vk,
+                v if v == VK_LEFT.0 as u32
+                    || v == VK_RIGHT.0 as u32
+                    || v == VK_UP.0 as u32
+                    || v == VK_DOWN.0 as u32
+                    || v == VK_HOME.0 as u32
+                    || v == VK_END.0 as u32
+                    || v == VK_PRIOR.0 as u32
+                    || v == VK_NEXT.0 as u32
+            ) {
+                let parent = GetParent(hwnd);
+                if with_state(parent, |state| {
+                    state.spellcheck_typing_in_progress = false;
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access editor state");
+                }
+            }
+        }
+        if msg == WM_CHAR {
+            let ch = wparam.0 as u32;
+            if ch == VK_TAB.0 as u32 {
+                let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+                let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+                if !ctrl_down && !alt_down {
+                    return LRESULT(0);
+                }
+            }
+            if matches!(
+                ch,
+                9 | 13 | 32 | 44 | 46 | 58 | 59 | 33 | 63 | 41 | 93 | 125
+            ) {
+                let parent = GetParent(hwnd);
+                if with_state(parent, |state| {
+                    state.spellcheck_space_trigger = Some(hwnd);
+                    state.spellcheck_typing_in_progress = false;
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access editor state");
+                }
+            } else if ch >= 32 {
+                let parent = GetParent(hwnd);
+                if with_state(parent, |state| {
+                    state.spellcheck_typing_in_progress = true;
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access editor state");
+                }
+            }
+            if ch == '\'' as u32 || ch == '\"' as u32 {
+                let parent = GetParent(hwnd);
+                let enabled =
+                    with_state(parent, |state| state.settings.smart_quotes).unwrap_or(false);
+                if enabled {
+                    let opening = should_use_opening_quote(hwnd);
+                    let replacement = match (ch, opening) {
+                        (34, true) => "“",
+                        (34, false) => "”",
+                        (_, true) => "‘",
+                        _ => "’",
+                    };
+                    let wide = to_wide(replacement);
+                    SendMessageW(
+                        hwnd,
+                        EM_REPLACESEL,
+                        WPARAM(1),
+                        LPARAM(wide.as_ptr() as isize),
+                    );
+                    return LRESULT(0);
+                }
+            }
+        }
+        if msg == WM_LBUTTONUP {
             let parent = GetParent(hwnd);
             if with_state(parent, |state| {
-                state.spellcheck_space_trigger = Some(hwnd);
                 state.spellcheck_typing_in_progress = false;
             })
             .is_none()
             {
                 crate::log_debug("Failed to access editor state");
             }
-        } else if ch >= 32 {
+        }
+        if msg == WM_CONTEXTMENU {
             let parent = GetParent(hwnd);
-            if with_state(parent, |state| {
-                state.spellcheck_typing_in_progress = true;
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access editor state");
-            }
+            crate::show_editor_context_menu(parent, hwnd, lparam);
+            return LRESULT(0);
         }
-        if ch == '\'' as u32 || ch == '\"' as u32 {
-            let parent = GetParent(hwnd);
-            let enabled = with_state(parent, |state| state.settings.smart_quotes).unwrap_or(false);
-            if enabled {
-                let opening = should_use_opening_quote(hwnd);
-                let replacement = match (ch, opening) {
-                    (34, true) => "“",
-                    (34, false) => "”",
-                    (_, true) => "‘",
-                    _ => "’",
-                };
-                let wide = to_wide(replacement);
-                SendMessageW(
-                    hwnd,
-                    EM_REPLACESEL,
-                    WPARAM(1),
-                    LPARAM(wide.as_ptr() as isize),
-                );
-                return LRESULT(0);
-            }
-        }
-    }
-    if msg == WM_LBUTTONUP {
-        let parent = GetParent(hwnd);
-        if with_state(parent, |state| {
-            state.spellcheck_typing_in_progress = false;
-        })
-        .is_none()
-        {
-            crate::log_debug("Failed to access editor state");
-        }
-    }
-    if msg == WM_CONTEXTMENU {
-        let parent = GetParent(hwnd);
-        crate::show_editor_context_menu(parent, hwnd, lparam);
-        return LRESULT(0);
-    }
 
-    let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
-    if prev != 0 {
-        CallWindowProcW(
-            Some(std::mem::transmute::<
-                isize,
-                unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-            >(prev)),
-            hwnd,
-            msg,
-            wparam,
-            lparam,
-        )
-    } else {
-        DefWindowProcW(hwnd, msg, wparam, lparam)
+        let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+        if prev != 0 {
+            CallWindowProcW(
+                Some(std::mem::transmute::<
+                    isize,
+                    unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+                >(prev)),
+                hwnd,
+                msg,
+                wparam,
+                lparam,
+            )
+        } else {
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
     }
 }
 

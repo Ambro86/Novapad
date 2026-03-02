@@ -277,314 +277,312 @@ unsafe extern "system" fn wiktionary_wndproc(
     crate::panic_guard::guard(
         "wiktionary_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { wiktionary_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || wiktionary_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn wiktionary_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*cs).lpCreateParams as *mut WiktionaryWindowState;
-            if init_ptr.is_null() {
-                return LRESULT(0);
-            }
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, init_ptr as isize);
+fn wiktionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut WiktionaryWindowState;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, init_ptr as isize);
 
-            let parent = (*init_ptr).parent;
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let labels = wiktionary_labels(language);
+                let parent = (*init_ptr).parent;
+                let language =
+                    with_state(parent, |state| state.settings.language).unwrap_or_default();
+                let labels = wiktionary_labels(language);
 
-            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&labels.word).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                12,
-                14,
-                120,
-                18,
-                hwnd,
-                HMENU(1),
-                hinstance,
-                None,
-            );
-            let input = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("COMBOBOX"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWN as u32),
-                12,
-                34,
-                360,
-                200,
-                hwnd,
-                HMENU(WIKTIONARY_INPUT_ID as isize),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&labels.language).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                12,
-                68,
-                120,
-                18,
-                hwnd,
-                HMENU(3),
-                hinstance,
-                None,
-            );
-            let language_combo = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("COMBOBOX"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                12,
-                88,
-                220,
-                240,
-                hwnd,
-                HMENU(WIKTIONARY_LANGUAGE_ID as isize),
-                hinstance,
-                None,
-            );
-            let search_history = with_state(parent, |state| {
-                state.settings.dictionary_search_history.clone()
-            })
-            .unwrap_or_default();
-            refresh_history_combo(input, &search_history);
-            let language_options = [
-                (labels.language_auto.clone(), "auto"),
-                (i18n::tr(language, "options.lang.it"), "it"),
-                (i18n::tr(language, "options.lang.en"), "en"),
-                (i18n::tr(language, "options.lang.es"), "es"),
-                (i18n::tr(language, "options.lang.pt"), "pt"),
-                (i18n::tr(language, "options.lang.sv"), "sv"),
-                (i18n::tr(language, "options.lang.vi"), "vi"),
-                (i18n::tr(language, "options.lang.cs"), "cs"),
-                (i18n::tr(language, "options.lang.pl"), "pl"),
-                (i18n::tr(language, "options.lang.fr"), "fr"),
-                (i18n::tr(language, "options.lang.sr"), "sr"),
-                (i18n::tr(language, "options.lang.uk"), "uk"),
-                (i18n::tr(language, "options.lang.lt"), "lt"),
-                (i18n::tr(language, "options.lang.zh"), "zh"),
-            ];
-            let saved_lookup_pref = with_state(parent, |state| {
-                state.settings.dictionary_lookup_language.clone()
-            })
-            .unwrap_or_else(|| "auto".to_string())
-            .trim()
-            .to_ascii_lowercase();
-            let mut selected_lang_index = 0usize;
-            for (idx, (label, value)) in language_options.iter().enumerate() {
-                let wide = to_wide(label);
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&labels.word).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    14,
+                    120,
+                    18,
+                    hwnd,
+                    HMENU(1),
+                    hinstance,
+                    None,
+                );
+                let input = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("COMBOBOX"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWN as u32),
+                    12,
+                    34,
+                    360,
+                    200,
+                    hwnd,
+                    HMENU(WIKTIONARY_INPUT_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&labels.language).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    68,
+                    120,
+                    18,
+                    hwnd,
+                    HMENU(3),
+                    hinstance,
+                    None,
+                );
+                let language_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("COMBOBOX"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    12,
+                    88,
+                    220,
+                    240,
+                    hwnd,
+                    HMENU(WIKTIONARY_LANGUAGE_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let search_history = with_state(parent, |state| {
+                    state.settings.dictionary_search_history.clone()
+                })
+                .unwrap_or_default();
+                refresh_history_combo(input, &search_history);
+                let language_options = [
+                    (labels.language_auto.clone(), "auto"),
+                    (i18n::tr(language, "options.lang.it"), "it"),
+                    (i18n::tr(language, "options.lang.en"), "en"),
+                    (i18n::tr(language, "options.lang.es"), "es"),
+                    (i18n::tr(language, "options.lang.pt"), "pt"),
+                    (i18n::tr(language, "options.lang.sv"), "sv"),
+                    (i18n::tr(language, "options.lang.vi"), "vi"),
+                    (i18n::tr(language, "options.lang.cs"), "cs"),
+                    (i18n::tr(language, "options.lang.pl"), "pl"),
+                    (i18n::tr(language, "options.lang.fr"), "fr"),
+                    (i18n::tr(language, "options.lang.sr"), "sr"),
+                    (i18n::tr(language, "options.lang.uk"), "uk"),
+                    (i18n::tr(language, "options.lang.lt"), "lt"),
+                    (i18n::tr(language, "options.lang.zh"), "zh"),
+                ];
+                let saved_lookup_pref = with_state(parent, |state| {
+                    state.settings.dictionary_lookup_language.clone()
+                })
+                .unwrap_or_else(|| "auto".to_string())
+                .trim()
+                .to_ascii_lowercase();
+                let mut selected_lang_index = 0usize;
+                for (idx, (label, value)) in language_options.iter().enumerate() {
+                    let wide = to_wide(label);
+                    SendMessageW(
+                        language_combo,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(PCWSTR(wide.as_ptr()).0 as isize),
+                    );
+                    if saved_lookup_pref == *value {
+                        selected_lang_index = idx;
+                    }
+                }
                 SendMessageW(
                     language_combo,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(PCWSTR(wide.as_ptr()).0 as isize),
+                    CB_SETCURSEL,
+                    WPARAM(selected_lang_index),
+                    LPARAM(0),
                 );
-                if saved_lookup_pref == *value {
-                    selected_lang_index = idx;
-                }
-            }
-            SendMessageW(
-                language_combo,
-                CB_SETCURSEL,
-                WPARAM(selected_lang_index),
-                LPARAM(0),
-            );
-            let search = CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&labels.search).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                382,
-                32,
-                110,
-                28,
-                hwnd,
-                HMENU(WIKTIONARY_SEARCH_ID as isize),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&labels.results).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                12,
-                122,
-                120,
-                18,
-                hwnd,
-                HMENU(2),
-                hinstance,
-                None,
-            );
-            let output = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WS_VSCROLL
-                    | WINDOW_STYLE(ES_MULTILINE as u32)
-                    | WINDOW_STYLE(ES_AUTOVSCROLL as u32)
-                    | WINDOW_STYLE(ES_READONLY as u32),
-                12,
-                142,
-                480,
-                206,
-                hwnd,
-                HMENU(WIKTIONARY_OUTPUT_ID as isize),
-                hinstance,
-                None,
-            );
-            let close = CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&labels.close).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                412,
-                360,
-                80,
-                28,
-                hwnd,
-                HMENU(WIKTIONARY_CLOSE_ID as isize),
-                hinstance,
-                None,
-            );
+                let search = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&labels.search).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    382,
+                    32,
+                    110,
+                    28,
+                    hwnd,
+                    HMENU(WIKTIONARY_SEARCH_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&labels.results).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    122,
+                    120,
+                    18,
+                    hwnd,
+                    HMENU(2),
+                    hinstance,
+                    None,
+                );
+                let output = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WS_VSCROLL
+                        | WINDOW_STYLE(ES_MULTILINE as u32)
+                        | WINDOW_STYLE(ES_AUTOVSCROLL as u32)
+                        | WINDOW_STYLE(ES_READONLY as u32),
+                    12,
+                    142,
+                    480,
+                    206,
+                    hwnd,
+                    HMENU(WIKTIONARY_OUTPUT_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let close = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&labels.close).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    412,
+                    360,
+                    80,
+                    28,
+                    hwnd,
+                    HMENU(WIKTIONARY_CLOSE_ID as isize),
+                    hinstance,
+                    None,
+                );
 
-            (*init_ptr).input = input;
-            (*init_ptr).language_combo = language_combo;
-            (*init_ptr).output = output;
-            (*init_ptr).search = search;
-            (*init_ptr).close = close;
-            let proc_ptr = tab_subclass_proc as *const () as usize;
-            for control in [input, language_combo, search, output, close] {
-                let prev = SetWindowLongPtrW(
-                    control,
-                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                    proc_ptr as isize,
-                );
-                SetWindowLongPtrW(control, GWLP_USERDATA, prev);
+                (*init_ptr).input = input;
+                (*init_ptr).language_combo = language_combo;
+                (*init_ptr).output = output;
+                (*init_ptr).search = search;
+                (*init_ptr).close = close;
+                let proc_ptr = tab_subclass_proc as *const () as usize;
+                for control in [input, language_combo, search, output, close] {
+                    let prev = SetWindowLongPtrW(
+                        control,
+                        windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                        proc_ptr as isize,
+                    );
+                    SetWindowLongPtrW(control, GWLP_USERDATA, prev);
+                }
+                let combo_edit = GetWindow(input, GW_CHILD);
+                if combo_edit.0 != 0 {
+                    let prev = SetWindowLongPtrW(
+                        combo_edit,
+                        windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                        proc_ptr as isize,
+                    );
+                    SetWindowLongPtrW(combo_edit, GWLP_USERDATA, prev);
+                }
+                SetFocus(input);
+                LRESULT(0)
             }
-            let combo_edit = GetWindow(input, GW_CHILD);
-            if combo_edit.0 != 0 {
-                let prev = SetWindowLongPtrW(
-                    combo_edit,
-                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                    proc_ptr as isize,
-                );
-                SetWindowLongPtrW(combo_edit, GWLP_USERDATA, prev);
-            }
-            SetFocus(input);
-            LRESULT(0)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                let focus = GetFocus();
-                let Some((search, close)) =
-                    with_window_state(hwnd, |state| (state.search, state.close))
-                else {
-                    return DefWindowProcW(hwnd, msg, wparam, lparam);
-                };
-                if focus == close {
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
                     crate::log_if_err!(DestroyWindow(hwnd));
                     return LRESULT(0);
                 }
-                if focus == search {
+                if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                    let focus = GetFocus();
+                    let Some((search, close)) =
+                        with_window_state(hwnd, |state| (state.search, state.close))
+                    else {
+                        return DefWindowProcW(hwnd, msg, wparam, lparam);
+                    };
+                    if focus == close {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        return LRESULT(0);
+                    }
+                    if focus == search {
+                        run_lookup(hwnd);
+                        return LRESULT(0);
+                    }
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            windows::Win32::UI::WindowsAndMessaging::WM_CHAR => {
+                if wparam.0 as u32 == 27 {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                if id == WIKTIONARY_CLOSE_ID || id == 2 {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                if id == WIKTIONARY_SEARCH_ID || id == 1 {
                     run_lookup(hwnd);
                     return LRESULT(0);
                 }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        windows::Win32::UI::WindowsAndMessaging::WM_CHAR => {
-            if wparam.0 as u32 == 27 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            if id == WIKTIONARY_CLOSE_ID || id == 2 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            if id == WIKTIONARY_SEARCH_ID || id == 1 {
-                run_lookup(hwnd);
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_SETFOCUS => {
-            if let Some(input) = with_window_state(hwnd, |state| state.input)
-                && input.0 != 0
-            {
-                SetFocus(input);
-            }
-            LRESULT(0)
-        }
-        WM_LOOKUP_DONE => {
-            let generation = wparam.0;
-            let current_gen = LOOKUP_GENERATION.load(Ordering::SeqCst);
-            if generation != current_gen {
-                return LRESULT(0);
-            }
-            let result_ptr = lparam.0 as *mut String;
-            if !result_ptr.is_null() {
-                let _unused_box = Box::from_raw(result_ptr);
-                let text = &*_unused_box;
-                if let Some(output) = with_window_state(hwnd, |state| state.output)
-                    && let Err(_e) = SetWindowTextW(output, PCWSTR(to_wide(text).as_ptr()))
+            WM_SETFOCUS => {
+                if let Some(input) = with_window_state(hwnd, |state| state.input)
+                    && input.0 != 0
                 {
-                    crate::log_debug(&format!("Error: {:?}", _e));
-                } else if let Some((parent, output)) =
-                    with_window_state(hwnd, |state| (state.parent, state.output))
-                {
-                    let language =
-                        with_state(parent, |state| state.settings.language).unwrap_or_default();
-                    let message = i18n::tr(language, "dictionary.lookup.results");
-                    if !nvda_speak(&message) {
-                        crate::log_debug("NVDA speak failed");
-                    }
-                    NotifyWinEvent(
-                        EVENT_OBJECT_VALUECHANGE,
-                        output,
-                        OBJID_CLIENT.0,
-                        CHILDID_SELF as i32,
-                    );
+                    SetFocus(input);
                 }
+                LRESULT(0)
             }
-            LRESULT(0)
-        }
-        WM_DESTROY => LRESULT(0),
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WiktionaryWindowState;
-            if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
-                with_state(_unused_box.parent, |s| s.wiktionary_window = HWND(0));
+            WM_LOOKUP_DONE => {
+                let generation = wparam.0;
+                let current_gen = LOOKUP_GENERATION.load(Ordering::SeqCst);
+                if generation != current_gen {
+                    return LRESULT(0);
+                }
+                let result_ptr = lparam.0 as *mut String;
+                if !result_ptr.is_null() {
+                    let _unused_box = Box::from_raw(result_ptr);
+                    let text = &*_unused_box;
+                    if let Some(output) = with_window_state(hwnd, |state| state.output)
+                        && let Err(_e) = SetWindowTextW(output, PCWSTR(to_wide(text).as_ptr()))
+                    {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    } else if let Some((parent, output)) =
+                        with_window_state(hwnd, |state| (state.parent, state.output))
+                    {
+                        let language =
+                            with_state(parent, |state| state.settings.language).unwrap_or_default();
+                        let message = i18n::tr(language, "dictionary.lookup.results");
+                        if !nvda_speak(&message) {
+                            crate::log_debug("NVDA speak failed");
+                        }
+                        NotifyWinEvent(
+                            EVENT_OBJECT_VALUECHANGE,
+                            output,
+                            OBJID_CLIENT.0,
+                            CHILDID_SELF as i32,
+                        );
+                    }
+                }
+                LRESULT(0)
             }
-            LRESULT(0)
+            WM_DESTROY => LRESULT(0),
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WiktionaryWindowState;
+                if !ptr.is_null() {
+                    let _unused_box = Box::from_raw(ptr);
+                    with_state(_unused_box.parent, |s| s.wiktionary_window = HWND(0));
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

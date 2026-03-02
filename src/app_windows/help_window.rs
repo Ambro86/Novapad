@@ -334,214 +334,212 @@ unsafe extern "system" fn help_wndproc(
     crate::panic_guard::guard(
         "help_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { help_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || help_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*create_struct).lpCreateParams as *mut HelpWindowInit;
-            if init_ptr.is_null() {
-                return LRESULT(0);
-            }
-            let init = unsafe { Box::from_raw(init_ptr) };
-            let parent = init.parent;
-            let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
+fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*create_struct).lpCreateParams as *mut HelpWindowInit;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let init = Box::from_raw(init_ptr);
+                let parent = init.parent;
+                let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_VSCROLL
-                    | WINDOW_STYLE(ES_MULTILINE as u32)
-                    | WINDOW_STYLE(ES_AUTOVSCROLL as u32)
-                    | WINDOW_STYLE(ES_WANTRETURN as u32)
-                    | WS_TABSTOP,
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            SendMessageW(
-                edit,
-                windows::Win32::UI::Controls::EM_SETREADONLY,
-                WPARAM(1),
-                LPARAM(0),
-            );
-            if hfont.0 != 0 {
-                SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            }
+                let edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_VSCROLL
+                        | WINDOW_STYLE(ES_MULTILINE as u32)
+                        | WINDOW_STYLE(ES_AUTOVSCROLL as u32)
+                        | WINDOW_STYLE(ES_WANTRETURN as u32)
+                        | WS_TABSTOP,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(
+                    edit,
+                    windows::Win32::UI::Controls::EM_SETREADONLY,
+                    WPARAM(1),
+                    LPARAM(0),
+                );
+                if hfont.0 != 0 {
+                    SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                }
 
-            let ok_text = i18n::tr(init.language, "options.ok");
-            let ok_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&ok_text).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                0,
-                0,
-                0,
-                0,
-                hwnd,
-                HMENU(HELP_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
-            if hfont.0 != 0 && ok_button.0 != 0 {
-                SendMessageW(ok_button, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            }
+                let ok_text = i18n::tr(init.language, "options.ok");
+                let ok_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&ok_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(HELP_ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                if hfont.0 != 0 && ok_button.0 != 0 {
+                    SendMessageW(ok_button, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                }
 
-            let content = match init.kind {
-                HelpWindowKind::Guide => match init.language {
-                    Language::Italian => include_str!("../../guida.txt").to_string(),
-                    Language::Ukrainian => include_str!("../../guida_uk.txt").to_string(),
-                    Language::English => include_str!("../../guida_en.txt").to_string(),
-                    Language::Spanish => include_str!("../../guida_es.txt").to_string(),
-                    Language::Portuguese => include_str!("../../guida_pt.txt").to_string(),
-                    Language::Swedish => read_override_text("guida_sv.txt")
-                        .unwrap_or_else(|| include_str!("../../guida_sv.txt").to_string()),
-                    Language::Vietnamese => include_str!("../../guida_vi.txt").to_string(),
-                    Language::Czech => read_override_text("guida_cs.txt")
-                        .unwrap_or_else(|| include_str!("../../guida_cs.txt").to_string()),
-                    Language::Polish => read_override_text("guida_pl.txt")
-                        .unwrap_or_else(|| include_str!("../../guida_pl.txt").to_string()),
-                    Language::French => read_override_text("guida_fr.txt")
-                        .unwrap_or_else(|| include_str!("../../guida_fr.txt").to_string()),
-                    Language::Serbian => read_override_text("guida_sr.txt")
-                        .unwrap_or_else(|| include_str!("../../guida_sr.txt").to_string()),
-                    Language::Lithuanian => include_str!("../../guida_lt.txt").to_string(),
-                    Language::Chinese => include_str!("../../guida_zh.txt").to_string(),
-                },
-                HelpWindowKind::Changelog => match init.language {
-                    Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
-                    Language::Ukrainian | Language::English => {
-                        include_str!("../../CHANGELOG.md").to_string()
-                    }
-                    Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
-                    Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
-                    Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
-                    Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
-                    Language::Czech => include_str!("../../CHANGELOG.md").to_string(),
-                    Language::Polish => include_str!("../../CHANGELOG_PL.md").to_string(),
-                    Language::French => include_str!("../../CHANGELOG_FR.md").to_string(),
-                    Language::Serbian => include_str!("../../CHANGELOG.md").to_string(),
-                    Language::Lithuanian => include_str!("../../CHANGELOG.md").to_string(),
-                    Language::Chinese => include_str!("../../CHANGELOG.md").to_string(),
-                },
-                HelpWindowKind::Donations => donations_content(init.language),
-            };
-            let content = normalize_to_crlf(&content);
-            let content_wide = to_wide(&content);
-            if let Err(e) = SetWindowTextW(edit, PCWSTR(content_wide.as_ptr())) {
-                crate::log_debug(&format!("Failed to set help content: {}", e));
-            }
-            SetFocus(edit);
+                let content = match init.kind {
+                    HelpWindowKind::Guide => match init.language {
+                        Language::Italian => include_str!("../../guida.txt").to_string(),
+                        Language::Ukrainian => include_str!("../../guida_uk.txt").to_string(),
+                        Language::English => include_str!("../../guida_en.txt").to_string(),
+                        Language::Spanish => include_str!("../../guida_es.txt").to_string(),
+                        Language::Portuguese => include_str!("../../guida_pt.txt").to_string(),
+                        Language::Swedish => read_override_text("guida_sv.txt")
+                            .unwrap_or_else(|| include_str!("../../guida_sv.txt").to_string()),
+                        Language::Vietnamese => include_str!("../../guida_vi.txt").to_string(),
+                        Language::Czech => read_override_text("guida_cs.txt")
+                            .unwrap_or_else(|| include_str!("../../guida_cs.txt").to_string()),
+                        Language::Polish => read_override_text("guida_pl.txt")
+                            .unwrap_or_else(|| include_str!("../../guida_pl.txt").to_string()),
+                        Language::French => read_override_text("guida_fr.txt")
+                            .unwrap_or_else(|| include_str!("../../guida_fr.txt").to_string()),
+                        Language::Serbian => read_override_text("guida_sr.txt")
+                            .unwrap_or_else(|| include_str!("../../guida_sr.txt").to_string()),
+                        Language::Lithuanian => include_str!("../../guida_lt.txt").to_string(),
+                        Language::Chinese => include_str!("../../guida_zh.txt").to_string(),
+                    },
+                    HelpWindowKind::Changelog => match init.language {
+                        Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
+                        Language::Ukrainian | Language::English => {
+                            include_str!("../../CHANGELOG.md").to_string()
+                        }
+                        Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
+                        Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
+                        Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
+                        Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
+                        Language::Czech => include_str!("../../CHANGELOG.md").to_string(),
+                        Language::Polish => include_str!("../../CHANGELOG_PL.md").to_string(),
+                        Language::French => include_str!("../../CHANGELOG_FR.md").to_string(),
+                        Language::Serbian => include_str!("../../CHANGELOG.md").to_string(),
+                        Language::Lithuanian => include_str!("../../CHANGELOG.md").to_string(),
+                        Language::Chinese => include_str!("../../CHANGELOG.md").to_string(),
+                    },
+                    HelpWindowKind::Donations => donations_content(init.language),
+                };
+                let content = normalize_to_crlf(&content);
+                let content_wide = to_wide(&content);
+                if let Err(e) = SetWindowTextW(edit, PCWSTR(content_wide.as_ptr())) {
+                    crate::log_debug(&format!("Failed to set help content: {}", e));
+                }
+                SetFocus(edit);
 
-            let state = Box::new(HelpWindowState {
-                parent,
-                edit,
-                ok_button,
-                kind: init.kind,
-            });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-            LRESULT(0)
-        }
-        WM_SETFOCUS => {
-            if with_help_state(hwnd, |state| {
-                SetFocus(state.edit);
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access help state");
-            }
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            if cmd_id == HELP_ID_OK || cmd_id == IDCANCEL.0 as usize {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_SIZE => {
-            let width = (lparam.0 & 0xffff) as i32;
-            let height = ((lparam.0 >> 16) & 0xffff) as i32;
-            if with_help_state(hwnd, |state| {
-                let button_width = 90;
-                let button_height = 28;
-                let margin = 12;
-                let edit_height = (height - button_height - (margin * 2)).max(0);
-                crate::log_if_err!(unsafe {
-                    MoveWindow(state.edit, 0, 0, width, edit_height, true)
+                let state = Box::new(HelpWindowState {
+                    parent,
+                    edit,
+                    ok_button,
+                    kind: init.kind,
                 });
-                crate::log_if_err!(unsafe {
-                    MoveWindow(
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                if with_help_state(hwnd, |state| {
+                    SetFocus(state.edit);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access help state");
+                }
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                if cmd_id == HELP_ID_OK || cmd_id == IDCANCEL.0 as usize {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_SIZE => {
+                let width = (lparam.0 & 0xffff) as i32;
+                let height = ((lparam.0 >> 16) & 0xffff) as i32;
+                if with_help_state(hwnd, |state| {
+                    let button_width = 90;
+                    let button_height = 28;
+                    let margin = 12;
+                    let edit_height = (height - button_height - (margin * 2)).max(0);
+                    crate::log_if_err!(MoveWindow(state.edit, 0, 0, width, edit_height, true));
+                    crate::log_if_err!(MoveWindow(
                         state.ok_button,
                         width - button_width - margin,
                         edit_height + margin,
                         button_width,
                         button_height,
                         true,
-                    )
-                });
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access help state");
-            }
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            let (parent, kind) = with_help_state(hwnd, |state| (state.parent, state.kind))
-                .unwrap_or((HWND(0), HelpWindowKind::Guide));
-            if parent.0 != 0
-                && with_state(parent, |state| match kind {
-                    HelpWindowKind::Guide => state.help_window = HWND(0),
-                    HelpWindowKind::Changelog => state.changelog_window = HWND(0),
-                    HelpWindowKind::Donations => state.donations_window = HWND(0),
-                })
-                .is_none()
-            {
-                crate::log_debug("Failed to access help state");
-            }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HelpWindowState;
-            if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
-            }
-            LRESULT(0)
-        }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                if with_help_state(hwnd, |state| {
-                    if GetFocus() == state.ok_button {
-                        crate::log_if_err!(DestroyWindow(hwnd));
-                    }
+                    ));
                 })
                 .is_none()
                 {
                     crate::log_debug("Failed to access help state");
                 }
-                return LRESULT(0);
+                LRESULT(0)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
+            WM_DESTROY => {
+                let (parent, kind) = with_help_state(hwnd, |state| (state.parent, state.kind))
+                    .unwrap_or((HWND(0), HelpWindowKind::Guide));
+                if parent.0 != 0
+                    && with_state(parent, |state| match kind {
+                        HelpWindowKind::Guide => state.help_window = HWND(0),
+                        HelpWindowKind::Changelog => state.changelog_window = HWND(0),
+                        HelpWindowKind::Donations => state.donations_window = HWND(0),
+                    })
+                    .is_none()
+                {
+                    crate::log_debug("Failed to access help state");
+                }
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HelpWindowState;
+                if !ptr.is_null() {
+                    let _unused_box = Box::from_raw(ptr);
+                }
+                LRESULT(0)
+            }
+            WM_CLOSE => {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                    if with_help_state(hwnd, |state| {
+                        if GetFocus() == state.ok_button {
+                            crate::log_if_err!(DestroyWindow(hwnd));
+                        }
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access help state");
+                    }
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

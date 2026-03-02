@@ -2072,160 +2072,99 @@ unsafe extern "system" fn rss_wndproc(
     crate::panic_guard::guard(
         "rss_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { rss_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || rss_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const CREATESTRUCTW;
-            let parent = HWND((*cs).lpCreateParams as isize);
+fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const CREATESTRUCTW;
+                let parent = HWND((*cs).lpCreateParams as isize);
 
-            let state = Box::new(RssWindowState {
-                parent,
-                hwnd_tree: HWND(0),
-                hwnd_import: HWND(0),
-                hwnd_export: HWND(0),
-                node_data: HashMap::new(),
-                pending_fetches: HashMap::new(),
-                source_items: HashMap::new(),
-                enter_guard: false,
-                add_guard: false,
-                reorder_dialog: HWND(0),
-                search_dialog: HWND(0),
-                pending_edit: None,
-                tree_proc: None,
-                last_selected: 0,
-                removed_history: Vec::new(),
-                suppress_tree_selection_events: false,
-                suppress_focus_restore_once: false,
-            });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                let state = Box::new(RssWindowState {
+                    parent,
+                    hwnd_tree: HWND(0),
+                    hwnd_import: HWND(0),
+                    hwnd_export: HWND(0),
+                    node_data: HashMap::new(),
+                    pending_fetches: HashMap::new(),
+                    source_items: HashMap::new(),
+                    enter_guard: false,
+                    add_guard: false,
+                    reorder_dialog: HWND(0),
+                    search_dialog: HWND(0),
+                    pending_edit: None,
+                    tree_proc: None,
+                    last_selected: 0,
+                    removed_history: Vec::new(),
+                    suppress_tree_selection_events: false,
+                    suppress_focus_restore_once: false,
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
 
-            create_controls(hwnd);
-            ensure_default_sources(parent);
-            reload_tree(hwnd);
-            let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            if hwnd_tree.0 != 0 {
-                select_first_root_if_needed(hwnd, hwnd_tree);
-                SetFocus(hwnd_tree);
+                create_controls(hwnd);
+                ensure_default_sources(parent);
+                reload_tree(hwnd);
+                let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                if hwnd_tree.0 != 0 {
+                    select_first_root_if_needed(hwnd, hwnd_tree);
+                    SetFocus(hwnd_tree);
+                }
+
+                // Start background check for new articles on all feeds
+                start_background_unread_check(hwnd);
+
+                LRESULT(0)
             }
-
-            // Start background check for new articles on all feeds
-            start_background_unread_check(hwnd);
-
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            if parent.0 != 0 {
-                if with_state(parent, |s| s.rss_window = HWND(0)).is_none() {
-                    crate::log_debug("Failed to reset rss_window state");
-                }
-                // Parent was never disabled; just bring it to front as a convenience.
-                // Only focus editor if not in player mode (audiobook)
-                if !crate::editor_manager::is_current_audiobook(parent) {
-                    force_focus_editor_on_parent(parent);
-                }
-            }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RssWindowState;
-            if !ptr.is_null() {
-                let parent = (*ptr).parent;
-                let hwnd_tree = (*ptr).hwnd_tree;
-                if hwnd_tree.0 != 0
-                    && let Some(proc) = (*ptr).tree_proc
-                {
-                    let proc_ptr = proc as usize;
-                    SetWindowLongPtrW(hwnd_tree, GWLP_WNDPROC, proc_ptr as isize);
-                }
+            WM_DESTROY => {
+                let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                 if parent.0 != 0 {
-                    force_focus_editor_on_parent(parent);
+                    if with_state(parent, |s| s.rss_window = HWND(0)).is_none() {
+                        crate::log_debug("Failed to reset rss_window state");
+                    }
+                    // Parent was never disabled; just bring it to front as a convenience.
+                    // Only focus editor if not in player mode (audiobook)
+                    if !crate::editor_manager::is_current_audiobook(parent) {
+                        force_focus_editor_on_parent(parent);
+                    }
                 }
-                let _unused_box = Box::from_raw(ptr);
+                LRESULT(0)
             }
-            LRESULT(0)
-        }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            match id {
-                ID_BTN_CLOSE | 2 => {
-                    crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
-                }
-                ID_BTN_ADD => {
-                    // Direct activation (mouse click, or Space/Enter if the button sends BN_CLICKED).
-                    // Guard against the common case where Enter also generates IDOK (1),
-                    // which would otherwise open the dialog twice and crash.
-                    let already = with_rss_state(hwnd, |s| s.add_guard).unwrap_or(false);
-                    if !already {
-                        with_rss_state(hwnd, |s| s.add_guard = true);
-                        if let Err(_e) =
-                            PostMessageW(hwnd, WM_SHOW_ADD_DIALOG, WPARAM(0), LPARAM(0))
-                        {
-                            crate::log_debug(&format!("Error: {:?}", _e));
-                        }
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RssWindowState;
+                if !ptr.is_null() {
+                    let parent = (*ptr).parent;
+                    let hwnd_tree = (*ptr).hwnd_tree;
+                    if hwnd_tree.0 != 0
+                        && let Some(proc) = (*ptr).tree_proc
+                    {
+                        let proc_ptr = proc as usize;
+                        SetWindowLongPtrW(hwnd_tree, GWLP_WNDPROC, proc_ptr as isize);
                     }
-                    LRESULT(0)
-                }
-                ID_BTN_IMPORT => {
-                    let language = with_rss_state(hwnd, |s| {
-                        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
-                    })
-                    .unwrap_or_default();
-                    if let Some(path) = open_import_txt_dialog(hwnd, language) {
-                        import_sources_from_file(hwnd, &path);
+                    if parent.0 != 0 {
+                        force_focus_editor_on_parent(parent);
                     }
-                    LRESULT(0)
+                    let _unused_box = Box::from_raw(ptr);
                 }
-                ID_BTN_SEARCH => {
-                    show_rss_search_dialog(hwnd);
-                    LRESULT(0)
-                }
-                ID_BTN_EXPORT => {
-                    let language = with_rss_state(hwnd, |s| {
-                        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
-                    })
-                    .unwrap_or_default();
-                    if let Some(path) = open_export_opml_dialog(hwnd, language) {
-                        match export_sources_to_opml_file(hwnd, &path) {
-                            Ok(count) => {
-                                if count > 0 {
-                                    announce_rss_status(&i18n::tr(language, "rss.exported"));
-                                }
-                            }
-                            Err(err) => {
-                                let title = i18n::tr(language, "rss.window.title");
-                                let message =
-                                    format!("{}: {}", i18n::tr(language, "rss.export_failed"), err);
-                                MessageBoxW(
-                                    hwnd,
-                                    PCWSTR(to_wide(&message).as_ptr()),
-                                    PCWSTR(to_wide(&title).as_ptr()),
-                                    MB_OK | MB_ICONINFORMATION,
-                                );
-                            }
-                        }
+                LRESULT(0)
+            }
+            WM_CLOSE => {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                match id {
+                    ID_BTN_CLOSE | 2 => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
                     }
-                    LRESULT(0)
-                }
-                1 => {
-                    // IDOK (Enter key often triggers this generic command)
-                    let focus = GetFocus();
-                    let btn_add = GetDlgItem(hwnd, ID_BTN_ADD as i32);
-                    let btn_search = GetDlgItem(hwnd, ID_BTN_SEARCH as i32);
-                    let btn_import = GetDlgItem(hwnd, ID_BTN_IMPORT as i32);
-                    let btn_export = GetDlgItem(hwnd, ID_BTN_EXPORT as i32);
-                    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-
-                    if focus == btn_add {
+                    ID_BTN_ADD => {
+                        // Direct activation (mouse click, or Space/Enter if the button sends BN_CLICKED).
+                        // Guard against the common case where Enter also generates IDOK (1),
+                        // which would otherwise open the dialog twice and crash.
                         let already = with_rss_state(hwnd, |s| s.add_guard).unwrap_or(false);
                         if !already {
                             with_rss_state(hwnd, |s| s.add_guard = true);
@@ -2235,10 +2174,9 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                                 crate::log_debug(&format!("Error: {:?}", _e));
                             }
                         }
-                        return LRESULT(0);
+                        LRESULT(0)
                     }
-
-                    if focus == btn_import {
+                    ID_BTN_IMPORT => {
                         let language = with_rss_state(hwnd, |s| {
                             with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
                         })
@@ -2246,15 +2184,13 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                         if let Some(path) = open_import_txt_dialog(hwnd, language) {
                             import_sources_from_file(hwnd, &path);
                         }
-                        return LRESULT(0);
+                        LRESULT(0)
                     }
-
-                    if focus == btn_search {
+                    ID_BTN_SEARCH => {
                         show_rss_search_dialog(hwnd);
-                        return LRESULT(0);
+                        LRESULT(0)
                     }
-
-                    if focus == btn_export {
+                    ID_BTN_EXPORT => {
                         let language = with_rss_state(hwnd, |s| {
                             with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
                         })
@@ -2282,387 +2218,470 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                                 }
                             }
                         }
-                        return LRESULT(0);
-                    }
-
-                    if focus == hwnd_tree {
-                        let already = with_rss_state(hwnd, |s| s.enter_guard).unwrap_or(false);
-                        if !already {
-                            let shift_down = GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16 != 0;
-                            with_rss_state(hwnd, |s| s.enter_guard = true);
-                            if let Err(_e) =
-                                PostMessageW(hwnd, WM_CLEAR_ENTER_GUARD, WPARAM(0), LPARAM(0))
-                            {
-                                crate::log_debug(&format!("Error: {:?}", _e));
-                            }
-                            handle_enter_action(hwnd, shift_down);
-                        }
-                        return LRESULT(0);
-                    }
-
-                    LRESULT(0)
-                }
-                ID_CTX_EDIT => {
-                    handle_edit_source(hwnd);
-                    LRESULT(0)
-                }
-                ID_CTX_DELETE => {
-                    handle_delete(hwnd);
-                    LRESULT(0)
-                }
-                ID_CTX_UNDO_DELETE => {
-                    undo_last_delete(hwnd);
-                    LRESULT(0)
-                }
-                ID_CTX_RETRY => {
-                    handle_retry_now(hwnd);
-                    LRESULT(0)
-                }
-                ID_CTX_REORDER_UP => {
-                    handle_reorder_action(hwnd, ReorderAction::Up);
-                    LRESULT(0)
-                }
-                ID_CTX_REORDER_DOWN => {
-                    handle_reorder_action(hwnd, ReorderAction::Down);
-                    LRESULT(0)
-                }
-                ID_CTX_REORDER_TOP => {
-                    handle_reorder_action(hwnd, ReorderAction::Top);
-                    LRESULT(0)
-                }
-                ID_CTX_REORDER_BOTTOM => {
-                    handle_reorder_action(hwnd, ReorderAction::Bottom);
-                    LRESULT(0)
-                }
-                ID_CTX_REORDER_POSITION => {
-                    handle_reorder_action(hwnd, ReorderAction::Position);
-                    LRESULT(0)
-                }
-                ID_CTX_SORT_ASC => {
-                    handle_sort_action(hwnd, crate::settings::SortOrder::TitleAsc);
-                    LRESULT(0)
-                }
-                ID_CTX_SORT_DESC => {
-                    handle_sort_action(hwnd, crate::settings::SortOrder::TitleDesc);
-                    LRESULT(0)
-                }
-                ID_CTX_SORT_NEWEST => {
-                    handle_sort_action(hwnd, crate::settings::SortOrder::DateNewest);
-                    LRESULT(0)
-                }
-                ID_CTX_SORT_OLDEST => {
-                    handle_sort_action(hwnd, crate::settings::SortOrder::DateOldest);
-                    LRESULT(0)
-                }
-                ID_CTX_OPEN_BROWSER => {
-                    handle_article_action(hwnd, ArticleAction::OpenInBrowser);
-                    LRESULT(0)
-                }
-                ID_CTX_SHARE_FACEBOOK => {
-                    handle_article_action(hwnd, ArticleAction::ShareFacebook);
-                    LRESULT(0)
-                }
-                ID_CTX_SHARE_TWITTER => {
-                    handle_article_action(hwnd, ArticleAction::ShareTwitter);
-                    LRESULT(0)
-                }
-                ID_CTX_SHARE_WHATSAPP => {
-                    handle_article_action(hwnd, ArticleAction::ShareWhatsApp);
-                    LRESULT(0)
-                }
-                ID_CTX_SHARE_EMAIL => {
-                    handle_article_action(hwnd, ArticleAction::ShareEmail);
-                    LRESULT(0)
-                }
-                ID_CTX_PROPERTIES => {
-                    show_selected_properties(hwnd);
-                    LRESULT(0)
-                }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-            }
-        }
-        windows::Win32::UI::WindowsAndMessaging::WM_COPYDATA => {
-            let cds = lparam.0 as *const COPYDATASTRUCT;
-            if (*cds).dwData == 0x52535331 {
-                let len = ((*cds).cbData / 2) as usize;
-                let slice = std::slice::from_raw_parts((*cds).lpData as *const u16, len);
-                // Need 0-term
-                let s = String::from_utf16_lossy(slice);
-                let payload = s.trim_matches(char::from(0)).to_string();
-                let mut lines = payload.lines();
-                let first = lines.next().unwrap_or("");
-                let second = lines.next();
-                let (mut title, url) = if let Some(url_line) = second {
-                    (first.trim().to_string(), url_line.trim().to_string())
-                } else {
-                    (String::new(), first.trim().to_string())
-                };
-                if url.is_empty() {
-                    return LRESULT(0);
-                }
-                if title.trim().is_empty() {
-                    title = url.clone();
-                }
-
-                let edit_idx = with_rss_state(hwnd, |s| s.pending_edit.take()).unwrap_or(None);
-                let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                if let Some(idx) = edit_idx {
-                    with_state(parent, |state| {
-                        if let Some(src) = state.settings.rss_sources.get_mut(idx) {
-                            src.title = title.clone();
-                            src.url = url.clone();
-                            src.user_title = title.trim() != url.trim();
-                            src.cache = rss::RssFeedCache::default();
-                        }
-                        crate::settings::save_settings(state.settings.clone());
-                    });
-                    reload_tree(hwnd);
-                } else {
-                    with_state(parent, |state| {
-                        state.settings.rss_sources.push(RssSource {
-                            title: title.clone(),
-                            url: url.clone(),
-                            kind: RssSourceType::Site,
-                            user_title: title.trim() != url.trim(),
-                            unread: false,
-                            cache: rss::RssFeedCache::default(),
-                            last_seen_guid: None,
-                            last_updated: None,
-                            removed_item_keys: Vec::new(),
-                            read_item_keys: Vec::new(),
-                        });
-                        crate::settings::save_settings(state.settings.clone());
-                    });
-                    reload_tree(hwnd);
-
-                    // Auto-expand the new item to trigger fetch (and title update)
-                    let idx = with_rss_state(hwnd, |s| {
-                        with_state(s.parent, |ps| ps.settings.rss_sources.len()).unwrap_or(0)
-                    })
-                    .unwrap_or(0);
-                    if idx > 0 {
-                        let last_idx = idx - 1;
-                        let hitem = with_rss_state(hwnd, |s| {
-                            s.node_data.iter().find_map(|(k, v)| {
-                                if let NodeData::Source(i) = v {
-                                    if *i == last_idx { Some(*k) } else { None }
-                                } else {
-                                    None
-                                }
-                            })
-                        })
-                        .flatten();
-
-                        if let Some(h) = hitem {
-                            let hwnd_tree =
-                                with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-                            SendMessageW(
-                                hwnd_tree,
-                                TVM_EXPAND,
-                                WPARAM(TVE_EXPAND.0 as usize),
-                                LPARAM(h),
-                            );
-                        }
-                    }
-                }
-            }
-            LRESULT(0)
-        }
-        WM_NOTIFY => {
-            let nmhdr = lparam.0 as *const NMHDR;
-            if (*nmhdr).idFrom == ID_TREE {
-                match (*nmhdr).code {
-                    TVN_ITEMEXPANDINGW => {
-                        let pnmtv = lparam.0 as *const NMTREEVIEWW;
-                        // action contains TVE_EXPAND (2) when expanding
-                        // Use bitwise AND to check for the expand flag
-                        let action_val = (*pnmtv).action.0;
-                        if (action_val & TVE_EXPAND.0) != 0 {
-                            let hitem = (*pnmtv).itemNew.hItem;
-                            handle_expand(hwnd, hitem);
-                        }
                         LRESULT(0)
                     }
-                    TVN_SELCHANGEDW => {
-                        if with_rss_state(hwnd, |s| s.suppress_tree_selection_events)
-                            .unwrap_or(false)
-                        {
+                    1 => {
+                        // IDOK (Enter key often triggers this generic command)
+                        let focus = GetFocus();
+                        let btn_add = GetDlgItem(hwnd, ID_BTN_ADD as i32);
+                        let btn_search = GetDlgItem(hwnd, ID_BTN_SEARCH as i32);
+                        let btn_import = GetDlgItem(hwnd, ID_BTN_IMPORT as i32);
+                        let btn_export = GetDlgItem(hwnd, ID_BTN_EXPORT as i32);
+                        let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+
+                        if focus == btn_add {
+                            let already = with_rss_state(hwnd, |s| s.add_guard).unwrap_or(false);
+                            if !already {
+                                with_rss_state(hwnd, |s| s.add_guard = true);
+                                if let Err(_e) =
+                                    PostMessageW(hwnd, WM_SHOW_ADD_DIALOG, WPARAM(0), LPARAM(0))
+                                {
+                                    crate::log_debug(&format!("Error: {:?}", _e));
+                                }
+                            }
                             return LRESULT(0);
                         }
-                        let pnmtv = lparam.0 as *const NMTREEVIEWW;
-                        let hitem = (*pnmtv).itemNew.hItem;
-                        handle_selection_changed(hwnd, hitem);
+
+                        if focus == btn_import {
+                            let language = with_rss_state(hwnd, |s| {
+                                with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+                            })
+                            .unwrap_or_default();
+                            if let Some(path) = open_import_txt_dialog(hwnd, language) {
+                                import_sources_from_file(hwnd, &path);
+                            }
+                            return LRESULT(0);
+                        }
+
+                        if focus == btn_search {
+                            show_rss_search_dialog(hwnd);
+                            return LRESULT(0);
+                        }
+
+                        if focus == btn_export {
+                            let language = with_rss_state(hwnd, |s| {
+                                with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+                            })
+                            .unwrap_or_default();
+                            if let Some(path) = open_export_opml_dialog(hwnd, language) {
+                                match export_sources_to_opml_file(hwnd, &path) {
+                                    Ok(count) => {
+                                        if count > 0 {
+                                            announce_rss_status(&i18n::tr(
+                                                language,
+                                                "rss.exported",
+                                            ));
+                                        }
+                                    }
+                                    Err(err) => {
+                                        let title = i18n::tr(language, "rss.window.title");
+                                        let message = format!(
+                                            "{}: {}",
+                                            i18n::tr(language, "rss.export_failed"),
+                                            err
+                                        );
+                                        MessageBoxW(
+                                            hwnd,
+                                            PCWSTR(to_wide(&message).as_ptr()),
+                                            PCWSTR(to_wide(&title).as_ptr()),
+                                            MB_OK | MB_ICONINFORMATION,
+                                        );
+                                    }
+                                }
+                            }
+                            return LRESULT(0);
+                        }
+
+                        if focus == hwnd_tree {
+                            let already = with_rss_state(hwnd, |s| s.enter_guard).unwrap_or(false);
+                            if !already {
+                                let shift_down =
+                                    GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16 != 0;
+                                with_rss_state(hwnd, |s| s.enter_guard = true);
+                                if let Err(_e) =
+                                    PostMessageW(hwnd, WM_CLEAR_ENTER_GUARD, WPARAM(0), LPARAM(0))
+                                {
+                                    crate::log_debug(&format!("Error: {:?}", _e));
+                                }
+                                handle_enter_action(hwnd, shift_down);
+                            }
+                            return LRESULT(0);
+                        }
+
                         LRESULT(0)
                     }
-                    TVN_KEYDOWN => {
-                        let ptvkd = lparam.0 as *const NMTVKEYDOWN;
-                        if (*ptvkd).wVKey
-                            == windows::Win32::UI::Input::KeyboardAndMouse::VK_RETURN.0
-                        {
-                            if GetKeyState(VK_MENU.0 as i32) < 0 {
-                                show_selected_properties(hwnd);
-                                return LRESULT(1);
+                    ID_CTX_EDIT => {
+                        handle_edit_source(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_CTX_DELETE => {
+                        handle_delete(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_CTX_UNDO_DELETE => {
+                        undo_last_delete(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_CTX_RETRY => {
+                        handle_retry_now(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_CTX_REORDER_UP => {
+                        handle_reorder_action(hwnd, ReorderAction::Up);
+                        LRESULT(0)
+                    }
+                    ID_CTX_REORDER_DOWN => {
+                        handle_reorder_action(hwnd, ReorderAction::Down);
+                        LRESULT(0)
+                    }
+                    ID_CTX_REORDER_TOP => {
+                        handle_reorder_action(hwnd, ReorderAction::Top);
+                        LRESULT(0)
+                    }
+                    ID_CTX_REORDER_BOTTOM => {
+                        handle_reorder_action(hwnd, ReorderAction::Bottom);
+                        LRESULT(0)
+                    }
+                    ID_CTX_REORDER_POSITION => {
+                        handle_reorder_action(hwnd, ReorderAction::Position);
+                        LRESULT(0)
+                    }
+                    ID_CTX_SORT_ASC => {
+                        handle_sort_action(hwnd, crate::settings::SortOrder::TitleAsc);
+                        LRESULT(0)
+                    }
+                    ID_CTX_SORT_DESC => {
+                        handle_sort_action(hwnd, crate::settings::SortOrder::TitleDesc);
+                        LRESULT(0)
+                    }
+                    ID_CTX_SORT_NEWEST => {
+                        handle_sort_action(hwnd, crate::settings::SortOrder::DateNewest);
+                        LRESULT(0)
+                    }
+                    ID_CTX_SORT_OLDEST => {
+                        handle_sort_action(hwnd, crate::settings::SortOrder::DateOldest);
+                        LRESULT(0)
+                    }
+                    ID_CTX_OPEN_BROWSER => {
+                        handle_article_action(hwnd, ArticleAction::OpenInBrowser);
+                        LRESULT(0)
+                    }
+                    ID_CTX_SHARE_FACEBOOK => {
+                        handle_article_action(hwnd, ArticleAction::ShareFacebook);
+                        LRESULT(0)
+                    }
+                    ID_CTX_SHARE_TWITTER => {
+                        handle_article_action(hwnd, ArticleAction::ShareTwitter);
+                        LRESULT(0)
+                    }
+                    ID_CTX_SHARE_WHATSAPP => {
+                        handle_article_action(hwnd, ArticleAction::ShareWhatsApp);
+                        LRESULT(0)
+                    }
+                    ID_CTX_SHARE_EMAIL => {
+                        handle_article_action(hwnd, ArticleAction::ShareEmail);
+                        LRESULT(0)
+                    }
+                    ID_CTX_PROPERTIES => {
+                        show_selected_properties(hwnd);
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                }
+            }
+            windows::Win32::UI::WindowsAndMessaging::WM_COPYDATA => {
+                let cds = lparam.0 as *const COPYDATASTRUCT;
+                if (*cds).dwData == 0x52535331 {
+                    let len = ((*cds).cbData / 2) as usize;
+                    let slice = std::slice::from_raw_parts((*cds).lpData as *const u16, len);
+                    // Need 0-term
+                    let s = String::from_utf16_lossy(slice);
+                    let payload = s.trim_matches(char::from(0)).to_string();
+                    let mut lines = payload.lines();
+                    let first = lines.next().unwrap_or("");
+                    let second = lines.next();
+                    let (mut title, url) = if let Some(url_line) = second {
+                        (first.trim().to_string(), url_line.trim().to_string())
+                    } else {
+                        (String::new(), first.trim().to_string())
+                    };
+                    if url.is_empty() {
+                        return LRESULT(0);
+                    }
+                    if title.trim().is_empty() {
+                        title = url.clone();
+                    }
+
+                    let edit_idx = with_rss_state(hwnd, |s| s.pending_edit.take()).unwrap_or(None);
+                    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                    if let Some(idx) = edit_idx {
+                        with_state(parent, |state| {
+                            if let Some(src) = state.settings.rss_sources.get_mut(idx) {
+                                src.title = title.clone();
+                                src.url = url.clone();
+                                src.user_title = title.trim() != url.trim();
+                                src.cache = rss::RssFeedCache::default();
                             }
-                            let shift_down = GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16 != 0;
-                            with_rss_state(hwnd, |s| s.enter_guard = true);
-                            if let Err(_e) =
-                                PostMessageW(hwnd, WM_CLEAR_ENTER_GUARD, WPARAM(0), LPARAM(0))
-                            {
-                                crate::log_debug(&format!("Error: {:?}", _e));
+                            crate::settings::save_settings(state.settings.clone());
+                        });
+                        reload_tree(hwnd);
+                    } else {
+                        with_state(parent, |state| {
+                            state.settings.rss_sources.push(RssSource {
+                                title: title.clone(),
+                                url: url.clone(),
+                                kind: RssSourceType::Site,
+                                user_title: title.trim() != url.trim(),
+                                unread: false,
+                                cache: rss::RssFeedCache::default(),
+                                last_seen_guid: None,
+                                last_updated: None,
+                                removed_item_keys: Vec::new(),
+                                read_item_keys: Vec::new(),
+                            });
+                            crate::settings::save_settings(state.settings.clone());
+                        });
+                        reload_tree(hwnd);
+
+                        // Auto-expand the new item to trigger fetch (and title update)
+                        let idx = with_rss_state(hwnd, |s| {
+                            with_state(s.parent, |ps| ps.settings.rss_sources.len()).unwrap_or(0)
+                        })
+                        .unwrap_or(0);
+                        if idx > 0 {
+                            let last_idx = idx - 1;
+                            let hitem = with_rss_state(hwnd, |s| {
+                                s.node_data.iter().find_map(|(k, v)| {
+                                    if let NodeData::Source(i) = v {
+                                        if *i == last_idx { Some(*k) } else { None }
+                                    } else {
+                                        None
+                                    }
+                                })
+                            })
+                            .flatten();
+
+                            if let Some(h) = hitem {
+                                let hwnd_tree =
+                                    with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                                SendMessageW(
+                                    hwnd_tree,
+                                    TVM_EXPAND,
+                                    WPARAM(TVE_EXPAND.0 as usize),
+                                    LPARAM(h),
+                                );
                             }
-                            handle_enter_action(hwnd, shift_down);
-                            LRESULT(1)
-                        } else if (*ptvkd).wVKey
-                            == windows::Win32::UI::Input::KeyboardAndMouse::VK_DELETE.0
-                        {
-                            handle_delete(hwnd);
-                            LRESULT(1)
-                        } else if (*ptvkd).wVKey == 'Z' as u16
-                            && GetKeyState(VK_CONTROL.0 as i32) < 0
-                        {
-                            undo_last_delete(hwnd);
-                            LRESULT(1)
-                        } else if (*ptvkd).wVKey == VK_F10.0 && GetKeyState(VK_SHIFT.0 as i32) < 0 {
-                            let hwnd_tree =
-                                with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-                            if hwnd_tree.0 != 0
-                                && let Err(_e) = PostMessageW(
-                                    hwnd,
-                                    WM_CONTEXTMENU,
-                                    WPARAM(hwnd_tree.0 as usize),
-                                    LPARAM(-1),
-                                )
-                            {}
-                            LRESULT(1)
-                        } else if (*ptvkd).wVKey == VK_APPS.0 {
-                            let hwnd_tree =
-                                with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-                            if hwnd_tree.0 != 0
-                                && let Err(_e) = PostMessageW(
-                                    hwnd,
-                                    WM_CONTEXTMENU,
-                                    WPARAM(hwnd_tree.0 as usize),
-                                    LPARAM(-1),
-                                )
-                            {}
-                            LRESULT(1)
-                        } else if (*ptvkd).wVKey == VK_ESCAPE.0 {
-                            crate::log_if_err!(DestroyWindow(hwnd));
-                            LRESULT(1)
-                        } else {
-                            LRESULT(0)
                         }
                     }
-                    NM_RCLICK => {
-                        let mut pt = POINT::default();
-                        crate::log_if_err!(GetCursorPos(&mut pt));
-                        show_rss_context_menu(hwnd, pt.x, pt.y, true);
-                        LRESULT(1)
-                    }
-                    _ => LRESULT(0),
                 }
-            } else {
                 LRESULT(0)
             }
-        }
-        WM_KEYDOWN | WM_SYSKEYDOWN => {
-            let key = wparam.0 as u32;
-            if key == u32::from(VK_ESCAPE.0) {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
+            WM_NOTIFY => {
+                let nmhdr = lparam.0 as *const NMHDR;
+                if (*nmhdr).idFrom == ID_TREE {
+                    match (*nmhdr).code {
+                        TVN_ITEMEXPANDINGW => {
+                            let pnmtv = lparam.0 as *const NMTREEVIEWW;
+                            // action contains TVE_EXPAND (2) when expanding
+                            // Use bitwise AND to check for the expand flag
+                            let action_val = (*pnmtv).action.0;
+                            if (action_val & TVE_EXPAND.0) != 0 {
+                                let hitem = (*pnmtv).itemNew.hItem;
+                                handle_expand(hwnd, hitem);
+                            }
+                            LRESULT(0)
+                        }
+                        TVN_SELCHANGEDW => {
+                            if with_rss_state(hwnd, |s| s.suppress_tree_selection_events)
+                                .unwrap_or(false)
+                            {
+                                return LRESULT(0);
+                            }
+                            let pnmtv = lparam.0 as *const NMTREEVIEWW;
+                            let hitem = (*pnmtv).itemNew.hItem;
+                            handle_selection_changed(hwnd, hitem);
+                            LRESULT(0)
+                        }
+                        TVN_KEYDOWN => {
+                            let ptvkd = lparam.0 as *const NMTVKEYDOWN;
+                            if (*ptvkd).wVKey
+                                == windows::Win32::UI::Input::KeyboardAndMouse::VK_RETURN.0
+                            {
+                                if GetKeyState(VK_MENU.0 as i32) < 0 {
+                                    show_selected_properties(hwnd);
+                                    return LRESULT(1);
+                                }
+                                let shift_down =
+                                    GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16 != 0;
+                                with_rss_state(hwnd, |s| s.enter_guard = true);
+                                if let Err(_e) =
+                                    PostMessageW(hwnd, WM_CLEAR_ENTER_GUARD, WPARAM(0), LPARAM(0))
+                                {
+                                    crate::log_debug(&format!("Error: {:?}", _e));
+                                }
+                                handle_enter_action(hwnd, shift_down);
+                                LRESULT(1)
+                            } else if (*ptvkd).wVKey
+                                == windows::Win32::UI::Input::KeyboardAndMouse::VK_DELETE.0
+                            {
+                                handle_delete(hwnd);
+                                LRESULT(1)
+                            } else if (*ptvkd).wVKey == 'Z' as u16
+                                && GetKeyState(VK_CONTROL.0 as i32) < 0
+                            {
+                                undo_last_delete(hwnd);
+                                LRESULT(1)
+                            } else if (*ptvkd).wVKey == VK_F10.0
+                                && GetKeyState(VK_SHIFT.0 as i32) < 0
+                            {
+                                let hwnd_tree =
+                                    with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                                if hwnd_tree.0 != 0
+                                    && let Err(_e) = PostMessageW(
+                                        hwnd,
+                                        WM_CONTEXTMENU,
+                                        WPARAM(hwnd_tree.0 as usize),
+                                        LPARAM(-1),
+                                    )
+                                {}
+                                LRESULT(1)
+                            } else if (*ptvkd).wVKey == VK_APPS.0 {
+                                let hwnd_tree =
+                                    with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                                if hwnd_tree.0 != 0
+                                    && let Err(_e) = PostMessageW(
+                                        hwnd,
+                                        WM_CONTEXTMENU,
+                                        WPARAM(hwnd_tree.0 as usize),
+                                        LPARAM(-1),
+                                    )
+                                {}
+                                LRESULT(1)
+                            } else if (*ptvkd).wVKey == VK_ESCAPE.0 {
+                                crate::log_if_err!(DestroyWindow(hwnd));
+                                LRESULT(1)
+                            } else {
+                                LRESULT(0)
+                            }
+                        }
+                        NM_RCLICK => {
+                            let mut pt = POINT::default();
+                            crate::log_if_err!(GetCursorPos(&mut pt));
+                            show_rss_context_menu(hwnd, pt.x, pt.y, true);
+                            LRESULT(1)
+                        }
+                        _ => LRESULT(0),
+                    }
+                } else {
+                    LRESULT(0)
+                }
             }
-            let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            if hwnd_tree.0 == 0 {
-                return LRESULT(0);
+            WM_KEYDOWN | WM_SYSKEYDOWN => {
+                let key = wparam.0 as u32;
+                if key == u32::from(VK_ESCAPE.0) {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                if hwnd_tree.0 == 0 {
+                    return LRESULT(0);
+                }
+                if GetFocus() != hwnd_tree {
+                    return LRESULT(0);
+                }
+                if key == u32::from(VK_APPS.0)
+                    || (key == u32::from(VK_F10.0) && GetKeyState(VK_SHIFT.0 as i32) < 0)
+                {
+                    if let Err(_e) = PostMessageW(
+                        hwnd,
+                        WM_CONTEXTMENU,
+                        WPARAM(hwnd_tree.0 as usize),
+                        LPARAM(-1),
+                    ) {}
+                    return LRESULT(0);
+                }
+                if key == 'Z' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
+                    undo_last_delete(hwnd);
+                    return LRESULT(0);
+                }
+                if key == 'C' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
+                    ignore_bool(handle_rss_quick_copy(hwnd));
+                    return LRESULT(0);
+                }
+                if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
+                    show_selected_properties(hwnd);
+                    return LRESULT(0);
+                }
+                if key == u32::from(VK_ESCAPE.0) {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            if GetFocus() != hwnd_tree {
-                return LRESULT(0);
+            WM_CONTEXTMENU => {
+                let mut x = (lparam.0 & 0xffff) as i32;
+                let mut y = ((lparam.0 >> 16) & 0xffff) as i32;
+                let use_hit_test = !(x == -1 && y == -1);
+                if x == -1 && y == -1 {
+                    let mut pt = POINT::default();
+                    crate::log_if_err!(GetCursorPos(&mut pt));
+                    x = pt.x;
+                    y = pt.y;
+                }
+                show_rss_context_menu(hwnd, x, y, use_hit_test);
+                LRESULT(0)
             }
-            if key == u32::from(VK_APPS.0)
-                || (key == u32::from(VK_F10.0) && GetKeyState(VK_SHIFT.0 as i32) < 0)
-            {
-                if let Err(_e) = PostMessageW(
-                    hwnd,
-                    WM_CONTEXTMENU,
-                    WPARAM(hwnd_tree.0 as usize),
-                    LPARAM(-1),
-                ) {}
-                return LRESULT(0);
+            WM_RSS_FETCH_COMPLETE => {
+                let ptr = lparam.0 as *mut FetchResult;
+                let res = *Box::from_raw(ptr);
+                process_fetch_result(hwnd, res);
+                LRESULT(0)
             }
-            if key == 'Z' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
-                undo_last_delete(hwnd);
-                return LRESULT(0);
+            WM_RSS_BACKGROUND_CHECK_COMPLETE => {
+                let ptr = lparam.0 as *mut BackgroundCheckResult;
+                let res = *Box::from_raw(ptr);
+                process_background_check_result(hwnd, res);
+                LRESULT(0)
             }
-            if key == 'C' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
-                ignore_bool(handle_rss_quick_copy(hwnd));
-                return LRESULT(0);
-            }
-            if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
-                show_selected_properties(hwnd);
-                return LRESULT(0);
-            }
-            if key == u32::from(VK_ESCAPE.0) {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_CONTEXTMENU => {
-            let mut x = (lparam.0 & 0xffff) as i32;
-            let mut y = ((lparam.0 >> 16) & 0xffff) as i32;
-            let use_hit_test = !(x == -1 && y == -1);
-            if x == -1 && y == -1 {
-                let mut pt = POINT::default();
-                crate::log_if_err!(GetCursorPos(&mut pt));
-                x = pt.x;
-                y = pt.y;
-            }
-            show_rss_context_menu(hwnd, x, y, use_hit_test);
-            LRESULT(0)
-        }
-        WM_RSS_FETCH_COMPLETE => {
-            let ptr = lparam.0 as *mut FetchResult;
-            let res = *unsafe { Box::from_raw(ptr) };
-            process_fetch_result(hwnd, res);
-            LRESULT(0)
-        }
-        WM_RSS_BACKGROUND_CHECK_COMPLETE => {
-            let ptr = lparam.0 as *mut BackgroundCheckResult;
-            let res = *unsafe { Box::from_raw(ptr) };
-            process_background_check_result(hwnd, res);
-            LRESULT(0)
-        }
-        WM_RSS_MARK_ITEM_READ_UI => {
-            let ptr = lparam.0 as *mut MarkItemReadUiMessage;
-            let msg_data = *unsafe { Box::from_raw(ptr) };
-            let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            if hwnd_tree.0 == 0 {
-                return LRESULT(0);
-            }
-            let hitem = windows::Win32::UI::Controls::HTREEITEM(msg_data.hitem);
-            let item = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
-                Some(NodeData::Item(item)) => Some(item.clone()),
-                _ => None,
-            })
-            .flatten();
-            if let Some(item) = item
-                && rss_item_key(&item) == msg_data.item_key
-            {
-                let (
-                    language,
-                    announce_unread,
-                    unread_label_position,
-                    rss_date_mode,
-                    rss_time_mode,
-                ) = with_rss_state(hwnd, |s| {
-                    with_state(s.parent, |ps| {
-                        (
-                            ps.settings.language,
-                            ps.settings.announce_unread_rss_podcast_items,
-                            ps.settings.rss_podcast_unread_label_position,
-                            ps.settings.rss_articles_date_display,
-                            ps.settings.rss_articles_time_display,
-                        )
+            WM_RSS_MARK_ITEM_READ_UI => {
+                let ptr = lparam.0 as *mut MarkItemReadUiMessage;
+                let msg_data = *Box::from_raw(ptr);
+                let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                if hwnd_tree.0 == 0 {
+                    return LRESULT(0);
+                }
+                let hitem = windows::Win32::UI::Controls::HTREEITEM(msg_data.hitem);
+                let item = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+                    Some(NodeData::Item(item)) => Some(item.clone()),
+                    _ => None,
+                })
+                .flatten();
+                if let Some(item) = item
+                    && rss_item_key(&item) == msg_data.item_key
+                {
+                    let (
+                        language,
+                        announce_unread,
+                        unread_label_position,
+                        rss_date_mode,
+                        rss_time_mode,
+                    ) = with_rss_state(hwnd, |s| {
+                        with_state(s.parent, |ps| {
+                            (
+                                ps.settings.language,
+                                ps.settings.announce_unread_rss_podcast_items,
+                                ps.settings.rss_podcast_unread_label_position,
+                                ps.settings.rss_articles_date_display,
+                                ps.settings.rss_articles_time_display,
+                            )
+                        })
+                        .unwrap_or((
+                            crate::settings::Language::English,
+                            true,
+                            crate::settings::RssPodcastUnreadLabelPosition::Before,
+                            ListDateDisplayMode::Always,
+                            ListTimeDisplayMode::Always,
+                        ))
                     })
                     .unwrap_or((
                         crate::settings::Language::English,
@@ -2670,165 +2689,159 @@ unsafe fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                         crate::settings::RssPodcastUnreadLabelPosition::Before,
                         ListDateDisplayMode::Always,
                         ListTimeDisplayMode::Always,
-                    ))
-                })
-                .unwrap_or((
-                    crate::settings::Language::English,
-                    true,
-                    crate::settings::RssPodcastUnreadLabelPosition::Before,
-                    ListDateDisplayMode::Always,
-                    ListTimeDisplayMode::Always,
-                ));
-                let day_counts = with_rss_state(hwnd, |s| {
-                    s.source_items
-                        .values()
-                        .find(|state| {
-                            state
-                                .items
-                                .iter()
-                                .any(|x| rss_item_key(x) == msg_data.item_key)
-                        })
-                        .map(|state| build_day_counts(&state.items))
-                        .unwrap_or_default()
-                })
-                .unwrap_or_default();
-                let same_day = has_multiple_items_same_day(item.pub_date, &day_counts);
-                let updated = rss_item_display_title(
-                    &item.title,
-                    language,
-                    announce_unread,
-                    false,
-                    item.pub_date,
-                    unread_label_position,
-                    rss_date_mode,
-                    rss_time_mode,
-                    same_day,
-                );
-                let text = to_wide(&updated);
-                let mut tv_item = TVITEMW {
-                    mask: TVIF_TEXT,
-                    hItem: hitem,
-                    pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
-                    cchTextMax: text.len() as i32,
-                    ..Default::default()
-                };
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_SETITEMW,
-                    WPARAM(0),
-                    LPARAM(&mut tv_item as *mut _ as isize),
-                );
-            }
-            LRESULT(0)
-        }
-        WM_RSS_SELECT_SOURCE_DELAYED => {
-            select_source_by_index(hwnd, wparam.0);
-            LRESULT(0)
-        }
-        WM_CLEAR_ENTER_GUARD => {
-            with_rss_state(hwnd, |s| s.enter_guard = false);
-            LRESULT(0)
-        }
-        WM_CLEAR_ADD_GUARD => {
-            with_rss_state(hwnd, |s| s.add_guard = false);
-            LRESULT(0)
-        }
-
-        WM_TIMER => {
-            // Clear short-lived guards (prevents double-open on Enter on the Add button)
-            if wparam.0 == ADD_GUARD_TIMER_ID {
-                with_rss_state(hwnd, |s| s.add_guard = false);
-                if let Err(e) = KillTimer(hwnd, ADD_GUARD_TIMER_ID) {
-                    crate::log_debug(&format!("Failed to kill ADD_GUARD_TIMER: {}", e));
-                }
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-
-        WM_RSS_IMPORT_COMPLETE => {
-            let ptr = lparam.0 as *mut ImportResult;
-            let res = unsafe { Box::from_raw(ptr) };
-
-            let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let rss_title = i18n::tr(language, "rss.temp_title");
-            let hwnd_edit = editor_manager::get_or_create_rss_document(parent, &rss_title);
-
-            if let Some(h_edit) = hwnd_edit {
-                // Bring the main window to the front *before* moving focus.
-                // Doing it the other way around is frequently ignored by Windows,
-                // especially when focus changes originate from posted messages.
-                let main_window = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-                if main_window.0 != 0 {
-                    SetForegroundWindow(main_window);
-                }
-                // Ensure large articles are not truncated by the default edit limit.
-                SendMessageW(h_edit, EM_LIMITTEXT, WPARAM(0x7FFF_FFFEusize), LPARAM(0));
-
-                // Replace the entire editor contents, then move caret to the start.
-                // We normalize text to avoid embedded NULs (which truncate Win32 edit text)
-                // and to reduce multiple blank lines.
-                let cleaned = normalize_article_text(&res.text);
-                let wide = to_wide(&cleaned);
-                SendMessageW(h_edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
-                SendMessageW(
-                    h_edit,
-                    EM_REPLACESEL,
-                    WPARAM(1),
-                    LPARAM(wide.as_ptr() as isize),
-                );
-                SendMessageW(h_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
-
-                SetFocus(h_edit);
-                if parent.0 != 0 {
-                    editor_manager::mark_current_document_from_rss(parent, true);
-                }
-            }
-            LRESULT(0)
-        }
-        WM_SHOW_ADD_DIALOG => {
-            // If the add dialog is already open, just bring it to the front.
-            let main_hwnd = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-            let existing = with_state(main_hwnd, |s| s.rss_add_dialog).unwrap_or(HWND(0));
-            if existing.0 != 0 {
-                SetForegroundWindow(existing);
-            } else {
-                show_add_dialog(hwnd);
-            }
-            if let Err(_e) = PostMessageW(hwnd, WM_CLEAR_ADD_GUARD, WPARAM(0), LPARAM(0)) {
-                crate::log_debug(&format!("Error: {:?}", _e));
-            }
-            LRESULT(0)
-        }
-        WM_RSS_SHOW_CONTEXT => {
-            show_context_menu_from_keyboard(hwnd);
-            LRESULT(0)
-        }
-        WM_SETFOCUS => {
-            let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            if hwnd_tree.0 != 0 {
-                SetFocus(hwnd_tree);
-                let suppress_restore =
-                    with_rss_state(hwnd, |s| mem::take(&mut s.suppress_focus_restore_once))
-                        .unwrap_or(false);
-                if suppress_restore {
-                    return LRESULT(0);
-                }
-                let last = with_rss_state(hwnd, |s| s.last_selected).unwrap_or(0);
-                if last != 0 {
+                    ));
+                    let day_counts = with_rss_state(hwnd, |s| {
+                        s.source_items
+                            .values()
+                            .find(|state| {
+                                state
+                                    .items
+                                    .iter()
+                                    .any(|x| rss_item_key(x) == msg_data.item_key)
+                            })
+                            .map(|state| build_day_counts(&state.items))
+                            .unwrap_or_default()
+                    })
+                    .unwrap_or_default();
+                    let same_day = has_multiple_items_same_day(item.pub_date, &day_counts);
+                    let updated = rss_item_display_title(
+                        &item.title,
+                        language,
+                        announce_unread,
+                        false,
+                        item.pub_date,
+                        unread_label_position,
+                        rss_date_mode,
+                        rss_time_mode,
+                        same_day,
+                    );
+                    let text = to_wide(&updated);
+                    let mut tv_item = TVITEMW {
+                        mask: TVIF_TEXT,
+                        hItem: hitem,
+                        pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                        cchTextMax: text.len() as i32,
+                        ..Default::default()
+                    };
                     SendMessageW(
                         hwnd_tree,
-                        TVM_SELECTITEM,
-                        WPARAM(TVGN_CARET as usize),
-                        LPARAM(last),
+                        TVM_SETITEMW,
+                        WPARAM(0),
+                        LPARAM(&mut tv_item as *mut _ as isize),
                     );
-                    SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(last));
                 }
+                LRESULT(0)
             }
-            LRESULT(0)
+            WM_RSS_SELECT_SOURCE_DELAYED => {
+                select_source_by_index(hwnd, wparam.0);
+                LRESULT(0)
+            }
+            WM_CLEAR_ENTER_GUARD => {
+                with_rss_state(hwnd, |s| s.enter_guard = false);
+                LRESULT(0)
+            }
+            WM_CLEAR_ADD_GUARD => {
+                with_rss_state(hwnd, |s| s.add_guard = false);
+                LRESULT(0)
+            }
+
+            WM_TIMER => {
+                // Clear short-lived guards (prevents double-open on Enter on the Add button)
+                if wparam.0 == ADD_GUARD_TIMER_ID {
+                    with_rss_state(hwnd, |s| s.add_guard = false);
+                    if let Err(e) = KillTimer(hwnd, ADD_GUARD_TIMER_ID) {
+                        crate::log_debug(&format!("Failed to kill ADD_GUARD_TIMER: {}", e));
+                    }
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+
+            WM_RSS_IMPORT_COMPLETE => {
+                let ptr = lparam.0 as *mut ImportResult;
+                let res = Box::from_raw(ptr);
+
+                let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                let language =
+                    with_state(parent, |state| state.settings.language).unwrap_or_default();
+                let rss_title = i18n::tr(language, "rss.temp_title");
+                let hwnd_edit = editor_manager::get_or_create_rss_document(parent, &rss_title);
+
+                if let Some(h_edit) = hwnd_edit {
+                    // Bring the main window to the front *before* moving focus.
+                    // Doing it the other way around is frequently ignored by Windows,
+                    // especially when focus changes originate from posted messages.
+                    let main_window = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                    if main_window.0 != 0 {
+                        SetForegroundWindow(main_window);
+                    }
+                    // Ensure large articles are not truncated by the default edit limit.
+                    SendMessageW(h_edit, EM_LIMITTEXT, WPARAM(0x7FFF_FFFEusize), LPARAM(0));
+
+                    // Replace the entire editor contents, then move caret to the start.
+                    // We normalize text to avoid embedded NULs (which truncate Win32 edit text)
+                    // and to reduce multiple blank lines.
+                    let cleaned = normalize_article_text(&res.text);
+                    let wide = to_wide(&cleaned);
+                    SendMessageW(h_edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
+                    SendMessageW(
+                        h_edit,
+                        EM_REPLACESEL,
+                        WPARAM(1),
+                        LPARAM(wide.as_ptr() as isize),
+                    );
+                    SendMessageW(h_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
+
+                    SetFocus(h_edit);
+                    if parent.0 != 0 {
+                        editor_manager::mark_current_document_from_rss(parent, true);
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_SHOW_ADD_DIALOG => {
+                // If the add dialog is already open, just bring it to the front.
+                let main_hwnd = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                let existing = with_state(main_hwnd, |s| s.rss_add_dialog).unwrap_or(HWND(0));
+                if existing.0 != 0 {
+                    SetForegroundWindow(existing);
+                } else {
+                    show_add_dialog(hwnd);
+                }
+                if let Err(_e) = PostMessageW(hwnd, WM_CLEAR_ADD_GUARD, WPARAM(0), LPARAM(0)) {
+                    crate::log_debug(&format!("Error: {:?}", _e));
+                }
+                LRESULT(0)
+            }
+            WM_RSS_SHOW_CONTEXT => {
+                show_context_menu_from_keyboard(hwnd);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+                if hwnd_tree.0 != 0 {
+                    SetFocus(hwnd_tree);
+                    let suppress_restore =
+                        with_rss_state(hwnd, |s| mem::take(&mut s.suppress_focus_restore_once))
+                            .unwrap_or(false);
+                    if suppress_restore {
+                        return LRESULT(0);
+                    }
+                    let last = with_rss_state(hwnd, |s| s.last_selected).unwrap_or(0);
+                    if last != 0 {
+                        SendMessageW(
+                            hwnd_tree,
+                            TVM_SELECTITEM,
+                            WPARAM(TVGN_CARET as usize),
+                            LPARAM(last),
+                        );
+                        SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(last));
+                    }
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

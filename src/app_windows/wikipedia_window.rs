@@ -182,294 +182,300 @@ unsafe extern "system" fn wikipedia_wndproc(
     crate::panic_guard::guard(
         "wikipedia_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { wikipedia_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || wikipedia_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let cs = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*cs).lpCreateParams as *mut WikipediaWindowState;
-            if init_ptr.is_null() {
-                return LRESULT(0);
-            }
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, init_ptr as isize);
+fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut WikipediaWindowState;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, init_ptr as isize);
 
-            let parent = (*init_ptr).parent;
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let label_set = labels(language);
+                let parent = (*init_ptr).parent;
+                let language =
+                    with_state(parent, |state| state.settings.language).unwrap_or_default();
+                let label_set = labels(language);
 
-            let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&label_set.search_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                12,
-                12,
-                80,
-                20,
-                hwnd,
-                HMENU(0),
-                hinstance,
-                None,
-            );
-            let input = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                90,
-                10,
-                310,
-                24,
-                hwnd,
-                HMENU(WIKIPEDIA_INPUT_ID as isize),
-                hinstance,
-                None,
-            );
-            let search = CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&label_set.search_button).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                410,
-                10,
-                100,
-                24,
-                hwnd,
-                HMENU(WIKIPEDIA_SEARCH_ID as isize),
-                hinstance,
-                None,
-            );
-            CreateWindowExW(
-                Default::default(),
-                w!("STATIC"),
-                PCWSTR(to_wide(&label_set.results_label).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                12,
-                44,
-                120,
-                20,
-                hwnd,
-                HMENU(0),
-                hinstance,
-                None,
-            );
-            let results = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_LISTBOXW,
-                PCWSTR::null(),
-                WS_CHILD
-                    | WS_VISIBLE
-                    | WS_TABSTOP
-                    | WS_VSCROLL
-                    | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT) as u32),
-                12,
-                66,
-                498,
-                260,
-                hwnd,
-                HMENU(WIKIPEDIA_RESULTS_ID as isize),
-                hinstance,
-                None,
-            );
-            let status = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE,
-                12,
-                334,
-                380,
-                20,
-                hwnd,
-                HMENU(WIKIPEDIA_STATUS_ID as isize),
-                hinstance,
-                None,
-            );
-            let close = CreateWindowExW(
-                Default::default(),
-                w!("BUTTON"),
-                PCWSTR(to_wide(&label_set.close).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                410,
-                330,
-                100,
-                26,
-                hwnd,
-                HMENU(WIKIPEDIA_CLOSE_ID as isize),
-                hinstance,
-                None,
-            );
-
-            (*init_ptr).input = input;
-            (*init_ptr).search = search;
-            (*init_ptr).results = results;
-            (*init_ptr).status = status;
-            (*init_ptr).close = close;
-            let proc_ptr = tab_subclass_proc as *const () as usize;
-            for control in [input, search, results, close] {
-                let prev = SetWindowLongPtrW(
-                    control,
-                    windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
-                    proc_ptr as isize,
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&label_set.search_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    12,
+                    80,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    hinstance,
+                    None,
                 );
-                SetWindowLongPtrW(control, GWLP_USERDATA, prev);
+                let input = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    90,
+                    10,
+                    310,
+                    24,
+                    hwnd,
+                    HMENU(WIKIPEDIA_INPUT_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let search = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&label_set.search_button).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    410,
+                    10,
+                    100,
+                    24,
+                    hwnd,
+                    HMENU(WIKIPEDIA_SEARCH_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&label_set.results_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    44,
+                    120,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    hinstance,
+                    None,
+                );
+                let results = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_LISTBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WS_VSCROLL
+                        | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT) as u32),
+                    12,
+                    66,
+                    498,
+                    260,
+                    hwnd,
+                    HMENU(WIKIPEDIA_RESULTS_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let status = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    334,
+                    380,
+                    20,
+                    hwnd,
+                    HMENU(WIKIPEDIA_STATUS_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let close = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&label_set.close).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    410,
+                    330,
+                    100,
+                    26,
+                    hwnd,
+                    HMENU(WIKIPEDIA_CLOSE_ID as isize),
+                    hinstance,
+                    None,
+                );
+
+                (*init_ptr).input = input;
+                (*init_ptr).search = search;
+                (*init_ptr).results = results;
+                (*init_ptr).status = status;
+                (*init_ptr).close = close;
+                let proc_ptr = tab_subclass_proc as *const () as usize;
+                for control in [input, search, results, close] {
+                    let prev = SetWindowLongPtrW(
+                        control,
+                        windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                        proc_ptr as isize,
+                    );
+                    SetWindowLongPtrW(control, GWLP_USERDATA, prev);
+                }
+                SetFocus(input);
+                LRESULT(0)
             }
-            SetFocus(input);
-            LRESULT(0)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                let focus = GetFocus();
-                let Some((search, close, results)) =
-                    with_window_state(hwnd, |state| (state.search, state.close, state.results))
-                else {
-                    return DefWindowProcW(hwnd, msg, wparam, lparam);
-                };
-                if focus == close {
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
                     crate::log_if_err!(DestroyWindow(hwnd));
                     return LRESULT(0);
                 }
-                if focus == search {
+                if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                    let focus = GetFocus();
+                    let Some((search, close, results)) =
+                        with_window_state(hwnd, |state| (state.search, state.close, state.results))
+                    else {
+                        return DefWindowProcW(hwnd, msg, wparam, lparam);
+                    };
+                    if focus == close {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        return LRESULT(0);
+                    }
+                    if focus == search {
+                        run_search(hwnd);
+                        return LRESULT(0);
+                    }
+                    if focus == with_window_state(hwnd, |state| state.input).unwrap_or(HWND(0)) {
+                        run_search(hwnd);
+                        return LRESULT(0);
+                    }
+                    if focus == results {
+                        start_import(hwnd);
+                        return LRESULT(0);
+                    }
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                if id == WIKIPEDIA_CLOSE_ID {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                if id == WIKIPEDIA_SEARCH_ID {
                     run_search(hwnd);
                     return LRESULT(0);
                 }
-                if focus == with_window_state(hwnd, |state| state.input).unwrap_or(HWND(0)) {
-                    run_search(hwnd);
-                    return LRESULT(0);
-                }
-                if focus == results {
+                if id == WIKIPEDIA_RESULTS_ID && ((wparam.0 >> 16) & 0xffff) == LBN_DBLCLK as usize
+                {
                     start_import(hwnd);
                     return LRESULT(0);
                 }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_COMMAND => {
-            let id = wparam.0 & 0xffff;
-            if id == WIKIPEDIA_CLOSE_ID {
-                crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
-            }
-            if id == WIKIPEDIA_SEARCH_ID {
-                run_search(hwnd);
-                return LRESULT(0);
-            }
-            if id == WIKIPEDIA_RESULTS_ID && ((wparam.0 >> 16) & 0xffff) == LBN_DBLCLK as usize {
-                start_import(hwnd);
-                return LRESULT(0);
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_WIKI_SEARCH_DONE => {
-            let generation = wparam.0;
-            if generation != SEARCH_GENERATION.load(Ordering::SeqCst) {
+            WM_WIKI_SEARCH_DONE => {
+                let generation = wparam.0;
+                if generation != SEARCH_GENERATION.load(Ordering::SeqCst) {
+                    let payload_ptr = lparam.0 as *mut SearchPayload;
+                    if !payload_ptr.is_null() {
+                        let _unused_box = Box::from_raw(payload_ptr);
+                    }
+                    return LRESULT(0);
+                }
                 let payload_ptr = lparam.0 as *mut SearchPayload;
-                if !payload_ptr.is_null() {
-                    let _unused_box = Box::from_raw(payload_ptr);
+                if payload_ptr.is_null() {
+                    return LRESULT(0);
                 }
-                return LRESULT(0);
-            }
-            let payload_ptr = lparam.0 as *mut SearchPayload;
-            if payload_ptr.is_null() {
-                return LRESULT(0);
-            }
-            let payload = unsafe { Box::from_raw(payload_ptr) };
-            let language = with_window_state(hwnd, |state| state.parent)
-                .and_then(|parent| with_state(parent, |s| s.settings.language))
-                .unwrap_or_default();
-            let label_set = labels(language);
-            let (results_hwnd, status_hwnd) =
-                with_window_state(hwnd, |state| (state.results, state.status))
-                    .unwrap_or((HWND(0), HWND(0)));
-            let results = payload.results;
-            let has_error = payload.error.is_some();
-            let is_empty = results.is_empty();
-            if results_hwnd.0 != 0 {
-                SendMessageW(results_hwnd, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
-                for item in &results {
-                    SendMessageW(
-                        results_hwnd,
-                        LB_ADDSTRING,
-                        WPARAM(0),
-                        LPARAM(to_wide(&item.title).as_ptr() as isize),
-                    );
+                let payload = Box::from_raw(payload_ptr);
+                let language = with_window_state(hwnd, |state| state.parent)
+                    .and_then(|parent| with_state(parent, |s| s.settings.language))
+                    .unwrap_or_default();
+                let label_set = labels(language);
+                let (results_hwnd, status_hwnd) =
+                    with_window_state(hwnd, |state| (state.results, state.status))
+                        .unwrap_or((HWND(0), HWND(0)));
+                let results = payload.results;
+                let has_error = payload.error.is_some();
+                let is_empty = results.is_empty();
+                if results_hwnd.0 != 0 {
+                    SendMessageW(results_hwnd, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                    for item in &results {
+                        SendMessageW(
+                            results_hwnd,
+                            LB_ADDSTRING,
+                            WPARAM(0),
+                            LPARAM(to_wide(&item.title).as_ptr() as isize),
+                        );
+                    }
+                    if !results.is_empty() {
+                        SendMessageW(results_hwnd, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+                        SetFocus(results_hwnd);
+                    }
                 }
-                if !results.is_empty() {
-                    SendMessageW(results_hwnd, LB_SETCURSEL, WPARAM(0), LPARAM(0));
-                    SetFocus(results_hwnd);
+                with_window_state(hwnd, |state| state.results_data = results);
+                let status_text = if has_error {
+                    label_set.status_search_error
+                } else if is_empty {
+                    label_set.status_no_results
+                } else {
+                    String::new()
+                };
+                if status_hwnd.0 != 0
+                    && let Err(e) =
+                        SetWindowTextW(status_hwnd, PCWSTR(to_wide(&status_text).as_ptr()))
+                {
+                    crate::log_debug(&format!("SetWindowTextW failed: {}", e));
                 }
+                LRESULT(0)
             }
-            with_window_state(hwnd, |state| state.results_data = results);
-            let status_text = if has_error {
-                label_set.status_search_error
-            } else if is_empty {
-                label_set.status_no_results
-            } else {
-                String::new()
-            };
-            if status_hwnd.0 != 0
-                && let Err(e) = SetWindowTextW(status_hwnd, PCWSTR(to_wide(&status_text).as_ptr()))
-            {
-                crate::log_debug(&format!("SetWindowTextW failed: {}", e));
-            }
-            LRESULT(0)
-        }
-        WM_WIKI_IMPORT_DONE => {
-            let generation = wparam.0;
-            if generation != IMPORT_GENERATION.load(Ordering::SeqCst) {
+            WM_WIKI_IMPORT_DONE => {
+                let generation = wparam.0;
+                if generation != IMPORT_GENERATION.load(Ordering::SeqCst) {
+                    let payload_ptr = lparam.0 as *mut ImportPayload;
+                    if !payload_ptr.is_null() {
+                        let _unused_box = Box::from_raw(payload_ptr);
+                    }
+                    return LRESULT(0);
+                }
                 let payload_ptr = lparam.0 as *mut ImportPayload;
-                if !payload_ptr.is_null() {
-                    let _unused_box = Box::from_raw(payload_ptr);
+                if payload_ptr.is_null() {
+                    return LRESULT(0);
                 }
-                return LRESULT(0);
+                let payload = Box::from_raw(payload_ptr);
+                let parent = with_window_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+                let language =
+                    with_state(parent, |state| state.settings.language).unwrap_or_default();
+                let label_set = labels(language);
+                if let Some(error) = payload.error {
+                    show_error(
+                        parent,
+                        language,
+                        &format!("{} {error}", label_set.status_import_error),
+                    );
+                    return LRESULT(0);
+                }
+                let text = if let Some(ref text) = payload.text {
+                    text
+                } else {
+                    show_error(parent, language, &label_set.status_import_error);
+                    return LRESULT(0);
+                };
+                if !apply_import_text(parent, text) {
+                    show_error(parent, language, &label_set.status_import_error);
+                    return LRESULT(0);
+                }
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
             }
-            let payload_ptr = lparam.0 as *mut ImportPayload;
-            if payload_ptr.is_null() {
-                return LRESULT(0);
+            WM_DESTROY => LRESULT(0),
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WikipediaWindowState;
+                if !ptr.is_null() {
+                    let state = Box::from_raw(ptr);
+                    with_state(state.parent, |s| s.wikipedia_window = HWND(0));
+                }
+                LRESULT(0)
             }
-            let payload = unsafe { Box::from_raw(payload_ptr) };
-            let parent = with_window_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-            let label_set = labels(language);
-            if let Some(error) = payload.error {
-                show_error(
-                    parent,
-                    language,
-                    &format!("{} {error}", label_set.status_import_error),
-                );
-                return LRESULT(0);
-            }
-            let text = if let Some(ref text) = payload.text {
-                text
-            } else {
-                show_error(parent, language, &label_set.status_import_error);
-                return LRESULT(0);
-            };
-            if !apply_import_text(parent, text) {
-                show_error(parent, language, &label_set.status_import_error);
-                return LRESULT(0);
-            }
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        WM_DESTROY => LRESULT(0),
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WikipediaWindowState;
-            if !ptr.is_null() {
-                let state = unsafe { Box::from_raw(ptr) };
-                with_state(state.parent, |s| s.wikipedia_window = HWND(0));
-            }
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

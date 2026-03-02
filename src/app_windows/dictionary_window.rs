@@ -594,355 +594,354 @@ unsafe extern "system" fn dictionary_entry_wndproc(
     crate::panic_guard::guard(
         "dictionary_entry_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { dictionary_entry_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || dictionary_entry_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn dictionary_entry_wndproc_inner(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let state_ptr = (*create_struct).lpCreateParams as *mut DictionaryEntryState;
-            if state_ptr.is_null() {
-                return LRESULT(0);
-            }
-            let mut state = unsafe { Box::from_raw(state_ptr) };
-            let language = with_state(state.parent, |s| s.settings.language).unwrap_or_default();
-            let labels = dictionary_labels(language);
-            let hfont = with_state(state.parent, |s| s.hfont).unwrap_or(HFONT(0));
-
-            let label_original = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.entry_original).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                10,
-                380,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_original = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                10,
-                32,
-                380,
-                24,
-                hwnd,
-                HMENU(DICT_ENTRY_ID_ORIGINAL as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let label_replacement = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.entry_replacement).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                10,
-                64,
-                380,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let edit_replacement = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                10,
-                86,
-                380,
-                24,
-                hwnd,
-                HMENU(DICT_ENTRY_ID_REPLACEMENT as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            // Voice controls
-            let checkbox_use_voice = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.entry_use_voice).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                10,
-                120,
-                380,
-                20,
-                hwnd,
-                HMENU(DICT_ENTRY_ID_USE_VOICE as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let label_engine = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.entry_engine).as_ptr()),
-                WS_CHILD,
-                10,
-                150,
-                120,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_engine = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                140,
-                148,
-                250,
-                120,
-                hwnd,
-                HMENU(DICT_ENTRY_ID_ENGINE as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let label_voice = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.entry_voice).as_ptr()),
-                WS_CHILD,
-                10,
-                185,
-                120,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-            let combo_voice = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                140,
-                183,
-                250,
-                200,
-                hwnd,
-                HMENU(DICT_ENTRY_ID_VOICE as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let button_preview = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.entry_preview).as_ptr()),
-                WS_CHILD | WS_TABSTOP,
-                140,
-                218,
-                250,
-                26,
-                hwnd,
-                HMENU(DICT_ENTRY_ID_PREVIEW as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            // Populate engine combo
-            SendMessageW(
-                combo_engine,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
-            );
-            SendMessageW(
-                combo_engine,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
-            );
-            SendMessageW(
-                combo_engine,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
-            );
-            SendMessageW(combo_engine, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-
-            let ok_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.entry_ok).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                200,
-                290,
-                90,
-                28,
-                hwnd,
-                HMENU(DICT_ENTRY_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
-            let cancel_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.entry_cancel).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                300,
-                290,
-                90,
-                28,
-                hwnd,
-                HMENU(DICT_ENTRY_ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            for ctrl in [
-                label_original,
-                edit_original,
-                label_replacement,
-                edit_replacement,
-                checkbox_use_voice,
-                label_engine,
-                combo_engine,
-                label_voice,
-                combo_voice,
-                button_preview,
-                ok_button,
-                cancel_button,
-            ] {
-                if ctrl.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let state_ptr = (*create_struct).lpCreateParams as *mut DictionaryEntryState;
+                if state_ptr.is_null() {
+                    return LRESULT(0);
                 }
-            }
+                let mut state = Box::from_raw(state_ptr);
+                let language =
+                    with_state(state.parent, |s| s.settings.language).unwrap_or_default();
+                let labels = dictionary_labels(language);
+                let hfont = with_state(state.parent, |s| s.hfont).unwrap_or(HFONT(0));
 
-            // Load existing entry data if editing
-            let saved_voice: Option<String> = if let Some(index) = state.index
-                && let Some(entry) =
-                    with_state(state.parent, |s| s.settings.dictionary.get(index).cloned())
-                        .unwrap_or(None)
-            {
-                if let Err(_e) =
-                    SetWindowTextW(edit_original, PCWSTR(to_wide(&entry.original).as_ptr()))
-                {
-                    crate::log_debug(&format!("Failed to set edit_original text: {:?}", _e));
-                }
-                if let Err(_e) = SetWindowTextW(
+                let label_original = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.entry_original).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    10,
+                    380,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_original = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    10,
+                    32,
+                    380,
+                    24,
+                    hwnd,
+                    HMENU(DICT_ENTRY_ID_ORIGINAL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let label_replacement = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.entry_replacement).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    64,
+                    380,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_replacement = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    10,
+                    86,
+                    380,
+                    24,
+                    hwnd,
+                    HMENU(DICT_ENTRY_ID_REPLACEMENT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                // Voice controls
+                let checkbox_use_voice = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.entry_use_voice).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    10,
+                    120,
+                    380,
+                    20,
+                    hwnd,
+                    HMENU(DICT_ENTRY_ID_USE_VOICE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let label_engine = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.entry_engine).as_ptr()),
+                    WS_CHILD,
+                    10,
+                    150,
+                    120,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_engine = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    140,
+                    148,
+                    250,
+                    120,
+                    hwnd,
+                    HMENU(DICT_ENTRY_ID_ENGINE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let label_voice = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.entry_voice).as_ptr()),
+                    WS_CHILD,
+                    10,
+                    185,
+                    120,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_voice = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    140,
+                    183,
+                    250,
+                    200,
+                    hwnd,
+                    HMENU(DICT_ENTRY_ID_VOICE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let button_preview = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.entry_preview).as_ptr()),
+                    WS_CHILD | WS_TABSTOP,
+                    140,
+                    218,
+                    250,
+                    26,
+                    hwnd,
+                    HMENU(DICT_ENTRY_ID_PREVIEW as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                // Populate engine combo
+                SendMessageW(
+                    combo_engine,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.engine_edge).as_ptr() as isize),
+                );
+                SendMessageW(
+                    combo_engine,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.engine_sapi5).as_ptr() as isize),
+                );
+                SendMessageW(
+                    combo_engine,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
+                );
+                SendMessageW(combo_engine, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+
+                let ok_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.entry_ok).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    200,
+                    290,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(DICT_ENTRY_ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let cancel_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.entry_cancel).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    300,
+                    290,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(DICT_ENTRY_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                for ctrl in [
+                    label_original,
+                    edit_original,
+                    label_replacement,
                     edit_replacement,
-                    PCWSTR(to_wide(&entry.replacement).as_ptr()),
-                ) {
-                    crate::log_debug(&format!("Failed to set edit_replacement text: {:?}", _e));
+                    checkbox_use_voice,
+                    label_engine,
+                    combo_engine,
+                    label_voice,
+                    combo_voice,
+                    button_preview,
+                    ok_button,
+                    cancel_button,
+                ] {
+                    if ctrl.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
                 }
-                None
-            } else {
-                None
-            };
 
-            state.edit_original = edit_original;
-            state.edit_replacement = edit_replacement;
-            state.ok_button = ok_button;
-            state.checkbox_use_voice = checkbox_use_voice;
-            state.label_engine = label_engine;
-            state.combo_engine = combo_engine;
-            state.label_voice = label_voice;
-            state.combo_voice = combo_voice;
-            state.button_preview = button_preview;
+                // Load existing entry data if editing
+                let saved_voice: Option<String> = if let Some(index) = state.index
+                    && let Some(entry) =
+                        with_state(state.parent, |s| s.settings.dictionary.get(index).cloned())
+                            .unwrap_or(None)
+                {
+                    if let Err(_e) =
+                        SetWindowTextW(edit_original, PCWSTR(to_wide(&entry.original).as_ptr()))
+                    {
+                        crate::log_debug(&format!("Failed to set edit_original text: {:?}", _e));
+                    }
+                    if let Err(_e) = SetWindowTextW(
+                        edit_replacement,
+                        PCWSTR(to_wide(&entry.replacement).as_ptr()),
+                    ) {
+                        crate::log_debug(&format!("Failed to set edit_replacement text: {:?}", _e));
+                    }
+                    None
+                } else {
+                    None
+                };
 
-            let state_ptr = Box::into_raw(state);
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, state_ptr as isize);
+                state.edit_original = edit_original;
+                state.edit_replacement = edit_replacement;
+                state.ok_button = ok_button;
+                state.checkbox_use_voice = checkbox_use_voice;
+                state.label_engine = label_engine;
+                state.combo_engine = combo_engine;
+                state.label_voice = label_voice;
+                state.combo_voice = combo_voice;
+                state.button_preview = button_preview;
 
-            // Populate voice combo and update visibility
-            populate_entry_voice_combo(hwnd, saved_voice.as_deref());
-            update_voice_controls_visibility(hwnd);
+                let state_ptr = Box::into_raw(state);
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, state_ptr as isize);
 
-            SetFocus(edit_original);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            match cmd_id {
-                DICT_ENTRY_ID_OK => {
-                    apply_entry_dialog(hwnd);
-                    LRESULT(0)
+                // Populate voice combo and update visibility
+                populate_entry_voice_combo(hwnd, saved_voice.as_deref());
+                update_voice_controls_visibility(hwnd);
+
+                SetFocus(edit_original);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                match cmd_id {
+                    DICT_ENTRY_ID_OK => {
+                        apply_entry_dialog(hwnd);
+                        LRESULT(0)
+                    }
+                    cmd if cmd == IDOK.0 as usize => {
+                        apply_entry_dialog(hwnd);
+                        LRESULT(0)
+                    }
+                    DICT_ENTRY_ID_CANCEL | 2 => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    DICT_ENTRY_ID_USE_VOICE => {
+                        update_voice_controls_visibility(hwnd);
+                        LRESULT(0)
+                    }
+                    DICT_ENTRY_ID_ENGINE => {
+                        populate_entry_voice_combo(hwnd, None);
+                        LRESULT(0)
+                    }
+                    DICT_ENTRY_ID_PREVIEW => {
+                        preview_entry_voice(hwnd);
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
-                cmd if cmd == IDOK.0 as usize => {
-                    apply_entry_dialog(hwnd);
-                    LRESULT(0)
-                }
-                DICT_ENTRY_ID_CANCEL | 2 => {
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
                     crate::log_if_err!(DestroyWindow(hwnd));
-                    LRESULT(0)
+                    return LRESULT(0);
                 }
-                DICT_ENTRY_ID_USE_VOICE => {
-                    update_voice_controls_visibility(hwnd);
-                    LRESULT(0)
-                }
-                DICT_ENTRY_ID_ENGINE => {
-                    populate_entry_voice_combo(hwnd, None);
-                    LRESULT(0)
-                }
-                DICT_ENTRY_ID_PREVIEW => {
-                    preview_entry_voice(hwnd);
-                    LRESULT(0)
-                }
-                _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+            WM_CLOSE => {
                 crate::log_if_err!(DestroyWindow(hwnd));
-                return LRESULT(0);
+                LRESULT(0)
             }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            let (owner, parent) =
-                with_entry_state(hwnd, |s| (s.owner, s.parent)).unwrap_or((HWND(0), HWND(0)));
-            if owner.0 != 0 {
-                EnableWindow(owner, true);
-                SetForegroundWindow(owner);
-                if let Err(_e) = PostMessageW(owner, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0)) {
-                    crate::log_debug(&format!("Error: {:?}", _e));
+            WM_DESTROY => {
+                let (owner, parent) =
+                    with_entry_state(hwnd, |s| (s.owner, s.parent)).unwrap_or((HWND(0), HWND(0)));
+                if owner.0 != 0 {
+                    EnableWindow(owner, true);
+                    SetForegroundWindow(owner);
+                    if let Err(_e) = PostMessageW(owner, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0))
+                    {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
                 }
+                if parent.0 != 0
+                    && with_state(parent, |state| {
+                        state.dictionary_entry_dialog = HWND(0);
+                    })
+                    .is_none()
+                {
+                    crate::log_debug("Failed to access dictionary state");
+                }
+                LRESULT(0)
             }
-            if parent.0 != 0
-                && with_state(parent, |state| {
-                    state.dictionary_entry_dialog = HWND(0);
-                })
-                .is_none()
-            {
-                crate::log_debug("Failed to access dictionary state");
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryEntryState;
+                if !ptr.is_null() {
+                    let _unused_box = Box::from_raw(ptr);
+                }
+                LRESULT(0)
             }
-            LRESULT(0)
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryEntryState;
-            if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
-            }
-            LRESULT(0)
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

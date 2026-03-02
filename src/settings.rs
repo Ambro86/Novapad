@@ -319,6 +319,8 @@ pub struct ShortcutSettings {
     pub unquote_lines: ShortcutBinding,
     pub media_prev: ShortcutBinding,
     pub media_next: ShortcutBinding,
+    pub chapter_prev: ShortcutBinding,
+    pub chapter_next: ShortcutBinding,
 }
 
 impl Default for ShortcutSettings {
@@ -344,6 +346,8 @@ impl Default for ShortcutSettings {
             unquote_lines: ShortcutBinding::new(true, true, false, 'Q' as u16),
             media_prev: ShortcutBinding::new(true, false, false, VK_PRIOR.0),
             media_next: ShortcutBinding::new(true, false, false, VK_NEXT.0),
+            chapter_prev: ShortcutBinding::new(true, false, true, VK_PRIOR.0),
+            chapter_next: ShortcutBinding::new(true, false, true, VK_NEXT.0),
         }
     }
 }

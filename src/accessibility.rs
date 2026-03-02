@@ -91,6 +91,12 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
             vk if ctrl_down && !alt_down && !shift_down && vk == VK_NEXT.0 as u32 => {
                 PlayerCommand::TrackNext
             }
+            vk if ctrl_down && alt_down && !shift_down && vk == VK_PRIOR.0 as u32 => {
+                PlayerCommand::ChapterPrev
+            }
+            vk if ctrl_down && alt_down && !shift_down && vk == VK_NEXT.0 as u32 => {
+                PlayerCommand::ChapterNext
+            }
             vk if ctrl_down && !alt_down && !shift_down && vk == 'T' as u32 => {
                 PlayerCommand::GoToTime
             }
@@ -124,7 +130,11 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
             vk if vk == VK_ESCAPE.0 as u32 => PlayerCommand::Stop,
             vk if vk == 'M' as u32 => PlayerCommand::MuteToggle,
             // Block navigation to prevent screen reader noise
-            vk if vk == VK_PRIOR.0 as u32 || vk == VK_NEXT.0 as u32 => {
+            vk if !ctrl_down
+                && !alt_down
+                && !shift_down
+                && (vk == VK_PRIOR.0 as u32 || vk == VK_NEXT.0 as u32) =>
+            {
                 PlayerCommand::BlockNavigation
             }
             _ => PlayerCommand::None,

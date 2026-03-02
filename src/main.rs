@@ -993,16 +993,30 @@ pub(crate) fn set_active_podcast_episode_info(
     title: Option<String>,
     cache_path: Option<PathBuf>,
 ) {
-    if url.is_some() {
+    if let Some(url_value) = url {
         unsafe {
+            let has_pending_chapters =
+                with_state(hwnd, |state| state.pending_podcast_chapters_key.is_some())
+                    .unwrap_or(false);
             if with_state(hwnd, |state| {
-                state.active_podcast_episode_url = url;
+                state.active_podcast_episode_url = Some(url_value.clone());
                 state.active_podcast_episode_title = title;
                 state.active_podcast_episode_cache = cache_path;
             })
             .is_none()
             {
                 crate::log_debug("Failed to set active podcast episode info");
+            }
+
+            if !has_pending_chapters {
+                let chapters_url = extract_embedded_chapters_url(&url_value)
+                    .or_else(|| extract_buzzsprout_chapters_url(&url_value));
+                if let Some(chapters_url) = chapters_url {
+                    let key = format!("url_chapters:{url_value}");
+                    set_pending_podcast_chapters_key(hwnd, Some(key.clone()));
+                    prefetch_podcast_chapters(hwnd, key, chapters_url);
+                    activate_pending_podcast_chapters(hwnd);
+                }
             }
         }
     }
@@ -1353,7 +1367,7 @@ fn fetch_chapters_with_fallback(
     }
 }
 
-fn extract_embedded_chapters_url(url: &str) -> Option<String> {
+pub(crate) fn extract_embedded_chapters_url(url: &str) -> Option<String> {
     let marker = "/chapters/";
     let idx = url.rfind(marker)?;
     let tail = &url[idx + marker.len()..];
@@ -1362,6 +1376,25 @@ fn extract_embedded_chapters_url(url: &str) -> Option<String> {
     } else {
         None
     }
+}
+
+pub(crate) fn extract_buzzsprout_chapters_url(url: &str) -> Option<String> {
+    // Supports direct Buzzsprout URLs and wrapped URLs (e.g. op3.dev/.../www.buzzsprout.com/...).
+    // Expected pattern: ".../<show_id>/episodes/<episode_id>-...".
+    let marker = "/episodes/";
+    let episode_idx = url.find(marker)?;
+    let before = &url[..episode_idx];
+    let show_id = before
+        .rsplit('/')
+        .find(|seg| !seg.is_empty() && seg.chars().all(|c| c.is_ascii_digit()))?;
+    let after = &url[episode_idx + marker.len()..];
+    let episode_id: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+    if episode_id.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "https://www.buzzsprout.com/{show_id}/{episode_id}/chapters.json"
+    ))
 }
 
 fn announce_player_time(hwnd: HWND) {
@@ -1506,29 +1539,73 @@ fn seek_to_chapter_index(hwnd: HWND, chapters: &[Chapter], index: usize) {
         "podcast_chapter_seek index={} start_ms={} title={}",
         index, chapter.start_ms, chapter.title
     ));
+    let target_secs = chapter.start_ms.saturating_add(999) / 1000;
     unsafe {
-        crate::log_if_err!(seek_audiobook_to(hwnd, chapter.start_ms / 1000));
-        update_chapter_announcement(hwnd);
+        match seek_audiobook_to(hwnd, target_secs) {
+            Ok(()) => {
+                let language = if let Some(lang) = with_state(hwnd, |state| {
+                    state.last_announced_chapter_index = Some(index);
+                    state.settings.language
+                }) {
+                    lang
+                } else {
+                    crate::log_debug("Failed to update last announced chapter index after seek");
+                    Language::default()
+                };
+                // Announce target chapter immediately; avoid recomputing from position too early
+                // because some backends can report the old position for a short time after seek.
+                let message = i18n::tr_f(
+                    language,
+                    "playback.chapter_announce",
+                    &[("title", &chapter.title)],
+                );
+                nvda_speak(&message);
+            }
+            Err(err) => crate::log_debug(&format!("podcast_chapter_seek_error {}", err)),
+        }
     }
 }
 
 fn handle_chapter_navigation(hwnd: HWND, direction: i32) {
-    let (chapters, language, current_pos_ms) = unsafe {
+    let (chapters, language, current_pos_ms, last_idx) = unsafe {
         with_state(hwnd, |state| {
             (
                 state.active_podcast_chapters.clone(),
                 state.settings.language,
                 audiobook_position_ms_from_state(state),
+                state.last_announced_chapter_index,
             )
         })
     }
-    .unwrap_or((Vec::new(), Language::default(), None));
+    .unwrap_or((Vec::new(), Language::default(), None, None));
     if chapters.is_empty() {
         announce_chapters_unavailable(language);
         return;
     }
     let current_idx = current_pos_ms
-        .and_then(|pos| crate::podcast::chapters::current_chapter_index(pos, &chapters));
+        .and_then(|pos| crate::podcast::chapters::current_chapter_index(pos, &chapters))
+        .or(last_idx);
+    if direction < 0 && matches!(current_idx, Some(0)) {
+        unsafe {
+            match seek_audiobook_to(hwnd, 0) {
+                Ok(()) => {
+                    if with_state(hwnd, |state| {
+                        // Intro segment before first chapter: no active chapter index.
+                        state.last_announced_chapter_index = None;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug(
+                            "Failed to clear last announced chapter index after intro seek",
+                        );
+                    }
+                }
+                Err(err) => crate::log_debug(&format!("podcast_chapter_intro_seek_error {}", err)),
+            }
+        }
+        return;
+    }
+
     let target = if direction > 0 {
         match current_idx {
             Some(idx) if idx + 1 < chapters.len() => Some(idx + 1),
@@ -8288,6 +8365,14 @@ unsafe fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     }
     if shortcut_matches_message(shortcuts.media_next, msg) {
         dispatch_shortcut_command(hwnd, IDM_PLAYBACK_TRACK_NEXT);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.chapter_prev, msg) {
+        dispatch_shortcut_command(hwnd, IDM_PLAYBACK_CHAPTER_PREV);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.chapter_next, msg) {
+        dispatch_shortcut_command(hwnd, IDM_PLAYBACK_CHAPTER_NEXT);
         return true;
     }
     false

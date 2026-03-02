@@ -457,6 +457,9 @@ unsafe fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
             }
             if parent.0 != 0 {
                 EnableWindow(parent, true);
+                // Keep focus within Sonarpad when progress dialogs close (e.g. streaming
+                // download -> conversion handoff), avoiding transient desktop focus.
+                SetForegroundWindow(parent);
                 if let Err(_e) = PostMessageW(parent, WM_PODCAST_SAVE_CLOSED, WPARAM(0), LPARAM(0))
                 {
                     crate::log_debug(&format!("Error: {:?}", _e));

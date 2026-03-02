@@ -232,10 +232,12 @@ enum ShortcutAction {
     UnquoteLines,
     MediaPrev,
     MediaNext,
+    ChapterPrev,
+    ChapterNext,
 }
 
 impl ShortcutAction {
-    const ALL: [ShortcutAction; 20] = [
+    const ALL: [ShortcutAction; 22] = [
         ShortcutAction::ReadPauseResume,
         ShortcutAction::ReadStart,
         ShortcutAction::ReadStop,
@@ -256,54 +258,60 @@ impl ShortcutAction {
         ShortcutAction::UnquoteLines,
         ShortcutAction::MediaPrev,
         ShortcutAction::MediaNext,
+        ShortcutAction::ChapterPrev,
+        ShortcutAction::ChapterNext,
     ];
 }
 
-fn shortcut_action_label(language: Language, action: ShortcutAction) -> &'static str {
+fn shortcut_action_label(language: Language, action: ShortcutAction) -> String {
     match language {
         Language::Italian => match action {
-            ShortcutAction::ReadPauseResume => "Pausa/riprendi lettura",
-            ShortcutAction::ReadStart => "Avvia lettura",
-            ShortcutAction::ReadStop => "Ferma lettura",
-            ShortcutAction::ExecuteFile => "Esegui file",
-            ShortcutAction::Audiobook => "Registra audiolibro",
-            ShortcutAction::BatchAudiobooks => "Registra audiolibri batch",
-            ShortcutAction::RecordPodcast => "Registra podcast",
-            ShortcutAction::ConvertAudio => "Converti audio",
-            ShortcutAction::OpenRss => "Apri RSS",
-            ShortcutAction::OpenPodcasts => "Apri podcast",
-            ShortcutAction::OpenDictionary => "Apri dizionario",
-            ShortcutAction::OpenOptions => "Apri opzioni",
-            ShortcutAction::OpenTerminal => "Apri terminale",
-            ShortcutAction::ImportWikipedia => "Cerca e importa da Wikipedia",
-            ShortcutAction::ImportYoutube => "Importa trascrizione YouTube",
-            ShortcutAction::Find => "Trova",
-            ShortcutAction::QuoteLines => "Commenta righe",
-            ShortcutAction::UnquoteLines => "Decommenta righe",
-            ShortcutAction::MediaPrev => "Brano precedente",
-            ShortcutAction::MediaNext => "Brano successivo",
+            ShortcutAction::ReadPauseResume => "Pausa/riprendi lettura".to_string(),
+            ShortcutAction::ReadStart => "Avvia lettura".to_string(),
+            ShortcutAction::ReadStop => "Ferma lettura".to_string(),
+            ShortcutAction::ExecuteFile => "Esegui file".to_string(),
+            ShortcutAction::Audiobook => "Registra audiolibro".to_string(),
+            ShortcutAction::BatchAudiobooks => "Registra audiolibri batch".to_string(),
+            ShortcutAction::RecordPodcast => "Registra podcast".to_string(),
+            ShortcutAction::ConvertAudio => "Converti audio".to_string(),
+            ShortcutAction::OpenRss => "Apri RSS".to_string(),
+            ShortcutAction::OpenPodcasts => "Apri podcast".to_string(),
+            ShortcutAction::OpenDictionary => "Apri dizionario".to_string(),
+            ShortcutAction::OpenOptions => "Apri opzioni".to_string(),
+            ShortcutAction::OpenTerminal => "Apri terminale".to_string(),
+            ShortcutAction::ImportWikipedia => "Cerca e importa da Wikipedia".to_string(),
+            ShortcutAction::ImportYoutube => "Importa trascrizione YouTube".to_string(),
+            ShortcutAction::Find => "Trova".to_string(),
+            ShortcutAction::QuoteLines => "Commenta righe".to_string(),
+            ShortcutAction::UnquoteLines => "Decommenta righe".to_string(),
+            ShortcutAction::MediaPrev => "Brano precedente".to_string(),
+            ShortcutAction::MediaNext => "Brano successivo".to_string(),
+            ShortcutAction::ChapterPrev => i18n::tr(language, "playback.chapter_prev"),
+            ShortcutAction::ChapterNext => i18n::tr(language, "playback.chapter_next"),
         },
         _ => match action {
-            ShortcutAction::ReadPauseResume => "Pause/resume reading",
-            ShortcutAction::ReadStart => "Start reading",
-            ShortcutAction::ReadStop => "Stop reading",
-            ShortcutAction::ExecuteFile => "Execute file",
-            ShortcutAction::Audiobook => "Record audiobook",
-            ShortcutAction::BatchAudiobooks => "Batch audiobooks",
-            ShortcutAction::RecordPodcast => "Record podcast",
-            ShortcutAction::ConvertAudio => "Convert audio",
-            ShortcutAction::OpenRss => "Open RSS",
-            ShortcutAction::OpenPodcasts => "Open podcasts",
-            ShortcutAction::OpenDictionary => "Open dictionary",
-            ShortcutAction::OpenOptions => "Open options",
-            ShortcutAction::OpenTerminal => "Open terminal",
-            ShortcutAction::ImportWikipedia => "Search and import from Wikipedia",
-            ShortcutAction::ImportYoutube => "Import YouTube transcript",
-            ShortcutAction::Find => "Find",
-            ShortcutAction::QuoteLines => "Quote lines",
-            ShortcutAction::UnquoteLines => "Unquote lines",
-            ShortcutAction::MediaPrev => "Previous track",
-            ShortcutAction::MediaNext => "Next track",
+            ShortcutAction::ReadPauseResume => "Pause/resume reading".to_string(),
+            ShortcutAction::ReadStart => "Start reading".to_string(),
+            ShortcutAction::ReadStop => "Stop reading".to_string(),
+            ShortcutAction::ExecuteFile => "Execute file".to_string(),
+            ShortcutAction::Audiobook => "Record audiobook".to_string(),
+            ShortcutAction::BatchAudiobooks => "Batch audiobooks".to_string(),
+            ShortcutAction::RecordPodcast => "Record podcast".to_string(),
+            ShortcutAction::ConvertAudio => "Convert audio".to_string(),
+            ShortcutAction::OpenRss => "Open RSS".to_string(),
+            ShortcutAction::OpenPodcasts => "Open podcasts".to_string(),
+            ShortcutAction::OpenDictionary => "Open dictionary".to_string(),
+            ShortcutAction::OpenOptions => "Open options".to_string(),
+            ShortcutAction::OpenTerminal => "Open terminal".to_string(),
+            ShortcutAction::ImportWikipedia => "Search and import from Wikipedia".to_string(),
+            ShortcutAction::ImportYoutube => "Import YouTube transcript".to_string(),
+            ShortcutAction::Find => "Find".to_string(),
+            ShortcutAction::QuoteLines => "Quote lines".to_string(),
+            ShortcutAction::UnquoteLines => "Unquote lines".to_string(),
+            ShortcutAction::MediaPrev => "Previous track".to_string(),
+            ShortcutAction::MediaNext => "Next track".to_string(),
+            ShortcutAction::ChapterPrev => i18n::tr(language, "playback.chapter_prev"),
+            ShortcutAction::ChapterNext => i18n::tr(language, "playback.chapter_next"),
         },
     }
 }
@@ -417,6 +425,8 @@ fn shortcut_binding_for_action(
         ShortcutAction::UnquoteLines => settings.unquote_lines,
         ShortcutAction::MediaPrev => settings.media_prev,
         ShortcutAction::MediaNext => settings.media_next,
+        ShortcutAction::ChapterPrev => settings.chapter_prev,
+        ShortcutAction::ChapterNext => settings.chapter_next,
     }
 }
 
@@ -446,6 +456,8 @@ fn set_shortcut_binding_for_action(
         ShortcutAction::UnquoteLines => settings.unquote_lines = binding,
         ShortcutAction::MediaPrev => settings.media_prev = binding,
         ShortcutAction::MediaNext => settings.media_next = binding,
+        ShortcutAction::ChapterPrev => settings.chapter_prev = binding,
+        ShortcutAction::ChapterNext => settings.chapter_next = binding,
     }
 }
 
@@ -551,7 +563,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                         let message = i18n::tr_f(
                             language,
                             "options.shortcuts.duplicate_error",
-                            &[("shortcut", &shortcut), ("action", conflict_label)],
+                            &[("shortcut", &shortcut), ("action", &conflict_label)],
                         );
                         (language, message)
                     },
@@ -4885,7 +4897,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                                 let message = i18n::tr_f(
                                     language,
                                     "options.shortcuts.duplicate_error",
-                                    &[("shortcut", &shortcut), ("action", conflict_label)],
+                                    &[("shortcut", &shortcut), ("action", &conflict_label)],
                                 );
                                 (language, message)
                             },
@@ -6567,7 +6579,7 @@ unsafe fn initialize_options_dialog(hwnd: HWND) {
             combo_shortcut_action,
             CB_ADDSTRING,
             WPARAM(0),
-            LPARAM(to_wide(shortcut_action_label(settings.language, action)).as_ptr() as isize),
+            LPARAM(to_wide(&shortcut_action_label(settings.language, action)).as_ptr() as isize),
         );
     }
     SendMessageW(combo_shortcut_action, CB_SETCURSEL, WPARAM(0), LPARAM(0));

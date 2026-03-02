@@ -23,13 +23,13 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
     CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT,
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL,
-    ES_MULTILINE, ES_READONLY, FindWindowExW, GWLP_USERDATA, GetMessageW, GetWindowLongPtrW, HMENU,
-    IDC_ARROW, IDYES, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MSG,
-    MessageBoxW, PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
-    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    ES_MULTILINE, ES_READONLY, FindWindowExW, GWLP_USERDATA, GetForegroundWindow, GetMessageW,
+    GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, LoadCursorW,
+    MB_ICONQUESTION, MB_YESNO, MSG, MessageBoxW, PM_REMOVE, PeekMessageW, PostMessageW,
+    RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, ShowWindow, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -2217,6 +2217,30 @@ fn pump_messages_detect_stream_cancel(parent: HWND, dialog: HWND) -> bool {
     cancelled
 }
 
+fn keep_stream_progress_focus(dialog: HWND) {
+    unsafe {
+        if dialog.0 == 0 || !IsWindow(dialog).as_bool() {
+            return;
+        }
+        let fg = GetForegroundWindow();
+        let dialog_is_foreground = fg == dialog || (fg.0 != 0 && IsChild(dialog, fg).as_bool());
+        if !dialog_is_foreground {
+            SetForegroundWindow(dialog);
+        }
+        let focus = GetFocus();
+        let dialog_has_focus =
+            focus == dialog || (focus.0 != 0 && IsChild(dialog, focus).as_bool());
+        if !dialog_has_focus {
+            let label = FindWindowExW(dialog, HWND(0), w!("EDIT"), PCWSTR::null());
+            if label.0 != 0 {
+                SetFocus(label);
+            } else {
+                SetFocus(dialog);
+            }
+        }
+    }
+}
+
 fn parse_ytdlp_progress_pct(line: &str) -> Option<u32> {
     let marker = line.find('%')?;
     let before = &line[..marker];
@@ -2491,8 +2515,13 @@ fn probe_stream_audio_tracks_responsive(
     let ytdlp = ytdlp_path.to_path_buf();
     let url = url.to_string();
     let worker = std::thread::spawn(move || probe_stream_audio_tracks(&ytdlp, &url));
+    let mut last_focus_keepalive = std::time::Instant::now();
     while !worker.is_finished() {
         ignore_bool(pump_messages_detect_stream_cancel(parent, progress));
+        if last_focus_keepalive.elapsed() > std::time::Duration::from_millis(300) {
+            keep_stream_progress_focus(progress);
+            last_focus_keepalive = std::time::Instant::now();
+        }
         std::thread::sleep(std::time::Duration::from_millis(30));
     }
     close_progress_dialog(progress);
@@ -3092,6 +3121,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     let mut stalled = false;
     let mut last_progress_at = std::time::Instant::now();
     let mut reached_100_at: Option<std::time::Instant> = None;
+    let mut last_focus_keepalive = std::time::Instant::now();
     let _status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break Some(status),
@@ -3119,6 +3149,10 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 if ui_pct < ui_target_pct {
                     ui_pct = (ui_pct + 1).min(ui_target_pct);
                     report_progress(progress, ui_pct);
+                }
+                if last_focus_keepalive.elapsed() > std::time::Duration::from_millis(300) {
+                    keep_stream_progress_focus(progress);
+                    last_focus_keepalive = std::time::Instant::now();
                 }
                 if allow_early_finalize
                     && reached_100_at
@@ -3280,6 +3314,12 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                                             let _unused = retry_child.kill();
                                             return;
                                         }
+                                        if last_focus_keepalive.elapsed()
+                                            > std::time::Duration::from_millis(300)
+                                        {
+                                            keep_stream_progress_focus(progress);
+                                            last_focus_keepalive = std::time::Instant::now();
+                                        }
                                         if retry_start.elapsed()
                                             > std::time::Duration::from_secs(
                                                 STREAM_RETRY_TIMEOUT_SECS,
@@ -3404,9 +3444,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         }
         return;
     };
-    report_progress(progress, 100);
-    close_progress_dialog(progress);
-
     let final_path = if let Some(convert_settings) = dialog_data
         .format
         .as_audio_convert_settings(dialog_data.quality)
@@ -3428,7 +3465,11 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 "stream_audio.progress_converting",
                 false,
             );
+            keep_stream_progress_focus(converting_progress);
+            report_progress(progress, 100);
+            close_progress_dialog(progress);
             let mut last_pump = std::time::Instant::now();
+            let mut last_focus_keepalive = std::time::Instant::now();
             let mut progress_cb = |pct| {
                 report_progress(converting_progress, pct);
                 // Keep window responsive during in-process conversion on slower machines.
@@ -3438,6 +3479,10 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                         converting_progress,
                     ));
                     last_pump = std::time::Instant::now();
+                }
+                if last_focus_keepalive.elapsed() >= std::time::Duration::from_millis(300) {
+                    keep_stream_progress_focus(converting_progress);
+                    last_focus_keepalive = std::time::Instant::now();
                 }
             };
             let convert_result = crate::ffmpeg_export::convert_audio_file(
@@ -3467,6 +3512,8 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             }
         }
     } else {
+        report_progress(progress, 100);
+        close_progress_dialog(progress);
         downloaded_path
     };
 

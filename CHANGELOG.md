@@ -1,10 +1,12 @@
 # Changelog
 
-Version 0.6.7 – 2026-02-13
+Version 0.6.7 – 2026-03-02
 Improvements
 • Updated Polish translation thanks to DJ Graco.
 • Added Lithuanian translation.
 • Added Chinese translation.
+• From now on, frequent beta builds will be published in the project Releases section, so users can test new changes before the next stable release.
+• Improved podcast chapter support: chapter navigation now works more reliably, including direct/streamed episodes where chapters are not embedded in the MP3 file, by using chapter metadata from feed/URL fallbacks when available. Added chapter navigation shortcuts `Ctrl+Alt+PageUp` (previous chapter) and `Ctrl+Alt+PageDown` (next chapter).
 • Reorganized Sonarpad output folders under `Documents\\Sonarpad`: files are now saved in dedicated subfolders `audiobooks`, `documents`, `recordings`, and `media`, with automatic migration from legacy paths.
 • Improved support for very large text files (including 60 MB): smoother opening and line-by-line navigation, especially with screen readers.
 • Updated guides for all languages and refreshed localization resources across the app, including donations texts and NSIS setup translations (new Simplified Chinese and Lithuanian installer strings, plus completed Ukrainian setup translation).

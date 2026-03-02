@@ -1,10 +1,12 @@
 # Dziennik zmian
 
-Wersja 0.6.7 – 2026-02-13
+Wersja 0.6.7 – 2026-03-02
 Ulepszenia
 • Zaktualizowano tłumaczenie polskie dzięki DJ Graco.
 • Dodano tłumaczenie litewskie.
 • Dodano tłumaczenie chińskie.
+• Od teraz częste wersje beta będą publikowane w sekcji Releases projektu, aby użytkownicy mogli testować nowe zmiany przed następną stabilną wersją.
+• Ulepszono obsługę rozdziałów podcastów: nawigacja rozdziałów działa teraz bardziej niezawodnie, także dla odcinków bezpośrednich/streamingowych, w których rozdziały nie są osadzone w pliku MP3, dzięki wykorzystaniu metadanych rozdziałów z feedu/URL jako fallback, gdy są dostępne. Dodano skróty `Ctrl+Alt+PageUp` (poprzedni rozdział) i `Ctrl+Alt+PageDown` (następny rozdział).
 • Zreorganizowano foldery wyjściowe do `Dokumenty\\Sonarpad`: pliki są teraz zapisywane w dedykowanych podfolderach `audiobooks`, `documents`, `recordings` i `media`, z automatyczną migracją ze starych ścieżek.
 • Ulepszono obsługę bardzo dużych plików tekstowych (także 60 MB): płynniejsze otwieranie i nawigacja linia po linii, szczególnie z czytnikami ekranu.
 • Zaktualizowano przewodniki we wszystkich językach i zasoby lokalizacyjne całej aplikacji, w tym teksty darowizn oraz tłumaczenia instalatora NSIS (nowe ciągi dla chińskiego uproszczonego i litewskiego oraz uzupełnione tłumaczenie ukraińskie setupu).

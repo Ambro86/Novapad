@@ -457,8 +457,14 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
             let mute_toggle = i18n::tr(language, "playback.mute_toggle");
             let add_subtitles = i18n::tr(language, "playback.add_subtitles");
             let remove_subtitles = i18n::tr(language, "playback.remove_subtitles");
-            let chapter_prev = i18n::tr(language, "playback.chapter_prev");
-            let chapter_next = i18n::tr(language, "playback.chapter_next");
+            let chapter_prev = label_with_shortcut(
+                &i18n::tr(language, "playback.chapter_prev"),
+                shortcuts.chapter_prev,
+            );
+            let chapter_next = label_with_shortcut(
+                &i18n::tr(language, "playback.chapter_next"),
+                shortcuts.chapter_next,
+            );
             let chapter_list = i18n::tr(language, "playback.chapter_list");
             let download_episode = i18n::tr(language, "playback.download_episode");
             let has_chapters = with_state(hwnd, |state| !state.active_podcast_chapters.is_empty())

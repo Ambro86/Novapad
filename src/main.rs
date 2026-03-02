@@ -10847,141 +10847,143 @@ fn index_to_encoding(index: u32) -> TextEncoding {
     }
 }
 
-pub(crate) unsafe fn open_file_dialog_with_encoding(
+pub(crate) fn open_file_dialog_with_encoding(
     hwnd: HWND,
 ) -> Option<Vec<(PathBuf, Option<TextEncoding>)>> {
-    log_debug("open_file_dialog_with_encoding called");
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    unsafe {
+        log_debug("open_file_dialog_with_encoding called");
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
 
-    use windows::Win32::UI::Shell::FileOpenDialog;
-    use windows::Win32::UI::Shell::IFileOpenDialog;
-    use windows::Win32::UI::Shell::{FILEOPENDIALOGOPTIONS, FOS_ALLOWMULTISELECT};
+        use windows::Win32::UI::Shell::FileOpenDialog;
+        use windows::Win32::UI::Shell::IFileOpenDialog;
+        use windows::Win32::UI::Shell::{FILEOPENDIALOGOPTIONS, FOS_ALLOWMULTISELECT};
 
-    let pfd: IFileOpenDialog = match CoCreateInstance(&FileOpenDialog, None, CLSCTX_ALL) {
-        Ok(dialog) => {
-            log_debug("FileOpenDialog created successfully");
-            dialog
-        }
-        Err(e) => {
-            log_debug(&format!("Failed to create FileOpenDialog: {:?}", e));
-            return None;
-        }
-    };
-
-    let filter_raw = i18n::tr(language, "dialog.open_filter");
-    let parts: Vec<&str> = filter_raw.split("\\0").collect();
-    let mut spec = Vec::new();
-    let mut pattern_wides = Vec::new();
-    let mut name_wides = Vec::new();
-    for i in (0..parts.len().saturating_sub(1)).step_by(2) {
-        if parts[i].is_empty() {
-            break;
-        }
-        name_wides.push(to_wide(parts[i]));
-        pattern_wides.push(to_wide(parts[i + 1]));
-    }
-    for i in 0..name_wides.len() {
-        spec.push(COMDLG_FILTERSPEC {
-            pszName: PCWSTR(name_wides[i].as_ptr()),
-            pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
-        });
-    }
-    pfd.SetFileTypes(&spec).ok()?;
-    pfd.SetFileTypeIndex(1).ok()?; // Default to "All supported formats"
-    let mut options = pfd.GetOptions().ok()?;
-    options |= FILEOPENDIALOGOPTIONS(FOS_ALLOWMULTISELECT.0);
-    pfd.SetOptions(options).ok()?;
-
-    let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
-    let encoding_label = i18n::tr(language, "dialog.encoding_label");
-    let encodings = vec![
-        i18n::tr(language, "encoding.ansi"),
-        i18n::tr(language, "encoding.utf8"),
-        i18n::tr(language, "encoding.utf8bom"),
-        i18n::tr(language, "encoding.utf16le"),
-        i18n::tr(language, "encoding.utf16be"),
-    ];
-
-    log_debug("Adding encoding controls to open dialog");
-
-    // Use ComboBox with "Codifica: " prefix in each item for NVDA
-    pfdc.AddComboBox(101).ok()?;
-
-    for (i, enc_name) in encodings.iter().enumerate() {
-        let item_text = format!("{} {}", encoding_label, enc_name);
-        pfdc.AddControlItem(101, i as u32, PCWSTR(to_wide(&item_text).as_ptr()))
-            .ok()?;
-    }
-    pfdc.SetSelectedControlItem(101, encoding_to_index(TextEncoding::Utf8))
-        .ok()?;
-
-    let handler: IFileDialogEvents = CustomFileDialogEventHandler {
-        _encoding_label: encoding_label,
-        _encodings: encodings,
-        _initial_encoding: TextEncoding::Utf8,
-        _is_save_dialog: false,
-    }
-    .into();
-    let cookie = pfd.Advise(&handler).ok()?;
-    log_debug(&format!(
-        "Event handler registered with cookie: {:?}",
-        cookie
-    ));
-
-    // Trigger OnTypeChange to set initial visibility
-    // Default index 1 = "All supported formats", encoding will be hidden
-    log_debug("Triggering initial OnTypeChange");
-    crate::log_if_err!(pfd.SetFileTypeIndex(1));
-
-    log_debug("Showing open dialog");
-    if pfd.Show(hwnd).is_ok() {
-        log_debug("Dialog closed with OK");
-        let selected_encoding_idx = pfdc.GetSelectedControlItem(101).ok()?;
-        let filter_index = pfd.GetFileTypeIndex().ok()?;
-        let manual_encoding = if filter_index == 2 {
-            Some(index_to_encoding(selected_encoding_idx))
-        } else {
-            None
+        let pfd: IFileOpenDialog = match CoCreateInstance(&FileOpenDialog, None, CLSCTX_ALL) {
+            Ok(dialog) => {
+                log_debug("FileOpenDialog created successfully");
+                dialog
+            }
+            Err(e) => {
+                log_debug(&format!("Failed to create FileOpenDialog: {:?}", e));
+                return None;
+            }
         };
-        let mut out = Vec::new();
-        if let Ok(items) = pfd.GetResults()
-            && let Ok(count) = items.GetCount()
-        {
-            for i in 0..count {
-                if let Ok(item) = items.GetItemAt(i)
-                    && let Ok(path_ptr) =
-                        item.GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
-                {
-                    let path_str = path_ptr.to_string().unwrap_or_default();
-                    CoTaskMemFree(Some(path_ptr.0 as *const _));
-                    if !path_str.is_empty() {
-                        out.push((PathBuf::from(path_str), None));
+
+        let filter_raw = i18n::tr(language, "dialog.open_filter");
+        let parts: Vec<&str> = filter_raw.split("\\0").collect();
+        let mut spec = Vec::new();
+        let mut pattern_wides = Vec::new();
+        let mut name_wides = Vec::new();
+        for i in (0..parts.len().saturating_sub(1)).step_by(2) {
+            if parts[i].is_empty() {
+                break;
+            }
+            name_wides.push(to_wide(parts[i]));
+            pattern_wides.push(to_wide(parts[i + 1]));
+        }
+        for i in 0..name_wides.len() {
+            spec.push(COMDLG_FILTERSPEC {
+                pszName: PCWSTR(name_wides[i].as_ptr()),
+                pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
+            });
+        }
+        pfd.SetFileTypes(&spec).ok()?;
+        pfd.SetFileTypeIndex(1).ok()?; // Default to "All supported formats"
+        let mut options = pfd.GetOptions().ok()?;
+        options |= FILEOPENDIALOGOPTIONS(FOS_ALLOWMULTISELECT.0);
+        pfd.SetOptions(options).ok()?;
+
+        let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
+        let encoding_label = i18n::tr(language, "dialog.encoding_label");
+        let encodings = vec![
+            i18n::tr(language, "encoding.ansi"),
+            i18n::tr(language, "encoding.utf8"),
+            i18n::tr(language, "encoding.utf8bom"),
+            i18n::tr(language, "encoding.utf16le"),
+            i18n::tr(language, "encoding.utf16be"),
+        ];
+
+        log_debug("Adding encoding controls to open dialog");
+
+        // Use ComboBox with "Codifica: " prefix in each item for NVDA
+        pfdc.AddComboBox(101).ok()?;
+
+        for (i, enc_name) in encodings.iter().enumerate() {
+            let item_text = format!("{} {}", encoding_label, enc_name);
+            pfdc.AddControlItem(101, i as u32, PCWSTR(to_wide(&item_text).as_ptr()))
+                .ok()?;
+        }
+        pfdc.SetSelectedControlItem(101, encoding_to_index(TextEncoding::Utf8))
+            .ok()?;
+
+        let handler: IFileDialogEvents = CustomFileDialogEventHandler {
+            _encoding_label: encoding_label,
+            _encodings: encodings,
+            _initial_encoding: TextEncoding::Utf8,
+            _is_save_dialog: false,
+        }
+        .into();
+        let cookie = pfd.Advise(&handler).ok()?;
+        log_debug(&format!(
+            "Event handler registered with cookie: {:?}",
+            cookie
+        ));
+
+        // Trigger OnTypeChange to set initial visibility
+        // Default index 1 = "All supported formats", encoding will be hidden
+        log_debug("Triggering initial OnTypeChange");
+        crate::log_if_err!(pfd.SetFileTypeIndex(1));
+
+        log_debug("Showing open dialog");
+        if pfd.Show(hwnd).is_ok() {
+            log_debug("Dialog closed with OK");
+            let selected_encoding_idx = pfdc.GetSelectedControlItem(101).ok()?;
+            let filter_index = pfd.GetFileTypeIndex().ok()?;
+            let manual_encoding = if filter_index == 2 {
+                Some(index_to_encoding(selected_encoding_idx))
+            } else {
+                None
+            };
+            let mut out = Vec::new();
+            if let Ok(items) = pfd.GetResults()
+                && let Ok(count) = items.GetCount()
+            {
+                for i in 0..count {
+                    if let Ok(item) = items.GetItemAt(i)
+                        && let Ok(path_ptr) =
+                            item.GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
+                    {
+                        let path_str = path_ptr.to_string().unwrap_or_default();
+                        CoTaskMemFree(Some(path_ptr.0 as *const _));
+                        if !path_str.is_empty() {
+                            out.push((PathBuf::from(path_str), None));
+                        }
                     }
                 }
             }
-        }
 
-        if out.is_empty() {
-            let item = pfd.GetResult().ok()?;
-            let path_ptr = item
-                .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
-                .ok()?;
-            let path_str = path_ptr.to_string().unwrap_or_default();
-            CoTaskMemFree(Some(path_ptr.0 as *const _));
-            if path_str.is_empty() {
-                pfd.Unadvise(cookie).ok()?;
-                return None;
+            if out.is_empty() {
+                let item = pfd.GetResult().ok()?;
+                let path_ptr = item
+                    .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
+                    .ok()?;
+                let path_str = path_ptr.to_string().unwrap_or_default();
+                CoTaskMemFree(Some(path_ptr.0 as *const _));
+                if path_str.is_empty() {
+                    pfd.Unadvise(cookie).ok()?;
+                    return None;
+                }
+                out.push((PathBuf::from(path_str), manual_encoding));
+            } else if out.len() == 1 {
+                out[0].1 = manual_encoding;
             }
-            out.push((PathBuf::from(path_str), manual_encoding));
-        } else if out.len() == 1 {
-            out[0].1 = manual_encoding;
-        }
 
-        pfd.Unadvise(cookie).ok()?;
-        Some(out)
-    } else {
-        pfd.Unadvise(cookie).ok()?;
-        None
+            pfd.Unadvise(cookie).ok()?;
+            Some(out)
+        } else {
+            pfd.Unadvise(cookie).ok()?;
+            None
+        }
     }
 }
 

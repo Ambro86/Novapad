@@ -919,7 +919,7 @@ fn import_sources_from_file(hwnd: HWND, path: &Path) {
             path.to_string_lossy(),
             added
         ));
-        unsafe { reload_tree(hwnd) };
+        reload_tree(hwnd);
     }
 }
 
@@ -3231,15 +3231,15 @@ unsafe fn create_controls(hwnd: HWND) {
     SetFocus(hwnd_tree);
 }
 
-unsafe fn reload_tree(hwnd: HWND) {
+fn reload_tree(hwnd: HWND) {
     let (hwnd_tree, sources, language, announce_unread, unread_label_position) =
         match with_rss_state(hwnd, |s| {
             (
                 s.hwnd_tree,
-                with_state(s.parent, |ps| ps.settings.rss_sources.clone()),
-                with_state(s.parent, |ps| ps.settings.language),
-                with_state(s.parent, |ps| ps.settings.announce_unread_rss_podcast_items),
-                with_state(s.parent, |ps| ps.settings.rss_podcast_unread_label_position),
+                unsafe { with_state(s.parent, |ps| ps.settings.rss_sources.clone()) },
+                unsafe { with_state(s.parent, |ps| ps.settings.language) },
+                unsafe { with_state(s.parent, |ps| ps.settings.announce_unread_rss_podcast_items) },
+                unsafe { with_state(s.parent, |ps| ps.settings.rss_podcast_unread_label_position) },
             )
         }) {
             Some((
@@ -3252,7 +3252,9 @@ unsafe fn reload_tree(hwnd: HWND) {
             _ => return,
         };
 
-    SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
+    unsafe {
+        SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
+    }
 
     with_rss_state(hwnd, |s| {
         s.node_data.clear();
@@ -3279,12 +3281,14 @@ unsafe fn reload_tree(hwnd: HWND) {
                 },
             },
         };
-        let hitem = SendMessageW(
-            hwnd_tree,
-            TVM_INSERTITEMW,
-            WPARAM(0),
-            LPARAM(&mut tvis as *mut _ as isize),
-        );
+        let hitem = unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_INSERTITEMW,
+                WPARAM(0),
+                LPARAM(&mut tvis as *mut _ as isize),
+            )
+        };
 
         with_rss_state(hwnd, |s| {
             s.node_data.insert(hitem.0, NodeData::Source(i));
@@ -3367,11 +3371,7 @@ fn update_source_tree_title(
     }
 }
 
-unsafe fn set_source_unread(
-    hwnd: HWND,
-    hitem: windows::Win32::UI::Controls::HTREEITEM,
-    unread: bool,
-) {
+fn set_source_unread(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM, unread: bool) {
     // When marking as read (!unread), also update last_seen_guid from the first item
     let first_item_key: Option<String> = if !unread {
         with_rss_state(hwnd, |s| {
@@ -3394,34 +3394,36 @@ unsafe fn set_source_unread(
         let Some(idx) = source_idx else {
             return (hwnd_tree, None);
         };
-        let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
-        let title_opt = with_state(parent, |ps| {
-            if let Some(src) = ps.settings.rss_sources.get_mut(idx) {
-                let mut changed = false;
-                if src.unread != unread {
-                    src.unread = unread;
-                    changed = true;
+        let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+        let title_opt = unsafe {
+            with_state(parent, |ps| {
+                if let Some(src) = ps.settings.rss_sources.get_mut(idx) {
+                    let mut changed = false;
+                    if src.unread != unread {
+                        src.unread = unread;
+                        changed = true;
+                    }
+                    // Update last_seen_guid when marking as read
+                    if let Some(ref key) = first_item_key
+                        && src.last_seen_guid.as_ref() != Some(key)
+                    {
+                        src.last_seen_guid = Some(key.clone());
+                        changed = true;
+                    }
+                    if changed {
+                        let title = rss_source_display_title(
+                            src,
+                            language,
+                            ps.settings.announce_unread_rss_podcast_items,
+                            ps.settings.rss_podcast_unread_label_position,
+                        );
+                        crate::settings::save_settings(ps.settings.clone());
+                        return Some(title);
+                    }
                 }
-                // Update last_seen_guid when marking as read
-                if let Some(ref key) = first_item_key
-                    && src.last_seen_guid.as_ref() != Some(key)
-                {
-                    src.last_seen_guid = Some(key.clone());
-                    changed = true;
-                }
-                if changed {
-                    let title = rss_source_display_title(
-                        src,
-                        language,
-                        ps.settings.announce_unread_rss_podcast_items,
-                        ps.settings.rss_podcast_unread_label_position,
-                    );
-                    crate::settings::save_settings(ps.settings.clone());
-                    return Some(title);
-                }
-            }
-            None
-        })
+                None
+            })
+        }
         .flatten();
         (hwnd_tree, title_opt)
     })
@@ -3431,7 +3433,7 @@ unsafe fn set_source_unread(
     }
 }
 
-unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
+fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
     // Check if items are already loaded - if so, mark as read immediately
     let has_loaded_items = with_rss_state(hwnd, |s| {
         if !matches!(s.node_data.get(&(hitem.0)), Some(NodeData::Source(_))) {
@@ -3452,12 +3454,14 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
     // in process_fetch_result after items are loaded
     let item_info_opt = with_rss_state(hwnd, |s| {
         if let Some(NodeData::Source(idx)) = s.node_data.get(&(hitem.0)) {
-            with_state(s.parent, |ps| {
-                ps.settings
-                    .rss_sources
-                    .get(*idx)
-                    .map(|src| (src.url.clone(), src.kind.clone(), src.cache.clone(), true))
-            })
+            unsafe {
+                with_state(s.parent, |ps| {
+                    ps.settings
+                        .rss_sources
+                        .get(*idx)
+                        .map(|src| (src.url.clone(), src.kind.clone(), src.cache.clone(), true))
+                })
+            }
             .flatten()
         } else if let Some(NodeData::Item(item)) = s.node_data.get(&(hitem.0)) {
             if item.is_folder {
@@ -3503,12 +3507,14 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
     // If there are no children yet, insert a temporary "Loading…" child.
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 != 0 {
-        let first_child = SendMessageW(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CHILD as usize),
-            LPARAM(hitem.0),
-        );
+        let first_child = unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CHILD as usize),
+                LPARAM(hitem.0),
+            )
+        };
         if first_child.0 == 0 {
             let mut loading_label = "Loading...".to_string();
             if loading_label.trim().is_empty() {
@@ -3527,21 +3533,25 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
                     },
                 },
             };
-            SendMessageW(
-                hwnd_tree,
-                TVM_INSERTITEMW,
-                WPARAM(0),
-                LPARAM(&mut tvis_loading as *mut _ as isize),
-            );
+            unsafe {
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_INSERTITEMW,
+                    WPARAM(0),
+                    LPARAM(&mut tvis_loading as *mut _ as isize),
+                );
+            }
         }
         // Force visual expansion now.
-        SendMessageW(
-            hwnd_tree,
-            TVM_EXPAND,
-            WPARAM(TVE_EXPAND.0 as usize),
-            LPARAM(hitem.0),
-        );
-        SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_EXPAND,
+                WPARAM(TVE_EXPAND.0 as usize),
+                LPARAM(hitem.0),
+            );
+            SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
+        }
     }
 
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
@@ -3550,7 +3560,7 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
     } else {
         rss::RssFetchConfig::default()
     };
-    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
@@ -3579,12 +3589,14 @@ unsafe fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEIT
             hitem: hitem.0,
             result: res,
         });
-        if let Err(_e) = PostMessageW(
-            hwnd,
-            WM_RSS_FETCH_COMPLETE,
-            WPARAM(0),
-            LPARAM(Box::into_raw(msg) as isize),
-        ) {}
+        if let Err(_e) = unsafe {
+            PostMessageW(
+                hwnd,
+                WM_RSS_FETCH_COMPLETE,
+                WPARAM(0),
+                LPARAM(Box::into_raw(msg) as isize),
+            )
+        } {}
     });
 }
 
@@ -3600,7 +3612,7 @@ struct BackgroundCheckResult {
 }
 
 /// Launch background check for all feeds to detect new articles without blocking UI
-unsafe fn start_background_unread_check(hwnd: HWND) {
+fn start_background_unread_check(hwnd: HWND) {
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return;
@@ -3612,22 +3624,24 @@ unsafe fn start_background_unread_check(hwnd: HWND) {
         rss::RssSourceType,
         rss::RssFeedCache,
         HashSet<String>,
-    )> = with_state(parent, |ps| {
-        ps.settings
-            .rss_sources
-            .iter()
-            .enumerate()
-            .map(|(i, src)| {
-                (
-                    i,
-                    src.url.clone(),
-                    src.kind.clone(),
-                    src.cache.clone(),
-                    src.removed_item_keys.iter().cloned().collect(),
-                )
-            })
-            .collect()
-    })
+    )> = unsafe {
+        with_state(parent, |ps| {
+            ps.settings
+                .rss_sources
+                .iter()
+                .enumerate()
+                .map(|(i, src)| {
+                    (
+                        i,
+                        src.url.clone(),
+                        src.kind.clone(),
+                        src.cache.clone(),
+                        src.removed_item_keys.iter().cloned().collect(),
+                    )
+                })
+                .collect()
+        })
+    }
     .unwrap_or_default();
 
     if sources.is_empty() {
@@ -3635,7 +3649,7 @@ unsafe fn start_background_unread_check(hwnd: HWND) {
     }
 
     let fetch_config = rss_fetch_config(parent);
-    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     ensure_rss_http(parent);
 
     let hwnd_raw = hwnd.0;
@@ -3671,12 +3685,14 @@ unsafe fn start_background_unread_check(hwnd: HWND) {
                             source_idx: idx,
                             newest_item_key: newest_key,
                         });
-                        if let Err(e) = PostMessageW(
-                            HWND(hwnd_val),
-                            WM_RSS_BACKGROUND_CHECK_COMPLETE,
-                            WPARAM(0),
-                            LPARAM(Box::into_raw(msg) as isize),
-                        ) {
+                        if let Err(e) = unsafe {
+                            PostMessageW(
+                                HWND(hwnd_val),
+                                WM_RSS_BACKGROUND_CHECK_COMPLETE,
+                                WPARAM(0),
+                                LPARAM(Box::into_raw(msg) as isize),
+                            )
+                        } {
                             crate::log_debug(&format!(
                                 "Failed to post WM_RSS_BACKGROUND_CHECK_COMPLETE: {}",
                                 e
@@ -3698,7 +3714,7 @@ unsafe fn start_background_unread_check(hwnd: HWND) {
 }
 
 /// Process background check result - update unread state if new articles detected
-unsafe fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
+fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return;
@@ -3709,16 +3725,18 @@ unsafe fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult
     };
 
     // Check if this is a new article compared to last_seen_guid
-    let should_mark_unread = with_state(parent, |ps| {
-        ps.settings
-            .rss_sources
-            .get(res.source_idx)
-            .map(|src| match &src.last_seen_guid {
-                Some(last_seen) => last_seen != &newest_key,
-                None => true, // Never seen before
-            })
-            .unwrap_or(false)
-    })
+    let should_mark_unread = unsafe {
+        with_state(parent, |ps| {
+            ps.settings
+                .rss_sources
+                .get(res.source_idx)
+                .map(|src| match &src.last_seen_guid {
+                    Some(last_seen) => last_seen != &newest_key,
+                    None => true, // Never seen before
+                })
+                .unwrap_or(false)
+        })
+    }
     .unwrap_or(false);
 
     if should_mark_unread {
@@ -4076,7 +4094,7 @@ unsafe fn process_fetch_result(hwnd: HWND, res: FetchResult) {
     }
 }
 
-unsafe fn handle_selection_changed(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
+fn handle_selection_changed(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
     if hitem.0 == 0 {
         return;
     }
@@ -4085,15 +4103,15 @@ unsafe fn handle_selection_changed(hwnd: HWND, hitem: windows::Win32::UI::Contro
     if hwnd_tree.0 == 0 {
         return;
     }
-    let parent = windows::Win32::UI::Controls::HTREEITEM(
+    let parent = windows::Win32::UI::Controls::HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(windows::Win32::UI::Controls::TVGN_PARENT as usize),
             LPARAM(hitem.0),
         )
-        .0,
-    );
+        .0
+    });
     if parent.0 == 0 {
         return;
     }
@@ -4107,29 +4125,29 @@ unsafe fn handle_selection_changed(hwnd: HWND, hitem: windows::Win32::UI::Contro
     if !has_more {
         return;
     }
-    let child = windows::Win32::UI::Controls::HTREEITEM(
+    let child = windows::Win32::UI::Controls::HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CHILD as usize),
             LPARAM(parent.0),
         )
-        .0,
-    );
+        .0
+    });
     if child.0 == 0 {
         return;
     }
     let mut last = child;
     loop {
-        let next = windows::Win32::UI::Controls::HTREEITEM(
+        let next = windows::Win32::UI::Controls::HTREEITEM(unsafe {
             SendMessageW(
                 hwnd_tree,
                 TVM_GETNEXTITEM,
                 WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
                 LPARAM(last.0),
             )
-            .0,
-        );
+            .0
+        });
         if next.0 == 0 {
             break;
         }
@@ -4142,7 +4160,7 @@ unsafe fn handle_selection_changed(hwnd: HWND, hitem: windows::Win32::UI::Contro
     }
 }
 
-unsafe fn load_more_items(
+fn load_more_items(
     hwnd: HWND,
     hitem: windows::Win32::UI::Controls::HTREEITEM,
     batch: usize,
@@ -4154,15 +4172,17 @@ unsafe fn load_more_items(
     }
     let (language, announce_unread, unread_label_position, rss_date_mode, rss_time_mode) =
         with_rss_state(hwnd, |s| {
-            with_state(s.parent, |ps| {
-                (
-                    ps.settings.language,
-                    ps.settings.announce_unread_rss_podcast_items,
-                    ps.settings.rss_podcast_unread_label_position,
-                    ps.settings.rss_articles_date_display,
-                    ps.settings.rss_articles_time_display,
-                )
-            })
+            unsafe {
+                with_state(s.parent, |ps| {
+                    (
+                        ps.settings.language,
+                        ps.settings.announce_unread_rss_podcast_items,
+                        ps.settings.rss_podcast_unread_label_position,
+                        ps.settings.rss_articles_date_display,
+                        ps.settings.rss_articles_time_display,
+                    )
+                })
+            }
             .unwrap_or((
                 crate::settings::Language::English,
                 true,
@@ -4179,7 +4199,9 @@ unsafe fn load_more_items(
             ListTimeDisplayMode::Always,
         ));
 
-    SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+    unsafe {
+        SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+    }
     let (inserted, loaded_after, total_after) = with_rss_state(hwnd, |s| {
         let Some(state) = s.source_items.get_mut(&hitem.0) else {
             return (0usize, 0usize, 0usize);
@@ -4223,12 +4245,14 @@ unsafe fn load_more_items(
                     },
                 },
             };
-            let hchild = SendMessageW(
-                hwnd_tree,
-                TVM_INSERTITEMW,
-                WPARAM(0),
-                LPARAM(&mut tvis as *mut _ as isize),
-            );
+            let hchild = unsafe {
+                SendMessageW(
+                    hwnd_tree,
+                    TVM_INSERTITEMW,
+                    WPARAM(0),
+                    LPARAM(&mut tvis as *mut _ as isize),
+                )
+            };
             s.node_data.insert(hchild.0, NodeData::Item(item.clone()));
             inserted += 1;
         }
@@ -4236,7 +4260,9 @@ unsafe fn load_more_items(
         (inserted, state.loaded, state.items.len())
     })
     .unwrap_or((0usize, 0usize, 0usize));
-    SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+    unsafe {
+        SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+    }
     if inserted > 0 {
         log_debug(&format!(
             "rss_ui_batch append source={} inserted={} loaded={} total={}",
@@ -4926,7 +4952,7 @@ unsafe fn undo_last_delete(hwnd: HWND) {
     }
 }
 
-unsafe fn handle_edit_source(hwnd: HWND) {
+fn handle_edit_source(hwnd: HWND) {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
         unsafe {
@@ -4954,12 +4980,14 @@ unsafe fn handle_edit_source(hwnd: HWND) {
     };
 
     let source_info = with_rss_state(hwnd, |s| {
-        with_state(s.parent, |ps| {
-            ps.settings
-                .rss_sources
-                .get(idx)
-                .map(|src| (src.title.clone(), src.url.clone()))
-        })
+        unsafe {
+            with_state(s.parent, |ps| {
+                ps.settings
+                    .rss_sources
+                    .get(idx)
+                    .map(|src| (src.title.clone(), src.url.clone()))
+            })
+        }
         .flatten()
     })
     .flatten();
@@ -4969,9 +4997,9 @@ unsafe fn handle_edit_source(hwnd: HWND) {
     }
 
     let main_hwnd = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let existing = with_state(main_hwnd, |s| s.rss_add_dialog).unwrap_or(HWND(0));
+    let existing = unsafe { with_state(main_hwnd, |s| s.rss_add_dialog) }.unwrap_or(HWND(0));
     if existing.0 != 0 {
-        SetForegroundWindow(existing);
+        unsafe { SetForegroundWindow(existing) };
         return;
     }
 
@@ -4979,7 +5007,7 @@ unsafe fn handle_edit_source(hwnd: HWND) {
     show_add_dialog_with_prefill(hwnd, title, url);
 }
 
-unsafe fn handle_retry_now(hwnd: HWND) {
+fn handle_retry_now(hwnd: HWND) {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
         unsafe {
@@ -4997,12 +5025,14 @@ unsafe fn handle_retry_now(hwnd: HWND) {
     }
 
     let source_info = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
-        Some(NodeData::Source(idx)) => with_state(s.parent, |ps| {
-            ps.settings
-                .rss_sources
-                .get(*idx)
-                .map(|src| (src.url.clone(), src.kind.clone(), src.cache.clone()))
-        })
+        Some(NodeData::Source(idx)) => unsafe {
+            with_state(s.parent, |ps| {
+                ps.settings
+                    .rss_sources
+                    .get(*idx)
+                    .map(|src| (src.url.clone(), src.kind.clone(), src.cache.clone()))
+            })
+        }
         .flatten(),
         _ => None,
     })
@@ -5030,7 +5060,7 @@ unsafe fn handle_retry_now(hwnd: HWND) {
     } else {
         rss::RssFetchConfig::default()
     };
-    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
@@ -5059,12 +5089,14 @@ unsafe fn handle_retry_now(hwnd: HWND) {
             hitem: hitem.0,
             result: res,
         });
-        if let Err(_e) = PostMessageW(
-            hwnd,
-            WM_RSS_FETCH_COMPLETE,
-            WPARAM(0),
-            LPARAM(Box::into_raw(msg) as isize),
-        ) {}
+        if let Err(_e) = unsafe {
+            PostMessageW(
+                hwnd,
+                WM_RSS_FETCH_COMPLETE,
+                WPARAM(0),
+                LPARAM(Box::into_raw(msg) as isize),
+            )
+        } {}
     });
 }
 
@@ -5171,7 +5203,7 @@ fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
         return;
     }
     if matches!(action, ReorderAction::Position) {
-        unsafe { show_reorder_dialog(hwnd, source_index, total) };
+        show_reorder_dialog(hwnd, source_index, total);
         return;
     }
     let new_index = match action {
@@ -5648,20 +5680,22 @@ fn collapse_blank_lines(input: &str) -> String {
     if out.is_empty() { String::new() } else { out }
 }
 
-unsafe fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
+fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
     let existing = with_rss_state(parent_hwnd, |s| s.reorder_dialog).unwrap_or(HWND(0));
     if existing.0 != 0 {
-        SetForegroundWindow(existing);
+        unsafe { SetForegroundWindow(existing) };
         return;
     }
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
     let class_name = to_wide("SonarpadRssReorder");
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
-                None,
-                windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
-            )
+            unsafe {
+                windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                    None,
+                    windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+                )
+            }
             .unwrap_or_default()
             .0,
         ),
@@ -5671,10 +5705,10 @@ unsafe fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usi
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    RegisterClassW(&wc);
+    unsafe { RegisterClassW(&wc) };
 
     let language = with_rss_state(parent_hwnd, |s| {
-        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+        unsafe { with_state(s.parent, |ps| ps.settings.language) }.unwrap_or_default()
     })
     .unwrap_or_default();
     let title = i18n::tr(language, "rss.context.reorder");
@@ -5683,22 +5717,24 @@ unsafe fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usi
         source_index,
         total,
     }));
-    let hwnd = CreateWindowExW(
-        WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(to_wide(&title).as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_POPUP,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        360,
-        160,
-        parent_hwnd,
-        None,
-        hinstance,
-        Some(init_ptr as *const _),
-    );
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(to_wide(&title).as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_POPUP,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            360,
+            160,
+            parent_hwnd,
+            None,
+            hinstance,
+            Some(init_ptr as *const _),
+        )
+    };
     if hwnd.0 == 0 {
-        let _unused_box = Box::from_raw(init_ptr);
+        let _unused_box = unsafe { Box::from_raw(init_ptr) };
         return;
     }
     with_rss_state(parent_hwnd, |s| s.reorder_dialog = hwnd);
@@ -5806,21 +5842,23 @@ fn show_add_dialog(parent_hwnd: HWND) {
     show_add_dialog_with_prefill(parent_hwnd, String::new(), String::new());
 }
 
-unsafe fn show_rss_search_dialog(parent_hwnd: HWND) {
+fn show_rss_search_dialog(parent_hwnd: HWND) {
     let exists = with_rss_state(parent_hwnd, |s| s.search_dialog).unwrap_or(HWND(0));
     if exists.0 != 0 {
-        SetForegroundWindow(exists);
+        unsafe { SetForegroundWindow(exists) };
         return;
     }
 
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
     let class_name = to_wide("SonarpadRssSearchKeyword");
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
-                None,
-                windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
-            )
+            unsafe {
+                windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                    None,
+                    windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+                )
+            }
             .unwrap_or_default()
             .0,
         ),
@@ -5830,30 +5868,32 @@ unsafe fn show_rss_search_dialog(parent_hwnd: HWND) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    RegisterClassW(&wc);
+    unsafe { RegisterClassW(&wc) };
 
     let main_hwnd = with_rss_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let language = with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(main_hwnd, |s| s.settings.language) }.unwrap_or_default();
     let title = tr_or(language, "rss.search_dialog.title", "Search RSS by keyword");
     let init_ptr = Box::into_raw(Box::new(SearchDialogInit {
         parent: parent_hwnd,
     }));
-    let hwnd = CreateWindowExW(
-        WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(to_wide(&title).as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_POPUP,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        420,
-        170,
-        parent_hwnd,
-        None,
-        hinstance,
-        Some(init_ptr as *const _),
-    );
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(to_wide(&title).as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_POPUP,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            420,
+            170,
+            parent_hwnd,
+            None,
+            hinstance,
+            Some(init_ptr as *const _),
+        )
+    };
     if hwnd.0 == 0 {
-        let _unused_box = Box::from_raw(init_ptr);
+        let _unused_box = unsafe { Box::from_raw(init_ptr) };
         return;
     }
     with_rss_state(parent_hwnd, |s| s.search_dialog = hwnd);
@@ -6014,24 +6054,26 @@ unsafe fn search_keyword_wndproc_inner(
 }
 
 fn show_add_dialog_with_prefill(parent_hwnd: HWND, title: String, url: String) {
-    unsafe { show_add_dialog_with_prefill_options(parent_hwnd, title, url, false) };
+    show_add_dialog_with_prefill_options(parent_hwnd, title, url, false);
 }
 
-unsafe fn show_add_dialog_with_prefill_options(
+fn show_add_dialog_with_prefill_options(
     parent_hwnd: HWND,
     title: String,
     url: String,
     hide_url_field: bool,
 ) {
-    let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+    let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
     let class_name = to_wide("SonarpadInput");
 
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
-                None,
-                windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
-            )
+            unsafe {
+                windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                    None,
+                    windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+                )
+            }
             .unwrap_or_default()
             .0,
         ),
@@ -6041,37 +6083,39 @@ unsafe fn show_add_dialog_with_prefill_options(
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    RegisterClassW(&wc);
+    unsafe { RegisterClassW(&wc) };
 
     let main_hwnd = with_rss_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
-    let language = with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(main_hwnd, |s| s.settings.language) }.unwrap_or_default();
     let init_ptr = Box::into_raw(Box::new(AddDialogInit {
         parent: parent_hwnd,
         prefill_title: title,
         prefill_url: url,
         hide_url_field,
     }));
-    let hwnd = CreateWindowExW(
-        WS_EX_DLGMODALFRAME,
-        PCWSTR(class_name.as_ptr()),
-        PCWSTR(to_wide(&i18n::tr(language, "rss.add_dialog.title")).as_ptr()),
-        WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_POPUP,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        400,
-        190,
-        parent_hwnd,
-        None,
-        hinstance,
-        Some(init_ptr as *const _),
-    );
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(to_wide(&i18n::tr(language, "rss.add_dialog.title")).as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_POPUP,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            400,
+            190,
+            parent_hwnd,
+            None,
+            hinstance,
+            Some(init_ptr as *const _),
+        )
+    };
     if hwnd.0 == 0 {
-        let _unused_box = Box::from_raw(init_ptr);
+        let _unused_box = unsafe { Box::from_raw(init_ptr) };
         return;
     }
 
     let main_window = with_rss_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
-    with_state(main_window, |s| s.rss_add_dialog = hwnd);
+    unsafe { with_state(main_window, |s| s.rss_add_dialog = hwnd) };
 }
 
 unsafe extern "system" fn input_wndproc(

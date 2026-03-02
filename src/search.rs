@@ -584,21 +584,17 @@ unsafe extern "system" fn find_replace_hook_proc(
     crate::panic_guard::guard(
         "find_replace_hook_proc",
         || 0,
-        || unsafe { find_replace_hook_proc_inner(hdlg, msg, wparam, lparam) },
+        || find_replace_hook_proc_inner(hdlg, msg, wparam, lparam),
     )
 }
 
-unsafe fn find_replace_hook_proc_inner(
-    hdlg: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> usize {
+fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> usize {
     match msg {
         WM_INITDIALOG => {
-            let fr = &*(lparam.0 as *const FINDREPLACEW);
+            let fr = unsafe { &*(lparam.0 as *const FINDREPLACEW) };
             let parent = fr.hwndOwner;
-            let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+            let language =
+                unsafe { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
             let is_replace = fr.lCustData.0 == REPLACE_DIALOG_ID;
             let (width, height, client_bottom) = dialog_metrics(hdlg);
 
@@ -629,19 +625,21 @@ unsafe fn find_replace_hook_proc_inner(
                 added += 2; // In selection, All docs
             }
             let extra = (added * (line_h + gap)) + 10;
-            crate::log_if_err!(SetWindowPos(
-                hdlg,
-                HWND(0),
-                0,
-                0,
-                width,
-                height + extra,
-                SWP_NOMOVE | SWP_NOZORDER,
-            ));
+            crate::log_if_err!(unsafe {
+                SetWindowPos(
+                    hdlg,
+                    HWND(0),
+                    0,
+                    0,
+                    width,
+                    height + extra,
+                    SWP_NOMOVE | SWP_NOZORDER,
+                )
+            });
 
             let x = 12;
             let checkbox_width = width.saturating_sub(x + 16);
-            let font = GetStockObject(DEFAULT_GUI_FONT);
+            let font = unsafe { GetStockObject(DEFAULT_GUI_FONT) };
 
             let regex = create_checkbox(hdlg, FIND_ID_REGEX, &regex_text, x, y, checkbox_width);
             set_checkbox_checked(regex, options.use_regex);
@@ -705,10 +703,18 @@ unsafe fn find_replace_hook_proc_inner(
                     REPLACE_ID_IN_SELECTION,
                     REPLACE_ID_IN_ALL_DOCS,
                 ] {
-                    let hwnd_child =
-                        windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hdlg, id as i32);
+                    let hwnd_child = unsafe {
+                        windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hdlg, id as i32)
+                    };
                     if hwnd_child.0 != 0 {
-                        SendMessageW(hwnd_child, WM_SETFONT, WPARAM(font.0 as usize), LPARAM(1));
+                        unsafe {
+                            SendMessageW(
+                                hwnd_child,
+                                WM_SETFONT,
+                                WPARAM(font.0 as usize),
+                                LPARAM(1),
+                            );
+                        }
                     }
                 }
             }
@@ -716,61 +722,75 @@ unsafe fn find_replace_hook_proc_inner(
         }
         WM_COMMAND => {
             let cmd_id = (wparam.0 & 0xffff) as isize;
-            let parent = GetParent(hdlg);
+            let parent = unsafe { GetParent(hdlg) };
             if parent.0 == 0 {
                 return 0;
             }
             match cmd_id {
                 FIND_ID_REGEX => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_REGEX);
-                    with_state(parent, |state| {
-                        state.find_use_regex = checked;
-                    });
+                    unsafe {
+                        with_state(parent, |state| {
+                            state.find_use_regex = checked;
+                        });
+                    }
                 }
                 FIND_ID_DOT_MATCHES_NEWLINE => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_DOT_MATCHES_NEWLINE);
-                    with_state(parent, |state| {
-                        state.find_dot_matches_newline = checked;
-                    });
+                    unsafe {
+                        with_state(parent, |state| {
+                            state.find_dot_matches_newline = checked;
+                        });
+                    }
                 }
                 FIND_ID_WRAP_AROUND => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_WRAP_AROUND);
-                    with_state(parent, |state| {
-                        state.find_wrap_around = checked;
-                    });
+                    unsafe {
+                        with_state(parent, |state| {
+                            state.find_wrap_around = checked;
+                        });
+                    }
                 }
                 FIND_ID_MATCH_CASE => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_MATCH_CASE);
-                    with_state(parent, |state| {
-                        state.find_match_case = checked;
-                    });
+                    unsafe {
+                        with_state(parent, |state| {
+                            state.find_match_case = checked;
+                        });
+                    }
                 }
                 FIND_ID_WHOLE_WORD => {
                     let checked = is_checkbox_checked(hdlg, FIND_ID_WHOLE_WORD);
-                    with_state(parent, |state| {
-                        state.find_whole_word = checked;
-                    });
+                    unsafe {
+                        with_state(parent, |state| {
+                            state.find_whole_word = checked;
+                        });
+                    }
                 }
                 REPLACE_ID_IN_SELECTION => {
                     let checked = is_checkbox_checked(hdlg, REPLACE_ID_IN_SELECTION);
-                    with_state(parent, |state| {
-                        state.find_replace_in_selection = checked;
-                        if checked {
-                            state.find_replace_in_all_docs = false;
-                        }
-                    });
+                    unsafe {
+                        with_state(parent, |state| {
+                            state.find_replace_in_selection = checked;
+                            if checked {
+                                state.find_replace_in_all_docs = false;
+                            }
+                        });
+                    }
                     if checked {
                         set_checkbox_checked_by_id(hdlg, REPLACE_ID_IN_ALL_DOCS, false);
                     }
                 }
                 REPLACE_ID_IN_ALL_DOCS => {
                     let checked = is_checkbox_checked(hdlg, REPLACE_ID_IN_ALL_DOCS);
-                    with_state(parent, |state| {
-                        state.find_replace_in_all_docs = checked;
-                        if checked {
-                            state.find_replace_in_selection = false;
-                        }
-                    });
+                    unsafe {
+                        with_state(parent, |state| {
+                            state.find_replace_in_all_docs = checked;
+                            if checked {
+                                state.find_replace_in_selection = false;
+                            }
+                        });
+                    }
                     if checked {
                         set_checkbox_checked_by_id(hdlg, REPLACE_ID_IN_SELECTION, false);
                     }

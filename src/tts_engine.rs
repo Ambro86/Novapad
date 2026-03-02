@@ -4232,7 +4232,7 @@ fn start_audiobook_with_text(
         base_split_option_visible
     };
     let Some(save_result) =
-        (unsafe { save_audio_dialog(hwnd, suggested_name.as_deref(), split_option_visible) })
+        save_audio_dialog(hwnd, suggested_name.as_deref(), split_option_visible)
     else {
         return;
     };

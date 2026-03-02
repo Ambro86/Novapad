@@ -10252,159 +10252,163 @@ pub(crate) struct SaveAudioDialogResult {
     pub create_parts_folder: bool,
 }
 
-pub(crate) unsafe fn save_audio_dialog(
+pub(crate) fn save_audio_dialog(
     hwnd: HWND,
     suggested_name: Option<&str>,
     show_split_folder_option: bool,
 ) -> Option<SaveAudioDialogResult> {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let initial_dir_setting =
-        with_state(hwnd, |state| state.settings.audiobook_save_folder.clone()).unwrap_or_default();
-    let initial_dir = initial_dir_setting.trim().to_string();
-    if !initial_dir.is_empty() {
-        crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
-    }
-    let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
-
-    let filter_raw = i18n::tr(language, "dialog.save_audio_filter");
-    let parts: Vec<&str> = filter_raw.split("\\0").collect();
-    let mut spec = Vec::new();
-    let mut pattern_wides = Vec::new();
-    let mut name_wides = Vec::new();
-    for i in (0..parts.len().saturating_sub(1)).step_by(2) {
-        if parts[i].is_empty() {
-            break;
+    unsafe {
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        let initial_dir_setting =
+            with_state(hwnd, |state| state.settings.audiobook_save_folder.clone())
+                .unwrap_or_default();
+        let initial_dir = initial_dir_setting.trim().to_string();
+        if !initial_dir.is_empty() {
+            crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
         }
-        name_wides.push(to_wide(parts[i]));
-        pattern_wides.push(to_wide(parts[i + 1]));
-    }
-    for i in 0..name_wides.len() {
-        spec.push(COMDLG_FILTERSPEC {
-            pszName: PCWSTR(name_wides[i].as_ptr()),
-            pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
-        });
-    }
-    pfd.SetFileTypes(&spec).ok()?;
-    pfd.SetFileTypeIndex(1).ok()?;
-    pfd.SetDefaultExtension(w!("mp3")).ok()?;
-    pfd.SetTitle(PCWSTR(
-        to_wide(&i18n::tr(language, "dialog.save_audio_title")).as_ptr(),
-    ))
-    .ok()?;
+        let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
 
-    if !initial_dir.is_empty() {
-        let initial_dir_w = to_wide(&initial_dir);
-        if let Ok(shell_folder) =
-            SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(initial_dir_w.as_ptr()), None)
-        {
-            let _unused = pfd.SetDefaultFolder(&shell_folder);
-            let _unused = pfd.SetFolder(&shell_folder);
+        let filter_raw = i18n::tr(language, "dialog.save_audio_filter");
+        let parts: Vec<&str> = filter_raw.split("\\0").collect();
+        let mut spec = Vec::new();
+        let mut pattern_wides = Vec::new();
+        let mut name_wides = Vec::new();
+        for i in (0..parts.len().saturating_sub(1)).step_by(2) {
+            if parts[i].is_empty() {
+                break;
+            }
+            name_wides.push(to_wide(parts[i]));
+            pattern_wides.push(to_wide(parts[i + 1]));
         }
-    }
-
-    if let Some(name) = suggested_name {
-        let default_name = Path::new(name)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .filter(|n| !n.trim().is_empty())
-            .unwrap_or(name);
-        pfd.SetFileName(PCWSTR(to_wide(default_name).as_ptr()))
-            .ok()?;
-    }
-
-    let current_bitrate =
-        with_state(hwnd, |state| state.settings.audiobook_m4b_bitrate).unwrap_or(128);
-    let bitrate_options = [64u32, 80, 96, 128, 160, 192, 256];
-    let initial_bitrate = if bitrate_options.contains(&current_bitrate) {
-        current_bitrate
-    } else {
-        128
-    };
-    let selected_bitrate = Arc::new(Mutex::new(initial_bitrate));
-
-    const AUDIO_SAVE_BITRATE_BUTTON_ID: u32 = 201;
-    const AUDIO_SAVE_SPLIT_FOLDER_CHECKBOX_ID: u32 = 202;
-    let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
-    pfdc.AddPushButton(
-        AUDIO_SAVE_BITRATE_BUTTON_ID,
-        PCWSTR(to_wide(&audiobook_bitrate_button_label(language, initial_bitrate)).as_ptr()),
-    )
-    .ok()?;
-    if show_split_folder_option {
-        pfdc.AddCheckButton(
-            AUDIO_SAVE_SPLIT_FOLDER_CHECKBOX_ID,
-            PCWSTR(to_wide(&i18n::tr(language, "dialog.save_audio_split_folder")).as_ptr()),
-            BOOL(1),
-        )
+        for i in 0..name_wides.len() {
+            spec.push(COMDLG_FILTERSPEC {
+                pszName: PCWSTR(name_wides[i].as_ptr()),
+                pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
+            });
+        }
+        pfd.SetFileTypes(&spec).ok()?;
+        pfd.SetFileTypeIndex(1).ok()?;
+        pfd.SetDefaultExtension(w!("mp3")).ok()?;
+        pfd.SetTitle(PCWSTR(
+            to_wide(&i18n::tr(language, "dialog.save_audio_title")).as_ptr(),
+        ))
         .ok()?;
-    }
 
-    let handler: IFileDialogEvents = AudiobookBitrateDialogHandler {
-        parent: hwnd,
-        language,
-        selected_bitrate: selected_bitrate.clone(),
-        allowed_bitrates: bitrate_options.to_vec(),
-    }
-    .into();
-    let cookie = pfd.Advise(&handler).ok()?;
-
-    let show_ok = pfd.Show(hwnd).is_ok();
-    pfd.Unadvise(cookie).ok()?;
-
-    if show_ok {
-        let item = pfd.GetResult().ok()?;
-        let path_ptr = item
-            .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
-            .ok()?;
-        let path_str = path_ptr.to_string().unwrap_or_default();
-        CoTaskMemFree(Some(path_ptr.0 as *const _));
-
-        let mut path = PathBuf::from(path_str);
-        let has_valid_ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(str::trim)
-            .is_some_and(|e| !e.is_empty());
-        if !has_valid_ext {
-            let filter_index = pfd.GetFileTypeIndex().ok().unwrap_or(1);
-            if filter_index == 2 {
-                path.set_extension("m4b");
-            } else {
-                path.set_extension("mp3");
+        if !initial_dir.is_empty() {
+            let initial_dir_w = to_wide(&initial_dir);
+            if let Ok(shell_folder) = SHCreateItemFromParsingName::<_, _, IShellItem>(
+                PCWSTR(initial_dir_w.as_ptr()),
+                None,
+            ) {
+                let _unused = pfd.SetDefaultFolder(&shell_folder);
+                let _unused = pfd.SetFolder(&shell_folder);
             }
         }
 
-        let selected_bitrate = selected_bitrate
-            .lock()
-            .map(|v| *v)
-            .unwrap_or(current_bitrate.clamp(64, 256));
-        log_debug(&format!(
-            "Save audio dialog: selected bitrate {} kbps (current {} kbps)",
-            selected_bitrate, current_bitrate
-        ));
-        if let Some(settings) = with_state(hwnd, |state| {
-            state.settings.audiobook_m4b_bitrate = selected_bitrate;
-            state.settings.clone()
-        }) {
-            save_settings(settings);
-        } else {
-            log_debug("Failed to access settings for audiobook bitrate");
+        if let Some(name) = suggested_name {
+            let default_name = Path::new(name)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .filter(|n| !n.trim().is_empty())
+                .unwrap_or(name);
+            pfd.SetFileName(PCWSTR(to_wide(default_name).as_ptr()))
+                .ok()?;
         }
 
-        let create_parts_folder = if show_split_folder_option {
-            pfdc.GetCheckButtonState(AUDIO_SAVE_SPLIT_FOLDER_CHECKBOX_ID)
-                .ok()
-                .is_none_or(|state| state.as_bool())
+        let current_bitrate =
+            with_state(hwnd, |state| state.settings.audiobook_m4b_bitrate).unwrap_or(128);
+        let bitrate_options = [64u32, 80, 96, 128, 160, 192, 256];
+        let initial_bitrate = if bitrate_options.contains(&current_bitrate) {
+            current_bitrate
         } else {
-            false
+            128
         };
+        let selected_bitrate = Arc::new(Mutex::new(initial_bitrate));
 
-        Some(SaveAudioDialogResult {
-            path,
-            create_parts_folder,
-        })
-    } else {
-        None
+        const AUDIO_SAVE_BITRATE_BUTTON_ID: u32 = 201;
+        const AUDIO_SAVE_SPLIT_FOLDER_CHECKBOX_ID: u32 = 202;
+        let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
+        pfdc.AddPushButton(
+            AUDIO_SAVE_BITRATE_BUTTON_ID,
+            PCWSTR(to_wide(&audiobook_bitrate_button_label(language, initial_bitrate)).as_ptr()),
+        )
+        .ok()?;
+        if show_split_folder_option {
+            pfdc.AddCheckButton(
+                AUDIO_SAVE_SPLIT_FOLDER_CHECKBOX_ID,
+                PCWSTR(to_wide(&i18n::tr(language, "dialog.save_audio_split_folder")).as_ptr()),
+                BOOL(1),
+            )
+            .ok()?;
+        }
+
+        let handler: IFileDialogEvents = AudiobookBitrateDialogHandler {
+            parent: hwnd,
+            language,
+            selected_bitrate: selected_bitrate.clone(),
+            allowed_bitrates: bitrate_options.to_vec(),
+        }
+        .into();
+        let cookie = pfd.Advise(&handler).ok()?;
+
+        let show_ok = pfd.Show(hwnd).is_ok();
+        pfd.Unadvise(cookie).ok()?;
+
+        if show_ok {
+            let item = pfd.GetResult().ok()?;
+            let path_ptr = item
+                .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
+                .ok()?;
+            let path_str = path_ptr.to_string().unwrap_or_default();
+            CoTaskMemFree(Some(path_ptr.0 as *const _));
+
+            let mut path = PathBuf::from(path_str);
+            let has_valid_ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(str::trim)
+                .is_some_and(|e| !e.is_empty());
+            if !has_valid_ext {
+                let filter_index = pfd.GetFileTypeIndex().ok().unwrap_or(1);
+                if filter_index == 2 {
+                    path.set_extension("m4b");
+                } else {
+                    path.set_extension("mp3");
+                }
+            }
+
+            let selected_bitrate = selected_bitrate
+                .lock()
+                .map(|v| *v)
+                .unwrap_or(current_bitrate.clamp(64, 256));
+            log_debug(&format!(
+                "Save audio dialog: selected bitrate {} kbps (current {} kbps)",
+                selected_bitrate, current_bitrate
+            ));
+            if let Some(settings) = with_state(hwnd, |state| {
+                state.settings.audiobook_m4b_bitrate = selected_bitrate;
+                state.settings.clone()
+            }) {
+                save_settings(settings);
+            } else {
+                log_debug("Failed to access settings for audiobook bitrate");
+            }
+
+            let create_parts_folder = if show_split_folder_option {
+                pfdc.GetCheckButtonState(AUDIO_SAVE_SPLIT_FOLDER_CHECKBOX_ID)
+                    .ok()
+                    .is_none_or(|state| state.as_bool())
+            } else {
+                false
+            };
+
+            Some(SaveAudioDialogResult {
+                path,
+                create_parts_folder,
+            })
+        } else {
+            None
+        }
     }
 }
 

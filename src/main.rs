@@ -562,9 +562,7 @@ fn confirm_menu_action(hwnd: HWND, key: &str) {
             }
         }
         let message = i18n::tr_f(language, "app.action_completed", &[("action", &cleaned)]);
-        unsafe {
-            show_info(hwnd, language, &message);
-        }
+        show_info(hwnd, language, &message);
     }
 }
 
@@ -10653,17 +10651,19 @@ pub(crate) fn show_error_with_id(
     watchdog::exit_modal_dialog();
 }
 
-pub(crate) unsafe fn show_info(hwnd: HWND, language: Language, message: &str) {
+pub(crate) fn show_info(hwnd: HWND, language: Language, message: &str) {
     log_debug(&format!("Info shown: {message}"));
     let wide = to_wide(message);
     let title = to_wide(&info_title(language));
     watchdog::enter_modal_dialog();
-    MessageBoxW(
-        hwnd,
-        PCWSTR(wide.as_ptr()),
-        PCWSTR(title.as_ptr()),
-        MB_OK | MB_ICONINFORMATION,
-    );
+    unsafe {
+        MessageBoxW(
+            hwnd,
+            PCWSTR(wide.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONINFORMATION,
+        );
+    }
     watchdog::exit_modal_dialog();
 }
 

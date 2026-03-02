@@ -1169,7 +1169,7 @@ fn replace_all_regex(
         );
     } else {
         let message = replaced_count_message(language, total_count);
-        unsafe { show_info(hwnd, language, &message) };
+        show_info(hwnd, language, &message);
     }
 }
 
@@ -1200,7 +1200,7 @@ fn replace_all_in_all_docs(hwnd: HWND, search: &str, replace: &str, flags: FINDR
         );
     } else {
         let message = replaced_count_message(language, total_count);
-        unsafe { show_info(hwnd, language, &message) };
+        show_info(hwnd, language, &message);
     }
 }
 
@@ -1236,7 +1236,7 @@ fn replace_all_in_selection(
         );
     } else {
         let message = replaced_count_message(language, count);
-        unsafe { show_info(hwnd, language, &message) };
+        show_info(hwnd, language, &message);
     }
 }
 

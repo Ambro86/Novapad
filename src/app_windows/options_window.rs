@@ -11095,7 +11095,7 @@ fn search_for_interpreter(hwnd: HWND) {
 
     if query.trim().is_empty() {
         let msg = i18n::tr(language, "options.interpreter_search.empty_query");
-        unsafe { crate::show_info(hwnd, language, &msg) };
+        crate::show_info(hwnd, language, &msg);
         return;
     }
 
@@ -11139,7 +11139,7 @@ fn search_for_interpreter(hwnd: HWND) {
             "options.interpreter_search.no_results",
             &[("query", &query)],
         );
-        unsafe { crate::show_info(hwnd, language, &msg) };
+        crate::show_info(hwnd, language, &msg);
         return;
     }
 

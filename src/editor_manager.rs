@@ -2421,7 +2421,7 @@ pub fn text_stats_active_edit(hwnd: HWND) {
     let language = unsafe { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     if text.is_empty() {
         let message = build_text_stats_message(language, 0, 0, 0, 0);
-        unsafe { crate::show_info(hwnd, language, &message) };
+        crate::show_info(hwnd, language, &message);
         return;
     }
 
@@ -2458,7 +2458,7 @@ pub fn text_stats_active_edit(hwnd: HWND) {
         words,
         lines,
     );
-    unsafe { crate::show_info(hwnd, language, &message) };
+    crate::show_info(hwnd, language, &message);
     unsafe { SetFocus(hwnd_edit) };
 }
 

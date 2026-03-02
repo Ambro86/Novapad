@@ -1311,13 +1311,11 @@ fn handle_batch_messages(hwnd: HWND) {
             return;
         }
         log_debug("Batch finished. Showing completion dialog.");
-        unsafe {
-            crate::show_info(
-                parent,
-                language,
-                &i18n::tr(language, "batch_audiobooks.done"),
-            );
-        }
+        crate::show_info(
+            parent,
+            language,
+            &i18n::tr(language, "batch_audiobooks.done"),
+        );
         if unsafe { IsWindow(list).as_bool() } {
             unsafe {
                 SetFocus(list);

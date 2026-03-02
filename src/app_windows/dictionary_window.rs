@@ -1003,17 +1003,17 @@ unsafe fn apply_entry_dialog(hwnd: HWND) {
     crate::log_if_err!(DestroyWindow(hwnd));
 }
 
-unsafe fn get_window_text(hwnd: HWND) -> String {
-    let len = GetWindowTextLengthW(hwnd);
+fn get_window_text(hwnd: HWND) -> String {
+    let len = unsafe { GetWindowTextLengthW(hwnd) };
     if len <= 0 {
         return String::new();
     }
     let mut buf = vec![0u16; (len + 1) as usize];
-    let read = GetWindowTextW(hwnd, &mut buf);
+    let read = unsafe { GetWindowTextW(hwnd, &mut buf) };
     String::from_utf16_lossy(&buf[..read as usize])
 }
 
-unsafe fn update_voice_controls_visibility(hwnd: HWND) {
+fn update_voice_controls_visibility(hwnd: HWND) {
     let (checkbox_use_voice, label_engine, combo_engine, label_voice, combo_voice, button_preview) =
         match with_entry_state(hwnd, |s| {
             (
@@ -1038,45 +1038,56 @@ unsafe fn update_voice_controls_visibility(hwnd: HWND) {
         button_preview,
     ];
     for control in controls {
-        ShowWindow(control, SW_HIDE);
-        EnableWindow(control, false);
+        unsafe {
+            ShowWindow(control, SW_HIDE);
+            EnableWindow(control, false);
+        }
     }
 }
 
-unsafe fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
+fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
     let (parent, combo_engine, combo_voice) =
         match with_entry_state(hwnd, |s| (s.parent, s.combo_engine, s.combo_voice)) {
             Some(values) => values,
             None => return,
         };
 
-    let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let engine_sel = unsafe { SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
         _ => TtsEngine::Edge,
     };
 
-    let voices: Vec<VoiceInfo> = with_state(parent, |state| match engine {
-        TtsEngine::Edge => state.edge_voices.clone(),
-        TtsEngine::Sapi5 => state.sapi_voices.clone(),
-        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
-    })
-    .unwrap_or_default();
+    let voices: Vec<VoiceInfo> = unsafe {
+        with_state(parent, |state| match engine {
+            TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Sapi5 => state.sapi_voices.clone(),
+            TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+        })
+        .unwrap_or_default()
+    };
 
-    let language = with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian);
+    let language =
+        unsafe { with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian) };
     let labels = dictionary_labels(language);
 
-    SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    unsafe {
+        SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    }
 
     if voices.is_empty() {
-        SendMessageW(
-            combo_voice,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&labels.voices_empty).as_ptr() as isize),
-        );
-        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        unsafe {
+            SendMessageW(
+                combo_voice,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&labels.voices_empty).as_ptr() as isize),
+            );
+        }
+        unsafe {
+            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        }
         return;
     }
 
@@ -1086,20 +1097,24 @@ unsafe fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
     for (voice_index, voice) in voices.iter().enumerate() {
         let label = format!("{} ({})", voice.short_name, voice.locale);
         let wide = to_wide(&label);
-        let idx = SendMessageW(
-            combo_voice,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(wide.as_ptr() as isize),
-        )
-        .0;
-        if idx >= 0 {
+        let idx = unsafe {
             SendMessageW(
                 combo_voice,
-                CB_SETITEMDATA,
-                WPARAM(idx as usize),
-                LPARAM(voice_index as isize),
-            );
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(wide.as_ptr() as isize),
+            )
+            .0
+        };
+        if idx >= 0 {
+            unsafe {
+                SendMessageW(
+                    combo_voice,
+                    CB_SETITEMDATA,
+                    WPARAM(idx as usize),
+                    LPARAM(voice_index as isize),
+                );
+            }
             if let Some(sel) = selected_voice
                 && voice.short_name == sel
             {
@@ -1110,13 +1125,17 @@ unsafe fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
     }
 
     if let Some(idx) = selected_index {
-        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
+        unsafe {
+            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
+        }
     } else if combo_index > 0 {
-        SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        unsafe {
+            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        }
     }
 }
 
-unsafe fn preview_entry_voice(hwnd: HWND) {
+fn preview_entry_voice(hwnd: HWND) {
     let (parent, edit_original, edit_replacement, combo_engine, combo_voice) =
         match with_entry_state(hwnd, |s| {
             (
@@ -1131,7 +1150,8 @@ unsafe fn preview_entry_voice(hwnd: HWND) {
             None => return,
         };
 
-    let language = with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian);
+    let language =
+        unsafe { with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian) };
 
     // Use the replacement text if available, otherwise use the original word
     let replacement = get_window_text(edit_replacement);
@@ -1150,31 +1170,35 @@ unsafe fn preview_entry_voice(hwnd: HWND) {
         return;
     }
 
-    let engine_sel = SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let engine_sel = unsafe { SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
         _ => TtsEngine::Edge,
     };
 
-    let voices: Vec<VoiceInfo> = with_state(parent, |state| match engine {
-        TtsEngine::Edge => state.edge_voices.clone(),
-        TtsEngine::Sapi5 => state.sapi_voices.clone(),
-        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
-    })
-    .unwrap_or_default();
+    let voices: Vec<VoiceInfo> = unsafe {
+        with_state(parent, |state| match engine {
+            TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Sapi5 => state.sapi_voices.clone(),
+            TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+        })
+        .unwrap_or_default()
+    };
 
-    let voice_sel = SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let voice_sel = unsafe { SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
     if voice_sel < 0 {
         return;
     }
-    let voice_index = SendMessageW(
-        combo_voice,
-        CB_GETITEMDATA,
-        WPARAM(voice_sel as usize),
-        LPARAM(0),
-    )
-    .0 as usize;
+    let voice_index = unsafe {
+        SendMessageW(
+            combo_voice,
+            CB_GETITEMDATA,
+            WPARAM(voice_sel as usize),
+            LPARAM(0),
+        )
+        .0 as usize
+    };
     if voice_index >= voices.len() {
         return;
     }
@@ -1215,16 +1239,18 @@ unsafe fn preview_entry_voice(hwnd: HWND) {
             };
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if with_state(parent, |state| {
-                state.tts_session = Some(tts_engine::TtsSession {
-                    id: state.tts_next_session_id,
-                    command_tx,
-                    cancel: cancel.clone(),
-                    paused: false,
-                    initial_caret_pos: 0,
-                });
-                state.tts_next_session_id += 1;
-            })
+            if unsafe {
+                with_state(parent, |state| {
+                    state.tts_session = Some(tts_engine::TtsSession {
+                        id: state.tts_next_session_id,
+                        command_tx,
+                        cancel: cancel.clone(),
+                        paused: false,
+                        initial_caret_pos: 0,
+                    });
+                    state.tts_next_session_id += 1;
+                })
+            }
             .is_none()
             {
                 crate::log_debug("Failed to access state in dictionary_window");
@@ -1237,16 +1263,18 @@ unsafe fn preview_entry_voice(hwnd: HWND) {
             tts_engine::stop_tts_playback(parent);
             let cancel = Arc::new(AtomicBool::new(false));
             let (command_tx, command_rx) = mpsc::unbounded_channel();
-            if with_state(parent, |state| {
-                state.tts_session = Some(tts_engine::TtsSession {
-                    id: state.tts_next_session_id,
-                    command_tx,
-                    cancel: cancel.clone(),
-                    paused: false,
-                    initial_caret_pos: 0,
-                });
-                state.tts_next_session_id += 1;
-            })
+            if unsafe {
+                with_state(parent, |state| {
+                    state.tts_session = Some(tts_engine::TtsSession {
+                        id: state.tts_next_session_id,
+                        command_tx,
+                        cancel: cancel.clone(),
+                        paused: false,
+                        initial_caret_pos: 0,
+                    });
+                    state.tts_next_session_id += 1;
+                })
+            }
             .is_none()
             {
                 crate::log_debug("Failed to access state in dictionary_window");

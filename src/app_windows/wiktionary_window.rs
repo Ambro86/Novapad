@@ -171,16 +171,20 @@ fn to_windows_newlines(text: &str) -> String {
     text.replace("\n", "\r\n")
 }
 
-unsafe fn refresh_history_combo(input: HWND, history: &[String]) {
-    SendMessageW(input, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+fn refresh_history_combo(input: HWND, history: &[String]) {
+    unsafe {
+        SendMessageW(input, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    }
     for item in history {
         let wide = to_wide(item);
-        SendMessageW(
-            input,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(PCWSTR(wide.as_ptr()).0 as isize),
-        );
+        unsafe {
+            SendMessageW(
+                input,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(PCWSTR(wide.as_ptr()).0 as isize),
+            );
+        }
     }
 }
 
@@ -584,19 +588,19 @@ unsafe fn wiktionary_wndproc_inner(
     }
 }
 
-unsafe fn handle_enter_key(hwnd: HWND) -> bool {
+fn handle_enter_key(hwnd: HWND) -> bool {
     let mut control = hwnd;
-    let mut control_id = GetDlgCtrlID(control) as usize;
+    let mut control_id = unsafe { GetDlgCtrlID(control) as usize };
     if control_id != WIKTIONARY_CLOSE_ID
         && control_id != WIKTIONARY_SEARCH_ID
         && control_id != WIKTIONARY_INPUT_ID
         && control_id != WIKTIONARY_LANGUAGE_ID
     {
-        let parent_control = windows::Win32::UI::WindowsAndMessaging::GetParent(control);
+        let parent_control = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(control) };
         if parent_control.0 == 0 {
             return false;
         }
-        let parent_id = GetDlgCtrlID(parent_control) as usize;
+        let parent_id = unsafe { GetDlgCtrlID(parent_control) as usize };
         if parent_id != WIKTIONARY_CLOSE_ID
             && parent_id != WIKTIONARY_SEARCH_ID
             && parent_id != WIKTIONARY_INPUT_ID
@@ -607,12 +611,12 @@ unsafe fn handle_enter_key(hwnd: HWND) -> bool {
         control = parent_control;
         control_id = parent_id;
     }
-    let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(control);
+    let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(control) };
     if parent.0 == 0 {
         return false;
     }
     if control_id == WIKTIONARY_CLOSE_ID {
-        crate::log_if_err!(DestroyWindow(parent));
+        crate::log_if_err!(unsafe { DestroyWindow(parent) });
         return true;
     }
     if control_id == WIKTIONARY_SEARCH_ID {
@@ -707,7 +711,7 @@ unsafe fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     )
 }
 
-unsafe fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
+fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     let order = with_window_state(parent, |state| {
         vec![
             state.input,
@@ -724,7 +728,8 @@ unsafe fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     let mut current_ctrl = current;
     let mut pos = order.iter().position(|hwnd| *hwnd == current_ctrl);
     if pos.is_none() {
-        let maybe_parent = windows::Win32::UI::WindowsAndMessaging::GetParent(current_ctrl);
+        let maybe_parent =
+            unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(current_ctrl) };
         if maybe_parent.0 != 0 {
             current_ctrl = maybe_parent;
             pos = order.iter().position(|hwnd| *hwnd == current_ctrl);
@@ -742,7 +747,9 @@ unsafe fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     };
     let target = order[next_index];
     if target.0 != 0 {
-        SetFocus(target);
+        unsafe {
+            SetFocus(target);
+        }
     }
 }
 
@@ -758,7 +765,7 @@ where
     }
 }
 
-unsafe fn run_lookup(hwnd: HWND) {
+fn run_lookup(hwnd: HWND) {
     let Some((parent, input, language_combo, output)) = with_window_state(hwnd, |state| {
         (
             state.parent,
@@ -769,13 +776,15 @@ unsafe fn run_lookup(hwnd: HWND) {
     }) else {
         return;
     };
-    let ui_language = with_state(parent, |s| s.settings.language).unwrap_or_default();
-    let pref = with_state(parent, |s| {
-        s.settings.dictionary_translation_language.clone()
-    })
+    let ui_language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
+    let pref = unsafe {
+        with_state(parent, |s| {
+            s.settings.dictionary_translation_language.clone()
+        })
+    }
     .unwrap_or_else(|| "auto".to_string());
     let lookup_pref = {
-        let sel = SendMessageW(language_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        let sel = unsafe { SendMessageW(language_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
         match sel {
             1 => "it",
             2 => "en",
@@ -800,60 +809,65 @@ unsafe fn run_lookup(hwnd: HWND) {
         language_from_code(&lookup_pref, ui_language)
     };
 
-    let len = GetWindowTextLengthW(input);
+    let len = unsafe { GetWindowTextLengthW(input) };
     if len <= 0 {
         let msg = i18n::tr(ui_language, "dictionary.no_word");
         if let Err(_e) =
-            SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr()))
+            unsafe { SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr())) }
         {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
         return;
     }
     let mut buf = vec![0u16; (len + 1) as usize];
-    let _read = GetWindowTextW(input, &mut buf);
+    let _read = unsafe { GetWindowTextW(input, &mut buf) };
     let word = String::from_utf16_lossy(&buf[..len as usize]);
     let trimmed = word.trim().to_string();
     if trimmed.is_empty() {
         let msg = i18n::tr(ui_language, "dictionary.no_word");
         if let Err(_e) =
-            SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr()))
+            unsafe { SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr())) }
         {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
         return;
     }
 
-    SetFocus(output);
+    unsafe { SetFocus(output) };
 
-    let history = with_state(parent, |state| {
-        let history = &mut state.settings.dictionary_search_history;
-        history.retain(|item| !item.eq_ignore_ascii_case(&trimmed));
-        history.insert(0, trimmed.clone());
-        if history.len() > 30 {
-            history.truncate(30);
-        }
-        state.settings.dictionary_lookup_language = lookup_pref.clone();
-        history.clone()
-    })
+    let history = unsafe {
+        with_state(parent, |state| {
+            let history = &mut state.settings.dictionary_search_history;
+            history.retain(|item| !item.eq_ignore_ascii_case(&trimmed));
+            history.insert(0, trimmed.clone());
+            if history.len() > 30 {
+                history.truncate(30);
+            }
+            state.settings.dictionary_lookup_language = lookup_pref.clone();
+            history.clone()
+        })
+    }
     .unwrap_or_default();
     refresh_history_combo(input, &history);
-    if let Some(settings_clone) = with_state(parent, |state| state.settings.clone()) {
+    if let Some(settings_clone) = unsafe { with_state(parent, |state| state.settings.clone()) } {
         crate::settings::save_settings(settings_clone);
     }
 
     let key = dictionary_cache_key(lookup_language, &pref, &trimmed);
     let cached_lines =
-        with_state(parent, |state| state.dictionary_cache.get(&key).cloned()).unwrap_or(None);
+        unsafe { with_state(parent, |state| state.dictionary_cache.get(&key).cloned()) }
+            .unwrap_or(None);
     if let Some(lines) = cached_lines {
         if is_dictionary_not_found_cache_entry(lookup_language, &lines) {
             remove_dictionary_cache(parent, &key);
         } else {
             let text = format_cached_output(lookup_language, &lines);
-            if let Err(_e) = SetWindowTextW(
-                output,
-                PCWSTR(to_wide(&to_windows_newlines(&text)).as_ptr()),
-            ) {}
+            if let Err(_e) = unsafe {
+                SetWindowTextW(
+                    output,
+                    PCWSTR(to_wide(&to_windows_newlines(&text)).as_ptr()),
+                )
+            } {}
             return;
         }
     }
@@ -864,10 +878,12 @@ unsafe fn run_lookup(hwnd: HWND) {
     LOOKUP_GENERATION.store(generation, Ordering::SeqCst);
 
     let loading_msg = i18n::tr(ui_language, "dictionary.loading");
-    if let Err(_e) = SetWindowTextW(
-        output,
-        PCWSTR(to_wide(&to_windows_newlines(&loading_msg)).as_ptr()),
-    ) {}
+    if let Err(_e) = unsafe {
+        SetWindowTextW(
+            output,
+            PCWSTR(to_wide(&to_windows_newlines(&loading_msg)).as_ptr()),
+        )
+    } {}
 
     let hwnd_val = hwnd.0;
     let parent_hwnd = parent;

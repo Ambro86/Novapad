@@ -506,7 +506,7 @@ struct MarkEpisodePlayedUiMessage {
     retries_left: u8,
 }
 
-unsafe fn post_mark_episode_played_ui_after_delay(
+fn post_mark_episode_played_ui_after_delay(
     hwnd: HWND,
     payload: MarkEpisodePlayedUiMessage,
     delay_ms: u64,
@@ -514,12 +514,14 @@ unsafe fn post_mark_episode_played_ui_after_delay(
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(delay_ms));
         let payload_ptr = Box::into_raw(Box::new(payload));
-        if let Err(e) = PostMessageW(
-            hwnd,
-            WM_PODCAST_MARK_EPISODE_PLAYED_UI,
-            WPARAM(0),
-            LPARAM(payload_ptr as isize),
-        ) {
+        if let Err(e) = unsafe {
+            PostMessageW(
+                hwnd,
+                WM_PODCAST_MARK_EPISODE_PLAYED_UI,
+                WPARAM(0),
+                LPARAM(payload_ptr as isize),
+            )
+        } {
             let _payload_owner = unsafe { Box::from_raw(payload_ptr) };
             log_debug(&format!(
                 "Failed to post WM_PODCAST_MARK_EPISODE_PLAYED_UI: {}",
@@ -644,7 +646,7 @@ fn export_podcast_sources_to_file(hwnd: HWND, path: &Path) -> Result<usize, Stri
     Ok(sources.len())
 }
 
-unsafe fn handle_import_opml(hwnd: HWND) {
+fn handle_import_opml(hwnd: HWND) {
     let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
     if let Some(path) = open_opml_file_dialog(hwnd, language, true) {
         if let Some(count) = import_podcast_sources_from_file(hwnd, &path) {
@@ -654,17 +656,19 @@ unsafe fn handle_import_opml(hwnd: HWND) {
         } else {
             let title = i18n::tr(language, "podcasts.window.title");
             let message = i18n::tr(language, "podcasts.import_failed");
-            MessageBoxW(
-                hwnd,
-                PCWSTR(to_wide(&message).as_ptr()),
-                PCWSTR(to_wide(&title).as_ptr()),
-                MB_OK | MB_ICONINFORMATION,
-            );
+            unsafe {
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(&message).as_ptr()),
+                    PCWSTR(to_wide(&title).as_ptr()),
+                    MB_OK | MB_ICONINFORMATION,
+                );
+            }
         }
     }
 }
 
-unsafe fn handle_export_opml(hwnd: HWND) {
+fn handle_export_opml(hwnd: HWND) {
     let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
     if let Some(path) = open_opml_file_dialog(hwnd, language, false) {
         match export_podcast_sources_to_file(hwnd, &path) {
@@ -676,12 +680,14 @@ unsafe fn handle_export_opml(hwnd: HWND) {
             Err(err) => {
                 let title = i18n::tr(language, "podcasts.window.title");
                 let message = format!("{}: {}", i18n::tr(language, "podcasts.export_failed"), err);
-                MessageBoxW(
-                    hwnd,
-                    PCWSTR(to_wide(&message).as_ptr()),
-                    PCWSTR(to_wide(&title).as_ptr()),
-                    MB_OK | MB_ICONINFORMATION,
-                );
+                unsafe {
+                    MessageBoxW(
+                        hwnd,
+                        PCWSTR(to_wide(&message).as_ptr()),
+                        PCWSTR(to_wide(&title).as_ptr()),
+                        MB_OK | MB_ICONINFORMATION,
+                    );
+                }
             }
         }
     }
@@ -792,7 +798,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             // Handle Enter on tree view
             if hwnd_tree.0 != 0
                 && focus == hwnd_tree
-                && let Some(item) = unsafe { selected_episode(hwnd) }
+                && let Some(item) = selected_episode(hwnd)
             {
                 let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                 unsafe { open_episode_in_player(hwnd, parent, &item) };
@@ -803,27 +809,31 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     handle_accessibility(hwnd, msg)
 }
 
-unsafe fn announce_status(message: &str) {
+fn announce_status(message: &str) {
     log_debug(&format!("podcasts_status {}", message));
     if !nvda_speak(message) {
         crate::log_debug("NVDA speak failed");
     }
 }
 
-unsafe fn ensure_rss_http(parent: HWND) {
-    let config = with_state(parent, |s| rss::config_from_settings(&s.settings))
-        .unwrap_or_else(rss::RssHttpConfig::default);
+fn ensure_rss_http(parent: HWND) {
+    let config = unsafe {
+        with_state(parent, |s| rss::config_from_settings(&s.settings))
+            .unwrap_or_else(rss::RssHttpConfig::default)
+    };
     if let Err(err) = rss::init_http(config) {
         log_debug(&format!("rss_http_init_error: {}", err));
     }
 }
 
-unsafe fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
-    with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
-        .unwrap_or_else(rss::RssFetchConfig::default)
+fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
+    unsafe {
+        with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
+            .unwrap_or_else(rss::RssFetchConfig::default)
+    }
 }
 
-unsafe fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
+fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     use windows::Win32::Foundation::HANDLE;
     use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
 
@@ -833,41 +843,43 @@ unsafe fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     if content.is_empty() {
         return;
     }
-    if OpenClipboard(hwnd).is_err() {
+    if unsafe { OpenClipboard(hwnd) }.is_err() {
         return;
     }
-    if let Err(e) = EmptyClipboard() {
+    if let Err(e) = unsafe { EmptyClipboard() } {
         crate::log_debug(&format!("EmptyClipboard failed: {}", e));
     }
     let size = content.len() * std::mem::size_of::<u16>();
-    let handle = match GlobalAlloc(GMEM_MOVEABLE, size) {
+    let handle = match unsafe { GlobalAlloc(GMEM_MOVEABLE, size) } {
         Ok(handle) => handle,
         Err(_) => {
-            if let Err(e) = CloseClipboard() {
+            if let Err(e) = unsafe { CloseClipboard() } {
                 crate::log_debug(&format!("CloseClipboard failed: {}", e));
             }
             return;
         }
     };
     if handle.0.is_null() {
-        if let Err(e) = CloseClipboard() {
+        if let Err(e) = unsafe { CloseClipboard() } {
             crate::log_debug(&format!("CloseClipboard failed: {}", e));
         }
         return;
     }
-    let ptr = GlobalLock(handle) as *mut u16;
+    let ptr = unsafe { GlobalLock(handle) as *mut u16 };
     if ptr.is_null() {
-        if let Err(e) = CloseClipboard() {
+        if let Err(e) = unsafe { CloseClipboard() } {
             crate::log_debug(&format!("CloseClipboard failed: {}", e));
         }
         return;
     }
-    std::ptr::copy_nonoverlapping(content.as_ptr(), ptr, content.len());
-    crate::log_if_err!(GlobalUnlock(handle));
-    if let Err(e) = SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize)) {
+    unsafe {
+        std::ptr::copy_nonoverlapping(content.as_ptr(), ptr, content.len());
+    }
+    crate::log_if_err!(unsafe { GlobalUnlock(handle) });
+    if let Err(e) = unsafe { SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize)) } {
         crate::log_debug(&format!("SetClipboardData failed: {}", e));
     }
-    if let Err(e) = CloseClipboard() {
+    if let Err(e) = unsafe { CloseClipboard() } {
         crate::log_debug(&format!("CloseClipboard failed: {}", e));
     }
 }
@@ -901,33 +913,33 @@ unsafe extern "system" fn podcast_tree_compare(
     )
 }
 
-unsafe fn collect_root_items(hwnd_tree: HWND) -> Vec<HTREEITEM> {
+fn collect_root_items(hwnd_tree: HWND) -> Vec<HTREEITEM> {
     let mut items = Vec::new();
-    let mut current = HTREEITEM(
+    let mut current = HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_ROOT as usize),
             LPARAM(0),
         )
-        .0,
-    );
+        .0
+    });
     while current.0 != 0 {
         items.push(current);
-        current = HTREEITEM(
+        current = HTREEITEM(unsafe {
             SendMessageW(
                 hwnd_tree,
                 TVM_GETNEXTITEM,
                 WPARAM(TVGN_NEXT as usize),
                 LPARAM(current.0),
             )
-            .0,
-        );
+            .0
+        });
     }
     items
 }
 
-unsafe fn apply_root_order(hwnd: HWND, hwnd_tree: HWND, ordered_items: &[HTREEITEM]) {
+fn apply_root_order(hwnd: HWND, hwnd_tree: HWND, ordered_items: &[HTREEITEM]) {
     for (i, hitem) in ordered_items.iter().enumerate() {
         let mut item = TVITEMW {
             mask: TVIF_PARAM,
@@ -935,12 +947,14 @@ unsafe fn apply_root_order(hwnd: HWND, hwnd_tree: HWND, ordered_items: &[HTREEIT
             ..Default::default()
         };
         item.hItem = *hitem;
-        SendMessageW(
-            hwnd_tree,
-            TVM_SETITEMW,
-            WPARAM(0),
-            LPARAM(&mut item as *mut _ as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_SETITEMW,
+                WPARAM(0),
+                LPARAM(&mut item as *mut _ as isize),
+            );
+        }
     }
     with_podcast_state(hwnd, |s| {
         for (i, hitem) in ordered_items.iter().enumerate() {
@@ -952,31 +966,33 @@ unsafe fn apply_root_order(hwnd: HWND, hwnd_tree: HWND, ordered_items: &[HTREEIT
         lpfnCompare: Some(podcast_tree_compare),
         lParam: LPARAM(0),
     };
-    SendMessageW(
-        hwnd_tree,
-        TVM_SORTCHILDRENCB,
-        WPARAM(0),
-        LPARAM(&mut sort_cb as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_tree,
+            TVM_SORTCHILDRENCB,
+            WPARAM(0),
+            LPARAM(&mut sort_cb as *mut _ as isize),
+        );
+    }
 }
 
-unsafe fn selected_tree_item(hwnd: HWND) -> HTREEITEM {
+fn selected_tree_item(hwnd: HWND) -> HTREEITEM {
     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
         return HTREEITEM(0);
     }
-    HTREEITEM(
+    HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
             LPARAM(0),
         )
-        .0,
-    )
+        .0
+    })
 }
 
-unsafe fn selected_source_index(hwnd: HWND) -> Option<usize> {
+fn selected_source_index(hwnd: HWND) -> Option<usize> {
     let hitem = selected_tree_item(hwnd);
     if hitem.0 == 0 {
         return None;
@@ -988,7 +1004,7 @@ unsafe fn selected_source_index(hwnd: HWND) -> Option<usize> {
     .flatten()
 }
 
-unsafe fn selected_node_data(hwnd: HWND) -> Option<NodeData> {
+fn selected_node_data(hwnd: HWND) -> Option<NodeData> {
     let hitem = selected_tree_item(hwnd);
     if hitem.0 == 0 {
         return None;
@@ -996,26 +1012,28 @@ unsafe fn selected_node_data(hwnd: HWND) -> Option<NodeData> {
     with_podcast_state(hwnd, |s| s.node_data.get(&hitem.0).cloned()).flatten()
 }
 
-unsafe fn selected_source_name(hwnd: HWND) -> Option<String> {
+fn selected_source_name(hwnd: HWND) -> Option<String> {
     let index = selected_source_index(hwnd)?;
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return None;
     }
-    with_state(parent, |ps| {
-        ps.settings.podcast_sources.get(index).map(|src| {
-            if src.title.trim().is_empty() {
-                src.url.clone()
-            } else {
-                src.title.clone()
-            }
+    unsafe {
+        with_state(parent, |ps| {
+            ps.settings.podcast_sources.get(index).map(|src| {
+                if src.title.trim().is_empty() {
+                    src.url.clone()
+                } else {
+                    src.title.clone()
+                }
+            })
         })
-    })
-    .unwrap_or(None)
+        .unwrap_or(None)
+    }
 }
 
 fn update_delete_button_state(hwnd: HWND) {
-    let enabled = unsafe { selected_source_name(hwnd).is_some() };
+    let enabled = selected_source_name(hwnd).is_some();
     unsafe {
         with_podcast_state(hwnd, |state| {
             if state.hwnd_delete.0 != 0 {
@@ -1025,7 +1043,7 @@ fn update_delete_button_state(hwnd: HWND) {
     }
 }
 
-unsafe fn selected_episode(hwnd: HWND) -> Option<PodcastEpisode> {
+fn selected_episode(hwnd: HWND) -> Option<PodcastEpisode> {
     let hitem = selected_tree_item(hwnd);
     if hitem.0 == 0 {
         return None;
@@ -1037,7 +1055,7 @@ unsafe fn selected_episode(hwnd: HWND) -> Option<PodcastEpisode> {
     .flatten()
 }
 
-unsafe fn show_selected_properties(hwnd: HWND) {
+fn show_selected_properties(hwnd: HWND) {
     let hitem = selected_tree_item(hwnd);
     if hitem.0 == 0 {
         return;
@@ -1049,9 +1067,11 @@ unsafe fn show_selected_properties(hwnd: HWND) {
     let mut lines: Vec<String> = Vec::new();
     match node {
         Some(NodeData::Source(index)) => {
-            let source = with_state(parent_hwnd, |ps| {
-                ps.settings.podcast_sources.get(index).cloned()
-            })
+            let source = unsafe {
+                with_state(parent_hwnd, |ps| {
+                    ps.settings.podcast_sources.get(index).cloned()
+                })
+            }
             .flatten();
             if let Some(src) = source {
                 let title_value = if src.title.trim().is_empty() {
@@ -1115,15 +1135,15 @@ unsafe fn show_selected_properties(hwnd: HWND) {
         Some(NodeData::Episode(item)) => {
             let item = *item;
             let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            let parent_item = HTREEITEM(
+            let parent_item = HTREEITEM(unsafe {
                 SendMessageW(
                     hwnd_tree,
                     TVM_GETNEXTITEM,
                     WPARAM(TVGN_PARENT as usize),
                     LPARAM(hitem.0),
                 )
-                .0,
-            );
+                .0
+            });
             let key = episode_key(&item);
             let unplayed = with_podcast_state(hwnd, |s| {
                 s.source_items
@@ -1182,7 +1202,7 @@ fn episode_key(item: &PodcastEpisode) -> String {
     item.title.trim().to_string()
 }
 
-unsafe fn source_removed_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<String> {
+fn source_removed_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<String> {
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return HashSet::new();
@@ -1195,17 +1215,19 @@ unsafe fn source_removed_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<S
     let Some(idx) = source_index else {
         return HashSet::new();
     };
-    with_state(parent, |ps| {
-        ps.settings
-            .podcast_sources
-            .get(idx)
-            .map(|src| src.removed_item_keys.iter().cloned().collect())
-    })
-    .flatten()
-    .unwrap_or_default()
+    unsafe {
+        with_state(parent, |ps| {
+            ps.settings
+                .podcast_sources
+                .get(idx)
+                .map(|src| src.removed_item_keys.iter().cloned().collect())
+        })
+        .flatten()
+        .unwrap_or_default()
+    }
 }
 
-unsafe fn source_read_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<String> {
+fn source_read_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<String> {
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return HashSet::new();
@@ -1218,17 +1240,19 @@ unsafe fn source_read_episode_keys(hwnd: HWND, hitem: HTREEITEM) -> HashSet<Stri
     let Some(idx) = source_index else {
         return HashSet::new();
     };
-    with_state(parent, |ps| {
-        ps.settings
-            .podcast_sources
-            .get(idx)
-            .map(|src| src.read_item_keys.iter().cloned().collect())
-    })
-    .flatten()
-    .unwrap_or_default()
+    unsafe {
+        with_state(parent, |ps| {
+            ps.settings
+                .podcast_sources
+                .get(idx)
+                .map(|src| src.read_item_keys.iter().cloned().collect())
+        })
+        .flatten()
+        .unwrap_or_default()
+    }
 }
 
-unsafe fn prune_persisted_played_keys_for_source(hwnd: HWND, hitem: HTREEITEM) {
+fn prune_persisted_played_keys_for_source(hwnd: HWND, hitem: HTREEITEM) {
     let source_index = with_podcast_state(hwnd, |s| match s.node_data.get(&hitem.0) {
         Some(NodeData::Source(idx)) => Some(*idx),
         _ => None,
@@ -1250,15 +1274,17 @@ unsafe fn prune_persisted_played_keys_for_source(hwnd: HWND, hitem: HTREEITEM) {
     if parent.0 == 0 {
         return;
     }
-    with_state(parent, |ps| {
-        if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
-            let before = src.read_item_keys.len();
-            src.read_item_keys.retain(|k| current_item_keys.contains(k));
-            if src.read_item_keys.len() != before {
-                settings::save_settings(ps.settings.clone());
+    unsafe {
+        with_state(parent, |ps| {
+            if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
+                let before = src.read_item_keys.len();
+                src.read_item_keys.retain(|k| current_item_keys.contains(k));
+                if src.read_item_keys.len() != before {
+                    settings::save_settings(ps.settings.clone());
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, node: NodeData, force: bool) {
@@ -1400,28 +1426,30 @@ unsafe fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, node: NodeData, fo
     });
 }
 
-unsafe fn update_source_cache(
+fn update_source_cache(
     parent: HWND,
     source_index: usize,
     cache: rss::RssFeedCache,
     last_updated: Option<i64>,
 ) {
-    if with_state(parent, |ps| {
-        if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
-            src.cache = cache;
-            if let Some(ts) = last_updated {
-                src.last_updated = Some(ts);
+    if unsafe {
+        with_state(parent, |ps| {
+            if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
+                src.cache = cache;
+                if let Some(ts) = last_updated {
+                    src.last_updated = Some(ts);
+                }
+                settings::save_settings(ps.settings.clone());
             }
-            settings::save_settings(ps.settings.clone());
-        }
-    })
+        })
+    }
     .is_none()
     {
         crate::log_debug("Failed to update source cache state");
     }
 }
 
-unsafe fn update_source_tree_title(hwnd_tree: HWND, hitem: HTREEITEM, title: &str) {
+fn update_source_tree_title(hwnd_tree: HWND, hitem: HTREEITEM, title: &str) {
     if hwnd_tree.0 == 0 || hitem.0 == 0 {
         return;
     }
@@ -1432,12 +1460,14 @@ unsafe fn update_source_tree_title(hwnd_tree: HWND, hitem: HTREEITEM, title: &st
         pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
         ..Default::default()
     };
-    SendMessageW(
-        hwnd_tree,
-        TVM_SETITEMW,
-        WPARAM(0),
-        LPARAM(&mut tvi as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_tree,
+            TVM_SETITEMW,
+            WPARAM(0),
+            LPARAM(&mut tvi as *mut _ as isize),
+        );
+    }
 }
 
 /// Launch background check for all podcast feeds to detect new episodes
@@ -1530,7 +1560,7 @@ unsafe fn start_background_unheard_check(hwnd: HWND) {
 }
 
 /// Process background check result - update unheard state if new episodes detected
-unsafe fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
+fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return;
@@ -1540,16 +1570,18 @@ unsafe fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult
         return;
     };
 
-    let should_mark_unheard = with_state(parent, |ps| {
-        ps.settings
-            .podcast_sources
-            .get(res.source_idx)
-            .map(|src| match &src.last_seen_guid {
-                Some(last_seen) => last_seen != &newest_key,
-                None => true,
-            })
-            .unwrap_or(false)
-    })
+    let should_mark_unheard = unsafe {
+        with_state(parent, |ps| {
+            ps.settings
+                .podcast_sources
+                .get(res.source_idx)
+                .map(|src| match &src.last_seen_guid {
+                    Some(last_seen) => last_seen != &newest_key,
+                    None => true,
+                })
+                .unwrap_or(false)
+        })
+    }
     .unwrap_or(false);
 
     if should_mark_unheard {
@@ -1566,12 +1598,12 @@ unsafe fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult
         .flatten();
 
         if let Some(hitem) = hitem_opt {
-            set_source_unheard(hwnd, hitem, true);
+            unsafe { set_source_unheard(hwnd, hitem, true) };
         }
     }
 }
 
-unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize, feed_title: &str) {
+fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize, feed_title: &str) {
     let title = feed_title.trim();
     if title.is_empty() {
         return;
@@ -1580,24 +1612,26 @@ unsafe fn update_source_title(hwnd: HWND, hitem: HTREEITEM, source_index: usize,
     if parent.0 == 0 {
         return;
     }
-    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+    let language = unsafe { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
     let mut updated = None;
-    let did_access = with_state(parent, |ps| {
-        if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
-            let looks_auto = src.title.trim().is_empty() || src.title == src.url;
-            if !src.user_title && looks_auto {
-                src.title = title.to_string();
-                let display = podcast_source_display_title(
-                    src,
-                    language,
-                    ps.settings.announce_unread_rss_podcast_items,
-                    ps.settings.rss_podcast_unread_label_position,
-                );
-                settings::save_settings(ps.settings.clone());
-                updated = Some(display);
+    let did_access = unsafe {
+        with_state(parent, |ps| {
+            if let Some(src) = ps.settings.podcast_sources.get_mut(source_index) {
+                let looks_auto = src.title.trim().is_empty() || src.title == src.url;
+                if !src.user_title && looks_auto {
+                    src.title = title.to_string();
+                    let display = podcast_source_display_title(
+                        src,
+                        language,
+                        ps.settings.announce_unread_rss_podcast_items,
+                        ps.settings.rss_podcast_unread_label_position,
+                    );
+                    settings::save_settings(ps.settings.clone());
+                    updated = Some(display);
+                }
             }
-        }
-    })
+        })
+    }
     .is_some();
     if !did_access {
         crate::log_debug("Failed to update source title state");
@@ -1772,7 +1806,7 @@ unsafe fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<Podcast
     added
 }
 
-unsafe fn create_tree_item(hwnd_tree: HWND, title: &str, index: usize) -> HTREEITEM {
+fn create_tree_item(hwnd_tree: HWND, title: &str, index: usize) -> HTREEITEM {
     let title_w = to_wide(title);
     let mut tvis = TVINSERTSTRUCTW {
         hParent: HTREEITEM(0),
@@ -1788,15 +1822,15 @@ unsafe fn create_tree_item(hwnd_tree: HWND, title: &str, index: usize) -> HTREEI
             },
         },
     };
-    HTREEITEM(
+    HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_INSERTITEMW,
             WPARAM(0),
             LPARAM(&mut tvis as *mut _ as isize),
         )
-        .0,
-    )
+        .0
+    })
 }
 
 unsafe fn reload_tree(hwnd: HWND) {
@@ -2502,16 +2536,12 @@ unsafe fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Optio
     .flatten()
 }
 
-unsafe fn update_search_results(
-    hwnd: HWND,
-    results: Vec<PodcastSearchResult>,
-    status: Option<&str>,
-) {
+fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>, status: Option<&str>) {
     let hwnd_results = with_podcast_state(hwnd, |s| s.hwnd_results).unwrap_or(HWND(0));
     if hwnd_results.0 == 0 {
         return;
     }
-    SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    unsafe { SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
     if let Some(status) = status
         && !status.trim().is_empty()
     {
@@ -2522,15 +2552,19 @@ unsafe fn update_search_results(
             with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
             "podcasts.search.no_results",
         ));
-        SendMessageW(
-            hwnd_results,
-            LB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(text.as_ptr() as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_results,
+                LB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(text.as_ptr() as isize),
+            );
+        }
         with_podcast_state(hwnd, |s| s.search_results = Vec::new());
-        SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
-        SetFocus(hwnd_results);
+        unsafe {
+            SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+            SetFocus(hwnd_results);
+        }
         return;
     }
     for item in &results {
@@ -2540,44 +2574,50 @@ unsafe fn update_search_results(
             format!("{} - {}", item.title, item.artist)
         };
         let wide = to_wide(&label);
-        SendMessageW(
-            hwnd_results,
-            LB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(wide.as_ptr() as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_results,
+                LB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(wide.as_ptr() as isize),
+            );
+        }
     }
     with_podcast_state(hwnd, |s| s.search_results = results);
-    SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
-    SetFocus(hwnd_results);
+    unsafe {
+        SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+        SetFocus(hwnd_results);
+    }
 }
 
-unsafe fn show_search_loading(hwnd: HWND) {
+fn show_search_loading(hwnd: HWND) {
     let hwnd_results = with_podcast_state(hwnd, |s| s.hwnd_results).unwrap_or(HWND(0));
     if hwnd_results.0 == 0 {
         return;
     }
-    SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    unsafe { SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
     let text = to_wide(&i18n::tr(
         with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
         "podcasts.loading",
     ));
-    SendMessageW(
-        hwnd_results,
-        LB_ADDSTRING,
-        WPARAM(0),
-        LPARAM(text.as_ptr() as isize),
-    );
-    SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
-    SetFocus(hwnd_results);
+    unsafe {
+        SendMessageW(
+            hwnd_results,
+            LB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(text.as_ptr() as isize),
+        );
+        SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+        SetFocus(hwnd_results);
+    }
 }
 
-unsafe fn selected_search_provider(hwnd: HWND) -> SearchProvider {
+fn selected_search_provider(hwnd: HWND) -> SearchProvider {
     let combo = with_podcast_state(hwnd, |s| s.hwnd_search_provider).unwrap_or(HWND(0));
     if combo.0 == 0 {
         return SearchProvider::Itunes;
     }
-    let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let sel = unsafe { SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
     if sel == 1 {
         SearchProvider::PodcastIndex
     } else {
@@ -3050,38 +3090,40 @@ async fn load_by_category(
     }
 }
 
-unsafe fn update_category_status(hwnd: HWND, message: Option<&str>) {
+fn update_category_status(hwnd: HWND, message: Option<&str>) {
     let hwnd_status = with_category_dialog_state(hwnd, |s| s.hwnd_status).unwrap_or(HWND(0));
     if hwnd_status.0 == 0 {
         return;
     }
     let text = message.unwrap_or_default();
     let wide = to_wide(text);
-    if let Err(e) = SetWindowTextW(hwnd_status, PCWSTR(wide.as_ptr())) {
+    if let Err(e) = unsafe { SetWindowTextW(hwnd_status, PCWSTR(wide.as_ptr())) } {
         crate::log_debug(&format!("SetWindowTextW failed: {:?}", e));
     }
 }
 
-unsafe fn update_category_list(hwnd: HWND, categories: Vec<Category>) {
+fn update_category_list(hwnd: HWND, categories: Vec<Category>) {
     let hwnd_list = with_category_dialog_state(hwnd, |s| s.hwnd_list).unwrap_or(HWND(0));
     if hwnd_list.0 == 0 {
         return;
     }
-    SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    unsafe { SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
     for category in &categories {
         let wide = to_wide(&category.name);
-        SendMessageW(
-            hwnd_list,
-            LB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(wide.as_ptr() as isize),
-        );
+        unsafe {
+            SendMessageW(
+                hwnd_list,
+                LB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(wide.as_ptr() as isize),
+            );
+        }
     }
     with_category_dialog_state(hwnd, |s| s.categories = categories);
-    SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+    unsafe { SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0)) };
 }
 
-unsafe fn load_categories_for_source(hwnd: HWND, source: Source) {
+fn load_categories_for_source(hwnd: HWND, source: Source) {
     let language = with_category_dialog_state(hwnd, |s| s.language).unwrap_or_default();
     with_category_dialog_state(hwnd, |s| s.source = source);
     match source {
@@ -3096,7 +3138,7 @@ unsafe fn load_categories_for_source(hwnd: HWND, source: Source) {
     }
 }
 
-unsafe fn set_category_mode(hwnd: HWND, mode: Mode) {
+fn set_category_mode(hwnd: HWND, mode: Mode) {
     with_category_dialog_state(hwnd, |s| s.mode = mode);
     let (label, edit) = with_category_dialog_state(hwnd, |s| (s.hwnd_term_label, s.hwnd_term_edit))
         .unwrap_or((HWND(0), HWND(0)));
@@ -3107,34 +3149,38 @@ unsafe fn set_category_mode(hwnd: HWND, mode: Mode) {
         windows::Win32::UI::WindowsAndMessaging::SW_HIDE
     };
     if label.0 != 0 {
-        windows::Win32::UI::WindowsAndMessaging::ShowWindow(label, show_flag);
+        unsafe { windows::Win32::UI::WindowsAndMessaging::ShowWindow(label, show_flag) };
     }
     if edit.0 != 0 {
-        windows::Win32::UI::WindowsAndMessaging::ShowWindow(edit, show_flag);
+        unsafe { windows::Win32::UI::WindowsAndMessaging::ShowWindow(edit, show_flag) };
     }
 }
 
-unsafe fn read_window_text(hwnd: HWND) -> String {
+fn read_window_text(hwnd: HWND) -> String {
     if hwnd.0 == 0 {
         return String::new();
     }
-    let len = SendMessageW(
-        hwnd,
-        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
-        WPARAM(0),
-        LPARAM(0),
-    )
-    .0;
+    let len = unsafe {
+        SendMessageW(
+            hwnd,
+            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0
+    };
     if len == 0 {
         return String::new();
     }
     let mut buf = vec![0u16; len as usize + 1];
-    SendMessageW(
-        hwnd,
-        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
-        WPARAM(buf.len()),
-        LPARAM(buf.as_mut_ptr() as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd,
+            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
+            WPARAM(buf.len()),
+            LPARAM(buf.as_mut_ptr() as isize),
+        );
+    }
     String::from_utf16_lossy(&buf[..len as usize])
 }
 
@@ -4365,9 +4411,10 @@ unsafe fn show_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
     }
 }
 
-unsafe fn selected_search_result(hwnd: HWND) -> Option<PodcastSearchResult> {
+fn selected_search_result(hwnd: HWND) -> Option<PodcastSearchResult> {
     let (results, idx) = with_podcast_state(hwnd, |s| {
-        let idx = SendMessageW(s.hwnd_results, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+        let idx =
+            unsafe { SendMessageW(s.hwnd_results, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32 };
         (s.search_results.clone(), idx)
     })
     .unwrap_or((Vec::new(), -1));
@@ -4377,34 +4424,42 @@ unsafe fn selected_search_result(hwnd: HWND) -> Option<PodcastSearchResult> {
     Some(results[idx as usize].clone())
 }
 
-unsafe fn trigger_search_from_edit(hwnd: HWND) {
+fn trigger_search_from_edit(hwnd: HWND) {
     let (hwnd_search, hwnd_results) =
         with_podcast_state(hwnd, |s| (s.hwnd_search, s.hwnd_results)).unwrap_or((HWND(0), HWND(0)));
     if hwnd_search.0 == 0 {
         return;
     }
-    let len = SendMessageW(
-        hwnd_search,
-        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
-        WPARAM(0),
-        LPARAM(0),
-    )
-    .0;
+    let len = unsafe {
+        SendMessageW(
+            hwnd_search,
+            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0
+    };
     let mut buf = vec![0u16; len as usize + 1];
-    SendMessageW(
-        hwnd_search,
-        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
-        WPARAM(buf.len()),
-        LPARAM(buf.as_mut_ptr() as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_search,
+            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXT,
+            WPARAM(buf.len()),
+            LPARAM(buf.as_mut_ptr() as isize),
+        );
+    }
     let query = String::from_utf16_lossy(&buf[..len as usize]);
-    perform_search(hwnd, &query);
+    unsafe {
+        perform_search(hwnd, &query);
+    }
     if hwnd_results.0 != 0 {
-        SetFocus(hwnd_results);
+        unsafe {
+            SetFocus(hwnd_results);
+        }
     }
 }
 
-unsafe fn show_search_result_info(hwnd: HWND) {
+fn show_search_result_info(hwnd: HWND) {
     let result = match selected_search_result(hwnd) {
         Some(result) => result,
         None => return,
@@ -4420,12 +4475,14 @@ unsafe fn show_search_result_info(hwnd: HWND) {
             ("feed", &result.feed_url),
         ],
     );
-    MessageBoxW(
-        hwnd,
-        PCWSTR(to_wide(&body).as_ptr()),
-        PCWSTR(to_wide(&title).as_ptr()),
-        windows::Win32::UI::WindowsAndMessaging::MB_OK,
-    );
+    unsafe {
+        MessageBoxW(
+            hwnd,
+            PCWSTR(to_wide(&body).as_ptr()),
+            PCWSTR(to_wide(&title).as_ptr()),
+            windows::Win32::UI::WindowsAndMessaging::MB_OK,
+        );
+    }
 }
 
 unsafe fn show_selected_result_episodes(hwnd: HWND) {

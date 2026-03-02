@@ -6918,14 +6918,14 @@ fn combo_value(hwnd: HWND) -> i32 {
     }
 }
 
-unsafe fn selected_voice_short_name_from_combo_text(combo: HWND) -> Option<String> {
-    let len = GetWindowTextLengthW(combo);
+fn selected_voice_short_name_from_combo_text(combo: HWND) -> Option<String> {
+    let len = unsafe { GetWindowTextLengthW(combo) };
     if len <= 0 {
         return None;
     }
 
     let mut buf = vec![0u16; (len + 1) as usize];
-    let read = GetWindowTextW(combo, &mut buf);
+    let read = unsafe { GetWindowTextW(combo, &mut buf) };
     if read <= 0 {
         return None;
     }

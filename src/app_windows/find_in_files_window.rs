@@ -956,16 +956,14 @@ pub(crate) fn apply_find_in_files_selection(
     start_utf16: i32,
     len_utf16: i32,
 ) {
-    unsafe {
-        if select_snippet_exact(hwnd_edit, snippet) {
-            return;
-        }
-        let term = normalize_to_crlf(term);
-        if term.is_empty() {
-            return;
-        }
-        select_term_at(hwnd_edit, &term, start_utf16, len_utf16);
+    if select_snippet_exact(hwnd_edit, snippet) {
+        return;
     }
+    let term = normalize_to_crlf(term);
+    if term.is_empty() {
+        return;
+    }
+    select_term_at(hwnd_edit, &term, start_utf16, len_utf16);
 }
 
 fn set_search_enabled(state: &mut FindInFilesState, enabled: bool) {
@@ -1461,7 +1459,7 @@ fn snippet_for_match(line: &str, match_start: usize, match_len: usize, max_chars
     snippet
 }
 
-unsafe fn select_term_at(hwnd_edit: HWND, term: &str, start: i32, _len: i32) {
+fn select_term_at(hwnd_edit: HWND, term: &str, start: i32, _len: i32) {
     if term.is_empty() {
         return;
     }
@@ -1474,13 +1472,15 @@ unsafe fn select_term_at(hwnd_edit: HWND, term: &str, start: i32, _len: i32) {
         lpstrText: PCWSTR(wide.as_ptr()),
         chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
     };
-    let found = SendMessageW(
-        hwnd_edit,
-        EM_FINDTEXTEXW,
-        WPARAM((FR_MATCHCASE | FR_DOWN).0 as usize),
-        LPARAM(&mut ft as *mut _ as isize),
-    )
-    .0 != -1;
+    let found = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_FINDTEXTEXW,
+            WPARAM((FR_MATCHCASE | FR_DOWN).0 as usize),
+            LPARAM(&mut ft as *mut _ as isize),
+        )
+        .0 != -1
+    };
 
     if found {
         let start = ft.chrgText.cpMin.min(ft.chrgText.cpMax);

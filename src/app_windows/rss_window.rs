@@ -468,26 +468,26 @@ fn format_timestamp_for_language(
     Some(dt.format(&full_pattern).to_string())
 }
 
-unsafe fn show_selected_properties(hwnd: HWND) {
+fn show_selected_properties(hwnd: HWND) {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
         return;
     }
-    let hitem = windows::Win32::UI::Controls::HTREEITEM(
+    let hitem = windows::Win32::UI::Controls::HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
             LPARAM(0),
         )
-        .0,
-    );
+        .0
+    });
     if hitem.0 == 0 {
         return;
     }
 
     let language = with_rss_state(hwnd, |s| {
-        with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+        unsafe { with_state(s.parent, |ps| ps.settings.language) }.unwrap_or_default()
     })
     .unwrap_or_default();
 
@@ -495,22 +495,23 @@ unsafe fn show_selected_properties(hwnd: HWND) {
         let node = s.node_data.get(&hitem.0).cloned();
         let source = match &node {
             Some(NodeData::Source(idx)) => {
-                with_state(s.parent, |ps| ps.settings.rss_sources.get(*idx).cloned()).flatten()
+                unsafe { with_state(s.parent, |ps| ps.settings.rss_sources.get(*idx).cloned()) }
+                    .flatten()
             }
             _ => None,
         };
         let item_unread = match &node {
             Some(NodeData::Item(item)) => {
                 let key = rss_item_key(item);
-                let parent_item = windows::Win32::UI::Controls::HTREEITEM(
+                let parent_item = windows::Win32::UI::Controls::HTREEITEM(unsafe {
                     SendMessageW(
                         s.hwnd_tree,
                         TVM_GETNEXTITEM,
                         WPARAM(TVGN_PARENT as usize),
                         LPARAM(hitem.0),
                     )
-                    .0,
-                );
+                    .0
+                });
                 let unread = s
                     .source_items
                     .get(&parent_item.0)
@@ -810,13 +811,13 @@ fn escape_opml_attr(value: &str) -> String {
         .replace('"', "&quot;")
 }
 
-unsafe fn export_sources_to_opml_file(hwnd: HWND, path: &Path) -> Result<usize, String> {
+fn export_sources_to_opml_file(hwnd: HWND, path: &Path) -> Result<usize, String> {
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return Err("missing parent".to_string());
     }
-    let sources =
-        with_state(parent, |state| state.settings.rss_sources.clone()).unwrap_or_default();
+    let sources = unsafe { with_state(parent, |state| state.settings.rss_sources.clone()) }
+        .unwrap_or_default();
     if sources.is_empty() {
         return Ok(0);
     }
@@ -847,7 +848,7 @@ unsafe fn export_sources_to_opml_file(hwnd: HWND, path: &Path) -> Result<usize, 
     Ok(sources.len())
 }
 
-unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
+fn import_sources_from_file(hwnd: HWND, path: &Path) {
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
         Err(err) => {
@@ -876,8 +877,8 @@ unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
         return;
     }
     let mut added = 0;
-    unsafe {
-        if with_state(parent, |state| {
+    if unsafe {
+        with_state(parent, |state| {
             let mut existing: std::collections::HashSet<String> = state
                 .settings
                 .rss_sources
@@ -909,9 +910,8 @@ unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
             }
         })
         .is_none()
-        {
-            crate::log_debug("Failed to access state in import_opml_file");
-        }
+    } {
+        crate::log_debug("Failed to access state in import_opml_file");
     }
     if added > 0 {
         log_debug(&format!(
@@ -919,7 +919,7 @@ unsafe fn import_sources_from_file(hwnd: HWND, path: &Path) {
             path.to_string_lossy(),
             added
         ));
-        reload_tree(hwnd);
+        unsafe { reload_tree(hwnd) };
     }
 }
 
@@ -970,7 +970,7 @@ fn select_newest_item_key(items: &[RssItem], removed_keys: &HashSet<String>) -> 
     best.map(|(_, _, key)| key)
 }
 
-unsafe fn source_removed_keys_for_tree_item(
+fn source_removed_keys_for_tree_item(
     hwnd: HWND,
     hitem: windows::Win32::UI::Controls::HTREEITEM,
 ) -> HashSet<String> {
@@ -986,14 +986,16 @@ unsafe fn source_removed_keys_for_tree_item(
     let Some(idx) = source_index else {
         return HashSet::new();
     };
-    with_state(parent, |ps| {
-        ps.settings
-            .rss_sources
-            .get(idx)
-            .map(|src| src.removed_item_keys.iter().cloned().collect())
-    })
-    .flatten()
-    .unwrap_or_default()
+    unsafe {
+        with_state(parent, |ps| {
+            ps.settings
+                .rss_sources
+                .get(idx)
+                .map(|src| src.removed_item_keys.iter().cloned().collect())
+        })
+        .flatten()
+        .unwrap_or_default()
+    }
 }
 
 fn sort_items_by_date_desc(items: &mut [RssItem]) {
@@ -1008,7 +1010,7 @@ fn sort_items_by_date_desc(items: &mut [RssItem]) {
     }
 }
 
-unsafe fn prune_persisted_read_keys_for_source(
+fn prune_persisted_read_keys_for_source(
     hwnd: HWND,
     hitem: windows::Win32::UI::Controls::HTREEITEM,
 ) {
@@ -1034,15 +1036,17 @@ unsafe fn prune_persisted_read_keys_for_source(
         return;
     }
 
-    with_state(parent, |ps| {
-        if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
-            let before = src.read_item_keys.len();
-            src.read_item_keys.retain(|k| current_item_keys.contains(k));
-            if src.read_item_keys.len() != before {
-                crate::settings::save_settings(ps.settings.clone());
+    unsafe {
+        with_state(parent, |ps| {
+            if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
+                let before = src.read_item_keys.len();
+                src.read_item_keys.retain(|k| current_item_keys.contains(k));
+                if src.read_item_keys.len() != before {
+                    crate::settings::save_settings(ps.settings.clone());
+                }
             }
-        }
-    });
+        });
+    }
 }
 
 unsafe extern "system" fn rss_tree_compare(
@@ -1091,39 +1095,41 @@ fn collect_root_items(hwnd_tree: HWND) -> Vec<windows::Win32::UI::Controls::HTRE
     items
 }
 
-unsafe fn select_first_root_if_needed(hwnd: HWND, hwnd_tree: HWND) {
+fn select_first_root_if_needed(hwnd: HWND, hwnd_tree: HWND) {
     if hwnd_tree.0 == 0 {
         return;
     }
-    let current = windows::Win32::UI::Controls::HTREEITEM(
+    let current = windows::Win32::UI::Controls::HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
             LPARAM(0),
         )
-        .0,
-    );
+        .0
+    });
     if current.0 != 0 {
         return;
     }
-    let first = windows::Win32::UI::Controls::HTREEITEM(
+    let first = windows::Win32::UI::Controls::HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_ROOT as usize),
             LPARAM(0),
         )
-        .0,
-    );
+        .0
+    });
     if first.0 != 0 {
-        SendMessageW(
-            hwnd_tree,
-            TVM_SELECTITEM,
-            WPARAM(TVGN_CARET as usize),
-            LPARAM(first.0),
-        );
-        SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(first.0));
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_SELECTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(first.0),
+            );
+            SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(first.0));
+        }
         with_rss_state(hwnd, |s| s.last_selected = first.0);
     }
 }
@@ -1739,7 +1745,7 @@ pub fn focus_library(hwnd: HWND) {
     unsafe { SetForegroundWindow(hwnd) };
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 != 0 {
-        unsafe { select_first_root_if_needed(hwnd, hwnd_tree) };
+        select_first_root_if_needed(hwnd, hwnd_tree);
         unsafe { SetFocus(hwnd_tree) };
     }
 }
@@ -3303,7 +3309,7 @@ fn schedule_delayed_source_select(hwnd: HWND, source_index: usize) {
     });
 }
 
-unsafe fn select_source_by_index(hwnd: HWND, source_index: usize) {
+fn select_source_by_index(hwnd: HWND, source_index: usize) {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
         return;
@@ -3318,21 +3324,23 @@ unsafe fn select_source_by_index(hwnd: HWND, source_index: usize) {
     })
     .flatten();
     if let Some(target) = target_hitem {
-        SendMessageW(
-            hwnd_tree,
-            TVM_SELECTITEM,
-            WPARAM(TVGN_CARET as usize),
-            LPARAM(target.0),
-        );
-        SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
-        if GetFocus() != hwnd_tree {
+        unsafe {
+            SendMessageW(
+                hwnd_tree,
+                TVM_SELECTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(target.0),
+            );
+            SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
+        }
+        if unsafe { GetFocus() } != hwnd_tree {
             with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
-            SetFocus(hwnd_tree);
+            unsafe { SetFocus(hwnd_tree) };
         }
     }
 }
 
-unsafe fn update_source_tree_title(
+fn update_source_tree_title(
     hwnd_tree: HWND,
     hitem: windows::Win32::UI::Controls::HTREEITEM,
     title: &str,
@@ -3347,12 +3355,14 @@ unsafe fn update_source_tree_title(
         pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
         ..Default::default()
     };
-    SendMessageW(
-        hwnd_tree,
-        TVM_SETITEMW,
-        WPARAM(0),
-        LPARAM(&mut tvi as *mut _ as isize),
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_tree,
+            TVM_SETITEMW,
+            WPARAM(0),
+            LPARAM(&mut tvi as *mut _ as isize),
+        );
+    }
 }
 
 unsafe fn set_source_unread(
@@ -5196,20 +5206,20 @@ enum ArticleAction {
     ShareEmail,
 }
 
-unsafe fn selected_article_item(hwnd: HWND) -> Option<RssItem> {
+fn selected_article_item(hwnd: HWND) -> Option<RssItem> {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
         return None;
     }
-    let hitem = windows::Win32::UI::Controls::HTREEITEM(
+    let hitem = windows::Win32::UI::Controls::HTREEITEM(unsafe {
         SendMessageW(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
             LPARAM(0),
         )
-        .0,
-    );
+        .0
+    });
     if hitem.0 == 0 {
         return None;
     }
@@ -5220,7 +5230,7 @@ unsafe fn selected_article_item(hwnd: HWND) -> Option<RssItem> {
     .flatten()
 }
 
-unsafe fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
+fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     use windows::Win32::Foundation::HANDLE;
     use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
 
@@ -5230,41 +5240,43 @@ unsafe fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     if content.is_empty() {
         return;
     }
-    if OpenClipboard(hwnd).is_err() {
+    if unsafe { OpenClipboard(hwnd) }.is_err() {
         return;
     }
-    if let Err(e) = EmptyClipboard() {
+    if let Err(e) = unsafe { EmptyClipboard() } {
         crate::log_debug(&format!("EmptyClipboard failed: {}", e));
     }
     let size = content.len() * std::mem::size_of::<u16>();
-    let handle = match GlobalAlloc(GMEM_MOVEABLE, size) {
+    let handle = match unsafe { GlobalAlloc(GMEM_MOVEABLE, size) } {
         Ok(handle) => handle,
         Err(_) => {
-            if let Err(e) = CloseClipboard() {
+            if let Err(e) = unsafe { CloseClipboard() } {
                 crate::log_debug(&format!("CloseClipboard failed: {}", e));
             }
             return;
         }
     };
     if handle.0.is_null() {
-        if let Err(e) = CloseClipboard() {
+        if let Err(e) = unsafe { CloseClipboard() } {
             crate::log_debug(&format!("CloseClipboard failed: {}", e));
         }
         return;
     }
-    let ptr = GlobalLock(handle) as *mut u16;
+    let ptr = unsafe { GlobalLock(handle) as *mut u16 };
     if ptr.is_null() {
-        if let Err(e) = CloseClipboard() {
+        if let Err(e) = unsafe { CloseClipboard() } {
             crate::log_debug(&format!("CloseClipboard failed: {}", e));
         }
         return;
     }
-    std::ptr::copy_nonoverlapping(content.as_ptr(), ptr, content.len());
-    crate::log_if_err!(GlobalUnlock(handle));
-    if let Err(e) = SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize)) {
+    unsafe {
+        std::ptr::copy_nonoverlapping(content.as_ptr(), ptr, content.len());
+    }
+    crate::log_if_err!(unsafe { GlobalUnlock(handle) });
+    if let Err(e) = unsafe { SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize)) } {
         crate::log_debug(&format!("SetClipboardData failed: {}", e));
     }
-    if let Err(e) = CloseClipboard() {
+    if let Err(e) = unsafe { CloseClipboard() } {
         crate::log_debug(&format!("CloseClipboard failed: {}", e));
     }
 }

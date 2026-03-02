@@ -182,39 +182,43 @@ fn selected_engine(hwnd_combo: HWND) -> TtsEngine {
     }
 }
 
-unsafe fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
-    let combo = GetDlgItem(hwnd_dialog, ID_VOICE);
+fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
+    let combo = unsafe { GetDlgItem(hwnd_dialog, ID_VOICE) };
     if combo.0 == 0 {
         return;
     }
-    let ptr = GetWindowLongPtrW(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData };
     if ptr.is_null() {
         return;
     }
-    let data = &mut *ptr;
-    let engine_combo = GetDlgItem(hwnd_dialog, ID_ENGINE);
+    let data = unsafe { &mut *ptr };
+    let engine_combo = unsafe { GetDlgItem(hwnd_dialog, ID_ENGINE) };
     let engine = selected_engine(engine_combo);
     let voices = match engine {
         TtsEngine::Edge => &data.edge_voices,
         TtsEngine::Sapi5 => &data.sapi5_voices,
         TtsEngine::Sapi4 => &data.sapi4_voices,
     };
-    let only_multilingual = SendMessageW(
-        GetDlgItem(hwnd_dialog, ID_ONLY_MULTILINGUAL),
+    let only_multilingual = unsafe {
+        SendMessageW(
+        unsafe { GetDlgItem(hwnd_dialog, ID_ONLY_MULTILINGUAL) },
         BM_GETCHECK,
         WPARAM(0),
         LPARAM(0),
     )
     .0 as u32
+    }
         == BST_CHECKED.0;
     let language_filter = if engine == TtsEngine::Edge && !only_multilingual {
-        let sel = SendMessageW(
-            GetDlgItem(hwnd_dialog, ID_LANGUAGE),
+        let sel = unsafe {
+            SendMessageW(
+            unsafe { GetDlgItem(hwnd_dialog, ID_LANGUAGE) },
             CB_GETCURSEL,
             WPARAM(0),
             LPARAM(0),
         )
-        .0;
+        .0
+        };
         if sel >= 0 {
             data.edge_language_codes.get(sel as usize).cloned()
         } else {
@@ -223,7 +227,7 @@ unsafe fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
     } else {
         None
     };
-    SendMessageW(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    unsafe { SendMessageW(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0)); }
     let mut selected_idx = 0usize;
     let mut combo_index = 0usize;
     for (i, voice) in voices.iter().enumerate() {
@@ -244,77 +248,83 @@ unsafe fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
             format!("{} ({})", voice.short_name, voice.locale)
         };
         let w = to_wide(&label);
-        let idx =
-            SendMessageW(combo, CB_ADDSTRING, WPARAM(0), LPARAM(w.as_ptr() as isize)).0 as usize;
-        SendMessageW(combo, CB_SETITEMDATA, WPARAM(idx), LPARAM(i as isize));
+        let idx = unsafe {
+            SendMessageW(combo, CB_ADDSTRING, WPARAM(0), LPARAM(w.as_ptr() as isize)).0 as usize
+        };
+        unsafe { SendMessageW(combo, CB_SETITEMDATA, WPARAM(idx), LPARAM(i as isize)); }
         if voice.short_name.eq_ignore_ascii_case(preferred_voice) {
             selected_idx = combo_index;
         }
         combo_index += 1;
     }
     if combo_index > 0 {
-        SendMessageW(combo, CB_SETCURSEL, WPARAM(selected_idx), LPARAM(0));
+        unsafe { SendMessageW(combo, CB_SETCURSEL, WPARAM(selected_idx), LPARAM(0)); }
     }
 }
 
-unsafe fn selected_voice(hwnd_dialog: HWND) -> String {
-    let combo = GetDlgItem(hwnd_dialog, ID_VOICE);
+fn selected_voice(hwnd_dialog: HWND) -> String {
+    let combo = unsafe { GetDlgItem(hwnd_dialog, ID_VOICE) };
     if combo.0 == 0 {
         return String::new();
     }
-    let ptr = GetWindowLongPtrW(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData;
+    let ptr = unsafe { GetWindowLongPtrW(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData };
     if ptr.is_null() {
         return String::new();
     }
-    let data = &*ptr;
-    let engine = selected_engine(GetDlgItem(hwnd_dialog, ID_ENGINE));
+    let data = unsafe { &*ptr };
+    let engine = selected_engine(unsafe { GetDlgItem(hwnd_dialog, ID_ENGINE) });
     let voices = match engine {
         TtsEngine::Edge => &data.edge_voices,
         TtsEngine::Sapi5 => &data.sapi5_voices,
         TtsEngine::Sapi4 => &data.sapi4_voices,
     };
-    let sel = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let sel = unsafe { SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
     if sel < 0 {
         return String::new();
     }
-    let idx = SendMessageW(combo, CB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0 as usize;
+    let idx = unsafe { SendMessageW(combo, CB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0 as usize };
     voices
         .get(idx)
         .map(|v| v.short_name.clone())
         .unwrap_or_default()
 }
 
-unsafe fn refresh_edge_controls(hwnd_dialog: HWND, preferred_voice: &str) {
-    let ptr = GetWindowLongPtrW(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData;
+fn refresh_edge_controls(hwnd_dialog: HWND, preferred_voice: &str) {
+    let ptr = unsafe { GetWindowLongPtrW(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData };
     if ptr.is_null() {
         return;
     }
-    let data = &mut *ptr;
-    let engine = selected_engine(GetDlgItem(hwnd_dialog, ID_ENGINE));
-    let label_language = GetDlgItem(hwnd_dialog, ID_LANGUAGE_LABEL);
-    let combo_language = GetDlgItem(hwnd_dialog, ID_LANGUAGE);
-    let check_multilingual = GetDlgItem(hwnd_dialog, ID_ONLY_MULTILINGUAL);
+    let data = unsafe { &mut *ptr };
+    let engine = selected_engine(unsafe { GetDlgItem(hwnd_dialog, ID_ENGINE) });
+    let label_language = unsafe { GetDlgItem(hwnd_dialog, ID_LANGUAGE_LABEL) };
+    let combo_language = unsafe { GetDlgItem(hwnd_dialog, ID_LANGUAGE) };
+    let check_multilingual = unsafe { GetDlgItem(hwnd_dialog, ID_ONLY_MULTILINGUAL) };
     let is_edge = engine == TtsEngine::Edge;
-    ShowWindow(check_multilingual, if is_edge { SW_SHOW } else { SW_HIDE });
-    EnableWindow(check_multilingual, is_edge);
+    unsafe {
+        ShowWindow(check_multilingual, if is_edge { SW_SHOW } else { SW_HIDE });
+        EnableWindow(check_multilingual, is_edge);
+    }
 
-    let only_multilingual = SendMessageW(check_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
-        as u32
+    let only_multilingual = unsafe {
+        SendMessageW(check_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+    }
         == BST_CHECKED.0;
     let show_language = is_edge && !only_multilingual;
-    ShowWindow(
-        label_language,
-        if show_language { SW_SHOW } else { SW_HIDE },
-    );
-    ShowWindow(
-        combo_language,
-        if show_language { SW_SHOW } else { SW_HIDE },
-    );
-    EnableWindow(combo_language, show_language);
+    unsafe {
+        ShowWindow(
+            label_language,
+            if show_language { SW_SHOW } else { SW_HIDE },
+        );
+        ShowWindow(
+            combo_language,
+            if show_language { SW_SHOW } else { SW_HIDE },
+        );
+        EnableWindow(combo_language, show_language);
+    }
 
     if show_language {
         let previous_selection = {
-            let sel = SendMessageW(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+            let sel = unsafe { SendMessageW(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
             if sel >= 0 {
                 data.edge_language_codes.get(sel as usize).cloned()
             } else {

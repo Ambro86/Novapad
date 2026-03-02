@@ -1663,43 +1663,50 @@ fn stream_quality_items(
     }
 }
 
-unsafe fn current_stream_format(state: &StreamDialogState) -> StreamOutputFormat {
-    let format_idx = SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+fn current_stream_format(state: &StreamDialogState) -> StreamOutputFormat {
+    let format_idx =
+        unsafe { SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
     StreamOutputFormat::combo_items(state.language)
         .get(format_idx.max(0) as usize)
         .map(|(_, f)| *f)
         .unwrap_or(StreamOutputFormat::Auto)
 }
 
-unsafe fn refill_stream_quality_combo(state: &StreamDialogState, keep_selection: bool) {
+fn refill_stream_quality_combo(state: &StreamDialogState, keep_selection: bool) {
     let prev_selection = if keep_selection {
-        SendMessageW(state.quality_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0
+        unsafe { SendMessageW(state.quality_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 }
     } else {
         -1
     };
-    SendMessageW(state.quality_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    unsafe {
+        SendMessageW(state.quality_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    }
     let format = current_stream_format(state);
     let items = stream_quality_items(state.language, format);
     for (label, _) in &items {
         let wide = to_wide(label);
-        SendMessageW(
-            state.quality_combo,
-            CB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(wide.as_ptr() as isize),
-        );
+        unsafe {
+            SendMessageW(
+                state.quality_combo,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(wide.as_ptr() as isize),
+            );
+        }
     }
     let selected_idx = if prev_selection >= 0 && (prev_selection as usize) < items.len() {
         prev_selection
     } else {
         0
     };
-    SendMessageW(
-        state.quality_combo,
-        CB_SETCURSEL,
-        WPARAM(selected_idx as usize),
-        LPARAM(0),
-    );
+    unsafe {
+        SendMessageW(
+            state.quality_combo,
+            CB_SETCURSEL,
+            WPARAM(selected_idx as usize),
+            LPARAM(0),
+        );
+    }
 }
 
 fn with_stream_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>

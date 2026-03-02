@@ -102,11 +102,11 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                     return true;
                 }
                 if focus == input || focus == search {
-                    unsafe { run_search(hwnd) };
+                    run_search(hwnd);
                     return true;
                 }
                 if focus == results {
-                    unsafe { start_import(hwnd) };
+                    start_import(hwnd);
                     return true;
                 }
             }
@@ -473,14 +473,14 @@ unsafe fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     }
 }
 
-unsafe fn handle_enter_key(hwnd: HWND) -> bool {
-    let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+fn handle_enter_key(hwnd: HWND) -> bool {
+    let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd) };
     if parent.0 == 0 {
         return false;
     }
-    let id = GetDlgCtrlID(hwnd) as usize;
+    let id = unsafe { GetDlgCtrlID(hwnd) as usize };
     if id == WIKIPEDIA_CLOSE_ID {
-        crate::log_if_err!(DestroyWindow(parent));
+        crate::log_if_err!(unsafe { DestroyWindow(parent) });
         return true;
     }
     if id == WIKIPEDIA_SEARCH_ID {
@@ -561,7 +561,7 @@ unsafe fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     )
 }
 
-unsafe fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
+fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     let order = with_window_state(parent, |state| {
         vec![state.input, state.search, state.results, state.close]
     })
@@ -581,7 +581,9 @@ unsafe fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     };
     let target = order[next_index];
     if target.0 != 0 {
-        SetFocus(target);
+        unsafe {
+            SetFocus(target);
+        }
     }
 }
 
@@ -597,53 +599,56 @@ where
     }
 }
 
-unsafe fn run_search(hwnd: HWND) {
+fn run_search(hwnd: HWND) {
     let Some((parent, input, results, status)) = with_window_state(hwnd, |state| {
         (state.parent, state.input, state.results, state.status)
     }) else {
         return;
     };
-    let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
-    let pref = with_state(parent, |s| s.settings.wikipedia_language.clone())
+    let language = unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
+    let pref = unsafe { with_state(parent, |s| s.settings.wikipedia_language.clone()) }
         .unwrap_or_else(|| "auto".to_string());
     let label_set = labels(language);
 
-    let len = GetWindowTextLengthW(input);
+    let len = unsafe { GetWindowTextLengthW(input) };
     if len <= 0 {
         if status.0 != 0
-            && let Err(e) =
+            && let Err(e) = unsafe {
                 SetWindowTextW(status, PCWSTR(to_wide(&label_set.status_no_query).as_ptr()))
+            }
         {
             crate::log_debug(&format!("SetWindowTextW failed: {}", e));
         }
         if results.0 != 0 {
-            SendMessageW(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+            unsafe { SendMessageW(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
         }
         return;
     }
     let mut buf = vec![0u16; (len + 1) as usize];
-    let _read = GetWindowTextW(input, &mut buf);
+    let _read = unsafe { GetWindowTextW(input, &mut buf) };
     let query = String::from_utf16_lossy(&buf[..len as usize]);
     let trimmed = query.trim().to_string();
     if trimmed.is_empty() {
         if status.0 != 0
-            && let Err(e) =
+            && let Err(e) = unsafe {
                 SetWindowTextW(status, PCWSTR(to_wide(&label_set.status_no_query).as_ptr()))
+            }
         {
             crate::log_debug(&format!("SetWindowTextW failed: {}", e));
         }
         if results.0 != 0 {
-            SendMessageW(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+            unsafe { SendMessageW(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
         }
         return;
     }
     if status.0 != 0
-        && let Err(e) = SetWindowTextW(status, PCWSTR(to_wide(&label_set.status_loading).as_ptr()))
+        && let Err(e) =
+            unsafe { SetWindowTextW(status, PCWSTR(to_wide(&label_set.status_loading).as_ptr())) }
     {
         crate::log_debug(&format!("SetWindowTextW failed: {}", e));
     }
     if results.0 != 0 {
-        SendMessageW(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        unsafe { SendMessageW(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
     }
 
     let generation = SEARCH_GENERATION
@@ -685,20 +690,20 @@ unsafe fn run_search(hwnd: HWND) {
     });
 }
 
-unsafe fn start_import(hwnd: HWND) {
+fn start_import(hwnd: HWND) {
     let Some((parent, results_hwnd)) =
         with_window_state(hwnd, |state| (state.parent, state.results))
     else {
         return;
     };
-    let sel = SendMessageW(results_hwnd, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+    let sel = unsafe { SendMessageW(results_hwnd, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32 };
     if sel < 0 {
         return;
     }
     let (language, pref, selection) = with_window_state(hwnd, |state| {
         (
-            with_state(parent, |s| s.settings.language).unwrap_or_default(),
-            with_state(parent, |s| s.settings.wikipedia_language.clone())
+            unsafe { with_state(parent, |s| s.settings.language) }.unwrap_or_default(),
+            unsafe { with_state(parent, |s| s.settings.wikipedia_language.clone()) }
                 .unwrap_or_else(|| "auto".to_string()),
             state.results_data.get(sel as usize).cloned(),
         )
@@ -709,10 +714,12 @@ unsafe fn start_import(hwnd: HWND) {
     };
     let label_set = labels(language);
     if let Some(status) = with_window_state(hwnd, |state| state.status)
-        && let Err(e) = SetWindowTextW(
-            status,
-            PCWSTR(to_wide(&label_set.status_importing).as_ptr()),
-        )
+        && let Err(e) = unsafe {
+            SetWindowTextW(
+                status,
+                PCWSTR(to_wide(&label_set.status_importing).as_ptr()),
+            )
+        }
     {
         crate::log_debug(&format!("SetWindowTextW failed: {}", e));
     }
@@ -760,42 +767,48 @@ unsafe fn start_import(hwnd: HWND) {
     });
 }
 
-unsafe fn force_focus_editor_on_parent(parent: HWND) {
+fn force_focus_editor_on_parent(parent: HWND) {
     if parent.0 == 0 {
         return;
     }
-    SetForegroundWindow(parent);
-    SendMessageW(
-        parent,
-        windows::Win32::UI::WindowsAndMessaging::WM_SETFOCUS,
-        WPARAM(0),
-        LPARAM(0),
-    );
-    if get_active_edit(parent).is_none() {
+    unsafe {
+        SetForegroundWindow(parent);
         SendMessageW(
             parent,
-            WM_COMMAND,
-            WPARAM(crate::menu::IDM_FILE_NEW),
+            windows::Win32::UI::WindowsAndMessaging::WM_SETFOCUS,
+            WPARAM(0),
             LPARAM(0),
         );
     }
-    if let Some(hwnd_edit) = get_active_edit(parent) {
-        SetFocus(hwnd_edit);
-        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
-        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-        NotifyWinEvent(
-            windows::Win32::UI::WindowsAndMessaging::EVENT_OBJECT_FOCUS,
-            hwnd_edit,
-            windows::Win32::UI::WindowsAndMessaging::OBJID_CLIENT.0,
-            windows::Win32::UI::WindowsAndMessaging::CHILDID_SELF as i32,
-        );
+    if unsafe { get_active_edit(parent) }.is_none() {
+        unsafe {
+            SendMessageW(
+                parent,
+                WM_COMMAND,
+                WPARAM(crate::menu::IDM_FILE_NEW),
+                LPARAM(0),
+            );
+        }
     }
-    crate::log_if_err!(PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
+    if let Some(hwnd_edit) = unsafe { get_active_edit(parent) } {
+        unsafe {
+            SetFocus(hwnd_edit);
+            SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
+            SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+            NotifyWinEvent(
+                windows::Win32::UI::WindowsAndMessaging::EVENT_OBJECT_FOCUS,
+                hwnd_edit,
+                windows::Win32::UI::WindowsAndMessaging::OBJID_CLIENT.0,
+                windows::Win32::UI::WindowsAndMessaging::CHILDID_SELF as i32,
+            );
+        }
+    }
+    crate::log_if_err!(unsafe { PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) });
 }
 
-unsafe fn apply_import_text(parent: HWND, text: &str) -> bool {
+fn apply_import_text(parent: HWND, text: &str) -> bool {
     force_focus_editor_on_parent(parent);
-    let Some(hwnd_edit) = get_active_edit(parent) else {
+    let Some(hwnd_edit) = (unsafe { get_active_edit(parent) }) else {
         return false;
     };
     let existing = get_edit_text(hwnd_edit);
@@ -805,33 +818,37 @@ unsafe fn apply_import_text(parent: HWND, text: &str) -> bool {
         format!("{text}\n\n{existing}")
     };
     let wide = to_wide_normalized(&combined);
-    SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
-    SendMessageW(
-        hwnd_edit,
-        crate::accessibility::EM_REPLACESEL,
-        WPARAM(1),
-        LPARAM(wide.as_ptr() as isize),
-    );
+    unsafe {
+        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
+        SendMessageW(
+            hwnd_edit,
+            crate::accessibility::EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
     let cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    SendMessageW(
-        hwnd_edit,
-        EM_EXSETSEL,
-        WPARAM(0),
-        LPARAM(&cr as *const _ as isize),
-    );
-    SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
-    SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-    NotifyWinEvent(
-        windows::Win32::UI::WindowsAndMessaging::EVENT_OBJECT_VALUECHANGE,
-        hwnd_edit,
-        windows::Win32::UI::WindowsAndMessaging::OBJID_CLIENT.0,
-        windows::Win32::UI::WindowsAndMessaging::CHILDID_SELF as i32,
-    );
-    NotifyWinEvent(
-        windows::Win32::UI::WindowsAndMessaging::EVENT_OBJECT_FOCUS,
-        hwnd_edit,
-        windows::Win32::UI::WindowsAndMessaging::OBJID_CLIENT.0,
-        windows::Win32::UI::WindowsAndMessaging::CHILDID_SELF as i32,
-    );
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&cr as *const _ as isize),
+        );
+        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+        NotifyWinEvent(
+            windows::Win32::UI::WindowsAndMessaging::EVENT_OBJECT_VALUECHANGE,
+            hwnd_edit,
+            windows::Win32::UI::WindowsAndMessaging::OBJID_CLIENT.0,
+            windows::Win32::UI::WindowsAndMessaging::CHILDID_SELF as i32,
+        );
+        NotifyWinEvent(
+            windows::Win32::UI::WindowsAndMessaging::EVENT_OBJECT_FOCUS,
+            hwnd_edit,
+            windows::Win32::UI::WindowsAndMessaging::OBJID_CLIENT.0,
+            windows::Win32::UI::WindowsAndMessaging::CHILDID_SELF as i32,
+        );
+    }
     true
 }

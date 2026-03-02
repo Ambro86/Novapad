@@ -369,342 +369,355 @@ unsafe extern "system" fn import_wndproc(
     crate::panic_guard::guard(
         "import_wndproc",
         || DefWindowProcW(hwnd, msg, wparam, lparam),
-        || unsafe { import_wndproc_inner(hwnd, msg, wparam, lparam) },
+        || import_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
 
-unsafe fn import_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    match msg {
-        WM_CREATE => {
-            let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let init_ptr = (*create_struct).lpCreateParams as *mut ImportInit;
-            if init_ptr.is_null() {
-                return LRESULT(0);
-            }
-            let init = Box::from_raw(init_ptr);
-            let labels = labels(init.language);
-            let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
-
-            let label_url = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.url).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                18,
-                90,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-
-            let url_edit = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                110,
-                16,
-                290,
-                22,
-                hwnd,
-                HMENU(YT_ID_URL as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let load_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.load).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                410,
-                15,
-                90,
-                26,
-                hwnd,
-                HMENU(YT_ID_LOAD as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let label_lang = CreateWindowExW(
-                Default::default(),
-                WC_STATIC,
-                PCWSTR(to_wide(&labels.language).as_ptr()),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                60,
-                90,
-                20,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-
-            let lang_combo = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                WC_COMBOBOXW,
-                PCWSTR::null(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                110,
-                58,
-                290,
-                140,
-                hwnd,
-                HMENU(YT_ID_LANG as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let status_label = CreateWindowExW(
-                WS_EX_CLIENTEDGE,
-                w!("EDIT"),
-                PCWSTR::null(),
-                WS_CHILD | WINDOW_STYLE((ES_READONLY | ES_MULTILINE) as u32),
-                110,
-                86,
-                390,
-                32,
-                hwnd,
-                HMENU(0),
-                HINSTANCE(0),
-                None,
-            );
-
-            let timestamp_check = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.include_timestamps).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                110,
-                112,
-                260,
-                22,
-                hwnd,
-                HMENU(YT_ID_TIMESTAMP as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let ok_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.ok).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                310,
-                154,
-                90,
-                28,
-                hwnd,
-                HMENU(YT_ID_OK as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            let cancel_button = CreateWindowExW(
-                Default::default(),
-                WC_BUTTON,
-                PCWSTR(to_wide(&labels.cancel).as_ptr()),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                410,
-                154,
-                90,
-                28,
-                hwnd,
-                HMENU(YT_ID_CANCEL as isize),
-                HINSTANCE(0),
-                None,
-            );
-
-            for control in [
-                label_url,
-                url_edit,
-                load_button,
-                label_lang,
-                lang_combo,
-                status_label,
-                timestamp_check,
-                ok_button,
-                cancel_button,
-            ] {
-                if control.0 != 0 && hfont.0 != 0 {
-                    SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+fn import_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*create_struct).lpCreateParams as *mut ImportInit;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
                 }
-            }
-            ShowWindow(status_label, SW_HIDE);
+                let init = Box::from_raw(init_ptr);
+                let labels = labels(init.language);
+                let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let state = Box::new(ImportState {
-                parent: init.parent,
-                language: init.language,
-                url_edit,
-                load_button,
-                lang_combo,
-                timestamp_check,
-                ok_button,
-                status_label,
-                loading: false,
-                cancelled: Arc::new(AtomicBool::new(false)),
-                transcripts: Vec::new(),
-                result: init.result.clone(),
-            });
-            SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                let label_url = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.url).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    18,
+                    90,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
 
-            let initial_check = if init.include_timestamps {
-                BST_CHECKED.0
-            } else {
-                0
-            };
-            SendMessageW(
-                timestamp_check,
-                BM_SETCHECK,
-                WPARAM(initial_check as usize),
-                LPARAM(0),
-            );
-            SetFocus(url_edit);
-            LRESULT(0)
-        }
-        WM_COMMAND => {
-            let cmd_id = wparam.0 & 0xffff;
-            let notification = ((wparam.0 >> 16) & 0xffff) as u16;
-            if cmd_id == YT_ID_LOAD {
-                start_load_languages(hwnd);
-                LRESULT(0)
-            } else if cmd_id == YT_ID_OK {
-                if with_import_state(hwnd, |state| {
-                    if state.loading {
-                        return;
+                let url_edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    110,
+                    16,
+                    290,
+                    22,
+                    hwnd,
+                    HMENU(YT_ID_URL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let load_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.load).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    410,
+                    15,
+                    90,
+                    26,
+                    hwnd,
+                    HMENU(YT_ID_LOAD as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let label_lang = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.language).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    60,
+                    90,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let lang_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    110,
+                    58,
+                    290,
+                    140,
+                    hwnd,
+                    HMENU(YT_ID_LANG as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let status_label = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WINDOW_STYLE((ES_READONLY | ES_MULTILINE) as u32),
+                    110,
+                    86,
+                    390,
+                    32,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let timestamp_check = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.include_timestamps).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    110,
+                    112,
+                    260,
+                    22,
+                    hwnd,
+                    HMENU(YT_ID_TIMESTAMP as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let ok_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.ok).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    310,
+                    154,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(YT_ID_OK as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                let cancel_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.cancel).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    410,
+                    154,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(YT_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+
+                for control in [
+                    label_url,
+                    url_edit,
+                    load_button,
+                    label_lang,
+                    lang_combo,
+                    status_label,
+                    timestamp_check,
+                    ok_button,
+                    cancel_button,
+                ] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                     }
-                    if state.transcripts.is_empty() {
-                        if !start_load_languages(hwnd) {
-                            crate::log_debug("Failed to start load languages");
+                }
+                ShowWindow(status_label, SW_HIDE);
+
+                let state = Box::new(ImportState {
+                    parent: init.parent,
+                    language: init.language,
+                    url_edit,
+                    load_button,
+                    lang_combo,
+                    timestamp_check,
+                    ok_button,
+                    status_label,
+                    loading: false,
+                    cancelled: Arc::new(AtomicBool::new(false)),
+                    transcripts: Vec::new(),
+                    result: init.result.clone(),
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+
+                let initial_check = if init.include_timestamps {
+                    BST_CHECKED.0
+                } else {
+                    0
+                };
+                SendMessageW(
+                    timestamp_check,
+                    BM_SETCHECK,
+                    WPARAM(initial_check as usize),
+                    LPARAM(0),
+                );
+                SetFocus(url_edit);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                let notification = ((wparam.0 >> 16) & 0xffff) as u16;
+                if cmd_id == YT_ID_LOAD {
+                    start_load_languages(hwnd);
+                    LRESULT(0)
+                } else if cmd_id == YT_ID_OK {
+                    if with_import_state(hwnd, |state| {
+                        if state.loading {
+                            return;
                         }
-                        return;
-                    }
-                    let idx = SendMessageW(state.lang_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                    if idx < 0 || idx as usize >= state.transcripts.len() {
-                        return;
-                    }
-                    let include_timestamps =
-                        SendMessageW(state.timestamp_check, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
-                            == BST_CHECKED.0 as isize;
+                        if state.transcripts.is_empty() {
+                            if !start_load_languages(hwnd) {
+                                crate::log_debug("Failed to start load languages");
+                            }
+                            return;
+                        }
+                        let idx =
+                            SendMessageW(state.lang_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                        if idx < 0 || idx as usize >= state.transcripts.len() {
+                            return;
+                        }
+                        let include_timestamps =
+                            SendMessageW(state.timestamp_check, BM_GETCHECK, WPARAM(0), LPARAM(0))
+                                .0
+                                == BST_CHECKED.0 as isize;
 
-                    let transcript = state.transcripts[idx as usize].clone();
-                    let url = read_edit_text(state.url_edit);
-                    // Start loading text instead of closing immediately
-                    if !start_load_transcript_text(hwnd, transcript, include_timestamps, url) {
-                        crate::log_debug("Failed to start load transcript text");
+                        let transcript = state.transcripts[idx as usize].clone();
+                        let url = read_edit_text(state.url_edit);
+                        // Start loading text instead of closing immediately
+                        if !start_load_transcript_text(hwnd, transcript, include_timestamps, url) {
+                            crate::log_debug("Failed to start load transcript text");
+                        }
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access import state");
                     }
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access import state");
-                }
-                LRESULT(0)
-            } else if cmd_id == YT_ID_CANCEL {
-                if with_import_state(hwnd, |state| {
-                    state.cancelled.store(true, Ordering::SeqCst);
-                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access import state");
-                }
-                if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
-                    crate::log_debug(&format!("Error: {:?}", _e));
-                }
-                LRESULT(0)
-            } else if cmd_id == YT_ID_URL && notification as u32 == EN_CHANGE {
-                if with_import_state(hwnd, |state| {
-                    if state.loading {
-                        return;
+                    LRESULT(0)
+                } else if cmd_id == YT_ID_CANCEL {
+                    if with_import_state(hwnd, |state| {
+                        state.cancelled.store(true, Ordering::SeqCst);
+                        *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access import state");
                     }
-                    state.transcripts.clear();
-                    SendMessageW(state.lang_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-                })
-                .is_none()
-                {
-                    crate::log_debug("Failed to access import state");
+                    if let Err(_e) = PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
+                    LRESULT(0)
+                } else if cmd_id == YT_ID_URL && notification as u32 == EN_CHANGE {
+                    if with_import_state(hwnd, |state| {
+                        if state.loading {
+                            return;
+                        }
+                        state.transcripts.clear();
+                        SendMessageW(state.lang_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access import state");
+                    }
+                    LRESULT(0)
+                } else {
+                    DefWindowProcW(hwnd, msg, wparam, lparam)
                 }
+            }
+            WM_YT_LOAD_COMPLETE => {
+                let result = Box::from_raw(lparam.0 as *mut LoadResult);
+                finish_load_languages(hwnd, *result);
                 LRESULT(0)
-            } else {
-                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-        }
-        WM_YT_LOAD_COMPLETE => {
-            let result = unsafe { Box::from_raw(lparam.0 as *mut LoadResult) };
-            finish_load_languages(hwnd, *result);
-            LRESULT(0)
-        }
-        WM_YT_LOAD_CANCEL => {
-            reset_languages_loading_state(hwnd);
-            LRESULT(0)
-        }
-        WM_YT_TEXT_COMPLETE => {
-            let result = unsafe { Box::from_raw(lparam.0 as *mut TextLoadResult) };
-            finish_load_text(hwnd, *result);
-            LRESULT(0)
-        }
-        WM_YT_TEXT_CANCEL => {
-            reset_text_loading_state(hwnd);
-            LRESULT(0)
-        }
-        WM_KEYDOWN => {
-            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                if let Err(_e) = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_CANCEL), LPARAM(0)) {
-                    crate::log_debug(&format!("Error: {:?}", _e));
-                }
-                return LRESULT(0);
+            WM_YT_LOAD_CANCEL => {
+                reset_languages_loading_state(hwnd);
+                LRESULT(0)
             }
-            if wparam.0 as u32 == VK_RETURN.0 as u32 {
-                let focus = GetFocus();
-                let url_edit = with_import_state(hwnd, |state| state.url_edit).unwrap_or(HWND(0));
-                if focus == url_edit {
-                    if let Err(_e) = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_LOAD), LPARAM(0)) {
+            WM_YT_TEXT_COMPLETE => {
+                let result = Box::from_raw(lparam.0 as *mut TextLoadResult);
+                finish_load_text(hwnd, *result);
+                LRESULT(0)
+            }
+            WM_YT_TEXT_CANCEL => {
+                reset_text_loading_state(hwnd);
+                LRESULT(0)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    if let Err(_e) = PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_CANCEL), LPARAM(0))
+                    {
                         crate::log_debug(&format!("Error: {:?}", _e));
                     }
                     return LRESULT(0);
                 }
-            }
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
-        WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
-            LRESULT(0)
-        }
-        WM_DESTROY => {
-            if with_import_state(hwnd, |state| {
-                EnableWindow(state.parent, true);
-                SetForegroundWindow(state.parent);
-                // Only focus editor if not in player mode (audiobook)
-                if !crate::editor_manager::is_current_audiobook(state.parent) {
-                    if let Err(e) =
-                        PostMessageW(state.parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
-                    {
-                        crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
-                    }
-                    if let Some(hwnd_edit) = get_active_edit(state.parent) {
-                        NotifyWinEvent(EVENT_OBJECT_FOCUS, hwnd_edit, OBJID_CLIENT, CHILDID_SELF);
+                if wparam.0 as u32 == VK_RETURN.0 as u32 {
+                    let focus = GetFocus();
+                    let url_edit =
+                        with_import_state(hwnd, |state| state.url_edit).unwrap_or(HWND(0));
+                    if focus == url_edit {
+                        if let Err(_e) =
+                            PostMessageW(hwnd, WM_COMMAND, WPARAM(YT_ID_LOAD), LPARAM(0))
+                        {
+                            crate::log_debug(&format!("Error: {:?}", _e));
+                        }
+                        return LRESULT(0);
                     }
                 }
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access import state");
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            LRESULT(0)
-        }
-        WM_NCDESTROY => {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImportState;
-            if !ptr.is_null() {
-                let _unused_box = Box::from_raw(ptr);
+            WM_CLOSE => {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
             }
-            LRESULT(0)
+            WM_DESTROY => {
+                if with_import_state(hwnd, |state| {
+                    EnableWindow(state.parent, true);
+                    SetForegroundWindow(state.parent);
+                    // Only focus editor if not in player mode (audiobook)
+                    if !crate::editor_manager::is_current_audiobook(state.parent) {
+                        if let Err(e) =
+                            PostMessageW(state.parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+                        {
+                            crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
+                        }
+                        if let Some(hwnd_edit) = get_active_edit(state.parent) {
+                            NotifyWinEvent(
+                                EVENT_OBJECT_FOCUS,
+                                hwnd_edit,
+                                OBJID_CLIENT,
+                                CHILDID_SELF,
+                            );
+                        }
+                    }
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access import state");
+                }
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImportState;
+                if !ptr.is_null() {
+                    let _unused_box = Box::from_raw(ptr);
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
 }
 

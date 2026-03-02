@@ -9289,58 +9289,60 @@ fn play_audio_playlist_item(hwnd: HWND, index: usize) {
     audio_player::start_audiobook_playback(hwnd, &path);
 }
 
-pub(crate) unsafe fn queue_audio_files_and_play(hwnd: HWND, paths: Vec<PathBuf>) {
-    if paths.is_empty() {
-        return;
-    }
-    for path in &paths {
-        if editor_manager::ensure_audio_document_tab(hwnd, path).is_none() {
-            crate::log_debug(&format!(
-                "Audio player: failed to ensure audio tab for {}",
-                path.display()
-            ));
+pub(crate) fn queue_audio_files_and_play(hwnd: HWND, paths: Vec<PathBuf>) {
+    unsafe {
+        if paths.is_empty() {
+            return;
         }
-        push_recent_file(hwnd, path);
-    }
-    let target_index = with_state(hwnd, |state| {
-        let play_path = paths[0].clone();
-        if state.audio_playlist.is_empty() {
-            for path in &paths {
-                if !state.audio_playlist.iter().any(|p| p == path) {
-                    state.audio_playlist.push(path.clone());
-                }
+        for path in &paths {
+            if editor_manager::ensure_audio_document_tab(hwnd, path).is_none() {
+                crate::log_debug(&format!(
+                    "Audio player: failed to ensure audio tab for {}",
+                    path.display()
+                ));
             }
-            let idx = state
+            push_recent_file(hwnd, path);
+        }
+        let target_index = with_state(hwnd, |state| {
+            let play_path = paths[0].clone();
+            if state.audio_playlist.is_empty() {
+                for path in &paths {
+                    if !state.audio_playlist.iter().any(|p| p == path) {
+                        state.audio_playlist.push(path.clone());
+                    }
+                }
+                let idx = state
+                    .audio_playlist
+                    .iter()
+                    .position(|p| p == &play_path)
+                    .unwrap_or(0);
+                state.audio_playlist_index = Some(idx);
+                return idx;
+            }
+            let current = state
+                .audio_playlist_index
+                .filter(|idx| *idx < state.audio_playlist.len())
+                .unwrap_or(0);
+            let mut insert_at = current.saturating_add(1);
+            for path in &paths {
+                if state.audio_playlist.iter().any(|p| p == path) {
+                    continue;
+                }
+                state.audio_playlist.insert(insert_at, path.clone());
+                insert_at = insert_at.saturating_add(1);
+            }
+            let target = state
                 .audio_playlist
                 .iter()
                 .position(|p| p == &play_path)
-                .unwrap_or(0);
-            state.audio_playlist_index = Some(idx);
-            return idx;
-        }
-        let current = state
-            .audio_playlist_index
-            .filter(|idx| *idx < state.audio_playlist.len())
-            .unwrap_or(0);
-        let mut insert_at = current.saturating_add(1);
-        for path in &paths {
-            if state.audio_playlist.iter().any(|p| p == path) {
-                continue;
-            }
-            state.audio_playlist.insert(insert_at, path.clone());
-            insert_at = insert_at.saturating_add(1);
-        }
-        let target = state
-            .audio_playlist
-            .iter()
-            .position(|p| p == &play_path)
-            .unwrap_or(current);
-        state.audio_playlist_index = Some(target);
-        target
-    })
-    .unwrap_or(0);
+                .unwrap_or(current);
+            state.audio_playlist_index = Some(target);
+            target
+        })
+        .unwrap_or(0);
 
-    play_audio_playlist_item(hwnd, target_index);
+        play_audio_playlist_item(hwnd, target_index);
+    }
 }
 
 fn switch_audio_playlist_relative(hwnd: HWND, delta: i32) -> bool {
@@ -9459,13 +9461,11 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
 }
 
 fn open_path_with_behavior(hwnd: HWND, path: &Path) {
-    unsafe {
-        if is_audio_path(path) {
-            queue_audio_files_and_play(hwnd, vec![path.to_path_buf()]);
-            return;
-        }
-        open_document_with_encoding(hwnd, path, None);
+    if is_audio_path(path) {
+        queue_audio_files_and_play(hwnd, vec![path.to_path_buf()]);
+        return;
     }
+    open_document_with_encoding(hwnd, path, None);
 }
 
 pub(crate) unsafe fn with_state<F, R>(hwnd: HWND, f: F) -> Option<R>
@@ -9909,9 +9909,7 @@ fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
         dropped_paths.push(path);
     }
     if !dropped_paths.is_empty() && dropped_paths.iter().all(|path| is_audio_path(path)) {
-        unsafe {
-            queue_audio_files_and_play(hwnd, dropped_paths);
-        }
+        queue_audio_files_and_play(hwnd, dropped_paths);
     } else {
         for path in dropped_paths {
             open_path_with_behavior(hwnd, &path);

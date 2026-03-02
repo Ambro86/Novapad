@@ -2886,23 +2886,16 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
 
     if dialog_data.direct_play {
         let stream_path = PathBuf::from(&url);
-        unsafe {
-            crate::queue_audio_files_and_play(parent, vec![stream_path.clone()]);
-            crate::editor_manager::mark_current_document_from_rss(parent, true);
-            let episode_title = stream_path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .filter(|s| !s.trim().is_empty())
-                .map(|s| s.to_string())
-                .or_else(|| Some(url.clone()));
-            crate::set_active_podcast_episode_info(
-                parent,
-                Some(url),
-                episode_title,
-                Some(stream_path),
-            );
-            crate::menu::update_playback_menu(parent, true);
-        }
+        crate::queue_audio_files_and_play(parent, vec![stream_path.clone()]);
+        crate::editor_manager::mark_current_document_from_rss(parent, true);
+        let episode_title = stream_path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.to_string())
+            .or_else(|| Some(url.clone()));
+        crate::set_active_podcast_episode_info(parent, Some(url), episode_title, Some(stream_path));
+        crate::menu::update_playback_menu(parent, true);
         return;
     }
 
@@ -3554,23 +3547,16 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         final_path.clone()
     };
 
-    unsafe {
-        crate::queue_audio_files_and_play(parent, vec![playback_path.clone()]);
-        crate::editor_manager::mark_current_document_from_rss(parent, true);
-        let episode_title = stream_title.or_else(|| {
-            playback_path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .map(|s| s.to_string())
-        });
-        crate::set_active_podcast_episode_info(
-            parent,
-            Some(url),
-            episode_title,
-            Some(playback_path.clone()),
-        );
-        crate::menu::update_playback_menu(parent, true);
-    }
+    crate::queue_audio_files_and_play(parent, vec![playback_path.clone()]);
+    crate::editor_manager::mark_current_document_from_rss(parent, true);
+    let episode_title = stream_title.or_else(|| {
+        playback_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string())
+    });
+    crate::set_active_podcast_episode_info(parent, Some(url), episode_title, Some(playback_path));
+    crate::menu::update_playback_menu(parent, true);
 }
 
 fn ensure_ytdlp_available(

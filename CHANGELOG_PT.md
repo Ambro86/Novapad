@@ -6,6 +6,7 @@ Melhorias
 • Adicionada a tradução lituana.
 • Adicionada a tradução chinesa.
 • A partir de agora, compilações beta frequentes serão publicadas na seção Releases do projeto, para que os usuários possam testar as novas alterações antes da próxima versão estável.
+• Adicionado o atalho `Ctrl+.` para inserir o caractere de reticências (…).
 • Melhorado o suporte a capítulos de podcast: a navegação por capítulos está agora mais fiável, incluindo episódios diretos/streaming em que os capítulos não estão incorporados no ficheiro MP3, usando metadados de capítulos do feed/URL como fallback quando disponíveis. Adicionados os atalhos `Ctrl+Alt+PageUp` (capítulo anterior) e `Ctrl+Alt+PageDown` (capítulo seguinte).
 • Reorganizadas as pastas de saída em `Documentos\\Sonarpad`: os ficheiros agora são guardados nas subpastas dedicadas `audiobooks`, `documents`, `recordings` e `media`, com migração automática dos caminhos antigos.
 • Melhorado o suporte para ficheiros de texto muito grandes (incluindo 60 MB): abertura e navegação linha a linha mais fluídas, especialmente com leitores de ecrã.

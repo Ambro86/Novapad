@@ -6,6 +6,7 @@ Ulepszenia
 • Dodano tłumaczenie litewskie.
 • Dodano tłumaczenie chińskie.
 • Od teraz częste wersje beta będą publikowane w sekcji Releases projektu, aby użytkownicy mogli testować nowe zmiany przed następną stabilną wersją.
+• Dodano skrót `Ctrl+.` do wstawiania znaku wielokropka (…).
 • Ulepszono obsługę rozdziałów podcastów: nawigacja rozdziałów działa teraz bardziej niezawodnie, także dla odcinków bezpośrednich/streamingowych, w których rozdziały nie są osadzone w pliku MP3, dzięki wykorzystaniu metadanych rozdziałów z feedu/URL jako fallback, gdy są dostępne. Dodano skróty `Ctrl+Alt+PageUp` (poprzedni rozdział) i `Ctrl+Alt+PageDown` (następny rozdział).
 • Zreorganizowano foldery wyjściowe do `Dokumenty\\Sonarpad`: pliki są teraz zapisywane w dedykowanych podfolderach `audiobooks`, `documents`, `recordings` i `media`, z automatyczną migracją ze starych ścieżek.
 • Ulepszono obsługę bardzo dużych plików tekstowych (także 60 MB): płynniejsze otwieranie i nawigacja linia po linii, szczególnie z czytnikami ekranu.

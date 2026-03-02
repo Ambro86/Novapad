@@ -4526,6 +4526,21 @@ unsafe fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     editor_manager::indent_active_edit(hwnd, true);
                     LRESULT(0)
                 }
+                IDM_EDIT_INSERT_ELLIPSIS => {
+                    log_debug("Menu: Insert ellipsis");
+                    if !editor_manager::is_current_audiobook(hwnd)
+                        && let Some(hwnd_edit) = get_active_edit(hwnd)
+                    {
+                        let text = to_wide("…");
+                        SendMessageW(
+                            hwnd_edit,
+                            EM_REPLACESEL,
+                            WPARAM(1),
+                            LPARAM(text.as_ptr() as isize),
+                        );
+                    }
+                    LRESULT(0)
+                }
                 IDM_EDIT_TEXT_STATS => {
                     log_debug("Menu: Text stats");
                     editor_manager::text_stats_active_edit(hwnd);
@@ -8479,6 +8494,11 @@ unsafe fn create_accelerators() -> HACCEL {
             fVirt: virt_shift,
             key: VK_OEM_PERIOD.0,
             cmd: IDM_EDIT_INDENT as u16,
+        },
+        ACCEL {
+            fVirt: virt,
+            key: VK_OEM_PERIOD.0,
+            cmd: IDM_EDIT_INSERT_ELLIPSIS as u16,
         },
         ACCEL {
             fVirt: virt_shift,

@@ -6,6 +6,7 @@ Mejoras
 • Añadida la traducción lituana.
 • Añadida la traducción china.
 • A partir de ahora, se publicarán compilaciones beta frecuentes en la sección Releases del proyecto, para que los usuarios puedan probar los nuevos cambios antes de la próxima versión estable.
+• Añadido el atajo `Ctrl+.` para insertar el carácter de puntos suspensivos (…).
 • Mejorado el soporte de capítulos en podcasts: la navegación por capítulos ahora es más fiable, también en episodios directos/streaming donde los capítulos no están incrustados en el archivo MP3, usando metadatos de capítulos desde feed/URL como fallback cuando están disponibles. Añadidos los atajos `Ctrl+Alt+PageUp` (capítulo anterior) y `Ctrl+Alt+PageDown` (capítulo siguiente).
 • Reorganizadas las carpetas de salida en `Documentos\\Sonarpad`: los archivos ahora se guardan en subcarpetas dedicadas `audiobooks`, `documents`, `recordings` y `media`, con migración automática desde rutas heredadas.
 • Mejorado el soporte para archivos de texto muy grandes (incluidos 60 MB): apertura y navegación línea por línea más fluidas, especialmente con lectores de pantalla.

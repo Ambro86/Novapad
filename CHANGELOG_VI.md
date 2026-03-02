@@ -6,6 +6,7 @@ Cải tiến
 • Đã thêm bản dịch tiếng Litva.
 • Đã thêm bản dịch tiếng Trung.
 • Từ bây giờ, các bản dựng beta thường xuyên sẽ được phát hành trong mục Releases của dự án, để người dùng có thể thử nghiệm các thay đổi mới trước bản phát hành ổn định tiếp theo.
+• Đã thêm phím tắt `Ctrl+.` để chèn ký tự dấu ba chấm (…).
 • Đã cải thiện hỗ trợ chương podcast: điều hướng chương hiện ổn định hơn, kể cả với các tập phát trực tiếp/streaming không có chương nhúng trong tệp MP3, bằng cách dùng metadata chương từ feed/URL làm fallback khi có sẵn. Đã thêm phím tắt `Ctrl+Alt+PageUp` (chương trước) và `Ctrl+Alt+PageDown` (chương tiếp theo).
 • Đã tổ chức lại thư mục đầu ra về `Documents\\Sonarpad`: tệp giờ được lưu vào các thư mục con riêng `audiobooks`, `documents`, `recordings` và `media`, kèm tự động chuyển dữ liệu từ đường dẫn cũ.
 • Đã cải thiện hỗ trợ cho tệp văn bản rất lớn (kể cả 60 MB): mở tệp và điều hướng theo từng dòng mượt hơn, đặc biệt khi dùng trình đọc màn hình.

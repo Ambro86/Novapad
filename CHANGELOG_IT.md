@@ -6,6 +6,7 @@ Miglioramenti
 • Aggiunta la traduzione lituana.
 • Aggiunta la traduzione cinese.
 • D’ora in poi, build beta frequenti saranno pubblicate nella sezione Releases del progetto, così gli utenti potranno testare le nuove modifiche prima della prossima versione stabile.
+• Aggiunta la scorciatoia `Ctrl+.` per inserire il carattere di ellissi (…).
 • Migliorato il supporto ai capitoli podcast: la navigazione capitoli è ora più affidabile anche negli episodi diretti/streaming in cui i capitoli non sono incorporati nel file MP3, usando quando disponibili i metadati capitolo dal feed/URL come fallback. Aggiunte le scorciatoie `Ctrl+Alt+Pagina su` (capitolo precedente) e `Ctrl+Alt+Pagina giù` (capitolo successivo).
 • Riorganizzate le cartelle di output in `Documenti\\Sonarpad`: i file ora vengono salvati nelle sottocartelle dedicate `audiobooks`, `documents`, `recordings` e `media`, con migrazione automatica dai percorsi legacy.
 • Migliorato il supporto per file di testo molto grandi (anche 60 MB): apertura e navigazione riga per riga più fluide, in particolare con gli screen reader.

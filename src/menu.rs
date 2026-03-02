@@ -57,6 +57,7 @@ pub const IDM_EDIT_AUTO_FORMAT_TTS: usize = 2027;
 pub const IDM_EDIT_INDENT: usize = 2028;
 pub const IDM_EDIT_OUTDENT: usize = 2029;
 pub const IDM_EDIT_FIND_PREVIOUS: usize = 2030;
+pub const IDM_EDIT_INSERT_ELLIPSIS: usize = 2031;
 pub const IDM_SPELLCHECK_SUGGESTION_BASE: usize = 12000;
 pub const IDM_SPELLCHECK_SUGGESTION_MAX: usize = 10;
 pub const IDM_SPELLCHECK_ADD_TO_DICTIONARY: usize = 12100;

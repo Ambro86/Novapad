@@ -27,8 +27,9 @@ use windows::Win32::UI::Controls::Dialogs::{
     OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::{
-    BST_CHECKED, NMHDR, TCIF_TEXT, TCITEMW, TCM_GETCURSEL, TCM_INSERTITEMW, TCM_SETCURSEL,
-    TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_STATIC, WC_TABCONTROLW,
+    BST_CHECKED, NMHDR, SetScrollInfo, ShowScrollBar, TCIF_TEXT, TCITEMW, TCM_GETCURSEL,
+    TCM_INSERTITEMW, TCM_SETCURSEL, TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_STATIC,
+    WC_TABCONTROLW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetAsyncKeyState, GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE,
@@ -41,13 +42,16 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
     CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
     DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_PASSWORD, ES_READONLY, GWLP_USERDATA,
-    GetClientRect, GetNextDlgTabItem, GetParent, GetWindowLongPtrW, GetWindowTextLengthW,
-    GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MB_ICONWARNING, MB_OK, MSG, MessageBoxW,
-    MoveWindow, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW,
+    GetClientRect, GetNextDlgTabItem, GetParent, GetScrollInfo, GetWindowLongPtrW,
+    GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MB_ICONWARNING, MB_OK,
+    MSG, MessageBoxW, MoveWindow, PostMessageW, RegisterClassW, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP,
+    SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE,
+    SIF_POS, SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW,
     SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
-    WM_NOTIFY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_MOUSEWHEEL, WM_NCDESTROY,
+    WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFONT, WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -173,16 +177,19 @@ const OPTIONS_TAB_SHORTCUTS: i32 = 5;
 const OPTIONS_TAB_COUNT: i32 = 6;
 const OPTIONS_CONTENT_TOP: i32 = 50;
 const OPTIONS_MARGIN_X: i32 = 20;
-const OPTIONS_LABEL_WIDTH: i32 = 235;
+const OPTIONS_LABEL_WIDTH: i32 = 245;
 const OPTIONS_CONTROL_X: i32 = OPTIONS_MARGIN_X + OPTIONS_LABEL_WIDTH + 16;
-const OPTIONS_CONTROL_WIDTH: i32 = 332;
+const OPTIONS_CONTROL_WIDTH: i32 = 350;
 const OPTIONS_ROW_HEIGHT: i32 = 32;
 const OPTIONS_ROW_HEIGHT_COMPACT: i32 = 26;
 const OPTIONS_CHECKBOX_HEIGHT: i32 = 22;
 const OPTIONS_BUTTON_HEIGHT: i32 = 28;
 const OPTIONS_COMBO_HEIGHT: i32 = 28;
 const OPTIONS_EDIT_HEIGHT: i32 = 24;
-const OPTIONS_SECTION_GAP: i32 = 8;
+const OPTIONS_SECTION_GAP: i32 = 12;
+const OPTIONS_SCROLL_LINE: i32 = 32;
+const OPTIONS_CONTENT_BOTTOM_GAP: i32 = 40;
+const OPTIONS_WHEEL_DELTA: i32 = 120;
 
 fn proxy_is_valid(proxy_url: &str, username: &str, password: &str) -> Result<(), String> {
     let mut proxy = reqwest::Proxy::all(proxy_url).map_err(|e| e.to_string())?;
@@ -818,6 +825,9 @@ struct OptionsDialogState {
     tts_voice_language_codes: Vec<String>,
     dialogue_voice_language_codes: Vec<String>,
     secondary_dialogue_voice_language_codes: Vec<String>,
+    active_tab: i32,
+    scroll_offsets: [i32; OPTIONS_TAB_COUNT as usize],
+    content_heights: [i32; OPTIONS_TAB_COUNT as usize],
     ok_button: HWND,
     cancel_button: HWND,
 }
@@ -1296,11 +1306,11 @@ pub fn open(parent: HWND) {
             WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
             PCWSTR(class_name.as_ptr()),
             PCWSTR(title.as_ptr()),
-            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_VSCROLL,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            620,
-            710,
+            700,
+            760,
             parent,
             None,
             hinstance,
@@ -1829,7 +1839,7 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                 20,
                 10,
-                560,
+                640,
                 28,
                 hwnd,
                 HMENU(OPTIONS_ID_TABS as isize),
@@ -4650,6 +4660,9 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 tts_voice_language_codes: Vec::new(),
                 dialogue_voice_language_codes: Vec::new(),
                 secondary_dialogue_voice_language_codes: Vec::new(),
+                active_tab: OPTIONS_TAB_GENERAL,
+                scroll_offsets: [0; OPTIONS_TAB_COUNT as usize],
+                content_heights: [0; OPTIONS_TAB_COUNT as usize],
                 ok_button,
                 cancel_button,
             });
@@ -4782,35 +4795,42 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 OPTIONS_ID_AUDIO_SPLIT => {
                     if code == CBN_SELCHANGE {
                         update_audio_split_visibility(hwnd);
+                        relayout_active_tab_content(hwnd);
                     }
                     LRESULT(0)
                 }
                 OPTIONS_ID_SUBTITLE_MODE => {
                     if code == CBN_SELCHANGE {
                         update_subtitle_ducking_visibility(hwnd);
+                        relayout_active_tab_content(hwnd);
                     }
                     LRESULT(0)
                 }
                 OPTIONS_ID_INDENT_MODE => {
                     if code == CBN_SELCHANGE {
                         update_indentation_visibility(hwnd);
+                        relayout_active_tab_content(hwnd);
                     }
                     LRESULT(0)
                 }
                 OPTIONS_ID_SPELLCHECK_ENABLED => {
                     update_spellcheck_language_visibility(hwnd);
+                    relayout_active_tab_content(hwnd);
                     LRESULT(0)
                 }
                 OPTIONS_ID_TTS_MANUAL_TUNING => {
                     update_tts_manual_visibility(hwnd);
+                    relayout_active_tab_content(hwnd);
                     LRESULT(0)
                 }
                 OPTIONS_ID_USE_DIALOGUE_VOICE => {
                     update_dialogue_voice_visibility(hwnd);
+                    relayout_active_tab_content(hwnd);
                     LRESULT(0)
                 }
                 OPTIONS_ID_DIALOGUE_USE_SECONDARY_VOICE => {
                     update_dialogue_voice_visibility(hwnd);
+                    relayout_active_tab_content(hwnd);
                     LRESULT(0)
                 }
                 OPTIONS_ID_DIALOGUE_VOICE_PREVIEW => {
@@ -4938,6 +4958,18 @@ unsafe fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 }
                 _ => DefWindowProcW(hwnd, msg, wparam, lparam),
             }
+        }
+        WM_VSCROLL => {
+            if handle_options_vscroll(hwnd, wparam) {
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+        WM_MOUSEWHEEL => {
+            if handle_options_mouse_wheel(hwnd, wparam) {
+                return LRESULT(0);
+            }
+            DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_TAB.0 as u32 {
@@ -9568,8 +9600,8 @@ fn layout_button_compact_height(name: &str, button: HWND, y: i32, height: i32) -
     y + OPTIONS_ROW_HEIGHT_COMPACT
 }
 
-fn layout_general_tab(state: &OptionsDialogState) {
-    let mut y = OPTIONS_CONTENT_TOP;
+fn layout_general_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
+    let mut y = OPTIONS_CONTENT_TOP - scroll_offset;
     y = layout_label_control(
         "label_language",
         state.label_language,
@@ -9640,7 +9672,7 @@ fn layout_general_tab(state: &OptionsDialogState) {
     );
     y = layout_checkbox("checkbox_context_menu", state.checkbox_context_menu, y);
     y += OPTIONS_SECTION_GAP;
-    layout_label_control(
+    y = layout_label_control(
         "label_file_associations",
         state.label_file_associations,
         "button_manage_associations",
@@ -9648,10 +9680,11 @@ fn layout_general_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_BUTTON_HEIGHT,
     );
+    y + scroll_offset
 }
 
-fn layout_voice_tab(state: &OptionsDialogState) {
-    let mut y = OPTIONS_CONTENT_TOP;
+fn layout_voice_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
+    let mut y = OPTIONS_CONTENT_TOP - scroll_offset;
     y = layout_label_control(
         "label_tts_engine",
         state.label_tts_engine,
@@ -9917,15 +9950,16 @@ fn layout_voice_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_EDIT_HEIGHT,
     );
-    layout_checkbox(
+    y = layout_checkbox(
         "checkbox_dialogue_allow_multiline",
         state.checkbox_dialogue_allow_multiline,
         y,
     );
+    y + scroll_offset
 }
 
-fn layout_editor_tab(state: &OptionsDialogState) {
-    let mut y = OPTIONS_CONTENT_TOP;
+fn layout_editor_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
+    let mut y = OPTIONS_CONTENT_TOP - scroll_offset;
     y = layout_checkbox("checkbox_word_wrap", state.checkbox_word_wrap, y);
     y = layout_checkbox("checkbox_smart_quotes", state.checkbox_smart_quotes, y);
     y = layout_checkbox(
@@ -10019,10 +10053,11 @@ fn layout_editor_tab(state: &OptionsDialogState) {
         OPTIONS_BUTTON_HEIGHT,
     );
     y += OPTIONS_SECTION_GAP;
-    layout_checkbox("checkbox_move_cursor", state.checkbox_move_cursor, y);
+    y = layout_checkbox("checkbox_move_cursor", state.checkbox_move_cursor, y);
+    y + scroll_offset
 }
 
-fn layout_audio_tab(state: &OptionsDialogState) {
+fn layout_audio_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
     let (show_text_split, show_time_split, show_parts_split) = unsafe {
         let split_sel = SendMessageW(state.combo_audio_split, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
         if split_sel >= 0 {
@@ -10042,7 +10077,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
             (false, false, false)
         }
     };
-    let mut y = OPTIONS_CONTENT_TOP;
+    let mut y = OPTIONS_CONTENT_TOP - scroll_offset;
     y = layout_label_control(
         "label_audio_skip",
         state.label_audio_skip,
@@ -10153,7 +10188,7 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_COMBO_HEIGHT,
     );
-    layout_label_control(
+    y = layout_label_control(
         "label_subtitle_offset",
         state.label_subtitle_offset,
         "edit_subtitle_offset",
@@ -10161,10 +10196,11 @@ fn layout_audio_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_EDIT_HEIGHT,
     );
+    y + scroll_offset
 }
 
-fn layout_rss_podcast_tab(state: &OptionsDialogState) {
-    let mut y = OPTIONS_CONTENT_TOP;
+fn layout_rss_podcast_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
+    let mut y = OPTIONS_CONTENT_TOP - scroll_offset;
     y = layout_label_control(
         "label_confirm_delete_rss_mode",
         state.label_confirm_delete_rss_mode,
@@ -10259,15 +10295,16 @@ fn layout_rss_podcast_tab(state: &OptionsDialogState) {
         y,
         OPTIONS_EDIT_HEIGHT,
     );
-    layout_button(
+    y = layout_button(
         "button_podcastindex_signup",
         state.button_podcastindex_signup,
         y,
     );
+    y + scroll_offset
 }
 
-fn layout_shortcuts_tab(state: &OptionsDialogState) {
-    let mut y = OPTIONS_CONTENT_TOP;
+fn layout_shortcuts_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
+    let mut y = OPTIONS_CONTENT_TOP - scroll_offset;
     y = layout_label_control(
         "label_shortcut_action",
         state.label_shortcut_action,
@@ -10305,14 +10342,186 @@ fn layout_shortcuts_tab(state: &OptionsDialogState) {
             true,
         ));
     }
-    layout_button(
+    y = layout_button(
         "button_shortcut_reset_all",
         state.button_shortcut_reset_all,
         y + OPTIONS_ROW_HEIGHT,
     );
+    y + scroll_offset
+}
+
+fn tab_array_index(index: i32) -> usize {
+    index.clamp(0, OPTIONS_TAB_COUNT - 1) as usize
+}
+
+fn options_viewport_height(hwnd: HWND) -> i32 {
+    let mut rect = RECT::default();
+    unsafe {
+        if GetClientRect(hwnd, &mut rect).is_err() {
+            crate::log_debug("GetClientRect failed for options viewport");
+            return 0;
+        }
+    }
+    let button_y = (rect.bottom - 40).max(OPTIONS_CONTENT_TOP);
+    (button_y - OPTIONS_CONTENT_TOP - OPTIONS_CONTENT_BOTTOM_GAP).max(0)
+}
+
+fn clamp_scroll_offset(offset: i32, content_height: i32, viewport_height: i32) -> i32 {
+    let max_offset = (content_height - viewport_height).max(0);
+    offset.clamp(0, max_offset)
+}
+
+fn layout_tab_content(state: &OptionsDialogState, index: i32, scroll_offset: i32) -> i32 {
+    match index {
+        OPTIONS_TAB_GENERAL => layout_general_tab(state, scroll_offset),
+        OPTIONS_TAB_VOICE => layout_voice_tab(state, scroll_offset),
+        OPTIONS_TAB_EDITOR => layout_editor_tab(state, scroll_offset),
+        OPTIONS_TAB_AUDIO => layout_audio_tab(state, scroll_offset),
+        OPTIONS_TAB_RSS_PODCAST => layout_rss_podcast_tab(state, scroll_offset),
+        OPTIONS_TAB_SHORTCUTS => layout_shortcuts_tab(state, scroll_offset),
+        _ => OPTIONS_CONTENT_TOP,
+    }
+}
+
+unsafe fn update_options_scrollbar(hwnd: HWND, state: &OptionsDialogState) {
+    let idx = tab_array_index(state.active_tab);
+    let viewport_height = options_viewport_height(hwnd);
+    let content_height = state.content_heights[idx].max(0);
+    let max_offset = (content_height - viewport_height).max(0);
+    let position = clamp_scroll_offset(state.scroll_offsets[idx], content_height, viewport_height);
+
+    let info = SCROLLINFO {
+        cbSize: std::mem::size_of::<SCROLLINFO>() as u32,
+        fMask: SIF_RANGE | SIF_PAGE | SIF_POS,
+        nMin: 0,
+        nMax: max_offset,
+        nPage: viewport_height.max(1) as u32,
+        nPos: position,
+        ..Default::default()
+    };
+    if SetScrollInfo(hwnd, SB_VERT, &info, true) == 0 {
+        crate::log_debug("SetScrollInfo failed for options dialog");
+    }
+    if ShowScrollBar(hwnd, SB_VERT, max_offset > 0).is_err() {
+        crate::log_debug("ShowScrollBar failed for options dialog");
+    }
+}
+
+unsafe fn relayout_active_tab_content(hwnd: HWND) {
+    if with_options_state(hwnd, |state| {
+        let idx = tab_array_index(state.active_tab);
+        let viewport_height = options_viewport_height(hwnd);
+        let content_height = state.content_heights[idx].max(0);
+        state.scroll_offsets[idx] =
+            clamp_scroll_offset(state.scroll_offsets[idx], content_height, viewport_height);
+        let scroll_offset = state.scroll_offsets[idx];
+        state.content_heights[idx] = layout_tab_content(state, state.active_tab, scroll_offset);
+        layout_dialog_buttons(hwnd, state.ok_button, state.cancel_button);
+        update_options_scrollbar(hwnd, state);
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access state in options_window");
+    }
+}
+
+fn wheel_delta_from_wparam(wparam: WPARAM) -> i32 {
+    (((wparam.0 >> 16) & 0xffff) as i16) as i32
+}
+
+unsafe fn handle_options_mouse_wheel(hwnd: HWND, wparam: WPARAM) -> bool {
+    let delta = wheel_delta_from_wparam(wparam);
+    if delta == 0 {
+        return false;
+    }
+    let steps = (delta.abs() / OPTIONS_WHEEL_DELTA).max(1);
+    let delta_pixels = steps * OPTIONS_SCROLL_LINE;
+
+    let changed = with_options_state(hwnd, |state| {
+        let idx = tab_array_index(state.active_tab);
+        let viewport_height = options_viewport_height(hwnd);
+        let content_height = state.content_heights[idx].max(0);
+        let old = state.scroll_offsets[idx];
+        let mut new = if delta > 0 {
+            old - delta_pixels
+        } else {
+            old + delta_pixels
+        };
+        new = clamp_scroll_offset(new, content_height, viewport_height);
+        if new != old {
+            state.scroll_offsets[idx] = new;
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+
+    if changed {
+        relayout_active_tab_content(hwnd);
+    }
+    changed
+}
+
+unsafe fn handle_options_vscroll(hwnd: HWND, wparam: WPARAM) -> bool {
+    let command = (wparam.0 & 0xffff) as u32;
+    let thumb_pos = ((wparam.0 >> 16) & 0xffff) as i32;
+
+    let changed = with_options_state(hwnd, |state| {
+        let idx = tab_array_index(state.active_tab);
+        let viewport_height = options_viewport_height(hwnd);
+        let content_height = state.content_heights[idx].max(0);
+        let max_offset = (content_height - viewport_height).max(0);
+        if max_offset <= 0 {
+            if state.scroll_offsets[idx] != 0 {
+                state.scroll_offsets[idx] = 0;
+                return true;
+            }
+            return false;
+        }
+
+        let old = state.scroll_offsets[idx];
+        let page_step = (viewport_height - OPTIONS_ROW_HEIGHT).max(OPTIONS_SCROLL_LINE);
+        let mut new = old;
+        match command {
+            c if c == SB_LINEUP.0 as u32 => new -= OPTIONS_SCROLL_LINE,
+            c if c == SB_LINEDOWN.0 as u32 => new += OPTIONS_SCROLL_LINE,
+            c if c == SB_PAGEUP.0 as u32 => new -= page_step,
+            c if c == SB_PAGEDOWN.0 as u32 => new += page_step,
+            c if c == SB_TOP.0 as u32 => new = 0,
+            c if c == SB_BOTTOM.0 as u32 => new = max_offset,
+            c if c == SB_THUMBPOSITION.0 as u32 || c == SB_THUMBTRACK.0 as u32 => {
+                let mut info = SCROLLINFO {
+                    cbSize: std::mem::size_of::<SCROLLINFO>() as u32,
+                    fMask: SIF_TRACKPOS,
+                    ..Default::default()
+                };
+                if GetScrollInfo(hwnd, SB_VERT, &mut info).is_ok() {
+                    new = info.nTrackPos;
+                } else {
+                    new = thumb_pos;
+                }
+            }
+            _ => {}
+        }
+        new = new.clamp(0, max_offset);
+        if new != old {
+            state.scroll_offsets[idx] = new;
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+
+    if changed {
+        relayout_active_tab_content(hwnd);
+    }
+    changed
 }
 
 unsafe fn set_active_tab(hwnd: HWND, index: i32) {
+    let index = index.clamp(0, OPTIONS_TAB_COUNT - 1);
     let focus_first = with_options_state(hwnd, |state| {
         if state.focus_initialized {
             false
@@ -10323,23 +10532,25 @@ unsafe fn set_active_tab(hwnd: HWND, index: i32) {
     })
     .unwrap_or(false);
     if with_options_state(hwnd, |state| {
+        state.active_tab = index;
+        let idx = tab_array_index(index);
+        let viewport_height = options_viewport_height(hwnd);
+        state.scroll_offsets[idx] = clamp_scroll_offset(
+            state.scroll_offsets[idx],
+            state.content_heights[idx],
+            viewport_height,
+        );
+        let scroll_offset = state.scroll_offsets[idx];
+        state.content_heights[idx] = layout_tab_content(state, index, scroll_offset);
+        layout_dialog_buttons(hwnd, state.ok_button, state.cancel_button);
+        update_options_scrollbar(hwnd, state);
+
         let show_general = index == OPTIONS_TAB_GENERAL;
         let show_voice = index == OPTIONS_TAB_VOICE;
         let show_editor = index == OPTIONS_TAB_EDITOR;
         let show_audio = index == OPTIONS_TAB_AUDIO;
         let show_rss_podcast = index == OPTIONS_TAB_RSS_PODCAST;
         let show_shortcuts = index == OPTIONS_TAB_SHORTCUTS;
-
-        match index {
-            OPTIONS_TAB_GENERAL => layout_general_tab(state),
-            OPTIONS_TAB_VOICE => layout_voice_tab(state),
-            OPTIONS_TAB_EDITOR => layout_editor_tab(state),
-            OPTIONS_TAB_AUDIO => layout_audio_tab(state),
-            OPTIONS_TAB_RSS_PODCAST => layout_rss_podcast_tab(state),
-            OPTIONS_TAB_SHORTCUTS => layout_shortcuts_tab(state),
-            _ => {}
-        }
-        layout_dialog_buttons(hwnd, state.ok_button, state.cancel_button);
 
         for control in [
             state.label_language,

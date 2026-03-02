@@ -9480,81 +9480,81 @@ where
     }
 }
 
-pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bool) {
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let path_buf = path.to_path_buf();
-    let title = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("File")
-        .to_string();
-    let (hwnd_edit, new_index) = with_state(hwnd, |state| {
-        let hwnd_edit = create_edit(
-            hwnd,
-            state.hfont,
-            state.settings.word_wrap,
-            state.settings.text_color,
-            state.settings.text_size,
-        );
-        editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(0, language));
-        let doc = Document {
-            title: title.clone(),
-            path: Some(path_buf.clone()),
-            hwnd_edit,
-            dirty: false,
-            format: FileFormat::Pdf,
-            opened_text_encoding: None,
-            current_save_text_encoding: None,
-            from_rss: false,
-            is_temporary: false,
+pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bool) {
+    unsafe {
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        let path_buf = path.to_path_buf();
+        let title = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("File")
+            .to_string();
+        let (hwnd_edit, new_index) = with_state(hwnd, |state| {
+            let hwnd_edit = create_edit(
+                hwnd,
+                state.hfont,
+                state.settings.word_wrap,
+                state.settings.text_color,
+                state.settings.text_size,
+            );
+            editor_manager::set_edit_text(hwnd_edit, &pdf_loading_placeholder(0, language));
+            let doc = Document {
+                title: title.clone(),
+                path: Some(path_buf.clone()),
+                hwnd_edit,
+                dirty: false,
+                format: FileFormat::Pdf,
+                opened_text_encoding: None,
+                current_save_text_encoding: None,
+                from_rss: false,
+                is_temporary: false,
+            };
+            state.docs.push(doc);
+            insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
+            (hwnd_edit, state.docs.len() - 1)
+        })
+        .unwrap_or((HWND(0), 0));
+
+        if hwnd_edit.0 == 0 {
+            return;
+        }
+        select_tab(hwnd, new_index);
+
+        let ocr_timeout_secs = if from_copydata {
+            PDF_OCR_PROMPT_TIMEOUT_COPYDATA_SECS
+        } else {
+            0
         };
-        state.docs.push(doc);
-        insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
-        (hwnd_edit, state.docs.len() - 1)
-    })
-    .unwrap_or((HWND(0), 0));
+        start_pdf_loading_animation(hwnd, hwnd_edit, ocr_timeout_secs);
 
-    if hwnd_edit.0 == 0 {
-        return;
-    }
-    select_tab(hwnd, new_index);
-
-    let ocr_timeout_secs = if from_copydata {
-        PDF_OCR_PROMPT_TIMEOUT_COPYDATA_SECS
-    } else {
-        0
-    };
-    start_pdf_loading_animation(hwnd, hwnd_edit, ocr_timeout_secs);
-
-    let hwnd_main = hwnd;
-    std::thread::spawn(move || {
-        let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            read_pdf_text_with_status(&path_buf, language)
-        })) {
-            Ok(result) => result,
-            Err(panic) => {
-                let panic_msg = if let Some(s) = panic.downcast_ref::<&str>() {
-                    (*s).to_string()
-                } else if let Some(s) = panic.downcast_ref::<String>() {
-                    s.clone()
-                } else {
-                    "unknown panic payload".to_string()
-                };
-                crate::log_debug(&format!("PDF load thread panic caught: {}", panic_msg));
-                Err(crate::i18n::tr_f(
-                    language,
-                    "file_handler.pdf_read_error",
-                    &[("err", "PDF extraction crashed unexpectedly")],
-                ))
-            }
-        };
-        let payload = Box::new(PdfLoadResult {
-            hwnd_edit,
-            path: path_buf,
-            result,
-            from_copydata,
-        });
-        unsafe {
+        let hwnd_main = hwnd;
+        std::thread::spawn(move || {
+            let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                read_pdf_text_with_status(&path_buf, language)
+            })) {
+                Ok(result) => result,
+                Err(panic) => {
+                    let panic_msg = if let Some(s) = panic.downcast_ref::<&str>() {
+                        (*s).to_string()
+                    } else if let Some(s) = panic.downcast_ref::<String>() {
+                        s.clone()
+                    } else {
+                        "unknown panic payload".to_string()
+                    };
+                    crate::log_debug(&format!("PDF load thread panic caught: {}", panic_msg));
+                    Err(crate::i18n::tr_f(
+                        language,
+                        "file_handler.pdf_read_error",
+                        &[("err", "PDF extraction crashed unexpectedly")],
+                    ))
+                }
+            };
+            let payload = Box::new(PdfLoadResult {
+                hwnd_edit,
+                path: path_buf,
+                result,
+                from_copydata,
+            });
             let payload_ptr = Box::into_raw(payload);
             if let Err(e) = PostMessageW(
                 hwnd_main,
@@ -9565,8 +9565,8 @@ pub(crate) unsafe fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copyd
                 crate::log_debug(&format!("Failed to post WM_PDF_LOADED: {}", e));
                 let _unused_box = Box::from_raw(payload_ptr);
             }
-        }
-    });
+        });
+    }
 }
 
 fn start_ocr_for_pdf(

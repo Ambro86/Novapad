@@ -1368,12 +1368,12 @@ impl FfmpegSource {
 
             let pkt_stream = unsafe { (*self.packet).stream_index };
             if pkt_stream != self.stream_index {
-                unsafe { (self.api.av_packet_unref)(self.packet) };
+                crate::ffmpeg_source::av_packet_unref_safe(self.api, self.packet);
                 continue;
             }
 
             let send_ret = unsafe { (self.api.avcodec_send_packet)(self.codec_ctx, self.packet) };
-            unsafe { (self.api.av_packet_unref)(self.packet) };
+            crate::ffmpeg_source::av_packet_unref_safe(self.api, self.packet);
             if send_ret < 0 {
                 log_debug(&format!(
                     "FFmpeg: send_packet failed: {}",

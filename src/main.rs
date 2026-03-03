@@ -74,8 +74,8 @@ use chrono::Local;
 use serde::{Deserialize, Serialize};
 
 use windows::Win32::Foundation::{
-    BOOL, ERROR_INVALID_PARAMETER, ERROR_INVALID_WINDOW_HANDLE, GetLastError, HINSTANCE, HWND,
-    LPARAM, LRESULT, POINT, SetLastError, WIN32_ERROR, WPARAM,
+    BOOL, ERROR_INVALID_PARAMETER, ERROR_INVALID_WINDOW_HANDLE, GetLastError, HANDLE, HINSTANCE,
+    HWND, LPARAM, LRESULT, POINT, SetLastError, WIN32_ERROR, WPARAM,
 };
 use windows::Win32::Graphics::Gdi::{
     COLOR_WINDOW, DEFAULT_GUI_FONT, DeleteObject, GetObjectW, GetStockObject, HBRUSH, HFONT,
@@ -83,10 +83,12 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::{
-    COPYDATASTRUCT, CloseClipboard, IsClipboardFormatAvailable,
+    COPYDATASTRUCT, CloseClipboard, EmptyClipboard, IsClipboardFormatAvailable, OpenClipboard,
+    SetClipboardData,
 };
 use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
+use windows::Win32::System::Memory::{GLOBAL_ALLOC_FLAGS, GlobalAlloc, GlobalLock, GlobalUnlock};
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
@@ -411,6 +413,37 @@ pub(crate) fn close_clipboard_safe() -> windows::core::Result<()> {
     unsafe { CloseClipboard() }
 }
 
+pub(crate) fn open_clipboard_safe(hwnd_new_owner: HWND) -> windows::core::Result<()> {
+    unsafe { OpenClipboard(hwnd_new_owner) }
+}
+
+pub(crate) fn empty_clipboard_safe() -> windows::core::Result<()> {
+    unsafe { EmptyClipboard() }
+}
+
+pub(crate) fn set_clipboard_data_safe(format: u32, hmem: HANDLE) -> windows::core::Result<HANDLE> {
+    unsafe { SetClipboardData(format, hmem) }
+}
+
+pub(crate) fn global_alloc_safe(
+    flags: GLOBAL_ALLOC_FLAGS,
+    bytes: usize,
+) -> windows::core::Result<windows::Win32::Foundation::HGLOBAL> {
+    unsafe { GlobalAlloc(flags, bytes) }
+}
+
+pub(crate) fn global_lock_as_safe(
+    hmem: windows::Win32::Foundation::HGLOBAL,
+) -> *mut core::ffi::c_void {
+    unsafe { GlobalLock(hmem) }
+}
+
+pub(crate) fn global_unlock_safe(
+    hmem: windows::Win32::Foundation::HGLOBAL,
+) -> windows::core::Result<()> {
+    unsafe { GlobalUnlock(hmem) }
+}
+
 pub(crate) fn is_clipboard_format_available_safe(format: u32) -> bool {
     unsafe { IsClipboardFormatAvailable(format).is_ok() }
 }
@@ -435,6 +468,14 @@ pub(crate) fn get_save_file_name_w_safe(ofn: *mut OPENFILENAMEW) -> BOOL {
 
 pub(crate) fn get_open_file_name_w_safe(ofn: *mut OPENFILENAMEW) -> BOOL {
     unsafe { GetOpenFileNameW(ofn) }
+}
+
+pub(crate) fn drag_query_file_w_safe(
+    hdrop: HDROP,
+    ifile: u32,
+    lpszfile: Option<&mut [u16]>,
+) -> u32 {
+    unsafe { DragQueryFileW(hdrop, ifile, lpszfile) }
 }
 
 pub(crate) fn post_message_w_safe(
@@ -10079,11 +10120,11 @@ pub(crate) fn pdf_loading_placeholder(frame: usize, language: crate::settings::L
 }
 
 fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
-    let count = unsafe { DragQueryFileW(hdrop, 0xFFFFFFFF, None) };
+    let count = drag_query_file_w_safe(hdrop, 0xFFFFFFFF, None);
     let mut dropped_paths = Vec::new();
     for index in 0..count {
         let mut buffer = [0u16; 260];
-        let len = unsafe { DragQueryFileW(hdrop, index, Some(&mut buffer)) };
+        let len = drag_query_file_w_safe(hdrop, index, Some(&mut buffer));
         if len == 0 {
             continue;
         }

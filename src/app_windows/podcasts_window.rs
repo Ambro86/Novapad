@@ -15,9 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
-use windows::Win32::System::DataExchange::{
-    COPYDATASTRUCT, EmptyClipboard, OpenClipboard, SetClipboardData,
-};
+use windows::Win32::System::DataExchange::COPYDATASTRUCT;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
@@ -831,7 +829,7 @@ fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
 
 fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     use windows::Win32::Foundation::HANDLE;
-    use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
+    use windows::Win32::System::Memory::GMEM_MOVEABLE;
 
     const CF_UNICODETEXT: u32 = 13;
 
@@ -839,14 +837,14 @@ fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     if content.is_empty() {
         return;
     }
-    if unsafe { OpenClipboard(hwnd) }.is_err() {
+    if crate::open_clipboard_safe(hwnd).is_err() {
         return;
     }
-    if let Err(e) = unsafe { EmptyClipboard() } {
+    if let Err(e) = crate::empty_clipboard_safe() {
         crate::log_debug(&format!("EmptyClipboard failed: {}", e));
     }
     let size = content.len() * std::mem::size_of::<u16>();
-    let handle = match unsafe { GlobalAlloc(GMEM_MOVEABLE, size) } {
+    let handle = match crate::global_alloc_safe(GMEM_MOVEABLE, size) {
         Ok(handle) => handle,
         Err(_) => {
             if let Err(e) = crate::close_clipboard_safe() {
@@ -861,7 +859,7 @@ fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
         }
         return;
     }
-    let ptr = unsafe { GlobalLock(handle) as *mut u16 };
+    let ptr = crate::global_lock_as_safe(handle) as *mut u16;
     if ptr.is_null() {
         if let Err(e) = crate::close_clipboard_safe() {
             crate::log_debug(&format!("CloseClipboard failed: {}", e));
@@ -871,8 +869,8 @@ fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     unsafe {
         std::ptr::copy_nonoverlapping(content.as_ptr(), ptr, content.len());
     }
-    crate::log_if_err!(unsafe { GlobalUnlock(handle) });
-    if let Err(e) = unsafe { SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize)) } {
+    crate::log_if_err!(crate::global_unlock_safe(handle));
+    if let Err(e) = crate::set_clipboard_data_safe(CF_UNICODETEXT, HANDLE(handle.0 as isize)) {
         crate::log_debug(&format!("SetClipboardData failed: {}", e));
     }
     if let Err(e) = crate::close_clipboard_safe() {

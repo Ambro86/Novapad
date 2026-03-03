@@ -253,22 +253,24 @@ fn selected_voice(hwnd_dialog: HWND) -> String {
     if ptr.is_null() {
         return String::new();
     }
-    let data = unsafe { &*ptr };
     let engine = selected_engine(crate::get_dlg_item_safe(hwnd_dialog, ID_ENGINE));
-    let voices = match engine {
-        TtsEngine::Edge => &data.edge_voices,
-        TtsEngine::Sapi5 => &data.sapi5_voices,
-        TtsEngine::Sapi4 => &data.sapi4_voices,
-    };
     let sel = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if sel < 0 {
         return String::new();
     }
     let idx = crate::send_message_w_safe(combo, CB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0 as usize;
-    voices
-        .get(idx)
-        .map(|v| v.short_name.clone())
-        .unwrap_or_default()
+    crate::with_raw_mut_ptr_safe(ptr, |data| {
+        let voices = match engine {
+            TtsEngine::Edge => &data.edge_voices,
+            TtsEngine::Sapi5 => &data.sapi5_voices,
+            TtsEngine::Sapi4 => &data.sapi4_voices,
+        };
+        voices
+            .get(idx)
+            .map(|v| v.short_name.clone())
+            .unwrap_or_default()
+    })
+    .unwrap_or_default()
 }
 
 fn refresh_edge_controls(hwnd_dialog: HWND, preferred_voice: &str) {

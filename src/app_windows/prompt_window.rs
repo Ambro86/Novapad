@@ -438,14 +438,20 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 let ptr =
                     crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut SimplePromptData;
                 if !ptr.is_null() {
-                    let data = unsafe { &mut *ptr };
                     let edit =
                         unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101) };
                     let len = crate::get_window_text_length_w_safe(edit);
                     let mut buf = vec![0u16; (len + 1) as usize];
                     let read = crate::get_window_text_w_safe(edit, &mut buf);
-                    data.value = String::from_utf16_lossy(&buf[..read as usize]);
-                    data.confirmed = true;
+                    let value = String::from_utf16_lossy(&buf[..read as usize]);
+                    if crate::with_raw_mut_ptr_safe(ptr, |data| {
+                        data.value = value;
+                        data.confirmed = true;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Prompt state pointer unavailable during OK handling");
+                    }
                 }
                 crate::log_if_err!(crate::destroy_window_safe(hwnd));
             } else if id == 2 {

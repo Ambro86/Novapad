@@ -261,7 +261,7 @@ fn open_window(parent: HWND, kind: HelpWindowKind) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let title = to_wide(&help_title(language, kind));

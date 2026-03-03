@@ -25,10 +25,10 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CreateWindowExW, DefWindowProcW, DispatchMessageW, GetWindowTextLengthW,
     GetWindowTextW, HMENU, IDC_ARROW, IsDialogMessageW, LoadCursorW, MSG, PostMessageW,
-    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowTextW, TranslateMessage,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
-    WM_NOTIFY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    SendMessageW, SetForegroundWindow, SetWindowTextW, TranslateMessage, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NOTIFY, WM_SETFONT,
+    WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -154,7 +154,7 @@ pub fn open_find_in_files_dialog(parent: HWND) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let init = Box::new(FindInFilesInit { parent, language });
     let labels = labels(language);

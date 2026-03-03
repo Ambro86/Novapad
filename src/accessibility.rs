@@ -10,7 +10,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VK_NEXT, VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_SPACE,
     VK_SUBTRACT, VK_UP,
 };
-use windows::Win32::UI::WindowsAndMessaging::{IsChild, IsDialogMessageW, MSG, WM_KEYDOWN};
+use windows::Win32::UI::WindowsAndMessaging::{IsDialogMessageW, MSG, WM_KEYDOWN};
 use windows::core::{BSTR, GUID, PCWSTR, VARIANT};
 
 pub const EM_GETSEL: u32 = 0x00B0;
@@ -47,7 +47,7 @@ pub fn handle_accessibility(hwnd: HWND, msg: &MSG) -> bool {
     // Only process messages that belong to this window or its children.
     // This prevents IsDialogMessageW from interfering with messages destined
     // for other windows (e.g., the main editor while a secondary window is open).
-    if msg.hwnd != hwnd && !unsafe { IsChild(hwnd, msg.hwnd) }.as_bool() {
+    if msg.hwnd != hwnd && !crate::is_child_safe(hwnd, msg.hwnd) {
         return false;
     }
 

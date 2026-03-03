@@ -519,7 +519,7 @@ fn open_entry_dialog(owner: HWND, index: Option<usize>) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let labels = dictionary_labels(language);

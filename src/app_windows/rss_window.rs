@@ -5715,7 +5715,7 @@ fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let language = with_rss_state(parent_hwnd, |s| {
         { with_state(s.parent, |ps| ps.settings.language) }.unwrap_or_default()
@@ -5884,7 +5884,7 @@ fn show_rss_search_dialog(parent_hwnd: HWND) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let main_hwnd = with_rss_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
     let language = { with_state(main_hwnd, |s| s.settings.language) }.unwrap_or_default();
@@ -6099,7 +6099,7 @@ fn show_add_dialog_with_prefill_options(
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let main_hwnd = with_rss_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
     let language = { with_state(main_hwnd, |s| s.settings.language) }.unwrap_or_default();

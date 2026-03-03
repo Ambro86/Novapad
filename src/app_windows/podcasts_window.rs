@@ -39,7 +39,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CHILDID_SELF,
     CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
     ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgItem, GetParent, GetWindowLongPtrW,
-    GetWindowRect, HMENU, IDC_ARROW, IDYES, IsChild, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT,
+    GetWindowRect, HMENU, IDC_ARROW, IDYES, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT,
     LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO,
     MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
     RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
@@ -767,7 +767,7 @@ struct PlayReadyMsg {
 }
 
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
-    if msg.hwnd != hwnd && !unsafe { IsChild(hwnd, msg.hwnd) }.as_bool() {
+    if msg.hwnd != hwnd && !crate::is_child_safe(hwnd, msg.hwnd) {
         return false;
     }
     if msg.message == WM_CHAR {
@@ -3322,7 +3322,7 @@ fn show_categories_dialog(parent_hwnd: HWND) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let language = with_podcast_state(parent_hwnd, |s| s.language).unwrap_or_default();
     let title = i18n::tr(language, "podcasts.categories.dialog.title");
@@ -4123,7 +4123,7 @@ fn show_add_dialog(parent_hwnd: HWND) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let language = with_podcast_state(parent_hwnd, |s| s.language).unwrap_or_default();
     let init_ptr = Box::into_raw(Box::new(AddDialogInit {
@@ -5615,7 +5615,7 @@ fn show_description_dialog(parent: HWND, title: &str, content: &str) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    let _atom = unsafe { RegisterClassW(&wc) };
+    let _atom = crate::register_class_w_safe(&wc);
 
     let window_title = i18n::tr(
         with_podcast_state(parent, |s| s.language).unwrap_or_default(),
@@ -6033,7 +6033,7 @@ fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let language = with_podcast_state(parent_hwnd, |s| s.language).unwrap_or_default();
     let title = i18n::tr(language, "podcasts.context.reorder");

@@ -279,7 +279,7 @@ fn show_import_dialog(
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let result = Arc::new(Mutex::new(None));
     let init = Box::new(ImportInit {

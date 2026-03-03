@@ -26,11 +26,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST,
     CREATESTRUCTW, CreateWindowExW, DefWindowProcW, ES_AUTOVSCROLL, ES_MULTILINE,
     GetNextDlgTabItem, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW,
-    IsWindow, KillTimer, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW,
-    SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_TIMER,
-    WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    IsWindow, KillTimer, LoadCursorW, MSG, PostMessageW, SendMessageW, SetForegroundWindow,
+    SetTimer, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION,
+    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -323,7 +323,7 @@ pub fn open(parent: HWND) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let labels = labels(language);
     let title = to_wide(&labels.title);

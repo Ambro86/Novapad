@@ -10,7 +10,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     DispatchMessageW, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IsDialogMessageW,
     LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBS_HASSTRINGS,
-    LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW,
+    LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, SendMessageW,
     SetForegroundWindow, SetWindowLongPtrW, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
     WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
     WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
@@ -64,7 +64,7 @@ pub fn select_chapter(parent: HWND, chapters: &[Chapter], language: Language) ->
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let result = Arc::new(Mutex::new(None));
     let init = Box::new(ChapterListInit {

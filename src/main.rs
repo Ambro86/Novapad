@@ -405,6 +405,12 @@ pub(crate) fn destroy_window_safe(hwnd: HWND) -> windows::core::Result<()> {
     unsafe { DestroyWindow(hwnd) }
 }
 
+pub(crate) fn register_class_w_safe(
+    class: &windows::Win32::UI::WindowsAndMessaging::WNDCLASSW,
+) -> u16 {
+    unsafe { RegisterClassW(class) }
+}
+
 pub(crate) fn set_window_text_w_safe(hwnd: HWND, text: PCWSTR) -> windows::core::Result<()> {
     unsafe { SetWindowTextW(hwnd, text) }
 }
@@ -7878,7 +7884,7 @@ fn can_undo_now(hwnd: HWND) -> bool {
         return false;
     };
     // SAFETY: querying EM_CANUNDO on the active edit control is side-effect free.
-    unsafe { SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0 }
+    send_message_w_safe(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0
 }
 
 pub(crate) fn update_main_status_bar(hwnd: HWND) {
@@ -9225,7 +9231,7 @@ fn announce_bookmark_target_line(hwnd_edit: HWND, position: i32, fallback: &str)
         return;
     }
     let line_start =
-        unsafe { SendMessageW(hwnd_edit, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)).0 as i32 };
+        send_message_w_safe(hwnd_edit, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)).0 as i32;
     if line_start < 0 {
         if !fallback.is_empty() {
             crate::accessibility::screen_reader_speak(fallback);
@@ -10329,7 +10335,7 @@ fn attempt_switch_to_selected_tab(hwnd: HWND) {
         Some(Some(values)) => values,
         _ => return,
     };
-    let sel = unsafe { SendMessageW(hwnd_tab, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32 };
+    let sel = send_message_w_safe(hwnd_tab, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
     if sel < 0 {
         return;
     }

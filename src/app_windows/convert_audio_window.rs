@@ -16,10 +16,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWN,
     CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow,
     ES_AUTOHSCROLL, GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, PostMessageW,
-    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, ShowWindow, WINDOW_STYLE,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
-    WS_TABSTOP, WS_VISIBLE,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, ShowWindow, WINDOW_STYLE, WM_CLOSE,
+    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION,
+    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -183,7 +183,7 @@ pub fn open(parent: HWND) {
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let labels = labels(language);
     let title = to_wide(&labels.title);

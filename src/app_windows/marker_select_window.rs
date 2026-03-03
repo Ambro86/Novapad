@@ -11,9 +11,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IsDialogMessageW,
     LB_ADDSTRING, LB_GETCOUNT, LB_GETSEL, LB_SETCARETINDEX, LB_SETCURSEL, LB_SETSEL,
     LB_SETTOPINDEX, LBN_SELCHANGE, LBS_MULTIPLESEL, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW,
-    MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    MSG, PostMessageW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
+    TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
     WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
@@ -82,7 +82,7 @@ pub fn select_marker_entries(
         hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
         ..Default::default()
     };
-    unsafe { RegisterClassW(&wc) };
+    crate::register_class_w_safe(&wc);
 
     let result = Arc::new(Mutex::new(None));
     let init = Box::new(MarkerSelectInit {

@@ -14,6 +14,13 @@ pub struct ComGuard {
     should_uninit: bool,
 }
 
+pub(crate) fn co_initialize_ex_safe(
+    reserved: Option<*const core::ffi::c_void>,
+    coinit: windows::Win32::System::Com::COINIT,
+) -> windows::core::HRESULT {
+    unsafe { CoInitializeEx(reserved, coinit) }
+}
+
 impl ComGuard {
     /// Initialize COM with apartment-threaded model (STA).
     /// Use this for UI threads and most SAPI operations.
@@ -28,7 +35,7 @@ impl ComGuard {
     }
 
     fn init(coinit: windows::Win32::System::Com::COINIT) -> Result<Self, windows::core::Error> {
-        let result = unsafe { CoInitializeEx(None, coinit) };
+        let result = co_initialize_ex_safe(None, coinit);
 
         // S_OK = success, we initialized COM
         if result.is_ok() {

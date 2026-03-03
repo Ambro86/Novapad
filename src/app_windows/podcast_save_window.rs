@@ -11,11 +11,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, GWLP_USERDATA,
-    GetParent, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING, MB_YESNO, MSG, MessageBoxW,
-    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
-    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION,
-    WS_CHILD, WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
+    GetParent, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING, MB_YESNO, MSG, PostMessageW,
+    RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS,
+    WM_SETFONT, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_DLGMODALFRAME,
+    WS_POPUP, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -525,14 +525,12 @@ fn request_cancel(hwnd: HWND) {
         let title = i18n::tr(state.language, "app.confirm_title");
         let msg_w = to_wide(&msg);
         let title_w = to_wide(&title);
-        let result = unsafe {
-            MessageBoxW(
-                hwnd,
-                PCWSTR(msg_w.as_ptr()),
-                PCWSTR(title_w.as_ptr()),
-                MB_YESNO | MB_ICONWARNING,
-            )
-        };
+        let result = crate::message_box_w_safe(
+            hwnd,
+            PCWSTR(msg_w.as_ptr()),
+            PCWSTR(title_w.as_ptr()),
+            MB_YESNO | MB_ICONWARNING,
+        );
         if result == IDYES {
             state.cancel_requested = true;
             unsafe {

@@ -32,7 +32,7 @@ use windows::Win32::System::Threading::{
     CreateWaitableTimerW, GetCurrentThread, SetThreadPriority, SetWaitableTimer,
     THREAD_PRIORITY_HIGHEST,
 };
-use windows::Win32::UI::WindowsAndMessaging::{IDYES, MB_ICONQUESTION, MB_YESNO, MessageBoxW};
+use windows::Win32::UI::WindowsAndMessaging::{IDYES, MB_ICONQUESTION, MB_YESNO};
 use windows::core::PCWSTR;
 
 type SubtitleSpeechCancel = Arc<Mutex<Option<Arc<AtomicBool>>>>;
@@ -2201,14 +2201,12 @@ fn confirm_edge_subtitle_download(
     let title = confirm_title(settings.language);
     let msg_w = to_wide(&msg);
     let title_w = to_wide(&title);
-    let response = unsafe {
-        MessageBoxW(
-            hwnd,
-            PCWSTR(msg_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            MB_YESNO | MB_ICONQUESTION,
-        )
-    };
+    let response = crate::message_box_w_safe(
+        hwnd,
+        PCWSTR(msg_w.as_ptr()),
+        PCWSTR(title_w.as_ptr()),
+        MB_YESNO | MB_ICONQUESTION,
+    );
     if response != IDYES {
         return false;
     }
@@ -2320,14 +2318,12 @@ fn start_subtitle_reader(
                 paused_for_prompt = true;
             }
             if !is_edge_confirmed(&edge_key) {
-                let response = unsafe {
-                    MessageBoxW(
-                        hwnd,
-                        PCWSTR(msg_w.as_ptr()),
-                        PCWSTR(title_w.as_ptr()),
-                        MB_YESNO | MB_ICONQUESTION,
-                    )
-                };
+                let response = crate::message_box_w_safe(
+                    hwnd,
+                    PCWSTR(msg_w.as_ptr()),
+                    PCWSTR(title_w.as_ptr()),
+                    MB_YESNO | MB_ICONQUESTION,
+                );
                 if response != IDYES {
                     if paused_for_prompt
                         && let Some(state) = subtitle_playback_state(hwnd, &media_path)

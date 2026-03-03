@@ -10,7 +10,7 @@ use windows::Win32::UI::Controls::{PBM_SETPOS, PBM_SETRANGE, WC_BUTTON};
 use windows::Win32::UI::Input::KeyboardAndMouse::{SetFocus, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, GWLP_USERDATA,
-    HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING, MB_YESNO, MSG, MessageBoxW, MoveWindow,
+    HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING, MB_YESNO, MSG, MoveWindow,
     RegisterClassW, SendMessageW, SetForegroundWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
     WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD,
     WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
@@ -352,14 +352,12 @@ pub fn request_cancel(hwnd: HWND) {
     let msg_w = to_wide(&msg);
     let title_w = to_wide(&title);
 
-    if unsafe {
-        MessageBoxW(
-            hwnd,
-            PCWSTR(msg_w.as_ptr()),
-            PCWSTR(title_w.as_ptr()),
-            MB_YESNO | MB_ICONWARNING,
-        )
-    } == IDYES
+    if crate::message_box_w_safe(
+        hwnd,
+        PCWSTR(msg_w.as_ptr()),
+        PCWSTR(title_w.as_ptr()),
+        MB_YESNO | MB_ICONWARNING,
+    ) == IDYES
     {
         if {
             with_state(parent, |state| {

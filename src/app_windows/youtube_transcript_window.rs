@@ -24,11 +24,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE,
     ES_READONLY, FindWindowExW, GWLP_USERDATA, GetForegroundWindow, GetWindowLongPtrW, HMENU,
     IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO,
-    MSG, MessageBoxW, PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
-    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    MSG, PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW,
+    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TranslateMessage,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
+    WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -3528,14 +3528,12 @@ fn ensure_ytdlp_available(
     }
     let title = to_wide(&confirm_title(language));
     let message = to_wide(&labels.ytdlp_prompt_download);
-    let response = unsafe {
-        MessageBoxW(
-            hwnd,
-            PCWSTR(message.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_YESNO | MB_ICONQUESTION,
-        )
-    };
+    let response = crate::message_box_w_safe(
+        hwnd,
+        PCWSTR(message.as_ptr()),
+        PCWSTR(title.as_ptr()),
+        MB_YESNO | MB_ICONQUESTION,
+    );
     if response != IDYES {
         return Ok(None);
     }
@@ -3583,14 +3581,12 @@ fn check_ytdlp_update(hwnd: HWND, language: Language, labels: &Labels, path: &Pa
     );
     let title = to_wide(&confirm_title(language));
     let message = to_wide(&prompt);
-    let response = unsafe {
-        MessageBoxW(
-            hwnd,
-            PCWSTR(message.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_YESNO | MB_ICONQUESTION,
-        )
-    };
+    let response = crate::message_box_w_safe(
+        hwnd,
+        PCWSTR(message.as_ptr()),
+        PCWSTR(title.as_ptr()),
+        MB_YESNO | MB_ICONQUESTION,
+    );
     if response != IDYES {
         return;
     }

@@ -699,18 +699,13 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
     if prev == 0 {
         return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
     }
-    unsafe {
-        windows::Win32::UI::WindowsAndMessaging::CallWindowProcW(
-            Some(std::mem::transmute::<
-                isize,
-                unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-            >(prev)),
-            hwnd,
-            msg,
-            wparam,
-            lparam,
-        )
-    }
+    crate::call_window_proc_w_safe(
+        crate::isize_to_wndproc_safe(prev),
+        hwnd,
+        msg,
+        wparam,
+        lparam,
+    )
 }
 
 fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {

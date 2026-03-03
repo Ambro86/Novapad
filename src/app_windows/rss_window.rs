@@ -5784,18 +5784,13 @@ fn reorder_control_subclass_proc_inner(
             if prev == 0 {
                 return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
             }
-            return unsafe {
-                CallWindowProcW(
-                    Some(std::mem::transmute::<
-                        isize,
-                        unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-                    >(prev)),
-                    hwnd,
-                    msg,
-                    wparam,
-                    lparam,
-                )
-            };
+            return crate::call_window_proc_w_safe(
+                crate::isize_to_wndproc_safe(prev),
+                hwnd,
+                msg,
+                wparam,
+                lparam,
+            );
         }
         let edit = crate::get_dlg_item_safe(parent, edit_id as i32);
         let ok = crate::get_dlg_item_safe(parent, ok_id as i32);
@@ -5834,18 +5829,13 @@ fn reorder_control_subclass_proc_inner(
     if prev == 0 {
         return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
     }
-    unsafe {
-        CallWindowProcW(
-            Some(std::mem::transmute::<
-                isize,
-                unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-            >(prev)),
-            hwnd,
-            msg,
-            wparam,
-            lparam,
-        )
-    }
+    crate::call_window_proc_w_safe(
+        crate::isize_to_wndproc_safe(prev),
+        hwnd,
+        msg,
+        wparam,
+        lparam,
+    )
 }
 
 fn show_add_dialog(parent_hwnd: HWND) {

@@ -2,8 +2,8 @@ use crate::settings;
 use std::sync::OnceLock;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Com::{
-    CLSCTX_ALL, CLSIDFromProgID, COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize,
-    DISPATCH_METHOD, DISPPARAMS, EXCEPINFO, IDispatch,
+    CLSCTX_ALL, CLSIDFromProgID, COINIT_APARTMENTTHREADED, CoUninitialize, DISPATCH_METHOD,
+    DISPPARAMS, EXCEPINFO, IDispatch,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, VK_ADD, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_MENU,
@@ -242,7 +242,7 @@ fn jaws_invoke_saystring(
     interrupt: bool,
     log_failures: bool,
 ) -> windows::core::Result<()> {
-    let init_res = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+    let init_res = crate::com_guard::co_initialize_ex_safe(None, COINIT_APARTMENTTHREADED);
     if let Err(e) = init_res.ok() {
         if log_failures {
             crate::log_debug(&format!("JAWS CoInitializeEx failed: {e}"));

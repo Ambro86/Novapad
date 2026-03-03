@@ -568,6 +568,15 @@ pub(crate) fn post_message_w_safe(
     unsafe { PostMessageW(hwnd, msg, wparam, lparam) }
 }
 
+pub(crate) fn message_box_w_safe(
+    hwnd: HWND,
+    text: PCWSTR,
+    caption: PCWSTR,
+    typ: MESSAGEBOX_STYLE,
+) -> MESSAGEBOX_RESULT {
+    unsafe { MessageBoxW(hwnd, text, caption, typ) }
+}
+
 pub(crate) fn get_module_handle_raw_default() -> isize {
     unsafe { GetModuleHandleW(None).unwrap_or_default().0 }
 }
@@ -602,6 +611,18 @@ pub(crate) fn create_popup_menu_safe() -> HMENU {
 
 pub(crate) fn check_menu_item_safe(hmenu: HMENU, id_check_item: u32, u_check: u32) -> u32 {
     unsafe { CheckMenuItem(hmenu, id_check_item, u_check) }
+}
+
+pub(crate) fn track_popup_menu_safe(
+    menu: HMENU,
+    flags: windows::Win32::UI::WindowsAndMessaging::TRACK_POPUP_MENU_FLAGS,
+    x: i32,
+    y: i32,
+    reserved: i32,
+    hwnd: HWND,
+    rect: Option<*const RECT>,
+) -> BOOL {
+    unsafe { TrackPopupMenu(menu, flags, x, y, reserved, hwnd, rect) }
 }
 
 pub(crate) fn append_menu_w_safe(
@@ -10324,17 +10345,15 @@ fn open_documents_popup(hwnd: HWND) {
     if crate::get_cursor_pos_safe(&mut pt).is_err() {
         return;
     }
-    let command = unsafe {
-        TrackPopupMenu(
-            menu,
-            TPM_RIGHTBUTTON | TPM_RETURNCMD,
-            pt.x,
-            pt.y,
-            0,
-            hwnd,
-            None,
-        )
-    };
+    let command = crate::track_popup_menu_safe(
+        menu,
+        TPM_RIGHTBUTTON | TPM_RETURNCMD,
+        pt.x,
+        pt.y,
+        0,
+        hwnd,
+        None,
+    );
     if let Some(index) = window_doc_menu_index_from_command(command.0 as usize) {
         select_tab(hwnd, index);
     }
@@ -10853,17 +10872,15 @@ impl IFileDialogControlEvents_Impl for AudiobookBitrateDialogHandler {
             let fg = crate::get_foreground_window_safe();
             if fg.0 != 0 { fg } else { self.parent }
         };
-        let command = unsafe {
-            TrackPopupMenu(
-                menu,
-                TPM_RIGHTBUTTON | TPM_RETURNCMD,
-                pt.x,
-                pt.y,
-                0,
-                owner,
-                None,
-            )
-        };
+        let command = crate::track_popup_menu_safe(
+            menu,
+            TPM_RIGHTBUTTON | TPM_RETURNCMD,
+            pt.x,
+            pt.y,
+            0,
+            owner,
+            None,
+        );
         let chosen = ids
             .iter()
             .find(|(id, _)| *id == command.0 as u32)
@@ -11014,7 +11031,7 @@ pub(crate) fn message_box_modal(
     flags: MESSAGEBOX_STYLE,
 ) -> MESSAGEBOX_RESULT {
     watchdog::enter_modal_dialog();
-    let result = unsafe { MessageBoxW(hwnd, message, title, flags) };
+    let result = crate::message_box_w_safe(hwnd, message, title, flags);
     watchdog::exit_modal_dialog();
     result
 }

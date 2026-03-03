@@ -4593,17 +4593,15 @@ fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
         ID_CTX_SEARCH_COPY_URL,
         PCWSTR(to_wide(&copy_label).as_ptr()),
     ) {}
-    let cmd = unsafe {
-        TrackPopupMenu(
-            menu,
-            windows::Win32::UI::WindowsAndMessaging::TPM_RETURNCMD,
-            x,
-            y,
-            0,
-            hwnd,
-            None,
-        )
-    }
+    let cmd = crate::track_popup_menu_safe(
+        menu,
+        windows::Win32::UI::WindowsAndMessaging::TPM_RETURNCMD,
+        x,
+        y,
+        0,
+        hwnd,
+        None,
+    )
     .0 as usize;
     match cmd {
         ID_CTX_SUBSCRIBE => subscribe_selected_result(hwnd),
@@ -10686,14 +10684,12 @@ fn podcastindex_credentials_or_prompt(hwnd: HWND, parent: HWND) -> Option<(Strin
         let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
         let title = i18n::tr(language, "podcasts.podcastindex.missing_title");
         let body = i18n::tr(language, "podcasts.podcastindex.missing_body");
-        let response = unsafe {
-            MessageBoxW(
-                hwnd,
-                PCWSTR(to_wide(&body).as_ptr()),
-                PCWSTR(to_wide(&title).as_ptr()),
-                MB_YESNO | MB_ICONINFORMATION,
-            )
-        };
+        let response = crate::message_box_w_safe(
+            hwnd,
+            PCWSTR(to_wide(&body).as_ptr()),
+            PCWSTR(to_wide(&title).as_ptr()),
+            MB_YESNO | MB_ICONINFORMATION,
+        );
         if response == IDYES
             && let Err(e) =
                 crate::audio_utils::open_url_in_browser("https://api.podcastindex.org/signup")

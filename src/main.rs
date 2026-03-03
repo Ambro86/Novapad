@@ -347,6 +347,12 @@ pub(crate) fn hwnd_from_create_struct_lparam_safe(create_struct: *const CREATEST
     unsafe { HWND((*create_struct).lpCreateParams as isize) }
 }
 
+pub(crate) fn wave_format_extensible_ref_safe(
+    fmt: &windows::Win32::Media::Audio::WAVEFORMATEX,
+) -> &windows::Win32::Media::Audio::WAVEFORMATEXTENSIBLE {
+    unsafe { &*(fmt as *const _ as *const windows::Win32::Media::Audio::WAVEFORMATEXTENSIBLE) }
+}
+
 pub(crate) fn get_focus_safe() -> HWND {
     unsafe { GetFocus() }
 }

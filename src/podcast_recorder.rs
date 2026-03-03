@@ -15,7 +15,7 @@ use windows::Win32::Media::Audio::{
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
     AUDCLNT_STREAMFLAGS_LOOPBACK, DEVICE_STATE_ACTIVE, EDataFlow, IAudioCaptureClient,
     IAudioClient, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator, MMDeviceEnumerator,
-    WAVEFORMATEX, WAVEFORMATEXTENSIBLE, eCapture, eConsole, eRender,
+    WAVEFORMATEX, eCapture, eConsole, eRender,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
@@ -1047,7 +1047,7 @@ fn parse_format(fmt: &WAVEFORMATEX) -> (u32, u16, SampleFormat) {
         _ => SampleFormat::I16,
     };
     if fmt.wFormatTag as u32 == WAVE_FORMAT_EXTENSIBLE {
-        let ext = unsafe { &*(fmt as *const _ as *const WAVEFORMATEXTENSIBLE) };
+        let ext = crate::wave_format_extensible_ref_safe(fmt);
         let subformat = crate::read_unaligned_safe(std::ptr::addr_of!(ext.SubFormat));
         if subformat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT {
             format = SampleFormat::F32;

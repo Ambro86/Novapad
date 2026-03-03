@@ -547,12 +547,31 @@ pub(crate) fn avcodec_find_encoder_safe(api: &FfmpegApi, codec_id: AVCodecID) ->
     unsafe { (api.avcodec_find_encoder)(codec_id) }
 }
 
+pub(crate) fn avcodec_find_encoder_by_name_safe(
+    api: &FfmpegApi,
+    name: *const core::ffi::c_char,
+) -> *const AVCodec {
+    unsafe { (api.avcodec_find_encoder_by_name)(name) }
+}
+
 pub(crate) fn avcodec_send_frame_safe(
     api: &FfmpegApi,
     avctx: *mut AVCodecContext,
     frame: *const AVFrame,
 ) -> i32 {
     unsafe { (api.avcodec_send_frame)(avctx, frame) }
+}
+
+pub(crate) fn avcodec_receive_packet_safe(
+    api: &FfmpegApi,
+    avctx: *mut AVCodecContext,
+    avpkt: *mut AVPacket,
+) -> i32 {
+    unsafe { (api.avcodec_receive_packet)(avctx, avpkt) }
+}
+
+pub(crate) fn av_packet_unref_safe(api: &FfmpegApi, pkt: *mut AVPacket) {
+    unsafe { (api.av_packet_unref)(pkt) }
 }
 
 pub(crate) fn swr_init_safe(api: &FfmpegApi, s: *mut SwrContext) -> i32 {

@@ -24,6 +24,31 @@ pub struct BassOutput {
 static BASS_INIT: OnceLock<Result<(), String>> = OnceLock::new();
 static BASS_PLUGINS: OnceLock<Result<Vec<Hplugin>, String>> = OnceLock::new();
 
+fn bass_stream_free_safe(api: &BassApi, handle: Hstream) -> i32 {
+    unsafe { (api.stream_free)(handle) }
+}
+
+fn bass_channel_set_attribute_safe(
+    api: &BassApi,
+    handle: Hstream,
+    attrib: Dword,
+    value: f32,
+) -> i32 {
+    unsafe { (api.channel_set_attribute)(handle, attrib, value) }
+}
+
+fn bass_channel_play_safe(api: &BassApi, handle: Hstream, restart: i32) -> i32 {
+    unsafe { (api.channel_play)(handle, restart) }
+}
+
+fn bass_channel_pause_safe(api: &BassApi, handle: Hstream) -> i32 {
+    unsafe { (api.channel_pause)(handle) }
+}
+
+fn bass_channel_stop_safe(api: &BassApi, handle: Hstream) -> i32 {
+    unsafe { (api.channel_stop)(handle) }
+}
+
 fn init_bass_once() -> Result<(), String> {
     BASS_INIT
         .get_or_init(|| {
@@ -118,7 +143,7 @@ impl BassOutput {
                 };
                 if tempo_handle == 0 {
                     log_bass_error(api, "BASS_FX_TempoCreate");
-                    let free_ok = unsafe { (api.stream_free)(source) };
+                    let free_ok = bass_stream_free_safe(api, source);
                     if free_ok == 0 {
                         log_bass_error(api, "BASS_StreamFree");
                     }
@@ -127,9 +152,12 @@ impl BassOutput {
                 } else {
                     let tempo = ((speed as f64 - 1.0) * 100.0) as f32;
                     let tempo = tempo.clamp(-95.0, 5000.0);
-                    let set_ok = unsafe {
-                        (api.channel_set_attribute)(tempo_handle, BASS_ATTRIB_TEMPO, tempo)
-                    };
+                    let set_ok = bass_channel_set_attribute_safe(
+                        api,
+                        tempo_handle,
+                        BASS_ATTRIB_TEMPO,
+                        tempo,
+                    );
                     if set_ok == 0 {
                         log_bass_error(api, "BASS_ChannelSetAttribute tempo");
                     }
@@ -157,7 +185,7 @@ impl BassOutput {
         };
 
         let volume = volume.clamp(0.0, 3.0);
-        let set_ok = unsafe { (api.channel_set_attribute)(handle, BASS_ATTRIB_VOL, volume) };
+        let set_ok = bass_channel_set_attribute_safe(api, handle, BASS_ATTRIB_VOL, volume);
         if set_ok == 0 {
             log_bass_error(api, "BASS_ChannelSetAttribute volume");
         }
@@ -167,7 +195,7 @@ impl BassOutput {
             let seek_ok = unsafe { (api.channel_set_position)(handle, pos, BASS_POS_BYTE) };
             if seek_ok == 0 {
                 log_bass_error(api, "BASS_ChannelSetPosition");
-                let free_ok = unsafe { (api.stream_free)(handle) };
+                let free_ok = bass_stream_free_safe(api, handle);
                 if free_ok == 0 {
                     log_bass_error(api, "BASS_StreamFree (seek-fail)");
                 }
@@ -179,7 +207,7 @@ impl BassOutput {
         }
 
         if !paused {
-            let play_ok = unsafe { (api.channel_play)(handle, 0) };
+            let play_ok = bass_channel_play_safe(api, handle, 0);
             if play_ok == 0 {
                 log_bass_error(api, "BASS_ChannelPlay");
             }
@@ -223,9 +251,12 @@ impl BassOutput {
                 } else {
                     let tempo = ((speed as f64 - 1.0) * 100.0) as f32;
                     let tempo = tempo.clamp(-95.0, 5000.0);
-                    let set_ok = unsafe {
-                        (api.channel_set_attribute)(tempo_handle, BASS_ATTRIB_TEMPO, tempo)
-                    };
+                    let set_ok = bass_channel_set_attribute_safe(
+                        api,
+                        tempo_handle,
+                        BASS_ATTRIB_TEMPO,
+                        tempo,
+                    );
                     if set_ok == 0 {
                         log_bass_error(api, "BASS_ChannelSetAttribute tempo (ffmpeg)");
                     }
@@ -253,16 +284,16 @@ impl BassOutput {
         };
 
         let volume = volume.clamp(0.0, 3.0);
-        let set_ok = unsafe { (api.channel_set_attribute)(handle, BASS_ATTRIB_VOL, volume) };
+        let set_ok = bass_channel_set_attribute_safe(api, handle, BASS_ATTRIB_VOL, volume);
         if set_ok == 0 {
             log_bass_error(api, "BASS_ChannelSetAttribute volume (ffmpeg)");
         }
 
         if !paused {
-            let play_ok = unsafe { (api.channel_play)(handle, 0) };
+            let play_ok = bass_channel_play_safe(api, handle, 0);
             if play_ok == 0 {
                 log_bass_error(api, "BASS_ChannelPlay (ffmpeg)");
-                let free_ok = unsafe { (api.stream_free)(handle) };
+                let free_ok = bass_stream_free_safe(api, handle);
                 if free_ok == 0 {
                     log_bass_error(api, "BASS_StreamFree (ffmpeg play-fail)");
                 }
@@ -284,7 +315,7 @@ impl BassOutput {
 
     pub fn play(&self) -> bool {
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
-        let ok = unsafe { (self.api.channel_play)(handle, 0) };
+        let ok = bass_channel_play_safe(self.api, handle, 0);
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelPlay");
             return false;
@@ -294,7 +325,7 @@ impl BassOutput {
 
     pub fn pause(&self) -> bool {
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
-        let ok = unsafe { (self.api.channel_pause)(handle) };
+        let ok = bass_channel_pause_safe(self.api, handle);
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelPause");
             return false;
@@ -304,11 +335,11 @@ impl BassOutput {
 
     pub fn stop(&self) {
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
-        let ok = unsafe { (self.api.channel_stop)(handle) };
+        let ok = bass_channel_stop_safe(self.api, handle);
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelStop");
         }
-        let free_ok = unsafe { (self.api.stream_free)(handle) };
+        let free_ok = bass_stream_free_safe(self.api, handle);
         if free_ok == 0 {
             log_bass_error(self.api, "BASS_StreamFree");
         }
@@ -317,7 +348,7 @@ impl BassOutput {
     pub fn set_volume(&self, volume: f32) {
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
         let volume = volume.clamp(0.0, 3.0);
-        let ok = unsafe { (self.api.channel_set_attribute)(handle, BASS_ATTRIB_VOL, volume) };
+        let ok = bass_channel_set_attribute_safe(self.api, handle, BASS_ATTRIB_VOL, volume);
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelSetAttribute volume");
         }

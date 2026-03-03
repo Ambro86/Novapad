@@ -499,7 +499,7 @@ pub fn segment_audio_file(
             break;
         }
         if unsafe { (*pkt).stream_index } != audio_stream_idx {
-            unsafe { (api.av_packet_unref)(pkt) };
+            crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
             continue;
         }
         unsafe {
@@ -801,7 +801,7 @@ pub fn merge_audio_files_with_chapters_copy(
                 break;
             }
             if unsafe { (*pkt).stream_index } != audio_idx {
-                unsafe { (api.av_packet_unref)(pkt) };
+                crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
                 continue;
             }
             unsafe {
@@ -1347,7 +1347,7 @@ fn encode_mixed_audio_to_m4a(
             if pkt.is_null() {
                 return Err("FFmpeg: packet alloc failed".to_string());
             }
-            let recv = unsafe { (api.avcodec_receive_packet)(codec_ctx, pkt) };
+            let recv = crate::ffmpeg_source::avcodec_receive_packet_safe(api, codec_ctx, pkt);
             if recv == 0 {
                 unsafe {
                     (*pkt).stream_index = (*stream).index;
@@ -1919,7 +1919,7 @@ pub fn convert_audio_file_with_channels(
     let codec = if matches!(settings.format, ConvertAudioFormat::Mp3) {
         let name =
             CString::new("libmp3lame").map_err(|_| "FFmpeg: invalid encoder name".to_string())?;
-        let by_name = unsafe { (api.avcodec_find_encoder_by_name)(name.as_ptr()) };
+        let by_name = crate::ffmpeg_source::avcodec_find_encoder_by_name_safe(api, name.as_ptr());
         if by_name.is_null() {
             crate::ffmpeg_source::avcodec_find_encoder_safe(api, codec_id)
         } else {
@@ -2138,7 +2138,7 @@ pub fn convert_audio_file_with_channels(
             if pkt.is_null() {
                 return Err("FFmpeg: packet alloc failed".to_string());
             }
-            let recv = unsafe { (api.avcodec_receive_packet)(codec_ctx, pkt) };
+            let recv = crate::ffmpeg_source::avcodec_receive_packet_safe(api, codec_ctx, pkt);
             if recv == 0 {
                 unsafe {
                     (*pkt).stream_index = (*stream).index;

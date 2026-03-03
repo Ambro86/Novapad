@@ -589,11 +589,14 @@ unsafe extern "system" fn find_replace_hook_proc(
 fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> usize {
     match msg {
         WM_INITDIALOG => {
-            let fr = unsafe { &*(lparam.0 as *const FINDREPLACEW) };
-            let parent = fr.hwndOwner;
+            let fr_ptr = lparam.0 as *mut FINDREPLACEW;
+            let Some((parent, is_replace)) = crate::with_raw_mut_ptr_safe(fr_ptr, |fr| {
+                (fr.hwndOwner, fr.lCustData.0 == REPLACE_DIALOG_ID)
+            }) else {
+                return 0;
+            };
             let language =
                 { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
-            let is_replace = fr.lCustData.0 == REPLACE_DIALOG_ID;
             let (width, height, client_bottom) = dialog_metrics(hdlg);
 
             let (

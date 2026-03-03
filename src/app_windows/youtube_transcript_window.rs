@@ -1688,35 +1688,29 @@ fn refill_stream_quality_combo(state: &StreamDialogState, keep_selection: bool) 
     } else {
         -1
     };
-    unsafe {
-        SendMessageW(state.quality_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    }
+    crate::send_message_w_safe(state.quality_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let format = current_stream_format(state);
     let items = stream_quality_items(state.language, format);
     for (label, _) in &items {
         let wide = to_wide(label);
-        unsafe {
-            SendMessageW(
-                state.quality_combo,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(wide.as_ptr() as isize),
-            );
-        }
+        crate::send_message_w_safe(
+            state.quality_combo,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        );
     }
     let selected_idx = if prev_selection >= 0 && (prev_selection as usize) < items.len() {
         prev_selection
     } else {
         0
     };
-    unsafe {
-        SendMessageW(
-            state.quality_combo,
-            CB_SETCURSEL,
-            WPARAM(selected_idx as usize),
-            LPARAM(0),
-        );
-    }
+    crate::send_message_w_safe(
+        state.quality_combo,
+        CB_SETCURSEL,
+        WPARAM(selected_idx as usize),
+        LPARAM(0),
+    );
 }
 
 fn with_stream_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
@@ -2162,28 +2156,24 @@ fn close_progress_dialog(dialog: HWND) {
     if dialog.0 == 0 {
         return;
     }
-    unsafe {
-        SendMessageW(
-            dialog,
-            crate::app_windows::podcast_save_window::WM_PODCAST_SAVE_DONE,
-            WPARAM(0),
-            LPARAM(0),
-        );
-    }
+    crate::send_message_w_safe(
+        dialog,
+        crate::app_windows::podcast_save_window::WM_PODCAST_SAVE_DONE,
+        WPARAM(0),
+        LPARAM(0),
+    );
 }
 
 fn report_progress(dialog: HWND, pct: u32) {
     if dialog.0 == 0 {
         return;
     }
-    unsafe {
-        SendMessageW(
-            dialog,
-            crate::app_windows::podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
-            WPARAM(pct.min(100) as usize),
-            LPARAM(0),
-        );
-    }
+    crate::send_message_w_safe(
+        dialog,
+        crate::app_windows::podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
+        WPARAM(pct.min(100) as usize),
+        LPARAM(0),
+    );
 }
 
 fn report_progress_status(dialog: HWND, text: &str) {

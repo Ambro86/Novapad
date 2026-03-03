@@ -715,7 +715,7 @@ fn start_import(hwnd: HWND) {
     else {
         return;
     };
-    let sel = unsafe { SendMessageW(results_hwnd, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32 };
+    let sel = crate::send_message_w_safe(results_hwnd, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
     if sel < 0 {
         return;
     }
@@ -798,14 +798,12 @@ fn force_focus_editor_on_parent(parent: HWND) {
         );
     }
     if get_active_edit(parent).is_none() {
-        unsafe {
-            SendMessageW(
-                parent,
-                WM_COMMAND,
-                WPARAM(crate::menu::IDM_FILE_NEW),
-                LPARAM(0),
-            );
-        }
+        crate::send_message_w_safe(
+            parent,
+            WM_COMMAND,
+            WPARAM(crate::menu::IDM_FILE_NEW),
+            LPARAM(0),
+        );
     }
     if let Some(hwnd_edit) = get_active_edit(parent) {
         unsafe {

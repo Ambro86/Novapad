@@ -1014,15 +1014,11 @@ fn set_progress(state: &mut FindInFilesState, percent: u32) {
 }
 
 fn clear_results_tree(tree: HWND) {
-    unsafe {
-        SendMessageW(tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
-    }
+    crate::send_message_w_safe(tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
 }
 
 fn set_results_redraw(tree: HWND, enabled: bool) {
-    unsafe {
-        SendMessageW(tree, WM_SETREDRAW, WPARAM(enabled as usize), LPARAM(0));
-    }
+    crate::send_message_w_safe(tree, WM_SETREDRAW, WPARAM(enabled as usize), LPARAM(0));
 }
 
 fn populate_results_tree(state: &mut FindInFilesState) {

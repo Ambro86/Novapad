@@ -1147,14 +1147,12 @@ fn apply_root_order(
             ..Default::default()
         };
         item.hItem = *hitem;
-        unsafe {
-            SendMessageW(
-                hwnd_tree,
-                TVM_SETITEMW,
-                WPARAM(0),
-                LPARAM(&mut item as *mut _ as isize),
-            );
-        }
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_SETITEMW,
+            WPARAM(0),
+            LPARAM(&mut item as *mut _ as isize),
+        );
     }
     with_rss_state(hwnd, |s| {
         for (i, hitem) in ordered_items.iter().enumerate() {
@@ -1166,14 +1164,12 @@ fn apply_root_order(
         lpfnCompare: Some(rss_tree_compare),
         lParam: LPARAM(0),
     };
-    unsafe {
-        SendMessageW(
-            hwnd_tree,
-            TVM_SORTCHILDRENCB,
-            WPARAM(0),
-            LPARAM(&mut sort_cb as *mut _ as isize),
-        );
-    }
+    crate::send_message_w_safe(
+        hwnd_tree,
+        TVM_SORTCHILDRENCB,
+        WPARAM(0),
+        LPARAM(&mut sort_cb as *mut _ as isize),
+    );
 }
 
 fn announce_rss_status(message: &str) {
@@ -3279,9 +3275,7 @@ fn reload_tree(hwnd: HWND) {
             _ => return,
         };
 
-    unsafe {
-        SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
-    }
+    crate::send_message_w_safe(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
 
     with_rss_state(hwnd, |s| {
         s.node_data.clear();
@@ -3384,14 +3378,12 @@ fn update_source_tree_title(
         pszText: windows::core::PWSTR(title_wide.as_ptr() as *mut _),
         ..Default::default()
     };
-    unsafe {
-        SendMessageW(
-            hwnd_tree,
-            TVM_SETITEMW,
-            WPARAM(0),
-            LPARAM(&mut tvi as *mut _ as isize),
-        );
-    }
+    crate::send_message_w_safe(
+        hwnd_tree,
+        TVM_SETITEMW,
+        WPARAM(0),
+        LPARAM(&mut tvi as *mut _ as isize),
+    );
 }
 
 fn set_source_unread(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM, unread: bool) {
@@ -3554,14 +3546,12 @@ fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
                     },
                 },
             };
-            unsafe {
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_INSERTITEMW,
-                    WPARAM(0),
-                    LPARAM(&mut tvis_loading as *mut _ as isize),
-                );
-            }
+            crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_INSERTITEMW,
+                WPARAM(0),
+                LPARAM(&mut tvis_loading as *mut _ as isize),
+            );
         }
         // Force visual expansion now.
         unsafe {
@@ -4225,9 +4215,7 @@ fn load_more_items(
             ListTimeDisplayMode::Always,
         ));
 
-    unsafe {
-        SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
-    }
+    crate::send_message_w_safe(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
     let (inserted, loaded_after, total_after) = with_rss_state(hwnd, |s| {
         let Some(state) = s.source_items.get_mut(&hitem.0) else {
             return (0usize, 0usize, 0usize);
@@ -4287,9 +4275,7 @@ fn load_more_items(
         (inserted, state.loaded, state.items.len())
     })
     .unwrap_or((0usize, 0usize, 0usize));
-    unsafe {
-        SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
-    }
+    crate::send_message_w_safe(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
     if inserted > 0 {
         log_debug(&format!(
             "rss_ui_batch append source={} inserted={} loaded={} total={}",
@@ -4383,14 +4369,12 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
             import_item(hwnd, item);
         }
     } else {
-        unsafe {
-            SendMessageW(
-                hwnd_tree,
-                TVM_EXPAND,
-                WPARAM(TVE_EXPAND.0 as usize),
-                LPARAM(hitem.0),
-            );
-        }
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_EXPAND,
+            WPARAM(TVE_EXPAND.0 as usize),
+            LPARAM(hitem.0),
+        );
     }
 }
 
@@ -5581,14 +5565,12 @@ fn force_focus_editor_on_parent(parent: HWND) {
         SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
     }
     if crate::get_active_edit(parent).is_none() {
-        unsafe {
-            SendMessageW(
-                parent,
-                WM_COMMAND,
-                WPARAM(crate::menu::IDM_FILE_NEW),
-                LPARAM(0),
-            );
-        }
+        crate::send_message_w_safe(
+            parent,
+            WM_COMMAND,
+            WPARAM(crate::menu::IDM_FILE_NEW),
+            LPARAM(0),
+        );
     }
     if let Some(hwnd_edit) = crate::get_active_edit(parent) {
         unsafe {
@@ -5613,9 +5595,7 @@ fn force_focus_editor_on_parent(parent: HWND) {
             );
         }
     }
-    unsafe {
-        SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
-    }
+    crate::send_message_w_safe(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
     if let Err(_e) =
         crate::post_message_w_safe(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
     {

@@ -1737,14 +1737,12 @@ fn append_output(state: &mut PromptState, text: &str) {
     let mut sel_start = 0u32;
     let mut sel_end = 0u32;
     if focus == output {
-        unsafe {
-            SendMessageW(
-                output,
-                EM_GETSEL,
-                WPARAM(&mut sel_start as *mut _ as usize),
-                LPARAM(&mut sel_end as *mut _ as isize),
-            );
-        }
+        crate::send_message_w_safe(
+            output,
+            EM_GETSEL,
+            WPARAM(&mut sel_start as *mut _ as usize),
+            LPARAM(&mut sel_end as *mut _ as isize),
+        );
     }
     let should_scroll = state.auto_scroll && (focus != output || sel_end as usize == prev_len);
 
@@ -1827,14 +1825,12 @@ fn append_output(state: &mut PromptState, text: &str) {
         let max = state.buffer_utf16_len as u32;
         let restore_start = sel_start.min(max);
         let restore_end = sel_end.min(max);
-        unsafe {
-            SendMessageW(
-                output,
-                EM_SETSEL,
-                WPARAM(restore_start as usize),
-                LPARAM(restore_end as isize),
-            );
-        }
+        crate::send_message_w_safe(
+            output,
+            EM_SETSEL,
+            WPARAM(restore_start as usize),
+            LPARAM(restore_end as isize),
+        );
     }
 }
 

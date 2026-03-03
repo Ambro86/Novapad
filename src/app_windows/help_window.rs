@@ -639,14 +639,12 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     None,
                 )
             };
-            unsafe {
-                SendMessageW(
-                    edit,
-                    windows::Win32::UI::Controls::EM_SETREADONLY,
-                    WPARAM(1),
-                    LPARAM(0),
-                );
-            }
+            crate::send_message_w_safe(
+                edit,
+                windows::Win32::UI::Controls::EM_SETREADONLY,
+                WPARAM(1),
+                LPARAM(0),
+            );
 
             let ok_button = unsafe {
                 CreateWindowExW(

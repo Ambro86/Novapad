@@ -340,14 +340,12 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 SendMessageW(progress, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             }
             if cancel_button.0 != 0 {
-                unsafe {
-                    SendMessageW(
-                        cancel_button,
-                        WM_SETFONT,
-                        WPARAM(hfont.0 as usize),
-                        LPARAM(1),
-                    );
-                }
+                crate::send_message_w_safe(
+                    cancel_button,
+                    WM_SETFONT,
+                    WPARAM(hfont.0 as usize),
+                    LPARAM(1),
+                );
             }
             unsafe {
                 SendMessageW(progress, PBM_SETRANGE, WPARAM(0), LPARAM((100isize) << 16));
@@ -449,14 +447,12 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 if with_save_state(hwnd, |state| {
                     if state.current_pct < SAVE_PROGRESS_MAX_FAKE {
                         state.current_pct = (state.current_pct + 1).min(SAVE_PROGRESS_MAX_FAKE);
-                        unsafe {
-                            SendMessageW(
-                                state.progress,
-                                PBM_SETPOS,
-                                WPARAM(state.current_pct),
-                                LPARAM(0),
-                            );
-                        }
+                        crate::send_message_w_safe(
+                            state.progress,
+                            PBM_SETPOS,
+                            WPARAM(state.current_pct),
+                            LPARAM(0),
+                        );
                         update_progress_label(state);
                     }
                 })

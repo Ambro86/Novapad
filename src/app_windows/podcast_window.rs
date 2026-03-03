@@ -1741,14 +1741,12 @@ fn restart_mic_monitor(state: &mut PodcastState) {
     match start_monitoring(device_id, device_name, gain) {
         Ok(handle) => state.monitor_handle = Some(handle),
         Err(e) => {
-            unsafe {
-                SendMessageW(
-                    state.monitor_check,
-                    BM_SETCHECK,
-                    WPARAM(BST_UNCHECKED.0 as usize),
-                    LPARAM(0),
-                );
-            }
+            crate::send_message_w_safe(
+                state.monitor_check,
+                BM_SETCHECK,
+                WPARAM(BST_UNCHECKED.0 as usize),
+                LPARAM(0),
+            );
             show_error(state.parent, state.language, &e);
         }
     }
@@ -1767,14 +1765,12 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
     // Stop microphone monitor if active to avoid conflicts
     if let Some(handle) = state.monitor_handle.take() {
         handle.stop();
-        unsafe {
-            SendMessageW(
-                state.monitor_check,
-                BM_SETCHECK,
-                WPARAM(BST_UNCHECKED.0 as usize),
-                LPARAM(0),
-            );
-        }
+        crate::send_message_w_safe(
+            state.monitor_check,
+            BM_SETCHECK,
+            WPARAM(BST_UNCHECKED.0 as usize),
+            LPARAM(0),
+        );
     }
 
     let mic_device_id = selected_device_id(state, true);
@@ -1800,14 +1796,12 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
             &format!("{} {}", labels.error_microphone, err),
         );
         if include_system {
-            unsafe {
-                SendMessageW(
-                    state.include_mic,
-                    BM_SETCHECK,
-                    WPARAM(BST_UNCHECKED.0 as usize),
-                    LPARAM(0),
-                );
-            }
+            crate::send_message_w_safe(
+                state.include_mic,
+                BM_SETCHECK,
+                WPARAM(BST_UNCHECKED.0 as usize),
+                LPARAM(0),
+            );
         }
     }
     if include_system
@@ -1820,14 +1814,12 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
             &format!("{} {}", labels.error_system_audio, err),
         );
         if include_mic {
-            unsafe {
-                SendMessageW(
-                    state.include_system,
-                    BM_SETCHECK,
-                    WPARAM(BST_UNCHECKED.0 as usize),
-                    LPARAM(0),
-                );
-            }
+            crate::send_message_w_safe(
+                state.include_system,
+                BM_SETCHECK,
+                WPARAM(BST_UNCHECKED.0 as usize),
+                LPARAM(0),
+            );
         }
     }
 
@@ -2121,7 +2113,7 @@ fn selected_save_folder(state: &PodcastState) -> PathBuf {
 }
 
 fn is_checked(hwnd: HWND) -> bool {
-    unsafe { SendMessageW(hwnd, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 == BST_CHECKED.0 as isize }
+    crate::send_message_w_safe(hwnd, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 == BST_CHECKED.0 as isize
 }
 
 fn click_button(hwnd: HWND, id: usize) {

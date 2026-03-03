@@ -7111,7 +7111,7 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         Some(values) => values,
         None => return,
     };
-    let manual = unsafe { SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 }
+    let manual = crate::send_message_w_safe(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
         == BST_CHECKED.0;
     if manual {
         let rate = combo_value(combo_speed);
@@ -7431,9 +7431,9 @@ fn update_dialogue_voice_visibility(hwnd: HWND) {
     ];
     let voice_tab_active = with_options_state(hwnd, |state| {
         state.hwnd_tabs.0 != 0
-            && unsafe {
-                SendMessageW(state.hwnd_tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32
-            } == OPTIONS_TAB_VOICE
+            && crate::send_message_w_safe(state.hwnd_tabs, TCM_GETCURSEL, WPARAM(0), LPARAM(0)).0
+                as i32
+                == OPTIONS_TAB_VOICE
     })
     .unwrap_or(false);
     if !voice_tab_active {
@@ -7445,49 +7445,46 @@ fn update_dialogue_voice_visibility(hwnd: HWND) {
         }
         return;
     }
-    let enabled = unsafe { SendMessageW(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 }
+    let enabled = crate::send_message_w_safe(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
         == BST_CHECKED.0;
     let secondary_enabled = enabled
-        && (unsafe {
-            SendMessageW(
-                checkbox_use_secondary_voice,
-                BM_GETCHECK,
-                WPARAM(0),
-                LPARAM(0),
-            )
-            .0 as u32
-        } == BST_CHECKED.0);
+        && (crate::send_message_w_safe(
+            checkbox_use_secondary_voice,
+            BM_GETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0 as u32
+            == BST_CHECKED.0);
     let secondary_engine_sel =
         crate::send_message_w_safe(combo_secondary_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let dialogue_engine_sel =
         crate::send_message_w_safe(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let dialogue_engine_is_edge = dialogue_engine_sel <= 0;
     let secondary_engine_is_edge = secondary_engine_sel <= 0;
-    let dialogue_only_multilingual = (unsafe {
-        SendMessageW(
-            checkbox_dialogue_multilingual,
-            BM_GETCHECK,
-            WPARAM(0),
-            LPARAM(0),
-        )
-        .0 as u32
-    } == BST_CHECKED.0);
-    let dialogue_secondary_only_multilingual = (unsafe {
-        SendMessageW(
-            checkbox_dialogue_secondary_multilingual,
-            BM_GETCHECK,
-            WPARAM(0),
-            LPARAM(0),
-        )
-        .0 as u32
-    } == BST_CHECKED.0);
+    let dialogue_only_multilingual = crate::send_message_w_safe(
+        checkbox_dialogue_multilingual,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
+        == BST_CHECKED.0;
+    let dialogue_secondary_only_multilingual = crate::send_message_w_safe(
+        checkbox_dialogue_secondary_multilingual,
+        BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 as u32
+        == BST_CHECKED.0;
     let show_dialogue_lang_combo =
         enabled && dialogue_engine_is_edge && !dialogue_only_multilingual;
     let show_secondary_lang_combo =
         secondary_enabled && secondary_engine_is_edge && !dialogue_secondary_only_multilingual;
     let manual_tuning =
         with_options_state(hwnd, |state| state.checkbox_tts_manual).is_some_and(|h| {
-            (unsafe { SendMessageW(h, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 })
+            (crate::send_message_w_safe(h, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32)
                 == BST_CHECKED.0
         });
     for control in controls {
@@ -7713,23 +7710,21 @@ fn preview_voice(hwnd: HWND) {
     if voice_sel < 0 {
         return;
     }
-    let voice_index = unsafe {
-        SendMessageW(
-            combo_voice,
-            CB_GETITEMDATA,
-            WPARAM(voice_sel as usize),
-            LPARAM(0),
-        )
-        .0 as usize
-    };
+    let voice_index = crate::send_message_w_safe(
+        combo_voice,
+        CB_GETITEMDATA,
+        WPARAM(voice_sel as usize),
+        LPARAM(0),
+    )
+    .0 as usize;
     if voice_index >= voices.len() {
         return;
     }
     let voice = voices[voice_index].short_name.clone();
 
-    let manual =
-        unsafe { SendMessageW(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 }
-            == BST_CHECKED.0;
+    let manual = crate::send_message_w_safe(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0))
+        .0 as u32
+        == BST_CHECKED.0;
     let rate = if manual {
         read_tts_tuning_edit_value(edit_tts_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX)
     } else {
@@ -7881,15 +7876,13 @@ fn insert_voice_tag_from_options(hwnd: HWND) {
     if voice_sel < 0 {
         return;
     }
-    let voice_index = unsafe {
-        SendMessageW(
-            combo_voice,
-            CB_GETITEMDATA,
-            WPARAM(voice_sel as usize),
-            LPARAM(0),
-        )
-        .0 as usize
-    };
+    let voice_index = crate::send_message_w_safe(
+        combo_voice,
+        CB_GETITEMDATA,
+        WPARAM(voice_sel as usize),
+        LPARAM(0),
+    )
+    .0 as usize;
     if voice_index >= voices.len() {
         return;
     }
@@ -7898,9 +7891,9 @@ fn insert_voice_tag_from_options(hwnd: HWND) {
         return;
     }
 
-    let manual =
-        unsafe { SendMessageW(checkbox_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 }
-            == BST_CHECKED.0;
+    let manual = crate::send_message_w_safe(checkbox_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
+        as u32
+        == BST_CHECKED.0;
     let rate = if manual {
         read_tts_tuning_edit_value(edit_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX)
     } else {
@@ -7979,23 +7972,21 @@ fn preview_dialogue_voice(hwnd: HWND) {
     if voice_sel < 0 {
         return;
     }
-    let voice_index = unsafe {
-        SendMessageW(
-            combo_dialogue_voice,
-            CB_GETITEMDATA,
-            WPARAM(voice_sel as usize),
-            LPARAM(0),
-        )
-        .0 as usize
-    };
+    let voice_index = crate::send_message_w_safe(
+        combo_dialogue_voice,
+        CB_GETITEMDATA,
+        WPARAM(voice_sel as usize),
+        LPARAM(0),
+    )
+    .0 as usize;
     if voice_index >= voices.len() {
         return;
     }
     let voice = voices[voice_index].short_name.clone();
 
-    let manual =
-        unsafe { SendMessageW(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 }
-            == BST_CHECKED.0;
+    let manual = crate::send_message_w_safe(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0))
+        .0 as u32
+        == BST_CHECKED.0;
     let rate = if manual {
         read_tts_tuning_edit_value(edit_dialogue_voice_rate, 0, TTS_RATE_MIN, TTS_RATE_MAX)
     } else {
@@ -8171,23 +8162,21 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
     if voice_sel < 0 {
         return;
     }
-    let voice_index = unsafe {
-        SendMessageW(
-            combo_dialogue_secondary_voice,
-            CB_GETITEMDATA,
-            WPARAM(voice_sel as usize),
-            LPARAM(0),
-        )
-        .0 as usize
-    };
+    let voice_index = crate::send_message_w_safe(
+        combo_dialogue_secondary_voice,
+        CB_GETITEMDATA,
+        WPARAM(voice_sel as usize),
+        LPARAM(0),
+    )
+    .0 as usize;
     if voice_index >= voices.len() {
         return;
     }
     let voice = voices[voice_index].short_name.clone();
 
-    let manual =
-        unsafe { SendMessageW(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 }
-            == BST_CHECKED.0;
+    let manual = crate::send_message_w_safe(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0))
+        .0 as u32
+        == BST_CHECKED.0;
     let rate = if manual {
         read_tts_tuning_edit_value(
             edit_dialogue_secondary_voice_rate,
@@ -9469,15 +9458,13 @@ fn update_audio_split_visibility(hwnd: HWND) {
     let split_sel =
         crate::send_message_w_safe(combo_audio_split, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let (selected_text, selected_time, selected_parts) = if split_sel >= 0 {
-        let split_parts = unsafe {
-            SendMessageW(
-                combo_audio_split,
-                CB_GETITEMDATA,
-                WPARAM(split_sel as usize),
-                LPARAM(0),
-            )
-            .0 as u32
-        };
+        let split_parts = crate::send_message_w_safe(
+            combo_audio_split,
+            CB_GETITEMDATA,
+            WPARAM(split_sel as usize),
+            LPARAM(0),
+        )
+        .0 as u32;
         (
             split_parts == AUDIOBOOK_SPLIT_BY_TEXT,
             split_parts == AUDIOBOOK_SPLIT_BY_TIME,
@@ -9544,7 +9531,7 @@ fn update_spellcheck_language_visibility(hwnd: HWND) {
             None => return,
         };
     let spellcheck_enabled =
-        unsafe { SendMessageW(checkbox_spellcheck, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32 }
+        crate::send_message_w_safe(checkbox_spellcheck, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
             == BST_CHECKED.0;
     unsafe {
         EnableWindow(label_spellcheck_language, spellcheck_enabled);

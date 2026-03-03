@@ -1035,14 +1035,12 @@ fn update_quality_controls(
             AudioFormat::Flac => 5,
             _ => 0,
         };
-        unsafe {
-            SendMessageW(
-                state.quality_combo,
-                CB_SETCURSEL,
-                WPARAM(default_index),
-                LPARAM(0),
-            );
-        }
+        crate::send_message_w_safe(
+            state.quality_combo,
+            CB_SETCURSEL,
+            WPARAM(default_index),
+            LPARAM(0),
+        );
     }
 }
 

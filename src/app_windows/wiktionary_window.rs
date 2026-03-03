@@ -172,19 +172,15 @@ fn to_windows_newlines(text: &str) -> String {
 }
 
 fn refresh_history_combo(input: HWND, history: &[String]) {
-    unsafe {
-        SendMessageW(input, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    }
+    crate::send_message_w_safe(input, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     for item in history {
         let wide = to_wide(item);
-        unsafe {
-            SendMessageW(
-                input,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(PCWSTR(wide.as_ptr()).0 as isize),
-            );
-        }
+        crate::send_message_w_safe(
+            input,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(PCWSTR(wide.as_ptr()).0 as isize),
+        );
     }
 }
 

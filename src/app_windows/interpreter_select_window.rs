@@ -179,14 +179,12 @@ fn interpreter_select_wndproc_inner(
             };
 
             for item in init.items.iter() {
-                unsafe {
-                    SendMessageW(
-                        list,
-                        LB_ADDSTRING,
-                        WPARAM(0),
-                        LPARAM(to_wide(item).as_ptr() as isize),
-                    );
-                }
+                crate::send_message_w_safe(
+                    list,
+                    LB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(item).as_ptr() as isize),
+                );
             }
             unsafe {
                 SendMessageW(list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
@@ -264,14 +262,12 @@ fn interpreter_select_wndproc_inner(
                             .0;
                             if len >= 0 {
                                 let mut buf = vec![0u16; (len + 1) as usize];
-                                unsafe {
-                                    SendMessageW(
-                                        state.list,
-                                        LB_GETTEXT,
-                                        WPARAM(sel as usize),
-                                        LPARAM(buf.as_mut_ptr() as isize),
-                                    );
-                                }
+                                crate::send_message_w_safe(
+                                    state.list,
+                                    LB_GETTEXT,
+                                    WPARAM(sel as usize),
+                                    LPARAM(buf.as_mut_ptr() as isize),
+                                );
                                 let path = String::from_utf16_lossy(&buf[..len as usize]);
                                 *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
                                     Some(path);

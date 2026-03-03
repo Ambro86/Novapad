@@ -437,14 +437,12 @@ pub fn refresh_dictionary_list(hwnd: HWND) {
         )
         .0;
         if lb_idx >= 0 {
-            unsafe {
-                SendMessageW(
-                    hwnd_list,
-                    LB_SETITEMDATA,
-                    WPARAM(lb_idx as usize),
-                    LPARAM(idx as isize),
-                );
-            }
+            crate::send_message_w_safe(
+                hwnd_list,
+                LB_SETITEMDATA,
+                WPARAM(lb_idx as usize),
+                LPARAM(idx as isize),
+            );
         }
     }
 
@@ -469,9 +467,8 @@ fn selected_dictionary_index(hwnd: HWND) -> Option<usize> {
     if sel < 0 {
         return None;
     }
-    let idx = unsafe {
-        SendMessageW(hwnd_list, LB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0 as isize
-    };
+    let idx = crate::send_message_w_safe(hwnd_list, LB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0))
+        .0 as isize;
     if idx < 0 {
         return None;
     }
@@ -1084,22 +1081,16 @@ fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
         { with_state(parent, |state| state.settings.language).unwrap_or(Language::Italian) };
     let labels = dictionary_labels(language);
 
-    unsafe {
-        SendMessageW(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    }
+    crate::send_message_w_safe(combo_voice, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
 
     if voices.is_empty() {
-        unsafe {
-            SendMessageW(
-                combo_voice,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&labels.voices_empty).as_ptr() as isize),
-            );
-        }
-        unsafe {
-            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-        }
+        crate::send_message_w_safe(
+            combo_voice,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.voices_empty).as_ptr() as isize),
+        );
+        crate::send_message_w_safe(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
         return;
     }
 
@@ -1117,14 +1108,12 @@ fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
         )
         .0;
         if idx >= 0 {
-            unsafe {
-                SendMessageW(
-                    combo_voice,
-                    CB_SETITEMDATA,
-                    WPARAM(idx as usize),
-                    LPARAM(voice_index as isize),
-                );
-            }
+            crate::send_message_w_safe(
+                combo_voice,
+                CB_SETITEMDATA,
+                WPARAM(idx as usize),
+                LPARAM(voice_index as isize),
+            );
             if let Some(sel) = selected_voice
                 && voice.short_name == sel
             {
@@ -1135,13 +1124,9 @@ fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
     }
 
     if let Some(idx) = selected_index {
-        unsafe {
-            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
-        }
+        crate::send_message_w_safe(combo_voice, CB_SETCURSEL, WPARAM(idx), LPARAM(0));
     } else if combo_index > 0 {
-        unsafe {
-            SendMessageW(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-        }
+        crate::send_message_w_safe(combo_voice, CB_SETCURSEL, WPARAM(0), LPARAM(0));
     }
 }
 
@@ -1200,15 +1185,13 @@ fn preview_entry_voice(hwnd: HWND) {
     if voice_sel < 0 {
         return;
     }
-    let voice_index = unsafe {
-        SendMessageW(
-            combo_voice,
-            CB_GETITEMDATA,
-            WPARAM(voice_sel as usize),
-            LPARAM(0),
-        )
-        .0 as usize
-    };
+    let voice_index = crate::send_message_w_safe(
+        combo_voice,
+        CB_GETITEMDATA,
+        WPARAM(voice_sel as usize),
+        LPARAM(0),
+    )
+    .0 as usize;
     if voice_index >= voices.len() {
         return;
     }

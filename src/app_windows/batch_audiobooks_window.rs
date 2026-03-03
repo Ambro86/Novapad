@@ -969,14 +969,12 @@ fn insert_column(list: HWND, index: i32, text: &str, width: i32) {
         iSubItem: index,
         ..Default::default()
     };
-    unsafe {
-        SendMessageW(
-            list,
-            LVM_INSERTCOLUMNW,
-            WPARAM(index as usize),
-            LPARAM(&column as *const _ as isize),
-        );
-    }
+    crate::send_message_w_safe(
+        list,
+        LVM_INSERTCOLUMNW,
+        WPARAM(index as usize),
+        LPARAM(&column as *const _ as isize),
+    );
 }
 
 fn insert_list_item(list: HWND, index: i32, input: &str, status: &str, output: &str) {
@@ -988,14 +986,12 @@ fn insert_list_item(list: HWND, index: i32, input: &str, status: &str, output: &
         pszText: PWSTR(input_wide.as_mut_ptr()),
         ..Default::default()
     };
-    unsafe {
-        SendMessageW(
-            list,
-            LVM_INSERTITEMW,
-            WPARAM(0),
-            LPARAM(&item as *const _ as isize),
-        );
-    }
+    crate::send_message_w_safe(
+        list,
+        LVM_INSERTITEMW,
+        WPARAM(0),
+        LPARAM(&item as *const _ as isize),
+    );
     set_list_subitem(list, index, 1, status);
     set_list_subitem(list, index, 2, output);
 }
@@ -1007,14 +1003,12 @@ fn set_list_subitem(list: HWND, index: i32, subitem: i32, text: &str) {
         pszText: PWSTR(wide.as_mut_ptr()),
         ..Default::default()
     };
-    unsafe {
-        SendMessageW(
-            list,
-            LVM_SETITEMTEXTW,
-            WPARAM(index as usize),
-            LPARAM(&item as *const _ as isize),
-        );
-    }
+    crate::send_message_w_safe(
+        list,
+        LVM_SETITEMTEXTW,
+        WPARAM(index as usize),
+        LPARAM(&item as *const _ as isize),
+    );
 }
 
 fn add_files_to_queue(state: &mut BatchState) {
@@ -1075,15 +1069,13 @@ fn remove_selected_items(state: &mut BatchState) {
     let mut indices = Vec::new();
     let mut current = -1i32;
     loop {
-        let next = unsafe {
-            SendMessageW(
-                state.list,
-                LVM_GETNEXTITEM,
-                WPARAM(current as isize as usize),
-                LPARAM(LVNI_SELECTED as isize),
-            )
-            .0 as i32
-        };
+        let next = crate::send_message_w_safe(
+            state.list,
+            LVM_GETNEXTITEM,
+            WPARAM(current as isize as usize),
+            LPARAM(LVNI_SELECTED as isize),
+        )
+        .0 as i32;
         if next == -1 {
             break;
         }
@@ -1097,9 +1089,7 @@ fn remove_selected_items(state: &mut BatchState) {
     for idx in indices {
         if idx < state.items.len() {
             state.items.remove(idx);
-            unsafe {
-                SendMessageW(state.list, LVM_DELETEITEM, WPARAM(idx), LPARAM(0));
-            }
+            crate::send_message_w_safe(state.list, LVM_DELETEITEM, WPARAM(idx), LPARAM(0));
         }
     }
     update_progress(state, 0, state.items.len());
@@ -1110,9 +1100,7 @@ fn clear_items(state: &mut BatchState) {
         return;
     }
     state.items.clear();
-    unsafe {
-        SendMessageW(state.list, LVM_DELETEALLITEMS, WPARAM(0), LPARAM(0));
-    }
+    crate::send_message_w_safe(state.list, LVM_DELETEALLITEMS, WPARAM(0), LPARAM(0));
     update_progress(state, 0, 0);
 }
 
@@ -1328,14 +1316,12 @@ fn update_progress(state: &mut BatchState, completed: usize, total: usize) {
         ((completed as f32 / total as f32) * 100.0).round() as u32
     };
     if is_window_valid(state.progress_bar, "progress_bar") {
-        unsafe {
-            SendMessageW(
-                state.progress_bar,
-                PBM_SETPOS,
-                WPARAM(percent as usize),
-                LPARAM(0),
-            );
-        }
+        crate::send_message_w_safe(
+            state.progress_bar,
+            PBM_SETPOS,
+            WPARAM(percent as usize),
+            LPARAM(0),
+        );
     }
     let label = i18n::tr_f(
         state.language,
@@ -1503,15 +1489,13 @@ fn is_temp_batch_path(path: &Path) -> bool {
 }
 
 fn is_checked(hwnd: HWND) -> bool {
-    unsafe {
-        SendMessageW(
-            hwnd,
-            windows::Win32::UI::WindowsAndMessaging::BM_GETCHECK,
-            WPARAM(0),
-            LPARAM(0),
-        )
-        .0 == BST_CHECKED.0 as isize
-    }
+    crate::send_message_w_safe(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::BM_GETCHECK,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0 == BST_CHECKED.0 as isize
 }
 
 fn read_control_text(hwnd: HWND) -> String {

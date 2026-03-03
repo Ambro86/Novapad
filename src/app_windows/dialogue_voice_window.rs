@@ -199,15 +199,7 @@ fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
         TtsEngine::Sapi5 => &data.sapi5_voices,
         TtsEngine::Sapi4 => &data.sapi4_voices,
     };
-    let only_multilingual = unsafe {
-        SendMessageW(
-        crate::get_dlg_item_safe(hwnd_dialog, ID_ONLY_MULTILINGUAL),
-        BM_GETCHECK,
-        WPARAM(0),
-        LPARAM(0),
-    )
-    .0 as u32
-    }
+    let only_multilingual = crate::send_message_w_safe(crate::get_dlg_item_safe(hwnd_dialog, ID_ONLY_MULTILINGUAL), BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
         == BST_CHECKED.0;
     let language_filter = if engine == TtsEngine::Edge && !only_multilingual {
         let sel = crate::send_message_w_safe(crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE), CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
@@ -219,7 +211,7 @@ fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
     } else {
         None
     };
-    unsafe { SendMessageW(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0)); }
+    crate::send_message_w_safe(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let mut selected_idx = 0usize;
     let mut combo_index = 0usize;
     for (i, voice) in voices.iter().enumerate() {
@@ -240,17 +232,15 @@ fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
             format!("{} ({})", voice.short_name, voice.locale)
         };
         let w = to_wide(&label);
-        let idx = unsafe {
-            SendMessageW(combo, CB_ADDSTRING, WPARAM(0), LPARAM(w.as_ptr() as isize)).0 as usize
-        };
-        unsafe { SendMessageW(combo, CB_SETITEMDATA, WPARAM(idx), LPARAM(i as isize)); }
+        let idx = crate::send_message_w_safe(combo, CB_ADDSTRING, WPARAM(0), LPARAM(w.as_ptr() as isize)).0 as usize;
+        crate::send_message_w_safe(combo, CB_SETITEMDATA, WPARAM(idx), LPARAM(i as isize));
         if voice.short_name.eq_ignore_ascii_case(preferred_voice) {
             selected_idx = combo_index;
         }
         combo_index += 1;
     }
     if combo_index > 0 {
-        unsafe { SendMessageW(combo, CB_SETCURSEL, WPARAM(selected_idx), LPARAM(0)); }
+        crate::send_message_w_safe(combo, CB_SETCURSEL, WPARAM(selected_idx), LPARAM(0));
     }
 }
 
@@ -274,7 +264,7 @@ fn selected_voice(hwnd_dialog: HWND) -> String {
     if sel < 0 {
         return String::new();
     }
-    let idx = unsafe { SendMessageW(combo, CB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0 as usize };
+    let idx = crate::send_message_w_safe(combo, CB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0 as usize;
     voices
         .get(idx)
         .map(|v| v.short_name.clone())
@@ -297,9 +287,7 @@ fn refresh_edge_controls(hwnd_dialog: HWND, preferred_voice: &str) {
         EnableWindow(check_multilingual, is_edge);
     }
 
-    let only_multilingual = unsafe {
-        SendMessageW(check_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
-    }
+    let only_multilingual = crate::send_message_w_safe(check_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
         == BST_CHECKED.0;
     let show_language = is_edge && !only_multilingual;
     unsafe {

@@ -467,14 +467,12 @@ fn list_has_unselected(list: HWND) -> bool {
 fn set_all_selected(list: HWND, selected: bool) {
     let count = crate::send_message_w_safe(list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
     for idx in 0..count {
-        unsafe {
-            SendMessageW(
-                list,
-                LB_SETSEL,
-                WPARAM(if selected { 1 } else { 0 }),
-                LPARAM(idx),
-            );
-        }
+        crate::send_message_w_safe(
+            list,
+            LB_SETSEL,
+            WPARAM(if selected { 1 } else { 0 }),
+            LPARAM(idx),
+        );
     }
 }
 

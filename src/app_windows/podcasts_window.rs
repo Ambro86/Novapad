@@ -16,7 +16,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::DataExchange::{
-    COPYDATASTRUCT, CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+    COPYDATASTRUCT, EmptyClipboard, OpenClipboard, SetClipboardData,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
@@ -849,21 +849,21 @@ fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     let handle = match unsafe { GlobalAlloc(GMEM_MOVEABLE, size) } {
         Ok(handle) => handle,
         Err(_) => {
-            if let Err(e) = unsafe { CloseClipboard() } {
+            if let Err(e) = crate::close_clipboard_safe() {
                 crate::log_debug(&format!("CloseClipboard failed: {}", e));
             }
             return;
         }
     };
     if handle.0.is_null() {
-        if let Err(e) = unsafe { CloseClipboard() } {
+        if let Err(e) = crate::close_clipboard_safe() {
             crate::log_debug(&format!("CloseClipboard failed: {}", e));
         }
         return;
     }
     let ptr = unsafe { GlobalLock(handle) as *mut u16 };
     if ptr.is_null() {
-        if let Err(e) = unsafe { CloseClipboard() } {
+        if let Err(e) = crate::close_clipboard_safe() {
             crate::log_debug(&format!("CloseClipboard failed: {}", e));
         }
         return;
@@ -875,7 +875,7 @@ fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     if let Err(e) = unsafe { SetClipboardData(CF_UNICODETEXT, HANDLE(handle.0 as isize)) } {
         crate::log_debug(&format!("SetClipboardData failed: {}", e));
     }
-    if let Err(e) = unsafe { CloseClipboard() } {
+    if let Err(e) = crate::close_clipboard_safe() {
         crate::log_debug(&format!("CloseClipboard failed: {}", e));
     }
 }

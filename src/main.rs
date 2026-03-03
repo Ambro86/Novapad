@@ -82,7 +82,9 @@ use windows::Win32::Graphics::Gdi::{
     InvalidateRect, LOGFONTW, ScreenToClient,
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
-use windows::Win32::System::DataExchange::{COPYDATASTRUCT, IsClipboardFormatAvailable};
+use windows::Win32::System::DataExchange::{
+    COPYDATASTRUCT, CloseClipboard, IsClipboardFormatAvailable,
+};
 use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
@@ -403,6 +405,10 @@ pub(crate) fn find_window_w_safe(class_name: PCWSTR, window_name: PCWSTR) -> HWN
 
 pub(crate) fn destroy_window_safe(hwnd: HWND) -> windows::core::Result<()> {
     unsafe { DestroyWindow(hwnd) }
+}
+
+pub(crate) fn close_clipboard_safe() -> windows::core::Result<()> {
+    unsafe { CloseClipboard() }
 }
 
 pub(crate) fn register_class_w_safe(

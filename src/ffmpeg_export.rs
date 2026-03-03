@@ -33,13 +33,7 @@ const AV_CODEC_FLAG_QSCALE_FALLBACK: i32 = 1 << 1;
 const FF_QP2LAMBDA_FALLBACK: i32 = 118;
 
 fn ffmpeg_error_text(api: &FfmpegApi, code: i32) -> String {
-    let mut buf = [0i8; 256];
-    let ret = unsafe { (api.av_strerror)(code, buf.as_mut_ptr(), buf.len()) };
-    if ret == 0 {
-        crate::cstr_ptr_to_lossy_string_safe(buf.as_ptr())
-    } else {
-        format!("ffmpeg error {}", code)
-    }
+    crate::ffmpeg_source::ffmpeg_err(api, code)
 }
 
 #[derive(Clone)]

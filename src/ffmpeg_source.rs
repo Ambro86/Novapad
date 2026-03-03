@@ -639,7 +639,7 @@ pub(crate) fn swr_get_out_samples_safe(
     unsafe { (api.swr_get_out_samples)(s, in_samples) }
 }
 
-fn ffmpeg_err(api: &FfmpegApi, code: i32) -> String {
+pub(crate) fn ffmpeg_err(api: &FfmpegApi, code: i32) -> String {
     let mut buf = [0i8; 256];
     let ret = unsafe { (api.av_strerror)(code, buf.as_mut_ptr(), buf.len()) };
     if ret == 0 {

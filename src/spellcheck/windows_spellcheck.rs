@@ -5,8 +5,7 @@ use windows::Win32::Globalization::{
     IEnumSpellingError, ISpellChecker, ISpellCheckerFactory, ISpellingError, SpellCheckerFactory,
 };
 use windows::Win32::System::Com::{
-    CLSCTX_ALL, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree,
-    IEnumString,
+    CLSCTX_ALL, COINIT_APARTMENTTHREADED, CoInitializeEx, CoTaskMemFree, IEnumString,
 };
 use windows::core::PCWSTR;
 
@@ -132,7 +131,7 @@ impl WindowsSpellChecker {
 
     fn factory(&mut self) -> Option<ISpellCheckerFactory> {
         if self.factory.is_none() {
-            let factory = unsafe { CoCreateInstance(&SpellCheckerFactory, None, CLSCTX_ALL) };
+            let factory = crate::co_create_instance_safe(&SpellCheckerFactory, None, CLSCTX_ALL);
             match factory {
                 Ok(factory) => {
                     self.factory = Some(factory);

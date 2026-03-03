@@ -15,7 +15,7 @@ use windows::Win32::Media::Audio::{
 };
 use windows::Win32::Media::Audio::{MMDeviceEnumerator, eConsole, eRender};
 use windows::Win32::Media::Multimedia::KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
-use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
+use windows::Win32::System::Com::{CLSCTX_ALL, CoTaskMemFree};
 use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
 use windows::Win32::System::Threading::CreateEventW;
 use windows::core::GUID;
@@ -129,7 +129,7 @@ impl WasapiOutput {
             };
 
             let enumerator: IMMDeviceEnumerator =
-                match unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) } {
+                match crate::co_create_instance_safe(&MMDeviceEnumerator, None, CLSCTX_ALL) {
                     Ok(enumerator) => enumerator,
                     Err(e) => {
                         log_debug(&format!("WASAPI: device enumerator failed: {}", e));

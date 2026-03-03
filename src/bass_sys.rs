@@ -107,8 +107,12 @@ fn load_symbol<T: Copy>(lib: &Library, name: &[u8]) -> Result<T, String> {
     }
 }
 
+fn load_library(path: &Path) -> Result<Library, libloading::Error> {
+    unsafe { Library::new(path) }
+}
+
 fn load_bass_api(path: &Path) -> Result<BassApi, String> {
-    let lib = unsafe { Library::new(path) }
+    let lib = load_library(path)
         .map_err(|e| format!("BASS: failed to load {}: {}", path.display(), e))?;
     Ok(BassApi {
         init: load_symbol(&lib, b"BASS_Init\0")?,
@@ -132,7 +136,7 @@ fn load_bass_api(path: &Path) -> Result<BassApi, String> {
 }
 
 fn load_bass_fx_api(path: &Path) -> Result<BassFxApi, String> {
-    let lib = unsafe { Library::new(path) }
+    let lib = load_library(path)
         .map_err(|e| format!("BASS: failed to load {}: {}", path.display(), e))?;
     Ok(BassFxApi {
         tempo_create: load_symbol(&lib, b"BASS_FX_TempoCreate\0")?,

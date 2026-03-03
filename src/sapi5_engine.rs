@@ -262,7 +262,7 @@ fn find_voice_token(voice_name: &str) -> Option<ISpObjectToken> {
 
     for category_id in [SAPI_VOICES_PATH, ONECORE_VOICES_PATH] {
         let category: windows::core::Result<ISpObjectTokenCategory> =
-            unsafe { CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL) };
+            crate::co_create_instance_safe(&SpObjectTokenCategory, None, CLSCTX_ALL);
         if let Ok(cat) = category {
             if let Err(e) = unsafe { cat.SetId(category_id, false) } {
                 crate::log_debug(&format!("Failed to set SAPI5 category: {:?}", e));
@@ -751,7 +751,7 @@ pub struct SapiVoice {
 
 impl SapiVoice {
     pub fn new() -> Result<Self, String> {
-        let voice: ISpVoice = unsafe { CoCreateInstance(&SpVoice, None, CLSCTX_ALL) }
+        let voice: ISpVoice = crate::co_create_instance_safe(&SpVoice, None, CLSCTX_ALL)
             .map_err(|e| format!("Failed to create SpVoice: {}", e))?;
         Ok(Self { voice })
     }

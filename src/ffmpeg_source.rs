@@ -421,9 +421,7 @@ fn ffmpeg_err(api: &FfmpegApi, code: i32) -> String {
     let mut buf = [0i8; 256];
     let ret = unsafe { (api.av_strerror)(code, buf.as_mut_ptr(), buf.len()) };
     if ret == 0 {
-        unsafe { CStr::from_ptr(buf.as_ptr()) }
-            .to_string_lossy()
-            .into_owned()
+        crate::cstr_ptr_to_lossy_string_safe(buf.as_ptr())
     } else {
         format!("ffmpeg error {}", code)
     }
@@ -888,8 +886,8 @@ impl FfmpegSource {
         codec_ctx: *mut AVCodecContext,
         codecpar: *const AVCodecParameters,
     ) -> Result<(*mut SwrContext, u16, u32), String> {
-        let mut in_layout: AVChannelLayout = unsafe { std::mem::zeroed() };
-        let mut out_layout: AVChannelLayout = unsafe { std::mem::zeroed() };
+        let mut in_layout: AVChannelLayout = crate::zeroed_safe();
+        let mut out_layout: AVChannelLayout = crate::zeroed_safe();
 
         let src_layout = unsafe { &(*codec_ctx).ch_layout };
         let mut channels = src_layout.nb_channels;

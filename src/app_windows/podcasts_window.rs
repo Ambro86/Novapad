@@ -4569,38 +4569,30 @@ fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
     let info_label = i18n::tr(language, "podcasts.context.info");
     let copy_label = i18n::tr(language, "podcasts.context.copy_url");
     let menu = crate::create_menu_safe().unwrap_or(HMENU(0));
-    if let Err(_e) = unsafe {
-        AppendMenuW(
-            menu,
-            MF_STRING,
-            ID_CTX_SUBSCRIBE,
-            PCWSTR(to_wide(&label).as_ptr()),
-        )
-    } {}
-    if let Err(_e) = unsafe {
-        AppendMenuW(
-            menu,
-            MF_STRING,
-            ID_CTX_SEARCH_SHOW_EPISODES,
-            PCWSTR(to_wide(&show_episodes_label).as_ptr()),
-        )
-    } {}
-    if let Err(_e) = unsafe {
-        AppendMenuW(
-            menu,
-            MF_STRING,
-            ID_CTX_SEARCH_INFO,
-            PCWSTR(to_wide(&info_label).as_ptr()),
-        )
-    } {}
-    if let Err(_e) = unsafe {
-        AppendMenuW(
-            menu,
-            MF_STRING,
-            ID_CTX_SEARCH_COPY_URL,
-            PCWSTR(to_wide(&copy_label).as_ptr()),
-        )
-    } {}
+    if let Err(_e) = crate::append_menu_w_safe(
+        menu,
+        MF_STRING,
+        ID_CTX_SUBSCRIBE,
+        PCWSTR(to_wide(&label).as_ptr()),
+    ) {}
+    if let Err(_e) = crate::append_menu_w_safe(
+        menu,
+        MF_STRING,
+        ID_CTX_SEARCH_SHOW_EPISODES,
+        PCWSTR(to_wide(&show_episodes_label).as_ptr()),
+    ) {}
+    if let Err(_e) = crate::append_menu_w_safe(
+        menu,
+        MF_STRING,
+        ID_CTX_SEARCH_INFO,
+        PCWSTR(to_wide(&info_label).as_ptr()),
+    ) {}
+    if let Err(_e) = crate::append_menu_w_safe(
+        menu,
+        MF_STRING,
+        ID_CTX_SEARCH_COPY_URL,
+        PCWSTR(to_wide(&copy_label).as_ptr()),
+    ) {}
     let cmd = unsafe {
         TrackPopupMenu(
             menu,

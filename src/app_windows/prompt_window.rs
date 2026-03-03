@@ -58,6 +58,10 @@ const PROMPT_OUTPUT_KEEP: usize = 10_000;
 const PROMPT_OUTPUT_TIMER_ID: usize = 3;
 const PROMPT_OUTPUT_FLUSH_CHARS: usize = 2048;
 
+fn read_file_ok(handle: HANDLE, buffer: &mut [u8], read: &mut u32) -> bool {
+    unsafe { ReadFile(handle, Some(buffer), Some(read), None).is_ok() }
+}
+
 struct PromptWindowInit {
     parent: HWND,
     initial_command: Option<String>,
@@ -1458,10 +1462,9 @@ fn start_output_reader(
             }
             let mut read = 0u32;
             log_debug("Prompt: Calling ReadFile...");
-            let ok =
-                unsafe { ReadFile(output_read, Some(&mut buffer), Some(&mut read), None).is_ok() };
+            let ok = read_file_ok(output_read, &mut buffer, &mut read);
             if !ok {
-                let err = unsafe { windows::Win32::Foundation::GetLastError() };
+                let err = crate::get_last_error_safe();
                 log_debug(&format!(
                     "Prompt: ReadFile returned false, error code: {:?}, total bytes read so far: {}",
                     err, total_read

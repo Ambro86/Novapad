@@ -1048,7 +1048,7 @@ fn parse_format(fmt: &WAVEFORMATEX) -> (u32, u16, SampleFormat) {
     };
     if fmt.wFormatTag as u32 == WAVE_FORMAT_EXTENSIBLE {
         let ext = unsafe { &*(fmt as *const _ as *const WAVEFORMATEXTENSIBLE) };
-        let subformat = unsafe { std::ptr::read_unaligned(std::ptr::addr_of!(ext.SubFormat)) };
+        let subformat = crate::read_unaligned_safe(std::ptr::addr_of!(ext.SubFormat));
         if subformat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT {
             format = SampleFormat::F32;
         } else {

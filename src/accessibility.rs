@@ -2,15 +2,15 @@ use crate::settings;
 use std::sync::OnceLock;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Com::{
-    CLSCTX_ALL, CLSIDFromProgID, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx,
-    CoUninitialize, DISPATCH_METHOD, DISPPARAMS, EXCEPINFO, IDispatch,
+    CLSCTX_ALL, CLSIDFromProgID, COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize,
+    DISPATCH_METHOD, DISPPARAMS, EXCEPINFO, IDispatch,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, VK_ADD, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_MENU,
     VK_NEXT, VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_SPACE,
     VK_SUBTRACT, VK_UP,
 };
-use windows::Win32::UI::WindowsAndMessaging::{IsDialogMessageW, MSG, WM_KEYDOWN};
+use windows::Win32::UI::WindowsAndMessaging::{MSG, WM_KEYDOWN};
 use windows::core::{BSTR, GUID, PCWSTR, VARIANT};
 
 pub const EM_GETSEL: u32 = 0x00B0;
@@ -53,7 +53,7 @@ pub fn handle_accessibility(hwnd: HWND, msg: &MSG) -> bool {
 
     // 1. Standard Dialog Navigation (TAB, Arrows, Enter, Space on controls)
     // IsDialogMessageW handles the vast majority of accessibility rules automatically.
-    if unsafe { IsDialogMessageW(hwnd, msg) }.as_bool() {
+    if crate::is_dialog_message_w_safe(hwnd, msg).as_bool() {
         return true;
     }
 
@@ -263,7 +263,7 @@ fn jaws_invoke_saystring(
             }
         };
 
-        let disp: IDispatch = match unsafe { CoCreateInstance(&clsid, None, CLSCTX_ALL) } {
+        let disp: IDispatch = match crate::co_create_instance_safe(&clsid, None, CLSCTX_ALL) {
             Ok(obj) => obj,
             Err(e) => {
                 if log_failures {

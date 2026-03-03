@@ -62,6 +62,7 @@ mod wiktionary;
 mod win_ocr;
 
 use std::collections::{HashMap, HashSet};
+use std::ffi::CStr;
 use std::io::Write;
 use std::mem::size_of;
 use std::path::{Path, PathBuf};
@@ -131,8 +132,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetClassNameW, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetForegroundWindow, GetMenu,
     GetMenuItemCount, GetMessageW, GetNextDlgTabItem, GetParent, GetSubMenu, GetWindowLongPtrW,
     GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL, HCURSOR, HICON, HMENU,
-    IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsIconic, IsWindow, KillTimer, LoadCursorW,
-    LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO,
+    IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsDialogMessageW, IsIconic, IsWindow, KillTimer,
+    LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO,
     MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED,
     MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW,
     OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
@@ -418,6 +419,22 @@ pub(crate) fn destroy_menu_safe(menu: HMENU) -> windows::core::Result<()> {
     unsafe { windows::Win32::UI::WindowsAndMessaging::DestroyMenu(menu) }
 }
 
+pub(crate) fn kill_timer_safe(hwnd: HWND, id_event: usize) -> windows::core::Result<()> {
+    unsafe { KillTimer(hwnd, id_event) }
+}
+
+pub(crate) fn co_create_instance_safe<T: Interface>(
+    clsid: *const windows::core::GUID,
+    outer: Option<&windows::core::IUnknown>,
+    clsctx: windows::Win32::System::Com::CLSCTX,
+) -> windows::core::Result<T> {
+    unsafe { CoCreateInstance(clsid, outer, clsctx) }
+}
+
+pub(crate) fn get_last_error_safe() -> WIN32_ERROR {
+    unsafe { GetLastError() }
+}
+
 pub(crate) fn get_message_w_safe(
     lpmsg: *mut MSG,
     hwnd: HWND,
@@ -425,6 +442,10 @@ pub(crate) fn get_message_w_safe(
     wmsgfiltermax: u32,
 ) -> BOOL {
     unsafe { GetMessageW(lpmsg, hwnd, wmsgfiltermin, wmsgfiltermax) }
+}
+
+pub(crate) fn is_dialog_message_w_safe(hwnd: HWND, msg: &MSG) -> BOOL {
+    unsafe { IsDialogMessageW(hwnd, msg) }
 }
 
 pub(crate) fn get_next_dlg_tab_item_safe(hwnd: HWND, hwndctrl: HWND, bprevious: bool) -> HWND {
@@ -583,6 +604,15 @@ pub(crate) fn check_menu_item_safe(hmenu: HMENU, id_check_item: u32, u_check: u3
     unsafe { CheckMenuItem(hmenu, id_check_item, u_check) }
 }
 
+pub(crate) fn append_menu_w_safe(
+    menu: HMENU,
+    flags: windows::Win32::UI::WindowsAndMessaging::MENU_ITEM_FLAGS,
+    new_item_id: usize,
+    text: PCWSTR,
+) -> windows::core::Result<()> {
+    unsafe { AppendMenuW(menu, flags, new_item_id, text) }
+}
+
 pub(crate) fn get_parent_safe(hwnd: HWND) -> HWND {
     unsafe { GetParent(hwnd) }
 }
@@ -612,8 +642,20 @@ pub(crate) fn box_from_raw_safe<T>(ptr: *mut T) -> Box<T> {
     unsafe { Box::from_raw(ptr) }
 }
 
+pub(crate) fn cstr_ptr_to_lossy_string_safe(ptr: *const i8) -> String {
+    unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
+}
+
+pub(crate) fn read_unaligned_safe<T: Copy>(src: *const T) -> T {
+    unsafe { std::ptr::read_unaligned(src) }
+}
+
 pub(crate) fn get_stock_object_safe(obj: GET_STOCK_OBJECT_FLAGS) -> HGDIOBJ {
     unsafe { GetStockObject(obj) }
+}
+
+pub(crate) fn zeroed_safe<T>() -> T {
+    unsafe { std::mem::zeroed() }
 }
 
 pub(crate) fn reset_spellcheck_state(hwnd: HWND) {

@@ -10,7 +10,7 @@ use crate::tts_engine;
 use rodio::Source;
 use sha2::Digest;
 use std::collections::VecDeque;
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -36,9 +36,7 @@ fn ffmpeg_error_text(api: &FfmpegApi, code: i32) -> String {
     let mut buf = [0i8; 256];
     let ret = unsafe { (api.av_strerror)(code, buf.as_mut_ptr(), buf.len()) };
     if ret == 0 {
-        unsafe { CStr::from_ptr(buf.as_ptr()) }
-            .to_string_lossy()
-            .into_owned()
+        crate::cstr_ptr_to_lossy_string_safe(buf.as_ptr())
     } else {
         format!("ffmpeg error {}", code)
     }
@@ -1190,8 +1188,8 @@ fn encode_mixed_audio_to_m4a(
         }
     }
 
-    let mut in_layout: AVChannelLayout = unsafe { std::mem::zeroed() };
-    let mut out_layout: AVChannelLayout = unsafe { std::mem::zeroed() };
+    let mut in_layout: AVChannelLayout = crate::zeroed_safe();
+    let mut out_layout: AVChannelLayout = crate::zeroed_safe();
     unsafe {
         (api.av_channel_layout_default)(&mut in_layout, channels as i32);
         (api.av_channel_layout_default)(&mut out_layout, channels as i32);
@@ -2045,8 +2043,8 @@ pub fn convert_audio_file_with_channels(
     } else {
         1024usize
     };
-    let mut in_layout: AVChannelLayout = unsafe { std::mem::zeroed() };
-    let mut out_layout: AVChannelLayout = unsafe { std::mem::zeroed() };
+    let mut in_layout: AVChannelLayout = crate::zeroed_safe();
+    let mut out_layout: AVChannelLayout = crate::zeroed_safe();
     unsafe {
         (api.av_channel_layout_default)(&mut in_layout, in_channels as i32);
         (api.av_channel_layout_default)(&mut out_layout, out_channels as i32);

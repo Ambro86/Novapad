@@ -5084,11 +5084,7 @@ where
     F: FnOnce(&mut OptionsDialogState) -> R,
 {
     let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut OptionsDialogState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { f(&mut *ptr) })
-    }
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 fn initialize_options_dialog(hwnd: HWND) {

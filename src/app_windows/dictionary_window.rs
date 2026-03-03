@@ -393,11 +393,7 @@ where
     F: FnOnce(&mut DictionaryWindowState) -> R,
 {
     let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut DictionaryWindowState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { f(&mut *ptr) })
-    }
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 fn update_button_states(hwnd: HWND) {
@@ -945,11 +941,7 @@ where
     F: FnOnce(&mut DictionaryEntryState) -> R,
 {
     let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut DictionaryEntryState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { f(&mut *ptr) })
-    }
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 fn apply_entry_dialog(hwnd: HWND) {

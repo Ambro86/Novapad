@@ -446,11 +446,7 @@ where
     F: FnOnce(&mut MarkerSelectState) -> R,
 {
     let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut MarkerSelectState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { f(&mut *ptr) })
-    }
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 fn list_has_unselected(list: HWND) -> bool {
     let count = crate::send_message_w_safe(list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;

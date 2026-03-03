@@ -572,6 +572,17 @@ pub(crate) fn get_dlg_item_safe(parent: HWND, id: i32) -> HWND {
     unsafe { GetDlgItem(parent, id) }
 }
 
+pub(crate) fn with_raw_mut_ptr_safe<T, F, R>(ptr: *mut T, f: F) -> Option<R>
+where
+    F: FnOnce(&mut T) -> R,
+{
+    if ptr.is_null() {
+        None
+    } else {
+        Some(unsafe { f(&mut *ptr) })
+    }
+}
+
 pub(crate) fn reset_spellcheck_state(hwnd: HWND) {
     {
         if with_state(hwnd, |state| {
@@ -3453,14 +3464,14 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 let combo_voice_proc = if combo_voice.0 != 0 {
                     let proc_ptr = voice_combo_subclass_proc as *const () as usize;
                     let old = SetWindowLongPtrW(combo_voice, GWLP_WNDPROC, proc_ptr as isize);
-                    std::mem::transmute::<isize, WNDPROC>(old)
+                    crate::isize_to_wndproc_safe(old)
                 } else {
                     None
                 };
                 let combo_favorites_proc = if combo_favorites.0 != 0 {
                     let proc_ptr = voice_combo_subclass_proc as *const () as usize;
                     let old = SetWindowLongPtrW(combo_favorites, GWLP_WNDPROC, proc_ptr as isize);
-                    std::mem::transmute::<isize, WNDPROC>(old)
+                    crate::isize_to_wndproc_safe(old)
                 } else {
                     None
                 };

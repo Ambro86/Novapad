@@ -768,11 +768,7 @@ where
         hwnd,
         windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
     ) as *mut FindInFilesState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { f(&mut *ptr) })
-    }
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 fn read_control_text(hwnd: HWND) -> String {

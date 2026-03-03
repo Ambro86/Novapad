@@ -1311,11 +1311,7 @@ where
         hwnd,
         windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
     ) as *mut PromptState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { f(&mut *ptr) })
-    }
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 fn copy_output_selection(hwnd_output: HWND) {

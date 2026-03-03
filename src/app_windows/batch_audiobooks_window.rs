@@ -949,11 +949,7 @@ fn with_batch_state<T>(hwnd: HWND, f: impl FnOnce(&mut BatchState) -> T) -> Opti
         hwnd,
         windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
     ) as *mut BatchState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { f(&mut *ptr) })
-    }
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 fn insert_column(list: HWND, index: i32, text: &str, width: i32) {

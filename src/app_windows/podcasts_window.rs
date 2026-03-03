@@ -3491,7 +3491,7 @@ fn categories_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                         windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
                         proc_ptr as isize,
                     );
-                    std::mem::transmute::<isize, WNDPROC>(old)
+                    crate::isize_to_wndproc_safe(old)
                 } else {
                     None
                 };
@@ -6698,9 +6698,7 @@ fn create_controls(hwnd: HWND) {
                 windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
                 proc_ptr as isize,
             );
-            with_podcast_state(hwnd, |s| {
-                s.tree_proc = std::mem::transmute::<isize, WNDPROC>(old)
-            });
+            with_podcast_state(hwnd, |s| s.tree_proc = crate::isize_to_wndproc_safe(old));
         }
 
         let hwnd_delete = CreateWindowExW(
@@ -6766,9 +6764,7 @@ fn create_controls(hwnd: HWND) {
                 windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
                 proc_ptr as isize,
             );
-            with_podcast_state(hwnd, |s| {
-                s.search_proc = std::mem::transmute::<isize, WNDPROC>(old)
-            });
+            with_podcast_state(hwnd, |s| s.search_proc = crate::isize_to_wndproc_safe(old));
         }
 
         let provider_itunes = i18n::tr(
@@ -8025,11 +8021,7 @@ fn with_podcast_state<R>(hwnd: HWND, f: impl FnOnce(&mut PodcastWindowState) -> 
         hwnd,
         windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
     ) as *mut PodcastWindowState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { f(&mut *ptr) })
-    }
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 fn with_category_dialog_state<R>(
@@ -8040,11 +8032,7 @@ fn with_category_dialog_state<R>(
         hwnd,
         windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
     ) as *mut CategoryDialogState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(unsafe { f(&mut *ptr) })
-    }
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 fn percent_encode(input: &str) -> String {

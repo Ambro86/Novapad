@@ -581,6 +581,10 @@ pub(crate) fn avcodec_find_encoder_safe(api: &FfmpegApi, codec_id: AVCodecID) ->
     unsafe { (api.avcodec_find_encoder)(codec_id) }
 }
 
+pub(crate) fn avcodec_find_decoder_safe(api: &FfmpegApi, codec_id: AVCodecID) -> *const AVCodec {
+    unsafe { (api.avcodec_find_decoder)(codec_id) }
+}
+
 pub(crate) fn avcodec_find_encoder_by_name_safe(
     api: &FfmpegApi,
     name: *const core::ffi::c_char,
@@ -606,6 +610,10 @@ pub(crate) fn avcodec_receive_packet_safe(
 
 pub(crate) fn av_packet_unref_safe(api: &FfmpegApi, pkt: *mut AVPacket) {
     unsafe { (api.av_packet_unref)(pkt) }
+}
+
+pub(crate) fn av_frame_unref_safe(api: &FfmpegApi, frame: *mut AVFrame) {
+    unsafe { (api.av_frame_unref)(frame) }
 }
 
 pub(crate) fn swr_init_safe(api: &FfmpegApi, s: *mut SwrContext) -> i32 {
@@ -758,7 +766,7 @@ pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
         }
 
         let codec_id = crate::ffmpeg_source::av_codecpar_codec_id_safe(codecpar);
-        let codec = unsafe { (api.avcodec_find_decoder)(codec_id) };
+        let codec = crate::ffmpeg_source::avcodec_find_decoder_safe(api, codec_id);
         let codec_name = if !codec.is_null() {
             let name_ptr = unsafe { (*codec).name };
             if !name_ptr.is_null() {
@@ -950,7 +958,7 @@ impl FfmpegSource {
 
         let codec_id = crate::ffmpeg_source::av_codecpar_codec_id_safe(codecpar);
         log_debug(&format!("FFmpeg: codec_id={}", codec_id));
-        let codec = unsafe { (api.avcodec_find_decoder)(codec_id) };
+        let codec = crate::ffmpeg_source::avcodec_find_decoder_safe(api, codec_id);
         if codec.is_null() {
             crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
             return Err(format!(
@@ -1199,13 +1207,13 @@ impl FfmpegSource {
     fn fill_from_frame(&mut self) -> Result<bool, String> {
         let in_samples = unsafe { (*self.frame).nb_samples };
         if in_samples <= 0 {
-            unsafe { (self.api.av_frame_unref)(self.frame) };
+            crate::ffmpeg_source::av_frame_unref_safe(self.api, self.frame);
             return Ok(false);
         }
 
         let out_samples = unsafe { (self.api.swr_get_out_samples)(self.swr_ctx, in_samples) };
         if out_samples <= 0 {
-            unsafe { (self.api.av_frame_unref)(self.frame) };
+            crate::ffmpeg_source::av_frame_unref_safe(self.api, self.frame);
             return Ok(false);
         }
 
@@ -1226,7 +1234,7 @@ impl FfmpegSource {
             (self.api.swr_convert)(self.swr_ctx, out_ptrs, out_samples, in_data, in_samples)
         };
 
-        unsafe { (self.api.av_frame_unref)(self.frame) };
+        crate::ffmpeg_source::av_frame_unref_safe(self.api, self.frame);
 
         if converted < 0 {
             return Err(format!(

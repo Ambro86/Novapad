@@ -210,15 +210,7 @@ fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
     }
         == BST_CHECKED.0;
     let language_filter = if engine == TtsEngine::Edge && !only_multilingual {
-        let sel = unsafe {
-            SendMessageW(
-            crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE),
-            CB_GETCURSEL,
-            WPARAM(0),
-            LPARAM(0),
-        )
-        .0
-        };
+        let sel = crate::send_message_w_safe(crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE), CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
         if sel >= 0 {
             data.edge_language_codes.get(sel as usize).cloned()
         } else {
@@ -278,7 +270,7 @@ fn selected_voice(hwnd_dialog: HWND) -> String {
         TtsEngine::Sapi5 => &data.sapi5_voices,
         TtsEngine::Sapi4 => &data.sapi4_voices,
     };
-    let sel = unsafe { SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if sel < 0 {
         return String::new();
     }
@@ -324,7 +316,7 @@ fn refresh_edge_controls(hwnd_dialog: HWND, preferred_voice: &str) {
 
     if show_language {
         let previous_selection = {
-            let sel = unsafe { SendMessageW(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+            let sel = crate::send_message_w_safe(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
             if sel >= 0 {
                 data.edge_language_codes.get(sel as usize).cloned()
             } else {

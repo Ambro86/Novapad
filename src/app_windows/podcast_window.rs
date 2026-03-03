@@ -2005,7 +2005,7 @@ fn persist_settings(state: &PodcastState) {
 // VIDEO REMOVED: selected_monitor_id function removed
 
 fn selected_format(state: &PodcastState) -> PodcastFormat {
-    let sel = unsafe { SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if sel == 1 {
         PodcastFormat::Wav
     } else {
@@ -2014,7 +2014,7 @@ fn selected_format(state: &PodcastState) -> PodcastFormat {
 }
 
 fn selected_bitrate(state: &PodcastState) -> u32 {
-    let sel = unsafe { SendMessageW(state.bitrate_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(state.bitrate_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     PODCAST_MP3_BITRATES
         .get(sel.max(0) as usize)
         .copied()
@@ -2030,7 +2030,7 @@ fn selected_system_gain(state: &PodcastState) -> f32 {
 }
 
 fn selected_gain(combo: HWND) -> f32 {
-    let sel = unsafe { SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     match sel {
         0 => 0.25, // Un quarto del volume
         1 => 0.33, // Un terzo del volume
@@ -2078,7 +2078,7 @@ fn selected_device_id(state: &PodcastState, mic: bool) -> String {
     } else {
         &state.system_devices
     };
-    let sel = unsafe { SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let index = if sel < 0 { 0 } else { sel as usize };
     list.get(index)
         .map(|d| d.id.clone())

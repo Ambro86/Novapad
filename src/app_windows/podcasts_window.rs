@@ -913,26 +913,26 @@ unsafe extern "system" fn podcast_tree_compare(
 
 fn collect_root_items(hwnd_tree: HWND) -> Vec<HTREEITEM> {
     let mut items = Vec::new();
-    let mut current = HTREEITEM(unsafe {
-        SendMessageW(
+    let mut current = HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_ROOT as usize),
             LPARAM(0),
         )
-        .0
-    });
+        .0,
+    );
     while current.0 != 0 {
         items.push(current);
-        current = HTREEITEM(unsafe {
-            SendMessageW(
+        current = HTREEITEM(
+            crate::send_message_w_safe(
                 hwnd_tree,
                 TVM_GETNEXTITEM,
                 WPARAM(TVGN_NEXT as usize),
                 LPARAM(current.0),
             )
-            .0
-        });
+            .0,
+        );
     }
     items
 }
@@ -979,15 +979,15 @@ fn selected_tree_item(hwnd: HWND) -> HTREEITEM {
     if hwnd_tree.0 == 0 {
         return HTREEITEM(0);
     }
-    HTREEITEM(unsafe {
-        SendMessageW(
+    HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
             LPARAM(0),
         )
-        .0
-    })
+        .0,
+    )
 }
 
 fn selected_source_index(hwnd: HWND) -> Option<usize> {
@@ -1133,15 +1133,15 @@ fn show_selected_properties(hwnd: HWND) {
         Some(NodeData::Episode(item)) => {
             let item = *item;
             let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-            let parent_item = HTREEITEM(unsafe {
-                SendMessageW(
+            let parent_item = HTREEITEM(
+                crate::send_message_w_safe(
                     hwnd_tree,
                     TVM_GETNEXTITEM,
                     WPARAM(TVGN_PARENT as usize),
                     LPARAM(hitem.0),
                 )
-                .0
-            });
+                .0,
+            );
             let key = episode_key(&item);
             let unplayed = with_podcast_state(hwnd, |s| {
                 s.source_items
@@ -1354,15 +1354,15 @@ fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, node: NodeData, force: bo
     let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
     let loading_txt = to_wide(&i18n::tr(language, "podcasts.loading"));
 
-    let child = HTREEITEM(unsafe {
-        SendMessageW(
+    let child = HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CHILD as usize),
             LPARAM(hitem.0),
         )
-        .0
-    });
+        .0,
+    );
     if child.0 == 0 {
         let mut tvis_loading = TVINSERTSTRUCTW {
             hParent: hitem,
@@ -1674,15 +1674,15 @@ fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<PodcastEpisode
         }
     }
 
-    let child = HTREEITEM(unsafe {
-        SendMessageW(
+    let child = HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CHILD as usize),
             LPARAM(hitem.0),
         )
-        .0
-    });
+        .0,
+    );
     if child.0 != 0 {
         let mut item = TVITEMW {
             mask: TVIF_TEXT,
@@ -1792,15 +1792,15 @@ fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<PodcastEpisode
                 },
             },
         };
-        let inserted = HTREEITEM(unsafe {
-            SendMessageW(
+        let inserted = HTREEITEM(
+            crate::send_message_w_safe(
                 hwnd_tree,
                 TVM_INSERTITEMW,
                 WPARAM(0),
                 LPARAM(&mut tvis as *mut _ as isize),
             )
-            .0
-        });
+            .0,
+        );
         if inserted.0 != 0 {
             with_podcast_state(hwnd, |s| {
                 s.node_data
@@ -1837,15 +1837,15 @@ fn create_tree_item(hwnd_tree: HWND, title: &str, index: usize) -> HTREEITEM {
             },
         },
     };
-    HTREEITEM(unsafe {
-        SendMessageW(
+    HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_INSERTITEMW,
             WPARAM(0),
             LPARAM(&mut tvis as *mut _ as isize),
         )
-        .0
-    })
+        .0,
+    )
 }
 
 fn reload_tree(hwnd: HWND) {
@@ -1909,15 +1909,15 @@ fn reload_tree(hwnd: HWND) {
         }
     }
 
-    let first = HTREEITEM(unsafe {
-        SendMessageW(
+    let first = HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_ROOT as usize),
             LPARAM(0),
         )
-        .0
-    });
+        .0,
+    );
     if first.0 != 0 {
         unsafe {
             SendMessageW(
@@ -1945,15 +1945,15 @@ fn mark_episode_played_with_ui_delay(
     if hwnd_tree.0 == 0 {
         return;
     }
-    let mut episode_hitem = HTREEITEM(unsafe {
-        SendMessageW(
+    let mut episode_hitem = HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
             LPARAM(0),
         )
-        .0
-    });
+        .0,
+    );
     let selected_matches = with_podcast_state(hwnd, |s| match s.node_data.get(&episode_hitem.0) {
         Some(NodeData::Episode(item)) => episode_key(item) == episode_key_value,
         _ => false,
@@ -1975,15 +1975,15 @@ fn mark_episode_played_with_ui_delay(
         return;
     }
 
-    let source_hitem = HTREEITEM(unsafe {
-        SendMessageW(
+    let source_hitem = HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_PARENT as usize),
             LPARAM(episode_hitem.0),
         )
-        .0
-    });
+        .0,
+    );
     if source_hitem.0 != 0 {
         with_podcast_state(hwnd, |s| {
             if let Some(state) = s.source_items.get_mut(&source_hitem.0) {
@@ -2642,7 +2642,7 @@ fn selected_search_provider(hwnd: HWND) -> SearchProvider {
     if combo.0 == 0 {
         return SearchProvider::Itunes;
     }
-    let sel = unsafe { SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if sel == 1 {
         SearchProvider::PodcastIndex
     } else {
@@ -3185,15 +3185,13 @@ fn read_window_text(hwnd: HWND) -> String {
     if hwnd.0 == 0 {
         return String::new();
     }
-    let len = unsafe {
-        SendMessageW(
-            hwnd,
-            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
-            WPARAM(0),
-            LPARAM(0),
-        )
-        .0
-    };
+    let len = crate::send_message_w_safe(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
     if len == 0 {
         return String::new();
     }
@@ -4482,15 +4480,13 @@ fn trigger_search_from_edit(hwnd: HWND) {
     if hwnd_search.0 == 0 {
         return;
     }
-    let len = unsafe {
-        SendMessageW(
-            hwnd_search,
-            windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
-            WPARAM(0),
-            LPARAM(0),
-        )
-        .0
-    };
+    let len = crate::send_message_w_safe(
+        hwnd_search,
+        windows::Win32::UI::WindowsAndMessaging::WM_GETTEXTLENGTH,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
     let mut buf = vec![0u16; len as usize + 1];
     unsafe {
         SendMessageW(
@@ -5093,15 +5089,15 @@ fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                 let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
                 if hwnd_tree.0 != 0 {
                     crate::set_focus_safe(hwnd_tree);
-                    let first = HTREEITEM(unsafe {
-                        SendMessageW(
+                    let first = HTREEITEM(
+                        crate::send_message_w_safe(
                             hwnd_tree,
                             TVM_GETNEXTITEM,
                             WPARAM(TVGN_ROOT as usize),
                             LPARAM(0),
                         )
-                        .0
-                    });
+                        .0,
+                    );
                     if first.0 != 0 {
                         unsafe {
                             SendMessageW(
@@ -5274,15 +5270,15 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
             if hwnd_tree.0 == 0 || hitem.0 == 0 {
                 return;
             }
-            let parent_item = HTREEITEM(unsafe {
-                SendMessageW(
+            let parent_item = HTREEITEM(
+                crate::send_message_w_safe(
                     hwnd_tree,
                     TVM_GETNEXTITEM,
                     WPARAM(TVGN_PARENT as usize),
                     LPARAM(hitem.0),
                 )
-                .0
-            });
+                .0,
+            );
             let key = episode_key(&item);
             let mut source_idx_for_undo: Option<usize> = None;
             if parent.0 != 0 {
@@ -5328,26 +5324,26 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
             if parent_item.0 != 0
                 && let Some(target_index) = focus_child_index
             {
-                let mut child = HTREEITEM(unsafe {
-                    SendMessageW(
+                let mut child = HTREEITEM(
+                    crate::send_message_w_safe(
                         hwnd_tree,
                         TVM_GETNEXTITEM,
                         WPARAM(TVGN_CHILD as usize),
                         LPARAM(parent_item.0),
                     )
-                    .0
-                });
+                    .0,
+                );
                 let mut idx = 0usize;
                 while child.0 != 0 && idx < target_index {
-                    child = HTREEITEM(unsafe {
-                        SendMessageW(
+                    child = HTREEITEM(
+                        crate::send_message_w_safe(
                             hwnd_tree,
                             TVM_GETNEXTITEM,
                             WPARAM(TVGN_NEXT as usize),
                             LPARAM(child.0),
                         )
-                        .0
-                    });
+                        .0,
+                    );
                     idx += 1;
                 }
                 if child.0 != 0 {

@@ -480,15 +480,15 @@ fn show_selected_properties(hwnd: HWND) {
     if hwnd_tree.0 == 0 {
         return;
     }
-    let hitem = windows::Win32::UI::Controls::HTREEITEM(unsafe {
-        SendMessageW(
+    let hitem = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
             LPARAM(0),
         )
-        .0
-    });
+        .0,
+    );
     if hitem.0 == 0 {
         return;
     }
@@ -509,15 +509,15 @@ fn show_selected_properties(hwnd: HWND) {
         let item_unread = match &node {
             Some(NodeData::Item(item)) => {
                 let key = rss_item_key(item);
-                let parent_item = windows::Win32::UI::Controls::HTREEITEM(unsafe {
-                    SendMessageW(
+                let parent_item = windows::Win32::UI::Controls::HTREEITEM(
+                    crate::send_message_w_safe(
                         s.hwnd_tree,
                         TVM_GETNEXTITEM,
                         WPARAM(TVGN_PARENT as usize),
                         LPARAM(hitem.0),
                     )
-                    .0
-                });
+                    .0,
+                );
                 let unread = s
                     .source_items
                     .get(&parent_item.0)
@@ -1100,27 +1100,27 @@ fn select_first_root_if_needed(hwnd: HWND, hwnd_tree: HWND) {
     if hwnd_tree.0 == 0 {
         return;
     }
-    let current = windows::Win32::UI::Controls::HTREEITEM(unsafe {
-        SendMessageW(
+    let current = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
             LPARAM(0),
         )
-        .0
-    });
+        .0,
+    );
     if current.0 != 0 {
         return;
     }
-    let first = windows::Win32::UI::Controls::HTREEITEM(unsafe {
-        SendMessageW(
+    let first = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_ROOT as usize),
             LPARAM(0),
         )
-        .0
-    });
+        .0,
+    );
     if first.0 != 0 {
         unsafe {
             SendMessageW(
@@ -4129,15 +4129,15 @@ fn handle_selection_changed(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTR
     if hwnd_tree.0 == 0 {
         return;
     }
-    let parent = windows::Win32::UI::Controls::HTREEITEM(unsafe {
-        SendMessageW(
+    let parent = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(windows::Win32::UI::Controls::TVGN_PARENT as usize),
             LPARAM(hitem.0),
         )
-        .0
-    });
+        .0,
+    );
     if parent.0 == 0 {
         return;
     }
@@ -4151,29 +4151,29 @@ fn handle_selection_changed(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTR
     if !has_more {
         return;
     }
-    let child = windows::Win32::UI::Controls::HTREEITEM(unsafe {
-        SendMessageW(
+    let child = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CHILD as usize),
             LPARAM(parent.0),
         )
-        .0
-    });
+        .0,
+    );
     if child.0 == 0 {
         return;
     }
     let mut last = child;
     loop {
-        let next = windows::Win32::UI::Controls::HTREEITEM(unsafe {
-            SendMessageW(
+        let next = windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
                 hwnd_tree,
                 TVM_GETNEXTITEM,
                 WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
                 LPARAM(last.0),
             )
-            .0
-        });
+            .0,
+        );
         if next.0 == 0 {
             break;
         }
@@ -4324,15 +4324,15 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
     if let Some(item) = item_opt {
         let item_key = rss_item_key(&item);
         with_rss_state(hwnd, |s| {
-            let parent = windows::Win32::UI::Controls::HTREEITEM(unsafe {
-                SendMessageW(
+            let parent = windows::Win32::UI::Controls::HTREEITEM(
+                crate::send_message_w_safe(
                     s.hwnd_tree,
                     TVM_GETNEXTITEM,
                     WPARAM(TVGN_PARENT as usize),
                     LPARAM(hitem.0),
                 )
-                .0
-            });
+                .0,
+            );
             if parent.0 != 0
                 && let Some(state) = s.source_items.get_mut(&parent.0)
             {
@@ -5278,15 +5278,15 @@ fn selected_article_item(hwnd: HWND) -> Option<RssItem> {
     if hwnd_tree.0 == 0 {
         return None;
     }
-    let hitem = windows::Win32::UI::Controls::HTREEITEM(unsafe {
-        SendMessageW(
+    let hitem = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
             hwnd_tree,
             TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
             LPARAM(0),
         )
-        .0
-    });
+        .0,
+    );
     if hitem.0 == 0 {
         return None;
     }

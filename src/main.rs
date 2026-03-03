@@ -6824,7 +6824,7 @@ fn current_voice_selection(hwnd: HWND, engine: TtsEngine) -> Option<String> {
     if voices.is_empty() || combo_voice.0 == 0 {
         return None;
     }
-    let sel = unsafe { SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if sel < 0 {
         return None;
     }
@@ -6846,7 +6846,7 @@ fn current_favorite_selection(hwnd: HWND) -> Option<FavoriteVoice> {
     if combo_favorites.0 == 0 || favorites.is_empty() {
         return None;
     }
-    let sel = unsafe { SendMessageW(combo_favorites, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(combo_favorites, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if sel < 0 {
         return None;
     }

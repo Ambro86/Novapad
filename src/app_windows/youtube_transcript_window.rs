@@ -1675,7 +1675,7 @@ fn stream_quality_items(
 
 fn current_stream_format(state: &StreamDialogState) -> StreamOutputFormat {
     let format_idx =
-        unsafe { SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+        crate::send_message_w_safe(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     StreamOutputFormat::combo_items(state.language)
         .get(format_idx.max(0) as usize)
         .map(|(_, f)| *f)
@@ -1684,7 +1684,7 @@ fn current_stream_format(state: &StreamDialogState) -> StreamOutputFormat {
 
 fn refill_stream_quality_combo(state: &StreamDialogState, keep_selection: bool) {
     let prev_selection = if keep_selection {
-        unsafe { SendMessageW(state.quality_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 }
+        crate::send_message_w_safe(state.quality_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0
     } else {
         -1
     };

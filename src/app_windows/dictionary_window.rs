@@ -407,8 +407,8 @@ fn update_button_states(hwnd: HWND) {
             None => return,
         };
 
-    let count = unsafe { SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0 };
-    let sel = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let count = crate::send_message_w_safe(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
+    let sel = crate::send_message_w_safe(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let has_selection = count > 0 && sel >= 0;
     unsafe {
         EnableWindow(hwnd_edit, has_selection);
@@ -465,7 +465,7 @@ fn selected_dictionary_index(hwnd: HWND) -> Option<usize> {
     if hwnd_list.0 == 0 {
         return None;
     }
-    let sel = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if sel < 0 {
         return None;
     }
@@ -1064,7 +1064,7 @@ fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
             None => return,
         };
 
-    let engine_sel = unsafe { SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let engine_sel = crate::send_message_w_safe(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
@@ -1109,15 +1109,13 @@ fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
     for (voice_index, voice) in voices.iter().enumerate() {
         let label = format!("{} ({})", voice.short_name, voice.locale);
         let wide = to_wide(&label);
-        let idx = unsafe {
-            SendMessageW(
-                combo_voice,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(wide.as_ptr() as isize),
-            )
-            .0
-        };
+        let idx = crate::send_message_w_safe(
+            combo_voice,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        )
+        .0;
         if idx >= 0 {
             unsafe {
                 SendMessageW(
@@ -1182,7 +1180,7 @@ fn preview_entry_voice(hwnd: HWND) {
         return;
     }
 
-    let engine_sel = unsafe { SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let engine_sel = crate::send_message_w_safe(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
@@ -1198,7 +1196,7 @@ fn preview_entry_voice(hwnd: HWND) {
         .unwrap_or_default()
     };
 
-    let voice_sel = unsafe { SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let voice_sel = crate::send_message_w_safe(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if voice_sel < 0 {
         return;
     }

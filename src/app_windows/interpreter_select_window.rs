@@ -247,19 +247,21 @@ fn interpreter_select_wndproc_inner(
             match id {
                 ID_OK => {
                     with_interpreter_state(hwnd, |state| {
-                        let sel = unsafe {
-                            SendMessageW(state.list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0
-                        };
+                        let sel = crate::send_message_w_safe(
+                            state.list,
+                            LB_GETCURSEL,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .0;
                         if sel >= 0 {
-                            let len = unsafe {
-                                SendMessageW(
-                                    state.list,
-                                    LB_GETTEXTLEN,
-                                    WPARAM(sel as usize),
-                                    LPARAM(0),
-                                )
-                                .0
-                            };
+                            let len = crate::send_message_w_safe(
+                                state.list,
+                                LB_GETTEXTLEN,
+                                WPARAM(sel as usize),
+                                LPARAM(0),
+                            )
+                            .0;
                             if len >= 0 {
                                 let mut buf = vec![0u16; (len + 1) as usize];
                                 unsafe {

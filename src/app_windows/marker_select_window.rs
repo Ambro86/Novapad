@@ -454,10 +454,10 @@ where
     }
 }
 fn list_has_unselected(list: HWND) -> bool {
-    let count = unsafe { SendMessageW(list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0 };
+    let count = crate::send_message_w_safe(list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
     for idx in 0..count {
         let is_selected =
-            unsafe { SendMessageW(list, LB_GETSEL, WPARAM(idx as usize), LPARAM(0)).0 };
+            crate::send_message_w_safe(list, LB_GETSEL, WPARAM(idx as usize), LPARAM(0)).0;
         if is_selected == 0 {
             return true;
         }
@@ -466,7 +466,7 @@ fn list_has_unselected(list: HWND) -> bool {
 }
 
 fn set_all_selected(list: HWND, selected: bool) {
-    let count = unsafe { SendMessageW(list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0 };
+    let count = crate::send_message_w_safe(list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
     for idx in 0..count {
         unsafe {
             SendMessageW(

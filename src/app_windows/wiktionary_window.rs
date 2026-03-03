@@ -792,7 +792,7 @@ fn run_lookup(hwnd: HWND) {
     }
     .unwrap_or_else(|| "auto".to_string());
     let lookup_pref = {
-        let sel = unsafe { SendMessageW(language_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+        let sel = crate::send_message_w_safe(language_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
         match sel {
             1 => "it",
             2 => "en",

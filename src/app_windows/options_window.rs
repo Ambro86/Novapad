@@ -7458,9 +7458,9 @@ fn update_dialogue_voice_visibility(hwnd: HWND) {
             .0 as u32
         } == BST_CHECKED.0);
     let secondary_engine_sel =
-        unsafe { SendMessageW(combo_secondary_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+        crate::send_message_w_safe(combo_secondary_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let dialogue_engine_sel =
-        unsafe { SendMessageW(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+        crate::send_message_w_safe(combo_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let dialogue_engine_is_edge = dialogue_engine_sel <= 0;
     let secondary_engine_is_edge = secondary_engine_sel <= 0;
     let dialogue_only_multilingual = (unsafe {
@@ -7694,7 +7694,7 @@ fn preview_voice(hwnd: HWND) {
     }
 
     let engine_sel =
-        unsafe { SendMessageW(combo_tts_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+        crate::send_message_w_safe(combo_tts_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
@@ -7709,7 +7709,7 @@ fn preview_voice(hwnd: HWND) {
     }
     .unwrap_or_default();
 
-    let voice_sel = unsafe { SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let voice_sel = crate::send_message_w_safe(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if voice_sel < 0 {
         return;
     }
@@ -7862,7 +7862,7 @@ fn insert_voice_tag_from_options(hwnd: HWND) {
     };
 
     let engine_sel =
-        unsafe { SendMessageW(combo_tts_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+        crate::send_message_w_safe(combo_tts_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
@@ -7877,7 +7877,7 @@ fn insert_voice_tag_from_options(hwnd: HWND) {
     }
     .unwrap_or_default();
 
-    let voice_sel = unsafe { SendMessageW(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let voice_sel = crate::send_message_w_safe(combo_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if voice_sel < 0 {
         return;
     }
@@ -7959,7 +7959,7 @@ fn preview_dialogue_voice(hwnd: HWND) {
     }
 
     let engine_sel =
-        unsafe { SendMessageW(combo_dialogue_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+        crate::send_message_w_safe(combo_dialogue_engine, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
@@ -7975,7 +7975,7 @@ fn preview_dialogue_voice(hwnd: HWND) {
     .unwrap_or_default();
 
     let voice_sel =
-        unsafe { SendMessageW(combo_dialogue_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+        crate::send_message_w_safe(combo_dialogue_voice, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if voice_sel < 0 {
         return;
     }
@@ -8140,15 +8140,13 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
         return;
     }
 
-    let engine_sel = unsafe {
-        SendMessageW(
-            combo_dialogue_secondary_engine,
-            CB_GETCURSEL,
-            WPARAM(0),
-            LPARAM(0),
-        )
-        .0
-    };
+    let engine_sel = crate::send_message_w_safe(
+        combo_dialogue_secondary_engine,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
@@ -8163,15 +8161,13 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
     }
     .unwrap_or_default();
 
-    let voice_sel = unsafe {
-        SendMessageW(
-            combo_dialogue_secondary_voice,
-            CB_GETCURSEL,
-            WPARAM(0),
-            LPARAM(0),
-        )
-        .0
-    };
+    let voice_sel = crate::send_message_w_safe(
+        combo_dialogue_secondary_voice,
+        CB_GETCURSEL,
+        WPARAM(0),
+        LPARAM(0),
+    )
+    .0;
     if voice_sel < 0 {
         return;
     }
@@ -9471,7 +9467,7 @@ fn update_audio_split_visibility(hwnd: HWND) {
     };
 
     let split_sel =
-        unsafe { SendMessageW(combo_audio_split, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+        crate::send_message_w_safe(combo_audio_split, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let (selected_text, selected_time, selected_parts) = if split_sel >= 0 {
         let split_parts = unsafe {
             SendMessageW(
@@ -9524,7 +9520,7 @@ fn update_subtitle_ducking_visibility(hwnd: HWND) {
         Some(values) => values,
         None => return,
     };
-    let sel = unsafe { SendMessageW(combo_subtitle_mode, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(combo_subtitle_mode, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let show = sel == 3;
     unsafe {
         ShowWindow(
@@ -9571,7 +9567,7 @@ fn update_indentation_visibility(hwnd: HWND) {
             None => return,
         };
 
-    let sel = unsafe { SendMessageW(combo_indentation, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(combo_indentation, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     let show_tab = sel == 1;
     let show_space = sel == 2;
 

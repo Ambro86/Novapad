@@ -834,7 +834,7 @@ fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
 }
 
 fn current_format(combo: HWND) -> AudioFormat {
-    let sel = unsafe { SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let sel = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     match sel {
         1 => AudioFormat::Aac,
         2 => AudioFormat::Opus,

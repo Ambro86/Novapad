@@ -14,13 +14,12 @@ use windows::Win32::UI::Controls::{EM_SCROLLCARET, EM_SETSEL, WC_LISTBOXW, WC_ST
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
-    IDC_ARROW, IsWindow, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK,
-    LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW,
-    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
-    WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WS_CAPTION,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU,
-    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LB_ADDSTRING,
+    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT,
+    LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -626,7 +625,7 @@ fn run_search(hwnd: HWND) {
         .unwrap_or_else(|| "auto".to_string());
     let label_set = labels(language);
 
-    let len = unsafe { GetWindowTextLengthW(input) };
+    let len = crate::get_window_text_length_w_safe(input);
     if len <= 0 {
         if status.0 != 0
             && let Err(e) = crate::set_window_text_w_safe(
@@ -642,7 +641,7 @@ fn run_search(hwnd: HWND) {
         return;
     }
     let mut buf = vec![0u16; (len + 1) as usize];
-    let _read = unsafe { GetWindowTextW(input, &mut buf) };
+    let _read = crate::get_window_text_w_safe(input, &mut buf);
     let query = String::from_utf16_lossy(&buf[..len as usize]);
     let trimmed = query.trim().to_string();
     if trimmed.is_empty() {

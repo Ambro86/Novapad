@@ -13,14 +13,13 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESC
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_GETITEMDATA, CB_RESETCONTENT,
     CB_SETCURSEL, CB_SETITEMDATA, CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW,
-    DestroyWindow, ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, GetWindowTextLengthW,
-    GetWindowTextW, HMENU, IDC_ARROW, IDCANCEL, IDOK, LB_ADDSTRING, LB_GETCOUNT, LB_GETCURSEL,
-    LB_GETITEMDATA, LB_RESETCONTENT, LB_SETCURSEL, LB_SETITEMDATA, LBN_SELCHANGE, LBS_HASSTRINGS,
-    LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, RegisterClassW, SW_HIDE, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
-    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    DestroyWindow, ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IDCANCEL,
+    IDOK, LB_ADDSTRING, LB_GETCOUNT, LB_GETCURSEL, LB_GETITEMDATA, LB_RESETCONTENT, LB_SETCURSEL,
+    LB_SETITEMDATA, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW,
+    RegisterClassW, SW_HIDE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
+    ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -500,7 +499,7 @@ fn remove_selected_entry(hwnd: HWND) {
         crate::log_debug("Failed to access dictionary state");
     }
     refresh_dictionary_list(hwnd);
-    if let Err(_e) = unsafe { PostMessageW(hwnd, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0)) } {
+    if let Err(_e) = crate::post_message_w_safe(hwnd, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0)) {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
 }
@@ -1010,19 +1009,19 @@ fn apply_entry_dialog(hwnd: HWND) {
     }
 
     refresh_dictionary_list(owner);
-    if let Err(_e) = unsafe { PostMessageW(owner, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0)) } {
+    if let Err(_e) = crate::post_message_w_safe(owner, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0)) {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
     crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
 }
 
 fn get_window_text(hwnd: HWND) -> String {
-    let len = unsafe { GetWindowTextLengthW(hwnd) };
+    let len = crate::get_window_text_length_w_safe(hwnd);
     if len <= 0 {
         return String::new();
     }
     let mut buf = vec![0u16; (len + 1) as usize];
-    let read = unsafe { GetWindowTextW(hwnd, &mut buf) };
+    let read = crate::get_window_text_w_safe(hwnd, &mut buf);
     String::from_utf16_lossy(&buf[..read as usize])
 }
 

@@ -17,12 +17,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWN,
     CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, EVENT_OBJECT_VALUECHANGE, GW_CHILD,
-    GWLP_USERDATA, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
-    IDC_ARROW, IsWindow, LoadCursorW, MSG, OBJID_CLIENT, PostMessageW, RegisterClassW,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
-    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    GWLP_USERDATA, GetWindow, GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, MSG,
+    OBJID_CLIENT, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -817,7 +817,7 @@ fn run_lookup(hwnd: HWND) {
         language_from_code(&lookup_pref, ui_language)
     };
 
-    let len = unsafe { GetWindowTextLengthW(input) };
+    let len = crate::get_window_text_length_w_safe(input);
     if len <= 0 {
         let msg = i18n::tr(ui_language, "dictionary.no_word");
         if let Err(_e) = crate::set_window_text_w_safe(
@@ -829,7 +829,7 @@ fn run_lookup(hwnd: HWND) {
         return;
     }
     let mut buf = vec![0u16; (len + 1) as usize];
-    let _read = unsafe { GetWindowTextW(input, &mut buf) };
+    let _read = crate::get_window_text_w_safe(input, &mut buf);
     let word = String::from_utf16_lossy(&buf[..len as usize]);
     let trimmed = word.trim().to_string();
     if trimmed.is_empty() {

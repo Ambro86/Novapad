@@ -20,7 +20,7 @@ use windows::Win32::UI::Controls::{
     WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetKeyState, SetFocus, VK_ESCAPE, VK_SHIFT, VK_TAB,
+    EnableWindow, SetFocus, VK_ESCAPE, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST,
@@ -91,7 +91,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN {
         let vk = msg.wParam.0 as u32;
         if vk == VK_ESCAPE.0 as u32 {
-            if let Err(e) = unsafe { PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) } {
+            if let Err(e) = crate::post_message_w_safe(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
                 crate::log_debug(&format!("Failed to post WM_CLOSE: {}", e));
             }
             return true;
@@ -104,7 +104,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             };
             if msg.hwnd == log_edit {
                 let shift_down =
-                    (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & (0x8000u16 as i16)) != 0;
+                    (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
                 let next = unsafe { GetNextDlgTabItem(hwnd, log_edit, shift_down) };
                 if next.0 != 0 {
                     crate::set_focus_safe(next);
@@ -1515,7 +1515,7 @@ fn is_checked(hwnd: HWND) -> bool {
 }
 
 fn read_control_text(hwnd: HWND) -> String {
-    let len = unsafe { GetWindowTextLengthW(hwnd) } as usize;
+    let len = crate::get_window_text_length_w_safe(hwnd) as usize;
     if len == 0 {
         return String::new();
     }

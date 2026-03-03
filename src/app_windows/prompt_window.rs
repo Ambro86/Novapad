@@ -441,9 +441,9 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     let data = unsafe { &mut *ptr };
                     let edit =
                         unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101) };
-                    let len = unsafe { GetWindowTextLengthW(edit) };
+                    let len = crate::get_window_text_length_w_safe(edit);
                     let mut buf = vec![0u16; (len + 1) as usize];
-                    let read = unsafe { GetWindowTextW(edit, &mut buf) };
+                    let read = crate::get_window_text_w_safe(edit, &mut buf);
                     data.value = String::from_utf16_lossy(&buf[..read as usize]);
                     data.confirmed = true;
                 }
@@ -458,7 +458,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             let key = wparam.0 as u32;
             if key == VK_TAB.0 as u32 {
                 let shift_down =
-                    (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & (0x8000u16 as i16)) != 0;
+                    (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
                 let current_focus = crate::get_focus_safe();
                 let edit =
                     unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101) };
@@ -1535,12 +1535,12 @@ fn send_input_to_pty(state: &mut PromptState) {
     if state.input.0 == 0 {
         return;
     }
-    let len = unsafe { GetWindowTextLengthW(state.input) };
+    let len = crate::get_window_text_length_w_safe(state.input);
     if len < 0 {
         return;
     }
     let mut buffer = vec![0u16; (len + 1) as usize];
-    let read = unsafe { GetWindowTextW(state.input, &mut buffer) };
+    let read = crate::get_window_text_w_safe(state.input, &mut buffer);
     let text = String::from_utf16_lossy(&buffer[..read as usize]);
     if state.program_is_codex && is_codex_approvals_command(&text) {
         spawn_codex_approvals();

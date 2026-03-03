@@ -15,11 +15,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESC
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWN,
     CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    ES_AUTOHSCROLL, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW,
-    IsWindow, LoadCursorW, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, ShowWindow, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    ES_AUTOHSCROLL, GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, PostMessageW,
+    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, ShowWindow, WINDOW_STYLE,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -142,7 +142,7 @@ fn labels(language: Language) -> ConvertLabels {
 
 pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessaging::MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-        if let Err(e) = unsafe { PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) } {
+        if let Err(e) = crate::post_message_w_safe(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
             crate::log_debug(&format!("Failed to post WM_CLOSE: {}", e));
         }
         return true;
@@ -1068,23 +1068,23 @@ fn set_combo_text(hwnd: HWND, text: &str) {
 }
 
 fn get_combo_text(hwnd: HWND) -> String {
-    let len = unsafe { GetWindowTextLengthW(hwnd) } as usize;
+    let len = crate::get_window_text_length_w_safe(hwnd) as usize;
     if len == 0 {
         return String::new();
     }
     let mut buf = vec![0u16; len + 1];
-    let read = unsafe { GetWindowTextW(hwnd, &mut buf) } as usize;
+    let read = crate::get_window_text_w_safe(hwnd, &mut buf) as usize;
     let used = read.min(len);
     String::from_utf16_lossy(&buf[..used])
 }
 
 fn get_edit_text(hwnd: HWND) -> String {
-    let len = unsafe { GetWindowTextLengthW(hwnd) } as usize;
+    let len = crate::get_window_text_length_w_safe(hwnd) as usize;
     if len == 0 {
         return String::new();
     }
     let mut buf = vec![0u16; len + 1];
-    let read = unsafe { GetWindowTextW(hwnd, &mut buf) } as usize;
+    let read = crate::get_window_text_w_safe(hwnd, &mut buf) as usize;
     let used = read.min(len);
     String::from_utf16_lossy(&buf[..used])
 }

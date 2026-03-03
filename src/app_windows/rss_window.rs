@@ -3324,14 +3324,12 @@ fn reload_tree(hwnd: HWND) {
 fn schedule_delayed_source_select(hwnd: HWND, source_index: usize) {
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(2));
-        if let Err(e) = unsafe {
-            PostMessageW(
-                hwnd,
-                WM_RSS_SELECT_SOURCE_DELAYED,
-                WPARAM(source_index),
-                LPARAM(0),
-            )
-        } {
+        if let Err(e) = crate::post_message_w_safe(
+            hwnd,
+            WM_RSS_SELECT_SOURCE_DELAYED,
+            WPARAM(source_index),
+            LPARAM(0),
+        ) {
             crate::log_debug(&format!(
                 "Failed to post delayed RSS source selection: {}",
                 e
@@ -3612,14 +3610,12 @@ fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
             hitem: hitem.0,
             result: res,
         });
-        if let Err(_e) = unsafe {
-            PostMessageW(
-                hwnd,
-                WM_RSS_FETCH_COMPLETE,
-                WPARAM(0),
-                LPARAM(Box::into_raw(msg) as isize),
-            )
-        } {}
+        if let Err(_e) = crate::post_message_w_safe(
+            hwnd,
+            WM_RSS_FETCH_COMPLETE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(msg) as isize),
+        ) {}
     });
 }
 
@@ -3708,14 +3704,12 @@ fn start_background_unread_check(hwnd: HWND) {
                             source_idx: idx,
                             newest_item_key: newest_key,
                         });
-                        if let Err(e) = unsafe {
-                            PostMessageW(
-                                HWND(hwnd_val),
-                                WM_RSS_BACKGROUND_CHECK_COMPLETE,
-                                WPARAM(0),
-                                LPARAM(Box::into_raw(msg) as isize),
-                            )
-                        } {
+                        if let Err(e) = crate::post_message_w_safe(
+                            HWND(hwnd_val),
+                            WM_RSS_BACKGROUND_CHECK_COMPLETE,
+                            WPARAM(0),
+                            LPARAM(Box::into_raw(msg) as isize),
+                        ) {
                             crate::log_debug(&format!(
                                 "Failed to post WM_RSS_BACKGROUND_CHECK_COMPLETE: {}",
                                 e
@@ -4373,14 +4367,12 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
                 item_key: delayed_key,
             });
             let payload_ptr = Box::into_raw(payload);
-            if let Err(e) = unsafe {
-                PostMessageW(
-                    hwnd,
-                    WM_RSS_MARK_ITEM_READ_UI,
-                    WPARAM(0),
-                    LPARAM(payload_ptr as isize),
-                )
-            } {
+            if let Err(e) = crate::post_message_w_safe(
+                hwnd,
+                WM_RSS_MARK_ITEM_READ_UI,
+                WPARAM(0),
+                LPARAM(payload_ptr as isize),
+            ) {
                 let _payload_owner = unsafe { Box::from_raw(payload_ptr) };
                 crate::log_debug(&format!("Failed to post WM_RSS_MARK_ITEM_READ_UI: {}", e));
             }
@@ -5132,14 +5124,12 @@ fn handle_retry_now(hwnd: HWND) {
             hitem: hitem.0,
             result: res,
         });
-        if let Err(_e) = unsafe {
-            PostMessageW(
-                hwnd,
-                WM_RSS_FETCH_COMPLETE,
-                WPARAM(0),
-                LPARAM(Box::into_raw(msg) as isize),
-            )
-        } {}
+        if let Err(_e) = crate::post_message_w_safe(
+            hwnd,
+            WM_RSS_FETCH_COMPLETE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(msg) as isize),
+        ) {}
     });
 }
 
@@ -5626,7 +5616,9 @@ fn force_focus_editor_on_parent(parent: HWND) {
     unsafe {
         SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
     }
-    if let Err(_e) = unsafe { PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) } {
+    if let Err(_e) =
+        crate::post_message_w_safe(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+    {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
 }
@@ -5673,14 +5665,12 @@ fn import_item(hwnd: HWND, item: RssItem) {
             }
         };
         let msg = Box::new(ImportResult { text });
-        if let Err(_e) = unsafe {
-            PostMessageW(
-                hwnd,
-                WM_RSS_IMPORT_COMPLETE,
-                WPARAM(0),
-                LPARAM(Box::into_raw(msg) as isize),
-            )
-        } {}
+        if let Err(_e) = crate::post_message_w_safe(
+            hwnd,
+            WM_RSS_IMPORT_COMPLETE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(msg) as isize),
+        ) {}
     });
 }
 
@@ -5837,7 +5827,7 @@ fn reorder_control_subclass_proc_inner(
         let ok = crate::get_dlg_item_safe(parent, ok_id as i32);
         let cancel = crate::get_dlg_item_safe(parent, cancel_id as i32);
         if wparam.0 as u16 == VK_TAB.0 {
-            let shift = (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & 0x8000u16 as i16) != 0;
+            let shift = (crate::get_key_state_safe(VK_SHIFT.0 as i32) & 0x8000u16 as i16) != 0;
             let next = if shift {
                 if id == edit_id {
                     cancel

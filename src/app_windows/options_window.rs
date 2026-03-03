@@ -483,7 +483,7 @@ fn is_modifier_vk(key: u16) -> bool {
 }
 
 fn modifier_down(vk: i32) -> bool {
-    ((unsafe { GetKeyState(vk) } & (0x8000u16 as i16)) != 0)
+    ((crate::get_key_state_safe(vk) & (0x8000u16 as i16)) != 0)
         || ((unsafe { GetAsyncKeyState(vk) } & (0x8000u16 as i16)) != 0)
 }
 
@@ -6938,13 +6938,13 @@ fn combo_value(hwnd: HWND) -> i32 {
 }
 
 fn selected_voice_short_name_from_combo_text(combo: HWND) -> Option<String> {
-    let len = unsafe { GetWindowTextLengthW(combo) };
+    let len = crate::get_window_text_length_w_safe(combo);
     if len <= 0 {
         return None;
     }
 
     let mut buf = vec![0u16; (len + 1) as usize];
-    let read = unsafe { GetWindowTextW(combo, &mut buf) };
+    let read = crate::get_window_text_w_safe(combo, &mut buf);
     if read <= 0 {
         return None;
     }
@@ -10919,7 +10919,7 @@ fn focus_tab_first(hwnd: HWND, index: i32) {
     if target.0 != 0 {
         crate::set_focus_safe(target);
         if let Err(_e) =
-            unsafe { PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(target.0 as usize), LPARAM(1)) }
+            crate::post_message_w_safe(hwnd, WM_NEXTDLGCTL, WPARAM(target.0 as usize), LPARAM(1))
         {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
@@ -11064,10 +11064,10 @@ fn browse_for_audiobook_folder(hwnd: HWND) {
 
 fn search_for_interpreter(hwnd: HWND) {
     let query = if let Some(edit) = with_options_state(hwnd, |state| state.edit_interpreter_path) {
-        let len = unsafe { GetWindowTextLengthW(edit) };
+        let len = crate::get_window_text_length_w_safe(edit);
         if len > 0 {
             let mut buf = vec![0u16; (len + 1) as usize];
-            let read = unsafe { GetWindowTextW(edit, &mut buf) };
+            let read = crate::get_window_text_w_safe(edit, &mut buf);
             String::from_utf16_lossy(&buf[..read as usize])
         } else {
             String::new()

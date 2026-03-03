@@ -381,12 +381,37 @@ pub(crate) fn get_open_file_name_w_safe(ofn: *mut OPENFILENAMEW) -> BOOL {
     unsafe { GetOpenFileNameW(ofn) }
 }
 
+pub(crate) fn post_message_w_safe(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> windows::core::Result<()> {
+    unsafe { PostMessageW(hwnd, msg, wparam, lparam) }
+}
+
 pub(crate) fn get_module_handle_raw_default() -> isize {
     unsafe { GetModuleHandleW(None).unwrap_or_default().0 }
 }
 
 pub(crate) fn get_class_name_w_safe(hwnd: HWND, class_name: &mut [u16]) -> i32 {
     unsafe { GetClassNameW(hwnd, class_name) }
+}
+
+pub(crate) fn get_window_text_length_w_safe(hwnd: HWND) -> i32 {
+    unsafe { GetWindowTextLengthW(hwnd) }
+}
+
+pub(crate) fn get_window_text_w_safe(hwnd: HWND, string: &mut [u16]) -> i32 {
+    unsafe { GetWindowTextW(hwnd, string) }
+}
+
+pub(crate) fn get_key_state_safe(vkey: i32) -> i16 {
+    unsafe { GetKeyState(vkey) }
+}
+
+pub(crate) fn get_menu_safe(hwnd: HWND) -> HMENU {
+    unsafe { GetMenu(hwnd) }
 }
 
 pub(crate) fn check_menu_item_safe(hmenu: HMENU, id_check_item: u32, u_check: u32) -> u32 {
@@ -5566,7 +5591,7 @@ fn update_voice_panel_menu_check(hwnd: HWND) {
         })
     }
     .unwrap_or((false, false, 0x000000, 12, false, true));
-    let hmenu = unsafe { GetMenu(hwnd) };
+    let hmenu = crate::get_menu_safe(hwnd);
     if hmenu.0 == 0 {
         return;
     }

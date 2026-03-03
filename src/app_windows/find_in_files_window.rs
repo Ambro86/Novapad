@@ -592,7 +592,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                if let Err(_e) = unsafe { PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) } {
+                if let Err(_e) = crate::post_message_w_safe(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
                 return LRESULT(0);

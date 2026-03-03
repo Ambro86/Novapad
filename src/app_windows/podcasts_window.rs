@@ -516,14 +516,12 @@ fn post_mark_episode_played_ui_after_delay(
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(delay_ms));
         let payload_ptr = Box::into_raw(Box::new(payload));
-        if let Err(e) = unsafe {
-            PostMessageW(
-                hwnd,
-                WM_PODCAST_MARK_EPISODE_PLAYED_UI,
-                WPARAM(0),
-                LPARAM(payload_ptr as isize),
-            )
-        } {
+        if let Err(e) = crate::post_message_w_safe(
+            hwnd,
+            WM_PODCAST_MARK_EPISODE_PLAYED_UI,
+            WPARAM(0),
+            LPARAM(payload_ptr as isize),
+        ) {
             let _payload_owner = unsafe { Box::from_raw(payload_ptr) };
             log_debug(&format!(
                 "Failed to post WM_PODCAST_MARK_EPISODE_PLAYED_UI: {}",
@@ -1423,14 +1421,12 @@ fn load_episode_children(hwnd: HWND, hitem: HTREEITEM, node: NodeData, force: bo
             node: node_copy,
             result: res,
         });
-        if let Err(_e) = unsafe {
-            PostMessageW(
-                hwnd_copy,
-                WM_PODCAST_FETCH_COMPLETE,
-                WPARAM(0),
-                LPARAM(Box::into_raw(msg) as isize),
-            )
-        } {}
+        if let Err(_e) = crate::post_message_w_safe(
+            hwnd_copy,
+            WM_PODCAST_FETCH_COMPLETE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(msg) as isize),
+        ) {}
     });
 }
 
@@ -1543,14 +1539,12 @@ fn start_background_unheard_check(hwnd: HWND) {
                             source_idx: idx,
                             newest_item_key: newest_key,
                         });
-                        if let Err(e) = unsafe {
-                            PostMessageW(
-                                HWND(hwnd_val),
-                                WM_PODCAST_BACKGROUND_CHECK_COMPLETE,
-                                WPARAM(0),
-                                LPARAM(Box::into_raw(msg) as isize),
-                            )
-                        } {
+                        if let Err(e) = crate::post_message_w_safe(
+                            HWND(hwnd_val),
+                            WM_PODCAST_BACKGROUND_CHECK_COMPLETE,
+                            WPARAM(0),
+                            LPARAM(Box::into_raw(msg) as isize),
+                        ) {
                             crate::log_debug(&format!(
                                 "Failed to post WM_PODCAST_BACKGROUND_CHECK_COMPLETE: {}",
                                 e
@@ -2114,14 +2108,12 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
             title: episode_title.clone(),
             item_key: play_key.clone(),
         });
-        if let Err(e) = unsafe {
-            PostMessageW(
-                hwnd,
-                WM_PODCAST_PLAY_READY,
-                WPARAM(0),
-                LPARAM(Box::into_raw(msg) as isize),
-            )
-        } {
+        if let Err(e) = crate::post_message_w_safe(
+            hwnd,
+            WM_PODCAST_PLAY_READY,
+            WPARAM(0),
+            LPARAM(Box::into_raw(msg) as isize),
+        ) {
             log_debug(&format!(
                 "Failed to post WM_PODCAST_PLAY_READY from cache: {}",
                 e
@@ -2717,14 +2709,12 @@ fn perform_search(hwnd: HWND, query: &str) {
                         status: None,
                         error: None,
                     });
-                    if let Err(e) = unsafe {
-                        PostMessageW(
-                            hwnd_copy,
-                            WM_PODCAST_SEARCH_COMPLETE,
-                            WPARAM(0),
-                            LPARAM(Box::into_raw(msg) as isize),
-                        )
-                    } {
+                    if let Err(e) = crate::post_message_w_safe(
+                        hwnd_copy,
+                        WM_PODCAST_SEARCH_COMPLETE,
+                        WPARAM(0),
+                        LPARAM(Box::into_raw(msg) as isize),
+                    ) {
                         crate::log_debug(&format!("PostMessageW failed: {:?}", e));
                     }
                     return;
@@ -2771,14 +2761,12 @@ fn perform_search(hwnd: HWND, query: &str) {
             status: None,
             error: None,
         });
-        if let Err(e) = unsafe {
-            PostMessageW(
-                hwnd_copy,
-                WM_PODCAST_SEARCH_COMPLETE,
-                WPARAM(0),
-                LPARAM(Box::into_raw(msg) as isize),
-            )
-        } {
+        if let Err(e) = crate::post_message_w_safe(
+            hwnd_copy,
+            WM_PODCAST_SEARCH_COMPLETE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(msg) as isize),
+        ) {
             crate::log_debug(&format!("PostMessageW failed: {:?}", e));
         }
     });
@@ -3276,14 +3264,12 @@ fn trigger_category_load(
                 error: Some(err),
             },
         };
-        if let Err(e) = unsafe {
-            PostMessageW(
-                hwnd_copy,
-                WM_PODCAST_SEARCH_COMPLETE,
-                WPARAM(0),
-                LPARAM(Box::into_raw(Box::new(msg)) as isize),
-            )
-        } {
+        if let Err(e) = crate::post_message_w_safe(
+            hwnd_copy,
+            WM_PODCAST_SEARCH_COMPLETE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(Box::new(msg)) as isize),
+        ) {
             crate::log_debug(&format!("PostMessageW failed: {:?}", e));
         }
     });
@@ -4455,7 +4441,9 @@ fn force_focus_editor_on_parent(parent: HWND) {
     unsafe {
         SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
     }
-    if let Err(_e) = unsafe { PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) } {
+    if let Err(_e) =
+        crate::post_message_w_safe(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+    {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
 }
@@ -5759,7 +5747,7 @@ fn description_control_subclass_proc_inner(
         // Allow Ctrl+A in edit
         if id == ID_DESCRIPTION_EDIT
             && wparam.0 as u16 == 'A' as u16
-            && unsafe { GetKeyState(VK_CONTROL.0 as i32) } < 0
+            && crate::get_key_state_safe(VK_CONTROL.0 as i32) < 0
         {
             crate::send_message_w_safe(edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
             return LRESULT(0);
@@ -6148,7 +6136,7 @@ fn reorder_control_subclass_proc_inner(
         let ok = crate::get_dlg_item_safe(parent, REORDER_OK_ID as i32);
         let cancel = crate::get_dlg_item_safe(parent, REORDER_CANCEL_ID as i32);
         if wparam.0 as u16 == VK_TAB.0 {
-            let shift = (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & 0x8000u16 as i16) != 0;
+            let shift = (crate::get_key_state_safe(VK_SHIFT.0 as i32) & 0x8000u16 as i16) != 0;
             let next = if shift {
                 if id == REORDER_EDIT_ID {
                     cancel
@@ -6467,7 +6455,8 @@ unsafe extern "system" fn podcast_tree_wndproc(
 }
 
 fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    if msg == WM_CHAR && wparam.0 as u32 == 26 && unsafe { GetKeyState(VK_CONTROL.0 as i32) < 0 } {
+    if msg == WM_CHAR && wparam.0 as u32 == 26 && crate::get_key_state_safe(VK_CONTROL.0 as i32) < 0
+    {
         return LRESULT(0);
     }
     if msg == WM_KEYDOWN
@@ -6496,7 +6485,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
                 return LRESULT(0);
             }
         }
-        if key == 'Z' as u32 && unsafe { GetKeyState(VK_CONTROL.0 as i32) < 0 } {
+        if key == 'Z' as u32 && crate::get_key_state_safe(VK_CONTROL.0 as i32) < 0 {
             let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 undo_last_delete(parent);
@@ -6566,7 +6555,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
         if key == VK_RETURN.0 as u32 {
             let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
-                if unsafe { GetKeyState(VK_MENU.0 as i32) < 0 } {
+                if crate::get_key_state_safe(VK_MENU.0 as i32) < 0 {
                     show_selected_properties(parent);
                     return LRESULT(0);
                 }
@@ -6587,13 +6576,16 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
             }
         }
         if key == u32::from(VK_APPS.0)
-            || (key == u32::from(VK_F10.0) && unsafe { GetKeyState(VK_SHIFT.0 as i32) < 0 })
+            || (key == u32::from(VK_F10.0) && crate::get_key_state_safe(VK_SHIFT.0 as i32) < 0)
         {
             let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
-                if let Err(_e) = unsafe {
-                    PostMessageW(parent, WM_CONTEXTMENU, WPARAM(hwnd.0 as usize), LPARAM(-1))
-                } {
+                if let Err(_e) = crate::post_message_w_safe(
+                    parent,
+                    WM_CONTEXTMENU,
+                    WPARAM(hwnd.0 as usize),
+                    LPARAM(-1),
+                ) {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
                 return LRESULT(0);
@@ -6661,7 +6653,7 @@ fn podcast_search_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     HWND(0),
                     HWND(0),
                 ));
-                let prev = unsafe { GetKeyState(VK_SHIFT.0 as i32) < 0 };
+                let prev = crate::get_key_state_safe(VK_SHIFT.0 as i32) < 0;
                 let target = if prev {
                     hwnd_tree
                 } else if hwnd_search_button.0 != 0 {

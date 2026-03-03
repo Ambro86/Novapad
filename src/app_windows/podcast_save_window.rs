@@ -7,7 +7,7 @@ use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::{PBM_SETPOS, PBM_SETRANGE, WC_BUTTON};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetKeyState, SetFocus, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
+    EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
@@ -67,7 +67,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         let key = msg.wParam.0 as u32;
         if key == VK_ESCAPE.0 as u32 {
             if let Err(_e) =
-                unsafe { PostMessageW(hwnd, WM_COMMAND, WPARAM(SAVE_ID_CANCEL), LPARAM(0)) }
+                crate::post_message_w_safe(hwnd, WM_COMMAND, WPARAM(SAVE_ID_CANCEL), LPARAM(0))
             {
                 crate::log_debug(&format!("Error: {:?}", _e));
             }
@@ -77,9 +77,12 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             let focus = crate::get_focus_safe();
             let cancel = with_save_state(hwnd, |state| state.cancel_button).unwrap_or(HWND(0));
             if cancel.0 != 0 && focus == cancel {
-                if let Err(_e) = unsafe {
-                    PostMessageW(hwnd, WM_COMMAND, WPARAM(SAVE_ID_CANCEL), LPARAM(cancel.0))
-                } {
+                if let Err(_e) = crate::post_message_w_safe(
+                    hwnd,
+                    WM_COMMAND,
+                    WPARAM(SAVE_ID_CANCEL),
+                    LPARAM(cancel.0),
+                ) {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
                 return true;
@@ -403,7 +406,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             {
                 let focus = crate::get_focus_safe();
                 let shift_down =
-                    (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & (0x8000u16 as i16)) != 0;
+                    (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
                 if !shift_down && focus != cancel {
                     crate::set_focus_safe(cancel);
                     return LRESULT(0);
@@ -418,9 +421,12 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 && cancel.0 != 0
                 && crate::get_focus_safe() == cancel
             {
-                if let Err(_e) = unsafe {
-                    PostMessageW(hwnd, WM_COMMAND, WPARAM(SAVE_ID_CANCEL), LPARAM(cancel.0))
-                } {}
+                if let Err(_e) = crate::post_message_w_safe(
+                    hwnd,
+                    WM_COMMAND,
+                    WPARAM(SAVE_ID_CANCEL),
+                    LPARAM(cancel.0),
+                ) {}
                 return LRESULT(0);
             }
             crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
@@ -481,7 +487,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 // download -> conversion handoff), avoiding transient desktop focus.
                 crate::set_foreground_window_safe(parent);
                 if let Err(_e) =
-                    unsafe { PostMessageW(parent, WM_PODCAST_SAVE_CLOSED, WPARAM(0), LPARAM(0)) }
+                    crate::post_message_w_safe(parent, WM_PODCAST_SAVE_CLOSED, WPARAM(0), LPARAM(0))
                 {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }

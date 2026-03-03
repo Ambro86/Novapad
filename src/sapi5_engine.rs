@@ -18,9 +18,10 @@ use windows::Win32::Foundation::VARIANT_BOOL;
 use windows::Win32::Media::Audio::{WAVE_FORMAT_PCM, WAVEFORMATEX};
 use windows::Win32::Media::Speech::{
     ISpEventSource, ISpMMSysAudio, ISpObjectToken, ISpObjectTokenCategory, ISpStream, ISpVoice,
-    ISpeechObjectToken, ISpeechObjectTokenCategory, ISpeechVoice, SPAS_PAUSE, SPAS_RUN, SPAS_STOP,
-    SPEI_WORD_BOUNDARY, SPEVENT, SPF_ASYNC, SPF_IS_XML, SPF_PURGEBEFORESPEAK, SPFM_CREATE_ALWAYS,
-    SPRS_DONE, SPVOICESTATUS, SpFileStream, SpMMAudioOut, SpObjectTokenCategory, SpVoice,
+    ISpeechObjectToken, ISpeechObjectTokenCategory, ISpeechObjectTokens, ISpeechVoice, SPAS_PAUSE,
+    SPAS_RUN, SPAS_STOP, SPEI_WORD_BOUNDARY, SPEVENT, SPF_ASYNC, SPF_IS_XML, SPF_PURGEBEFORESPEAK,
+    SPFM_CREATE_ALWAYS, SPRS_DONE, SPVOICESTATUS, SpFileStream, SpMMAudioOut,
+    SpObjectTokenCategory, SpVoice,
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::core::{BSTR, GUID, Interface, PCWSTR, w};
@@ -175,6 +176,33 @@ fn speech_token_display_name(token: &ISpeechObjectToken) -> Option<String> {
     None
 }
 
+fn speech_tokens_count_safe(tokens: &ISpeechObjectTokens) -> windows::core::Result<i32> {
+    unsafe { tokens.Count() }
+}
+
+fn speech_tokens_item_safe(
+    tokens: &ISpeechObjectTokens,
+    index: i32,
+) -> windows::core::Result<ISpeechObjectToken> {
+    unsafe { tokens.Item(index) }
+}
+
+fn speech_category_set_id_safe(
+    category: &ISpeechObjectTokenCategory,
+    category_id: &BSTR,
+    create_if_not_exist: VARIANT_BOOL,
+) -> windows::core::Result<()> {
+    unsafe { category.SetId(category_id, create_if_not_exist) }
+}
+
+fn speech_category_enumerate_tokens_safe(
+    category: &ISpeechObjectTokenCategory,
+    required_attributes: &BSTR,
+    optional_attributes: &BSTR,
+) -> windows::core::Result<ISpeechObjectTokens> {
+    unsafe { category.EnumerateTokens(required_attributes, optional_attributes) }
+}
+
 fn collect_voice_descriptions_from_speech_voice() -> Result<Vec<String>, String> {
     let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
     let voice: ISpeechVoice = unsafe {
@@ -185,10 +213,11 @@ fn collect_voice_descriptions_from_speech_voice() -> Result<Vec<String>, String>
     let optional = BSTR::from("");
     let tokens = unsafe { voice.GetVoices(&required, &optional) }
         .map_err(|e| format!("ISpeechVoice.GetVoices failed: {}", e))?;
-    let count = unsafe { tokens.Count() }.map_err(|e| format!("tokens.Count failed: {}", e))?;
+    let count =
+        speech_tokens_count_safe(&tokens).map_err(|e| format!("tokens.Count failed: {}", e))?;
     let mut voices = Vec::new();
     for i in 0..count {
-        if let Ok(token) = unsafe { tokens.Item(i) }
+        if let Ok(token) = speech_tokens_item_safe(&tokens, i)
             && let Some(name) = speech_token_display_name(&token)
         {
             voices.push(name);
@@ -206,16 +235,17 @@ fn collect_voice_descriptions_from_speech_category(
             .map_err(|e| format!("CoCreateInstance(ISpeechObjectTokenCategory) failed: {}", e))?
     };
     let category_id = BSTR::from(category_id);
-    unsafe { category.SetId(&category_id, VARIANT_BOOL(0)) }
+    speech_category_set_id_safe(&category, &category_id, VARIANT_BOOL(0))
         .map_err(|e| format!("ISpeechObjectTokenCategory.SetId failed: {}", e))?;
     let required = BSTR::from("");
     let optional = BSTR::from("");
-    let tokens = unsafe { category.EnumerateTokens(&required, &optional) }
+    let tokens = speech_category_enumerate_tokens_safe(&category, &required, &optional)
         .map_err(|e| format!("ISpeechObjectTokenCategory.EnumerateTokens failed: {}", e))?;
-    let count = unsafe { tokens.Count() }.map_err(|e| format!("tokens.Count failed: {}", e))?;
+    let count =
+        speech_tokens_count_safe(&tokens).map_err(|e| format!("tokens.Count failed: {}", e))?;
     let mut voices = Vec::new();
     for i in 0..count {
-        if let Ok(token) = unsafe { tokens.Item(i) }
+        if let Ok(token) = speech_tokens_item_safe(&tokens, i)
             && let Some(name) = speech_token_display_name(&token)
         {
             voices.push(name);
@@ -231,13 +261,13 @@ fn find_voice_token_in_speech_category(
     let category: ISpeechObjectTokenCategory =
         unsafe { CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL).ok()? };
     let category_id = BSTR::from(category_id);
-    unsafe { category.SetId(&category_id, VARIANT_BOOL(0)) }.ok()?;
+    speech_category_set_id_safe(&category, &category_id, VARIANT_BOOL(0)).ok()?;
     let required = BSTR::from("");
     let optional = BSTR::from("");
-    let tokens = unsafe { category.EnumerateTokens(&required, &optional) }.ok()?;
-    let count = unsafe { tokens.Count() }.ok()?;
+    let tokens = speech_category_enumerate_tokens_safe(&category, &required, &optional).ok()?;
+    let count = speech_tokens_count_safe(&tokens).ok()?;
     for i in 0..count {
-        if let Ok(token) = unsafe { tokens.Item(i) }
+        if let Ok(token) = speech_tokens_item_safe(&tokens, i)
             && let Some(description) = speech_token_display_name(&token)
             && description == voice_name
             && let Ok(sp_token) = token.cast::<ISpObjectToken>()

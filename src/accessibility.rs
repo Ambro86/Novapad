@@ -6,9 +6,9 @@ use windows::Win32::System::Com::{
     DISPPARAMS, EXCEPINFO, IDispatch,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyState, VK_ADD, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_MENU,
-    VK_NEXT, VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_SPACE,
-    VK_SUBTRACT, VK_UP,
+    VK_ADD, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_MENU, VK_NEXT,
+    VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_SPACE, VK_SUBTRACT,
+    VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{MSG, WM_KEYDOWN};
 use windows::core::{BSTR, GUID, PCWSTR, VARIANT};
@@ -64,9 +64,9 @@ pub fn handle_accessibility(hwnd: HWND, msg: &MSG) -> bool {
 /// Returns a PlayerCommand indicating what the application should do.
 pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
     if msg.message == WM_KEYDOWN {
-        let ctrl_down = unsafe { (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 };
-        let alt_down = unsafe { (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0 };
-        let shift_down = unsafe { (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0 };
+        let ctrl_down = (crate::get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+        let alt_down = (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+        let shift_down = (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
         let vk = msg.wParam.0 as u32;
         let base_skip = skip_seconds.max(1) as i64;
         let small_skip = (base_skip / 3).max(1);

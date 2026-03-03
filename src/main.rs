@@ -8805,9 +8805,9 @@ fn shortcut_matches_message(binding: ShortcutBinding, msg: &MSG) -> bool {
     // SAFETY: key-state reads are thread-local Win32 queries with no aliasing requirements.
     let ctrl_down = unsafe { (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 };
     // SAFETY: key-state reads are thread-local Win32 queries with no aliasing requirements.
-    let shift_down = unsafe { (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0 };
+    let shift_down = (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
     // SAFETY: key-state reads are thread-local Win32 queries with no aliasing requirements.
-    let alt_down = unsafe { (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0 };
+    let alt_down = (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
     key == binding.key
         && ctrl_down == binding.ctrl
         && shift_down == binding.shift
@@ -8838,8 +8838,8 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     // NOTE: this intentionally takes precedence over the accelerator table.
     let key = msg.wParam.0 as u16;
     let ctrl_down = unsafe { (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0 };
-    let shift_down = unsafe { (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0 };
-    let alt_down = unsafe { (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0 };
+    let shift_down = (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+    let alt_down = (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
     if key == 'S' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_STREAM_AUDIO);
         return true;

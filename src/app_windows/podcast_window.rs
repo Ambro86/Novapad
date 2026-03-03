@@ -21,7 +21,7 @@ use windows::Win32::UI::Controls::{
     BST_CHECKED, BST_UNCHECKED, WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE, VK_SHIFT,
+    EnableWindow, SetFocus, VK_CONTROL, VK_ESCAPE, VK_SHIFT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_CLICK, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, BS_GROUPBOX,
@@ -75,8 +75,8 @@ struct PodcastSaveResult {
 
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN {
-        let ctrl = unsafe { (GetKeyState(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0 };
-        let shift = unsafe { (GetKeyState(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0 };
+        let ctrl = (crate::get_key_state_safe(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
+        let shift = (crate::get_key_state_safe(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
         let key = msg.wParam.0 as u32;
 
         if key == VK_ESCAPE.0 as u32 {

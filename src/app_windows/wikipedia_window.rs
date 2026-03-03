@@ -481,7 +481,7 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
 }
 
 fn handle_enter_key(hwnd: HWND) -> bool {
-    let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd) };
+    let parent = crate::get_parent_safe(hwnd);
     if parent.0 == 0 {
         return false;
     }
@@ -530,7 +530,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                 )
             } & 0x8000u16 as i16
                 != 0;
-            let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 focus_next_control(parent, hwnd, shift_down);
                 return LRESULT(0);

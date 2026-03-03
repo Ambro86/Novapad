@@ -592,7 +592,7 @@ fn handle_enter_key(hwnd: HWND) -> bool {
         && control_id != WIKTIONARY_INPUT_ID
         && control_id != WIKTIONARY_LANGUAGE_ID
     {
-        let parent_control = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(control) };
+        let parent_control = crate::get_parent_safe(control);
         if parent_control.0 == 0 {
             return false;
         }
@@ -607,7 +607,7 @@ fn handle_enter_key(hwnd: HWND) -> bool {
         control = parent_control;
         control_id = parent_id;
     }
-    let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(control) };
+    let parent = crate::get_parent_safe(control);
     if parent.0 == 0 {
         return false;
     }
@@ -649,7 +649,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
     if msg == WM_KEYDOWN {
         let key = wparam.0 as u16;
         if key == windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE.0 {
-            let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 crate::log_if_err!(crate::destroy_window_safe(parent));
                 return LRESULT(0);
@@ -662,7 +662,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                 )
             } & 0x8000u16 as i16
                 != 0;
-            let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 focus_next_control(parent, hwnd, shift_down);
                 return LRESULT(0);
@@ -674,7 +674,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         }
     }
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR && wparam.0 == 27 {
-        let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd) };
+        let parent = crate::get_parent_safe(hwnd);
         if parent.0 != 0 {
             crate::log_if_err!(crate::destroy_window_safe(parent));
             return LRESULT(0);
@@ -730,8 +730,7 @@ fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     let mut current_ctrl = current;
     let mut pos = order.iter().position(|hwnd| *hwnd == current_ctrl);
     if pos.is_none() {
-        let maybe_parent =
-            unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(current_ctrl) };
+        let maybe_parent = crate::get_parent_safe(current_ctrl);
         if maybe_parent.0 != 0 {
             current_ctrl = maybe_parent;
             pos = order.iter().position(|hwnd| *hwnd == current_ctrl);

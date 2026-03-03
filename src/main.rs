@@ -75,7 +75,7 @@ use serde::{Deserialize, Serialize};
 
 use windows::Win32::Foundation::{
     BOOL, ERROR_INVALID_PARAMETER, ERROR_INVALID_WINDOW_HANDLE, GetLastError, HANDLE, HINSTANCE,
-    HWND, LPARAM, LRESULT, POINT, SetLastError, WIN32_ERROR, WPARAM,
+    HWND, LPARAM, LRESULT, POINT, RECT, SetLastError, WIN32_ERROR, WPARAM,
 };
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
 use windows::Win32::Graphics::Gdi::{
@@ -393,6 +393,29 @@ pub(crate) fn show_window_safe(
     cmdshow: windows::Win32::UI::WindowsAndMessaging::SHOW_WINDOW_CMD,
 ) -> BOOL {
     unsafe { ShowWindow(hwnd, cmdshow) }
+}
+
+pub(crate) fn load_cursor_w_safe(
+    instance: HINSTANCE,
+    cursor_name: PCWSTR,
+) -> windows::core::Result<HCURSOR> {
+    unsafe { LoadCursorW(instance, cursor_name) }
+}
+
+pub(crate) fn get_window_rect_safe(hwnd: HWND, rect: &mut RECT) -> windows::core::Result<()> {
+    unsafe { windows::Win32::UI::WindowsAndMessaging::GetWindowRect(hwnd, rect) }
+}
+
+pub(crate) fn get_client_rect_safe(hwnd: HWND, rect: &mut RECT) -> windows::core::Result<()> {
+    unsafe { windows::Win32::UI::WindowsAndMessaging::GetClientRect(hwnd, rect) }
+}
+
+pub(crate) fn create_menu_safe() -> windows::core::Result<HMENU> {
+    unsafe { windows::Win32::UI::WindowsAndMessaging::CreateMenu() }
+}
+
+pub(crate) fn destroy_menu_safe(menu: HMENU) -> windows::core::Result<()> {
+    unsafe { windows::Win32::UI::WindowsAndMessaging::DestroyMenu(menu) }
 }
 
 pub(crate) fn get_message_w_safe(

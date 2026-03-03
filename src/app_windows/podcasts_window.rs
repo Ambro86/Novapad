@@ -35,15 +35,15 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CHILDID_SELF,
-    CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
-    ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgItem, GetParent, GetWindowLongPtrW,
-    GetWindowRect, HMENU, IDC_ARROW, IDYES, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT,
-    LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO,
-    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
-    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
-    TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS, WM_SETFONT,
-    WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    CallWindowProcW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, ES_AUTOHSCROLL,
+    EVENT_OBJECT_FOCUS, GetClientRect, GetDlgItem, GetParent, GetWindowLongPtrW, GetWindowRect,
+    HMENU, IDC_ARROW, IDYES, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK,
+    LBS_NOTIFY, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP,
+    MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW, RegisterClassW,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, TrackPopupMenu,
+    WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
+    WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
     WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
@@ -3148,10 +3148,10 @@ fn set_category_mode(hwnd: HWND, mode: Mode) {
         windows::Win32::UI::WindowsAndMessaging::SW_HIDE
     };
     if label.0 != 0 {
-        unsafe { windows::Win32::UI::WindowsAndMessaging::ShowWindow(label, show_flag) };
+        crate::show_window_safe(label, show_flag);
     }
     if edit.0 != 0 {
-        unsafe { windows::Win32::UI::WindowsAndMessaging::ShowWindow(edit, show_flag) };
+        crate::show_window_safe(edit, show_flag);
     }
 }
 
@@ -3310,7 +3310,7 @@ fn show_categories_dialog(parent_hwnd: HWND) {
     let class_name = to_wide(PODCASTS_CATEGORIES_CLASS);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            unsafe { windows::Win32::UI::WindowsAndMessaging::LoadCursorW(None, IDC_ARROW) }
+            crate::load_cursor_w_safe(HINSTANCE(0), IDC_ARROW)
                 .unwrap_or_default()
                 .0,
         ),
@@ -4111,7 +4111,7 @@ fn show_add_dialog(parent_hwnd: HWND) {
     let class_name = to_wide(PODCASTS_ADD_CLASS);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            unsafe { windows::Win32::UI::WindowsAndMessaging::LoadCursorW(None, IDC_ARROW) }
+            crate::load_cursor_w_safe(HINSTANCE(0), IDC_ARROW)
                 .unwrap_or_default()
                 .0,
         ),
@@ -4558,7 +4558,7 @@ fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
     }
     let mut rect = windows::Win32::Foundation::RECT::default();
     if use_hit_test
-        && unsafe { GetWindowRect(hwnd_results, &mut rect) }.is_ok()
+        && crate::get_window_rect_safe(hwnd_results, &mut rect).is_ok()
         && (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
     {
         return;
@@ -4568,7 +4568,7 @@ fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
     let show_episodes_label = i18n::tr(language, "podcasts.context.show_episodes");
     let info_label = i18n::tr(language, "podcasts.context.info");
     let copy_label = i18n::tr(language, "podcasts.context.copy_url");
-    let menu = unsafe { CreateMenu() }.unwrap_or(HMENU(0));
+    let menu = crate::create_menu_safe().unwrap_or(HMENU(0));
     if let Err(_e) = unsafe {
         AppendMenuW(
             menu,
@@ -4624,7 +4624,7 @@ fn show_search_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
         }
         _ => {}
     }
-    crate::log_if_err!(unsafe { DestroyMenu(menu) });
+    crate::log_if_err!(crate::destroy_menu_safe(menu));
 }
 
 fn show_tree_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
@@ -5603,7 +5603,7 @@ fn show_description_dialog(parent: HWND, title: &str, content: &str) {
 
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            unsafe { windows::Win32::UI::WindowsAndMessaging::LoadCursorW(None, IDC_ARROW) }
+            crate::load_cursor_w_safe(HINSTANCE(0), IDC_ARROW)
                 .unwrap_or_default()
                 .0,
         ),
@@ -6016,7 +6016,7 @@ fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
     let class_name = to_wide(PODCASTS_REORDER_CLASS);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
-            unsafe { windows::Win32::UI::WindowsAndMessaging::LoadCursorW(None, IDC_ARROW) }
+            crate::load_cursor_w_safe(HINSTANCE(0), IDC_ARROW)
                 .unwrap_or_default()
                 .0,
         ),
@@ -6991,7 +6991,7 @@ fn create_controls(hwnd: HWND) {
 
 fn resize_controls(hwnd: HWND) {
     let mut rect = windows::Win32::Foundation::RECT::default();
-    if unsafe { GetClientRect(hwnd, &mut rect) }.is_err() {
+    if crate::get_client_rect_safe(hwnd, &mut rect).is_err() {
         return;
     }
     let width = (rect.right - rect.left).max(0);

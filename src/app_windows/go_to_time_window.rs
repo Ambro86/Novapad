@@ -7,11 +7,11 @@ use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, GetFocus, SetFocus};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    GetDlgItem, GetParent, GetWindowLongPtrW, HMENU, IDC_ARROW, LoadCursorW, RegisterClassW,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, GetDlgItem,
+    GetParent, GetWindowLongPtrW, HMENU, IDC_ARROW, LoadCursorW, RegisterClassW, SendMessageW,
+    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_COMMAND, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -220,7 +220,7 @@ fn go_to_time_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 if wparam.0 as u32
                     == windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE.0 as u32
                 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -228,7 +228,7 @@ fn go_to_time_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
                 if id == GO_TO_TIME_CANCEL_ID || id == 2 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 if id == GO_TO_TIME_OK_ID || id == 1 {
@@ -272,7 +272,7 @@ fn go_to_time_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                     .unwrap_or(None)
                     .unwrap_or((std::path::PathBuf::new(), None));
                     if path.as_os_str().is_empty() {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         return LRESULT(0);
                     }
                     let mut seek_target = target as u64;
@@ -287,7 +287,7 @@ fn go_to_time_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                         nvda_speak(&msg);
                     }
                     crate::log_if_err!(seek_audiobook_to(parent, seek_target));
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)

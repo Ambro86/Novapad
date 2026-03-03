@@ -23,13 +23,12 @@ use windows::Win32::UI::Shell::{
     BIF_NEWDIALOGSTYLE, BIF_RETURNONLYFSDIRS, BROWSEINFOW, SHBrowseForFolderW, SHGetPathFromIDListW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
-    GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsDialogMessageW, LoadCursorW, MSG,
-    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowTextW,
-    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_NOTIFY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    BS_DEFPUSHBUTTON, CreateWindowExW, DefWindowProcW, DispatchMessageW, GetWindowTextLengthW,
+    GetWindowTextW, HMENU, IDC_ARROW, IsDialogMessageW, LoadCursorW, MSG, PostMessageW,
+    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowTextW, TranslateMessage,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
+    WM_NOTIFY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -734,7 +733,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             {
                 crate::log_debug("Failed to access find state");
             }
-            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
             LRESULT(0)
         }
         WM_DESTROY => {

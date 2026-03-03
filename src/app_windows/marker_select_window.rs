@@ -7,7 +7,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     DispatchMessageW, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IsDialogMessageW,
     LB_ADDSTRING, LB_GETCOUNT, LB_GETSEL, LB_SETCARETINDEX, LB_SETCURSEL, LB_SETSEL,
     LB_SETTOPINDEX, LBN_SELCHANGE, LBS_MULTIPLESEL, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW,
@@ -415,7 +415,7 @@ fn marker_select_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 {
                     crate::log_debug("Failed to access marker state");
                 }
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_DESTROY => {

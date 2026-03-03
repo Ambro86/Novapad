@@ -24,7 +24,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST,
-    CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE,
+    CREATESTRUCTW, CreateWindowExW, DefWindowProcW, ES_AUTOVSCROLL, ES_MULTILINE,
     GetNextDlgTabItem, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW,
     IsWindow, KillTimer, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW,
     SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
@@ -876,7 +876,7 @@ unsafe extern "system" fn batch_wndproc(
                 })
                 .unwrap_or(true);
                 if allow_close {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 }
                 LRESULT(0)
             }

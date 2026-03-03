@@ -41,7 +41,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW,
-    CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow, ES_AUTOHSCROLL,
+    CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, ES_AUTOHSCROLL,
     EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgItem, GetParent,
     GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONINFORMATION, MB_ICONQUESTION,
     MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW, OBJID_CLIENT,
@@ -2150,14 +2150,14 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 LRESULT(0)
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
                 match id {
                     ID_BTN_CLOSE | 2 => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     ID_BTN_ADD => {
@@ -2557,7 +2557,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                 {}
                                 LRESULT(1)
                             } else if (*ptvkd).wVKey == VK_ESCAPE.0 {
-                                crate::log_if_err!(DestroyWindow(hwnd));
+                                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                                 LRESULT(1)
                             } else {
                                 LRESULT(0)
@@ -2578,7 +2578,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
             WM_KEYDOWN | WM_SYSKEYDOWN => {
                 let key = wparam.0 as u32;
                 if key == u32::from(VK_ESCAPE.0) {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
@@ -2612,7 +2612,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     return LRESULT(0);
                 }
                 if key == u32::from(VK_ESCAPE.0) {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -3018,11 +3018,11 @@ fn reorder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                             let message = template.replace("{x}", &(new_index + 1).to_string());
                             announce_rss_status(&message);
                         }
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     REORDER_CANCEL_ID | 2 => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -6015,7 +6015,7 @@ fn search_keyword_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
                 if id == SEARCH_CANCEL_ID || id == 2 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 if id == SEARCH_OK_ID || id == 1 {
@@ -6048,13 +6048,13 @@ fn search_keyword_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     let url = build_google_news_rss_url(&keyword, language);
                     let source_title = format_google_news_source_title(&keyword);
                     show_add_dialog_with_prefill_options(parent, source_title, url, true);
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_NCDESTROY => {
@@ -6362,11 +6362,11 @@ fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> 
                                 LPARAM(&cds as *const _ as isize),
                             );
                         }
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     103 | 2 => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     _ => DefWindowProcW(hwnd, msg, wparam, lparam),

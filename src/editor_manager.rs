@@ -24,10 +24,10 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallWindowProcW, DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
-    ES_WANTRETURN, GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW, HMENU,
-    IDNO, IDYES, MB_ICONWARNING, MB_YESNOCANCEL, MessageBoxW, MoveWindow, PostMessageW, SW_HIDE,
-    SW_SHOW, SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU,
+    CallWindowProcW, DefWindowProcW, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN,
+    GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW, HMENU, IDNO, IDYES,
+    MB_ICONWARNING, MB_YESNOCANCEL, MessageBoxW, MoveWindow, PostMessageW, SW_HIDE, SW_SHOW,
+    SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU,
     WM_GETTEXTLENGTH, WM_KEYDOWN, WM_LBUTTONUP, WM_SETFONT, WM_UNDO, WS_CHILD, WS_CLIPCHILDREN,
     WS_EX_CLIENTEDGE, WS_GROUP, WS_HSCROLL, WS_VSCROLL,
 };
@@ -4308,7 +4308,7 @@ pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
         }
 
         if closing_hwnd_edit.0 != 0 {
-            crate::log_if_err!(DestroyWindow(closing_hwnd_edit));
+            crate::log_if_err!(crate::destroy_window_safe(closing_hwnd_edit));
         }
         if was_audiobook {
             crate::audio_player::stop_audiobook_playback(hwnd);
@@ -4356,38 +4356,36 @@ pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
 }
 
 pub fn try_close_app(hwnd: HWND) -> bool {
-    unsafe {
-        let result = with_state(hwnd, |state| {
-            state
-                .docs
-                .iter()
-                .enumerate()
-                .map(|(i, d)| (i, d.title.clone()))
-                .collect::<Vec<_>>()
-        });
-        if result.is_none() {
-            crate::log_debug("Failed to access editor state");
-        }
+    let result = with_state(hwnd, |state| {
+        state
+            .docs
+            .iter()
+            .enumerate()
+            .map(|(i, d)| (i, d.title.clone()))
+            .collect::<Vec<_>>()
+    });
+    if result.is_none() {
+        crate::log_debug("Failed to access editor state");
+    }
 
-        if let Some(entries) = result {
-            for (index, title) in entries {
-                if !confirm_save_if_dirty_entry(hwnd, index, &title) {
-                    return false;
-                }
+    if let Some(entries) = result {
+        for (index, title) in entries {
+            if !confirm_save_if_dirty_entry(hwnd, index, &title) {
+                return false;
             }
         }
-        let has_active_audiobook =
-            with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false);
-        if has_active_audiobook {
-            crate::audio_player::stop_audiobook_playback(hwnd);
-        }
-        crate::clear_active_podcast_chapters(hwnd);
-        if let Err(e) = crate::ffmpeg_export::cleanup_tts_artifacts() {
-            crate::log_debug(&e);
-        }
-        crate::log_if_err!(DestroyWindow(hwnd));
-        true
     }
+    let has_active_audiobook =
+        with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false);
+    if has_active_audiobook {
+        crate::audio_player::stop_audiobook_playback(hwnd);
+    }
+    crate::clear_active_podcast_chapters(hwnd);
+    if let Err(e) = crate::ffmpeg_export::cleanup_tts_artifacts() {
+        crate::log_debug(&e);
+    }
+    crate::log_if_err!(crate::destroy_window_safe(hwnd));
+    true
 }
 
 pub fn sync_dirty_from_edit(hwnd: HWND, index: usize) -> bool {

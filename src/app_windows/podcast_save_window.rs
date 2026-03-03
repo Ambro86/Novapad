@@ -10,12 +10,12 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    GWLP_USERDATA, GetParent, HMENU, IDC_ARROW, IDYES, KillTimer, LoadCursorW, MB_ICONWARNING,
-    MB_YESNO, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetTimer, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SYSKEYDOWN, WM_TIMER,
-    WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, GWLP_USERDATA,
+    GetParent, HMENU, IDC_ARROW, IDYES, KillTimer, LoadCursorW, MB_ICONWARNING, MB_YESNO, MSG,
+    MessageBoxW, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer,
+    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE,
+    WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -465,7 +465,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_PODCAST_SAVE_DONE => {
-            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
             LRESULT(0)
         }
         WM_CLOSE => {

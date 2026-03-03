@@ -13,8 +13,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESC
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_GETITEMDATA, CB_RESETCONTENT,
     CB_SETCURSEL, CB_SETITEMDATA, CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW,
-    DestroyWindow, ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IDCANCEL,
-    IDOK, LB_ADDSTRING, LB_GETCOUNT, LB_GETCURSEL, LB_GETITEMDATA, LB_RESETCONTENT, LB_SETCURSEL,
+    ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IDCANCEL, IDOK,
+    LB_ADDSTRING, LB_GETCOUNT, LB_GETCURSEL, LB_GETITEMDATA, LB_RESETCONTENT, LB_SETCURSEL,
     LB_SETITEMDATA, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW,
     RegisterClassW, SW_HIDE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
     ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
@@ -113,7 +113,7 @@ fn dictionary_labels(language: Language) -> DictionaryLabels {
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN {
         if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
             return true;
         }
         if msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
@@ -321,7 +321,7 @@ fn dictionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                         LRESULT(0)
                     }
                     DICT_ID_CLOSE => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     DICT_ID_LIST if notify == LBN_SELCHANGE as u16 => {
@@ -329,7 +329,7 @@ fn dictionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                         LRESULT(0)
                     }
                     cmd if cmd == IDCANCEL.0 as usize || cmd == 2 => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -345,13 +345,13 @@ fn dictionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             }
             WM_KEYDOWN => {
                 if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_DESTROY => {
@@ -878,7 +878,7 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                         LRESULT(0)
                     }
                     DICT_ENTRY_ID_CANCEL | 2 => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     DICT_ENTRY_ID_USE_VOICE => {
@@ -898,13 +898,13 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             WM_KEYDOWN => {
                 if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_DESTROY => {
@@ -1009,7 +1009,7 @@ fn apply_entry_dialog(hwnd: HWND) {
     if let Err(_e) = crate::post_message_w_safe(owner, DICT_FOCUS_LIST_MSG, WPARAM(0), LPARAM(0)) {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
-    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+    crate::log_if_err!(crate::destroy_window_safe(hwnd));
 }
 
 fn get_window_text(hwnd: HWND) -> String {

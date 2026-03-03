@@ -401,6 +401,10 @@ pub(crate) fn find_window_w_safe(class_name: PCWSTR, window_name: PCWSTR) -> HWN
     unsafe { FindWindowW(class_name, window_name) }
 }
 
+pub(crate) fn destroy_window_safe(hwnd: HWND) -> windows::core::Result<()> {
+    unsafe { DestroyWindow(hwnd) }
+}
+
 pub(crate) fn set_window_text_w_safe(hwnd: HWND, text: PCWSTR) -> windows::core::Result<()> {
     unsafe { SetWindowTextW(hwnd, text) }
 }

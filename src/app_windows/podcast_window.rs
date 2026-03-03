@@ -1279,7 +1279,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     crate::log_debug("Failed to access podcast state");
                 }
                 if should_close {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 }
                 LRESULT(0)
             }

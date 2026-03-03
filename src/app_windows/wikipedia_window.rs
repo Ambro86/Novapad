@@ -13,7 +13,7 @@ use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL};
 use windows::Win32::UI::Controls::{EM_SCROLLCARET, EM_SETSEL, WC_LISTBOXW, WC_STATIC};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LB_ADDSTRING,
     LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT,
     LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
@@ -88,7 +88,7 @@ fn labels(language: Language) -> WikipediaLabels {
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == windows::Win32::UI::WindowsAndMessaging::WM_KEYDOWN {
         if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
-            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
             return true;
         }
         if msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
@@ -97,7 +97,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                 (state.input, state.search, state.results, state.close)
             }) {
                 if focus == close {
-                    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return true;
                 }
                 if focus == input || focus == search {
@@ -326,7 +326,7 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
             }
             WM_KEYDOWN => {
                 if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 if wparam.0 as u32 == VK_RETURN.0 as u32 {
@@ -337,7 +337,7 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                         return DefWindowProcW(hwnd, msg, wparam, lparam);
                     };
                     if focus == close {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         return LRESULT(0);
                     }
                     if focus == search {
@@ -358,7 +358,7 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
                 if id == WIKIPEDIA_CLOSE_ID {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 if id == WIKIPEDIA_SEARCH_ID {
@@ -463,7 +463,7 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     show_error(parent, language, &label_set.status_import_error);
                     return LRESULT(0);
                 }
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_DESTROY => LRESULT(0),
@@ -487,7 +487,7 @@ fn handle_enter_key(hwnd: HWND) -> bool {
     }
     let id = crate::get_dlg_ctrl_id_safe(hwnd);
     if id == WIKIPEDIA_CLOSE_ID {
-        crate::log_if_err!(unsafe { DestroyWindow(parent) });
+        crate::log_if_err!(crate::destroy_window_safe(parent));
         return true;
     }
     if id == WIKIPEDIA_SEARCH_ID {

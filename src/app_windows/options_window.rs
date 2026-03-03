@@ -41,17 +41,16 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCOUNT,
     CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
     CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
-    DefWindowProcW, DestroyWindow, ES_AUTOHSCROLL, ES_PASSWORD, ES_READONLY, GWLP_USERDATA,
-    GetClientRect, GetNextDlgTabItem, GetParent, GetScrollInfo, GetWindowLongPtrW,
-    GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MB_ICONWARNING, MB_OK,
-    MSG, MessageBoxW, MoveWindow, PostMessageW, RegisterClassW, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP,
-    SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE,
-    SIF_POS, SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_MOUSEWHEEL, WM_NCDESTROY,
-    WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFONT, WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    DefWindowProcW, ES_AUTOHSCROLL, ES_PASSWORD, ES_READONLY, GWLP_USERDATA, GetClientRect,
+    GetNextDlgTabItem, GetParent, GetScrollInfo, GetWindowLongPtrW, GetWindowTextLengthW,
+    GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MB_ICONWARNING, MB_OK, MSG, MessageBoxW,
+    MoveWindow, PostMessageW, RegisterClassW, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN,
+    SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS,
+    SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
+    WM_SETFONT, WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -4697,7 +4696,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         LRESULT(0)
                     }
                     OPTIONS_ID_CANCEL | 2 => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     OPTIONS_ID_MULTILINGUAL => {
@@ -5033,7 +5032,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         return LRESULT(0);
                     }
                 } else if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -5073,7 +5072,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 LRESULT(0)
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -9421,7 +9420,7 @@ fn apply_options_dialog(hwnd: HWND) {
         {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        crate::log_if_err!(DestroyWindow(hwnd));
+        crate::log_if_err!(crate::destroy_window_safe(hwnd));
     }
 }
 

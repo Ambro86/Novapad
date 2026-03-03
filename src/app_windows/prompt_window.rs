@@ -26,11 +26,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    DispatchMessageW, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, GWLP_USERDATA,
-    GetClientRect, GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
-    HMENU, IDC_ARROW, IsDialogMessageW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION,
-    MB_OKCANCEL, MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW,
+    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, DefWindowProcW, DispatchMessageW,
+    ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, GWLP_USERDATA, GetClientRect,
+    GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
+    IDC_ARROW, IsDialogMessageW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION, MB_OKCANCEL,
+    MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW,
     SetForegroundWindow, SetTimer, SetWindowLongPtrW, TranslateMessage, WINDOW_STYLE, WM_APP,
     WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
     WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
@@ -447,10 +447,10 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     data.value = String::from_utf16_lossy(&buf[..read as usize]);
                     data.confirmed = true;
                 }
-                crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
             } else if id == 2 {
                 // Cancel
-                crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
             }
             LRESULT(0)
         }
@@ -488,7 +488,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_CLOSE => {
-            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
             LRESULT(0)
         }
         _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
@@ -1125,7 +1125,7 @@ fn prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     return LRESULT(0);
                 }
                 if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
@@ -1295,7 +1295,7 @@ fn prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 LRESULT(0)
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),

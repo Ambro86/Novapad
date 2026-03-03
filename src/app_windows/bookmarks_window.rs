@@ -11,7 +11,7 @@ use windows::Win32::UI::Controls::RichEdit::CHARRANGE;
 use windows::Win32::UI::Controls::{WC_BUTTON, WC_LISTBOXW};
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     EVENT_OBJECT_FOCUS, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IDCANCEL, LB_ADDSTRING,
     LB_GETCOUNT, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS,
     LBS_NOTIFY, LoadCursorW, MSG, OBJID_CLIENT, RegisterClassW, SendMessageW, SetForegroundWindow,
@@ -279,7 +279,7 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     LRESULT(0)
                 }
                 BOOKMARKS_ID_OK => {
-                    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     LRESULT(0)
                 }
                 BOOKMARKS_ID_LIST if notify == LBN_DBLCLK as u16 => {
@@ -287,14 +287,14 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     LRESULT(0)
                 }
                 cmd if cmd == IDCANCEL.0 as usize || cmd == 2 => {
-                    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     LRESULT(0)
                 }
                 _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
             }
         }
         WM_CLOSE => {
-            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
             LRESULT(0)
         }
         WM_DESTROY => {
@@ -448,7 +448,7 @@ pub fn goto_selected(hwnd: HWND) {
     {
         crate::log_debug("Failed to access bookmarks state");
     }
-    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+    crate::log_if_err!(crate::destroy_window_safe(hwnd));
 }
 
 pub fn delete_selected(hwnd: HWND) {

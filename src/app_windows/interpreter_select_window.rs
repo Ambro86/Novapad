@@ -4,7 +4,7 @@ use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::UI::Controls::WC_BUTTON;
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     DispatchMessageW, GWLP_USERDATA, HMENU, IDC_ARROW, IsDialogMessageW, LB_ADDSTRING,
     LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MSG,
     PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, TranslateMessage,
@@ -274,18 +274,18 @@ fn interpreter_select_wndproc_inner(
                             }
                         }
                     });
-                    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     LRESULT(0)
                 }
                 ID_CANCEL => {
-                    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     LRESULT(0)
                 }
                 _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
             }
         }
         WM_CLOSE => {
-            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
             LRESULT(0)
         }
         WM_NCDESTROY => {

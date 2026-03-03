@@ -7,7 +7,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN, VK_SPACE,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     DispatchMessageW, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IsDialogMessageW,
     LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBS_HASSTRINGS,
     LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW,
@@ -281,18 +281,18 @@ fn chapter_list_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
                                 crate::log_debug("Failed to update podcast chapter selection");
                             }
                         }
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     CHAPTER_LIST_ID_CANCEL => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_DESTROY => {

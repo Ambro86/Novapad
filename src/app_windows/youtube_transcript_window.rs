@@ -21,14 +21,14 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
     CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT,
-    CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL,
-    ES_MULTILINE, ES_READONLY, FindWindowExW, GWLP_USERDATA, GetForegroundWindow,
-    GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, LoadCursorW,
-    MB_ICONQUESTION, MB_YESNO, MSG, MessageBoxW, PM_REMOVE, PeekMessageW, PostMessageW,
-    RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE,
+    ES_READONLY, FindWindowExW, GWLP_USERDATA, GetForegroundWindow, GetWindowLongPtrW, HMENU,
+    IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO,
+    MSG, MessageBoxW, PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
+    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -680,7 +680,7 @@ fn import_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_DESTROY => {
@@ -2033,7 +2033,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_DESTROY => {
@@ -2720,7 +2720,7 @@ fn stream_track_dialog_wndproc_inner(
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_DESTROY => {

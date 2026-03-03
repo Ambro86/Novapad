@@ -38,15 +38,15 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CHILDID_SELF,
     CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
-    DestroyWindow, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgItem, GetParent,
-    GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, IsChild, LB_ADDSTRING, LB_GETCURSEL,
-    LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_ICONQUESTION,
-    MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT,
-    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS,
-    WM_SETFONT, WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgItem, GetParent, GetWindowLongPtrW,
+    GetWindowRect, HMENU, IDC_ARROW, IDYES, IsChild, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT,
+    LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO,
+    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
+    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
+    TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS, WM_SETFONT,
+    WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -3298,7 +3298,7 @@ fn apply_category_selection(hwnd: HWND) {
     if parent.0 != 0 {
         trigger_category_load(parent, source, mode, category, term);
     }
-    crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+    crate::log_if_err!(crate::destroy_window_safe(hwnd));
 }
 
 fn show_categories_dialog(parent_hwnd: HWND) {
@@ -3871,7 +3871,7 @@ fn categories_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                         LRESULT(0)
                     }
                     CATEGORIES_CANCEL_ID | 2 => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     CATEGORIES_SOURCE_COMBO_ID => {
@@ -3925,7 +3925,7 @@ fn categories_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             WM_KEYDOWN => {
                 let key = wparam.0 as u16;
                 if key == VK_ESCAPE.0 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 if key == VK_RETURN.0 {
@@ -4285,11 +4285,11 @@ fn add_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                 LPARAM(&cds as *const _ as isize),
                             );
                         }
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     ADD_CANCEL_ID | 2 => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -5699,11 +5699,11 @@ fn description_control_subclass_proc_inner(
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_RETURN.0 && id == ID_DESCRIPTION_OK {
-            crate::log_if_err!(unsafe { DestroyWindow(parent) });
+            crate::log_if_err!(crate::destroy_window_safe(parent));
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_ESCAPE.0 {
-            crate::log_if_err!(unsafe { DestroyWindow(parent) });
+            crate::log_if_err!(crate::destroy_window_safe(parent));
             return LRESULT(0);
         }
         // Allow Ctrl+A in edit
@@ -5896,14 +5896,14 @@ fn description_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
                 if id == ID_DESCRIPTION_OK || id == 2 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_KEYDOWN => {
                 if wparam.0 as u16 == VK_ESCAPE.0 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -6358,7 +6358,7 @@ fn reorder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                             let message = template.replace("{x}", &(new_index + 1).to_string());
                             announce_status(&message);
                         }
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         focus_library(init.parent);
                         LRESULT(0)
                     }
@@ -6372,7 +6372,7 @@ fn reorder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         } else {
                             (*ptr).parent
                         };
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         if parent.0 != 0 {
                             focus_library(parent);
                         }
@@ -7360,7 +7360,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         LRESULT(0)
                     }
                     ID_CLOSE_BUTTON | 2 => {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         LRESULT(0)
                     }
                     ID_SEARCH_BUTTON => {

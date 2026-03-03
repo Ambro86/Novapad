@@ -11,7 +11,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetFocus, GetKeyState, SetFocus, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, GWLP_USERDATA, GetWindowLongPtrW, HMENU,
     IDC_ARROW, IDCANCEL, IsChild, LoadCursorW, MSG, MoveWindow, RegisterClassW, SendMessageW,
     SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
@@ -156,14 +156,14 @@ pub fn handle_readonly_navigation(msg: &MSG) -> bool {
             return true;
         }
         if key == VK_ESCAPE.0 as u32 {
-            crate::log_if_err!(DestroyWindow(hwnd));
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
             return true;
         }
         if key == VK_RETURN.0 as u32 {
             let mut handled = false;
             if with_readonly_text_state(hwnd, |state| {
                 if GetFocus() == state.ok_button {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     handled = true;
                 }
             })
@@ -469,7 +469,7 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             WM_COMMAND => {
                 let cmd_id = wparam.0 & 0xffff;
                 if cmd_id == HELP_ID_OK || cmd_id == IDCANCEL.0 as usize {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -521,14 +521,14 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 LRESULT(0)
             }
             WM_CLOSE => {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 LRESULT(0)
             }
             WM_KEYDOWN => {
                 if wparam.0 as u32 == VK_RETURN.0 as u32 {
                     if with_help_state(hwnd, |state| {
                         if GetFocus() == state.ok_button {
-                            crate::log_if_err!(DestroyWindow(hwnd));
+                            crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         }
                     })
                     .is_none()
@@ -684,7 +684,7 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
         WM_COMMAND => {
             let cmd_id = wparam.0 & 0xffff;
             if cmd_id == READONLY_TEXT_ID_OK || cmd_id == IDCANCEL.0 as usize {
-                crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 return LRESULT(0);
             }
             crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
@@ -732,14 +732,14 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             LRESULT(0)
         }
         WM_CLOSE => {
-            crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
             LRESULT(0)
         }
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_RETURN.0 as u32 {
                 if with_readonly_text_state(hwnd, |state| {
                     if crate::get_focus_safe() == state.ok_button {
-                        crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     }
                 })
                 .is_none()

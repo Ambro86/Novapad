@@ -16,11 +16,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE,
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWN,
     CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
-    DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, EVENT_OBJECT_VALUECHANGE, GW_CHILD,
-    GWLP_USERDATA, GetWindow, GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, MSG,
-    OBJID_CLIENT, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, EVENT_OBJECT_VALUECHANGE, GW_CHILD, GWLP_USERDATA,
+    GetWindow, GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, MSG, OBJID_CLIENT,
+    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
     WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
     WS_VSCROLL,
 };
@@ -489,7 +489,7 @@ fn wiktionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             }
             WM_KEYDOWN => {
                 if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 if wparam.0 as u32 == VK_RETURN.0 as u32 {
@@ -500,7 +500,7 @@ fn wiktionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                         return DefWindowProcW(hwnd, msg, wparam, lparam);
                     };
                     if focus == close {
-                        crate::log_if_err!(DestroyWindow(hwnd));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
                         return LRESULT(0);
                     }
                     if focus == search {
@@ -512,7 +512,7 @@ fn wiktionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             }
             windows::Win32::UI::WindowsAndMessaging::WM_CHAR => {
                 if wparam.0 as u32 == 27 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -520,7 +520,7 @@ fn wiktionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
                 if id == WIKTIONARY_CLOSE_ID || id == 2 {
-                    crate::log_if_err!(DestroyWindow(hwnd));
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 if id == WIKTIONARY_SEARCH_ID || id == 1 {
@@ -612,7 +612,7 @@ fn handle_enter_key(hwnd: HWND) -> bool {
         return false;
     }
     if control_id == WIKTIONARY_CLOSE_ID {
-        crate::log_if_err!(unsafe { DestroyWindow(parent) });
+        crate::log_if_err!(crate::destroy_window_safe(parent));
         return true;
     }
     if control_id == WIKTIONARY_SEARCH_ID {
@@ -651,7 +651,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         if key == windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE.0 {
             let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd) };
             if parent.0 != 0 {
-                crate::log_if_err!(unsafe { DestroyWindow(parent) });
+                crate::log_if_err!(crate::destroy_window_safe(parent));
                 return LRESULT(0);
             }
         }
@@ -676,7 +676,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR && wparam.0 == 27 {
         let parent = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd) };
         if parent.0 != 0 {
-            crate::log_if_err!(unsafe { DestroyWindow(parent) });
+            crate::log_if_err!(crate::destroy_window_safe(parent));
             return LRESULT(0);
         }
     }

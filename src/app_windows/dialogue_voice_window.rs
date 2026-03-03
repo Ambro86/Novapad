@@ -679,11 +679,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         });
                     }
                 }
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 return LRESULT(0);
             }
             if id == ID_CANCEL {
-                crate::log_if_err!(DestroyWindow(hwnd));
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 return LRESULT(0);
             }
             LRESULT(0)
@@ -701,7 +701,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
             DefWindowProcW(hwnd, msg, wparam, lparam)
         }
         WM_CLOSE => {
-            crate::log_if_err!(DestroyWindow(hwnd));
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
             LRESULT(0)
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),

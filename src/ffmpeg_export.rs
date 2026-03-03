@@ -498,7 +498,7 @@ pub fn segment_audio_file(
         if read_ret < 0 {
             break;
         }
-        if unsafe { (*pkt).stream_index } != audio_stream_idx {
+        if crate::ffmpeg_source::av_packet_stream_index_safe(pkt) != audio_stream_idx {
             crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
             continue;
         }
@@ -800,7 +800,7 @@ pub fn merge_audio_files_with_chapters_copy(
             if read_ret < 0 {
                 break;
             }
-            if unsafe { (*pkt).stream_index } != audio_idx {
+            if crate::ffmpeg_source::av_packet_stream_index_safe(pkt) != audio_idx {
                 crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
                 continue;
             }
@@ -1025,7 +1025,7 @@ fn read_next_packet_for_stream(
         if ret < 0 {
             return false;
         }
-        let idx = unsafe { (*pkt).stream_index };
+        let idx = crate::ffmpeg_source::av_packet_stream_index_safe(pkt);
         if idx == stream_idx {
             return true;
         }

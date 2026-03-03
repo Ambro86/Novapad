@@ -543,6 +543,40 @@ pub(crate) fn av_codec_context_frame_size_safe(codec_ctx: *const AVCodecContext)
     unsafe { (*codec_ctx).frame_size }
 }
 
+pub(crate) fn av_format_context_nb_streams_safe(fmt_ctx: *const AVFormatContext) -> u32 {
+    unsafe { (*fmt_ctx).nb_streams }
+}
+
+pub(crate) fn av_format_context_streams_safe(
+    fmt_ctx: *const AVFormatContext,
+) -> *mut *mut AVStream {
+    unsafe { (*fmt_ctx).streams }
+}
+
+pub(crate) fn av_stream_codecpar_safe(stream: *const AVStream) -> *mut AVCodecParameters {
+    unsafe { (*stream).codecpar }
+}
+
+pub(crate) fn av_codecpar_codec_type_safe(codecpar: *const AVCodecParameters) -> AVMediaType {
+    unsafe { (*codecpar).codec_type }
+}
+
+pub(crate) fn av_codecpar_codec_id_safe(codecpar: *const AVCodecParameters) -> AVCodecID {
+    unsafe { (*codecpar).codec_id }
+}
+
+pub(crate) fn av_codecpar_channels_safe(codecpar: *const AVCodecParameters) -> i32 {
+    unsafe { (*codecpar).ch_layout.nb_channels }
+}
+
+pub(crate) fn av_codecpar_sample_rate_safe(codecpar: *const AVCodecParameters) -> i32 {
+    unsafe { (*codecpar).sample_rate }
+}
+
+pub(crate) fn av_packet_stream_index_safe(pkt: *const AVPacket) -> i32 {
+    unsafe { (*pkt).stream_index }
+}
+
 pub(crate) fn avcodec_find_encoder_safe(api: &FfmpegApi, codec_id: AVCodecID) -> *const AVCodec {
     unsafe { (api.avcodec_find_encoder)(codec_id) }
 }
@@ -699,8 +733,8 @@ pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
     );
 
     let mut streams = Vec::new();
-    let nb_streams = unsafe { (*fmt_ctx).nb_streams };
-    let streams_ptr = unsafe { (*fmt_ctx).streams };
+    let nb_streams = crate::ffmpeg_source::av_format_context_nb_streams_safe(fmt_ctx);
+    let streams_ptr = crate::ffmpeg_source::av_format_context_streams_safe(fmt_ctx);
 
     if streams_ptr.is_null() {
         crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
@@ -713,17 +747,17 @@ pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
             continue;
         }
 
-        let codecpar = unsafe { (*stream).codecpar };
+        let codecpar = crate::ffmpeg_source::av_stream_codecpar_safe(stream);
         if codecpar.is_null() {
             continue;
         }
 
-        let codec_type = unsafe { (*codecpar).codec_type };
+        let codec_type = crate::ffmpeg_source::av_codecpar_codec_type_safe(codecpar);
         if codec_type != AVMediaType_AVMEDIA_TYPE_AUDIO {
             continue;
         }
 
-        let codec_id = unsafe { (*codecpar).codec_id };
+        let codec_id = crate::ffmpeg_source::av_codecpar_codec_id_safe(codecpar);
         let codec = unsafe { (api.avcodec_find_decoder)(codec_id) };
         let codec_name = if !codec.is_null() {
             let name_ptr = unsafe { (*codec).name };
@@ -736,8 +770,8 @@ pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
             format!("codec_{}", codec_id)
         };
 
-        let channels = unsafe { (*codecpar).ch_layout.nb_channels };
-        let sample_rate = unsafe { (*codecpar).sample_rate };
+        let channels = crate::ffmpeg_source::av_codecpar_channels_safe(codecpar);
+        let sample_rate = crate::ffmpeg_source::av_codecpar_sample_rate_safe(codecpar);
         let metadata = unsafe { (*stream).metadata };
 
         let language = dict_get_string(api, metadata, "language");
@@ -836,7 +870,8 @@ impl FfmpegSource {
         // Determine which audio stream to use
         let stream_index = if let Some(preferred) = preferred_stream_index {
             // Validate that the preferred stream exists and is an audio stream
-            let nb_streams = unsafe { (*fmt_ctx).nb_streams } as i32;
+            let nb_streams =
+                crate::ffmpeg_source::av_format_context_nb_streams_safe(fmt_ctx) as i32;
             if preferred < 0 || preferred >= nb_streams {
                 crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err(format!(
@@ -845,7 +880,7 @@ impl FfmpegSource {
                     nb_streams - 1
                 ));
             }
-            let streams = unsafe { (*fmt_ctx).streams };
+            let streams = crate::ffmpeg_source::av_format_context_streams_safe(fmt_ctx);
             if streams.is_null() {
                 crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err("FFmpeg: stream list missing".to_string());
@@ -855,7 +890,7 @@ impl FfmpegSource {
                 crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err(format!("FFmpeg: stream {} is null", preferred));
             }
-            let codecpar = unsafe { (*stream).codecpar };
+            let codecpar = crate::ffmpeg_source::av_stream_codecpar_safe(stream);
             if codecpar.is_null() {
                 crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err(format!(
@@ -863,7 +898,7 @@ impl FfmpegSource {
                     preferred
                 ));
             }
-            let codec_type = unsafe { (*codecpar).codec_type };
+            let codec_type = crate::ffmpeg_source::av_codecpar_codec_type_safe(codecpar);
             if codec_type != AVMediaType_AVMEDIA_TYPE_AUDIO {
                 crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err(format!(
@@ -907,13 +942,13 @@ impl FfmpegSource {
             return Err("FFmpeg: audio stream pointer missing".to_string());
         }
 
-        let codecpar = unsafe { (*stream).codecpar };
+        let codecpar = crate::ffmpeg_source::av_stream_codecpar_safe(stream);
         if codecpar.is_null() {
             crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
             return Err("FFmpeg: codec parameters missing".to_string());
         }
 
-        let codec_id = unsafe { (*codecpar).codec_id };
+        let codec_id = crate::ffmpeg_source::av_codecpar_codec_id_safe(codecpar);
         log_debug(&format!("FFmpeg: codec_id={}", codec_id));
         let codec = unsafe { (api.avcodec_find_decoder)(codec_id) };
         if codec.is_null() {
@@ -1071,7 +1106,7 @@ impl FfmpegSource {
         let src_layout = unsafe { &(*codec_ctx).ch_layout };
         let mut channels = src_layout.nb_channels;
         if channels <= 0 && !codecpar.is_null() {
-            channels = unsafe { (*codecpar).ch_layout.nb_channels };
+            channels = crate::ffmpeg_source::av_codecpar_channels_safe(codecpar);
         }
         if channels <= 0 {
             channels = 2;
@@ -1106,7 +1141,7 @@ impl FfmpegSource {
 
         let mut sample_rate = unsafe { (*codec_ctx).sample_rate };
         if sample_rate <= 0 && !codecpar.is_null() {
-            sample_rate = unsafe { (*codecpar).sample_rate };
+            sample_rate = crate::ffmpeg_source::av_codecpar_sample_rate_safe(codecpar);
         }
         if sample_rate <= 0 {
             sample_rate = 48_000;

@@ -153,7 +153,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessagi
 pub fn open(parent: HWND) {
     let existing = { with_state(parent, |state| state.convert_audio_window).unwrap_or(HWND(0)) };
     if existing.0 != 0 {
-        if unsafe { !IsWindow(existing).as_bool() } {
+        if !crate::is_window_handle_valid(existing) {
             let result = {
                 with_state(parent, |state| {
                     state.convert_audio_window = HWND(0);

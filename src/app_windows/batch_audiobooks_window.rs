@@ -25,7 +25,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST,
     CREATESTRUCTW, CreateWindowExW, DefWindowProcW, ES_AUTOVSCROLL, ES_MULTILINE,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsWindow, KillTimer,
+    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, KillTimer,
     LoadCursorW, MSG, PostMessageW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
     SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
     WM_NCDESTROY, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
@@ -292,7 +292,7 @@ fn status_text(labels: &BatchLabels, status: BatchStatusCode) -> &str {
 pub fn open(parent: HWND) {
     let existing = { with_state(parent, |state| state.batch_audiobooks_window).unwrap_or(HWND(0)) };
     if existing.0 != 0 {
-        if unsafe { !IsWindow(existing).as_bool() } {
+        if !crate::is_window_handle_valid(existing) {
             let result = {
                 with_state(parent, |state| {
                     state.batch_audiobooks_window = HWND(0);
@@ -1224,7 +1224,7 @@ fn update_item_status(state: &mut BatchState, index: usize, status: BatchStatusC
         item.status = status;
         item.output = output.to_string();
     }
-    if unsafe { !IsWindow(state.list).as_bool() } {
+    if !crate::is_window_handle_valid(state.list) {
         return;
     }
     let count =
@@ -1285,7 +1285,7 @@ fn handle_batch_messages(hwnd: HWND) {
         crate::log_debug("Failed to access batch state");
     }
     if let Some((parent, language, list)) = done_dialog {
-        if unsafe { !IsWindow(parent).as_bool() } {
+        if !crate::is_window_handle_valid(parent) {
             log_debug("Batch finished: parent window invalid, skipping dialog.");
             return;
         }
@@ -2450,7 +2450,7 @@ fn post_status(
     status: BatchStatusCode,
     output: String,
 ) {
-    if unsafe { !IsWindow(hwnd).as_bool() } {
+    if !crate::is_window_handle_valid(hwnd) {
         return;
     }
     if let Ok(mut queue) = queue.lock() {
@@ -2463,7 +2463,7 @@ fn post_status(
 }
 
 fn post_log(queue: &Arc<Mutex<VecDeque<BatchMessage>>>, hwnd: HWND, line: &str) {
-    if unsafe { !IsWindow(hwnd).as_bool() } {
+    if !crate::is_window_handle_valid(hwnd) {
         return;
     }
     if let Ok(mut queue) = queue.lock() {
@@ -2477,7 +2477,7 @@ fn post_progress(
     completed: usize,
     total: usize,
 ) {
-    if unsafe { !IsWindow(hwnd).as_bool() } {
+    if !crate::is_window_handle_valid(hwnd) {
         return;
     }
     if let Ok(mut queue) = queue.lock() {
@@ -2486,7 +2486,7 @@ fn post_progress(
 }
 
 fn post_done(queue: &Arc<Mutex<VecDeque<BatchMessage>>>, hwnd: HWND, report_path: Option<PathBuf>) {
-    if unsafe { !IsWindow(hwnd).as_bool() } {
+    if !crate::is_window_handle_valid(hwnd) {
         return;
     }
     if let Ok(mut queue) = queue.lock() {

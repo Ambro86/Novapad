@@ -438,8 +438,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 let ptr =
                     crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut SimplePromptData;
                 if !ptr.is_null() {
-                    let edit =
-                        unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101) };
+                    let edit = crate::get_dlg_item_safe(hwnd, 101);
                     let len = crate::get_window_text_length_w_safe(edit);
                     let mut buf = vec![0u16; (len + 1) as usize];
                     let read = crate::get_window_text_w_safe(edit, &mut buf);
@@ -466,11 +465,9 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 let shift_down =
                     (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
                 let current_focus = crate::get_focus_safe();
-                let edit =
-                    unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101) };
-                let ok = unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 1) };
-                let cancel =
-                    unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 2) };
+                let edit = crate::get_dlg_item_safe(hwnd, 101);
+                let ok = crate::get_dlg_item_safe(hwnd, 1);
+                let cancel = crate::get_dlg_item_safe(hwnd, 2);
 
                 let order = [edit, ok, cancel];
                 let mut idx = order.iter().position(|&h| h == current_focus).unwrap_or(0);

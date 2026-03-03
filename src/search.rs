@@ -701,9 +701,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     REPLACE_ID_IN_SELECTION,
                     REPLACE_ID_IN_ALL_DOCS,
                 ] {
-                    let hwnd_child = unsafe {
-                        windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hdlg, id as i32)
-                    };
+                    let hwnd_child = crate::get_dlg_item_safe(hdlg, id as i32);
                     if hwnd_child.0 != 0 {
                         unsafe {
                             SendMessageW(
@@ -837,8 +835,7 @@ fn create_checkbox(parent: HWND, id: isize, text: &str, x: i32, y: i32, width: i
 }
 
 fn is_checkbox_checked(hwnd: HWND, id: isize) -> bool {
-    let hwnd_child =
-        unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, id as i32) };
+    let hwnd_child = crate::get_dlg_item_safe(hwnd, id as i32);
     if hwnd_child.0 == 0 {
         return false;
     }
@@ -859,8 +856,7 @@ fn set_checkbox_checked(hwnd: HWND, checked: bool) {
 }
 
 fn set_checkbox_checked_by_id(hwnd: HWND, id: isize, checked: bool) {
-    let hwnd_child =
-        unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, id as i32) };
+    let hwnd_child = crate::get_dlg_item_safe(hwnd, id as i32);
     set_checkbox_checked(hwnd_child, checked);
 }
 

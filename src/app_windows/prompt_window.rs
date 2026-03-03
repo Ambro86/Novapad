@@ -331,8 +331,12 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
             let data_ptr = unsafe { (*create_struct).lpCreateParams as *mut SimplePromptData };
             crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, data_ptr as isize);
-
-            let data = unsafe { &*data_ptr };
+            let Some((body_text, value_text)) = crate::with_raw_mut_ptr_safe(data_ptr, |data| {
+                (data.body.clone(), data.value.clone())
+            }) else {
+                crate::log_debug("Prompt create params pointer unavailable");
+                return LRESULT(0);
+            };
             let hfont = HFONT(
                 unsafe {
                     windows::Win32::Graphics::Gdi::GetStockObject(
@@ -351,7 +355,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
-                    PCWSTR(to_wide(&data.body).as_ptr()),
+                    PCWSTR(to_wide(&body_text).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     20,
                     20,
@@ -368,7 +372,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 CreateWindowExW(
                     WS_EX_CLIENTEDGE,
                     WC_EDIT,
-                    PCWSTR(to_wide(&data.value).as_ptr()),
+                    PCWSTR(to_wide(&value_text).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
                     20,
                     90,

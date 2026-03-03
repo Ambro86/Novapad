@@ -24,8 +24,8 @@ use windows::Win32::System::DataExchange::{
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
-    GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY,
-    OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
+    OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST,
+    OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::{
     NM_RCLICK, NMHDR, NMTREEVIEWW, NMTVKEYDOWN, TVE_EXPAND, TVGN_CARET, TVGN_CHILD, TVGN_NEXT,
@@ -784,7 +784,7 @@ fn open_import_txt_dialog(hwnd: HWND, language: crate::settings::Language) -> Op
         Flags: OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY,
         ..Default::default()
     };
-    if !unsafe { GetOpenFileNameW(&mut ofn).as_bool() } {
+    if !crate::get_open_file_name_w_safe(&mut ofn).as_bool() {
         return None;
     }
     parse_single_path(&buffer)
@@ -803,7 +803,7 @@ fn open_export_opml_dialog(hwnd: HWND, language: crate::settings::Language) -> O
         Flags: OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY,
         ..Default::default()
     };
-    if !unsafe { GetSaveFileNameW(&mut ofn).as_bool() } {
+    if !crate::get_save_file_name_w_safe(&mut ofn).as_bool() {
         return None;
     }
     parse_single_path(&buffer)

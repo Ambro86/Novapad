@@ -23,8 +23,7 @@ use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM}
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::Dialogs::{
-    GetOpenFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_PATHMUSTEXIST,
-    OPENFILENAMEW,
+    OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_PATHMUSTEXIST, OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::{
     BST_CHECKED, NMHDR, SetScrollInfo, ShowScrollBar, TCIF_TEXT, TCITEMW, TCM_GETCURSEL,
@@ -11021,7 +11020,7 @@ fn browse_for_interpreter(hwnd: HWND) {
         ..Default::default()
     };
 
-    if unsafe { GetOpenFileNameW(&mut ofn).as_bool() } {
+    if crate::get_open_file_name_w_safe(&mut ofn).as_bool() {
         let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
         let path = String::from_utf16_lossy(&buffer[..len]);
         if let Some(edit) = with_options_state(hwnd, |state| state.edit_interpreter_path) {

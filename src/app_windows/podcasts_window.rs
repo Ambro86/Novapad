@@ -21,8 +21,8 @@ use windows::Win32::System::DataExchange::{
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
-    GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY,
-    OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
+    OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST,
+    OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::{
     HTREEITEM, NM_RETURN, NMTVKEYDOWN, TVGN_CARET, TVGN_CHILD, TVGN_NEXT, TVGN_PARENT, TVGN_ROOT,
@@ -287,9 +287,9 @@ fn open_opml_file_dialog(hwnd: HWND, language: Language, for_import: bool) -> Op
         ..Default::default()
     };
     let success = if for_import {
-        unsafe { GetOpenFileNameW(&mut ofn).as_bool() }
+        crate::get_open_file_name_w_safe(&mut ofn).as_bool()
     } else {
-        unsafe { GetSaveFileNameW(&mut ofn).as_bool() }
+        crate::get_save_file_name_w_safe(&mut ofn).as_bool()
     };
     if !success {
         return None;

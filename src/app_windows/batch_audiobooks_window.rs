@@ -9,8 +9,8 @@ use chrono::Local;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::UI::Controls::Dialogs::{
-    GetOpenFileNameW, OFN_ALLOWMULTISELECT, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY,
-    OFN_PATHMUSTEXIST, OPENFILENAMEW,
+    OFN_ALLOWMULTISELECT, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_PATHMUSTEXIST,
+    OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::{
     BST_CHECKED, LVCOLUMNW, LVIF_TEXT, LVITEMW, LVM_DELETEALLITEMS, LVM_DELETEITEM,
@@ -1393,7 +1393,7 @@ fn open_files_dialog(hwnd: HWND, language: Language) -> Option<Vec<PathBuf>> {
             | OFN_ALLOWMULTISELECT,
         ..Default::default()
     };
-    if !unsafe { GetOpenFileNameW(&mut ofn).as_bool() } {
+    if !crate::get_open_file_name_w_safe(&mut ofn).as_bool() {
         return None;
     }
     Some(parse_multi_select(&buffer))

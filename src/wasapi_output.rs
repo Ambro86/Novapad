@@ -18,7 +18,7 @@ use windows::Win32::Media::Multimedia::KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 use windows::Win32::System::Com::{CLSCTX_ALL, CoTaskMemFree};
 use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
 use windows::Win32::System::Threading::CreateEventW;
-use windows::core::GUID;
+use windows::core::{GUID, Interface};
 
 const WAVE_FORMAT_PCM: u16 = 0x0001;
 const WAVE_FORMAT_IEEE_FLOAT: u16 = 0x0003;
@@ -226,7 +226,7 @@ impl WasapiOutput {
                 }
             };
 
-            let render: IAudioRenderClient = match unsafe { client.GetService() } {
+            let render: IAudioRenderClient = match audio_client_get_service_safe(&client) {
                 Ok(render) => render,
                 Err(e) => {
                     log_debug(&format!("WASAPI: GetService(Render) failed: {}", e));
@@ -234,7 +234,7 @@ impl WasapiOutput {
                 }
             };
 
-            let clock: IAudioClock = match unsafe { client.GetService() } {
+            let clock: IAudioClock = match audio_client_get_service_safe(&client) {
                 Ok(clock) => clock,
                 Err(e) => {
                     log_debug(&format!("WASAPI: GetService(Clock) failed: {}", e));
@@ -282,7 +282,7 @@ impl WasapiOutput {
             }
             let mut source = UniformSourceIterator::new(source, channels, sample_rate);
             let mut playing = !start_paused;
-            if playing && let Err(e) = unsafe { client.Start() } {
+            if playing && let Err(e) = audio_client_start_safe(&client) {
                 log_debug(&format!("WASAPI: Start failed: {}", e));
                 return;
             }
@@ -306,7 +306,7 @@ impl WasapiOutput {
                     match cmd {
                         WasapiCommand::Play => {
                             if !playing {
-                                if let Err(e) = unsafe { client.Start() } {
+                                if let Err(e) = audio_client_start_safe(&client) {
                                     log_debug(&format!("WASAPI: Start failed: {}", e));
                                 } else {
                                     playing = true;
@@ -316,7 +316,7 @@ impl WasapiOutput {
                         }
                         WasapiCommand::Pause => {
                             if playing {
-                                if let Err(e) = unsafe { client.Stop() } {
+                                if let Err(e) = audio_client_stop_safe(&client) {
                                     log_debug(&format!("WASAPI: Stop failed: {}", e));
                                 } else {
                                     playing = false;
@@ -326,7 +326,7 @@ impl WasapiOutput {
                         }
                         WasapiCommand::Stop => {
                             stopped_thread.store(true, Ordering::Relaxed);
-                            if let Err(e) = unsafe { client.Stop() } {
+                            if let Err(e) = audio_client_stop_safe(&client) {
                                 log_debug(&format!("WASAPI: Stop failed: {}", e));
                             }
                             return;
@@ -798,6 +798,20 @@ fn parse_mix_format(
             (None, None)
         }
     }
+}
+
+fn audio_client_get_service_safe<T: Interface>(
+    client: &IAudioClient,
+) -> windows::core::Result<T> {
+    unsafe { client.GetService() }
+}
+
+fn audio_client_start_safe(client: &IAudioClient) -> windows::core::Result<()> {
+    unsafe { client.Start() }
+}
+
+fn audio_client_stop_safe(client: &IAudioClient) -> windows::core::Result<()> {
+    unsafe { client.Stop() }
 }
 
 fn mix_format_ptr(format: &MixFormat) -> *const WAVEFORMATEX {

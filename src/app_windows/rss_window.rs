@@ -4353,7 +4353,7 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
                 WPARAM(0),
                 LPARAM(payload_ptr as isize),
             ) {
-                let _payload_owner = unsafe { Box::from_raw(payload_ptr) };
+                let _payload_owner = crate::box_from_raw_safe(payload_ptr);
                 crate::log_debug(&format!("Failed to post WM_RSS_MARK_ITEM_READ_UI: {}", e));
             }
         });
@@ -5738,7 +5738,7 @@ fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
         )
     };
     if hwnd.0 == 0 {
-        let _unused_box = unsafe { Box::from_raw(init_ptr) };
+        let _unused_box = crate::box_from_raw_safe(init_ptr);
         return;
     }
     with_rss_state(parent_hwnd, |s| s.reorder_dialog = hwnd);
@@ -5903,7 +5903,7 @@ fn show_rss_search_dialog(parent_hwnd: HWND) {
         )
     };
     if hwnd.0 == 0 {
-        let _unused_box = unsafe { Box::from_raw(init_ptr) };
+        let _unused_box = crate::box_from_raw_safe(init_ptr);
         return;
     }
     with_rss_state(parent_hwnd, |s| s.search_dialog = hwnd);
@@ -6120,7 +6120,7 @@ fn show_add_dialog_with_prefill_options(
         )
     };
     if hwnd.0 == 0 {
-        let _unused_box = unsafe { Box::from_raw(init_ptr) };
+        let _unused_box = crate::box_from_raw_safe(init_ptr);
         return;
     }
 

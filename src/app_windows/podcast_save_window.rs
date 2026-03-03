@@ -265,8 +265,8 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
     match msg {
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let params =
-                unsafe { Box::from_raw((*create_struct).lpCreateParams as *mut SaveCreateParams) };
+            let params_ptr = unsafe { (*create_struct).lpCreateParams as *mut SaveCreateParams };
+            let params = crate::box_from_raw_safe(params_ptr);
             let parent = params.parent;
             let language = params.language;
             let labels = params.labels;
@@ -490,7 +490,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             }
             let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA);
             if ptr != 0 {
-                let _unused_box = unsafe { Box::from_raw(ptr as *mut SaveState) };
+                let _unused_box = crate::box_from_raw_safe(ptr as *mut SaveState);
             }
             LRESULT(0)
         }

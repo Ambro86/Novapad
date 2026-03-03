@@ -152,7 +152,7 @@ fn interpreter_select_wndproc_inner(
             if init_ptr.is_null() {
                 return LRESULT(0);
             }
-            let init = unsafe { Box::from_raw(init_ptr) };
+            let init = crate::box_from_raw_safe(init_ptr);
             let parent = init.parent;
             let hfont = { with_state(parent, |state| state.hfont) }.unwrap_or(HFONT(0));
 
@@ -291,7 +291,7 @@ fn interpreter_select_wndproc_inner(
             let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
                 as *mut InterpreterSelectState;
             if !ptr.is_null() {
-                let _unused_box = unsafe { Box::from_raw(ptr) };
+                let _unused_box = crate::box_from_raw_safe(ptr);
             }
             LRESULT(0)
         }

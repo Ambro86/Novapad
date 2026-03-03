@@ -288,7 +288,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             if init_ptr.is_null() {
                 return LRESULT(0);
             }
-            let init = unsafe { Box::from_raw(init_ptr) };
+            let init = crate::box_from_raw_safe(init_ptr);
             let labels = labels(init.language);
             let hfont = { with_state(init.parent, |state| state.hfont) }.unwrap_or(HFONT(0));
 
@@ -696,7 +696,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
         WM_FIND_IN_FILES_DONE => {
             let results_ptr = lparam.0 as *mut Vec<SearchResult>;
             if !results_ptr.is_null() {
-                let results = unsafe { Box::from_raw(results_ptr) };
+                let results = crate::box_from_raw_safe(results_ptr);
                 let res = with_find_state(hwnd, |state| {
                     state.results = *results;
                     state.searching = false;
@@ -752,7 +752,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
             ) as *mut FindInFilesState;
             if !ptr.is_null() {
-                let _unused_box = unsafe { Box::from_raw(ptr) };
+                let _unused_box = crate::box_from_raw_safe(ptr);
             }
             LRESULT(0)
         }

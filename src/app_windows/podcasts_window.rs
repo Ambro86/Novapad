@@ -520,7 +520,7 @@ fn post_mark_episode_played_ui_after_delay(
             WPARAM(0),
             LPARAM(payload_ptr as isize),
         ) {
-            let _payload_owner = unsafe { Box::from_raw(payload_ptr) };
+            let _payload_owner = crate::box_from_raw_safe(payload_ptr);
             log_debug(&format!(
                 "Failed to post WM_PODCAST_MARK_EPISODE_PLAYED_UI: {}",
                 e

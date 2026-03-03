@@ -302,7 +302,7 @@ fn open_window(parent: HWND, kind: HelpWindowKind) {
         }
         crate::set_foreground_window_safe(window);
     } else if !init_ptr.is_null() {
-        let _unused_box = unsafe { Box::from_raw(init_ptr) };
+        let _unused_box = crate::box_from_raw_safe(init_ptr);
     }
 }
 
@@ -611,7 +611,7 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             if init_ptr.is_null() {
                 return LRESULT(0);
             }
-            let init = unsafe { Box::from_raw(init_ptr) };
+            let init = crate::box_from_raw_safe(init_ptr);
 
             let edit = unsafe {
                 CreateWindowExW(
@@ -718,7 +718,7 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             let ptr =
                 crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState;
             if !ptr.is_null() {
-                let state = unsafe { Box::from_raw(ptr) };
+                let state = crate::box_from_raw_safe(ptr);
                 if state.parent.0 != 0 {
                     crate::set_foreground_window_safe(state.parent);
                     crate::app_windows::podcasts_window::focus_library(state.parent);

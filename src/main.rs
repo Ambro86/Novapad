@@ -583,6 +583,12 @@ where
     }
 }
 
+pub(crate) fn box_from_raw_safe<T>(ptr: *mut T) -> Box<T> {
+    // Safety: caller guarantees `ptr` was allocated by `Box::into_raw`
+    // and is consumed exactly once.
+    unsafe { Box::from_raw(ptr) }
+}
+
 pub(crate) fn reset_spellcheck_state(hwnd: HWND) {
     {
         if with_state(hwnd, |state| {

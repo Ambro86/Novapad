@@ -153,7 +153,7 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
     match msg {
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let parent = unsafe { HWND((*create_struct).lpCreateParams as isize) };
+            let parent = crate::hwnd_from_create_struct_lparam_safe(create_struct);
             let language =
                 { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
             let label_text = progress_text(language, 0);

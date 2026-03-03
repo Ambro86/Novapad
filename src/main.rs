@@ -343,6 +343,10 @@ pub(crate) fn is_window_handle_valid(hwnd: HWND) -> bool {
     unsafe { IsWindow(hwnd).as_bool() }
 }
 
+pub(crate) fn hwnd_from_create_struct_lparam_safe(create_struct: *const CREATESTRUCTW) -> HWND {
+    unsafe { HWND((*create_struct).lpCreateParams as isize) }
+}
+
 pub(crate) fn get_focus_safe() -> HWND {
     unsafe { GetFocus() }
 }

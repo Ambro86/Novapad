@@ -159,7 +159,7 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
     match msg {
         WM_CREATE => {
             let create_struct = lparam.0 as *const CREATESTRUCTW;
-            let parent = unsafe { HWND((*create_struct).lpCreateParams as isize) };
+            let parent = crate::hwnd_from_create_struct_lparam_safe(create_struct);
             let hfont = { with_state(parent, |state| state.hfont) }.unwrap_or(HFONT(0));
             let language =
                 { with_state(parent, |state| state.settings.language) }.unwrap_or_default();

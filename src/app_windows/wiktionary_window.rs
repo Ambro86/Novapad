@@ -692,12 +692,10 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
             return LRESULT(windows::Win32::UI::WindowsAndMessaging::DLGC_WANTALLKEYS as isize);
         }
     }
-    let prev = unsafe {
-        windows::Win32::UI::WindowsAndMessaging::GetWindowLongPtrW(
-            hwnd,
-            windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-        )
-    };
+    let prev = crate::get_window_long_ptr_w_safe(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+    );
     if prev == 0 {
         return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
     }

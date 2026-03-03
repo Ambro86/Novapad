@@ -531,6 +531,18 @@ pub(crate) fn av_frame_alloc_safe(api: &FfmpegApi) -> *mut AVFrame {
     unsafe { (api.av_frame_alloc)() }
 }
 
+pub(crate) fn av_frame_nb_samples_safe(frame: *const AVFrame) -> i32 {
+    unsafe { (*frame).nb_samples }
+}
+
+pub(crate) fn av_frame_data_mut_ptr_safe(frame: *mut AVFrame) -> *mut *mut u8 {
+    unsafe { (*frame).data.as_mut_ptr() }
+}
+
+pub(crate) fn av_codec_context_frame_size_safe(codec_ctx: *const AVCodecContext) -> i32 {
+    unsafe { (*codec_ctx).frame_size }
+}
+
 pub(crate) fn avcodec_find_encoder_safe(api: &FfmpegApi, codec_id: AVCodecID) -> *const AVCodec {
     unsafe { (api.avcodec_find_encoder)(codec_id) }
 }

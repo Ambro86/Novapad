@@ -1158,7 +1158,8 @@ fn encode_mixed_audio_to_m4a(
         return Err("FFmpeg: failed to write output header".to_string());
     }
 
-    let frame_size = unsafe { (*codec_ctx).frame_size }.max(1024) as usize;
+    let frame_size =
+        crate::ffmpeg_source::av_codec_context_frame_size_safe(codec_ctx).max(1024) as usize;
     let mut frame = crate::ffmpeg_source::av_frame_alloc_safe(api);
     if frame.is_null() {
         unsafe {
@@ -1321,11 +1322,11 @@ fn encode_mixed_audio_to_m4a(
         }
         let mut in_ptr = input_frame.as_ptr() as *const u8;
         let in_ptrs = &mut in_ptr as *mut *const u8;
-        let out_count = unsafe { (*frame).nb_samples };
+        let out_count = crate::ffmpeg_source::av_frame_nb_samples_safe(frame);
         let conv = crate::ffmpeg_source::swr_convert_safe(
             api,
             swr_ctx,
-            unsafe { (*frame).data.as_mut_ptr() },
+            crate::ffmpeg_source::av_frame_data_mut_ptr_safe(frame),
             out_count,
             in_ptrs,
             out_count,
@@ -2029,7 +2030,7 @@ pub fn convert_audio_file_with_channels(
         return Err("FFmpeg: failed to write output header".to_string());
     }
 
-    let encoder_frame_size = unsafe { (*codec_ctx).frame_size };
+    let encoder_frame_size = crate::ffmpeg_source::av_codec_context_frame_size_safe(codec_ctx);
     let encoder_has_fixed_frame_size = encoder_frame_size > 0;
     let in_frame_size = if encoder_has_fixed_frame_size {
         encoder_frame_size as usize
@@ -2213,7 +2214,7 @@ pub fn convert_audio_file_with_channels(
         let needed_out =
             crate::ffmpeg_source::swr_get_out_samples_safe(api, swr_ctx, in_frame_size as i32);
         if !encoder_has_fixed_frame_size && needed_out > 0 {
-            let current_cap = unsafe { (*frame).nb_samples };
+            let current_cap = crate::ffmpeg_source::av_frame_nb_samples_safe(frame);
             if needed_out > current_cap {
                 unsafe {
                     (*frame).nb_samples = needed_out;
@@ -2241,11 +2242,11 @@ pub fn convert_audio_file_with_channels(
         }
         let mut in_ptr = input_frame.as_ptr() as *const u8;
         let in_ptrs = &mut in_ptr as *mut *const u8;
-        let out_count = unsafe { (*frame).nb_samples };
+        let out_count = crate::ffmpeg_source::av_frame_nb_samples_safe(frame);
         let converted = crate::ffmpeg_source::swr_convert_safe(
             api,
             swr_ctx,
-            unsafe { (*frame).data.as_mut_ptr() },
+            crate::ffmpeg_source::av_frame_data_mut_ptr_safe(frame),
             out_count,
             in_ptrs,
             in_frame_size as i32,
@@ -2312,7 +2313,7 @@ pub fn convert_audio_file_with_channels(
             if pending <= 0 {
                 break;
             }
-            let current_cap = unsafe { (*frame).nb_samples };
+            let current_cap = crate::ffmpeg_source::av_frame_nb_samples_safe(frame);
             if !encoder_has_fixed_frame_size && pending > current_cap {
                 unsafe {
                     (*frame).nb_samples = pending;
@@ -2336,11 +2337,11 @@ pub fn convert_audio_file_with_channels(
                     (*frame).nb_samples = encoder_frame_size;
                 }
             }
-            let out_count = unsafe { (*frame).nb_samples };
+            let out_count = crate::ffmpeg_source::av_frame_nb_samples_safe(frame);
             let converted = crate::ffmpeg_source::swr_convert_safe(
                 api,
                 swr_ctx,
-                unsafe { (*frame).data.as_mut_ptr() },
+                crate::ffmpeg_source::av_frame_data_mut_ptr_safe(frame),
                 out_count,
                 ptr::null(),
                 0,

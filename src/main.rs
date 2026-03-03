@@ -345,6 +345,10 @@ pub(crate) fn set_foreground_window_safe(hwnd: HWND) {
     }
 }
 
+pub(crate) fn get_foreground_window_safe() -> HWND {
+    unsafe { GetForegroundWindow() }
+}
+
 pub(crate) fn send_message_w_safe(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     unsafe { SendMessageW(hwnd, msg, wparam, lparam) }
 }
@@ -412,6 +416,14 @@ pub(crate) fn get_key_state_safe(vkey: i32) -> i16 {
 
 pub(crate) fn get_menu_safe(hwnd: HWND) -> HMENU {
     unsafe { GetMenu(hwnd) }
+}
+
+pub(crate) fn is_child_safe(parent: HWND, child: HWND) -> bool {
+    unsafe { IsChild(parent, child).as_bool() }
+}
+
+pub(crate) fn create_popup_menu_safe() -> HMENU {
+    unsafe { CreatePopupMenu().unwrap_or(HMENU(0)) }
 }
 
 pub(crate) fn check_menu_item_safe(hmenu: HMENU, id_check_item: u32, u_check: u32) -> u32 {
@@ -8577,7 +8589,7 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     }
     let options_hwnd = { with_state(hwnd, |state| state.options_dialog) }.unwrap_or(HWND(0));
     if options_hwnd.0 != 0
-        && (msg.hwnd == options_hwnd || unsafe { IsChild(options_hwnd, msg.hwnd).as_bool() })
+        && (msg.hwnd == options_hwnd || crate::is_child_safe(options_hwnd, msg.hwnd))
     {
         return false;
     }
@@ -10075,7 +10087,7 @@ fn open_documents_popup(hwnd: HWND) {
         return;
     }
 
-    let menu = unsafe { CreatePopupMenu().unwrap_or(HMENU(0)) };
+    let menu = crate::create_popup_menu_safe();
     if menu.0 == 0 {
         return;
     }
@@ -10601,7 +10613,7 @@ impl IFileDialogControlEvents_Impl for AudiobookBitrateDialogHandler {
             .map(|v| *v)
             .unwrap_or(128)
             .clamp(64, 256);
-        let menu = unsafe { CreatePopupMenu().unwrap_or(HMENU(0)) };
+        let menu = crate::create_popup_menu_safe();
         if menu.0 == 0 {
             return Ok(());
         }
@@ -10628,7 +10640,7 @@ impl IFileDialogControlEvents_Impl for AudiobookBitrateDialogHandler {
             return Ok(());
         }
         let owner = {
-            let fg = unsafe { GetForegroundWindow() };
+            let fg = crate::get_foreground_window_safe();
             if fg.0 != 0 { fg } else { self.parent }
         };
         let command = unsafe {

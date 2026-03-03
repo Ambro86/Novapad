@@ -79,8 +79,8 @@ use windows::Win32::Foundation::{
 };
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
 use windows::Win32::Graphics::Gdi::{
-    COLOR_WINDOW, DEFAULT_GUI_FONT, DeleteObject, GetObjectW, GetStockObject, HBRUSH, HFONT,
-    InvalidateRect, LOGFONTW, ScreenToClient,
+    COLOR_WINDOW, DEFAULT_GUI_FONT, DeleteObject, GET_STOCK_OBJECT_FLAGS, GetObjectW,
+    GetStockObject, HBRUSH, HFONT, HGDIOBJ, InvalidateRect, LOGFONTW, ScreenToClient,
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::{
@@ -587,6 +587,10 @@ pub(crate) fn box_from_raw_safe<T>(ptr: *mut T) -> Box<T> {
     // Safety: caller guarantees `ptr` was allocated by `Box::into_raw`
     // and is consumed exactly once.
     unsafe { Box::from_raw(ptr) }
+}
+
+pub(crate) fn get_stock_object_safe(obj: GET_STOCK_OBJECT_FLAGS) -> HGDIOBJ {
+    unsafe { GetStockObject(obj) }
 }
 
 pub(crate) fn reset_spellcheck_state(hwnd: HWND) {
@@ -5635,7 +5639,7 @@ fn apply_ui_font(hwnd: HWND, face_name: String) {
     );
     let is_custom = custom_font.is_some() && !face_name.trim().is_empty();
     let new_font_resolved =
-        custom_font.unwrap_or_else(|| unsafe { HFONT(GetStockObject(DEFAULT_GUI_FONT).0) });
+        custom_font.unwrap_or_else(|| HFONT(crate::get_stock_object_safe(DEFAULT_GUI_FONT).0));
     let Some((new_font, old_font, old_custom)) = {
         with_state(hwnd, |state| {
             let old_font = state.hfont;

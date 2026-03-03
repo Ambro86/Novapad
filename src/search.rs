@@ -6,7 +6,7 @@ use crate::{get_active_edit, show_error, show_info, with_state};
 use fancy_regex::Regex;
 use windows::Win32::Foundation::HINSTANCE;
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
-use windows::Win32::Graphics::Gdi::{DEFAULT_GUI_FONT, GetStockObject};
+use windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT;
 use windows::Win32::UI::Controls::Dialogs::{
     FINDREPLACE_FLAGS, FINDREPLACEW, FR_DIALOGTERM, FR_DOWN, FR_ENABLEHOOK, FR_FINDNEXT,
     FR_HIDEMATCHCASE, FR_HIDEWHOLEWORD, FR_MATCHCASE, FR_REPLACE, FR_REPLACEALL, FR_WHOLEWORD,
@@ -640,7 +640,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
 
             let x = 12;
             let checkbox_width = width.saturating_sub(x + 16);
-            let font = unsafe { GetStockObject(DEFAULT_GUI_FONT) };
+            let font = crate::get_stock_object_safe(DEFAULT_GUI_FONT);
 
             let regex = create_checkbox(hdlg, FIND_ID_REGEX, &regex_text, x, y, checkbox_width);
             set_checkbox_checked(regex, options.use_regex);

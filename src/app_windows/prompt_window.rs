@@ -338,12 +338,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 return LRESULT(0);
             };
             let hfont = HFONT(
-                unsafe {
-                    windows::Win32::Graphics::Gdi::GetStockObject(
-                        windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT,
-                    )
-                }
-                .0,
+                crate::get_stock_object_safe(windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT).0,
             );
 
             // Get language from parent or default

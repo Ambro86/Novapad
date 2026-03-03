@@ -818,7 +818,12 @@ fn force_focus_editor_on_parent(parent: HWND) {
             );
         }
     }
-    crate::log_if_err!(unsafe { PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) });
+    crate::log_if_err!(crate::post_message_w_safe(
+        parent,
+        WM_FOCUS_EDITOR,
+        WPARAM(0),
+        LPARAM(0),
+    ));
 }
 
 fn apply_import_text(parent: HWND, text: &str) -> bool {

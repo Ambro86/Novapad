@@ -411,6 +411,10 @@ pub(crate) fn close_clipboard_safe() -> windows::core::Result<()> {
     unsafe { CloseClipboard() }
 }
 
+pub(crate) fn is_clipboard_format_available_safe(format: u32) -> bool {
+    unsafe { IsClipboardFormatAvailable(format).is_ok() }
+}
+
 pub(crate) fn register_class_w_safe(
     class: &windows::Win32::UI::WindowsAndMessaging::WNDCLASSW,
 ) -> u16 {
@@ -8006,7 +8010,7 @@ fn can_paste_now(hwnd: HWND) -> bool {
         return false;
     }
     // CF_UNICODETEXT = 13
-    unsafe { IsClipboardFormatAvailable(13).is_ok() }
+    is_clipboard_format_available_safe(13)
 }
 
 fn show_voice_context_menu(hwnd: HWND, target: HWND, lparam: LPARAM) {

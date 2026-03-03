@@ -1733,7 +1733,7 @@ pub fn open(parent: HWND) {
 
 pub fn show_context_menu_from_keyboard(hwnd: HWND) {
     let mut pt = POINT::default();
-    crate::log_if_err!(unsafe { GetCursorPos(&mut pt) });
+    crate::log_if_err!(crate::get_cursor_pos_safe(&mut pt));
     show_rss_context_menu(hwnd, pt.x, pt.y, false);
 }
 

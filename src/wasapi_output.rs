@@ -17,7 +17,7 @@ use windows::Win32::Media::Audio::{MMDeviceEnumerator, eConsole, eRender};
 use windows::Win32::Media::Multimedia::KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
-use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
+use windows::Win32::System::Threading::CreateEventW;
 use windows::core::GUID;
 
 const WAVE_FORMAT_PCM: u16 = 0x0001;
@@ -356,7 +356,7 @@ impl WasapiOutput {
                     continue;
                 }
 
-                let wait_res = unsafe { WaitForSingleObject(event_handle, 2000) };
+                let wait_res = crate::wait_for_single_object_safe(event_handle, 2000);
                 if wait_res == WAIT_TIMEOUT {
                     update_clock(&clock, &position_units_thread, &last_qpc_thread);
                     continue;

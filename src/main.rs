@@ -90,7 +90,9 @@ use windows::Win32::System::DataExchange::{
 use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 use windows::Win32::System::Memory::{GLOBAL_ALLOC_FLAGS, GlobalAlloc, GlobalLock, GlobalUnlock};
-use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+use windows::Win32::System::Threading::{
+    AttachThreadInput, GetCurrentThreadId, WaitForSingleObject,
+};
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
     FINDREPLACE_FLAGS, FINDREPLACEW, GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER,
@@ -127,21 +129,21 @@ use windows::Win32::UI::WindowsAndMessaging::{
     DrawMenuBar, EN_CHANGE, EN_KILLFOCUS, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, EnableMenuItem,
     EnumWindows, FALT, FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC,
     GetClassNameW, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetForegroundWindow, GetMenu,
-    GetMenuItemCount, GetMessageW, GetParent, GetSubMenu, GetWindowLongPtrW, GetWindowTextLengthW,
-    GetWindowTextW, GetWindowThreadProcessId, HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW,
-    IDI_APPLICATION, IDYES, IsChild, IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW,
-    MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO, MESSAGEBOX_RESULT,
-    MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP,
-    MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW, OBJID_CLIENT,
-    PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE,
-    SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetTimer,
-    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu,
-    TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND,
-    WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
-    WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
-    WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW,
-    WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP,
-    WS_VISIBLE,
+    GetMenuItemCount, GetMessageW, GetNextDlgTabItem, GetParent, GetSubMenu, GetWindowLongPtrW,
+    GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL, HCURSOR, HICON, HMENU,
+    IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsIconic, IsWindow, KillTimer, LoadCursorW,
+    LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO,
+    MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED,
+    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW,
+    OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
+    SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow,
+    SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON,
+    TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP,
+    WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT,
+    WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
+    WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER,
+    WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
+    WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -402,8 +404,38 @@ pub(crate) fn get_message_w_safe(
     unsafe { GetMessageW(lpmsg, hwnd, wmsgfiltermin, wmsgfiltermax) }
 }
 
+pub(crate) fn get_next_dlg_tab_item_safe(hwnd: HWND, hwndctrl: HWND, bprevious: bool) -> HWND {
+    unsafe { GetNextDlgTabItem(hwnd, hwndctrl, bprevious) }
+}
+
+pub(crate) fn wait_for_single_object_safe(
+    handle: HANDLE,
+    milliseconds: u32,
+) -> windows::Win32::Foundation::WAIT_EVENT {
+    unsafe { WaitForSingleObject(handle, milliseconds) }
+}
+
 pub(crate) fn find_window_w_safe(class_name: PCWSTR, window_name: PCWSTR) -> HWND {
     unsafe { FindWindowW(class_name, window_name) }
+}
+
+pub(crate) fn call_window_proc_w_safe(
+    prev_wnd_func: WNDPROC,
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe { CallWindowProcW(prev_wnd_func, hwnd, msg, wparam, lparam) }
+}
+
+pub(crate) fn isize_to_wndproc_safe(value: isize) -> WNDPROC {
+    unsafe {
+        Some(std::mem::transmute::<
+            isize,
+            unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+        >(value))
+    }
 }
 
 pub(crate) fn destroy_window_safe(hwnd: HWND) -> windows::core::Result<()> {

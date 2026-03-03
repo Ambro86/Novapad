@@ -30,7 +30,7 @@ use uuid::Uuid;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, HWND, WAIT_OBJECT_0};
 use windows::Win32::System::Threading::{
     CreateWaitableTimerW, GetCurrentThread, SetThreadPriority, SetWaitableTimer,
-    THREAD_PRIORITY_HIGHEST, WaitForSingleObject,
+    THREAD_PRIORITY_HIGHEST,
 };
 use windows::Win32::UI::WindowsAndMessaging::{IDYES, MB_ICONQUESTION, MB_YESNO, MessageBoxW};
 use windows::core::PCWSTR;
@@ -1869,7 +1869,7 @@ fn sleep_precise(timer: &WaitableTimer, duration: Duration) -> bool {
         log_debug(&format!("Subtitle: SetWaitableTimer failed: {}", e));
         return false;
     }
-    let wait = unsafe { WaitForSingleObject(timer.handle, u32::MAX) };
+    let wait = crate::wait_for_single_object_safe(timer.handle, u32::MAX);
     wait == WAIT_OBJECT_0
 }
 

@@ -5720,18 +5720,13 @@ fn description_control_subclass_proc_inner(
     if prev == 0 {
         return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
     }
-    unsafe {
-        CallWindowProcW(
-            Some(std::mem::transmute::<
-                isize,
-                unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-            >(prev)),
-            hwnd,
-            msg,
-            wparam,
-            lparam,
-        )
-    }
+    crate::call_window_proc_w_safe(
+        crate::isize_to_wndproc_safe(prev),
+        hwnd,
+        msg,
+        wparam,
+        lparam,
+    )
 }
 
 unsafe extern "system" fn description_wndproc(
@@ -6136,18 +6131,13 @@ fn reorder_control_subclass_proc_inner(
     if prev == 0 {
         return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
     }
-    unsafe {
-        CallWindowProcW(
-            Some(std::mem::transmute::<
-                isize,
-                unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-            >(prev)),
-            hwnd,
-            msg,
-            wparam,
-            lparam,
-        )
-    }
+    crate::call_window_proc_w_safe(
+        crate::isize_to_wndproc_safe(prev),
+        hwnd,
+        msg,
+        wparam,
+        lparam,
+    )
 }
 
 unsafe extern "system" fn reorder_wndproc(
@@ -6554,7 +6544,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
         None
     };
     if let Some(proc) = prev_proc {
-        unsafe { CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam) }
+        crate::call_window_proc_w_safe(Some(proc), hwnd, msg, wparam, lparam)
     } else {
         crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
     }
@@ -6670,7 +6660,7 @@ fn podcast_search_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
         None
     };
     if let Some(proc) = prev_proc {
-        unsafe { CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam) }
+        crate::call_window_proc_w_safe(Some(proc), hwnd, msg, wparam, lparam)
     } else {
         crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
     }

@@ -1890,6 +1890,8 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
             let audiobook_progress_in_foreground =
                 state.audiobook_progress.0 != 0 && foreground == state.audiobook_progress;
             state.update_progress_window.0 == 0
+                && state.podcast_window.0 == 0
+                && state.podcast_save_window.0 == 0
                 && !audiobook_progress_in_foreground
                 && !is_reader_mode
         })

@@ -9,7 +9,6 @@ use std::path::PathBuf;
 #[cfg(not(feature = "standalone"))]
 use std::path::{Component, Prefix};
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, HANDLE, HLOCAL, LocalFree};
-use windows::Win32::Globalization::GetUserDefaultLocaleName;
 use windows::Win32::Security::Cryptography::{
     CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData, CryptUnprotectData,
 };
@@ -1174,7 +1173,7 @@ fn get_settings_path() -> PathBuf {
 
 fn system_language() -> Language {
     let mut buffer = [0u16; 85];
-    let len = unsafe { GetUserDefaultLocaleName(&mut buffer) };
+    let len = crate::get_user_default_locale_name_safe(&mut buffer);
     if len > 0 {
         let locale = String::from_utf16_lossy(&buffer[..(len as usize).saturating_sub(1)]);
         let lower = locale.to_lowercase();

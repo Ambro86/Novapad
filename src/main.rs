@@ -77,6 +77,7 @@ use windows::Win32::Foundation::{
     BOOL, ERROR_INVALID_PARAMETER, ERROR_INVALID_WINDOW_HANDLE, GetLastError, HANDLE, HINSTANCE,
     HWND, LPARAM, LRESULT, POINT, SetLastError, WIN32_ERROR, WPARAM,
 };
+use windows::Win32::Globalization::GetUserDefaultLocaleName;
 use windows::Win32::Graphics::Gdi::{
     COLOR_WINDOW, DEFAULT_GUI_FONT, DeleteObject, GetObjectW, GetStockObject, HBRUSH, HFONT,
     InvalidateRect, LOGFONTW, ScreenToClient,
@@ -476,6 +477,10 @@ pub(crate) fn drag_query_file_w_safe(
     lpszfile: Option<&mut [u16]>,
 ) -> u32 {
     unsafe { DragQueryFileW(hdrop, ifile, lpszfile) }
+}
+
+pub(crate) fn get_user_default_locale_name_safe(locale_name: &mut [u16]) -> i32 {
+    unsafe { GetUserDefaultLocaleName(locale_name) }
 }
 
 pub(crate) fn post_message_w_safe(

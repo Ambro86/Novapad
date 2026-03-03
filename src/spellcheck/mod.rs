@@ -5,7 +5,6 @@ pub use windows_spellcheck::{Misspelling, WindowsSpellChecker, utf16_offset_to_u
 use crate::settings::{AppSettings, Language, SpellcheckLanguageMode};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use windows::Win32::Globalization::GetUserDefaultLocaleName;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct LineCacheKey {
@@ -285,7 +284,7 @@ fn is_word_char(ch: char) -> bool {
 
 fn system_language_tag() -> Option<String> {
     let mut buffer = [0u16; 85];
-    let len = unsafe { GetUserDefaultLocaleName(&mut buffer) };
+    let len = crate::get_user_default_locale_name_safe(&mut buffer);
     if len == 0 {
         return None;
     }

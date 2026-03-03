@@ -19,9 +19,9 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowW, IDYES, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_SETFOREGROUND,
-    MB_YESNO, MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, SetForegroundWindow,
-    ShowWindow, WM_CLOSE,
+    IDYES, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_SETFOREGROUND, MB_YESNO,
+    MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, SetForegroundWindow, ShowWindow,
+    WM_CLOSE,
 };
 use windows::core::{HSTRING, PCWSTR};
 
@@ -1763,7 +1763,7 @@ fn wait_for_main_window(timeout: std::time::Duration) -> HWND {
     let deadline = std::time::Instant::now() + timeout;
     while std::time::Instant::now() < deadline {
         let class_name = to_wide("SonarpadWin32");
-        let hwnd = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) };
+        let hwnd = crate::find_window_w_safe(PCWSTR(class_name.as_ptr()), PCWSTR::null());
         if hwnd.0 != 0 {
             return hwnd;
         }
@@ -1781,7 +1781,7 @@ fn show_update_message(
     let mut target = owner;
     if target.0 == 0 {
         let class_name = to_wide("SonarpadWin32");
-        target = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) };
+        target = crate::find_window_w_safe(PCWSTR(class_name.as_ptr()), PCWSTR::null());
     }
 
     if target.0 == 0 {

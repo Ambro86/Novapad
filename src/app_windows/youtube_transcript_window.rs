@@ -22,7 +22,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
     CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT,
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL,
-    ES_MULTILINE, ES_READONLY, FindWindowExW, GWLP_USERDATA, GetForegroundWindow, GetMessageW,
+    ES_MULTILINE, ES_READONLY, FindWindowExW, GWLP_USERDATA, GetForegroundWindow,
     GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, LoadCursorW,
     MB_ICONQUESTION, MB_YESNO, MSG, MessageBoxW, PM_REMOVE, PeekMessageW, PostMessageW,
     RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
@@ -323,7 +323,7 @@ fn show_import_dialog(
         if !crate::is_window_handle_valid(hwnd) {
             break;
         }
-        let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
+        let res = crate::get_message_w_safe(&mut msg, HWND(0), 0, 0);
         if res.0 == 0 || res.0 == -1 {
             break;
         }
@@ -2123,7 +2123,7 @@ fn show_stream_dialog(
         if !crate::is_window_handle_valid(hwnd) {
             break;
         }
-        let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
+        let res = crate::get_message_w_safe(&mut msg, HWND(0), 0, 0);
         if res.0 == 0 || res.0 == -1 {
             break;
         }
@@ -2812,7 +2812,7 @@ fn choose_stream_audio_track(
         if !crate::is_window_handle_valid(hwnd) {
             break;
         }
-        let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
+        let res = crate::get_message_w_safe(&mut msg, HWND(0), 0, 0);
         if res.0 == 0 || res.0 == -1 {
             break;
         }

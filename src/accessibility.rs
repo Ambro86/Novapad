@@ -10,9 +10,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VK_NEXT, VK_OEM_MINUS, VK_OEM_PERIOD, VK_OEM_PLUS, VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_SPACE,
     VK_SUBTRACT, VK_UP,
 };
-use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowW, IsChild, IsDialogMessageW, MSG, WM_KEYDOWN,
-};
+use windows::Win32::UI::WindowsAndMessaging::{IsChild, IsDialogMessageW, MSG, WM_KEYDOWN};
 use windows::core::{BSTR, GUID, PCWSTR, VARIANT};
 
 pub const EM_GETSEL: u32 = 0x00B0;
@@ -336,7 +334,7 @@ fn jaws_is_active() -> bool {
             }
             let class = to_wide("JFWUI2");
             let title = to_wide("JAWS");
-            unsafe { FindWindowW(PCWSTR(class.as_ptr()), PCWSTR(title.as_ptr())).0 != 0 }
+            crate::find_window_w_safe(PCWSTR(class.as_ptr()), PCWSTR(title.as_ptr())).0 != 0
         }
     }
 }

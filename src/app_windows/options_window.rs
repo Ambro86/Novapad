@@ -7608,7 +7608,7 @@ fn update_dialogue_voice_visibility(hwnd: HWND) {
         } else {
             visible
         };
-        unsafe { ShowWindow(control, visible) };
+        crate::show_window_safe(control, visible);
         if is_primary_lang_control {
             crate::enable_window_safe(control, show_dialogue_lang_combo);
         } else if is_secondary_lang_control {
@@ -10670,7 +10670,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_file_associations,
             state.button_manage_associations,
         ] {
-            unsafe { ShowWindow(control, if show_general { SW_SHOW } else { SW_HIDE }) };
+            crate::show_window_safe(control, if show_general { SW_SHOW } else { SW_HIDE });
         }
 
         for control in [
@@ -10736,7 +10736,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.button_dialogue_voice_preview,
             state.button_dialogue_secondary_voice_preview,
         ] {
-            unsafe { ShowWindow(control, if show_voice { SW_SHOW } else { SW_HIDE }) };
+            crate::show_window_safe(control, if show_voice { SW_SHOW } else { SW_HIDE });
         }
 
         for control in [
@@ -10766,7 +10766,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.button_interpreter_search,
             state.checkbox_move_cursor,
         ] {
-            unsafe { ShowWindow(control, if show_editor { SW_SHOW } else { SW_HIDE }) };
+            crate::show_window_safe(control, if show_editor { SW_SHOW } else { SW_HIDE });
         }
 
         for control in [
@@ -10794,7 +10794,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_subtitle_offset,
             state.edit_subtitle_offset,
         ] {
-            unsafe { ShowWindow(control, if show_audio { SW_SHOW } else { SW_HIDE }) };
+            crate::show_window_safe(control, if show_audio { SW_SHOW } else { SW_HIDE });
         }
 
         for control in [
@@ -10823,7 +10823,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_podcastindex_secret,
             state.button_podcastindex_signup,
         ] {
-            unsafe { ShowWindow(control, if show_rss_podcast { SW_SHOW } else { SW_HIDE }) };
+            crate::show_window_safe(control, if show_rss_podcast { SW_SHOW } else { SW_HIDE });
         }
 
         for control in [
@@ -10835,7 +10835,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.button_shortcut_reset,
             state.button_shortcut_reset_all,
         ] {
-            unsafe { ShowWindow(control, if show_shortcuts { SW_SHOW } else { SW_HIDE }) };
+            crate::show_window_safe(control, if show_shortcuts { SW_SHOW } else { SW_HIDE });
         }
     })
     .is_none()

@@ -381,6 +381,26 @@ pub(crate) fn enable_window_safe(hwnd: HWND, enable: bool) -> BOOL {
     unsafe { EnableWindow(hwnd, enable) }
 }
 
+pub(crate) fn show_window_safe(
+    hwnd: HWND,
+    cmdshow: windows::Win32::UI::WindowsAndMessaging::SHOW_WINDOW_CMD,
+) -> BOOL {
+    unsafe { ShowWindow(hwnd, cmdshow) }
+}
+
+pub(crate) fn get_message_w_safe(
+    lpmsg: *mut MSG,
+    hwnd: HWND,
+    wmsgfiltermin: u32,
+    wmsgfiltermax: u32,
+) -> BOOL {
+    unsafe { GetMessageW(lpmsg, hwnd, wmsgfiltermin, wmsgfiltermax) }
+}
+
+pub(crate) fn find_window_w_safe(class_name: PCWSTR, window_name: PCWSTR) -> HWND {
+    unsafe { FindWindowW(class_name, window_name) }
+}
+
 pub(crate) fn set_window_text_w_safe(hwnd: HWND, text: PCWSTR) -> windows::core::Result<()> {
     unsafe { SetWindowTextW(hwnd, text) }
 }

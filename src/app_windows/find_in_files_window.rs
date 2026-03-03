@@ -24,12 +24,12 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
-    FindWindowW, GetMessageW, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
-    IDC_ARROW, IsDialogMessageW, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW,
-    SetForegroundWindow, SetWindowTextW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE,
-    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NOTIFY, WM_SETFONT,
-    WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsDialogMessageW,
+    LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
+    SetWindowTextW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NOTIFY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -135,7 +135,7 @@ fn labels(language: Language) -> FindInFilesLabels {
 
 pub fn open_find_in_files_dialog(parent: HWND) {
     let class_name = to_wide(FIND_IN_FILES_CLASS_NAME);
-    let existing = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) };
+    let existing = crate::find_window_w_safe(PCWSTR(class_name.as_ptr()), PCWSTR::null());
     if existing.0 != 0 {
         unsafe {
             SetForegroundWindow(existing);
@@ -191,7 +191,7 @@ pub fn open_find_in_files_dialog(parent: HWND) {
         if !crate::is_window_handle_valid(hwnd) {
             break;
         }
-        let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
+        let res = crate::get_message_w_safe(&mut msg, HWND(0), 0, 0);
         if res.0 == 0 {
             break;
         }
@@ -264,7 +264,7 @@ unsafe extern "system" fn find_in_files_wndproc(
 
 pub(crate) fn focus_find_in_files_results() -> bool {
     let class_name = to_wide(FIND_IN_FILES_CLASS_NAME);
-    let hwnd = unsafe { FindWindowW(PCWSTR(class_name.as_ptr()), PCWSTR::null()) };
+    let hwnd = crate::find_window_w_safe(PCWSTR(class_name.as_ptr()), PCWSTR::null());
     if hwnd.0 == 0 {
         return false;
     }

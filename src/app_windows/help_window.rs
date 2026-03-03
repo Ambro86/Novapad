@@ -674,7 +674,7 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 edit,
                 ok_button,
             });
-            unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize) };
+            crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
             LRESULT(0)
         }
         WM_SETFOCUS => {

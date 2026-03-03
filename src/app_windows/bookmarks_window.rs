@@ -15,10 +15,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     EVENT_OBJECT_FOCUS, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IDCANCEL, LB_ADDSTRING,
     LB_GETCOUNT, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS,
     LBS_NOTIFY, LoadCursorW, MSG, OBJID_CLIENT, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_NEXTDLGCTL, WM_SETFOCUS, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
+    WM_NEXTDLGCTL, WM_SETFOCUS, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::PCWSTR;
 
@@ -256,7 +255,7 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                 hwnd_list,
                 hwnd_goto,
             });
-            unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize) };
+            crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
 
             refresh_bookmarks_list(hwnd);
 
@@ -301,7 +300,7 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         WM_DESTROY => {
             let parent = with_bookmarks_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
             if parent.0 != 0 {
-                unsafe { EnableWindow(parent, true) };
+                crate::enable_window_safe(parent, true);
                 force_focus_editor_on_parent(parent);
                 if {
                     with_state(parent, |state| {

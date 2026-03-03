@@ -482,7 +482,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 crate::log_debug(&format!("Failed to kill SAVE_PROGRESS_TIMER: {}", e));
             }
             if parent.0 != 0 {
-                unsafe { EnableWindow(parent, true) };
+                crate::enable_window_safe(parent, true);
                 // Keep focus within Sonarpad when progress dialogs close (e.g. streaming
                 // download -> conversion handoff), avoiding transient desktop focus.
                 crate::set_foreground_window_safe(parent);

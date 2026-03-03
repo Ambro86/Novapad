@@ -330,7 +330,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             let create_struct =
                 lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
             let data_ptr = unsafe { (*create_struct).lpCreateParams as *mut SimplePromptData };
-            unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, data_ptr as isize) };
+            crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, data_ptr as isize);
 
             let data = unsafe { &*data_ptr };
             let hfont = HFONT(

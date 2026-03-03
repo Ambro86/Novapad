@@ -369,6 +369,18 @@ pub(crate) fn get_window_long_ptr_w_safe(
     unsafe { GetWindowLongPtrW(hwnd, index) }
 }
 
+pub(crate) fn set_window_long_ptr_w_safe(
+    hwnd: HWND,
+    index: windows::Win32::UI::WindowsAndMessaging::WINDOW_LONG_PTR_INDEX,
+    new_long: isize,
+) -> isize {
+    unsafe { SetWindowLongPtrW(hwnd, index, new_long) }
+}
+
+pub(crate) fn enable_window_safe(hwnd: HWND, enable: bool) -> BOOL {
+    unsafe { EnableWindow(hwnd, enable) }
+}
+
 pub(crate) fn set_window_text_w_safe(hwnd: HWND, text: PCWSTR) -> windows::core::Result<()> {
     unsafe { SetWindowTextW(hwnd, text) }
 }

@@ -26,8 +26,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
     FindWindowW, GetMessageW, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
     IDC_ARROW, IsDialogMessageW, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, TranslateMessage, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NOTIFY, WM_SETFONT,
+    SetForegroundWindow, SetWindowTextW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE,
+    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NOTIFY, WM_SETFONT,
     WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
     WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
@@ -531,13 +531,11 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 searching: false,
                 cancel_flag: None,
             });
-            unsafe {
-                SetWindowLongPtrW(
-                    hwnd,
-                    windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
-                    Box::into_raw(state) as isize,
-                )
-            };
+            crate::set_window_long_ptr_w_safe(
+                hwnd,
+                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+                Box::into_raw(state) as isize,
+            );
 
             if with_find_state(hwnd, |state| {
                 apply_cache(state);

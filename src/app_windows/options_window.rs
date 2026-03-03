@@ -7610,25 +7610,25 @@ fn update_dialogue_voice_visibility(hwnd: HWND) {
         };
         unsafe { ShowWindow(control, visible) };
         if is_primary_lang_control {
-            unsafe { EnableWindow(control, show_dialogue_lang_combo) };
+            crate::enable_window_safe(control, show_dialogue_lang_combo);
         } else if is_secondary_lang_control {
-            unsafe { EnableWindow(control, show_secondary_lang_combo) };
+            crate::enable_window_safe(control, show_secondary_lang_combo);
         } else if is_primary_combo_tuning {
-            unsafe { EnableWindow(control, enabled && !manual_tuning) };
+            crate::enable_window_safe(control, enabled && !manual_tuning);
         } else if is_primary_edit_tuning {
-            unsafe { EnableWindow(control, enabled && manual_tuning) };
+            crate::enable_window_safe(control, enabled && manual_tuning);
         } else if is_secondary_combo_tuning {
-            unsafe { EnableWindow(control, secondary_enabled && !manual_tuning) };
+            crate::enable_window_safe(control, secondary_enabled && !manual_tuning);
         } else if is_secondary_edit_tuning {
-            unsafe { EnableWindow(control, secondary_enabled && manual_tuning) };
+            crate::enable_window_safe(control, secondary_enabled && manual_tuning);
         } else if is_primary_multilingual_toggle {
-            unsafe { EnableWindow(control, enabled && dialogue_engine_is_edge) };
+            crate::enable_window_safe(control, enabled && dialogue_engine_is_edge);
         } else if is_secondary_multilingual_toggle {
-            unsafe { EnableWindow(control, secondary_enabled && secondary_engine_is_edge) };
+            crate::enable_window_safe(control, secondary_enabled && secondary_engine_is_edge);
         } else if is_secondary_control {
-            unsafe { EnableWindow(control, secondary_enabled) };
+            crate::enable_window_safe(control, secondary_enabled);
         } else {
-            unsafe { EnableWindow(control, is_toggle || is_secondary_toggle || enabled) };
+            crate::enable_window_safe(control, is_toggle || is_secondary_toggle || enabled);
         }
     }
 }

@@ -423,21 +423,19 @@ pub fn refresh_dictionary_list(hwnd: HWND) {
         None => return,
     };
 
-    let selected = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0;
-    unsafe { SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
+    let selected = crate::send_message_w_safe(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    crate::send_message_w_safe(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
 
     let entries =
         { with_state(parent, |state| state.settings.dictionary.clone()) }.unwrap_or_default();
     for (idx, entry) in entries.iter().enumerate() {
         let label = format!("{} -> {}", entry.original, entry.replacement);
-        let lb_idx = unsafe {
-            SendMessageW(
-                hwnd_list,
-                LB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(&label).as_ptr() as isize),
-            )
-        }
+        let lb_idx = crate::send_message_w_safe(
+            hwnd_list,
+            LB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&label).as_ptr() as isize),
+        )
         .0;
         if lb_idx >= 0 {
             unsafe {
@@ -451,14 +449,14 @@ pub fn refresh_dictionary_list(hwnd: HWND) {
         }
     }
 
-    let count = unsafe { SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)) }.0;
+    let count = crate::send_message_w_safe(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
     if count > 0 {
         let target = if selected >= 0 && selected < count {
             selected
         } else {
             0
         };
-        unsafe { SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(target as usize), LPARAM(0)) };
+        crate::send_message_w_safe(hwnd_list, LB_SETCURSEL, WPARAM(target as usize), LPARAM(0));
     }
     update_button_states(hwnd);
 }
@@ -513,7 +511,7 @@ fn open_entry_dialog(owner: HWND, index: Option<usize>) {
         return;
     }
 
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(DICTIONARY_ENTRY_CLASS_NAME);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {

@@ -249,7 +249,7 @@ fn open_window(parent: HWND, kind: HelpWindowKind) {
         return;
     }
 
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(HELP_CLASS_NAME);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
@@ -666,7 +666,7 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             };
 
             let content_wide = to_wide(&init.content);
-            let _res = unsafe { SetWindowTextW(edit, PCWSTR(content_wide.as_ptr())) };
+            let _res = crate::set_window_text_w_safe(edit, PCWSTR(content_wide.as_ptr()));
             crate::set_focus_safe(edit);
 
             let state = Box::new(ReadonlyTextState {
@@ -689,7 +689,7 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                 return LRESULT(0);
             }
-            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_SIZE => {
             let width = (lparam.0 & 0xffff) as i32;
@@ -749,9 +749,9 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 }
                 return LRESULT(0);
             }
-            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
-        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
     }
 }
 

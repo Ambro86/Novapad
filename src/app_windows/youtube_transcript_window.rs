@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL};
@@ -268,7 +267,7 @@ fn show_import_dialog(
     language: Language,
     include_timestamps: bool,
 ) -> Option<ImportResult> {
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(YT_IMPORT_CLASS_NAME);
     let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
@@ -2071,7 +2070,7 @@ fn show_stream_dialog(
     language: Language,
     default_format: StreamOutputFormat,
 ) -> Option<StreamDialogResult> {
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(STREAM_DIALOG_CLASS_NAME);
     let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
@@ -2762,7 +2761,7 @@ fn choose_stream_audio_track(
     language: Language,
     tracks: Vec<StreamAudioTrack>,
 ) -> Option<Option<String>> {
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(STREAM_TRACK_DIALOG_CLASS_NAME);
     let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {

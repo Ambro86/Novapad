@@ -344,10 +344,11 @@ fn outdent_single_line(
     space_width: u32,
     tab_width: u32,
 ) {
-    let line = unsafe { SendMessageW(hwnd, EM_LINEFROMCHAR, WPARAM(caret_pos as usize), LPARAM(0)) }
-        .0 as i32;
+    let line =
+        crate::send_message_w_safe(hwnd, EM_LINEFROMCHAR, WPARAM(caret_pos as usize), LPARAM(0)).0
+            as i32;
     let line_start =
-        unsafe { SendMessageW(hwnd, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)) }.0 as i32;
+        crate::send_message_w_safe(hwnd, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)).0 as i32;
     if line_start < 0 {
         return;
     }
@@ -393,11 +394,13 @@ fn indent_selection(
     shift_down: bool,
 ) {
     let start_line =
-        unsafe { SendMessageW(hwnd, EM_LINEFROMCHAR, WPARAM(start as usize), LPARAM(0)) }.0 as i32;
+        crate::send_message_w_safe(hwnd, EM_LINEFROMCHAR, WPARAM(start as usize), LPARAM(0)).0
+            as i32;
     let mut end_line =
-        unsafe { SendMessageW(hwnd, EM_LINEFROMCHAR, WPARAM(end as usize), LPARAM(0)) }.0 as i32;
+        crate::send_message_w_safe(hwnd, EM_LINEFROMCHAR, WPARAM(end as usize), LPARAM(0)).0 as i32;
     let end_line_start =
-        unsafe { SendMessageW(hwnd, EM_LINEINDEX, WPARAM(end_line as usize), LPARAM(0)) }.0 as i32;
+        crate::send_message_w_safe(hwnd, EM_LINEINDEX, WPARAM(end_line as usize), LPARAM(0)).0
+            as i32;
     if end > start && end == end_line_start {
         end_line -= 1;
     }
@@ -422,7 +425,8 @@ fn indent_selection(
     }
     for line in (start_line..=end_line).rev() {
         let line_start =
-            unsafe { SendMessageW(hwnd, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)) }.0 as i32;
+            crate::send_message_w_safe(hwnd, EM_LINEINDEX, WPARAM(line as usize), LPARAM(0)).0
+                as i32;
         if line_start < 0 {
             continue;
         }
@@ -1173,15 +1177,15 @@ pub fn set_edit_text(hwnd_edit: HWND, text: &str) {
     let wide = to_wide_normalized(text);
     if hwnd_edit.0 != 0 {
         // Prevent programmatic loads from marking the document as modified.
-        unsafe { SendMessageW(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0)) };
+        crate::send_message_w_safe(hwnd_edit, EM_SETEVENTMASK, WPARAM(0), LPARAM(0));
     }
-    if let Err(e) = unsafe { SetWindowTextW(hwnd_edit, PCWSTR(wide.as_ptr())) } {
+    if let Err(e) = crate::set_window_text_w_safe(hwnd_edit, PCWSTR(wide.as_ptr())) {
         crate::log_debug(&format!("Failed to set editor text: {}", e));
     }
     if hwnd_edit.0 != 0 {
-        unsafe { SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0)) };
+        crate::send_message_w_safe(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
         // Programmatic loads must not leave stale undo history.
-        unsafe { SendMessageW(hwnd_edit, EM_EMPTYUNDOBUFFER, WPARAM(0), LPARAM(0)) };
+        crate::send_message_w_safe(hwnd_edit, EM_EMPTYUNDOBUFFER, WPARAM(0), LPARAM(0));
         unsafe {
             SendMessageW(
                 hwnd_edit,
@@ -1195,7 +1199,8 @@ pub fn set_edit_text(hwnd_edit: HWND, text: &str) {
 
 pub fn get_edit_text(hwnd_edit: HWND) -> String {
     use windows::Win32::UI::WindowsAndMessaging::{WM_GETTEXT, WM_GETTEXTLENGTH};
-    let len = unsafe { SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)) }.0 as usize;
+    let len =
+        crate::send_message_w_safe(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as usize;
     if len == 0 {
         return String::new();
     }
@@ -1213,7 +1218,7 @@ pub fn get_edit_text(hwnd_edit: HWND) -> String {
 
 pub fn send_to_active_edit(hwnd: HWND, msg: u32) {
     if let Some(hwnd_edit) = crate::get_active_edit(hwnd) {
-        unsafe { SendMessageW(hwnd_edit, msg, WPARAM(0), LPARAM(0)) };
+        crate::send_message_w_safe(hwnd_edit, msg, WPARAM(0), LPARAM(0));
     }
 }
 
@@ -1345,14 +1350,12 @@ fn get_text_range(hwnd_edit: HWND, range: CHARRANGE) -> String {
         chrg: range,
         lpstrText: PWSTR(buf.as_mut_ptr()),
     };
-    let copied = unsafe {
-        SendMessageW(
-            hwnd_edit,
-            EM_GETTEXTRANGE,
-            WPARAM(0),
-            LPARAM(&mut text_range as *mut _ as isize),
-        )
-    }
+    let copied = crate::send_message_w_safe(
+        hwnd_edit,
+        EM_GETTEXTRANGE,
+        WPARAM(0),
+        LPARAM(&mut text_range as *mut _ as isize),
+    )
     .0 as usize;
     let used = copied.min(len);
     String::from_utf16_lossy(&buf[..used])
@@ -1405,7 +1408,7 @@ pub fn apply_font_to_all_edits(hwnd: HWND, hfont: HFONT) {
         if hwnd_edit.0 == 0 {
             continue;
         }
-        unsafe { SendMessageW(hwnd_edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1)) };
+        crate::send_message_w_safe(hwnd_edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
     }
 }
 
@@ -1563,11 +1566,12 @@ pub fn undo_active_edit_skip_navigation(hwnd: HWND) -> bool {
     // Some operations can leave multiple non-text undo records (caret/selection moves).
     // Keep skipping those until we hit an actual text change.
     for _ in 0..32 {
-        let can_undo = unsafe { SendMessageW(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)) }.0 != 0;
+        let can_undo =
+            crate::send_message_w_safe(hwnd_edit, EM_CANUNDO, WPARAM(0), LPARAM(0)).0 != 0;
         if !can_undo {
             return false;
         }
-        unsafe { SendMessageW(hwnd_edit, WM_UNDO, WPARAM(0), LPARAM(0)) };
+        crate::send_message_w_safe(hwnd_edit, WM_UNDO, WPARAM(0), LPARAM(0));
         let after = get_edit_text(hwnd_edit);
         if after != before {
             return true;
@@ -1664,14 +1668,12 @@ pub fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
         flags: GTL_NUMCHARS,
         codepage: CP_UNICODE,
     };
-    let total_chars = unsafe {
-        SendMessageW(
-            hwnd_edit,
-            EM_GETTEXTLENGTHEX,
-            WPARAM(&mut length_info as *mut _ as usize),
-            LPARAM(0),
-        )
-    }
+    let total_chars = crate::send_message_w_safe(
+        hwnd_edit,
+        EM_GETTEXTLENGTHEX,
+        WPARAM(&mut length_info as *mut _ as usize),
+        LPARAM(0),
+    )
     .0 as i32;
     let mut sel_start = selection.cpMin;
     let mut sel_end = selection.cpMax;
@@ -1756,7 +1758,7 @@ pub fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
         );
     }
     // Single-undo guarantee.
-    unsafe { SendMessageW(hwnd_edit, EM_STOPGROUPTYPING, WPARAM(0), LPARAM(0)) };
+    crate::send_message_w_safe(hwnd_edit, EM_STOPGROUPTYPING, WPARAM(0), LPARAM(0));
     let result = {
         with_state(hwnd, |state| {
             state.normalize_undo = Some(NormalizeUndo {

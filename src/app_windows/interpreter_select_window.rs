@@ -1,7 +1,6 @@
 use std::sync::{Arc, Mutex};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::WC_BUTTON;
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -42,7 +41,7 @@ pub fn select_interpreter(parent: HWND, items: Vec<String>, language: Language) 
         return None;
     }
 
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(INTERPRETER_SELECT_CLASS_NAME);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
@@ -284,7 +283,7 @@ fn interpreter_select_wndproc_inner(
                     crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                     LRESULT(0)
                 }
-                _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+                _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
             }
         }
         WM_CLOSE => {
@@ -299,7 +298,7 @@ fn interpreter_select_wndproc_inner(
             }
             LRESULT(0)
         }
-        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
     }
 }
 

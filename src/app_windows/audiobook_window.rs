@@ -12,9 +12,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, GWLP_USERDATA,
     GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING, MB_YESNO, MSG,
     MessageBoxW, MoveWindow, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
+    WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -244,7 +244,7 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
                 request_cancel(hwnd);
                 LRESULT(0)
             } else {
-                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+                crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
             }
         }
         WM_UPDATE_PROGRESS => {
@@ -261,13 +261,13 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
                     state.current = current;
                 }
 
-                unsafe { SendMessageW(state.hwnd_pb, PBM_SETPOS, WPARAM(current), LPARAM(0)) };
+                crate::send_message_w_safe(state.hwnd_pb, PBM_SETPOS, WPARAM(current), LPARAM(0));
                 if state.total > 0 {
                     let pct = ((current * 100) / state.total).min(100);
                     let text = progress_text(state.language, pct);
                     let wide = to_wide(&text);
                     if let Err(e) =
-                        unsafe { SetWindowTextW(state.hwnd_text, PCWSTR(wide.as_ptr())) }
+                        crate::set_window_text_w_safe(state.hwnd_text, PCWSTR(wide.as_ptr()))
                     {
                         crate::log_debug(&format!("Failed to set status text: {}", e));
                     }
@@ -320,7 +320,7 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
             }
             LRESULT(0)
         }
-        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
     }
 }
 

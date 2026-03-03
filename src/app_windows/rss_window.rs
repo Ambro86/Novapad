@@ -1073,27 +1073,23 @@ unsafe extern "system" fn rss_tree_compare(
 fn collect_root_items(hwnd_tree: HWND) -> Vec<windows::Win32::UI::Controls::HTREEITEM> {
     let mut items = Vec::new();
     let mut current = windows::Win32::UI::Controls::HTREEITEM(
-        unsafe {
-            SendMessageW(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(TVGN_ROOT as usize),
-                LPARAM(0),
-            )
-        }
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_ROOT as usize),
+            LPARAM(0),
+        )
         .0,
     );
     while current.0 != 0 {
         items.push(current);
         current = windows::Win32::UI::Controls::HTREEITEM(
-            unsafe {
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_GETNEXTITEM,
-                    WPARAM(TVGN_NEXT as usize),
-                    LPARAM(current.0),
-                )
-            }
+            crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_NEXT as usize),
+                LPARAM(current.0),
+            )
             .0,
         );
     }
@@ -2863,7 +2859,7 @@ unsafe extern "system" fn reorder_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "reorder_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || reorder_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
@@ -3076,7 +3072,7 @@ unsafe extern "system" fn rss_tree_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "rss_tree_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || rss_tree_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
@@ -3312,14 +3308,12 @@ fn reload_tree(hwnd: HWND) {
                 },
             },
         };
-        let hitem = unsafe {
-            SendMessageW(
-                hwnd_tree,
-                TVM_INSERTITEMW,
-                WPARAM(0),
-                LPARAM(&mut tvis as *mut _ as isize),
-            )
-        };
+        let hitem = crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_INSERTITEMW,
+            WPARAM(0),
+            LPARAM(&mut tvis as *mut _ as isize),
+        );
 
         with_rss_state(hwnd, |s| {
             s.node_data.insert(hitem.0, NodeData::Source(i));
@@ -3538,14 +3532,12 @@ fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
     // If there are no children yet, insert a temporary "Loading…" child.
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 != 0 {
-        let first_child = unsafe {
-            SendMessageW(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(TVGN_CHILD as usize),
-                LPARAM(hitem.0),
-            )
-        };
+        let first_child = crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CHILD as usize),
+            LPARAM(hitem.0),
+        );
         if first_child.0 == 0 {
             let mut loading_label = "Loading...".to_string();
             if loading_label.trim().is_empty() {
@@ -4288,14 +4280,12 @@ fn load_more_items(
                     },
                 },
             };
-            let hchild = unsafe {
-                SendMessageW(
-                    hwnd_tree,
-                    TVM_INSERTITEMW,
-                    WPARAM(0),
-                    LPARAM(&mut tvis as *mut _ as isize),
-                )
-            };
+            let hchild = crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_INSERTITEMW,
+                WPARAM(0),
+                LPARAM(&mut tvis as *mut _ as isize),
+            );
             s.node_data.insert(hchild.0, NodeData::Item(item.clone()));
             inserted += 1;
         }
@@ -4319,14 +4309,12 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
     // UI: Enter imports the article, Shift+Enter opens it in the browser.
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
-        unsafe {
-            SendMessageW(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(TVGN_CARET as usize),
-                LPARAM(0),
-            )
-        }
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
         .0,
     );
     if hitem.0 == 0 {
@@ -5014,14 +5002,12 @@ fn undo_last_delete(hwnd: HWND) {
 fn handle_edit_source(hwnd: HWND) {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
-        unsafe {
-            SendMessageW(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(TVGN_CARET as usize),
-                LPARAM(0),
-            )
-        }
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
         .0,
     );
     if hitem.0 == 0 {
@@ -5069,14 +5055,12 @@ fn handle_edit_source(hwnd: HWND) {
 fn handle_retry_now(hwnd: HWND) {
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
-        unsafe {
-            SendMessageW(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(TVGN_CARET as usize),
-                LPARAM(0),
-            )
-        }
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
         .0,
     );
     if hitem.0 == 0 {
@@ -5181,14 +5165,12 @@ fn selected_source_index(hwnd: HWND) -> Option<usize> {
         return None;
     }
     let hitem = windows::Win32::UI::Controls::HTREEITEM(
-        unsafe {
-            SendMessageW(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(TVGN_CARET as usize),
-                LPARAM(0),
-            )
-        }
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
         .0,
     );
     if hitem.0 == 0 {
@@ -5834,9 +5816,9 @@ fn reorder_control_subclass_proc_inner(
                 (0, 0, 0)
             };
         if edit_id == 0 {
-            let prev = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) };
+            let prev = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA);
             if prev == 0 {
-                return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+                return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
             }
             return unsafe {
                 CallWindowProcW(
@@ -5876,17 +5858,17 @@ fn reorder_control_subclass_proc_inner(
         }
         if wparam.0 as u16 == VK_RETURN.0 {
             let target = if id == cancel_id { cancel_id } else { ok_id };
-            unsafe { SendMessageW(parent, WM_COMMAND, WPARAM(target), LPARAM(0)) };
+            crate::send_message_w_safe(parent, WM_COMMAND, WPARAM(target), LPARAM(0));
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_ESCAPE.0 {
-            unsafe { SendMessageW(parent, WM_COMMAND, WPARAM(cancel_id), LPARAM(0)) };
+            crate::send_message_w_safe(parent, WM_COMMAND, WPARAM(cancel_id), LPARAM(0));
             return LRESULT(0);
         }
     }
-    let prev = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) };
+    let prev = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA);
     if prev == 0 {
-        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+        return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
     }
     unsafe {
         CallWindowProcW(
@@ -5971,7 +5953,7 @@ unsafe extern "system" fn search_keyword_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "search_keyword_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || search_keyword_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
@@ -6190,7 +6172,7 @@ unsafe extern "system" fn input_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "input_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || input_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }

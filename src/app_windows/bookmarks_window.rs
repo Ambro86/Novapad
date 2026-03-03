@@ -242,7 +242,12 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
 
             for ctrl in [hwnd_list, hwnd_goto, hwnd_delete, hwnd_ok] {
                 if ctrl.0 != 0 && hfont.0 != 0 {
-                    unsafe { SendMessageW(ctrl, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1)) };
+                    crate::send_message_w_safe(
+                        ctrl,
+                        WM_SETFONT,
+                        WPARAM(hfont.0 as usize),
+                        LPARAM(1),
+                    );
                 }
             }
 
@@ -256,7 +261,7 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
             refresh_bookmarks_list(hwnd);
 
             if unsafe { SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0 } > 0 {
-                unsafe { SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0)) };
+                crate::send_message_w_safe(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
             }
             crate::set_focus_safe(hwnd_list);
 
@@ -286,7 +291,7 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                     LRESULT(0)
                 }
-                _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+                _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
             }
         }
         WM_CLOSE => {
@@ -318,7 +323,7 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
             }
             LRESULT(0)
         }
-        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
     }
 }
 
@@ -357,7 +362,7 @@ pub fn refresh_bookmarks_list(hwnd: HWND) {
     }
     let (storage_key, _) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
-    unsafe { SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
+    crate::send_message_w_safe(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
 
     if unsafe {
         with_state(parent, |state| {
@@ -380,11 +385,11 @@ pub fn refresh_bookmarks_list(hwnd: HWND) {
         crate::log_debug("Failed to access bookmarks state");
     }
 
-    let count = unsafe { SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)) }.0 as i32;
+    let count = crate::send_message_w_safe(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0 as i32;
     if count > 0
-        && unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0 as i32 == -1
+        && crate::send_message_w_safe(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32 == -1
     {
-        unsafe { SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0)) };
+        crate::send_message_w_safe(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
     }
 }
 
@@ -394,7 +399,7 @@ pub fn goto_selected(hwnd: HWND) {
         None => return,
     };
 
-    let sel = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0 as i32;
+    let sel = crate::send_message_w_safe(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
     if sel < 0 {
         return;
     }
@@ -453,7 +458,7 @@ pub fn delete_selected(hwnd: HWND) {
         None => return,
     };
 
-    let sel = unsafe { SendMessageW(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0 as i32;
+    let sel = crate::send_message_w_safe(hwnd_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
     if sel < 0 {
         return;
     }

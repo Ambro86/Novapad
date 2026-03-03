@@ -2,7 +2,6 @@ use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::{WC_BUTTON, WC_STATIC};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN,
@@ -72,7 +71,7 @@ pub fn select_marker_entries(
         return Some(Vec::new());
     }
 
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(MARKER_SELECT_CLASS_NAME);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
@@ -173,7 +172,7 @@ unsafe extern "system" fn marker_select_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "marker_select_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || marker_select_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }

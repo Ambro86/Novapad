@@ -11,12 +11,11 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    GWLP_USERDATA, GetParent, GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, KillTimer, LoadCursorW,
-    MB_ICONWARNING, MB_YESNO, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW,
-    SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
-    WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_DLGMODALFRAME, WS_POPUP,
-    WS_TABSTOP, WS_VISIBLE,
+    GWLP_USERDATA, GetParent, HMENU, IDC_ARROW, IDYES, KillTimer, LoadCursorW, MB_ICONWARNING,
+    MB_YESNO, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
+    SetTimer, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SYSKEYDOWN, WM_TIMER,
+    WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -328,7 +327,8 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 HWND(0)
             };
 
-            if let Err(e) = unsafe { SetWindowTextW(hwnd, PCWSTR(to_wide(&labels.title).as_ptr())) }
+            if let Err(e) =
+                crate::set_window_text_w_safe(hwnd, PCWSTR(to_wide(&labels.title).as_ptr()))
             {
                 crate::log_debug(&format!("Failed to set title: {}", e));
             }
@@ -387,7 +387,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 request_cancel(hwnd);
                 return LRESULT(0);
             }
-            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_KEYDOWN | WM_SYSKEYDOWN => {
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
@@ -423,12 +423,12 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 } {}
                 return LRESULT(0);
             }
-            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_PODCAST_SAVE_PROGRESS => {
             let pct = wparam.0.min(100);
             if with_save_state(hwnd, |state| {
-                unsafe { SendMessageW(state.progress, PBM_SETPOS, WPARAM(pct), LPARAM(0)) };
+                crate::send_message_w_safe(state.progress, PBM_SETPOS, WPARAM(pct), LPARAM(0));
                 state.current_pct = state.current_pct.max(pct);
                 update_progress_label(state);
             })
@@ -460,7 +460,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 }
                 return LRESULT(0);
             }
-            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_PODCAST_SAVE_DONE => {
             crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
@@ -486,18 +486,18 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
             }
-            let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) };
+            let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA);
             if ptr != 0 {
                 let _unused_box = unsafe { Box::from_raw(ptr as *mut SaveState) };
             }
             LRESULT(0)
         }
-        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
     }
 }
 
 fn with_save_state<T>(hwnd: HWND, f: impl FnOnce(&mut SaveState) -> T) -> Option<T> {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *mut SaveState;
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut SaveState;
     if ptr.is_null() {
         None
     } else {

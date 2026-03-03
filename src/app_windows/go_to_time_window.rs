@@ -97,7 +97,7 @@ unsafe extern "system" fn go_to_time_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "go_to_time_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || go_to_time_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }

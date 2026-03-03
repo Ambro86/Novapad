@@ -6,7 +6,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::Com::CoTaskMemFree;
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::Dialogs::{FR_DOWN, FR_MATCHCASE};
 use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL, EM_FINDTEXTEXW, FINDTEXTEXW};
 use windows::Win32::UI::Controls::{
@@ -145,7 +144,7 @@ pub fn open_find_in_files_dialog(parent: HWND) {
     }
 
     let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
             LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
@@ -426,14 +425,12 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     None,
                 )
             };
-            unsafe {
-                SendMessageW(
-                    progress_bar,
-                    PBM_SETRANGE,
-                    WPARAM(0),
-                    LPARAM(((0u16 as u32) | ((100u16 as u32) << 16)) as isize),
-                )
-            };
+            crate::send_message_w_safe(
+                progress_bar,
+                PBM_SETRANGE,
+                WPARAM(0),
+                LPARAM(((0u16 as u32) | ((100u16 as u32) << 16)) as isize),
+            );
 
             let results_label = unsafe {
                 CreateWindowExW(
@@ -505,9 +502,12 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 go_button,
             ] {
                 if control.0 != 0 && hfont.0 != 0 {
-                    unsafe {
-                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1))
-                    };
+                    crate::send_message_w_safe(
+                        control,
+                        WM_SETFONT,
+                        WPARAM(hfont.0 as usize),
+                        LPARAM(1),
+                    );
                 }
             }
 
@@ -556,7 +556,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     if let Some(folder) = browse_for_folder(hwnd, state.language) {
                         let wide = to_wide(folder.to_string_lossy().as_ref());
                         if let Err(_e) =
-                            unsafe { SetWindowTextW(state.folder_edit, PCWSTR(wide.as_ptr())) }
+                            crate::set_window_text_w_safe(state.folder_edit, PCWSTR(wide.as_ptr()))
                         {
                             crate::log_debug(&format!("Error: {:?}", _e));
                         }
@@ -587,7 +587,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 }
                 LRESULT(0)
             } else {
-                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+                crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
             }
         }
         WM_KEYDOWN => {
@@ -612,7 +612,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 }
                 return LRESULT(0);
             }
-            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_NOTIFY => {
             let hdr = lparam.0 as *const NMHDR;
@@ -683,7 +683,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     }
                 }
             }
-            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_FIND_IN_FILES_PROGRESS => {
             let percent = wparam.0 as u32;
@@ -759,7 +759,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             }
             LRESULT(0)
         }
-        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
     }
 }
 
@@ -1110,14 +1110,12 @@ fn insert_tree_item(
         hInsertAfter: windows::Win32::UI::Controls::HTREEITEM(0),
         Anonymous: TVINSERTSTRUCTW_0 { item },
     };
-    let res = unsafe {
-        SendMessageW(
-            tree,
-            TVM_INSERTITEMW,
-            WPARAM(0),
-            LPARAM(&insert as *const _ as isize),
-        )
-    };
+    let res = crate::send_message_w_safe(
+        tree,
+        TVM_INSERTITEMW,
+        WPARAM(0),
+        LPARAM(&insert as *const _ as isize),
+    );
     windows::Win32::UI::Controls::HTREEITEM(res.0)
 }
 
@@ -1125,14 +1123,12 @@ fn ensure_children_loaded(
     state: &mut FindInFilesState,
     parent: windows::Win32::UI::Controls::HTREEITEM,
 ) {
-    let has_child = unsafe {
-        SendMessageW(
-            state.results_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CHILD as usize),
-            LPARAM(parent.0),
-        )
-    };
+    let has_child = crate::send_message_w_safe(
+        state.results_tree,
+        TVM_GETNEXTITEM,
+        WPARAM(TVGN_CHILD as usize),
+        LPARAM(parent.0),
+    );
     if has_child.0 != 0 {
         return;
     }
@@ -1141,14 +1137,12 @@ fn ensure_children_loaded(
         hItem: parent,
         ..Default::default()
     };
-    let ok = unsafe {
-        SendMessageW(
-            state.results_tree,
-            TVM_GETITEMW,
-            WPARAM(0),
-            LPARAM(&mut item as *mut _ as isize),
-        )
-    };
+    let ok = crate::send_message_w_safe(
+        state.results_tree,
+        TVM_GETITEMW,
+        WPARAM(0),
+        LPARAM(&mut item as *mut _ as isize),
+    );
     if ok.0 == 0 {
         return;
     }
@@ -1188,14 +1182,12 @@ fn tree_item_param(tree: HWND, item: windows::Win32::UI::Controls::HTREEITEM) ->
         hItem: item,
         ..Default::default()
     };
-    let ok = unsafe {
-        SendMessageW(
-            tree,
-            TVM_GETITEMW,
-            WPARAM(0),
-            LPARAM(&mut tv_item as *mut _ as isize),
-        )
-    };
+    let ok = crate::send_message_w_safe(
+        tree,
+        TVM_GETITEMW,
+        WPARAM(0),
+        LPARAM(&mut tv_item as *mut _ as isize),
+    );
     if ok.0 == 0 {
         return None;
     }
@@ -1203,14 +1195,12 @@ fn tree_item_param(tree: HWND, item: windows::Win32::UI::Controls::HTREEITEM) ->
 }
 
 fn selected_result_index(tree: HWND) -> Option<usize> {
-    let hitem = unsafe {
-        SendMessageW(
-            tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CARET as usize),
-            LPARAM(0),
-        )
-    };
+    let hitem = crate::send_message_w_safe(
+        tree,
+        TVM_GETNEXTITEM,
+        WPARAM(TVGN_CARET as usize),
+        LPARAM(0),
+    );
     if hitem.0 == 0 {
         return None;
     }
@@ -1219,14 +1209,12 @@ fn selected_result_index(tree: HWND) -> Option<usize> {
         hItem: windows::Win32::UI::Controls::HTREEITEM(hitem.0),
         ..Default::default()
     };
-    let ok = unsafe {
-        SendMessageW(
-            tree,
-            TVM_GETITEMW,
-            WPARAM(0),
-            LPARAM(&mut item as *mut _ as isize),
-        )
-    };
+    let ok = crate::send_message_w_safe(
+        tree,
+        TVM_GETITEMW,
+        WPARAM(0),
+        LPARAM(&mut item as *mut _ as isize),
+    );
     if ok.0 == 0 {
         return None;
     }
@@ -1555,14 +1543,12 @@ fn select_snippet_exact(hwnd_edit: HWND, snippet: &str) -> bool {
         lpstrText: PCWSTR(wide.as_ptr()),
         chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
     };
-    let result = unsafe {
-        SendMessageW(
-            hwnd_edit,
-            EM_FINDTEXTEXW,
-            WPARAM((FR_MATCHCASE | FR_DOWN).0 as usize),
-            LPARAM(&mut ft as *mut _ as isize),
-        )
-    };
+    let result = crate::send_message_w_safe(
+        hwnd_edit,
+        EM_FINDTEXTEXW,
+        WPARAM((FR_MATCHCASE | FR_DOWN).0 as usize),
+        LPARAM(&mut ft as *mut _ as isize),
+    );
     if result.0 == -1 {
         return false;
     }

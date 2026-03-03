@@ -31,11 +31,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetClientRect, GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
     HMENU, IDC_ARROW, IsDialogMessageW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION,
     MB_OKCANCEL, MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW,
-    SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, TranslateMessage,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
-    WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE, WS_VSCROLL,
+    SetForegroundWindow, SetTimer, SetWindowLongPtrW, TranslateMessage, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
+    WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::PCWSTR;
 
@@ -478,20 +478,20 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 return LRESULT(0);
             }
             if key == VK_RETURN.0 as u32 {
-                unsafe { SendMessageW(hwnd, WM_COMMAND, WPARAM(1), LPARAM(0)) };
+                crate::send_message_w_safe(hwnd, WM_COMMAND, WPARAM(1), LPARAM(0));
                 return LRESULT(0);
             }
             if key == VK_ESCAPE.0 as u32 {
-                unsafe { SendMessageW(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0)) };
+                crate::send_message_w_safe(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
                 return LRESULT(0);
             }
-            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_CLOSE => {
             crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
             LRESULT(0)
         }
-        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
     }
 }
 
@@ -1544,7 +1544,7 @@ fn send_input_to_pty(state: &mut PromptState) {
     let text = String::from_utf16_lossy(&buffer[..read as usize]);
     if state.program_is_codex && is_codex_approvals_command(&text) {
         spawn_codex_approvals();
-        if let Err(_e) = unsafe { SetWindowTextW(state.input, PCWSTR::null()) } {
+        if let Err(_e) = crate::set_window_text_w_safe(state.input, PCWSTR::null()) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
         return;
@@ -1556,7 +1556,7 @@ fn send_input_to_pty(state: &mut PromptState) {
             crate::log_debug("Failed to write input");
         }
     }
-    if let Err(_e) = unsafe { SetWindowTextW(state.input, PCWSTR::null()) } {
+    if let Err(_e) = crate::set_window_text_w_safe(state.input, PCWSTR::null()) {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
 }
@@ -1570,7 +1570,7 @@ fn clear_output(state: &mut PromptState) {
     state.blank_line_streak = 0;
     state.pending_ws.clear();
     state.last_announced_line.clear();
-    if let Err(_e) = unsafe { SetWindowTextW(state.output, PCWSTR::null()) } {
+    if let Err(_e) = crate::set_window_text_w_safe(state.output, PCWSTR::null()) {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
 }
@@ -1601,8 +1601,8 @@ fn trim_output_keep_last(state: &mut PromptState) {
     state.pending_ws.clear();
     state.last_announced_line.clear();
     let wide = to_wide(&state.buffer);
-    unsafe { SendMessageW(state.output, EM_SETREADONLY, WPARAM(0), LPARAM(0)) };
-    if let Err(_e) = unsafe { SetWindowTextW(state.output, PCWSTR(wide.as_ptr())) } {
+    crate::send_message_w_safe(state.output, EM_SETREADONLY, WPARAM(0), LPARAM(0));
+    if let Err(_e) = crate::set_window_text_w_safe(state.output, PCWSTR(wide.as_ptr())) {
         crate::log_debug(&format!("Error: {:?}", _e));
     }
     unsafe {

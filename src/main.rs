@@ -345,6 +345,54 @@ pub(crate) fn set_foreground_window_safe(hwnd: HWND) {
     }
 }
 
+pub(crate) fn send_message_w_safe(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe { SendMessageW(hwnd, msg, wparam, lparam) }
+}
+
+pub(crate) fn def_window_proc_w_safe(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+pub(crate) fn get_window_long_ptr_w_safe(
+    hwnd: HWND,
+    index: windows::Win32::UI::WindowsAndMessaging::WINDOW_LONG_PTR_INDEX,
+) -> isize {
+    unsafe { GetWindowLongPtrW(hwnd, index) }
+}
+
+pub(crate) fn set_window_text_w_safe(hwnd: HWND, text: PCWSTR) -> windows::core::Result<()> {
+    unsafe { SetWindowTextW(hwnd, text) }
+}
+
+pub(crate) fn get_cursor_pos_safe(point: *mut POINT) -> windows::core::Result<()> {
+    unsafe { GetCursorPos(point) }
+}
+
+pub(crate) fn get_save_file_name_w_safe(ofn: *mut OPENFILENAMEW) -> BOOL {
+    unsafe { GetSaveFileNameW(ofn) }
+}
+
+pub(crate) fn get_open_file_name_w_safe(ofn: *mut OPENFILENAMEW) -> BOOL {
+    unsafe { GetOpenFileNameW(ofn) }
+}
+
+pub(crate) fn get_module_handle_raw_default() -> isize {
+    unsafe { GetModuleHandleW(None).unwrap_or_default().0 }
+}
+
+pub(crate) fn get_class_name_w_safe(hwnd: HWND, class_name: &mut [u16]) -> i32 {
+    unsafe { GetClassNameW(hwnd, class_name) }
+}
+
+pub(crate) fn check_menu_item_safe(hmenu: HMENU, id_check_item: u32, u_check: u32) -> u32 {
+    unsafe { CheckMenuItem(hmenu, id_check_item, u_check) }
+}
+
 pub(crate) fn get_parent_safe(hwnd: HWND) -> HWND {
     unsafe { GetParent(hwnd) }
 }
@@ -758,14 +806,12 @@ fn prefetch_dictionary_for_selection(hwnd: HWND, hwnd_edit: HWND) {
         lpstrText: windows::core::PWSTR(buf.as_mut_ptr()),
     };
     // SAFETY: `tr` points to `buf`, which is allocated for the requested range plus terminator.
-    let copied = unsafe {
-        SendMessageW(
-            hwnd_edit,
-            EM_GETTEXTRANGE,
-            WPARAM(0),
-            LPARAM(&mut tr as *mut _ as isize),
-        )
-    }
+    let copied = crate::send_message_w_safe(
+        hwnd_edit,
+        EM_GETTEXTRANGE,
+        WPARAM(0),
+        LPARAM(&mut tr as *mut _ as isize),
+    )
     .0 as usize;
     if copied == 0 {
         return;
@@ -1292,7 +1338,7 @@ fn save_podcast_episode_dialog(
         Flags: OFN_EXPLORER | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT,
         ..Default::default()
     };
-    if !unsafe { GetSaveFileNameW(&mut ofn) }.as_bool() {
+    if !crate::get_save_file_name_w_safe(&mut ofn).as_bool() {
         return None;
     }
     let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
@@ -5525,7 +5571,7 @@ fn update_voice_panel_menu_check(hwnd: HWND) {
         return;
     }
     let flags = if visible { MF_CHECKED } else { MF_UNCHECKED };
-    if unsafe { CheckMenuItem(hmenu, IDM_VIEW_SHOW_VOICES as u32, (MF_BYCOMMAND | flags).0) }
+    if crate::check_menu_item_safe(hmenu, IDM_VIEW_SHOW_VOICES as u32, (MF_BYCOMMAND | flags).0)
         == 0xFFFFFFFF
     {
         crate::log_debug("CheckMenuItem failed for IDM_VIEW_SHOW_VOICES");
@@ -5577,7 +5623,8 @@ fn update_voice_panel_menu_check(hwnd: HWND) {
         } else {
             MF_UNCHECKED
         };
-        if unsafe { CheckMenuItem(hmenu, item as u32, (MF_BYCOMMAND | item_flags).0) } == 0xFFFFFFFF
+        if crate::check_menu_item_safe(hmenu, item as u32, (MF_BYCOMMAND | item_flags).0)
+            == 0xFFFFFFFF
         {
             crate::log_debug("CheckMenuItem failed for view item");
         }
@@ -5597,7 +5644,8 @@ fn update_voice_panel_menu_check(hwnd: HWND) {
         } else {
             MF_UNCHECKED
         };
-        if unsafe { CheckMenuItem(hmenu, item as u32, (MF_BYCOMMAND | item_flags).0) } == 0xFFFFFFFF
+        if crate::check_menu_item_safe(hmenu, item as u32, (MF_BYCOMMAND | item_flags).0)
+            == 0xFFFFFFFF
         {
             crate::log_debug("CheckMenuItem failed for color item");
         }
@@ -8240,7 +8288,7 @@ fn is_focus_in_voice_panel(hwnd: HWND) -> bool {
     }
 
     let mut class_buf = [0u16; 64];
-    let len = unsafe { GetClassNameW(focus, &mut class_buf) };
+    let len = crate::get_class_name_w_safe(focus, &mut class_buf);
     let class_name = String::from_utf16_lossy(&class_buf[..len as usize]);
     if class_name == "ComboLBox" {
         return true;
@@ -10026,7 +10074,7 @@ fn open_documents_popup(hwnd: HWND) {
     }
 
     let mut pt = POINT::default();
-    if unsafe { GetCursorPos(&mut pt).is_err() } {
+    if crate::get_cursor_pos_safe(&mut pt).is_err() {
         return;
     }
     let command = unsafe {
@@ -10551,7 +10599,7 @@ impl IFileDialogControlEvents_Impl for AudiobookBitrateDialogHandler {
             }
         }
         let mut pt = POINT::default();
-        if unsafe { GetCursorPos(&mut pt).is_err() } {
+        if crate::get_cursor_pos_safe(&mut pt).is_err() {
             return Ok(());
         }
         let owner = {
@@ -11064,7 +11112,7 @@ pub(crate) fn open_subtitle_file_dialog(hwnd: HWND) -> Option<PathBuf> {
         ..Default::default()
     };
 
-    if !unsafe { GetOpenFileNameW(&mut ofn) }.as_bool() {
+    if !crate::get_open_file_name_w_safe(&mut ofn).as_bool() {
         return None;
     }
     let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());

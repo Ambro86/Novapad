@@ -2,7 +2,6 @@ use std::sync::{Arc, Mutex};
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::WC_BUTTON;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN, VK_SPACE,
@@ -53,7 +52,7 @@ pub fn select_chapter(parent: HWND, chapters: &[Chapter], language: Language) ->
         .map(crate::podcast::chapters::chapter_label)
         .collect();
 
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(CHAPTER_LIST_CLASS_NAME);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
@@ -173,7 +172,7 @@ unsafe extern "system" fn chapter_list_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "chapter_list_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || chapter_list_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }

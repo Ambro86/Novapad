@@ -7117,25 +7117,22 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         let rate = combo_value(combo_speed);
         let pitch = combo_value(combo_pitch);
         let volume = combo_value(combo_volume);
-        if let Err(_e) = unsafe {
-            SetWindowTextW(
-                edit_speed,
-                PCWSTR(to_wide(&tts_ui_value_from_internal(rate).to_string()).as_ptr()),
-            )
-        } {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            edit_speed,
+            PCWSTR(to_wide(&tts_ui_value_from_internal(rate).to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = unsafe {
-            SetWindowTextW(
-                edit_pitch,
-                PCWSTR(to_wide(&tts_ui_value_from_internal(pitch).to_string()).as_ptr()),
-            )
-        } {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            edit_pitch,
+            PCWSTR(to_wide(&tts_ui_value_from_internal(pitch).to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) =
-            unsafe { SetWindowTextW(edit_volume, PCWSTR(to_wide(&volume.to_string()).as_ptr())) }
-        {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            edit_volume,
+            PCWSTR(to_wide(&volume.to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
         let d_rate = combo_value(combo_dialogue_voice_rate);
@@ -7144,52 +7141,40 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         let sd_rate = combo_value(combo_dialogue_secondary_voice_rate);
         let sd_pitch = combo_value(combo_dialogue_secondary_voice_pitch);
         let sd_volume = combo_value(combo_dialogue_secondary_voice_volume);
-        if let Err(_e) = unsafe {
-            SetWindowTextW(
-                edit_dialogue_voice_rate,
-                PCWSTR(to_wide(&tts_ui_value_from_internal(d_rate).to_string()).as_ptr()),
-            )
-        } {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            edit_dialogue_voice_rate,
+            PCWSTR(to_wide(&tts_ui_value_from_internal(d_rate).to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = unsafe {
-            SetWindowTextW(
-                edit_dialogue_voice_pitch,
-                PCWSTR(to_wide(&tts_ui_value_from_internal(d_pitch).to_string()).as_ptr()),
-            )
-        } {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            edit_dialogue_voice_pitch,
+            PCWSTR(to_wide(&tts_ui_value_from_internal(d_pitch).to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = unsafe {
-            SetWindowTextW(
-                edit_dialogue_voice_volume,
-                PCWSTR(to_wide(&d_volume.to_string()).as_ptr()),
-            )
-        } {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            edit_dialogue_voice_volume,
+            PCWSTR(to_wide(&d_volume.to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = unsafe {
-            SetWindowTextW(
-                edit_dialogue_secondary_voice_rate,
-                PCWSTR(to_wide(&tts_ui_value_from_internal(sd_rate).to_string()).as_ptr()),
-            )
-        } {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            edit_dialogue_secondary_voice_rate,
+            PCWSTR(to_wide(&tts_ui_value_from_internal(sd_rate).to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = unsafe {
-            SetWindowTextW(
-                edit_dialogue_secondary_voice_pitch,
-                PCWSTR(to_wide(&tts_ui_value_from_internal(sd_pitch).to_string()).as_ptr()),
-            )
-        } {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            edit_dialogue_secondary_voice_pitch,
+            PCWSTR(to_wide(&tts_ui_value_from_internal(sd_pitch).to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        if let Err(_e) = unsafe {
-            SetWindowTextW(
-                edit_dialogue_secondary_voice_volume,
-                PCWSTR(to_wide(&sd_volume.to_string()).as_ptr()),
-            )
-        } {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            edit_dialogue_secondary_voice_volume,
+            PCWSTR(to_wide(&sd_volume.to_string()).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
     } else {
@@ -11070,7 +11055,7 @@ fn browse_for_audiobook_folder(hwnd: HWND) {
     {
         let path = folder.to_string_lossy().to_string();
         if let Some(edit) = with_options_state(hwnd, |state| state.edit_audiobook_save_folder)
-            && let Err(_e) = unsafe { SetWindowTextW(edit, PCWSTR(to_wide(&path).as_ptr())) }
+            && let Err(_e) = crate::set_window_text_w_safe(edit, PCWSTR(to_wide(&path).as_ptr()))
         {
             crate::log_debug(&format!("Error: {:?}", _e));
         }

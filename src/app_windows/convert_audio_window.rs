@@ -6,7 +6,6 @@ use std::sync::{
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::Dialogs::{
     GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY,
     OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
@@ -18,9 +17,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow,
     ES_AUTOHSCROLL, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW,
     IsWindow, LoadCursorW, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    SetWindowLongPtrW, ShowWindow, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -173,7 +172,7 @@ pub fn open(parent: HWND) {
 
     let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let class_name = to_wide(CONVERT_CLASS_NAME);
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
             LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
@@ -944,7 +943,7 @@ fn read_quality(
 
 fn set_status(state: &ConvertWindowState, text: &str) {
     let wide = to_wide(text);
-    if let Err(e) = unsafe { SetWindowTextW(state.status_label, PCWSTR(wide.as_ptr())) } {
+    if let Err(e) = crate::set_window_text_w_safe(state.status_label, PCWSTR(wide.as_ptr())) {
         log_debug(&format!("Failed to set status text: {}", e));
     }
 }
@@ -975,7 +974,8 @@ fn update_quality_controls(
     };
 
     let label_wide = to_wide(label_text);
-    if let Err(e) = unsafe { SetWindowTextW(state.quality_label, PCWSTR(label_wide.as_ptr())) } {
+    if let Err(e) = crate::set_window_text_w_safe(state.quality_label, PCWSTR(label_wide.as_ptr()))
+    {
         log_debug(&format!("Failed to set quality label: {}", e));
     }
 
@@ -1062,7 +1062,7 @@ fn set_combo_items(hwnd: HWND, items: &[&str]) {
 
 fn set_combo_text(hwnd: HWND, text: &str) {
     let wide = to_wide(text);
-    if let Err(e) = unsafe { SetWindowTextW(hwnd, PCWSTR(wide.as_ptr())) } {
+    if let Err(e) = crate::set_window_text_w_safe(hwnd, PCWSTR(wide.as_ptr())) {
         log_debug(&format!("Failed to set combo text: {}", e));
     }
 }
@@ -1091,7 +1091,7 @@ fn get_edit_text(hwnd: HWND) -> String {
 
 fn set_edit_text(hwnd: HWND, path: &Path) {
     let wide = to_wide(&path.to_string_lossy());
-    if let Err(e) = unsafe { SetWindowTextW(hwnd, PCWSTR(wide.as_ptr())) } {
+    if let Err(e) = crate::set_window_text_w_safe(hwnd, PCWSTR(wide.as_ptr())) {
         log_debug(&format!("Failed to set edit text: {}", e));
     }
 }

@@ -8,7 +8,6 @@ use std::time::Duration;
 use chrono::Local;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::Dialogs::{
     GetOpenFileNameW, OFN_ALLOWMULTISELECT, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY,
     OFN_PATHMUSTEXIST, OPENFILENAMEW,
@@ -313,7 +312,7 @@ pub fn open(parent: HWND) {
 
     let language = { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
     let class_name = to_wide(BATCH_CLASS_NAME);
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
             LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
@@ -1143,7 +1142,7 @@ fn start_batch(state: &mut BatchState) {
         return;
     }
     let format_sel =
-        unsafe { SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)) }.0 as i32;
+        crate::send_message_w_safe(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
     let format = if format_sel == 1 {
         AudioFormat::Wav
     } else {
@@ -1246,7 +1245,7 @@ fn update_item_status(state: &mut BatchState, index: usize, status: BatchStatusC
         return;
     }
     let count =
-        unsafe { SendMessageW(state.list, LVM_GETITEMCOUNT, WPARAM(0), LPARAM(0)) }.0 as usize;
+        crate::send_message_w_safe(state.list, LVM_GETITEMCOUNT, WPARAM(0), LPARAM(0)).0 as usize;
     if index >= count {
         return;
     }

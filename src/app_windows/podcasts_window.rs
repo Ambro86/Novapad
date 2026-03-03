@@ -1708,14 +1708,12 @@ fn apply_episode_results(hwnd: HWND, hitem: HTREEITEM, items: Vec<PodcastEpisode
         let mut buf = vec![0u16; 128];
         item.pszText = windows::core::PWSTR(buf.as_mut_ptr());
         item.cchTextMax = buf.len() as i32;
-        if unsafe {
-            SendMessageW(
-                hwnd_tree,
-                TVM_GETITEMW,
-                WPARAM(0),
-                LPARAM(&mut item as *mut _ as isize),
-            )
-        }
+        if crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETITEMW,
+            WPARAM(0),
+            LPARAM(&mut item as *mut _ as isize),
+        )
         .0 != 0
         {
             let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
@@ -2576,7 +2574,7 @@ fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>, status: 
     if hwnd_results.0 == 0 {
         return;
     }
-    unsafe { SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
+    crate::send_message_w_safe(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
     if let Some(status) = status
         && !status.trim().is_empty()
     {
@@ -2630,7 +2628,7 @@ fn show_search_loading(hwnd: HWND) {
     if hwnd_results.0 == 0 {
         return;
     }
-    unsafe { SendMessageW(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
+    crate::send_message_w_safe(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let text = to_wide(&i18n::tr(
         with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
         "podcasts.loading",
@@ -3136,7 +3134,7 @@ fn update_category_status(hwnd: HWND, message: Option<&str>) {
     }
     let text = message.unwrap_or_default();
     let wide = to_wide(text);
-    if let Err(e) = unsafe { SetWindowTextW(hwnd_status, PCWSTR(wide.as_ptr())) } {
+    if let Err(e) = crate::set_window_text_w_safe(hwnd_status, PCWSTR(wide.as_ptr())) {
         crate::log_debug(&format!("SetWindowTextW failed: {:?}", e));
     }
 }
@@ -3146,7 +3144,7 @@ fn update_category_list(hwnd: HWND, categories: Vec<Category>) {
     if hwnd_list.0 == 0 {
         return;
     }
-    unsafe { SendMessageW(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
+    crate::send_message_w_safe(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
     for category in &categories {
         let wide = to_wide(&category.name);
         unsafe {
@@ -3159,7 +3157,7 @@ fn update_category_list(hwnd: HWND, categories: Vec<Category>) {
         }
     }
     with_category_dialog_state(hwnd, |s| s.categories = categories);
-    unsafe { SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0)) };
+    crate::send_message_w_safe(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
 }
 
 fn load_categories_for_source(hwnd: HWND, source: Source) {
@@ -3417,7 +3415,7 @@ unsafe extern "system" fn categories_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "categories_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || categories_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
@@ -4036,7 +4034,7 @@ unsafe extern "system" fn category_list_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "category_list_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || category_list_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
@@ -4206,7 +4204,7 @@ unsafe extern "system" fn add_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "add_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || add_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
@@ -5337,7 +5335,7 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                     }
                 }
             });
-            unsafe { SendMessageW(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(hitem.0)) };
+            crate::send_message_w_safe(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(hitem.0));
             let mut target = parent_item;
             if parent_item.0 != 0
                 && let Some(target_index) = focus_child_index
@@ -5763,14 +5761,16 @@ fn description_control_subclass_proc_inner(
             && wparam.0 as u16 == 'A' as u16
             && unsafe { GetKeyState(VK_CONTROL.0 as i32) } < 0
         {
-            unsafe { SendMessageW(edit, EM_SETSEL, WPARAM(0), LPARAM(-1)) };
+            crate::send_message_w_safe(edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
             return LRESULT(0);
         }
     }
-    let prev =
-        unsafe { GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA) };
+    let prev = crate::get_window_long_ptr_w_safe(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+    );
     if prev == 0 {
-        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+        return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
     }
     unsafe {
         CallWindowProcW(
@@ -5794,7 +5794,7 @@ unsafe extern "system" fn description_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "description_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || description_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
@@ -6173,18 +6173,20 @@ fn reorder_control_subclass_proc_inner(
             } else {
                 REORDER_OK_ID
             };
-            unsafe { SendMessageW(parent, WM_COMMAND, WPARAM(target), LPARAM(0)) };
+            crate::send_message_w_safe(parent, WM_COMMAND, WPARAM(target), LPARAM(0));
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_ESCAPE.0 {
-            unsafe { SendMessageW(parent, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0)) };
+            crate::send_message_w_safe(parent, WM_COMMAND, WPARAM(REORDER_CANCEL_ID), LPARAM(0));
             return LRESULT(0);
         }
     }
-    let prev =
-        unsafe { GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA) };
+    let prev = crate::get_window_long_ptr_w_safe(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+    );
     if prev == 0 {
-        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+        return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
     }
     unsafe {
         CallWindowProcW(
@@ -6208,7 +6210,7 @@ unsafe extern "system" fn reorder_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "reorder_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || reorder_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
@@ -6459,7 +6461,7 @@ unsafe extern "system" fn podcast_tree_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "podcast_tree_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || podcast_tree_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
@@ -6528,14 +6530,12 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
                 let hitem = selected_tree_item(parent);
                 if hitem.0 != 0 {
                     let parent_item = HTREEITEM(
-                        unsafe {
-                            SendMessageW(
-                                hwnd,
-                                TVM_GETNEXTITEM,
-                                WPARAM(TVGN_PARENT as usize),
-                                LPARAM(hitem.0),
-                            )
-                        }
+                        crate::send_message_w_safe(
+                            hwnd,
+                            TVM_GETNEXTITEM,
+                            WPARAM(TVGN_PARENT as usize),
+                            LPARAM(hitem.0),
+                        )
                         .0,
                     );
                     if parent_item.0 != 0 {
@@ -6610,7 +6610,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
     if let Some(proc) = prev_proc {
         unsafe { CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam) }
     } else {
-        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+        crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
     }
 }
 
@@ -6622,7 +6622,7 @@ unsafe extern "system" fn podcast_search_wndproc(
 ) -> LRESULT {
     crate::panic_guard::guard(
         "podcast_search_wndproc",
-        || unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
         || podcast_search_wndproc_inner(hwnd, msg, wparam, lparam),
     )
 }
@@ -6726,7 +6726,7 @@ fn podcast_search_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
     if let Some(proc) = prev_proc {
         unsafe { CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam) }
     } else {
-        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+        crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
     }
 }
 

@@ -436,14 +436,12 @@ fn replace_selection_if_match(
         chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
     };
 
-    let res = unsafe {
-        SendMessageW(
-            hwnd_edit,
-            EM_FINDTEXTEXW,
-            WPARAM(flags.0 as usize),
-            LPARAM(&mut ft as *mut _ as isize),
-        )
-    };
+    let res = crate::send_message_w_safe(
+        hwnd_edit,
+        EM_FINDTEXTEXW,
+        WPARAM(flags.0 as usize),
+        LPARAM(&mut ft as *mut _ as isize),
+    );
 
     if res.0 == cr.cpMin as isize && ft.chrgText.cpMax == cr.cpMax {
         let replace_wide = to_wide(replace);
@@ -844,7 +842,7 @@ fn is_checkbox_checked(hwnd: HWND, id: isize) -> bool {
     if hwnd_child.0 == 0 {
         return false;
     }
-    let res = unsafe { SendMessageW(hwnd_child, BM_GETCHECK, WPARAM(0), LPARAM(0)) };
+    let res = crate::send_message_w_safe(hwnd_child, BM_GETCHECK, WPARAM(0), LPARAM(0));
     res.0 as u32 == BST_CHECKED.0
 }
 
@@ -857,7 +855,7 @@ fn set_checkbox_checked(hwnd: HWND, checked: bool) {
     } else {
         Default::default()
     };
-    unsafe { SendMessageW(hwnd, BM_SETCHECK, WPARAM(value.0 as usize), LPARAM(0)) };
+    crate::send_message_w_safe(hwnd, BM_SETCHECK, WPARAM(value.0 as usize), LPARAM(0));
 }
 
 fn set_checkbox_checked_by_id(hwnd: HWND, id: isize, checked: bool) {
@@ -1267,14 +1265,12 @@ fn replace_all_in_range(
             lpstrText: PCWSTR(search_wide.as_ptr()),
             chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
         };
-        let res = unsafe {
-            SendMessageW(
-                hwnd_edit,
-                EM_FINDTEXTEXW,
-                WPARAM(flags.0 as usize),
-                LPARAM(&mut ft as *mut _ as isize),
-            )
-        };
+        let res = crate::send_message_w_safe(
+            hwnd_edit,
+            EM_FINDTEXTEXW,
+            WPARAM(flags.0 as usize),
+            LPARAM(&mut ft as *mut _ as isize),
+        );
         if res.0 == -1 {
             break;
         }

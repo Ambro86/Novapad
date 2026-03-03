@@ -703,7 +703,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         )
     };
     if prev == 0 {
-        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+        return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
     }
     unsafe {
         windows::Win32::UI::WindowsAndMessaging::CallWindowProcW(
@@ -820,9 +820,10 @@ fn run_lookup(hwnd: HWND) {
     let len = unsafe { GetWindowTextLengthW(input) };
     if len <= 0 {
         let msg = i18n::tr(ui_language, "dictionary.no_word");
-        if let Err(_e) =
-            unsafe { SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr())) }
-        {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            output,
+            PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
         return;
@@ -833,9 +834,10 @@ fn run_lookup(hwnd: HWND) {
     let trimmed = word.trim().to_string();
     if trimmed.is_empty() {
         let msg = i18n::tr(ui_language, "dictionary.no_word");
-        if let Err(_e) =
-            unsafe { SetWindowTextW(output, PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr())) }
-        {
+        if let Err(_e) = crate::set_window_text_w_safe(
+            output,
+            PCWSTR(to_wide(&to_windows_newlines(&msg)).as_ptr()),
+        ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
         return;
@@ -869,12 +871,10 @@ fn run_lookup(hwnd: HWND) {
             remove_dictionary_cache(parent, &key);
         } else {
             let text = format_cached_output(lookup_language, &lines);
-            if let Err(_e) = unsafe {
-                SetWindowTextW(
-                    output,
-                    PCWSTR(to_wide(&to_windows_newlines(&text)).as_ptr()),
-                )
-            } {}
+            if let Err(_e) = crate::set_window_text_w_safe(
+                output,
+                PCWSTR(to_wide(&to_windows_newlines(&text)).as_ptr()),
+            ) {}
             return;
         }
     }
@@ -885,12 +885,10 @@ fn run_lookup(hwnd: HWND) {
     LOOKUP_GENERATION.store(generation, Ordering::SeqCst);
 
     let loading_msg = i18n::tr(ui_language, "dictionary.loading");
-    if let Err(_e) = unsafe {
-        SetWindowTextW(
-            output,
-            PCWSTR(to_wide(&to_windows_newlines(&loading_msg)).as_ptr()),
-        )
-    } {}
+    if let Err(_e) = crate::set_window_text_w_safe(
+        output,
+        PCWSTR(to_wide(&to_windows_newlines(&loading_msg)).as_ptr()),
+    ) {}
 
     let hwnd_val = hwnd.0;
     let parent_hwnd = parent;

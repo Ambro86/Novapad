@@ -561,7 +561,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         )
     };
     if prev == 0 {
-        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+        return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
     }
     unsafe {
         windows::Win32::UI::WindowsAndMessaging::CallWindowProcW(
@@ -629,14 +629,15 @@ fn run_search(hwnd: HWND) {
     let len = unsafe { GetWindowTextLengthW(input) };
     if len <= 0 {
         if status.0 != 0
-            && let Err(e) = unsafe {
-                SetWindowTextW(status, PCWSTR(to_wide(&label_set.status_no_query).as_ptr()))
-            }
+            && let Err(e) = crate::set_window_text_w_safe(
+                status,
+                PCWSTR(to_wide(&label_set.status_no_query).as_ptr()),
+            )
         {
             crate::log_debug(&format!("SetWindowTextW failed: {}", e));
         }
         if results.0 != 0 {
-            unsafe { SendMessageW(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
+            crate::send_message_w_safe(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
         }
         return;
     }
@@ -646,25 +647,28 @@ fn run_search(hwnd: HWND) {
     let trimmed = query.trim().to_string();
     if trimmed.is_empty() {
         if status.0 != 0
-            && let Err(e) = unsafe {
-                SetWindowTextW(status, PCWSTR(to_wide(&label_set.status_no_query).as_ptr()))
-            }
+            && let Err(e) = crate::set_window_text_w_safe(
+                status,
+                PCWSTR(to_wide(&label_set.status_no_query).as_ptr()),
+            )
         {
             crate::log_debug(&format!("SetWindowTextW failed: {}", e));
         }
         if results.0 != 0 {
-            unsafe { SendMessageW(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
+            crate::send_message_w_safe(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
         }
         return;
     }
     if status.0 != 0
-        && let Err(e) =
-            unsafe { SetWindowTextW(status, PCWSTR(to_wide(&label_set.status_loading).as_ptr())) }
+        && let Err(e) = crate::set_window_text_w_safe(
+            status,
+            PCWSTR(to_wide(&label_set.status_loading).as_ptr()),
+        )
     {
         crate::log_debug(&format!("SetWindowTextW failed: {}", e));
     }
     if results.0 != 0 {
-        unsafe { SendMessageW(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0)) };
+        crate::send_message_w_safe(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
     }
 
     let generation = SEARCH_GENERATION
@@ -730,12 +734,10 @@ fn start_import(hwnd: HWND) {
     };
     let label_set = labels(language);
     if let Some(status) = with_window_state(hwnd, |state| state.status)
-        && let Err(e) = unsafe {
-            SetWindowTextW(
-                status,
-                PCWSTR(to_wide(&label_set.status_importing).as_ptr()),
-            )
-        }
+        && let Err(e) = crate::set_window_text_w_safe(
+            status,
+            PCWSTR(to_wide(&label_set.status_importing).as_ptr()),
+        )
     {
         crate::log_debug(&format!("SetWindowTextW failed: {}", e));
     }

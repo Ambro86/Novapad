@@ -17,7 +17,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::{
     BST_CHECKED, BST_UNCHECKED, WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_STATIC,
 };
@@ -81,7 +80,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         let key = msg.wParam.0 as u32;
 
         if key == VK_ESCAPE.0 as u32 {
-            unsafe { SendMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) };
+            crate::send_message_w_safe(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
             return true;
         }
         if ctrl && !shift {
@@ -231,7 +230,7 @@ pub fn open(parent: HWND) {
         return;
     }
 
-    let hinstance = HINSTANCE(unsafe { GetModuleHandleW(None).unwrap_or_default().0 });
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(PODCAST_CLASS_NAME);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
@@ -1340,7 +1339,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
 }
 
 fn with_podcast_state<T>(hwnd: HWND, f: impl FnOnce(&mut PodcastState) -> T) -> Option<T> {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA);
     if ptr == 0 {
         return None;
     }

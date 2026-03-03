@@ -214,6 +214,11 @@ fn parse_format(fmt: &WAVEFORMATEX) -> (u32, u16, SampleFormat) {
     (rate, channels, format)
 }
 
+fn parse_mix_format_ptr(mix_format: *mut WAVEFORMATEX) -> Result<(u32, u16, SampleFormat), String> {
+    crate::with_raw_mut_ptr_safe(mix_format, |fmt| parse_format(fmt))
+        .ok_or_else(|| "GetMixFormat returned null pointer".to_string())
+}
+
 fn read_samples(ptr: *mut u8, frames: u32, channels: u16, format: SampleFormat) -> Vec<f32> {
     let sample_count = frames as usize * channels as usize;
     if ptr.is_null() || sample_count == 0 {
@@ -287,7 +292,7 @@ fn capture_loop(
             .GetMixFormat()
             .map_err(|e| format!("GetMixFormat failed: {e}"))?
     };
-    let (input_rate, input_channels, input_format) = parse_format(unsafe { &*mix_format });
+    let (input_rate, input_channels, input_format) = parse_mix_format_ptr(mix_format)?;
     crate::log_debug(&format!(
         "Monitor capture: rate={}, channels={}, format={:?}",
         input_rate,
@@ -395,7 +400,7 @@ fn playback_loop(
             .GetMixFormat()
             .map_err(|e| format!("GetMixFormat failed: {e}"))?
     };
-    let (output_rate, output_channels, output_format) = parse_format(unsafe { &*mix_format });
+    let (output_rate, output_channels, output_format) = parse_mix_format_ptr(mix_format)?;
     crate::log_debug(&format!(
         "Monitor playback: rate={}, channels={}, format={:?}",
         output_rate,

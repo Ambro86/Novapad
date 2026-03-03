@@ -842,7 +842,7 @@ fn capture_source(options: CaptureOptions) -> Result<(), String> {
             .GetMixFormat()
             .map_err(|e| format!("GetMixFormat failed: {e}"))?
     };
-    let (input_rate, input_channels, input_format) = parse_format(unsafe { &*mix_format });
+    let (input_rate, input_channels, input_format) = parse_mix_format_ptr(mix_format)?;
 
     let mut stream_flags = 0;
     if options.loopback {
@@ -1056,6 +1056,11 @@ fn parse_format(fmt: &WAVEFORMATEX) -> (u32, u16, SampleFormat) {
         }
     }
     (rate, channels, format)
+}
+
+fn parse_mix_format_ptr(mix_format: *mut WAVEFORMATEX) -> Result<(u32, u16, SampleFormat), String> {
+    crate::with_raw_mut_ptr_safe(mix_format, |fmt| parse_format(fmt))
+        .ok_or_else(|| "GetMixFormat returned null pointer".to_string())
 }
 
 fn read_samples(ptr: *mut u8, frames: u32, channels: u16, format: SampleFormat) -> Vec<f32> {

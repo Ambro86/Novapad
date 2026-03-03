@@ -417,6 +417,120 @@ pub(crate) fn ffmpeg_api() -> Result<&'static FfmpegApi, String> {
     res.as_ref().map_err(|e| e.clone())
 }
 
+pub(crate) fn avformat_close_input_safe(api: &FfmpegApi, fmt_ctx: *mut *mut AVFormatContext) {
+    unsafe { (api.avformat_close_input)(fmt_ctx) }
+}
+
+pub(crate) fn avformat_open_input_safe(
+    api: &FfmpegApi,
+    ps: *mut *mut AVFormatContext,
+    url: *const i8,
+    fmt: *mut AVInputFormat,
+    options: *mut *mut AVDictionary,
+) -> i32 {
+    unsafe { (api.avformat_open_input)(ps, url, fmt, options) }
+}
+
+pub(crate) fn avformat_find_stream_info_safe(
+    api: &FfmpegApi,
+    ic: *mut AVFormatContext,
+    options: *mut *mut AVDictionary,
+) -> i32 {
+    unsafe { (api.avformat_find_stream_info)(ic, options) }
+}
+
+pub(crate) fn av_find_best_stream_safe(
+    api: &FfmpegApi,
+    ic: *mut AVFormatContext,
+    typ: AVMediaType,
+    wanted_stream_nb: i32,
+    related_stream: i32,
+    decoder_ret: *mut *const AVCodec,
+    flags: i32,
+) -> i32 {
+    unsafe {
+        (api.av_find_best_stream)(
+            ic,
+            typ,
+            wanted_stream_nb,
+            related_stream,
+            decoder_ret,
+            flags,
+        )
+    }
+}
+
+pub(crate) fn av_packet_alloc_safe(api: &FfmpegApi) -> *mut AVPacket {
+    unsafe { (api.av_packet_alloc)() }
+}
+
+pub(crate) fn avformat_free_context_safe(api: &FfmpegApi, s: *mut AVFormatContext) {
+    unsafe { (api.avformat_free_context)(s) }
+}
+
+pub(crate) fn avformat_new_stream_safe(
+    api: &FfmpegApi,
+    s: *mut AVFormatContext,
+    c: *const AVCodec,
+) -> *mut AVStream {
+    unsafe { (api.avformat_new_stream)(s, c) }
+}
+
+pub(crate) fn avformat_alloc_output_context2_safe(
+    api: &FfmpegApi,
+    ctx: *mut *mut AVFormatContext,
+    oformat: *mut AVOutputFormat,
+    format_name: *const i8,
+    filename: *const i8,
+) -> i32 {
+    unsafe { (api.avformat_alloc_output_context2)(ctx, oformat, format_name, filename) }
+}
+
+pub(crate) fn avformat_write_header_safe(
+    api: &FfmpegApi,
+    s: *mut AVFormatContext,
+    options: *mut *mut AVDictionary,
+) -> i32 {
+    unsafe { (api.avformat_write_header)(s, options) }
+}
+
+pub(crate) fn avio_open_safe(
+    api: &FfmpegApi,
+    s: *mut *mut AVIOContext,
+    url: *const i8,
+    flags: i32,
+) -> i32 {
+    unsafe { (api.avio_open)(s, url, flags) }
+}
+
+pub(crate) fn av_read_frame_safe(
+    api: &FfmpegApi,
+    s: *mut AVFormatContext,
+    pkt: *mut AVPacket,
+) -> i32 {
+    unsafe { (api.av_read_frame)(s, pkt) }
+}
+
+pub(crate) fn avcodec_alloc_context3_safe(
+    api: &FfmpegApi,
+    codec: *const AVCodec,
+) -> *mut AVCodecContext {
+    unsafe { (api.avcodec_alloc_context3)(codec) }
+}
+
+pub(crate) fn avcodec_open2_safe(
+    api: &FfmpegApi,
+    avctx: *mut AVCodecContext,
+    codec: *const AVCodec,
+    options: *mut *mut AVDictionary,
+) -> i32 {
+    unsafe { (api.avcodec_open2)(avctx, codec, options) }
+}
+
+pub(crate) fn av_frame_alloc_safe(api: &FfmpegApi) -> *mut AVFrame {
+    unsafe { (api.av_frame_alloc)() }
+}
+
 fn ffmpeg_err(api: &FfmpegApi, code: i32) -> String {
     let mut buf = [0i8; 256];
     let ret = unsafe { (api.av_strerror)(code, buf.as_mut_ptr(), buf.len()) };
@@ -483,14 +597,13 @@ pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
         .map_err(|_| "FFmpeg: invalid path".to_string())?;
 
     let mut fmt_ctx: *mut AVFormatContext = ptr::null_mut();
-    let open_ret = unsafe {
-        (api.avformat_open_input)(
-            &mut fmt_ctx,
-            path_c.as_ptr(),
-            ptr::null_mut(),
-            ptr::null_mut(),
-        )
-    };
+    let open_ret = crate::ffmpeg_source::avformat_open_input_safe(
+        api,
+        &mut fmt_ctx,
+        path_c.as_ptr(),
+        ptr::null_mut(),
+        ptr::null_mut(),
+    );
     if open_ret < 0 || fmt_ctx.is_null() {
         return Err(format!(
             "FFmpeg: input open failed: {}",
@@ -498,9 +611,10 @@ pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
         ));
     }
 
-    let info_ret = unsafe { (api.avformat_find_stream_info)(fmt_ctx, ptr::null_mut()) };
+    let info_ret =
+        crate::ffmpeg_source::avformat_find_stream_info_safe(api, fmt_ctx, ptr::null_mut());
     if info_ret < 0 {
-        unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
         return Err(format!(
             "FFmpeg: stream info failed: {}",
             ffmpeg_err(api, info_ret)
@@ -508,23 +622,22 @@ pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
     }
 
     // Find the default audio stream index
-    let default_stream = unsafe {
-        (api.av_find_best_stream)(
-            fmt_ctx,
-            AVMediaType_AVMEDIA_TYPE_AUDIO,
-            -1,
-            -1,
-            ptr::null_mut(),
-            0,
-        )
-    };
+    let default_stream = crate::ffmpeg_source::av_find_best_stream_safe(
+        api,
+        fmt_ctx,
+        AVMediaType_AVMEDIA_TYPE_AUDIO,
+        -1,
+        -1,
+        ptr::null_mut(),
+        0,
+    );
 
     let mut streams = Vec::new();
     let nb_streams = unsafe { (*fmt_ctx).nb_streams };
     let streams_ptr = unsafe { (*fmt_ctx).streams };
 
     if streams_ptr.is_null() {
-        unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
         return Ok(streams);
     }
 
@@ -577,7 +690,7 @@ pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
         });
     }
 
-    unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+    crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
     Ok(streams)
 }
 
@@ -630,14 +743,13 @@ impl FfmpegSource {
             .map_err(|_| "FFmpeg: invalid path".to_string())?;
 
         let mut fmt_ctx: *mut AVFormatContext = ptr::null_mut();
-        let open_ret = unsafe {
-            (api.avformat_open_input)(
-                &mut fmt_ctx,
-                path_c.as_ptr(),
-                ptr::null_mut(),
-                ptr::null_mut(),
-            )
-        };
+        let open_ret = crate::ffmpeg_source::avformat_open_input_safe(
+            api,
+            &mut fmt_ctx,
+            path_c.as_ptr(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+        );
         if open_ret < 0 || fmt_ctx.is_null() {
             return Err(format!(
                 "FFmpeg: input open failed: {}",
@@ -645,9 +757,10 @@ impl FfmpegSource {
             ));
         }
 
-        let info_ret = unsafe { (api.avformat_find_stream_info)(fmt_ctx, ptr::null_mut()) };
+        let info_ret =
+            crate::ffmpeg_source::avformat_find_stream_info_safe(api, fmt_ctx, ptr::null_mut());
         if info_ret < 0 {
-            unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+            crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
             return Err(format!(
                 "FFmpeg: stream info failed: {}",
                 ffmpeg_err(api, info_ret)
@@ -659,7 +772,7 @@ impl FfmpegSource {
             // Validate that the preferred stream exists and is an audio stream
             let nb_streams = unsafe { (*fmt_ctx).nb_streams } as i32;
             if preferred < 0 || preferred >= nb_streams {
-                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err(format!(
                     "FFmpeg: stream index {} out of range (0-{})",
                     preferred,
@@ -668,17 +781,17 @@ impl FfmpegSource {
             }
             let streams = unsafe { (*fmt_ctx).streams };
             if streams.is_null() {
-                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err("FFmpeg: stream list missing".to_string());
             }
             let stream = unsafe { *streams.add(preferred as usize) };
             if stream.is_null() {
-                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err(format!("FFmpeg: stream {} is null", preferred));
             }
             let codecpar = unsafe { (*stream).codecpar };
             if codecpar.is_null() {
-                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err(format!(
                     "FFmpeg: stream {} has no codec parameters",
                     preferred
@@ -686,7 +799,7 @@ impl FfmpegSource {
             }
             let codec_type = unsafe { (*codecpar).codec_type };
             if codec_type != AVMediaType_AVMEDIA_TYPE_AUDIO {
-                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err(format!(
                     "FFmpeg: stream {} is not an audio stream",
                     preferred
@@ -699,18 +812,17 @@ impl FfmpegSource {
             preferred
         } else {
             // Use the best audio stream
-            let idx = unsafe {
-                (api.av_find_best_stream)(
-                    fmt_ctx,
-                    AVMediaType_AVMEDIA_TYPE_AUDIO,
-                    -1,
-                    -1,
-                    ptr::null_mut(),
-                    0,
-                )
-            };
+            let idx = crate::ffmpeg_source::av_find_best_stream_safe(
+                api,
+                fmt_ctx,
+                AVMediaType_AVMEDIA_TYPE_AUDIO,
+                -1,
+                -1,
+                ptr::null_mut(),
+                0,
+            );
             if idx < 0 {
-                unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+                crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
                 return Err("FFmpeg: audio stream not found".to_string());
             }
             idx
@@ -725,13 +837,13 @@ impl FfmpegSource {
             *streams.add(stream_index as usize)
         };
         if stream.is_null() {
-            unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+            crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
             return Err("FFmpeg: audio stream pointer missing".to_string());
         }
 
         let codecpar = unsafe { (*stream).codecpar };
         if codecpar.is_null() {
-            unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+            crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
             return Err("FFmpeg: codec parameters missing".to_string());
         }
 
@@ -739,7 +851,7 @@ impl FfmpegSource {
         log_debug(&format!("FFmpeg: codec_id={}", codec_id));
         let codec = unsafe { (api.avcodec_find_decoder)(codec_id) };
         if codec.is_null() {
-            unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+            crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
             return Err(format!(
                 "FFmpeg: decoder not found for codec_id={}",
                 codec_id
@@ -747,9 +859,9 @@ impl FfmpegSource {
         }
         log_debug("FFmpeg: decoder found");
 
-        let mut codec_ctx = unsafe { (api.avcodec_alloc_context3)(codec) };
+        let mut codec_ctx = crate::ffmpeg_source::avcodec_alloc_context3_safe(api, codec);
         if codec_ctx.is_null() {
-            unsafe { (api.avformat_close_input)(&mut fmt_ctx) };
+            crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
             return Err("FFmpeg: failed to allocate codec context".to_string());
         }
 
@@ -765,7 +877,8 @@ impl FfmpegSource {
             ));
         }
 
-        let open_ret = unsafe { (api.avcodec_open2)(codec_ctx, codec, ptr::null_mut()) };
+        let open_ret =
+            crate::ffmpeg_source::avcodec_open2_safe(api, codec_ctx, codec, ptr::null_mut());
         if open_ret < 0 {
             unsafe {
                 (api.avcodec_free_context)(&mut codec_ctx);
@@ -779,7 +892,7 @@ impl FfmpegSource {
 
         let (mut swr_ctx, channels, sample_rate) = Self::init_resampler(api, codec_ctx, codecpar)?;
 
-        let mut packet = unsafe { (api.av_packet_alloc)() };
+        let mut packet = crate::ffmpeg_source::av_packet_alloc_safe(api);
         if packet.is_null() {
             unsafe {
                 (api.swr_free)(&mut swr_ctx);
@@ -789,7 +902,7 @@ impl FfmpegSource {
             return Err("FFmpeg: packet alloc failed".to_string());
         }
 
-        let frame = unsafe { (api.av_frame_alloc)() };
+        let frame = crate::ffmpeg_source::av_frame_alloc_safe(api);
         if frame.is_null() {
             unsafe {
                 (api.av_packet_free)(&mut packet);

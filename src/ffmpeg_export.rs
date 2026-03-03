@@ -395,52 +395,49 @@ pub fn segment_audio_file(
     let mut in_ctx: *mut AVFormatContext = ptr::null_mut();
     let mut out_ctx: *mut AVFormatContext = ptr::null_mut();
 
-    let open_ret = unsafe {
-        (api.avformat_open_input)(
-            &mut in_ctx,
-            input_c.as_ptr(),
-            ptr::null_mut(),
-            ptr::null_mut(),
-        )
-    };
+    let open_ret = crate::ffmpeg_source::avformat_open_input_safe(
+        api,
+        &mut in_ctx,
+        input_c.as_ptr(),
+        ptr::null_mut(),
+        ptr::null_mut(),
+    );
     if open_ret < 0 || in_ctx.is_null() {
         return Err("FFmpeg: failed to open input".to_string());
     }
-    if unsafe { (api.avformat_find_stream_info)(in_ctx, ptr::null_mut()) } < 0 {
-        unsafe { (api.avformat_close_input)(&mut in_ctx) };
+    if crate::ffmpeg_source::avformat_find_stream_info_safe(api, in_ctx, ptr::null_mut()) < 0 {
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
         return Err("FFmpeg: input stream info failed".to_string());
     }
 
-    let audio_stream_idx = unsafe {
-        (api.av_find_best_stream)(
-            in_ctx,
-            AVMediaType_AVMEDIA_TYPE_AUDIO,
-            -1,
-            -1,
-            ptr::null_mut(),
-            0,
-        )
-    };
+    let audio_stream_idx = crate::ffmpeg_source::av_find_best_stream_safe(
+        api,
+        in_ctx,
+        AVMediaType_AVMEDIA_TYPE_AUDIO,
+        -1,
+        -1,
+        ptr::null_mut(),
+        0,
+    );
     if audio_stream_idx < 0 {
-        unsafe { (api.avformat_close_input)(&mut in_ctx) };
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
         return Err("FFmpeg: audio stream not found".to_string());
     }
 
-    let alloc_ret = unsafe {
-        (api.avformat_alloc_output_context2)(
-            &mut out_ctx,
-            ptr::null_mut(),
-            format_c.as_ptr(),
-            output_c.as_ptr(),
-        )
-    };
+    let alloc_ret = crate::ffmpeg_source::avformat_alloc_output_context2_safe(
+        api,
+        &mut out_ctx,
+        ptr::null_mut(),
+        format_c.as_ptr(),
+        output_c.as_ptr(),
+    );
     if alloc_ret < 0 || out_ctx.is_null() {
-        unsafe { (api.avformat_close_input)(&mut in_ctx) };
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
         return Err("FFmpeg: failed to allocate segment output".to_string());
     }
 
     let in_stream = unsafe { *(*in_ctx).streams.add(audio_stream_idx as usize) };
-    let out_stream = unsafe { (api.avformat_new_stream)(out_ctx, ptr::null()) };
+    let out_stream = crate::ffmpeg_source::avformat_new_stream_safe(api, out_ctx, ptr::null());
     if out_stream.is_null() {
         unsafe {
             (api.avformat_free_context)(out_ctx);
@@ -474,7 +471,7 @@ pub fn segment_audio_file(
         dict_set_str(api, &mut dict, "segment_format", fmt)?;
     }
 
-    let header_ret = unsafe { (api.avformat_write_header)(out_ctx, &mut dict) };
+    let header_ret = crate::ffmpeg_source::avformat_write_header_safe(api, out_ctx, &mut dict);
     unsafe {
         (api.av_dict_free)(&mut dict);
     }
@@ -486,7 +483,7 @@ pub fn segment_audio_file(
         return Err("FFmpeg: failed to write segment header".to_string());
     }
 
-    let mut pkt = unsafe { (api.av_packet_alloc)() };
+    let mut pkt = crate::ffmpeg_source::av_packet_alloc_safe(api);
     if pkt.is_null() {
         unsafe {
             (api.av_write_trailer)(out_ctx);
@@ -497,7 +494,7 @@ pub fn segment_audio_file(
     }
 
     loop {
-        let read_ret = unsafe { (api.av_read_frame)(in_ctx, pkt) };
+        let read_ret = crate::ffmpeg_source::av_read_frame_safe(api, in_ctx, pkt);
         if read_ret < 0 {
             break;
         }
@@ -555,14 +552,13 @@ pub fn merge_audio_files_with_chapters_copy(
     let out_c = CString::new(output_path.to_string_lossy().as_bytes())
         .map_err(|_| "FFmpeg: invalid output path".to_string())?;
     let mut out_ctx: *mut AVFormatContext = ptr::null_mut();
-    let alloc_ret = unsafe {
-        (api.avformat_alloc_output_context2)(
-            &mut out_ctx,
-            ptr::null_mut(),
-            ptr::null(),
-            out_c.as_ptr(),
-        )
-    };
+    let alloc_ret = crate::ffmpeg_source::avformat_alloc_output_context2_safe(
+        api,
+        &mut out_ctx,
+        ptr::null_mut(),
+        ptr::null(),
+        out_c.as_ptr(),
+    );
     if alloc_ret < 0 || out_ctx.is_null() {
         return Err("FFmpeg: failed to allocate output context".to_string());
     }
@@ -570,35 +566,34 @@ pub fn merge_audio_files_with_chapters_copy(
     let mut first_in_ctx: *mut AVFormatContext = ptr::null_mut();
     let first_c = CString::new(input_files[0].to_string_lossy().as_bytes())
         .map_err(|_| "FFmpeg: invalid first input path".to_string())?;
-    let first_open = unsafe {
-        (api.avformat_open_input)(
-            &mut first_in_ctx,
-            first_c.as_ptr(),
-            ptr::null_mut(),
-            ptr::null_mut(),
-        )
-    };
+    let first_open = crate::ffmpeg_source::avformat_open_input_safe(
+        api,
+        &mut first_in_ctx,
+        first_c.as_ptr(),
+        ptr::null_mut(),
+        ptr::null_mut(),
+    );
     if first_open < 0 || first_in_ctx.is_null() {
-        unsafe { (api.avformat_free_context)(out_ctx) };
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
         return Err("FFmpeg: failed to open first input".to_string());
     }
-    if unsafe { (api.avformat_find_stream_info)(first_in_ctx, ptr::null_mut()) } < 0 {
+    if crate::ffmpeg_source::avformat_find_stream_info_safe(api, first_in_ctx, ptr::null_mut()) < 0
+    {
         unsafe {
             (api.avformat_close_input)(&mut first_in_ctx);
             (api.avformat_free_context)(out_ctx);
         }
         return Err("FFmpeg: failed to read first input stream info".to_string());
     }
-    let first_audio_idx = unsafe {
-        (api.av_find_best_stream)(
-            first_in_ctx,
-            AVMediaType_AVMEDIA_TYPE_AUDIO,
-            -1,
-            -1,
-            ptr::null_mut(),
-            0,
-        )
-    };
+    let first_audio_idx = crate::ffmpeg_source::av_find_best_stream_safe(
+        api,
+        first_in_ctx,
+        AVMediaType_AVMEDIA_TYPE_AUDIO,
+        -1,
+        -1,
+        ptr::null_mut(),
+        0,
+    );
     if first_audio_idx < 0 {
         unsafe {
             (api.avformat_close_input)(&mut first_in_ctx);
@@ -607,7 +602,7 @@ pub fn merge_audio_files_with_chapters_copy(
         return Err("FFmpeg: no audio stream in first input".to_string());
     }
     let in_stream = unsafe { *(*first_in_ctx).streams.add(first_audio_idx as usize) };
-    let out_stream = unsafe { (api.avformat_new_stream)(out_ctx, ptr::null()) };
+    let out_stream = crate::ffmpeg_source::avformat_new_stream_safe(api, out_ctx, ptr::null());
     if out_stream.is_null() {
         unsafe {
             (api.avformat_close_input)(&mut first_in_ctx);
@@ -673,7 +668,8 @@ pub fn merge_audio_files_with_chapters_copy(
     }
 
     let mut io: *mut AVIOContext = ptr::null_mut();
-    let open_io = unsafe { (api.avio_open)(&mut io, out_c.as_ptr(), AVIO_FLAG_WRITE) };
+    let open_io =
+        crate::ffmpeg_source::avio_open_safe(api, &mut io, out_c.as_ptr(), AVIO_FLAG_WRITE);
     if open_io < 0 {
         unsafe {
             (api.avformat_close_input)(&mut first_in_ctx);
@@ -685,7 +681,8 @@ pub fn merge_audio_files_with_chapters_copy(
         (*out_ctx).pb = io;
     }
 
-    let header_ret = unsafe { (api.avformat_write_header)(out_ctx, ptr::null_mut()) };
+    let header_ret =
+        crate::ffmpeg_source::avformat_write_header_safe(api, out_ctx, ptr::null_mut());
     if header_ret < 0 {
         unsafe {
             (api.avio_closep)(&mut io);
@@ -715,14 +712,13 @@ pub fn merge_audio_files_with_chapters_copy(
         let mut in_ctx: *mut AVFormatContext = ptr::null_mut();
         let input_c = CString::new(input.to_string_lossy().as_bytes())
             .map_err(|_| "FFmpeg: invalid input path".to_string())?;
-        let open_ret = unsafe {
-            (api.avformat_open_input)(
-                &mut in_ctx,
-                input_c.as_ptr(),
-                ptr::null_mut(),
-                ptr::null_mut(),
-            )
-        };
+        let open_ret = crate::ffmpeg_source::avformat_open_input_safe(
+            api,
+            &mut in_ctx,
+            input_c.as_ptr(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+        );
         if open_ret < 0 || in_ctx.is_null() {
             unsafe {
                 (api.avio_closep)(&mut io);
@@ -730,7 +726,7 @@ pub fn merge_audio_files_with_chapters_copy(
             };
             return Err(format!("FFmpeg: failed to open {}", input.display()));
         }
-        if unsafe { (api.avformat_find_stream_info)(in_ctx, ptr::null_mut()) } < 0 {
+        if crate::ffmpeg_source::avformat_find_stream_info_safe(api, in_ctx, ptr::null_mut()) < 0 {
             unsafe {
                 (api.avformat_close_input)(&mut in_ctx);
                 (api.avio_closep)(&mut io);
@@ -741,16 +737,15 @@ pub fn merge_audio_files_with_chapters_copy(
                 input.display()
             ));
         }
-        let audio_idx = unsafe {
-            (api.av_find_best_stream)(
-                in_ctx,
-                AVMediaType_AVMEDIA_TYPE_AUDIO,
-                -1,
-                -1,
-                ptr::null_mut(),
-                0,
-            )
-        };
+        let audio_idx = crate::ffmpeg_source::av_find_best_stream_safe(
+            api,
+            in_ctx,
+            AVMediaType_AVMEDIA_TYPE_AUDIO,
+            -1,
+            -1,
+            ptr::null_mut(),
+            0,
+        );
         if audio_idx < 0 {
             unsafe {
                 (api.avformat_close_input)(&mut in_ctx);
@@ -783,7 +778,7 @@ pub fn merge_audio_files_with_chapters_copy(
                 }
             }
         };
-        let mut pkt = unsafe { (api.av_packet_alloc)() };
+        let mut pkt = crate::ffmpeg_source::av_packet_alloc_safe(api);
         if pkt.is_null() {
             unsafe {
                 (api.avformat_close_input)(&mut in_ctx);
@@ -801,7 +796,7 @@ pub fn merge_audio_files_with_chapters_copy(
         let mut part_max_end_ts = part_cursor_ts;
         let mut packets_written_in_part: usize = 0;
         loop {
-            let read_ret = unsafe { (api.av_read_frame)(in_ctx, pkt) };
+            let read_ret = crate::ffmpeg_source::av_read_frame_safe(api, in_ctx, pkt);
             if read_ret < 0 {
                 break;
             }
@@ -1026,7 +1021,7 @@ fn read_next_packet_for_stream(
     stream_idx: i32,
 ) -> bool {
     loop {
-        let ret = unsafe { (api.av_read_frame)(ctx, pkt) };
+        let ret = crate::ffmpeg_source::av_read_frame_safe(api, ctx, pkt);
         if ret < 0 {
             return false;
         }
@@ -1082,31 +1077,30 @@ fn encode_mixed_audio_to_m4a(
     let out_path_c = CString::new(out_audio_path.to_string_lossy().as_bytes())
         .map_err(|_| "FFmpeg: invalid output path".to_string())?;
     let mut out_ctx: *mut AVFormatContext = ptr::null_mut();
-    let alloc_ret = unsafe {
-        (api.avformat_alloc_output_context2)(
-            &mut out_ctx,
-            ptr::null_mut(),
-            ptr::null(),
-            out_path_c.as_ptr(),
-        )
-    };
+    let alloc_ret = crate::ffmpeg_source::avformat_alloc_output_context2_safe(
+        api,
+        &mut out_ctx,
+        ptr::null_mut(),
+        ptr::null(),
+        out_path_c.as_ptr(),
+    );
     if alloc_ret < 0 || out_ctx.is_null() {
         return Err("FFmpeg: failed to allocate output context".to_string());
     }
 
     let codec = unsafe { (api.avcodec_find_encoder)(AVCodecID_AV_CODEC_ID_AAC) };
     if codec.is_null() {
-        unsafe { (api.avformat_free_context)(out_ctx) };
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
         return Err("FFmpeg: AAC encoder not found".to_string());
     }
-    let stream = unsafe { (api.avformat_new_stream)(out_ctx, codec) };
+    let stream = crate::ffmpeg_source::avformat_new_stream_safe(api, out_ctx, codec);
     if stream.is_null() {
-        unsafe { (api.avformat_free_context)(out_ctx) };
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
         return Err("FFmpeg: failed to create output stream".to_string());
     }
-    let mut codec_ctx = unsafe { (api.avcodec_alloc_context3)(codec) };
+    let mut codec_ctx = crate::ffmpeg_source::avcodec_alloc_context3_safe(api, codec);
     if codec_ctx.is_null() {
-        unsafe { (api.avformat_free_context)(out_ctx) };
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
         return Err("FFmpeg: failed to allocate encoder context".to_string());
     }
     let enc_fmt = pick_encoder_sample_fmt(codec);
@@ -1122,7 +1116,7 @@ fn encode_mixed_audio_to_m4a(
         (api.av_channel_layout_default)(&mut out_layout, channels as i32);
         (*codec_ctx).ch_layout = out_layout;
     }
-    let open_ret = unsafe { (api.avcodec_open2)(codec_ctx, codec, ptr::null_mut()) };
+    let open_ret = crate::ffmpeg_source::avcodec_open2_safe(api, codec_ctx, codec, ptr::null_mut());
     if open_ret < 0 {
         unsafe {
             (api.avcodec_free_context)(&mut codec_ctx);
@@ -1141,7 +1135,8 @@ fn encode_mixed_audio_to_m4a(
     }
 
     let mut io: *mut AVIOContext = ptr::null_mut();
-    let open_io = unsafe { (api.avio_open)(&mut io, out_path_c.as_ptr(), AVIO_FLAG_WRITE) };
+    let open_io =
+        crate::ffmpeg_source::avio_open_safe(api, &mut io, out_path_c.as_ptr(), AVIO_FLAG_WRITE);
     if open_io < 0 {
         unsafe {
             (api.avcodec_free_context)(&mut codec_ctx);
@@ -1152,7 +1147,8 @@ fn encode_mixed_audio_to_m4a(
     unsafe {
         (*out_ctx).pb = io;
     }
-    let header_ret = unsafe { (api.avformat_write_header)(out_ctx, ptr::null_mut()) };
+    let header_ret =
+        crate::ffmpeg_source::avformat_write_header_safe(api, out_ctx, ptr::null_mut());
     if header_ret < 0 {
         unsafe {
             (api.avio_closep)(&mut io);
@@ -1163,7 +1159,7 @@ fn encode_mixed_audio_to_m4a(
     }
 
     let frame_size = unsafe { (*codec_ctx).frame_size }.max(1024) as usize;
-    let mut frame = unsafe { (api.av_frame_alloc)() };
+    let mut frame = crate::ffmpeg_source::av_frame_alloc_safe(api);
     if frame.is_null() {
         unsafe {
             (api.avio_closep)(&mut io);
@@ -1347,7 +1343,7 @@ fn encode_mixed_audio_to_m4a(
             return Err("FFmpeg: send_frame failed".to_string());
         }
         loop {
-            let mut pkt = unsafe { (api.av_packet_alloc)() };
+            let mut pkt = crate::ffmpeg_source::av_packet_alloc_safe(api);
             if pkt.is_null() {
                 return Err("FFmpeg: packet alloc failed".to_string());
             }
@@ -1424,37 +1420,35 @@ fn mux_video_with_audio(
     let mut in_audio: *mut AVFormatContext = ptr::null_mut();
     let mut out_ctx: *mut AVFormatContext = ptr::null_mut();
 
-    let open_vid = unsafe {
-        (api.avformat_open_input)(
-            &mut in_video,
-            video_c.as_ptr(),
-            ptr::null_mut(),
-            ptr::null_mut(),
-        )
-    };
+    let open_vid = crate::ffmpeg_source::avformat_open_input_safe(
+        api,
+        &mut in_video,
+        video_c.as_ptr(),
+        ptr::null_mut(),
+        ptr::null_mut(),
+    );
     if open_vid < 0 || in_video.is_null() {
         return Err("FFmpeg: failed to open video input".to_string());
     }
-    let open_aud = unsafe {
-        (api.avformat_open_input)(
-            &mut in_audio,
-            audio_c.as_ptr(),
-            ptr::null_mut(),
-            ptr::null_mut(),
-        )
-    };
+    let open_aud = crate::ffmpeg_source::avformat_open_input_safe(
+        api,
+        &mut in_audio,
+        audio_c.as_ptr(),
+        ptr::null_mut(),
+        ptr::null_mut(),
+    );
     if open_aud < 0 || in_audio.is_null() {
-        unsafe { (api.avformat_close_input)(&mut in_video) };
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_video);
         return Err("FFmpeg: failed to open audio input".to_string());
     }
-    if unsafe { (api.avformat_find_stream_info)(in_video, ptr::null_mut()) } < 0 {
+    if crate::ffmpeg_source::avformat_find_stream_info_safe(api, in_video, ptr::null_mut()) < 0 {
         unsafe {
             (api.avformat_close_input)(&mut in_audio);
             (api.avformat_close_input)(&mut in_video);
         }
         return Err("FFmpeg: video stream info failed".to_string());
     }
-    if unsafe { (api.avformat_find_stream_info)(in_audio, ptr::null_mut()) } < 0 {
+    if crate::ffmpeg_source::avformat_find_stream_info_safe(api, in_audio, ptr::null_mut()) < 0 {
         unsafe {
             (api.avformat_close_input)(&mut in_audio);
             (api.avformat_close_input)(&mut in_video);
@@ -1462,16 +1456,15 @@ fn mux_video_with_audio(
         return Err("FFmpeg: audio stream info failed".to_string());
     }
 
-    let video_stream_idx = unsafe {
-        (api.av_find_best_stream)(
-            in_video,
-            AVMediaType_AVMEDIA_TYPE_VIDEO,
-            -1,
-            -1,
-            ptr::null_mut(),
-            0,
-        )
-    };
+    let video_stream_idx = crate::ffmpeg_source::av_find_best_stream_safe(
+        api,
+        in_video,
+        AVMediaType_AVMEDIA_TYPE_VIDEO,
+        -1,
+        -1,
+        ptr::null_mut(),
+        0,
+    );
     if video_stream_idx < 0 {
         unsafe {
             (api.avformat_close_input)(&mut in_audio);
@@ -1479,16 +1472,15 @@ fn mux_video_with_audio(
         }
         return Err("FFmpeg: video stream not found".to_string());
     }
-    let audio_stream_idx = unsafe {
-        (api.av_find_best_stream)(
-            in_audio,
-            AVMediaType_AVMEDIA_TYPE_AUDIO,
-            -1,
-            -1,
-            ptr::null_mut(),
-            0,
-        )
-    };
+    let audio_stream_idx = crate::ffmpeg_source::av_find_best_stream_safe(
+        api,
+        in_audio,
+        AVMediaType_AVMEDIA_TYPE_AUDIO,
+        -1,
+        -1,
+        ptr::null_mut(),
+        0,
+    );
     if audio_stream_idx < 0 {
         unsafe {
             (api.avformat_close_input)(&mut in_audio);
@@ -1497,14 +1489,13 @@ fn mux_video_with_audio(
         return Err("FFmpeg: audio stream not found".to_string());
     }
 
-    let alloc_ret = unsafe {
-        (api.avformat_alloc_output_context2)(
-            &mut out_ctx,
-            ptr::null_mut(),
-            ptr::null(),
-            out_c.as_ptr(),
-        )
-    };
+    let alloc_ret = crate::ffmpeg_source::avformat_alloc_output_context2_safe(
+        api,
+        &mut out_ctx,
+        ptr::null_mut(),
+        ptr::null(),
+        out_c.as_ptr(),
+    );
     if alloc_ret < 0 || out_ctx.is_null() {
         unsafe {
             (api.avformat_close_input)(&mut in_audio);
@@ -1515,8 +1506,8 @@ fn mux_video_with_audio(
 
     let in_v_stream = unsafe { *(*in_video).streams.add(video_stream_idx as usize) };
     let in_a_stream = unsafe { *(*in_audio).streams.add(audio_stream_idx as usize) };
-    let out_v_stream = unsafe { (api.avformat_new_stream)(out_ctx, ptr::null()) };
-    let out_a_stream = unsafe { (api.avformat_new_stream)(out_ctx, ptr::null()) };
+    let out_v_stream = crate::ffmpeg_source::avformat_new_stream_safe(api, out_ctx, ptr::null());
+    let out_a_stream = crate::ffmpeg_source::avformat_new_stream_safe(api, out_ctx, ptr::null());
     if out_v_stream.is_null() || out_a_stream.is_null() {
         unsafe {
             (api.avformat_free_context)(out_ctx);
@@ -1533,7 +1524,8 @@ fn mux_video_with_audio(
     }
 
     let mut io: *mut AVIOContext = ptr::null_mut();
-    let open_io = unsafe { (api.avio_open)(&mut io, out_c.as_ptr(), AVIO_FLAG_WRITE) };
+    let open_io =
+        crate::ffmpeg_source::avio_open_safe(api, &mut io, out_c.as_ptr(), AVIO_FLAG_WRITE);
     if open_io < 0 {
         unsafe {
             (api.avformat_free_context)(out_ctx);
@@ -1545,7 +1537,8 @@ fn mux_video_with_audio(
     unsafe {
         (*out_ctx).pb = io;
     }
-    let header_ret = unsafe { (api.avformat_write_header)(out_ctx, ptr::null_mut()) };
+    let header_ret =
+        crate::ffmpeg_source::avformat_write_header_safe(api, out_ctx, ptr::null_mut());
     if header_ret < 0 {
         unsafe {
             (api.avio_closep)(&mut io);
@@ -1556,8 +1549,8 @@ fn mux_video_with_audio(
         return Err("FFmpeg: failed to write header".to_string());
     }
 
-    let mut pkt_v = unsafe { (api.av_packet_alloc)() };
-    let mut pkt_a = unsafe { (api.av_packet_alloc)() };
+    let mut pkt_v = crate::ffmpeg_source::av_packet_alloc_safe(api);
+    let mut pkt_a = crate::ffmpeg_source::av_packet_alloc_safe(api);
     let mut has_v = read_next_packet_for_stream(api, in_video, pkt_v, video_stream_idx);
     let mut has_a = read_next_packet_for_stream(api, in_audio, pkt_a, audio_stream_idx);
 
@@ -1912,14 +1905,13 @@ pub fn convert_audio_file_with_channels(
     let out_path_c = CString::new(output_path.to_string_lossy().as_bytes())
         .map_err(|_| "FFmpeg: invalid output path".to_string())?;
     let mut out_ctx: *mut AVFormatContext = ptr::null_mut();
-    let alloc_ret = unsafe {
-        (api.avformat_alloc_output_context2)(
-            &mut out_ctx,
-            ptr::null_mut(),
-            ptr::null(),
-            out_path_c.as_ptr(),
-        )
-    };
+    let alloc_ret = crate::ffmpeg_source::avformat_alloc_output_context2_safe(
+        api,
+        &mut out_ctx,
+        ptr::null_mut(),
+        ptr::null(),
+        out_path_c.as_ptr(),
+    );
     if alloc_ret < 0 || out_ctx.is_null() {
         return Err("FFmpeg: failed to allocate output context".to_string());
     }
@@ -1937,18 +1929,18 @@ pub fn convert_audio_file_with_channels(
         unsafe { (api.avcodec_find_encoder)(codec_id) }
     };
     if codec.is_null() {
-        unsafe { (api.avformat_free_context)(out_ctx) };
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
         return Err("FFmpeg: encoder not found".to_string());
     }
-    let stream = unsafe { (api.avformat_new_stream)(out_ctx, codec) };
+    let stream = crate::ffmpeg_source::avformat_new_stream_safe(api, out_ctx, codec);
     if stream.is_null() {
-        unsafe { (api.avformat_free_context)(out_ctx) };
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
         return Err("FFmpeg: failed to create output stream".to_string());
     }
 
-    let mut codec_ctx = unsafe { (api.avcodec_alloc_context3)(codec) };
+    let mut codec_ctx = crate::ffmpeg_source::avcodec_alloc_context3_safe(api, codec);
     if codec_ctx.is_null() {
-        unsafe { (api.avformat_free_context)(out_ctx) };
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
         return Err("FFmpeg: failed to allocate encoder context".to_string());
     }
 
@@ -1995,7 +1987,7 @@ pub fn convert_audio_file_with_channels(
         _ => {}
     }
 
-    let open_ret = unsafe { (api.avcodec_open2)(codec_ctx, codec, ptr::null_mut()) };
+    let open_ret = crate::ffmpeg_source::avcodec_open2_safe(api, codec_ctx, codec, ptr::null_mut());
     if open_ret < 0 {
         unsafe {
             (api.avcodec_free_context)(&mut codec_ctx);
@@ -2015,7 +2007,8 @@ pub fn convert_audio_file_with_channels(
     }
 
     let mut io: *mut AVIOContext = ptr::null_mut();
-    let open_io = unsafe { (api.avio_open)(&mut io, out_path_c.as_ptr(), AVIO_FLAG_WRITE) };
+    let open_io =
+        crate::ffmpeg_source::avio_open_safe(api, &mut io, out_path_c.as_ptr(), AVIO_FLAG_WRITE);
     if open_io < 0 {
         unsafe {
             (api.avcodec_free_context)(&mut codec_ctx);
@@ -2026,7 +2019,8 @@ pub fn convert_audio_file_with_channels(
     unsafe {
         (*out_ctx).pb = io;
     }
-    let header_ret = unsafe { (api.avformat_write_header)(out_ctx, ptr::null_mut()) };
+    let header_ret =
+        crate::ffmpeg_source::avformat_write_header_safe(api, out_ctx, ptr::null_mut());
     if header_ret < 0 {
         unsafe {
             (api.avio_closep)(&mut io);
@@ -2085,7 +2079,7 @@ pub fn convert_audio_file_with_channels(
         return Err("FFmpeg: failed to init resampler".to_string());
     }
 
-    let mut frame = unsafe { (api.av_frame_alloc)() };
+    let mut frame = crate::ffmpeg_source::av_frame_alloc_safe(api);
     if frame.is_null() {
         unsafe {
             (api.swr_free)(&mut swr_ctx);
@@ -2140,7 +2134,7 @@ pub fn convert_audio_file_with_channels(
     };
     let drain_packets = || -> Result<(), String> {
         loop {
-            let mut pkt = unsafe { (api.av_packet_alloc)() };
+            let mut pkt = crate::ffmpeg_source::av_packet_alloc_safe(api);
             if pkt.is_null() {
                 return Err("FFmpeg: packet alloc failed".to_string());
             }

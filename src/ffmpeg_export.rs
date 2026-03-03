@@ -1088,7 +1088,7 @@ fn encode_mixed_audio_to_m4a(
         return Err("FFmpeg: failed to allocate output context".to_string());
     }
 
-    let codec = unsafe { (api.avcodec_find_encoder)(AVCodecID_AV_CODEC_ID_AAC) };
+    let codec = crate::ffmpeg_source::avcodec_find_encoder_safe(api, AVCodecID_AV_CODEC_ID_AAC);
     if codec.is_null() {
         crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
         return Err("FFmpeg: AAC encoder not found".to_string());
@@ -1213,7 +1213,7 @@ fn encode_mixed_audio_to_m4a(
         }
         return Err("FFmpeg: failed to init resampler".to_string());
     }
-    if unsafe { (api.swr_init)(swr_ctx) } < 0 {
+    if crate::ffmpeg_source::swr_init_safe(api, swr_ctx) < 0 {
         unsafe {
             (api.swr_free)(&mut swr_ctx);
             (api.av_frame_free)(&mut frame);
@@ -1322,15 +1322,14 @@ fn encode_mixed_audio_to_m4a(
         let mut in_ptr = input_frame.as_ptr() as *const u8;
         let in_ptrs = &mut in_ptr as *mut *const u8;
         let out_count = unsafe { (*frame).nb_samples };
-        let conv = unsafe {
-            (api.swr_convert)(
-                swr_ctx,
-                (*frame).data.as_mut_ptr(),
-                out_count,
-                in_ptrs,
-                out_count,
-            )
-        };
+        let conv = crate::ffmpeg_source::swr_convert_safe(
+            api,
+            swr_ctx,
+            unsafe { (*frame).data.as_mut_ptr() },
+            out_count,
+            in_ptrs,
+            out_count,
+        );
         if conv < 0 {
             return Err("FFmpeg: resample failed".to_string());
         }
@@ -1338,7 +1337,7 @@ fn encode_mixed_audio_to_m4a(
             (*frame).pts = next_pts;
         }
         next_pts += out_count as i64;
-        let send_ret = unsafe { (api.avcodec_send_frame)(codec_ctx, frame) };
+        let send_ret = crate::ffmpeg_source::avcodec_send_frame_safe(api, codec_ctx, frame);
         if send_ret < 0 {
             return Err("FFmpeg: send_frame failed".to_string());
         }
@@ -1921,12 +1920,12 @@ pub fn convert_audio_file_with_channels(
             CString::new("libmp3lame").map_err(|_| "FFmpeg: invalid encoder name".to_string())?;
         let by_name = unsafe { (api.avcodec_find_encoder_by_name)(name.as_ptr()) };
         if by_name.is_null() {
-            unsafe { (api.avcodec_find_encoder)(codec_id) }
+            crate::ffmpeg_source::avcodec_find_encoder_safe(api, codec_id)
         } else {
             by_name
         }
     } else {
-        unsafe { (api.avcodec_find_encoder)(codec_id) }
+        crate::ffmpeg_source::avcodec_find_encoder_safe(api, codec_id)
     };
     if codec.is_null() {
         crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
@@ -2067,7 +2066,7 @@ pub fn convert_audio_file_with_channels(
         }
         return Err("FFmpeg: failed to init resampler".to_string());
     }
-    if unsafe { (api.swr_init)(swr_ctx) } < 0 {
+    if crate::ffmpeg_source::swr_init_safe(api, swr_ctx) < 0 {
         unsafe {
             (api.swr_free)(&mut swr_ctx);
             (api.avio_closep)(&mut io);
@@ -2094,7 +2093,7 @@ pub fn convert_audio_file_with_channels(
     let mut out_capacity = if encoder_has_fixed_frame_size {
         encoder_frame_size
     } else {
-        unsafe { (api.swr_get_out_samples)(swr_ctx, in_frame_size as i32) }
+        crate::ffmpeg_source::swr_get_out_samples_safe(api, swr_ctx, in_frame_size as i32)
     };
     if out_capacity <= 0 {
         out_capacity = in_frame_size as i32;
@@ -2211,7 +2210,8 @@ pub fn convert_audio_file_with_channels(
             }
         }
 
-        let needed_out = unsafe { (api.swr_get_out_samples)(swr_ctx, in_frame_size as i32) };
+        let needed_out =
+            crate::ffmpeg_source::swr_get_out_samples_safe(api, swr_ctx, in_frame_size as i32);
         if !encoder_has_fixed_frame_size && needed_out > 0 {
             let current_cap = unsafe { (*frame).nb_samples };
             if needed_out > current_cap {
@@ -2242,15 +2242,14 @@ pub fn convert_audio_file_with_channels(
         let mut in_ptr = input_frame.as_ptr() as *const u8;
         let in_ptrs = &mut in_ptr as *mut *const u8;
         let out_count = unsafe { (*frame).nb_samples };
-        let converted = unsafe {
-            (api.swr_convert)(
-                swr_ctx,
-                (*frame).data.as_mut_ptr(),
-                out_count,
-                in_ptrs,
-                in_frame_size as i32,
-            )
-        };
+        let converted = crate::ffmpeg_source::swr_convert_safe(
+            api,
+            swr_ctx,
+            unsafe { (*frame).data.as_mut_ptr() },
+            out_count,
+            in_ptrs,
+            in_frame_size as i32,
+        );
         if converted < 0 {
             unsafe {
                 (api.swr_free)(&mut swr_ctx);
@@ -2272,7 +2271,7 @@ pub fn convert_audio_file_with_channels(
         }
         next_pts += converted as i64;
 
-        let send_ret = unsafe { (api.avcodec_send_frame)(codec_ctx, frame) };
+        let send_ret = crate::ffmpeg_source::avcodec_send_frame_safe(api, codec_ctx, frame);
         if send_ret < 0 {
             unsafe {
                 (api.swr_free)(&mut swr_ctx);
@@ -2309,7 +2308,7 @@ pub fn convert_audio_file_with_channels(
                 canceled = true;
                 break;
             }
-            let pending = unsafe { (api.swr_get_out_samples)(swr_ctx, 0) };
+            let pending = crate::ffmpeg_source::swr_get_out_samples_safe(api, swr_ctx, 0);
             if pending <= 0 {
                 break;
             }
@@ -2338,15 +2337,14 @@ pub fn convert_audio_file_with_channels(
                 }
             }
             let out_count = unsafe { (*frame).nb_samples };
-            let converted = unsafe {
-                (api.swr_convert)(
-                    swr_ctx,
-                    (*frame).data.as_mut_ptr(),
-                    out_count,
-                    ptr::null(),
-                    0,
-                )
-            };
+            let converted = crate::ffmpeg_source::swr_convert_safe(
+                api,
+                swr_ctx,
+                unsafe { (*frame).data.as_mut_ptr() },
+                out_count,
+                ptr::null(),
+                0,
+            );
             if converted <= 0 {
                 break;
             }
@@ -2355,7 +2353,7 @@ pub fn convert_audio_file_with_channels(
                 (*frame).pts = next_pts;
             }
             next_pts += converted as i64;
-            let send_ret = unsafe { (api.avcodec_send_frame)(codec_ctx, frame) };
+            let send_ret = crate::ffmpeg_source::avcodec_send_frame_safe(api, codec_ctx, frame);
             if send_ret < 0 {
                 unsafe {
                     (api.swr_free)(&mut swr_ctx);

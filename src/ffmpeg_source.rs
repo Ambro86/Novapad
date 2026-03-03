@@ -531,6 +531,41 @@ pub(crate) fn av_frame_alloc_safe(api: &FfmpegApi) -> *mut AVFrame {
     unsafe { (api.av_frame_alloc)() }
 }
 
+pub(crate) fn avcodec_find_encoder_safe(api: &FfmpegApi, codec_id: AVCodecID) -> *const AVCodec {
+    unsafe { (api.avcodec_find_encoder)(codec_id) }
+}
+
+pub(crate) fn avcodec_send_frame_safe(
+    api: &FfmpegApi,
+    avctx: *mut AVCodecContext,
+    frame: *const AVFrame,
+) -> i32 {
+    unsafe { (api.avcodec_send_frame)(avctx, frame) }
+}
+
+pub(crate) fn swr_init_safe(api: &FfmpegApi, s: *mut SwrContext) -> i32 {
+    unsafe { (api.swr_init)(s) }
+}
+
+pub(crate) fn swr_convert_safe(
+    api: &FfmpegApi,
+    s: *mut SwrContext,
+    out: *mut *mut u8,
+    out_count: i32,
+    input: *const *const u8,
+    in_count: i32,
+) -> i32 {
+    unsafe { (api.swr_convert)(s, out, out_count, input, in_count) }
+}
+
+pub(crate) fn swr_get_out_samples_safe(
+    api: &FfmpegApi,
+    s: *mut SwrContext,
+    in_samples: i32,
+) -> i32 {
+    unsafe { (api.swr_get_out_samples)(s, in_samples) }
+}
+
 fn ffmpeg_err(api: &FfmpegApi, code: i32) -> String {
     let mut buf = [0i8; 256];
     let ret = unsafe { (api.av_strerror)(code, buf.as_mut_ptr(), buf.len()) };
@@ -1047,6 +1082,7 @@ impl FfmpegSource {
         }
 
         let mut swr_ctx: *mut SwrContext = ptr::null_mut();
+        let in_sample_fmt = unsafe { (*codec_ctx).sample_fmt };
         let swr_ret = unsafe {
             (api.swr_alloc_set_opts2)(
                 &mut swr_ctx,
@@ -1054,7 +1090,7 @@ impl FfmpegSource {
                 AVSampleFormat_AV_SAMPLE_FMT_FLT,
                 sample_rate,
                 &in_layout,
-                (*codec_ctx).sample_fmt,
+                in_sample_fmt,
                 sample_rate,
                 0,
                 ptr::null_mut(),
@@ -1071,7 +1107,7 @@ impl FfmpegSource {
             ));
         }
 
-        let init_ret = unsafe { (api.swr_init)(swr_ctx) };
+        let init_ret = crate::ffmpeg_source::swr_init_safe(api, swr_ctx);
         if init_ret < 0 {
             unsafe {
                 (api.swr_free)(&mut swr_ctx);

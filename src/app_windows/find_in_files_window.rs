@@ -24,12 +24,12 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsDialogMessageW,
-    LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetWindowTextW, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NOTIFY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
-    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsDialogMessageW, LoadCursorW, MSG,
+    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowTextW,
+    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_NOTIFY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -748,10 +748,10 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            let ptr = unsafe {
-                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-                    as *mut FindInFilesState
-            };
+            let ptr = crate::get_window_long_ptr_w_safe(
+                hwnd,
+                windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+            ) as *mut FindInFilesState;
             if !ptr.is_null() {
                 let _unused_box = unsafe { Box::from_raw(ptr) };
             }
@@ -765,10 +765,10 @@ fn with_find_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut FindInFilesState) -> R,
 {
-    let ptr = unsafe {
-        GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-            as *mut FindInFilesState
-    };
+    let ptr = crate::get_window_long_ptr_w_safe(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+    ) as *mut FindInFilesState;
     if ptr.is_null() {
         None
     } else {

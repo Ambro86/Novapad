@@ -8033,10 +8033,10 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
 }
 
 fn with_podcast_state<R>(hwnd: HWND, f: impl FnOnce(&mut PodcastWindowState) -> R) -> Option<R> {
-    let ptr = unsafe {
-        GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-            as *mut PodcastWindowState
-    };
+    let ptr = crate::get_window_long_ptr_w_safe(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+    ) as *mut PodcastWindowState;
     if ptr.is_null() {
         None
     } else {
@@ -8048,10 +8048,10 @@ fn with_category_dialog_state<R>(
     hwnd: HWND,
     f: impl FnOnce(&mut CategoryDialogState) -> R,
 ) -> Option<R> {
-    let ptr = unsafe {
-        GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-            as *mut CategoryDialogState
-    };
+    let ptr = crate::get_window_long_ptr_w_safe(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+    ) as *mut CategoryDialogState;
     if ptr.is_null() {
         None
     } else {

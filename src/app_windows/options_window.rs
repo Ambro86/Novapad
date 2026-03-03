@@ -5085,7 +5085,7 @@ fn with_options_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut OptionsDialogState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut OptionsDialogState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut OptionsDialogState;
     if ptr.is_null() {
         None
     } else {

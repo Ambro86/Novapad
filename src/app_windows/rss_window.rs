@@ -3052,7 +3052,7 @@ fn with_rss_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut RssWindowState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RssWindowState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut RssWindowState;
     if ptr.is_null() {
         None
     } else {

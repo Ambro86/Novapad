@@ -436,7 +436,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             if id == 1 {
                 // OK
                 let ptr =
-                    unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut SimplePromptData };
+                    crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut SimplePromptData;
                 if !ptr.is_null() {
                     let data = unsafe { &mut *ptr };
                     let edit =
@@ -1307,10 +1307,10 @@ fn with_prompt_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut PromptState) -> R,
 {
-    let ptr = unsafe {
-        GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-            as *mut PromptState
-    };
+    let ptr = crate::get_window_long_ptr_w_safe(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+    ) as *mut PromptState;
     if ptr.is_null() {
         None
     } else {

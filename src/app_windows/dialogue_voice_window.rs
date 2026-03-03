@@ -187,7 +187,7 @@ fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
     if combo.0 == 0 {
         return;
     }
-    let ptr = unsafe { GetWindowLongPtrW(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData;
     if ptr.is_null() {
         return;
     }
@@ -249,7 +249,7 @@ fn selected_voice(hwnd_dialog: HWND) -> String {
     if combo.0 == 0 {
         return String::new();
     }
-    let ptr = unsafe { GetWindowLongPtrW(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData;
     if ptr.is_null() {
         return String::new();
     }
@@ -272,7 +272,7 @@ fn selected_voice(hwnd_dialog: HWND) -> String {
 }
 
 fn refresh_edge_controls(hwnd_dialog: HWND, preferred_voice: &str) {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd_dialog, GWLP_USERDATA) as *mut DialogueVoiceDialogData;
     if ptr.is_null() {
         return;
     }

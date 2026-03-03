@@ -606,7 +606,7 @@ fn with_window_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut WikipediaWindowState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WikipediaWindowState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut WikipediaWindowState;
     if ptr.is_null() {
         None
     } else {

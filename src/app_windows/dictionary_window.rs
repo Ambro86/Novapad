@@ -392,7 +392,7 @@ fn with_dictionary_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut DictionaryWindowState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryWindowState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut DictionaryWindowState;
     if ptr.is_null() {
         None
     } else {
@@ -944,7 +944,7 @@ fn with_entry_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut DictionaryEntryState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut DictionaryEntryState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut DictionaryEntryState;
     if ptr.is_null() {
         None
     } else {

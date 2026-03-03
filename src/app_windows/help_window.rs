@@ -548,7 +548,7 @@ fn with_help_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut HelpWindowState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut HelpWindowState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut HelpWindowState;
     if ptr.is_null() {
         None
     } else {
@@ -719,7 +719,8 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
         }
         WM_NCDESTROY => {
             unregister_readonly_text_window(hwnd);
-            let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState };
+            let ptr =
+                crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState;
             if !ptr.is_null() {
                 let state = unsafe { Box::from_raw(ptr) };
                 if state.parent.0 != 0 {
@@ -757,7 +758,7 @@ fn with_readonly_text_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut ReadonlyTextState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut ReadonlyTextState;
     if ptr.is_null() {
         None
     } else {

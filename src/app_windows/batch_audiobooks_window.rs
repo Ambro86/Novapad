@@ -946,10 +946,10 @@ unsafe extern "system" fn batch_wndproc(
 }
 
 fn with_batch_state<T>(hwnd: HWND, f: impl FnOnce(&mut BatchState) -> T) -> Option<T> {
-    let ptr = unsafe {
-        GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
-            as *mut BatchState
-    };
+    let ptr = crate::get_window_long_ptr_w_safe(
+        hwnd,
+        windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+    ) as *mut BatchState;
     if ptr.is_null() {
         None
     } else {

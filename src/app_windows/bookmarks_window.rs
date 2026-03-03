@@ -316,7 +316,7 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         }
         WM_NCDESTROY => {
             let ptr =
-                unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState };
+                crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState;
             if !ptr.is_null() {
                 let _unused_box = unsafe { Box::from_raw(ptr) };
             }

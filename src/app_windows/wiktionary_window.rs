@@ -761,7 +761,7 @@ fn with_window_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut WiktionaryWindowState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WiktionaryWindowState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut WiktionaryWindowState;
     if ptr.is_null() {
         None
     } else {

@@ -445,7 +445,7 @@ fn with_marker_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut MarkerSelectState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut MarkerSelectState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut MarkerSelectState;
     if ptr.is_null() {
         None
     } else {

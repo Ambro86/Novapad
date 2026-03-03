@@ -5,9 +5,9 @@ use windows::Win32::UI::Controls::WC_BUTTON;
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    DispatchMessageW, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IsDialogMessageW,
-    LB_ADDSTRING, LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW,
-    MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, TranslateMessage,
+    DispatchMessageW, GWLP_USERDATA, HMENU, IDC_ARROW, IsDialogMessageW, LB_ADDSTRING,
+    LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MSG,
+    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, TranslateMessage,
     WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW,
     WS_CAPTION, WS_CHILD, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP,
     WS_VISIBLE, WS_VSCROLL,
@@ -289,8 +289,8 @@ fn interpreter_select_wndproc_inner(
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            let ptr =
-                unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InterpreterSelectState };
+            let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
+                as *mut InterpreterSelectState;
             if !ptr.is_null() {
                 let _unused_box = unsafe { Box::from_raw(ptr) };
             }
@@ -304,7 +304,7 @@ fn with_interpreter_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut InterpreterSelectState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut InterpreterSelectState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut InterpreterSelectState;
     if ptr.is_null() {
         None
     } else {

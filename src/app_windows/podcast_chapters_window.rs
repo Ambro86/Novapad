@@ -313,7 +313,7 @@ fn chapter_list_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
 }
 
 fn with_chapter_state<R>(hwnd: HWND, f: impl FnOnce(&mut ChapterListState) -> R) -> Option<R> {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ChapterListState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut ChapterListState;
     if ptr.is_null() {
         None
     } else {

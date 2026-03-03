@@ -726,7 +726,7 @@ fn with_import_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut ImportState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImportState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut ImportState;
     if ptr.is_null() {
         None
     } else {
@@ -1717,7 +1717,7 @@ fn with_stream_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut StreamDialogState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamDialogState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut StreamDialogState;
     if ptr.is_null() {
         None
     } else {
@@ -1729,7 +1729,7 @@ fn with_stream_track_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut StreamTrackDialogState) -> R,
 {
-    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamTrackDialogState };
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut StreamTrackDialogState;
     if ptr.is_null() {
         None
     } else {

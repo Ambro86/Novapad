@@ -191,56 +191,61 @@ fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
     if ptr.is_null() {
         return;
     }
-    let data = unsafe { &mut *ptr };
-    let engine_combo = crate::get_dlg_item_safe(hwnd_dialog, ID_ENGINE);
-    let engine = selected_engine(engine_combo);
-    let voices = match engine {
-        TtsEngine::Edge => &data.edge_voices,
-        TtsEngine::Sapi5 => &data.sapi5_voices,
-        TtsEngine::Sapi4 => &data.sapi4_voices,
-    };
-    let only_multilingual = crate::send_message_w_safe(crate::get_dlg_item_safe(hwnd_dialog, ID_ONLY_MULTILINGUAL), BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
-        == BST_CHECKED.0;
-    let language_filter = if engine == TtsEngine::Edge && !only_multilingual {
-        let sel = crate::send_message_w_safe(crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE), CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-        if sel >= 0 {
-            data.edge_language_codes.get(sel as usize).cloned()
+    if crate::with_raw_mut_ptr_safe(ptr, |data| {
+        let engine_combo = crate::get_dlg_item_safe(hwnd_dialog, ID_ENGINE);
+        let engine = selected_engine(engine_combo);
+        let voices = match engine {
+            TtsEngine::Edge => &data.edge_voices,
+            TtsEngine::Sapi5 => &data.sapi5_voices,
+            TtsEngine::Sapi4 => &data.sapi4_voices,
+        };
+        let only_multilingual = crate::send_message_w_safe(crate::get_dlg_item_safe(hwnd_dialog, ID_ONLY_MULTILINGUAL), BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+            == BST_CHECKED.0;
+        let language_filter = if engine == TtsEngine::Edge && !only_multilingual {
+            let sel = crate::send_message_w_safe(crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE), CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+            if sel >= 0 {
+                data.edge_language_codes.get(sel as usize).cloned()
+            } else {
+                None
+            }
         } else {
             None
-        }
-    } else {
-        None
-    };
-    crate::send_message_w_safe(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let mut selected_idx = 0usize;
-    let mut combo_index = 0usize;
-    for (i, voice) in voices.iter().enumerate() {
-        if engine == TtsEngine::Edge && only_multilingual && !voice.is_multilingual {
-            continue;
-        }
-        if let Some(filter) = language_filter.as_deref() {
-            let Some(code) = voice_locale_language_code(&voice.locale) else {
-                continue;
-            };
-            if code != filter {
+        };
+        crate::send_message_w_safe(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        let mut selected_idx = 0usize;
+        let mut combo_index = 0usize;
+        for (i, voice) in voices.iter().enumerate() {
+            if engine == TtsEngine::Edge && only_multilingual && !voice.is_multilingual {
                 continue;
             }
+            if let Some(filter) = language_filter.as_deref() {
+                let Some(code) = voice_locale_language_code(&voice.locale) else {
+                    continue;
+                };
+                if code != filter {
+                    continue;
+                }
+            }
+            let label = if voice.locale.trim().is_empty() {
+                voice.short_name.clone()
+            } else {
+                format!("{} ({})", voice.short_name, voice.locale)
+            };
+            let w = to_wide(&label);
+            let idx = crate::send_message_w_safe(combo, CB_ADDSTRING, WPARAM(0), LPARAM(w.as_ptr() as isize)).0 as usize;
+            crate::send_message_w_safe(combo, CB_SETITEMDATA, WPARAM(idx), LPARAM(i as isize));
+            if voice.short_name.eq_ignore_ascii_case(preferred_voice) {
+                selected_idx = combo_index;
+            }
+            combo_index += 1;
         }
-        let label = if voice.locale.trim().is_empty() {
-            voice.short_name.clone()
-        } else {
-            format!("{} ({})", voice.short_name, voice.locale)
-        };
-        let w = to_wide(&label);
-        let idx = crate::send_message_w_safe(combo, CB_ADDSTRING, WPARAM(0), LPARAM(w.as_ptr() as isize)).0 as usize;
-        crate::send_message_w_safe(combo, CB_SETITEMDATA, WPARAM(idx), LPARAM(i as isize));
-        if voice.short_name.eq_ignore_ascii_case(preferred_voice) {
-            selected_idx = combo_index;
+        if combo_index > 0 {
+            crate::send_message_w_safe(combo, CB_SETCURSEL, WPARAM(selected_idx), LPARAM(0));
         }
-        combo_index += 1;
-    }
-    if combo_index > 0 {
-        crate::send_message_w_safe(combo, CB_SETCURSEL, WPARAM(selected_idx), LPARAM(0));
+    })
+    .is_none()
+    {
+        crate::log_debug("Dialogue voice state pointer unavailable in fill_voice_combo");
     }
 }
 
@@ -278,82 +283,87 @@ fn refresh_edge_controls(hwnd_dialog: HWND, preferred_voice: &str) {
     if ptr.is_null() {
         return;
     }
-    let data = unsafe { &mut *ptr };
-    let engine = selected_engine(crate::get_dlg_item_safe(hwnd_dialog, ID_ENGINE));
-    let label_language = crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE_LABEL);
-    let combo_language = crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE);
-    let check_multilingual = crate::get_dlg_item_safe(hwnd_dialog, ID_ONLY_MULTILINGUAL);
-    let is_edge = engine == TtsEngine::Edge;
-    unsafe {
-        ShowWindow(check_multilingual, if is_edge { SW_SHOW } else { SW_HIDE });
-        EnableWindow(check_multilingual, is_edge);
-    }
+    if crate::with_raw_mut_ptr_safe(ptr, |data| {
+        let engine = selected_engine(crate::get_dlg_item_safe(hwnd_dialog, ID_ENGINE));
+        let label_language = crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE_LABEL);
+        let combo_language = crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE);
+        let check_multilingual = crate::get_dlg_item_safe(hwnd_dialog, ID_ONLY_MULTILINGUAL);
+        let is_edge = engine == TtsEngine::Edge;
+        unsafe {
+            ShowWindow(check_multilingual, if is_edge { SW_SHOW } else { SW_HIDE });
+            EnableWindow(check_multilingual, is_edge);
+        }
 
-    let only_multilingual = crate::send_message_w_safe(check_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
-        == BST_CHECKED.0;
-    let show_language = is_edge && !only_multilingual;
-    unsafe {
-        ShowWindow(
-            label_language,
-            if show_language { SW_SHOW } else { SW_HIDE },
-        );
-        ShowWindow(
-            combo_language,
-            if show_language { SW_SHOW } else { SW_HIDE },
-        );
-        EnableWindow(combo_language, show_language);
-    }
+        let only_multilingual = crate::send_message_w_safe(check_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+            == BST_CHECKED.0;
+        let show_language = is_edge && !only_multilingual;
+        unsafe {
+            ShowWindow(
+                label_language,
+                if show_language { SW_SHOW } else { SW_HIDE },
+            );
+            ShowWindow(
+                combo_language,
+                if show_language { SW_SHOW } else { SW_HIDE },
+            );
+            EnableWindow(combo_language, show_language);
+        }
 
-    if show_language {
-        let previous_selection = {
-            let sel = crate::send_message_w_safe(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-            if sel >= 0 {
-                data.edge_language_codes.get(sel as usize).cloned()
-            } else {
-                None
-            }
-        };
-        let mut codes = collect_voice_language_codes(&data.edge_voices);
-        if !codes.is_empty() {
-            let selected_from_voice = data
-                .edge_voices
-                .iter()
-                .find(|v| v.short_name == preferred_voice)
-                .and_then(|v| voice_locale_language_code(&v.locale));
-            let selected_code = previous_selection
-                .filter(|code| codes.contains(code))
-                .or(selected_from_voice.filter(|code| codes.contains(code)))
-                .unwrap_or_else(|| codes[0].clone());
-            SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-            let mut selected_idx = 0usize;
-            for (idx, code) in codes.iter().enumerate() {
-                let label = localized_voice_language_name(data.language, code);
+        if show_language {
+            let previous_selection = {
+                let sel = crate::send_message_w_safe(combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                if sel >= 0 {
+                    data.edge_language_codes.get(sel as usize).cloned()
+                } else {
+                    None
+                }
+            };
+            let mut codes = collect_voice_language_codes(&data.edge_voices);
+            if !codes.is_empty() {
+                let selected_from_voice = data
+                    .edge_voices
+                    .iter()
+                    .find(|v| v.short_name == preferred_voice)
+                    .and_then(|v| voice_locale_language_code(&v.locale));
+                let selected_code = previous_selection
+                    .filter(|code| codes.contains(code))
+                    .or(selected_from_voice.filter(|code| codes.contains(code)))
+                    .unwrap_or_else(|| codes[0].clone());
+                SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                let mut selected_idx = 0usize;
+                for (idx, code) in codes.iter().enumerate() {
+                    let label = localized_voice_language_name(data.language, code);
+                    SendMessageW(
+                        combo_language,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(&label).as_ptr() as isize),
+                    );
+                    if *code == selected_code {
+                        selected_idx = idx;
+                    }
+                }
                 SendMessageW(
                     combo_language,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(to_wide(&label).as_ptr() as isize),
+                    CB_SETCURSEL,
+                    WPARAM(selected_idx),
+                    LPARAM(0),
                 );
-                if *code == selected_code {
-                    selected_idx = idx;
-                }
+            } else {
+                SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
             }
-            SendMessageW(
-                combo_language,
-                CB_SETCURSEL,
-                WPARAM(selected_idx),
-                LPARAM(0),
-            );
+            data.edge_language_codes = std::mem::take(&mut codes);
         } else {
             SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+            data.edge_language_codes.clear();
         }
-        data.edge_language_codes = std::mem::take(&mut codes);
-    } else {
-        SendMessageW(combo_language, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-        data.edge_language_codes.clear();
-    }
 
-    fill_voice_combo(hwnd_dialog, preferred_voice);
+        fill_voice_combo(hwnd_dialog, preferred_voice);
+    })
+    .is_none()
+    {
+        crate::log_debug("Dialogue voice state pointer unavailable in refresh_edge_controls");
+    }
 }
 
 fn tts_rate_items(language: Language) -> Vec<(String, i32)> {

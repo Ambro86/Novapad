@@ -433,23 +433,31 @@ pub fn segment_audio_file(
     let in_stream = unsafe { *(*in_ctx).streams.add(audio_stream_idx as usize) };
     let out_stream = crate::ffmpeg_source::avformat_new_stream_safe(api, out_ctx, ptr::null());
     if out_stream.is_null() {
-        unsafe {
-            (api.avformat_free_context)(out_ctx);
-            (api.avformat_close_input)(&mut in_ctx);
-        }
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
         return Err("FFmpeg: failed to create output stream".to_string());
     }
+    let codecpar_copy_ret = crate::ffmpeg_source::avcodec_parameters_copy_safe(
+        api,
+        crate::ffmpeg_source::av_stream_codecpar_safe(out_stream),
+        crate::ffmpeg_source::av_stream_codecpar_safe(in_stream),
+    );
+    if codecpar_copy_ret < 0 {
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
+        return Err(format!(
+            "FFmpeg: failed to copy codec parameters (code {})",
+            codecpar_copy_ret
+        ));
+    }
     unsafe {
-        (api.avcodec_parameters_copy)((*out_stream).codecpar, (*in_stream).codecpar);
-        (*out_stream).time_base = (*in_stream).time_base;
+        (*out_stream).time_base = crate::ffmpeg_source::av_stream_time_base_safe(in_stream);
     }
 
     let mut dict: *mut AVDictionary = ptr::null_mut();
     if segment_seconds == 0 {
-        unsafe {
-            (api.avformat_free_context)(out_ctx);
-            (api.avformat_close_input)(&mut in_ctx);
-        }
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
         return Err("FFmpeg: segment time must be > 0".to_string());
     }
     dict_set_str(api, &mut dict, "segment_time", &segment_seconds.to_string())?;
@@ -466,24 +474,24 @@ pub fn segment_audio_file(
     }
 
     let header_ret = crate::ffmpeg_source::avformat_write_header_safe(api, out_ctx, &mut dict);
-    unsafe {
-        (api.av_dict_free)(&mut dict);
-    }
+    crate::ffmpeg_source::av_dict_free_safe(api, &mut dict);
     if header_ret < 0 {
-        unsafe {
-            (api.avformat_free_context)(out_ctx);
-            (api.avformat_close_input)(&mut in_ctx);
-        }
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
         return Err("FFmpeg: failed to write segment header".to_string());
     }
 
     let mut pkt = crate::ffmpeg_source::av_packet_alloc_safe(api);
     if pkt.is_null() {
-        unsafe {
-            (api.av_write_trailer)(out_ctx);
-            (api.avformat_free_context)(out_ctx);
-            (api.avformat_close_input)(&mut in_ctx);
+        let trailer_ret = crate::ffmpeg_source::av_write_trailer_safe(api, out_ctx);
+        if trailer_ret < 0 {
+            log_debug(&format!(
+                "FFmpeg: av_write_trailer failed during alloc cleanup: {}",
+                trailer_ret
+            ));
         }
+        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
         return Err("FFmpeg: packet alloc failed".to_string());
     }
 
@@ -496,26 +504,30 @@ pub fn segment_audio_file(
             crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
             continue;
         }
-        unsafe {
-            (*pkt).stream_index = (*out_stream).index;
-            (api.av_packet_rescale_ts)(pkt, (*in_stream).time_base, (*out_stream).time_base);
-            let write_ret = (api.av_interleaved_write_frame)(out_ctx, pkt);
-            if write_ret < 0 {
-                log_debug(&format!("FFmpeg: segment write failed: {}", write_ret));
-            }
-            (api.av_packet_unref)(pkt);
+        crate::ffmpeg_source::av_packet_set_stream_index_safe(
+            pkt,
+            crate::ffmpeg_source::av_stream_index_safe(out_stream),
+        );
+        crate::ffmpeg_source::av_packet_rescale_ts_safe(
+            api,
+            pkt,
+            crate::ffmpeg_source::av_stream_time_base_safe(in_stream),
+            crate::ffmpeg_source::av_stream_time_base_safe(out_stream),
+        );
+        let write_ret = crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt);
+        if write_ret < 0 {
+            log_debug(&format!("FFmpeg: segment write failed: {}", write_ret));
         }
+        crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
     }
 
-    unsafe {
-        let trailer_ret = (api.av_write_trailer)(out_ctx);
-        if trailer_ret < 0 {
-            log_debug(&format!("FFmpeg: av_write_trailer failed: {}", trailer_ret));
-        }
-        (api.av_packet_free)(&mut pkt);
-        (api.avformat_free_context)(out_ctx);
-        (api.avformat_close_input)(&mut in_ctx);
+    let trailer_ret = crate::ffmpeg_source::av_write_trailer_safe(api, out_ctx);
+    if trailer_ret < 0 {
+        log_debug(&format!("FFmpeg: av_write_trailer failed: {}", trailer_ret));
     }
+    crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
+    crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
+    crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
     Ok(())
 }
 
@@ -800,7 +812,7 @@ pub fn merge_audio_files_with_chapters_copy(
             }
             unsafe {
                 (*pkt).stream_index = (*out_stream).index;
-                (api.av_packet_rescale_ts)(pkt, in_tb, out_tb);
+                crate::ffmpeg_source::av_packet_rescale_ts_safe(api, pkt, in_tb, out_tb);
                 let out_duration = if (*pkt).duration > 0 {
                     (*pkt).duration
                 } else {
@@ -817,7 +829,7 @@ pub fn merge_audio_files_with_chapters_copy(
                 (*pkt).dts = normalized_dts;
                 (*pkt).pts = normalized_pts;
                 (*pkt).pos = -1;
-                let wret = (api.av_interleaved_write_frame)(out_ctx, pkt);
+                let wret = crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt);
                 if wret >= 0 {
                     packets_written_in_part = packets_written_in_part.saturating_add(1);
                     global_last_dts = normalized_dts;
@@ -828,7 +840,7 @@ pub fn merge_audio_files_with_chapters_copy(
                         part_max_end_ts = end_ts;
                     }
                 }
-                (api.av_packet_unref)(pkt);
+                crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
                 if wret < 0 {
                     let err_text = ffmpeg_error_text(api, wret);
                     log_debug(&format!(
@@ -844,7 +856,7 @@ pub fn merge_audio_files_with_chapters_copy(
                         normalized_dts,
                         global_last_dts
                     ));
-                    (api.av_packet_free)(&mut pkt);
+                    crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
                     (api.avformat_close_input)(&mut in_ctx);
                     (api.avio_closep)(&mut io);
                     (api.avformat_free_context)(out_ctx);
@@ -865,7 +877,7 @@ pub fn merge_audio_files_with_chapters_copy(
         ));
         if packets_written_in_part == 0 {
             unsafe {
-                (api.av_packet_free)(&mut pkt);
+                crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
                 (api.avformat_close_input)(&mut in_ctx);
                 (api.avio_closep)(&mut io);
                 (api.avformat_free_context)(out_ctx);
@@ -876,13 +888,13 @@ pub fn merge_audio_files_with_chapters_copy(
             ));
         }
         unsafe {
-            (api.av_packet_free)(&mut pkt);
+            crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
             (api.avformat_close_input)(&mut in_ctx);
         }
     }
 
     unsafe {
-        let trailer_ret = (api.av_write_trailer)(out_ctx);
+        let trailer_ret = crate::ffmpeg_source::av_write_trailer_safe(api, out_ctx);
         if trailer_ret < 0 {
             log_debug(&format!(
                 "FFmpeg: av_write_trailer failed in merge_audio_files_with_chapters_copy: {}",
@@ -1023,9 +1035,7 @@ fn read_next_packet_for_stream(
         if idx == stream_idx {
             return true;
         }
-        unsafe {
-            (api.av_packet_unref)(pkt);
-        }
+        crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
     }
 }
 
@@ -1345,18 +1355,22 @@ fn encode_mixed_audio_to_m4a(
             if recv == 0 {
                 unsafe {
                     (*pkt).stream_index = (*stream).index;
-                    (api.av_packet_rescale_ts)(pkt, (*codec_ctx).time_base, (*stream).time_base);
-                    let wret = (api.av_interleaved_write_frame)(out_ctx, pkt);
-                    (api.av_packet_unref)(pkt);
-                    (api.av_packet_free)(&mut pkt);
+                    crate::ffmpeg_source::av_packet_rescale_ts_safe(
+                        api,
+                        pkt,
+                        (*codec_ctx).time_base,
+                        (*stream).time_base,
+                    );
+                    let wret =
+                        crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt);
+                    crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
+                    crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
                     if wret < 0 {
                         return Err("FFmpeg: write audio packet failed".to_string());
                     }
                 }
             } else {
-                unsafe {
-                    (api.av_packet_free)(&mut pkt);
-                }
+                crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
                 break;
             }
         }
@@ -1372,16 +1386,21 @@ fn encode_mixed_audio_to_m4a(
             let recv = (api.avcodec_receive_packet)(codec_ctx, pkt);
             if recv == 0 {
                 (*pkt).stream_index = (*stream).index;
-                (api.av_packet_rescale_ts)(pkt, (*codec_ctx).time_base, (*stream).time_base);
-                (api.av_interleaved_write_frame)(out_ctx, pkt);
-                (api.av_packet_unref)(pkt);
-                (api.av_packet_free)(&mut pkt);
+                crate::ffmpeg_source::av_packet_rescale_ts_safe(
+                    api,
+                    pkt,
+                    (*codec_ctx).time_base,
+                    (*stream).time_base,
+                );
+                crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt);
+                crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
+                crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
             } else {
-                (api.av_packet_free)(&mut pkt);
+                crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
                 break;
             }
         }
-        let trailer_ret = (api.av_write_trailer)(out_ctx);
+        let trailer_ret = crate::ffmpeg_source::av_write_trailer_safe(api, out_ctx);
         if trailer_ret < 0 {
             log_debug(&format!("FFmpeg: av_write_trailer failed: {}", trailer_ret));
         }
@@ -1568,52 +1587,56 @@ fn mux_video_with_audio(
         if write_video {
             unsafe {
                 (*pkt_v).stream_index = (*out_v_stream).index;
-                (api.av_packet_rescale_ts)(
+                crate::ffmpeg_source::av_packet_rescale_ts_safe(
+                    api,
                     pkt_v,
                     (*in_v_stream).time_base,
                     (*out_v_stream).time_base,
                 );
-                let write_ret = (api.av_interleaved_write_frame)(out_ctx, pkt_v);
+                let write_ret =
+                    crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt_v);
                 if write_ret < 0 {
                     log_debug(&format!(
                         "FFmpeg: av_interleaved_write_frame (V) failed: {}",
                         write_ret
                     ));
                 }
-                (api.av_packet_unref)(pkt_v);
+                crate::ffmpeg_source::av_packet_unref_safe(api, pkt_v);
             }
             has_v = read_next_packet_for_stream(api, in_video, pkt_v, video_stream_idx);
         } else {
             unsafe {
                 (*pkt_a).stream_index = (*out_a_stream).index;
-                (api.av_packet_rescale_ts)(
+                crate::ffmpeg_source::av_packet_rescale_ts_safe(
+                    api,
                     pkt_a,
                     (*in_a_stream).time_base,
                     (*out_a_stream).time_base,
                 );
-                let write_ret = (api.av_interleaved_write_frame)(out_ctx, pkt_a);
+                let write_ret =
+                    crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt_a);
                 if write_ret < 0 {
                     log_debug(&format!(
                         "FFmpeg: av_interleaved_write_frame (A) failed: {}",
                         write_ret
                     ));
                 }
-                (api.av_packet_unref)(pkt_a);
+                crate::ffmpeg_source::av_packet_unref_safe(api, pkt_a);
             }
             has_a = read_next_packet_for_stream(api, in_audio, pkt_a, audio_stream_idx);
         }
     }
 
     unsafe {
-        let trailer_ret = (api.av_write_trailer)(out_ctx);
+        let trailer_ret = crate::ffmpeg_source::av_write_trailer_safe(api, out_ctx);
         if trailer_ret < 0 {
             log_debug(&format!("FFmpeg: av_write_trailer failed: {}", trailer_ret));
         }
         if !pkt_v.is_null() {
-            (api.av_packet_free)(&mut pkt_v);
+            crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt_v);
         }
         if !pkt_a.is_null() {
-            (api.av_packet_free)(&mut pkt_a);
+            crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt_a);
         }
         (api.avio_closep)(&mut io);
         (api.avformat_free_context)(out_ctx);
@@ -2136,18 +2159,22 @@ pub fn convert_audio_file_with_channels(
             if recv == 0 {
                 unsafe {
                     (*pkt).stream_index = (*stream).index;
-                    (api.av_packet_rescale_ts)(pkt, (*codec_ctx).time_base, (*stream).time_base);
-                    let wret = (api.av_interleaved_write_frame)(out_ctx, pkt);
-                    (api.av_packet_unref)(pkt);
-                    (api.av_packet_free)(&mut pkt);
+                    crate::ffmpeg_source::av_packet_rescale_ts_safe(
+                        api,
+                        pkt,
+                        (*codec_ctx).time_base,
+                        (*stream).time_base,
+                    );
+                    let wret =
+                        crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt);
+                    crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
+                    crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
                     if wret < 0 {
                         return Err("FFmpeg: write audio packet failed".to_string());
                     }
                 }
             } else {
-                unsafe {
-                    (api.av_packet_free)(&mut pkt);
-                }
+                crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
                 break;
             }
         }
@@ -2407,16 +2434,21 @@ pub fn convert_audio_file_with_channels(
             let recv = (api.avcodec_receive_packet)(codec_ctx, pkt);
             if recv == 0 {
                 (*pkt).stream_index = (*stream).index;
-                (api.av_packet_rescale_ts)(pkt, (*codec_ctx).time_base, (*stream).time_base);
-                (api.av_interleaved_write_frame)(out_ctx, pkt);
-                (api.av_packet_unref)(pkt);
-                (api.av_packet_free)(&mut pkt);
+                crate::ffmpeg_source::av_packet_rescale_ts_safe(
+                    api,
+                    pkt,
+                    (*codec_ctx).time_base,
+                    (*stream).time_base,
+                );
+                crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt);
+                crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
+                crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
             } else {
-                (api.av_packet_free)(&mut pkt);
+                crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
                 break;
             }
         }
-        let trailer_ret = (api.av_write_trailer)(out_ctx);
+        let trailer_ret = crate::ffmpeg_source::av_write_trailer_safe(api, out_ctx);
         if trailer_ret < 0 {
             log_debug(&format!("FFmpeg: av_write_trailer failed: {}", trailer_ret));
         }

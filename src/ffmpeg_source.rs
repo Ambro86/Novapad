@@ -494,6 +494,10 @@ pub(crate) fn avformat_write_header_safe(
     unsafe { (api.avformat_write_header)(s, options) }
 }
 
+pub(crate) fn av_write_trailer_safe(api: &FfmpegApi, s: *mut AVFormatContext) -> i32 {
+    unsafe { (api.av_write_trailer)(s) }
+}
+
 pub(crate) fn avio_open_safe(
     api: &FfmpegApi,
     s: *mut *mut AVIOContext,
@@ -509,6 +513,14 @@ pub(crate) fn av_read_frame_safe(
     pkt: *mut AVPacket,
 ) -> i32 {
     unsafe { (api.av_read_frame)(s, pkt) }
+}
+
+pub(crate) fn av_interleaved_write_frame_safe(
+    api: &FfmpegApi,
+    s: *mut AVFormatContext,
+    pkt: *mut AVPacket,
+) -> i32 {
+    unsafe { (api.av_interleaved_write_frame)(s, pkt) }
 }
 
 pub(crate) fn avcodec_alloc_context3_safe(
@@ -577,6 +589,18 @@ pub(crate) fn av_packet_stream_index_safe(pkt: *const AVPacket) -> i32 {
     unsafe { (*pkt).stream_index }
 }
 
+pub(crate) fn av_packet_set_stream_index_safe(pkt: *mut AVPacket, stream_index: i32) {
+    unsafe { (*pkt).stream_index = stream_index }
+}
+
+pub(crate) fn av_stream_index_safe(stream: *const AVStream) -> i32 {
+    unsafe { (*stream).index }
+}
+
+pub(crate) fn av_stream_time_base_safe(stream: *const AVStream) -> AVRational {
+    unsafe { (*stream).time_base }
+}
+
 pub(crate) fn avcodec_find_encoder_safe(api: &FfmpegApi, codec_id: AVCodecID) -> *const AVCodec {
     unsafe { (api.avcodec_find_encoder)(codec_id) }
 }
@@ -610,6 +634,19 @@ pub(crate) fn avcodec_receive_packet_safe(
 
 pub(crate) fn av_packet_unref_safe(api: &FfmpegApi, pkt: *mut AVPacket) {
     unsafe { (api.av_packet_unref)(pkt) }
+}
+
+pub(crate) fn av_packet_free_safe(api: &FfmpegApi, pkt: *mut *mut AVPacket) {
+    unsafe { (api.av_packet_free)(pkt) }
+}
+
+pub(crate) fn av_packet_rescale_ts_safe(
+    api: &FfmpegApi,
+    pkt: *mut AVPacket,
+    tb_src: AVRational,
+    tb_dst: AVRational,
+) {
+    unsafe { (api.av_packet_rescale_ts)(pkt, tb_src, tb_dst) }
 }
 
 pub(crate) fn av_frame_unref_safe(api: &FfmpegApi, frame: *mut AVFrame) {
@@ -647,6 +684,18 @@ pub(crate) fn ffmpeg_err(api: &FfmpegApi, code: i32) -> String {
     } else {
         format!("ffmpeg error {}", code)
     }
+}
+
+pub(crate) fn av_dict_free_safe(api: &FfmpegApi, dict: *mut *mut AVDictionary) {
+    unsafe { (api.av_dict_free)(dict) }
+}
+
+pub(crate) fn avcodec_parameters_copy_safe(
+    api: &FfmpegApi,
+    dst: *mut AVCodecParameters,
+    src: *const AVCodecParameters,
+) -> i32 {
+    unsafe { (api.avcodec_parameters_copy)(dst, src) }
 }
 
 fn is_eagain(code: i32) -> bool {

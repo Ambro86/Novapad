@@ -1339,12 +1339,11 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
 }
 
 fn with_podcast_state<T>(hwnd: HWND, f: impl FnOnce(&mut PodcastState) -> T) -> Option<T> {
-    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA);
-    if ptr == 0 {
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut PodcastState;
+    if ptr.is_null() {
         return None;
     }
-    let state = unsafe { &mut *(ptr as *mut PodcastState) };
-    Some(f(state))
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 pub(crate) fn language_for_window(hwnd: HWND) -> Option<Language> {

@@ -500,11 +500,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
 
 fn with_save_state<T>(hwnd: HWND, f: impl FnOnce(&mut SaveState) -> T) -> Option<T> {
     let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut SaveState;
-    if ptr.is_null() {
-        None
-    } else {
-        Some(f(unsafe { &mut *ptr }))
-    }
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 fn update_progress_label(state: &SaveState) {

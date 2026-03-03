@@ -3,7 +3,7 @@ use crate::bass_ffmpeg_stream::FfmpegBassStream;
 use crate::bass_sys::{
     BASS_ATTRIB_TEMPO, BASS_ATTRIB_TEMPO_PITCH, BASS_ATTRIB_VOL, BASS_FX_FREESOURCE, BASS_POS_BYTE,
     BASS_SAMPLE_FLOAT, BASS_STREAM_DECODE, BASS_STREAM_PRESCAN, BASS_UNICODE, BassApi, Dword,
-    Hplugin, Hstream, bass_api, bass_error, bass_fx_api, log_bass_error,
+    Hplugin, Hstream, Qword, bass_api, bass_error, bass_fx_api, log_bass_error,
 };
 use crate::embedded_deps;
 use crate::log_debug;
@@ -47,6 +47,30 @@ fn bass_channel_pause_safe(api: &BassApi, handle: Hstream) -> i32 {
 
 fn bass_channel_stop_safe(api: &BassApi, handle: Hstream) -> i32 {
     unsafe { (api.channel_stop)(handle) }
+}
+
+fn bass_channel_get_position_safe(api: &BassApi, handle: Hstream, mode: Dword) -> Qword {
+    unsafe { (api.channel_get_position)(handle, mode) }
+}
+
+fn bass_channel_get_length_safe(api: &BassApi, handle: Hstream, mode: Dword) -> Qword {
+    unsafe { (api.channel_get_length)(handle, mode) }
+}
+
+fn bass_channel_set_position_safe(api: &BassApi, handle: Hstream, pos: Qword, mode: Dword) -> i32 {
+    unsafe { (api.channel_set_position)(handle, pos, mode) }
+}
+
+fn bass_channel_bytes2seconds_safe(api: &BassApi, handle: Hstream, pos: Qword) -> f64 {
+    unsafe { (api.channel_bytes2seconds)(handle, pos) }
+}
+
+fn bass_channel_seconds2bytes_safe(api: &BassApi, handle: Hstream, pos: f64) -> Qword {
+    unsafe { (api.channel_seconds2bytes)(handle, pos) }
+}
+
+fn bass_channel_is_active_safe(api: &BassApi, handle: Hstream) -> Dword {
+    unsafe { (api.channel_is_active)(handle) }
 }
 
 fn init_bass_once() -> Result<(), String> {
@@ -191,8 +215,8 @@ impl BassOutput {
         }
 
         if start_seconds > 0 {
-            let pos = unsafe { (api.channel_seconds2bytes)(handle, start_seconds as f64) };
-            let seek_ok = unsafe { (api.channel_set_position)(handle, pos, BASS_POS_BYTE) };
+            let pos = bass_channel_seconds2bytes_safe(api, handle, start_seconds as f64);
+            let seek_ok = bass_channel_set_position_safe(api, handle, pos, BASS_POS_BYTE);
             if seek_ok == 0 {
                 log_bass_error(api, "BASS_ChannelSetPosition");
                 let free_ok = bass_stream_free_safe(api, handle);
@@ -356,7 +380,7 @@ impl BassOutput {
 
     pub fn position_secs(&self) -> Option<f64> {
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
-        let pos = unsafe { (self.api.channel_get_position)(handle, BASS_POS_BYTE) };
+        let pos = bass_channel_get_position_safe(self.api, handle, BASS_POS_BYTE);
         if pos == 0 {
             let err = bass_error(self.api);
             if err != 0 {
@@ -364,7 +388,7 @@ impl BassOutput {
                 return None;
             }
         }
-        let bass_pos = unsafe { (self.api.channel_bytes2seconds)(handle, pos) }.max(0.0);
+        let bass_pos = bass_channel_bytes2seconds_safe(self.api, handle, pos).max(0.0);
         // Add start offset for FFmpeg streams that were seeked
         Some(bass_pos + self.start_offset_secs)
     }
@@ -377,7 +401,7 @@ impl BassOutput {
         }
 
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
-        let len = unsafe { (self.api.channel_get_length)(handle, BASS_POS_BYTE) };
+        let len = bass_channel_get_length_safe(self.api, handle, BASS_POS_BYTE);
         if len == u64::MAX {
             return None;
         }
@@ -388,7 +412,7 @@ impl BassOutput {
                 return None;
             }
         }
-        let bass_len = unsafe { (self.api.channel_bytes2seconds)(handle, len) }.max(0.0);
+        let bass_len = bass_channel_bytes2seconds_safe(self.api, handle, len).max(0.0);
         // Add start offset for FFmpeg streams started from a non-zero position.
         Some(bass_len + self.start_offset_secs)
     }
@@ -405,16 +429,16 @@ impl BassOutput {
             // For FFmpeg-backed streams (not directly seekable file handles),
             // backward seeks via BASS can report success but not really rewind.
             // Force reopen path for backward seeks to guarantee accurate behavior.
-            let pos_now = unsafe { (self.api.channel_get_position)(handle, BASS_POS_BYTE) };
-            let now_rel = unsafe { (self.api.channel_bytes2seconds)(handle, pos_now) }.max(0.0);
+            let pos_now = bass_channel_get_position_safe(self.api, handle, BASS_POS_BYTE);
+            let now_rel = bass_channel_bytes2seconds_safe(self.api, handle, pos_now).max(0.0);
             let now_abs = now_rel + self.start_offset_secs;
             if absolute_seconds + 0.05 < now_abs {
                 return false;
             }
         }
         let relative = (absolute_seconds - self.start_offset_secs).max(0.0);
-        let pos = unsafe { (self.api.channel_seconds2bytes)(handle, relative) };
-        let ok = unsafe { (self.api.channel_set_position)(handle, pos, BASS_POS_BYTE) };
+        let pos = bass_channel_seconds2bytes_safe(self.api, handle, relative);
+        let ok = bass_channel_set_position_safe(self.api, handle, pos, BASS_POS_BYTE);
         if ok == 0 {
             log_bass_error(self.api, "BASS_ChannelSetPosition");
             return false;
@@ -425,7 +449,7 @@ impl BassOutput {
     pub fn is_stopped(&self) -> bool {
         const BASS_ACTIVE_STOPPED: Dword = 0;
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
-        let state = unsafe { (self.api.channel_is_active)(handle) };
+        let state = bass_channel_is_active_safe(self.api, handle);
         state == BASS_ACTIVE_STOPPED
     }
 

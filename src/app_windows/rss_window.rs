@@ -5696,7 +5696,7 @@ fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
         crate::set_foreground_window_safe(existing);
         return;
     }
-    let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide("SonarpadRssReorder");
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
@@ -5865,7 +5865,7 @@ fn show_rss_search_dialog(parent_hwnd: HWND) {
         return;
     }
 
-    let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide("SonarpadRssSearchKeyword");
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
@@ -6079,7 +6079,7 @@ fn show_add_dialog_with_prefill_options(
     url: String,
     hide_url_field: bool,
 ) {
-    let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide("SonarpadInput");
 
     let wc = WNDCLASSW {

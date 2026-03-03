@@ -3308,7 +3308,7 @@ fn show_categories_dialog(parent_hwnd: HWND) {
         crate::set_foreground_window_safe(existing);
         return;
     }
-    let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(PODCASTS_CATEGORIES_CLASS);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
@@ -4109,7 +4109,7 @@ fn show_add_dialog(parent_hwnd: HWND) {
         crate::set_foreground_window_safe(existing);
         return;
     }
-    let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(PODCASTS_ADD_CLASS);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
@@ -5600,7 +5600,7 @@ const ID_DESCRIPTION_EDIT: usize = 14001;
 const ID_DESCRIPTION_OK: usize = 14002;
 
 fn show_description_dialog(parent: HWND, title: &str, content: &str) {
-    let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(DESCRIPTION_DIALOG_CLASS);
 
     let wc = WNDCLASSW {
@@ -6019,7 +6019,7 @@ fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
         crate::set_foreground_window_safe(existing);
         return;
     }
-    let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(PODCASTS_REORDER_CLASS);
     let wc = WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(

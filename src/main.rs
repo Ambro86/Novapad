@@ -9744,14 +9744,8 @@ pub(crate) fn with_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut AppState) -> R,
 {
-    unsafe {
-        let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AppState;
-        if ptr.is_null() {
-            None
-        } else {
-            Some(f(&mut *ptr))
-        }
-    }
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut AppState;
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bool) {

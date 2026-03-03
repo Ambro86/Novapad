@@ -12,9 +12,9 @@ use windows::Win32::UI::Controls::{WC_BUTTON, WC_LISTBOXW};
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
-    EVENT_OBJECT_FOCUS, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IDCANCEL, LB_ADDSTRING,
-    LB_GETCOUNT, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS,
-    LBS_NOTIFY, LoadCursorW, MSG, OBJID_CLIENT, RegisterClassW, SendMessageW, SetForegroundWindow,
+    EVENT_OBJECT_FOCUS, GWLP_USERDATA, HMENU, IDC_ARROW, IDCANCEL, LB_ADDSTRING, LB_GETCOUNT,
+    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS, LBS_NOTIFY,
+    LoadCursorW, MSG, OBJID_CLIENT, RegisterClassW, SendMessageW, SetForegroundWindow,
     WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
     WM_NEXTDLGCTL, WM_SETFOCUS, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
     WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
@@ -330,14 +330,8 @@ fn with_bookmarks_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut BookmarksWindowState) -> R,
 {
-    unsafe {
-        let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState;
-        if ptr.is_null() {
-            None
-        } else {
-            Some(f(&mut *ptr))
-        }
-    }
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut BookmarksWindowState;
+    crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
 pub fn refresh_bookmarks_list(hwnd: HWND) {

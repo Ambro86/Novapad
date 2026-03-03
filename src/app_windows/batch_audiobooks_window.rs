@@ -108,7 +108,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                     (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & (0x8000u16 as i16)) != 0;
                 let next = unsafe { GetNextDlgTabItem(hwnd, log_edit, shift_down) };
                 if next.0 != 0 {
-                    unsafe { SetFocus(next) };
+                    crate::set_focus_safe(next);
                     return true;
                 }
             }
@@ -1313,7 +1313,7 @@ fn handle_batch_messages(hwnd: HWND) {
             language,
             &i18n::tr(language, "batch_audiobooks.done"),
         );
-        if unsafe { IsWindow(list).as_bool() } {
+        if crate::is_window_handle_valid(list) {
             unsafe {
                 SetFocus(list);
             }
@@ -1384,7 +1384,7 @@ fn append_log(state: &mut BatchState, line: &str) {
 }
 
 fn is_window_valid(hwnd: HWND, label: &str) -> bool {
-    let ok = unsafe { IsWindow(hwnd).as_bool() };
+    let ok = crate::is_window_handle_valid(hwnd);
     if !ok {
         log_debug(&format!("Batch: {label} window invalid. hwnd={}", hwnd.0));
     }

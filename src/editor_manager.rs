@@ -1551,7 +1551,7 @@ pub fn try_normalize_undo(hwnd: HWND) -> bool {
     {
         crate::log_debug("Failed to access editor state");
     }
-    unsafe { SetFocus(undo.hwnd_edit) };
+    crate::set_focus_safe(undo.hwnd_edit);
     true
 }
 
@@ -1636,7 +1636,7 @@ pub fn strip_markdown_active_edit(hwnd: HWND) -> bool {
     }
     end_single_undo_action(hwnd_edit);
     mark_dirty_from_edit(hwnd, hwnd_edit);
-    unsafe { SetFocus(hwnd_edit) };
+    crate::set_focus_safe(hwnd_edit);
     true
 }
 
@@ -1786,7 +1786,7 @@ pub fn normalize_whitespace_active_edit(hwnd: HWND) -> bool {
         );
     }
     mark_dirty_from_edit(hwnd, hwnd_edit);
-    unsafe { SetFocus(hwnd_edit) };
+    crate::set_focus_safe(hwnd_edit);
     true
 }
 
@@ -2460,7 +2460,7 @@ pub fn text_stats_active_edit(hwnd: HWND) {
         lines,
     );
     crate::show_info(hwnd, language, &message);
-    unsafe { SetFocus(hwnd_edit) };
+    crate::set_focus_safe(hwnd_edit);
 }
 
 fn normalize_whitespace_block(text: &str, line_ending: &str) -> String {

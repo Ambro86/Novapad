@@ -183,7 +183,7 @@ fn selected_engine(hwnd_combo: HWND) -> TtsEngine {
 }
 
 fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
-    let combo = unsafe { GetDlgItem(hwnd_dialog, ID_VOICE) };
+    let combo = crate::get_dlg_item_safe(hwnd_dialog, ID_VOICE);
     if combo.0 == 0 {
         return;
     }
@@ -192,7 +192,7 @@ fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
         return;
     }
     let data = unsafe { &mut *ptr };
-    let engine_combo = unsafe { GetDlgItem(hwnd_dialog, ID_ENGINE) };
+    let engine_combo = crate::get_dlg_item_safe(hwnd_dialog, ID_ENGINE);
     let engine = selected_engine(engine_combo);
     let voices = match engine {
         TtsEngine::Edge => &data.edge_voices,
@@ -201,7 +201,7 @@ fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
     };
     let only_multilingual = unsafe {
         SendMessageW(
-        unsafe { GetDlgItem(hwnd_dialog, ID_ONLY_MULTILINGUAL) },
+        crate::get_dlg_item_safe(hwnd_dialog, ID_ONLY_MULTILINGUAL),
         BM_GETCHECK,
         WPARAM(0),
         LPARAM(0),
@@ -212,7 +212,7 @@ fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
     let language_filter = if engine == TtsEngine::Edge && !only_multilingual {
         let sel = unsafe {
             SendMessageW(
-            unsafe { GetDlgItem(hwnd_dialog, ID_LANGUAGE) },
+            crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE),
             CB_GETCURSEL,
             WPARAM(0),
             LPARAM(0),
@@ -263,7 +263,7 @@ fn fill_voice_combo(hwnd_dialog: HWND, preferred_voice: &str) {
 }
 
 fn selected_voice(hwnd_dialog: HWND) -> String {
-    let combo = unsafe { GetDlgItem(hwnd_dialog, ID_VOICE) };
+    let combo = crate::get_dlg_item_safe(hwnd_dialog, ID_VOICE);
     if combo.0 == 0 {
         return String::new();
     }
@@ -272,7 +272,7 @@ fn selected_voice(hwnd_dialog: HWND) -> String {
         return String::new();
     }
     let data = unsafe { &*ptr };
-    let engine = selected_engine(unsafe { GetDlgItem(hwnd_dialog, ID_ENGINE) });
+    let engine = selected_engine(crate::get_dlg_item_safe(hwnd_dialog, ID_ENGINE));
     let voices = match engine {
         TtsEngine::Edge => &data.edge_voices,
         TtsEngine::Sapi5 => &data.sapi5_voices,
@@ -295,10 +295,10 @@ fn refresh_edge_controls(hwnd_dialog: HWND, preferred_voice: &str) {
         return;
     }
     let data = unsafe { &mut *ptr };
-    let engine = selected_engine(unsafe { GetDlgItem(hwnd_dialog, ID_ENGINE) });
-    let label_language = unsafe { GetDlgItem(hwnd_dialog, ID_LANGUAGE_LABEL) };
-    let combo_language = unsafe { GetDlgItem(hwnd_dialog, ID_LANGUAGE) };
-    let check_multilingual = unsafe { GetDlgItem(hwnd_dialog, ID_ONLY_MULTILINGUAL) };
+    let engine = selected_engine(crate::get_dlg_item_safe(hwnd_dialog, ID_ENGINE));
+    let label_language = crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE_LABEL);
+    let combo_language = crate::get_dlg_item_safe(hwnd_dialog, ID_LANGUAGE);
+    let check_multilingual = crate::get_dlg_item_safe(hwnd_dialog, ID_ONLY_MULTILINGUAL);
     let is_edge = engine == TtsEngine::Edge;
     unsafe {
         ShowWindow(check_multilingual, if is_edge { SW_SHOW } else { SW_HIDE });

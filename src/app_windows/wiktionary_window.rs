@@ -17,12 +17,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWN,
     CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY, EVENT_OBJECT_VALUECHANGE, GW_CHILD,
-    GWLP_USERDATA, GetDlgCtrlID, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW,
-    GetWindowTextW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, MSG, OBJID_CLIENT, PostMessageW,
-    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
-    WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS,
-    WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
-    WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    GWLP_USERDATA, GetWindow, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
+    IDC_ARROW, IsWindow, LoadCursorW, MSG, OBJID_CLIENT, PostMessageW, RegisterClassW,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
+    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -590,7 +590,7 @@ fn wiktionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
 
 fn handle_enter_key(hwnd: HWND) -> bool {
     let mut control = hwnd;
-    let mut control_id = unsafe { GetDlgCtrlID(control) as usize };
+    let mut control_id = crate::get_dlg_ctrl_id_safe(control);
     if control_id != WIKTIONARY_CLOSE_ID
         && control_id != WIKTIONARY_SEARCH_ID
         && control_id != WIKTIONARY_INPUT_ID
@@ -600,7 +600,7 @@ fn handle_enter_key(hwnd: HWND) -> bool {
         if parent_control.0 == 0 {
             return false;
         }
-        let parent_id = unsafe { GetDlgCtrlID(parent_control) as usize };
+        let parent_id = crate::get_dlg_ctrl_id_safe(parent_control);
         if parent_id != WIKTIONARY_CLOSE_ID
             && parent_id != WIKTIONARY_SEARCH_ID
             && parent_id != WIKTIONARY_INPUT_ID
@@ -691,7 +691,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         return LRESULT(0);
     }
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_GETDLGCODE {
-        let id = unsafe { GetDlgCtrlID(hwnd) as usize };
+        let id = crate::get_dlg_ctrl_id_safe(hwnd);
         if id == WIKTIONARY_CLOSE_ID || id == WIKTIONARY_SEARCH_ID {
             return LRESULT(windows::Win32::UI::WindowsAndMessaging::DLGC_WANTALLKEYS as isize);
         }
@@ -841,7 +841,7 @@ fn run_lookup(hwnd: HWND) {
         return;
     }
 
-    unsafe { SetFocus(output) };
+    crate::set_focus_safe(output);
 
     let history = {
         with_state(parent, |state| {

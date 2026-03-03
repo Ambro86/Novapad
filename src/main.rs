@@ -121,21 +121,22 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreatePopupMenu, CreateWindowExW, DefWindowProcW, DeleteMenu, DestroyWindow, DispatchMessageW,
     DrawMenuBar, EN_CHANGE, EN_KILLFOCUS, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, EnableMenuItem,
     EnumWindows, FALT, FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC,
-    GetClassNameW, GetCursorPos, GetForegroundWindow, GetMenu, GetMenuItemCount, GetMessageW,
-    GetParent, GetSubMenu, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
-    GetWindowThreadProcessId, HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IDYES,
-    IsChild, IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR,
-    MB_ICONINFORMATION, MB_OK, MB_YESNO, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND,
-    MF_BYPOSITION, MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
-    MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW, OBJID_CLIENT, PostMessageW, PostQuitMessage,
-    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
-    SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
-    ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
-    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND,
-    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
-    WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
-    WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC,
-    WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    GetClassNameW, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetForegroundWindow, GetMenu,
+    GetMenuItemCount, GetMessageW, GetParent, GetSubMenu, GetWindowLongPtrW, GetWindowTextLengthW,
+    GetWindowTextW, GetWindowThreadProcessId, HACCEL, HCURSOR, HICON, HMENU, IDC_ARROW,
+    IDI_APPLICATION, IDYES, IsChild, IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW,
+    MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO, MESSAGEBOX_RESULT,
+    MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP,
+    MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW, OBJID_CLIENT,
+    PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE,
+    SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetTimer,
+    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu,
+    TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND,
+    WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
+    WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
+    WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW,
+    WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP,
+    WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -301,11 +302,11 @@ pub(crate) fn focus_editor(hwnd: HWND) {
             if is_audiobook {
                 let tab_hwnd = with_state(hwnd, |state| state.hwnd_tab).unwrap_or(HWND(0));
                 if tab_hwnd.0 != 0 {
-                    SetFocus(tab_hwnd);
+                    set_focus_safe(tab_hwnd);
                 }
                 return;
             }
-            SetFocus(hwnd_edit);
+            set_focus_safe(hwnd_edit);
             SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
             SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
             crate::log_if_err!(PostMessageW(
@@ -322,6 +323,38 @@ pub(crate) fn focus_editor(hwnd: HWND) {
             );
         }
     }
+}
+
+pub(crate) fn set_focus_safe(hwnd: HWND) {
+    unsafe {
+        SetFocus(hwnd);
+    }
+}
+
+pub(crate) fn is_window_handle_valid(hwnd: HWND) -> bool {
+    unsafe { IsWindow(hwnd).as_bool() }
+}
+
+pub(crate) fn get_focus_safe() -> HWND {
+    unsafe { GetFocus() }
+}
+
+pub(crate) fn set_foreground_window_safe(hwnd: HWND) {
+    unsafe {
+        SetForegroundWindow(hwnd);
+    }
+}
+
+pub(crate) fn get_parent_safe(hwnd: HWND) -> HWND {
+    unsafe { GetParent(hwnd) }
+}
+
+pub(crate) fn get_dlg_ctrl_id_safe(hwnd: HWND) -> usize {
+    unsafe { GetDlgCtrlID(hwnd) as usize }
+}
+
+pub(crate) fn get_dlg_item_safe(parent: HWND, id: i32) -> HWND {
+    unsafe { GetDlgItem(parent, id) }
 }
 
 pub(crate) fn reset_spellcheck_state(hwnd: HWND) {
@@ -686,7 +719,7 @@ fn start_dictionary_lookup(
             cacheable,
         });
         let hwnd = HWND(hwnd_val);
-        if unsafe { IsWindow(hwnd).as_bool() } {
+        if crate::is_window_handle_valid(hwnd) {
             unsafe {
                 crate::log_if_err!(PostMessageW(
                     hwnd,
@@ -1905,7 +1938,7 @@ fn force_active_editor_focus(hwnd: HWND) {
     }
     unsafe {
         if let Some(hwnd_edit) = get_active_edit(hwnd) {
-            SetFocus(hwnd_edit);
+            set_focus_safe(hwnd_edit);
             SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
             SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
             crate::log_if_err!(PostMessageW(
@@ -2561,7 +2594,7 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                 if is_insert_tag {
                     insert_voice_tag_from_voice_panel(hwnd);
                     if let Some(hwnd_edit) = get_active_edit(hwnd) {
-                        SetFocus(hwnd_edit);
+                        set_focus_safe(hwnd_edit);
                     }
                     continue;
                 }
@@ -3969,7 +4002,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         state.audiobook_cancel = None;
                     }
                     if let Some(doc) = state.docs.get(state.current) {
-                        SetFocus(doc.hwnd_edit);
+                        set_focus_safe(doc.hwnd_edit);
                     }
                 });
 
@@ -4482,7 +4515,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         if editor_manager::strip_markdown_active_edit(hwnd) {
                             confirm_menu_action(hwnd, "edit.strip_markdown");
                             if let Some(hwnd_edit) = get_active_edit(hwnd) {
-                                SetFocus(hwnd_edit);
+                                set_focus_safe(hwnd_edit);
                             }
                         }
                         LRESULT(0)
@@ -7158,7 +7191,7 @@ fn handle_spellcheck_highlight_timer(hwnd: HWND) {
     };
 
     // Don't do anything if editor doesn't have focus
-    if unsafe { GetFocus() } != hwnd_edit {
+    if crate::get_focus_safe() != hwnd_edit {
         return;
     }
 
@@ -8201,7 +8234,7 @@ fn remove_favorite_voice(hwnd: HWND, engine: TtsEngine, voice_name: &str) {
 }
 
 fn is_focus_in_voice_panel(hwnd: HWND) -> bool {
-    let focus = unsafe { GetFocus() };
+    let focus = crate::get_focus_safe();
     if focus.0 == 0 {
         return false;
     }
@@ -8368,9 +8401,9 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
         let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
         if focus == hwnd_edit || focus == hwnd_tab {
             if visible {
-                SetFocus(combo_engine);
+                set_focus_safe(combo_engine);
             } else if favorites_visible {
-                SetFocus(combo_favorites);
+                set_focus_safe(combo_favorites);
             }
             return true;
         }
@@ -8403,27 +8436,27 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
         if shift_down {
             if idx == 0 {
                 if fallback_edit.0 != 0 {
-                    SetFocus(fallback_edit);
+                    set_focus_safe(fallback_edit);
                     return true;
                 }
                 return false;
             }
             let target = order[idx - 1];
             if target.0 != 0 {
-                SetFocus(target);
+                set_focus_safe(target);
                 return true;
             }
         } else {
             if idx + 1 >= order.len() {
                 if fallback_edit.0 != 0 {
-                    SetFocus(fallback_edit);
+                    set_focus_safe(fallback_edit);
                     return true;
                 }
                 return false;
             }
             let target = order[idx + 1];
             if target.0 != 0 {
-                SetFocus(target);
+                set_focus_safe(target);
                 return true;
             }
         }
@@ -9048,7 +9081,7 @@ fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
             LPARAM(&mut cr as *mut _ as isize),
         );
         SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-        SetFocus(hwnd_edit);
+        set_focus_safe(hwnd_edit);
     }
     announce_bookmark_target_line(hwnd_edit, target_position, &target_snippet);
     true

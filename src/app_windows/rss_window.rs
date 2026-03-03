@@ -42,15 +42,15 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW,
     CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DestroyWindow, ES_AUTOHSCROLL,
-    EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgCtrlID, GetDlgItem,
-    GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONINFORMATION,
-    MB_ICONQUESTION, MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW,
-    OBJID_CLIENT, PostMessageW, RegisterClassW, SW_HIDE, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowTextW, ShowWindow, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE,
-    WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
-    WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER,
-    WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgItem, GetParent,
+    GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONINFORMATION, MB_ICONQUESTION,
+    MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW, OBJID_CLIENT,
+    PostMessageW, RegisterClassW, SW_HIDE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, ShowWindow, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
+    WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WNDCLASSW, WNDPROC,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -1749,11 +1749,11 @@ pub fn focus_library(hwnd: HWND) {
     if hwnd.0 == 0 {
         return;
     }
-    unsafe { SetForegroundWindow(hwnd) };
+    crate::set_foreground_window_safe(hwnd);
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 != 0 {
         select_first_root_if_needed(hwnd, hwnd_tree);
-        unsafe { SetFocus(hwnd_tree) };
+        crate::set_focus_safe(hwnd_tree);
     }
 }
 
@@ -3370,9 +3370,9 @@ fn select_source_by_index(hwnd: HWND, source_index: usize) {
             );
             SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
         }
-        if unsafe { GetFocus() } != hwnd_tree {
+        if crate::get_focus_safe() != hwnd_tree {
             with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
-            unsafe { SetFocus(hwnd_tree) };
+            crate::set_focus_safe(hwnd_tree);
         }
     }
 }
@@ -5058,7 +5058,7 @@ fn handle_edit_source(hwnd: HWND) {
     let main_hwnd = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     let existing = { with_state(main_hwnd, |s| s.rss_add_dialog) }.unwrap_or(HWND(0));
     if existing.0 != 0 {
-        unsafe { SetForegroundWindow(existing) };
+        crate::set_foreground_window_safe(existing);
         return;
     }
 
@@ -5741,7 +5741,7 @@ fn collapse_blank_lines(input: &str) -> String {
 fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
     let existing = with_rss_state(parent_hwnd, |s| s.reorder_dialog).unwrap_or(HWND(0));
     if existing.0 != 0 {
-        unsafe { SetForegroundWindow(existing) };
+        crate::set_foreground_window_safe(existing);
         return;
     }
     let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
@@ -5823,8 +5823,8 @@ fn reorder_control_subclass_proc_inner(
         return LRESULT(0);
     }
     if msg == WM_KEYDOWN {
-        let id = unsafe { GetDlgCtrlID(hwnd) as usize };
-        let parent = unsafe { GetParent(hwnd) };
+        let id = crate::get_dlg_ctrl_id_safe(hwnd);
+        let parent = crate::get_parent_safe(hwnd);
         let (edit_id, ok_id, cancel_id) =
             if id == REORDER_EDIT_ID || id == REORDER_OK_ID || id == REORDER_CANCEL_ID {
                 (REORDER_EDIT_ID, REORDER_OK_ID, REORDER_CANCEL_ID)
@@ -5851,9 +5851,9 @@ fn reorder_control_subclass_proc_inner(
                 )
             };
         }
-        let edit = unsafe { GetDlgItem(parent, edit_id as i32) };
-        let ok = unsafe { GetDlgItem(parent, ok_id as i32) };
-        let cancel = unsafe { GetDlgItem(parent, cancel_id as i32) };
+        let edit = crate::get_dlg_item_safe(parent, edit_id as i32);
+        let ok = crate::get_dlg_item_safe(parent, ok_id as i32);
+        let cancel = crate::get_dlg_item_safe(parent, cancel_id as i32);
         if wparam.0 as u16 == VK_TAB.0 {
             let shift = (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & 0x8000u16 as i16) != 0;
             let next = if shift {
@@ -5871,7 +5871,7 @@ fn reorder_control_subclass_proc_inner(
             } else {
                 edit
             };
-            unsafe { SetFocus(next) };
+            crate::set_focus_safe(next);
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_RETURN.0 {
@@ -5909,7 +5909,7 @@ fn show_add_dialog(parent_hwnd: HWND) {
 fn show_rss_search_dialog(parent_hwnd: HWND) {
     let exists = with_rss_state(parent_hwnd, |s| s.search_dialog).unwrap_or(HWND(0));
     if exists.0 != 0 {
-        unsafe { SetForegroundWindow(exists) };
+        crate::set_foreground_window_safe(exists);
         return;
     }
 

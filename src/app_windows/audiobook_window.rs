@@ -7,7 +7,7 @@ use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM}
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::{PBM_SETPOS, PBM_SETRANGE, WC_BUTTON};
-use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_RETURN};
+use windows::Win32::UI::Input::KeyboardAndMouse::{SetFocus, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, GWLP_USERDATA,
     GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING, MB_YESNO, MSG,
@@ -39,7 +39,7 @@ fn progress_text(language: Language, pct: usize) -> String {
 
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-        let focus = unsafe { GetFocus() };
+        let focus = crate::get_focus_safe();
         let cancel_btn = with_progress_state(hwnd, |s| s.hwnd_cancel).unwrap_or(HWND(0));
         if focus == cancel_btn {
             request_cancel(hwnd);
@@ -223,13 +223,13 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
             unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize) };
 
             if label.0 != 0 {
-                unsafe { SetFocus(label) };
+                crate::set_focus_safe(label);
             }
             LRESULT(0)
         }
         WM_SETFOCUS => {
             if with_progress_state(hwnd, |state| {
-                unsafe { SetFocus(state.hwnd_text) };
+                crate::set_focus_safe(state.hwnd_text);
             })
             .is_none()
             {
@@ -309,7 +309,7 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
         WM_DESTROY => {
             let parent = with_progress_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
             if parent.0 != 0 {
-                unsafe { SetForegroundWindow(parent) };
+                crate::set_foreground_window_safe(parent);
             }
             LRESULT(0)
         }

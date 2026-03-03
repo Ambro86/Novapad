@@ -321,7 +321,7 @@ fn show_import_dialog(
     let mut msg = MSG::default();
     crate::watchdog::enter_modal_dialog();
     loop {
-        if !unsafe { IsWindow(hwnd).as_bool() } {
+        if !crate::is_window_handle_valid(hwnd) {
             break;
         }
         let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
@@ -2121,7 +2121,7 @@ fn show_stream_dialog(
 
     let mut msg = MSG::default();
     loop {
-        if !unsafe { IsWindow(hwnd).as_bool() } {
+        if !crate::is_window_handle_valid(hwnd) {
             break;
         }
         let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
@@ -2810,7 +2810,7 @@ fn choose_stream_audio_track(
     }
     let mut msg = MSG::default();
     loop {
-        if !unsafe { IsWindow(hwnd).as_bool() } {
+        if !crate::is_window_handle_valid(hwnd) {
             break;
         }
         let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };

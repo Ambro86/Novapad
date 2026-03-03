@@ -245,7 +245,7 @@ fn open_window(parent: HWND, kind: HelpWindowKind) {
     }
     .unwrap_or(HWND(0));
     if existing.0 != 0 {
-        unsafe { SetForegroundWindow(existing) };
+        crate::set_foreground_window_safe(existing);
         return;
     }
 
@@ -300,7 +300,7 @@ fn open_window(parent: HWND, kind: HelpWindowKind) {
         {
             crate::log_debug("Failed to access help state");
         }
-        unsafe { SetForegroundWindow(window) };
+        crate::set_foreground_window_safe(window);
     } else if !init_ptr.is_null() {
         let _unused_box = unsafe { Box::from_raw(init_ptr) };
     }
@@ -667,7 +667,7 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
 
             let content_wide = to_wide(&init.content);
             let _res = unsafe { SetWindowTextW(edit, PCWSTR(content_wide.as_ptr())) };
-            unsafe { SetFocus(edit) };
+            crate::set_focus_safe(edit);
 
             let state = Box::new(ReadonlyTextState {
                 parent: unsafe { (*create_struct).hwndParent },
@@ -678,7 +678,7 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             LRESULT(0)
         }
         WM_SETFOCUS => {
-            if with_readonly_text_state(hwnd, |state| unsafe { SetFocus(state.edit) }).is_none() {
+            if with_readonly_text_state(hwnd, |state| crate::set_focus_safe(state.edit)).is_none() {
                 crate::log_debug("Failed to access readonly text state");
             }
             LRESULT(0)
@@ -725,7 +725,7 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             if !ptr.is_null() {
                 let state = unsafe { Box::from_raw(ptr) };
                 if state.parent.0 != 0 {
-                    unsafe { SetForegroundWindow(state.parent) };
+                    crate::set_foreground_window_safe(state.parent);
                     crate::app_windows::podcasts_window::focus_library(state.parent);
                     crate::app_windows::rss_window::focus_library(state.parent);
                 }
@@ -739,7 +739,7 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
         WM_KEYDOWN => {
             if wparam.0 as u32 == VK_RETURN.0 as u32 {
                 if with_readonly_text_state(hwnd, |state| {
-                    if unsafe { GetFocus() } == state.ok_button {
+                    if crate::get_focus_safe() == state.ok_button {
                         crate::log_if_err!(unsafe { DestroyWindow(hwnd) });
                     }
                 })

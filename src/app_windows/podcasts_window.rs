@@ -38,16 +38,15 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CHILDID_SELF,
     CallWindowProcW, CreateMenu, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
-    DestroyWindow, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgCtrlID, GetDlgItem,
-    GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, IsChild, LB_ADDSTRING,
-    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION,
-    MB_ICONQUESTION, MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG,
-    MessageBoxW, OBJID_CLIENT, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND,
-    WM_CONTEXTMENU, WM_COPYDATA, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
-    WM_NOTIFY, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE,
+    DestroyWindow, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, GetClientRect, GetDlgItem, GetParent,
+    GetWindowLongPtrW, GetWindowRect, HMENU, IDC_ARROW, IDYES, IsChild, LB_ADDSTRING, LB_GETCURSEL,
+    LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_NOTIFY, MB_ICONINFORMATION, MB_ICONQUESTION,
+    MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT,
+    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS,
+    WM_SETFONT, WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -788,7 +787,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             let (hwnd_tree, hwnd_results) =
                 with_podcast_state(hwnd, |s| (s.hwnd_tree, s.hwnd_results))
                     .unwrap_or((HWND(0), HWND(0)));
-            let focus = unsafe { GetFocus() };
+            let focus = crate::get_focus_safe();
 
             // Handle Enter on search results list
             if hwnd_results.0 != 0 && focus == hwnd_results {
@@ -3336,7 +3335,7 @@ fn apply_category_selection(hwnd: HWND) {
             );
         }
         if term_edit.0 != 0 {
-            unsafe { SetFocus(term_edit) };
+            crate::set_focus_safe(term_edit);
         }
         return;
     }
@@ -3350,7 +3349,7 @@ fn show_categories_dialog(parent_hwnd: HWND) {
     let main_hwnd = with_podcast_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
     let existing = { with_state(main_hwnd, |s| s.podcasts_categories_dialog) }.unwrap_or(HWND(0));
     if existing.0 != 0 {
-        unsafe { SetForegroundWindow(existing) };
+        crate::set_foreground_window_safe(existing);
         return;
     }
     let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
@@ -4151,7 +4150,7 @@ fn show_add_dialog(parent_hwnd: HWND) {
     let main_hwnd = with_podcast_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
     let existing = { with_state(main_hwnd, |s| s.podcasts_add_dialog) }.unwrap_or(HWND(0));
     if existing.0 != 0 {
-        unsafe { SetForegroundWindow(existing) };
+        crate::set_foreground_window_safe(existing);
         return;
     }
     let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
@@ -4409,7 +4408,7 @@ pub fn show_context_menu_from_keyboard(hwnd: HWND) {
 pub fn focus_library(hwnd: HWND) {
     let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 != 0 {
-        unsafe { SetFocus(hwnd_tree) };
+        crate::set_focus_safe(hwnd_tree);
     }
 }
 
@@ -4469,7 +4468,7 @@ fn show_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
     if hwnd_tree.0 == 0 {
         return;
     }
-    let focus = unsafe { GetFocus() };
+    let focus = crate::get_focus_safe();
     let target_list = focus == hwnd_results;
     if target_list {
         show_search_context_menu(hwnd, x, y, use_hit_test);
@@ -5069,7 +5068,7 @@ fn handle_source_action(hwnd: HWND, verb: SourceAction) {
             if !confirm {
                 let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
                 if hwnd_tree.0 != 0 {
-                    unsafe { SetFocus(hwnd_tree) };
+                    crate::set_focus_safe(hwnd_tree);
                 }
                 update_delete_button_state(hwnd);
                 return;
@@ -5107,7 +5106,7 @@ fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                 update_delete_button_state(hwnd);
                 let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
                 if hwnd_tree.0 != 0 {
-                    unsafe { SetFocus(hwnd_tree) };
+                    crate::set_focus_safe(hwnd_tree);
                     let first = HTREEITEM(unsafe {
                         SendMessageW(
                             hwnd_tree,
@@ -5132,7 +5131,7 @@ fn handle_source_action(hwnd: HWND, verb: SourceAction) {
             {
                 let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
                 if hwnd_tree.0 != 0 {
-                    unsafe { SetFocus(hwnd_tree) };
+                    crate::set_focus_safe(hwnd_tree);
                 }
                 update_delete_button_state(hwnd);
             }
@@ -5278,8 +5277,8 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                             );
                         }
                     }
-                    if unsafe { GetFocus() } != hwnd_tree {
-                        unsafe { SetFocus(hwnd_tree) };
+                    if crate::get_focus_safe() != hwnd_tree {
+                        crate::set_focus_safe(hwnd_tree);
                     }
                 }
                 return;
@@ -5391,8 +5390,8 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                 });
             }
             announce_status(&i18n::tr(language, "podcasts.episode_removed"));
-            if hwnd_tree.0 != 0 && unsafe { GetFocus() } != hwnd_tree {
-                unsafe { SetFocus(hwnd_tree) };
+            if hwnd_tree.0 != 0 && crate::get_focus_safe() != hwnd_tree {
+                crate::set_focus_safe(hwnd_tree);
             }
         }
     }
@@ -5739,15 +5738,15 @@ fn description_control_subclass_proc_inner(
         return LRESULT(0);
     }
     if msg == WM_KEYDOWN {
-        let id = unsafe { GetDlgCtrlID(hwnd) as usize };
-        let parent = unsafe { GetParent(hwnd) };
-        let edit = unsafe { GetDlgItem(parent, ID_DESCRIPTION_EDIT as i32) };
-        let ok = unsafe { GetDlgItem(parent, ID_DESCRIPTION_OK as i32) };
+        let id = crate::get_dlg_ctrl_id_safe(hwnd);
+        let parent = crate::get_parent_safe(hwnd);
+        let edit = crate::get_dlg_item_safe(parent, ID_DESCRIPTION_EDIT as i32);
+        let ok = crate::get_dlg_item_safe(parent, ID_DESCRIPTION_OK as i32);
 
         if wparam.0 as u16 == VK_TAB.0 {
             let next = if id == ID_DESCRIPTION_EDIT { ok } else { edit };
             if next.0 != 0 {
-                unsafe { SetFocus(next) };
+                crate::set_focus_safe(next);
             }
             return LRESULT(0);
         }
@@ -6067,7 +6066,7 @@ fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
 fn show_reorder_dialog(parent_hwnd: HWND, source_index: usize, total: usize) {
     let existing = with_podcast_state(parent_hwnd, |s| s.reorder_dialog).unwrap_or(HWND(0));
     if existing.0 != 0 {
-        unsafe { SetForegroundWindow(existing) };
+        crate::set_foreground_window_safe(existing);
         return;
     }
     let hinstance = unsafe { HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0) };
@@ -6143,11 +6142,11 @@ fn reorder_control_subclass_proc_inner(
         return LRESULT(0);
     }
     if msg == WM_KEYDOWN {
-        let id = unsafe { GetDlgCtrlID(hwnd) as usize };
-        let parent = unsafe { GetParent(hwnd) };
-        let edit = unsafe { GetDlgItem(parent, REORDER_EDIT_ID as i32) };
-        let ok = unsafe { GetDlgItem(parent, REORDER_OK_ID as i32) };
-        let cancel = unsafe { GetDlgItem(parent, REORDER_CANCEL_ID as i32) };
+        let id = crate::get_dlg_ctrl_id_safe(hwnd);
+        let parent = crate::get_parent_safe(hwnd);
+        let edit = crate::get_dlg_item_safe(parent, REORDER_EDIT_ID as i32);
+        let ok = crate::get_dlg_item_safe(parent, REORDER_OK_ID as i32);
+        let cancel = crate::get_dlg_item_safe(parent, REORDER_CANCEL_ID as i32);
         if wparam.0 as u16 == VK_TAB.0 {
             let shift = (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & 0x8000u16 as i16) != 0;
             let next = if shift {
@@ -6165,7 +6164,7 @@ fn reorder_control_subclass_proc_inner(
             } else {
                 edit
             };
-            unsafe { SetFocus(next) };
+            crate::set_focus_safe(next);
             return LRESULT(0);
         }
         if wparam.0 as u16 == VK_RETURN.0 {
@@ -6475,7 +6474,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
     {
         let key = wparam.0 as u32;
         if msg == WM_CHAR && key == VK_RETURN.0 as u32 {
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0
                 && let Some(item) = selected_episode(parent)
             {
@@ -6485,7 +6484,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
             }
         }
         if key == VK_DELETE.0 as u32 {
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 if selected_episode(parent).is_some() {
                     handle_episode_action(parent, EpisodeAction::Remove);
@@ -6496,14 +6495,14 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
             }
         }
         if key == 'Z' as u32 && unsafe { GetKeyState(VK_CONTROL.0 as i32) < 0 } {
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 undo_last_delete(parent);
                 return LRESULT(0);
             }
         }
         if key == VK_RIGHT.0 as u32 {
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0
                 && let Some(node) = selected_node_data(parent)
                 && matches!(node, NodeData::Source(_) | NodeData::PreviewSource(_))
@@ -6524,7 +6523,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
             }
         }
         if key == VK_LEFT.0 as u32 {
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 let hitem = selected_tree_item(parent);
                 if hitem.0 != 0 {
@@ -6565,7 +6564,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
             }
         }
         if key == VK_RETURN.0 as u32 {
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 if unsafe { GetKeyState(VK_MENU.0 as i32) < 0 } {
                     show_selected_properties(parent);
@@ -6590,7 +6589,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
         if key == u32::from(VK_APPS.0)
             || (key == u32::from(VK_F10.0) && unsafe { GetKeyState(VK_SHIFT.0 as i32) < 0 })
         {
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 if let Err(_e) = unsafe {
                     PostMessageW(parent, WM_CONTEXTMENU, WPARAM(hwnd.0 as usize), LPARAM(-1))
@@ -6602,7 +6601,7 @@ fn podcast_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPAR
         }
     }
 
-    let parent = unsafe { GetParent(hwnd) };
+    let parent = crate::get_parent_safe(hwnd);
     let prev_proc = if parent.0 != 0 {
         with_podcast_state(parent, |s| s.tree_proc).unwrap_or(None)
     } else {
@@ -6632,7 +6631,7 @@ fn podcast_search_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
     if msg == WM_KEYDOWN || msg == windows::Win32::UI::WindowsAndMessaging::WM_SYSKEYDOWN {
         let key = wparam.0 as u32;
         if key == VK_TAB.0 as u32 {
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 let (
                     hwnd_tree,
@@ -6679,13 +6678,13 @@ fn podcast_search_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                     hwnd_close
                 };
                 if target.0 != 0 {
-                    unsafe { SetFocus(target) };
+                    crate::set_focus_safe(target);
                     return LRESULT(0);
                 }
             }
         }
         if key == VK_RETURN.0 as u32 {
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 trigger_search_from_edit(parent);
             }
@@ -6697,7 +6696,7 @@ fn podcast_search_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
     {
         let key = wparam.0 as u32;
         if key == VK_RETURN.0 as u32 {
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
                 trigger_search_from_edit(parent);
             }
@@ -6705,20 +6704,20 @@ fn podcast_search_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
         }
     }
     if msg == WM_CHAR && wparam.0 as u32 == 13 {
-        let parent = unsafe { GetParent(hwnd) };
+        let parent = crate::get_parent_safe(hwnd);
         if parent.0 != 0 {
             trigger_search_from_edit(parent);
         }
         return LRESULT(0);
     }
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_SYSCHAR && wparam.0 as u32 == 13 {
-        let parent = unsafe { GetParent(hwnd) };
+        let parent = crate::get_parent_safe(hwnd);
         if parent.0 != 0 {
             trigger_search_from_edit(parent);
         }
         return LRESULT(0);
     }
-    let parent = unsafe { GetParent(hwnd) };
+    let parent = crate::get_parent_safe(hwnd);
     let prev_proc = if parent.0 != 0 {
         with_podcast_state(parent, |s| s.search_proc).unwrap_or(None)
     } else {

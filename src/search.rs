@@ -18,9 +18,9 @@ use windows::Win32::UI::Controls::RichEdit::{
 use windows::Win32::UI::Controls::{BST_CHECKED, WC_BUTTON};
 use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
-    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, GetClientRect, GetParent,
-    GetWindowRect, HMENU, MB_ICONWARNING, MB_OK, SWP_NOMOVE, SWP_NOZORDER, SendMessageW,
-    SetWindowPos, WINDOW_STYLE, WM_COMMAND, WM_GETTEXTLENGTH, WM_INITDIALOG, WM_SETFONT,
+    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, GetClientRect, GetWindowRect,
+    HMENU, MB_ICONWARNING, MB_OK, SWP_NOMOVE, SWP_NOZORDER, SendMessageW, SetWindowPos,
+    WINDOW_STYLE, WM_COMMAND, WM_GETTEXTLENGTH, WM_INITDIALOG, WM_SETFONT,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -722,7 +722,7 @@ fn find_replace_hook_proc_inner(hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LP
         }
         WM_COMMAND => {
             let cmd_id = (wparam.0 & 0xffff) as isize;
-            let parent = unsafe { GetParent(hdlg) };
+            let parent = crate::get_parent_safe(hdlg);
             if parent.0 == 0 {
                 return 0;
             }

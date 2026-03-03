@@ -7,7 +7,7 @@ use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::{PBM_SETPOS, PBM_SETRANGE, WC_BUTTON};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, GetKeyState, SetFocus, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
+    EnableWindow, GetKeyState, SetFocus, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
@@ -75,7 +75,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             return true;
         }
         if key == VK_RETURN.0 as u32 {
-            let focus = unsafe { GetFocus() };
+            let focus = crate::get_focus_safe();
             let cancel = with_save_state(hwnd, |state| state.cancel_button).unwrap_or(HWND(0));
             if cancel.0 != 0 && focus == cancel {
                 if let Err(_e) = unsafe {
@@ -269,7 +269,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             let language = params.language;
             let labels = params.labels;
             let show_cancel = params.show_cancel;
-            let main = unsafe { GetParent(parent) };
+            let main = crate::get_parent_safe(parent);
             let hfont = { with_state(main, |state| state.hfont) }.unwrap_or(HFONT(0));
             let label_text = format!("{} 0%", labels.in_progress);
 
@@ -373,7 +373,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
         }
         WM_SETFOCUS => {
             if with_save_state(hwnd, |state| {
-                unsafe { SetFocus(state.label) };
+                crate::set_focus_safe(state.label);
             })
             .is_none()
             {
@@ -401,22 +401,22 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 && show_cancel
                 && cancel.0 != 0
             {
-                let focus = unsafe { GetFocus() };
+                let focus = crate::get_focus_safe();
                 let shift_down =
                     (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & (0x8000u16 as i16)) != 0;
                 if !shift_down && focus != cancel {
-                    unsafe { SetFocus(cancel) };
+                    crate::set_focus_safe(cancel);
                     return LRESULT(0);
                 }
                 if shift_down && focus == cancel {
-                    unsafe { SetFocus(label) };
+                    crate::set_focus_safe(label);
                     return LRESULT(0);
                 }
             }
             if wparam.0 as u32 == VK_RETURN.0 as u32
                 && let Some(cancel) = with_save_state(hwnd, |state| state.cancel_button)
                 && cancel.0 != 0
-                && unsafe { GetFocus() } == cancel
+                && crate::get_focus_safe() == cancel
             {
                 if let Err(_e) = unsafe {
                     PostMessageW(hwnd, WM_COMMAND, WPARAM(SAVE_ID_CANCEL), LPARAM(cancel.0))
@@ -479,7 +479,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 unsafe { EnableWindow(parent, true) };
                 // Keep focus within Sonarpad when progress dialogs close (e.g. streaming
                 // download -> conversion handoff), avoiding transient desktop focus.
-                unsafe { SetForegroundWindow(parent) };
+                crate::set_foreground_window_safe(parent);
                 if let Err(_e) =
                     unsafe { PostMessageW(parent, WM_PODCAST_SAVE_CLOSED, WPARAM(0), LPARAM(0)) }
                 {
@@ -548,7 +548,7 @@ fn request_cancel(hwnd: HWND) {
         crate::log_debug("Failed to access save state");
     }
     if should_post {
-        let parent = unsafe { GetParent(hwnd) };
+        let parent = crate::get_parent_safe(hwnd);
         if parent.0 != 0 {
             unsafe {
                 if let Err(_e) = PostMessageW(parent, WM_PODCAST_SAVE_CANCEL, WPARAM(0), LPARAM(0))

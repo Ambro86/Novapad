@@ -343,7 +343,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             );
 
             // Get language from parent or default
-            let parent = unsafe { GetParent(hwnd) };
+            let parent = crate::get_parent_safe(hwnd);
             let language =
                 { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
 
@@ -459,7 +459,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             if key == VK_TAB.0 as u32 {
                 let shift_down =
                     (unsafe { GetKeyState(VK_SHIFT.0 as i32) } & (0x8000u16 as i16)) != 0;
-                let current_focus = unsafe { GetFocus() };
+                let current_focus = crate::get_focus_safe();
                 let edit =
                     unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 101) };
                 let ok = unsafe { windows::Win32::UI::WindowsAndMessaging::GetDlgItem(hwnd, 1) };
@@ -474,7 +474,7 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 } else {
                     idx = (idx + 1) % order.len();
                 }
-                unsafe { SetFocus(order[idx]) };
+                crate::set_focus_safe(order[idx]);
                 return LRESULT(0);
             }
             if key == VK_RETURN.0 as u32 {
@@ -1733,7 +1733,7 @@ fn append_output(state: &mut PromptState, text: &str) {
     }
 
     let output = state.output;
-    let focus = unsafe { GetFocus() };
+    let focus = crate::get_focus_safe();
     let mut sel_start = 0u32;
     let mut sel_end = 0u32;
     if focus == output {

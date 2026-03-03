@@ -492,10 +492,10 @@ fn modifier_down_any(vks: &[i32]) -> bool {
 }
 
 fn move_options_focus_tab(hwnd: HWND, backwards: bool) {
-    let current = unsafe { GetFocus() };
+    let current = crate::get_focus_safe();
     let next = unsafe { GetNextDlgTabItem(hwnd, current, backwards) };
     if next.0 != 0 {
-        unsafe { SetFocus(next) };
+        crate::set_focus_safe(next);
     }
 }
 
@@ -10932,7 +10932,7 @@ fn focus_tab_first(hwnd: HWND, index: i32) {
     .unwrap_or(HWND(0));
 
     if target.0 != 0 {
-        unsafe { SetFocus(target) };
+        crate::set_focus_safe(target);
         if let Err(_e) =
             unsafe { PostMessageW(hwnd, WM_NEXTDLGCTL, WPARAM(target.0 as usize), LPARAM(1)) }
         {

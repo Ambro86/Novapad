@@ -9,7 +9,7 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::RichEdit::CHARRANGE;
 use windows::Win32::UI::Controls::{WC_BUTTON, WC_LISTBOXW};
-use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, GetFocus, SetFocus, VK_RETURN};
+use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
     EVENT_OBJECT_FOCUS, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IDCANCEL, LB_ADDSTRING,
@@ -41,7 +41,7 @@ fn force_focus_editor_on_parent(parent: HWND) {
     if parent.0 == 0 {
         return;
     }
-    unsafe { SetForegroundWindow(parent) };
+    crate::set_foreground_window_safe(parent);
     if let Some(hwnd_edit) = crate::get_active_edit(parent) {
         unsafe {
             SetFocus(hwnd_edit);
@@ -70,7 +70,7 @@ fn force_focus_editor_on_parent(parent: HWND) {
 
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-        let focus = unsafe { GetFocus() };
+        let focus = crate::get_focus_safe();
         let (list, btn) = with_bookmarks_state(hwnd, |s| (s.hwnd_list, s.hwnd_goto))
             .unwrap_or((HWND(0), HWND(0)));
         if focus == list || focus == btn {
@@ -258,7 +258,7 @@ fn bookmarks_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
             if unsafe { SendMessageW(hwnd_list, LB_GETCOUNT, WPARAM(0), LPARAM(0)).0 } > 0 {
                 unsafe { SendMessageW(hwnd_list, LB_SETCURSEL, WPARAM(0), LPARAM(0)) };
             }
-            unsafe { SetFocus(hwnd_list) };
+            crate::set_focus_safe(hwnd_list);
 
             LRESULT(0)
         }

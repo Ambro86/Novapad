@@ -26,11 +26,11 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
     FindWindowW, GetMessageW, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
-    IDC_ARROW, IsDialogMessageW, IsWindow, LoadCursorW, MSG, PostMessageW, RegisterClassW,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, TranslateMessage,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
-    WM_NOTIFY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    IDC_ARROW, IsDialogMessageW, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW,
+    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, TranslateMessage, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NOTIFY, WM_SETFONT,
+    WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -189,7 +189,7 @@ pub fn open_find_in_files_dialog(parent: HWND) {
 
     let mut msg = MSG::default();
     loop {
-        if !unsafe { IsWindow(hwnd).as_bool() } {
+        if !crate::is_window_handle_valid(hwnd) {
             break;
         }
         let res = unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
@@ -511,7 +511,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 }
             }
 
-            unsafe { SetFocus(term_edit) };
+            crate::set_focus_safe(term_edit);
 
             let state = Box::new(FindInFilesState {
                 hwnd,
@@ -560,7 +560,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                         {
                             crate::log_debug(&format!("Error: {:?}", _e));
                         }
-                        unsafe { SetFocus(state.term_edit) };
+                        crate::set_focus_safe(state.term_edit);
                     }
                 })
                 .is_none()
@@ -599,7 +599,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             }
             if wparam.0 as u32 == VK_RETURN.0 as u32 {
                 if with_find_state(hwnd, |state| {
-                    let focus = unsafe { GetFocus() };
+                    let focus = crate::get_focus_safe();
                     if focus == state.results_tree {
                         open_selected_result(state);
                     } else {
@@ -741,7 +741,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
         }
         WM_DESTROY => {
             if with_find_state(hwnd, |state| {
-                unsafe { SetForegroundWindow(state.parent) };
+                crate::set_foreground_window_safe(state.parent);
             })
             .is_none()
             {

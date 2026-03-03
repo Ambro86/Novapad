@@ -14,13 +14,13 @@ use windows::Win32::UI::Controls::{EM_SCROLLCARET, EM_SETSEL, WC_LISTBOXW, WC_ST
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow,
-    ES_AUTOHSCROLL, GWLP_USERDATA, GetDlgCtrlID, GetWindowLongPtrW, GetWindowTextLengthW,
-    GetWindowTextW, HMENU, IDC_ARROW, IsWindow, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT,
-    LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MSG,
-    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
-    WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
+    IDC_ARROW, IsWindow, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK,
+    LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW,
+    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
+    WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WS_CAPTION,
+    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -93,7 +93,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             return true;
         }
         if msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-            let focus = unsafe { GetFocus() };
+            let focus = crate::get_focus_safe();
             if let Some((input, search, results, close)) = with_window_state(hwnd, |state| {
                 (state.input, state.search, state.results, state.close)
             }) {
@@ -486,7 +486,7 @@ fn handle_enter_key(hwnd: HWND) -> bool {
     if parent.0 == 0 {
         return false;
     }
-    let id = unsafe { GetDlgCtrlID(hwnd) as usize };
+    let id = crate::get_dlg_ctrl_id_safe(hwnd);
     if id == WIKIPEDIA_CLOSE_ID {
         crate::log_if_err!(unsafe { DestroyWindow(parent) });
         return true;
@@ -549,7 +549,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         return LRESULT(0);
     }
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_GETDLGCODE {
-        let id = unsafe { GetDlgCtrlID(hwnd) as usize };
+        let id = crate::get_dlg_ctrl_id_safe(hwnd);
         if id == WIKIPEDIA_CLOSE_ID || id == WIKIPEDIA_SEARCH_ID || id == WIKIPEDIA_RESULTS_ID {
             return LRESULT(windows::Win32::UI::WindowsAndMessaging::DLGC_WANTALLKEYS as isize);
         }

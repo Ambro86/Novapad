@@ -67,7 +67,7 @@ use std::io::Write;
 use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
@@ -161,7 +161,7 @@ use crate::app_windows::find_in_files_window::{
     FindInFilesCache, apply_find_in_files_selection, focus_find_in_files_results,
 };
 use crate::podcast::chapters::Chapter;
-use crate::tools::whisper_transcribe::WhisperModel;
+use crate::tools::faster_whisper_bridge::BridgeModel;
 
 const WM_PDF_LOADED: u32 = WM_APP + 1;
 const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
@@ -2114,11 +2114,11 @@ enum TranscriptionProfile {
     Large,
 }
 
-fn map_profile_to_model(profile: TranscriptionProfile) -> WhisperModel {
+fn map_profile_to_bridge_model(profile: TranscriptionProfile) -> BridgeModel {
     match profile {
-        TranscriptionProfile::Small => WhisperModel::SmallQ51,
-        TranscriptionProfile::Medium => WhisperModel::MediumQ50,
-        TranscriptionProfile::Large => WhisperModel::LargeV3TurboQ50,
+        TranscriptionProfile::Small => BridgeModel::Small,
+        TranscriptionProfile::Medium => BridgeModel::Medium,
+        TranscriptionProfile::Large => BridgeModel::LargeV3,
     }
 }
 
@@ -2223,7 +2223,7 @@ fn close_whisper_progress_window(hwnd: HWND) {
 
 fn start_whisper_transcription(hwnd: HWND) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let Some(profile) = choose_whisper_profile_if_needed(hwnd, language) else {
+    let Some(whisper_profile) = choose_whisper_profile_if_needed(hwnd, language) else {
         return;
     };
     let media_info = with_state(hwnd, |state| {
@@ -2266,38 +2266,39 @@ fn start_whisper_transcription(hwnd: HWND) {
 
     std::thread::spawn(move || {
         let result = (|| -> Result<WhisperTranscriptionResult, String> {
-            #[cfg(feature = "whisper_cuda")]
-            {
-                let cuda_dir = settings::settings_dir().join("cuda");
-                crate::tools::whisper_transcribe::ensure_cuda_runtime(&cuda_dir, &cancel_flag)?;
-            }
-            let models_dir = settings::settings_dir().join("models").join("whisper");
-            let model = map_profile_to_model(profile);
-            screen_reader_speak(&i18n::tr(language, "whisper.status.downloading_model"));
-            let model_path =
-                crate::tools::whisper_transcribe::ensure_model(&models_dir, model, &cancel_flag)?;
-            if cancel_flag.load(Ordering::Relaxed) {
-                return Ok(WhisperTranscriptionResult {
-                    title: String::new(),
-                    text: String::new(),
-                    error: None,
-                    cancelled: true,
-                });
-            }
+            crate::log_debug("Transcription: preparing WAV for faster-whisper bridge");
+            let wav_path = {
+                screen_reader_speak(&i18n::tr(language, "whisper.status.preparing_audio"));
+                let _unused = post_message_w_safe(
+                    hwnd,
+                    WM_WHISPER_TRANSCRIPTION_PROGRESS,
+                    WPARAM(10),
+                    LPARAM(0),
+                );
+                crate::audio_player::prepare_media_wav_for_transcription(&media_path, stream_index)?
+            };
 
-            screen_reader_speak(&i18n::tr(language, "whisper.status.preparing_audio"));
-            let wav_path = crate::audio_player::prepare_media_wav_for_transcription(
-                &media_path,
-                stream_index,
-            )?;
-
+            let model = map_profile_to_bridge_model(whisper_profile);
+            crate::log_debug(&format!(
+                "Transcription: invoking faster-whisper bridge model={}",
+                match model {
+                    BridgeModel::Small => "small",
+                    BridgeModel::Medium => "medium",
+                    BridgeModel::LargeV3 => "large-v3",
+                }
+            ));
+            let _unused = post_message_w_safe(
+                hwnd,
+                WM_WHISPER_TRANSCRIPTION_PROGRESS,
+                WPARAM(20),
+                LPARAM(0),
+            );
             screen_reader_speak(&i18n::tr(language, "whisper.status.transcribing"));
-            let progress_last = Arc::new(AtomicI32::new(-1));
-            let progress_last_closure = Arc::clone(&progress_last);
-            let progress_callback: Box<dyn FnMut(i32)> = Box::new(move |pct| {
+            let mut progress_last = -1;
+            let progress_callback: Box<dyn FnMut(i32) + Send> = Box::new(move |pct| {
                 let clamped = pct.clamp(0, 100);
-                let prev = progress_last_closure.fetch_max(clamped, Ordering::Relaxed);
-                if clamped > prev {
+                if clamped > progress_last {
+                    progress_last = clamped;
                     let _unused = post_message_w_safe(
                         hwnd,
                         WM_WHISPER_TRANSCRIPTION_PROGRESS,
@@ -2307,13 +2308,17 @@ fn start_whisper_transcription(hwnd: HWND) {
                 }
             });
 
-            let text = crate::tools::whisper_transcribe::transcribe_wav(
-                &model_path,
+            let text = crate::tools::faster_whisper_bridge::transcribe_wav(
                 &wav_path,
-                false,
+                model,
+                language,
                 &cancel_flag,
                 Some(progress_callback),
             )?;
+            crate::log_debug(&format!(
+                "Transcription: bridge completed text_len={}",
+                text.len()
+            ));
             if cancel_flag.load(Ordering::Relaxed) {
                 return Ok(WhisperTranscriptionResult {
                     title: String::new(),
@@ -2351,6 +2356,13 @@ fn start_whisper_transcription(hwnd: HWND) {
                 cancelled: cancel_flag.load(Ordering::Relaxed),
             },
         };
+        if let Some(err) = payload.error.as_ref() {
+            crate::log_debug(&format!("Transcription: failed: {}", err));
+        } else if payload.cancelled {
+            crate::log_debug("Transcription: cancelled");
+        } else {
+            crate::log_debug("Transcription: posting result to UI thread");
+        }
         let ptr = Box::into_raw(Box::new(payload));
         if let Err(err) = post_message_w_safe(
             hwnd,

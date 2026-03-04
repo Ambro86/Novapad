@@ -1,1 +1,1 @@
-dll/whisper-cuda-runtime-win64-v13.1.zip filter=lfs diff=lfs merge=lfs -text
+dll/faster_whisper_bridge.exe filter=lfs diff=lfs merge=lfs -text

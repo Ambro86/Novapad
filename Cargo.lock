@@ -4152,6 +4152,7 @@ name = "sonarpad"
 version = "0.6.8"
 dependencies = [
  "anyhow",
+ "base64",
  "bindgen 0.70.1",
  "calamine",
  "cfb",

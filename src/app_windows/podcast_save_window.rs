@@ -51,6 +51,7 @@ struct SaveState {
     cancel_requested: bool,
     language: Language,
     current_pct: usize,
+    has_real_progress: bool,
     labels: SaveDialogLabels,
     show_cancel: bool,
 }
@@ -362,6 +363,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 cancel_requested: false,
                 language,
                 current_pct: 0,
+                has_real_progress: false,
                 labels,
                 show_cancel,
             };
@@ -435,7 +437,8 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             let pct = wparam.0.min(100);
             if with_save_state(hwnd, |state| {
                 crate::send_message_w_safe(state.progress, PBM_SETPOS, WPARAM(pct), LPARAM(0));
-                state.current_pct = state.current_pct.max(pct);
+                state.has_real_progress = true;
+                state.current_pct = pct;
                 update_progress_label(state);
             })
             .is_none()
@@ -447,7 +450,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
         WM_TIMER => {
             if wparam.0 == SAVE_PROGRESS_TIMER_ID {
                 if with_save_state(hwnd, |state| {
-                    if state.current_pct < SAVE_PROGRESS_MAX_FAKE {
+                    if !state.has_real_progress && state.current_pct < SAVE_PROGRESS_MAX_FAKE {
                         state.current_pct = (state.current_pct + 1).min(SAVE_PROGRESS_MAX_FAKE);
                         crate::send_message_w_safe(
                             state.progress,

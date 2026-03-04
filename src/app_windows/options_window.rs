@@ -102,6 +102,7 @@ const OPTIONS_ID_PODCAST_CACHE_LIMIT: usize = 6030;
 const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
 const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
 const OPTIONS_ID_PODCASTINDEX_SIGNUP: usize = 6037;
+const OPTIONS_ID_GEMINI_API_KEY: usize = 6111;
 const OPTIONS_ID_DICTIONARY_TRANSLATION: usize = 6038;
 const OPTIONS_ID_WIKIPEDIA_LANGUAGE: usize = 6040;
 const OPTIONS_ID_INTERPRETER_PATH: usize = 6041;
@@ -649,6 +650,8 @@ struct OptionsDialogState {
     edit_podcastindex_key: HWND,
     label_podcastindex_secret: HWND,
     edit_podcastindex_secret: HWND,
+    label_gemini_api_key: HWND,
+    edit_gemini_api_key: HWND,
     button_podcastindex_signup: HWND,
     checkbox_multilingual: HWND,
     checkbox_use_dialogue_voice: HWND,
@@ -866,6 +869,7 @@ struct OptionsLabels {
     label_podcast_time_display: String,
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
+    label_gemini_api_key: String,
     label_podcastindex_signup: String,
     lang_it: String,
     lang_en: String,
@@ -1113,6 +1117,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_podcast_time_display: i18n::tr(language, "options.label.podcast_time_display"),
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
+        label_gemini_api_key: "Gemini API key:".to_string(),
         label_podcastindex_signup: i18n::tr(language, "options.button.podcastindex_signup"),
         lang_it: i18n::tr(language, "options.lang.it"),
         lang_en: i18n::tr(language, "options.lang.en"),
@@ -3562,6 +3567,36 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 30;
 
+                let label_gemini_api_key = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_gemini_api_key).as_ptr()),
+                    WS_CHILD,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_gemini_api_key = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_GEMINI_API_KEY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
                 let button_podcastindex_signup = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -4419,6 +4454,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_podcastindex_key,
                     label_podcastindex_secret,
                     edit_podcastindex_secret,
+                    label_gemini_api_key,
+                    edit_gemini_api_key,
                     button_podcastindex_signup,
                     checkbox_tts_manual,
                     checkbox_multilingual,
@@ -4596,6 +4633,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_podcastindex_key,
                     label_podcastindex_secret,
                     edit_podcastindex_secret,
+                    label_gemini_api_key,
+                    edit_gemini_api_key,
                     button_podcastindex_signup,
                     checkbox_multilingual,
                     checkbox_use_dialogue_voice,
@@ -5183,6 +5222,8 @@ fn initialize_options_dialog(hwnd: HWND) {
             edit_podcastindex_key,
             _label_podcastindex_secret,
             edit_podcastindex_secret,
+            _label_gemini_api_key,
+            edit_gemini_api_key,
             _button_podcastindex_signup,
             checkbox_tts_manual,
             checkbox_multilingual,
@@ -5310,6 +5351,8 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.edit_podcastindex_key,
                 state.label_podcastindex_secret,
                 state.edit_podcastindex_secret,
+                state.label_gemini_api_key,
+                state.edit_gemini_api_key,
                 state.button_podcastindex_signup,
                 state.checkbox_tts_manual,
                 state.checkbox_multilingual,
@@ -6923,6 +6966,12 @@ fn initialize_options_dialog(hwnd: HWND) {
         {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
+        let gemini_key =
+            crate::settings::decrypt_gemini_api_key(&settings.gemini_api_key).unwrap_or_default();
+        if let Err(_e) = SetWindowTextW(edit_gemini_api_key, PCWSTR(to_wide(&gemini_key).as_ptr()))
+        {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
 
         refresh_voices(hwnd);
     }
@@ -8437,6 +8486,7 @@ fn apply_options_dialog(hwnd: HWND) {
             combo_podcast_time_display,
             edit_podcastindex_key,
             edit_podcastindex_secret,
+            edit_gemini_api_key,
             checkbox_tts_manual,
             checkbox_multilingual,
             checkbox_use_dialogue_voice,
@@ -8526,6 +8576,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.combo_podcast_time_display,
                 state.edit_podcastindex_key,
                 state.edit_podcastindex_secret,
+                state.edit_gemini_api_key,
                 state.checkbox_tts_manual,
                 state.checkbox_multilingual,
                 state.checkbox_use_dialogue_voice,
@@ -9458,6 +9509,18 @@ fn apply_options_dialog(hwnd: HWND) {
             } else {
                 settings.podcast_index_api_secret =
                     crate::settings::encrypt_podcast_index_secret(trimmed);
+            }
+        }
+        let gemini_key_len = GetWindowTextLengthW(edit_gemini_api_key);
+        if gemini_key_len >= 0 {
+            let mut buf = vec![0u16; (gemini_key_len + 1) as usize];
+            let read = GetWindowTextW(edit_gemini_api_key, &mut buf);
+            let text = String::from_utf16_lossy(&buf[..read as usize]);
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                settings.gemini_api_key.clear();
+            } else {
+                settings.gemini_api_key = crate::settings::encrypt_gemini_api_key(trimmed);
             }
         }
 

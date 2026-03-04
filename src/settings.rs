@@ -547,6 +547,8 @@ pub struct AppSettings {
     pub show_media_save_confirmation: bool,
     pub podcast_index_api_key: String,
     pub podcast_index_api_secret: String,
+    #[serde(default)]
+    pub gemini_api_key: String,
     pub youtube_include_timestamps: bool,
     #[serde(default = "default_stream_audio_output_format")]
     pub stream_audio_default_format: String,
@@ -812,6 +814,7 @@ impl Default for AppSettings {
             show_media_save_confirmation: true,
             podcast_index_api_key: String::new(),
             podcast_index_api_secret: String::new(),
+            gemini_api_key: String::new(),
             youtube_include_timestamps: true,
             stream_audio_default_format: default_stream_audio_output_format(),
             whisper_model_profile: String::new(),
@@ -1528,6 +1531,7 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.dictionary_lookup_language.trim().is_empty() {
         settings.dictionary_lookup_language = default_dictionary_lookup_language();
     }
+    settings.gemini_api_key = settings.gemini_api_key.trim().to_string();
     settings.stream_audio_default_format = settings.stream_audio_default_format.trim().to_string();
     if settings.stream_audio_default_format.is_empty() {
         settings.stream_audio_default_format = default_stream_audio_output_format();
@@ -1632,6 +1636,27 @@ pub fn encrypt_podcast_index_secret(secret: &str) -> String {
 }
 
 pub fn decrypt_podcast_index_secret(secret: &str) -> Option<String> {
+    if secret.trim().is_empty() {
+        return None;
+    }
+    let decoded = match hex::decode(secret) {
+        Ok(decoded) => decoded,
+        Err(_) => return Some(secret.to_string()),
+    };
+    let bytes = dpapi_unprotect(&decoded)?;
+    String::from_utf8(bytes).ok()
+}
+
+pub fn encrypt_gemini_api_key(secret: &str) -> String {
+    if secret.trim().is_empty() {
+        return String::new();
+    }
+    dpapi_protect(secret.as_bytes())
+        .map(hex::encode)
+        .unwrap_or_default()
+}
+
+pub fn decrypt_gemini_api_key(secret: &str) -> Option<String> {
     if secret.trim().is_empty() {
         return None;
     }

@@ -83,6 +83,7 @@ Importa trascrizione da YouTube: incolla un URL, scegli la lingua e importa il t
 Cerca e importa da Wikipedia: cerca un articolo su Wikipedia e ne importa il testo nell'editor (Alt+Shift+W).
 Dizionario online: cerca definizioni e traduzioni nel Wiktionary online (Alt+Shift+D).
 Riproduci audio da streaming (Alt+Shift+S): Riproduce audio da siti di streaming come YouTube, permette di scegliere formato e qualità e consente l’ascolto senza scaricare (ad esempio per radio online).
+BdCiechi (Alt+Shift+B): Aggiunto il pieno supporto della biblioteca BdCiechi, accessibile da Strumenti o con la scorciatoia Alt+Shift+B. E' possibile cercare, scaricare libri, leggere le ultime novità, scaricare un testo di assaggio. Quando verrà salvato un file è possibile aprirlo direttamente in Sonarpad e leggerlo con le voci di alta qualità presenti nel programma.
 Terminale accessibile: apre un terminale dedicato con output separato e stabile per gli screen reader (Ctrl+Shift+T).
 Scorciatoie: Alt+I sposta il focus sull'input, Alt+O sposta il focus sull'output, Tab/Shift+Tab per spostarsi tra input, output e opzioni.
 Invio: invia il testo. Ctrl+C copia l'output (o invia Ctrl+C al programma). Ctrl+L pulisce l'output con conferma.

@@ -42,7 +42,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, ES_AUTOHSCROLL,
     EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgItem, GetParent,
     GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONINFORMATION, MB_ICONQUESTION,
-    MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW, OBJID_CLIENT,
+    MB_OK, MB_YESNOCANCEL, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW, OBJID_CLIENT,
     PostMessageW, RegisterClassW, SW_HIDE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
     SetWindowTextW, ShowWindow, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
     WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
@@ -4424,7 +4424,7 @@ fn handle_delete(hwnd: HWND) {
                     hwnd,
                     PCWSTR(to_wide(&msg_text).as_ptr()),
                     PCWSTR(to_wide(&caption).as_ptr()),
-                    MB_YESNO | MB_ICONQUESTION,
+                    MB_YESNOCANCEL | MB_ICONQUESTION,
                 ) == IDYES
             } else {
                 true
@@ -4560,7 +4560,7 @@ fn handle_delete(hwnd: HWND) {
                     hwnd,
                     PCWSTR(to_wide(&msg_text).as_ptr()),
                     PCWSTR(to_wide(&caption).as_ptr()),
-                    MB_YESNO | MB_ICONQUESTION,
+                    MB_YESNOCANCEL | MB_ICONQUESTION,
                 ) == IDYES
             } else {
                 true

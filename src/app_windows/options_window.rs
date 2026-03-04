@@ -88,6 +88,7 @@ const OPTIONS_ID_AUDIO_SKIP: usize = 6010;
 const OPTIONS_ID_AUDIO_SPLIT: usize = 6011;
 const OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER: usize = 6064;
 const OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER_BROWSE: usize = 6065;
+const OPTIONS_ID_DEFAULT_SAVE_FOLDER_KIND: usize = 6110;
 const OPTIONS_ID_AUDIO_SPLIT_MINUTES: usize = 6058;
 const OPTIONS_ID_AUDIO_SPLIT_START_NUMBER: usize = 6059;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
@@ -189,6 +190,9 @@ const OPTIONS_SECTION_GAP: i32 = 12;
 const OPTIONS_SCROLL_LINE: i32 = 32;
 const OPTIONS_CONTENT_BOTTOM_GAP: i32 = 40;
 const OPTIONS_WHEEL_DELTA: i32 = 120;
+const DEFAULT_SAVE_FOLDER_AUDIOBOOK: u32 = 0;
+const DEFAULT_SAVE_FOLDER_MEDIA: u32 = 1;
+const DEFAULT_SAVE_FOLDER_DOCUMENTS: u32 = 2;
 
 fn proxy_is_valid(proxy_url: &str, username: &str, password: &str) -> Result<(), String> {
     let mut proxy = reqwest::Proxy::all(proxy_url).map_err(|e| e.to_string())?;
@@ -685,6 +689,8 @@ struct OptionsDialogState {
     checkbox_tts_manual: HWND,
     label_audio_skip: HWND,
     combo_audio_skip: HWND,
+    label_default_save_folder_kind: HWND,
+    combo_default_save_folder_kind: HWND,
     label_audiobook_save_folder: HWND,
     edit_audiobook_save_folder: HWND,
     button_audiobook_save_folder_browse: HWND,
@@ -828,6 +834,10 @@ struct OptionsDialogState {
     active_tab: i32,
     scroll_offsets: [i32; OPTIONS_TAB_COUNT as usize],
     content_heights: [i32; OPTIONS_TAB_COUNT as usize],
+    default_save_folder_selection: u32,
+    default_save_folder_audiobook: String,
+    default_save_folder_media: String,
+    default_save_folder_documents: String,
     ok_button: HWND,
     cancel_button: HWND,
 }
@@ -909,6 +919,10 @@ struct OptionsLabels {
     label_shortcut_reset: String,
     label_shortcut_reset_all: String,
     label_audio_skip: String,
+    label_default_save_folder_kind: String,
+    option_default_save_folder_audiobooks: String,
+    option_default_save_folder_media: String,
+    option_default_save_folder_documents: String,
     label_audiobook_save_folder: String,
     label_audiobook_save_folder_browse: String,
     label_show_media_save_confirmation: String,
@@ -1102,7 +1116,46 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_shortcut_reset: shortcuts_reset_label(language).to_string(),
         label_shortcut_reset_all: shortcuts_reset_all_label(language).to_string(),
         label_audio_skip: i18n::tr(language, "options.label.audio_skip"),
-        label_audiobook_save_folder: i18n::tr(language, "options.label.audiobook_save_folder"),
+        label_default_save_folder_kind: {
+            let value = i18n::tr(language, "options.label.default_save_folder_kind");
+            if value == "options.label.default_save_folder_kind" {
+                "Default folder type:".to_string()
+            } else {
+                value
+            }
+        },
+        option_default_save_folder_audiobooks: {
+            let value = i18n::tr(language, "options.choice.default_save_folder.audiobooks");
+            if value == "options.choice.default_save_folder.audiobooks" {
+                "Audiobooks".to_string()
+            } else {
+                value
+            }
+        },
+        option_default_save_folder_media: {
+            let value = i18n::tr(language, "options.choice.default_save_folder.media");
+            if value == "options.choice.default_save_folder.media" {
+                "Media".to_string()
+            } else {
+                value
+            }
+        },
+        option_default_save_folder_documents: {
+            let value = i18n::tr(language, "options.choice.default_save_folder.documents");
+            if value == "options.choice.default_save_folder.documents" {
+                "Documents".to_string()
+            } else {
+                value
+            }
+        },
+        label_audiobook_save_folder: {
+            let value = i18n::tr(language, "options.label.default_save_folder_path");
+            if value == "options.label.default_save_folder_path" {
+                "Default folder path:".to_string()
+            } else {
+                value
+            }
+        },
         label_audiobook_save_folder_browse: i18n::tr(language, "options.button.browse"),
         label_show_media_save_confirmation: i18n::tr(
             language,
@@ -2890,6 +2943,36 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 40;
 
+                let label_default_save_folder_kind = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_default_save_folder_kind).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_default_save_folder_kind = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DEFAULT_SAVE_FOLDER_KIND as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
                 let label_audiobook_save_folder = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
@@ -4376,6 +4459,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     button_tts_insert_tag,
                     label_audio_skip,
                     combo_audio_skip,
+                    label_default_save_folder_kind,
+                    combo_default_save_folder_kind,
                     label_audiobook_save_folder,
                     edit_audiobook_save_folder,
                     button_audiobook_save_folder_browse,
@@ -4551,6 +4636,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_tts_manual,
                     label_audio_skip,
                     combo_audio_skip,
+                    label_default_save_folder_kind,
+                    combo_default_save_folder_kind,
                     label_audiobook_save_folder,
                     edit_audiobook_save_folder,
                     button_audiobook_save_folder_browse,
@@ -4694,6 +4781,10 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     active_tab: OPTIONS_TAB_GENERAL,
                     scroll_offsets: [0; OPTIONS_TAB_COUNT as usize],
                     content_heights: [0; OPTIONS_TAB_COUNT as usize],
+                    default_save_folder_selection: 0,
+                    default_save_folder_audiobook: String::new(),
+                    default_save_folder_media: String::new(),
+                    default_save_folder_documents: String::new(),
                     ok_button,
                     cancel_button,
                 });
@@ -4876,6 +4967,12 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     }
                     OPTIONS_ID_DIALOGUE_SECONDARY_VOICE_PREVIEW => {
                         preview_dialogue_secondary_voice(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_DEFAULT_SAVE_FOLDER_KIND => {
+                        if code == CBN_SELCHANGE {
+                            on_default_save_folder_kind_changed(hwnd);
+                        }
                         LRESULT(0)
                     }
                     OPTIONS_ID_PODCASTINDEX_SIGNUP => {
@@ -5133,6 +5230,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             edit_tts_pitch,
             edit_tts_volume,
             combo_audio_skip,
+            combo_default_save_folder_kind,
             _label_audiobook_save_folder,
             edit_audiobook_save_folder,
             _button_audiobook_save_folder_browse,
@@ -5259,6 +5357,7 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.edit_tts_pitch,
                 state.edit_tts_volume,
                 state.combo_audio_skip,
+                state.combo_default_save_folder_kind,
                 state.label_audiobook_save_folder,
                 state.edit_audiobook_save_folder,
                 state.button_audiobook_save_folder_browse,
@@ -6697,6 +6796,56 @@ fn initialize_options_dialog(hwnd: HWND) {
             combo_audio_skip,
             CB_SETCURSEL,
             WPARAM(selected_idx),
+            LPARAM(0),
+        );
+        if with_options_state(hwnd, |state| {
+            state.default_save_folder_selection = DEFAULT_SAVE_FOLDER_AUDIOBOOK;
+            state.default_save_folder_audiobook = settings.audiobook_save_folder.clone();
+            state.default_save_folder_media = settings.media_save_folder.clone();
+            state.default_save_folder_documents = settings.documents_save_folder.clone();
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to access state in options_window");
+        }
+        SendMessageW(
+            combo_default_save_folder_kind,
+            CB_RESETCONTENT,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        for (kind, label) in [
+            (
+                DEFAULT_SAVE_FOLDER_AUDIOBOOK,
+                labels.option_default_save_folder_audiobooks.clone(),
+            ),
+            (
+                DEFAULT_SAVE_FOLDER_MEDIA,
+                labels.option_default_save_folder_media.clone(),
+            ),
+            (
+                DEFAULT_SAVE_FOLDER_DOCUMENTS,
+                labels.option_default_save_folder_documents.clone(),
+            ),
+        ] {
+            let idx = SendMessageW(
+                combo_default_save_folder_kind,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            )
+            .0 as usize;
+            SendMessageW(
+                combo_default_save_folder_kind,
+                CB_SETITEMDATA,
+                WPARAM(idx),
+                LPARAM(kind as isize),
+            );
+        }
+        SendMessageW(
+            combo_default_save_folder_kind,
+            CB_SETCURSEL,
+            WPARAM(0),
             LPARAM(0),
         );
         if let Err(_e) = SetWindowTextW(
@@ -9331,12 +9480,25 @@ fn apply_options_dialog(hwnd: HWND) {
             let text = String::from_utf16_lossy(&buf[..read as usize]);
             settings.audiobook_split_text = text;
         }
-        let audiobook_folder_len = GetWindowTextLengthW(edit_audiobook_save_folder);
-        if audiobook_folder_len >= 0 {
-            let mut buf = vec![0u16; (audiobook_folder_len + 1) as usize];
-            let read = GetWindowTextW(edit_audiobook_save_folder, &mut buf);
-            let text = String::from_utf16_lossy(&buf[..read as usize]);
-            settings.audiobook_save_folder = text.trim().to_string();
+        persist_default_save_folder_edit(hwnd);
+        if let Some((audiobook, media, documents)) = with_options_state(hwnd, |state| {
+            (
+                state.default_save_folder_audiobook.clone(),
+                state.default_save_folder_media.clone(),
+                state.default_save_folder_documents.clone(),
+            )
+        }) {
+            settings.audiobook_save_folder = audiobook.trim().to_string();
+            settings.media_save_folder = media.trim().to_string();
+            settings.documents_save_folder = documents.trim().to_string();
+        } else {
+            let audiobook_folder_len = GetWindowTextLengthW(edit_audiobook_save_folder);
+            if audiobook_folder_len >= 0 {
+                let mut buf = vec![0u16; (audiobook_folder_len + 1) as usize];
+                let read = GetWindowTextW(edit_audiobook_save_folder, &mut buf);
+                let text = String::from_utf16_lossy(&buf[..read as usize]);
+                settings.audiobook_save_folder = text.trim().to_string();
+            }
         }
         settings.show_media_save_confirmation = SendMessageW(
             checkbox_show_media_save_confirmation,
@@ -10223,6 +10385,14 @@ fn layout_audio_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
         OPTIONS_COMBO_HEIGHT,
     );
     y = layout_label_control(
+        "label_default_save_folder_kind",
+        state.label_default_save_folder_kind,
+        "combo_default_save_folder_kind",
+        state.combo_default_save_folder_kind,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_label_control(
         "label_audiobook_save_folder",
         state.label_audiobook_save_folder,
         "edit_audiobook_save_folder",
@@ -10813,6 +10983,8 @@ fn set_active_tab(hwnd: HWND, index: i32) {
         for control in [
             state.label_audio_skip,
             state.combo_audio_skip,
+            state.label_default_save_folder_kind,
+            state.combo_default_save_folder_kind,
             state.label_audiobook_save_folder,
             state.edit_audiobook_save_folder,
             state.button_audiobook_save_folder_browse,
@@ -11085,7 +11257,92 @@ fn browse_for_interpreter(hwnd: HWND) {
     }
 }
 
+fn selected_default_save_folder_kind(hwnd: HWND) -> u32 {
+    with_options_state(hwnd, |state| {
+        let sel = crate::send_message_w_safe(
+            state.combo_default_save_folder_kind,
+            CB_GETCURSEL,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0;
+        if sel < 0 {
+            return DEFAULT_SAVE_FOLDER_AUDIOBOOK;
+        }
+        let data = crate::send_message_w_safe(
+            state.combo_default_save_folder_kind,
+            CB_GETITEMDATA,
+            WPARAM(sel as usize),
+            LPARAM(0),
+        )
+        .0;
+        if data < 0 {
+            DEFAULT_SAVE_FOLDER_AUDIOBOOK
+        } else {
+            data as u32
+        }
+    })
+    .unwrap_or(DEFAULT_SAVE_FOLDER_AUDIOBOOK)
+}
+
+fn persist_default_save_folder_edit(hwnd: HWND) {
+    let text =
+        if let Some(edit) = with_options_state(hwnd, |state| state.edit_audiobook_save_folder) {
+            let len = crate::get_window_text_length_w_safe(edit);
+            if len > 0 {
+                let mut buf = vec![0u16; (len + 1) as usize];
+                let read = crate::get_window_text_w_safe(edit, &mut buf);
+                String::from_utf16_lossy(&buf[..read as usize])
+                    .trim()
+                    .to_string()
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+    let _updated = with_options_state(hwnd, |state| match state.default_save_folder_selection {
+        DEFAULT_SAVE_FOLDER_MEDIA => state.default_save_folder_media = text,
+        DEFAULT_SAVE_FOLDER_DOCUMENTS => state.default_save_folder_documents = text,
+        _ => state.default_save_folder_audiobook = text,
+    });
+}
+
+fn refresh_default_save_folder_edit(hwnd: HWND) {
+    let data = with_options_state(hwnd, |state| {
+        let text = match state.default_save_folder_selection {
+            DEFAULT_SAVE_FOLDER_MEDIA => state.default_save_folder_media.clone(),
+            DEFAULT_SAVE_FOLDER_DOCUMENTS => state.default_save_folder_documents.clone(),
+            _ => state.default_save_folder_audiobook.clone(),
+        };
+        (state.edit_audiobook_save_folder, text)
+    });
+    if let Some((edit, text)) = data {
+        crate::log_if_err!(crate::set_window_text_w_safe(
+            edit,
+            PCWSTR(to_wide(&text).as_ptr())
+        ));
+    }
+}
+
+fn on_default_save_folder_kind_changed(hwnd: HWND) {
+    persist_default_save_folder_edit(hwnd);
+    let new_kind = selected_default_save_folder_kind(hwnd);
+    let _updated = with_options_state(hwnd, |state| {
+        state.default_save_folder_selection = new_kind;
+    });
+    refresh_default_save_folder_edit(hwnd);
+}
+
 fn browse_for_audiobook_folder(hwnd: HWND) {
+    browse_for_folder_into_edit(hwnd, |state| state.edit_audiobook_save_folder);
+    persist_default_save_folder_edit(hwnd);
+}
+
+fn browse_for_folder_into_edit<F>(hwnd: HWND, edit_selector: F)
+where
+    F: Fn(&mut OptionsDialogState) -> HWND,
+{
     let language = with_options_state(hwnd, |state| {
         { with_state(state.parent, |app| app.settings.language) }.unwrap_or_default()
     })
@@ -11094,7 +11351,7 @@ fn browse_for_audiobook_folder(hwnd: HWND) {
         crate::app_windows::find_in_files_window::browse_for_folder(hwnd, language)
     {
         let path = folder.to_string_lossy().to_string();
-        if let Some(edit) = with_options_state(hwnd, |state| state.edit_audiobook_save_folder)
+        if let Some(edit) = with_options_state(hwnd, |state| edit_selector(state))
             && let Err(_e) = crate::set_window_text_w_safe(edit, PCWSTR(to_wide(&path).as_ptr()))
         {
             crate::log_debug(&format!("Error: {:?}", _e));

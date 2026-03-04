@@ -1609,7 +1609,11 @@ fn save_podcast_episode_dialog(
     {
         buffer[i] = *ch;
     }
-    let initial_dir = PathBuf::from(settings::default_media_save_folder());
+    let initial_dir = with_state(hwnd, |state| state.settings.media_save_folder.clone())
+        .map(|path| path.trim().to_string())
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(settings::default_media_save_folder()));
     crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
     let initial_dir_wide = to_wide(&initial_dir.to_string_lossy());
     let mut ofn = OPENFILENAMEW {
@@ -11470,7 +11474,10 @@ pub(crate) fn save_file_dialog_with_encoding(
         pfd.SetFileTypes(&spec).ok()?;
         pfd.SetFileTypeIndex(1).ok()?; // Default to TXT
         pfd.SetDefaultExtension(w!("txt")).ok()?;
-        let initial_dir = settings::default_documents_save_folder();
+        let initial_dir = with_state(hwnd, |state| state.settings.documents_save_folder.clone())
+            .map(|path| path.trim().to_string())
+            .filter(|path| !path.is_empty())
+            .unwrap_or_else(settings::default_documents_save_folder);
         crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
         let initial_dir_w = to_wide(&initial_dir);
         if let Ok(shell_folder) =

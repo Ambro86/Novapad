@@ -536,6 +536,10 @@ pub struct AppSettings {
     pub podcast_save_folder: String,
     #[serde(default = "default_audiobook_save_folder")]
     pub audiobook_save_folder: String,
+    #[serde(default = "default_media_save_folder")]
+    pub media_save_folder: String,
+    #[serde(default = "default_documents_save_folder")]
+    pub documents_save_folder: String,
     pub podcast_include_video: bool,
     pub podcast_monitor_id: String,
     pub podcast_cache_limit_mb: u32,
@@ -798,6 +802,8 @@ impl Default for AppSettings {
             podcast_mp3_bitrate: 128,
             podcast_save_folder: default_podcast_save_folder(),
             audiobook_save_folder: default_audiobook_save_folder(),
+            media_save_folder: default_media_save_folder(),
+            documents_save_folder: default_documents_save_folder(),
             podcast_include_video: false,
             podcast_monitor_id: String::new(),
             podcast_cache_limit_mb: 500,
@@ -1400,6 +1406,14 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.audiobook_save_folder.trim().is_empty() {
         settings.audiobook_save_folder = default_audiobook_save_folder();
     }
+    settings.media_save_folder = settings.media_save_folder.trim().to_string();
+    if settings.media_save_folder.is_empty() {
+        settings.media_save_folder = default_media_save_folder();
+    }
+    settings.documents_save_folder = settings.documents_save_folder.trim().to_string();
+    if settings.documents_save_folder.is_empty() {
+        settings.documents_save_folder = default_documents_save_folder();
+    }
     if settings
         .podcast_save_folder
         .trim()
@@ -1436,6 +1450,13 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     let legacy_media_path = PathBuf::from(legacy_media_save_folder());
     let new_media_path = PathBuf::from(default_media_save_folder());
     migrate_legacy_folder(&legacy_media_path, &new_media_path);
+    if settings
+        .media_save_folder
+        .trim()
+        .eq_ignore_ascii_case(&legacy_media_save_folder())
+    {
+        settings.media_save_folder = new_media_path.to_string_lossy().to_string();
+    }
     if settings.podcast_mp3_bitrate == 0 {
         settings.podcast_mp3_bitrate = 128;
     }

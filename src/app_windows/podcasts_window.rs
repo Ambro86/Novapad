@@ -38,12 +38,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CallWindowProcW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, ES_AUTOHSCROLL,
     EVENT_OBJECT_FOCUS, GetClientRect, GetDlgItem, GetParent, GetWindowLongPtrW, GetWindowRect,
     HMENU, IDC_ARROW, IDYES, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK,
-    LBS_NOTIFY, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO, MF_GRAYED, MF_POPUP,
-    MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW, RegisterClassW,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, TrackPopupMenu,
-    WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
-    WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    LBS_NOTIFY, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO, MB_YESNOCANCEL, MF_GRAYED,
+    MF_POPUP, MF_SEPARATOR, MF_STRING, MSG, MessageBoxW, OBJID_CLIENT, PostMessageW,
+    RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
+    TrackPopupMenu, WINDOW_STYLE, WM_CHAR, WM_COMMAND, WM_CONTEXTMENU, WM_COPYDATA, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFOCUS, WM_SETFONT,
+    WM_SIZE, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
     WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
@@ -5022,7 +5022,7 @@ fn handle_source_action(hwnd: HWND, verb: SourceAction) {
                             hwnd,
                             PCWSTR(to_wide(&msg).as_ptr()),
                             PCWSTR(to_wide(&title).as_ptr()),
-                            MB_YESNO,
+                            MB_YESNOCANCEL,
                         ) == IDYES
                     }
                 } else {
@@ -5217,7 +5217,7 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
                         hwnd,
                         PCWSTR(to_wide(&msg).as_ptr()),
                         PCWSTR(to_wide(&caption).as_ptr()),
-                        MB_YESNO | MB_ICONQUESTION,
+                        MB_YESNOCANCEL | MB_ICONQUESTION,
                     ) == IDYES
                 }
             } else {

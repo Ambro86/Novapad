@@ -209,6 +209,7 @@
   "options.button.browse": "Naršyti...",
   "options.label.move_cursor": "Kursoriaus judinimas skaitant",
   "options.label.check_updates": "Patikrinti atnaujinimus paleidžiant kompiuterį",
+  "options.label.check_beta_updates": "Tikrinti beta atnaujinimus",
   "options.label.legacy_name": "Naudokite senąjį pavadinimą",
   "options.label.send_crash_reports": "Siųsti anonimiškas avarijų ataskaitas",
   "options.label.context_menu": "Pridėti „Atidaryti su Sonarpad“ į kontekstinį meniu",

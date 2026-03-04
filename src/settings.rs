@@ -567,6 +567,10 @@ pub struct AppSettings {
     pub show_voice_panel: bool,
     pub show_favorite_panel: bool,
     pub check_updates_on_startup: bool,
+    #[serde(default)]
+    pub check_beta_updates_on_startup: bool,
+    #[serde(default)]
+    pub installed_release_tag: String,
     pub prompt_program: String,
     #[serde(default)]
     pub network_proxy_url: String,
@@ -819,6 +823,8 @@ impl Default for AppSettings {
             show_voice_panel: false,
             show_favorite_panel: false,
             check_updates_on_startup: true,
+            check_beta_updates_on_startup: false,
+            installed_release_tag: String::new(),
             prompt_program: "cmd.exe".to_string(),
             network_proxy_url: String::new(),
             network_proxy_username: String::new(),

@@ -207,6 +207,7 @@
   "options.button.browse": "Bläddra...",
   "options.label.move_cursor": "Flytta markören under läsning",
   "options.label.check_updates": "Sök efter uppdateringar vid start",
+  "options.label.check_beta_updates": "Sök efter betauppdateringar",
   "options.label.legacy_name": "Använd gamla namnet",
   "options.label.send_crash_reports": "Skicka anonyma felrapporter",
   "options.label.context_menu": "Lägg till \"Öppna med Sonarpad\" i snabbmenyn",

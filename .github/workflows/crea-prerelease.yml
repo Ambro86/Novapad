@@ -27,9 +27,50 @@ jobs:
 
         with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env:
             env.write(f"APP_VERSION={version}\n")
-            env.write(f"PRERELEASE_TAG=v{version}-beta\n")
-            env.write(f"PRERELEASE_TITLE=Sonarpad v{version} beta\n")
         PY
+
+    - name: Resolve next beta tag and previous prereleases
+      id: beta_meta
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const version = process.env.APP_VERSION;
+          const prefix = `v${version}-beta`;
+          let page = 1;
+          const releases = [];
+          while (true) {
+            const resp = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+              page
+            });
+            releases.push(...resp.data);
+            if (resp.data.length < 100) break;
+            page += 1;
+          }
+
+          let maxBeta = 0;
+          const existingPrereleaseTags = [];
+          for (const rel of releases) {
+            if (rel.prerelease) {
+              existingPrereleaseTags.push(rel.tag_name);
+            }
+            if (!rel.tag_name.startsWith(prefix)) continue;
+            const suffix = rel.tag_name.slice(prefix.length);
+            const parsed = Number.parseInt(suffix, 10);
+            if (Number.isFinite(parsed) && parsed > maxBeta) {
+              maxBeta = parsed;
+            }
+          }
+
+          const nextBeta = maxBeta + 1;
+          const nextTag = `${prefix}${nextBeta}`;
+          const nextTitle = `Sonarpad v${version} beta${nextBeta}`;
+
+          core.setOutput('next_tag', nextTag);
+          core.setOutput('next_title', nextTitle);
+          core.setOutput('delete_tags_json', JSON.stringify(existingPrereleaseTags));
 
     - name: Get latest successful CI run
       id: get_run
@@ -127,28 +168,47 @@ jobs:
         pathlib.Path('prerelease_notes.md').write_text(notes + '\n', encoding='utf-8')
         PY
 
-    - name: Replace existing prerelease (same tag)
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        if gh release view "${PRERELEASE_TAG}" >/dev/null 2>&1; then
-          gh release delete "${PRERELEASE_TAG}" --yes --cleanup-tag
-        fi
+    - name: Delete existing prereleases
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const raw = `${{ steps.beta_meta.outputs.delete_tags_json }}`;
+          const tags = JSON.parse(raw || '[]');
+          for (const tag of tags) {
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag
+            });
+            await github.rest.repos.deleteRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.data.id
+            });
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`
+              });
+            } catch (_) {
+            }
+          }
 
     - name: Create prerelease
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release create "${PRERELEASE_TAG}" \
+        gh release create "${{ steps.beta_meta.outputs.next_tag }}" \
           release_files/* \
-          --title "${PRERELEASE_TITLE}" \
+          --title "${{ steps.beta_meta.outputs.next_title }}" \
           --notes-file prerelease_notes.md \
           --prerelease
 
     - name: Summary
       run: |
         echo "Prerelease created/replaced successfully"
-        echo "Tag: ${PRERELEASE_TAG}"
+        echo "Tag: ${{ steps.beta_meta.outputs.next_tag }}"
         echo "Build ID: ${{ steps.get_run.outputs.run_id }}"
         echo "Build SHA: ${{ steps.get_run.outputs.run_sha }}"
         echo "Assets:"

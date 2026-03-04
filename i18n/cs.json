@@ -209,6 +209,7 @@
   "options.button.browse": "Procházet...",
   "options.label.move_cursor": "Posouvat kurzor během čtení",
   "options.label.check_updates": "Zkontrolovat aktualizace při spuštění",
+  "options.label.check_beta_updates": "Kontrolovat beta aktualizace",
   "options.label.legacy_name": "Použít původní název",
   "options.label.send_crash_reports": "Odesílat anonymní hlášení o chybách",
   "options.label.context_menu": "Přidat \"Otevřít v Sonarpadu\" do kontextového menu",

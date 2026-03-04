@@ -209,6 +209,7 @@
   "options.button.browse": "Browse...",
   "options.label.move_cursor": "Move Cursor During Reading",
   "options.label.check_updates": "Check for Updates on Startup",
+  "options.label.check_beta_updates": "Check for beta updates",
   "options.label.legacy_name": "Use Legacy Name",
   "options.label.send_crash_reports": "Send Anonymous Crash Reports",
   "options.label.context_menu": "Add \"Open with Sonarpad\" to the context menu",

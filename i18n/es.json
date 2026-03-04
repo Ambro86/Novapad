@@ -199,6 +199,7 @@
   "options.label.quote_prefix": "Prefijo de cita (Comentar líneas (Q)):",
   "options.label.move_cursor": "Mover cursor durante la lectura",
   "options.label.check_updates": "Buscar actualizaciones al iniciar",
+  "options.label.check_beta_updates": "Buscar actualizaciones beta",
   "options.label.legacy_name": "Usar nombre legado",
   "options.label.send_crash_reports": "Enviar informes de errores anónimos",
   "options.label.context_menu": "Agregar \"Abrir con Sonarpad\" al menú contextual",

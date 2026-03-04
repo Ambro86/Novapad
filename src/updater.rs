@@ -28,7 +28,7 @@ use windows::core::{HSTRING, PCWSTR};
 use crate::accessibility::to_wide;
 use crate::i18n;
 use crate::log_debug;
-use crate::settings::{Language, load_settings};
+use crate::settings::{Language, load_settings, save_settings};
 use crate::with_state;
 
 const REPO_OWNER: &str = "Ambro86";
@@ -55,6 +55,67 @@ fn app_language(hwnd: HWND) -> Language {
     with_state(hwnd, |state| state.settings.language).unwrap_or_default()
 }
 
+fn app_beta_updates_enabled(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| state.settings.check_beta_updates_on_startup).unwrap_or(false)
+}
+
+fn app_installed_release_tag(hwnd: HWND) -> Option<String> {
+    with_state(hwnd, |state| state.settings.installed_release_tag.clone()).and_then(|tag| {
+        let trimmed = tag.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
+}
+
+fn seed_installed_release_tag_if_missing(hwnd: HWND, tag: &str) {
+    let mut should_save = false;
+    let mut snapshot = None;
+    with_state(hwnd, |state| {
+        if state.settings.installed_release_tag.trim().is_empty() {
+            state.settings.installed_release_tag = tag.to_string();
+            should_save = true;
+            snapshot = Some(state.settings.clone());
+        }
+    });
+    if should_save && let Some(settings) = snapshot {
+        save_settings(settings);
+    }
+}
+
+fn persist_installed_release_tag(tag: &str) {
+    let trimmed = tag.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    let mut settings = load_settings();
+    if settings.installed_release_tag.trim() != trimmed {
+        settings.installed_release_tag = trimmed.to_string();
+        save_settings(settings);
+    }
+}
+
+fn current_version_for_update_check(
+    hwnd: HWND,
+    include_beta_updates: bool,
+    package_version: &str,
+) -> String {
+    if let Some(tag) = app_installed_release_tag(hwnd) {
+        let normalized = normalize_version(&tag);
+        if parse_version(&normalized).is_some() {
+            return normalized;
+        }
+    }
+    if include_beta_updates {
+        let seeded_tag = format!("v{package_version}-beta1");
+        seed_installed_release_tag_if_missing(hwnd, &seeded_tag);
+        return normalize_version(&seeded_tag);
+    }
+    package_version.to_string()
+}
+
 #[derive(Deserialize)]
 struct ReleaseAsset {
     name: String,
@@ -66,18 +127,23 @@ struct ReleaseAsset {
 struct ReleaseInfo {
     tag_name: String,
     assets: Vec<ReleaseAsset>,
+    #[serde(default)]
+    draft: bool,
 }
 
 pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
     let language = app_language(hwnd);
+    let include_beta_updates = app_beta_updates_enabled(hwnd);
+    let package_version = env!("CARGO_PKG_VERSION");
+    let current_version =
+        current_version_for_update_check(hwnd, include_beta_updates, package_version);
     log_debug(&format!(
-        "Update check triggered: interactive={interactive}"
+        "Update check triggered: interactive={interactive} include_beta={include_beta_updates} current={current_version}"
     ));
     thread::spawn(move || {
         if let Err(e) = std::panic::catch_unwind(move || {
-            let current_version = env!("CARGO_PKG_VERSION");
             log_debug("Update check: fetching latest release...");
-            let latest = match fetch_latest_release() {
+            let latest = match fetch_latest_release(include_beta_updates) {
                 Ok(info) => info,
                 Err(err) => {
                     log_debug(&format!("Update check failed: {err}"));
@@ -93,7 +159,7 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
                 "Update check: current={} latest={}",
                 current_version, latest_version
             ));
-            if !is_newer_version(&latest_version, current_version) {
+            if !is_newer_version(&latest_version, &current_version) {
                 log_debug("Update check: no newer version available.");
                 if interactive {
                     show_update_info(language, UpdateInfo::NoUpdate);
@@ -192,7 +258,7 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
             }
 
             log_debug("Update check: prompting user...");
-            if !prompt_update(hwnd, language, current_version, &latest_version) {
+            if !prompt_update(hwnd, language, &current_version, &latest_version) {
                 log_debug("Update check: user declined update.");
                 return;
             }
@@ -205,6 +271,7 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
                 asset.size,
                 sha_asset.map(|asset| asset.browser_download_url.as_str()),
                 &asset.name,
+                &latest.tag_name,
             ) {
                 Ok(UpdateAction::Started) => {
                     log_debug("Update check: update process started successfully.");
@@ -233,13 +300,21 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
     });
 }
 
-fn fetch_latest_release() -> Result<ReleaseInfo, String> {
-    let url = format!("https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest");
+fn fetch_latest_release(include_beta_updates: bool) -> Result<ReleaseInfo, String> {
     let client = reqwest::blocking::Client::builder()
         .user_agent(USER_AGENT)
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|err| err.to_string())?;
+    if include_beta_updates {
+        fetch_latest_release_including_beta(&client)
+    } else {
+        fetch_latest_stable_release(&client)
+    }
+}
+
+fn fetch_latest_stable_release(client: &reqwest::blocking::Client) -> Result<ReleaseInfo, String> {
+    let url = format!("https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest");
     let resp = client
         .get(url)
         .send()
@@ -247,6 +322,30 @@ fn fetch_latest_release() -> Result<ReleaseInfo, String> {
         .error_for_status()
         .map_err(|err| err.to_string())?;
     resp.json().map_err(|err| err.to_string())
+}
+
+fn fetch_latest_release_including_beta(
+    client: &reqwest::blocking::Client,
+) -> Result<ReleaseInfo, String> {
+    let url =
+        format!("https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases?per_page=100");
+    let resp = client
+        .get(url)
+        .send()
+        .map_err(|err| err.to_string())?
+        .error_for_status()
+        .map_err(|err| err.to_string())?;
+    let releases: Vec<ReleaseInfo> = resp.json().map_err(|err| err.to_string())?;
+    releases
+        .into_iter()
+        .filter(|release| !release.draft)
+        .max_by(|a, b| {
+            compare_version_strings(
+                &normalize_version(&a.tag_name),
+                &normalize_version(&b.tag_name),
+            )
+        })
+        .ok_or_else(|| "No releases found".to_string())
 }
 
 fn select_portable_asset(assets: &[ReleaseAsset]) -> Option<&ReleaseAsset> {
@@ -282,22 +381,87 @@ fn normalize_version(tag: &str) -> String {
     tag.trim().trim_start_matches('v').to_string()
 }
 
-fn parse_version(value: &str) -> Option<(u32, u32, u32)> {
-    let mut parts = value.split('.').take(3);
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ParsedVersion {
+    major: u32,
+    minor: u32,
+    patch: u32,
+    prerelease_beta: Option<u32>,
+}
+
+fn parse_version(value: &str) -> Option<ParsedVersion> {
+    let trimmed = value.trim();
+    let (core, suffix) = match trimmed.split_once('-') {
+        Some((core, suffix)) => (core, Some(suffix)),
+        None => (trimmed, None),
+    };
+    let mut parts = core.split('.').take(3);
     let major = parts.next()?.parse().ok()?;
     let minor = parts.next().unwrap_or("0").parse().ok()?;
     let patch = parts.next().unwrap_or("0").parse().ok()?;
-    Some((major, minor, patch))
+    let prerelease_beta = suffix.and_then(parse_beta_suffix);
+    Some(ParsedVersion {
+        major,
+        minor,
+        patch,
+        prerelease_beta,
+    })
+}
+
+fn parse_beta_suffix(suffix: &str) -> Option<u32> {
+    let normalized = suffix.trim().to_ascii_lowercase();
+    if !normalized.starts_with("beta") {
+        return Some(0);
+    }
+    let numeric = normalized
+        .trim_start_matches("beta")
+        .trim_start_matches('.');
+    if numeric.is_empty() {
+        return Some(1);
+    }
+    numeric.parse::<u32>().ok().or(Some(1))
+}
+
+fn compare_versions(a: ParsedVersion, b: ParsedVersion) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    match a.major.cmp(&b.major) {
+        Ordering::Equal => {}
+        non_eq => return non_eq,
+    }
+    match a.minor.cmp(&b.minor) {
+        Ordering::Equal => {}
+        non_eq => return non_eq,
+    }
+    match a.patch.cmp(&b.patch) {
+        Ordering::Equal => {}
+        non_eq => return non_eq,
+    }
+    match (a.prerelease_beta, b.prerelease_beta) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Greater,
+        (Some(_), None) => Ordering::Less,
+        (Some(av), Some(bv)) => av.cmp(&bv),
+    }
+}
+
+fn compare_version_strings(a: &str, b: &str) -> std::cmp::Ordering {
+    let Some(parsed_a) = parse_version(a) else {
+        return std::cmp::Ordering::Equal;
+    };
+    let Some(parsed_b) = parse_version(b) else {
+        return std::cmp::Ordering::Equal;
+    };
+    compare_versions(parsed_a, parsed_b)
 }
 
 fn is_newer_version(latest: &str, current: &str) -> bool {
-    let Some(latest) = parse_version(latest) else {
+    let Some(latest_parsed) = parse_version(latest) else {
         return false;
     };
-    let Some(current) = parse_version(current) else {
+    let Some(current_parsed) = parse_version(current) else {
         return false;
     };
-    latest > current
+    compare_versions(latest_parsed, current_parsed).is_gt()
 }
 
 fn prompt_update(hwnd: HWND, language: Language, current: &str, latest: &str) -> bool {
@@ -352,6 +516,7 @@ fn download_and_update(
     expected_size: u64,
     sha_url: Option<&str>,
     asset_name: &str,
+    release_tag: &str,
 ) -> Result<UpdateAction, String> {
     let current_exe = std::env::current_exe().map_err(|err| err.to_string())?;
     let temp_path = temp_update_path(&current_exe)?;
@@ -396,13 +561,19 @@ fn download_and_update(
     }
     log_debug("Download integrity ok.");
 
-    write_update_metadata(&temp_path, expected_size, expected_hash.as_deref());
+    write_update_metadata(
+        &temp_path,
+        expected_size,
+        expected_hash.as_deref(),
+        Some(release_tag),
+    );
 
     if !prompt_restart_after_download(hwnd, language) {
         return Ok(UpdateAction::Deferred);
     }
 
-    launch_self_updater(&current_exe, &temp_path).map_err(|err| err.to_string())?;
+    launch_self_updater(&current_exe, &temp_path, Some(release_tag))
+        .map_err(|err| err.to_string())?;
 
     unsafe {
         crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
@@ -586,24 +757,36 @@ fn temp_update_meta_path(update_path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.meta", update_path.to_string_lossy()))
 }
 
-fn write_update_metadata(update_path: &Path, expected_size: u64, sha256: Option<&str>) {
+fn write_update_metadata(
+    update_path: &Path,
+    expected_size: u64,
+    sha256: Option<&str>,
+    release_tag: Option<&str>,
+) {
     let meta_path = temp_update_meta_path(update_path);
     let mut lines = Vec::new();
     lines.push(format!("size={expected_size}"));
     if let Some(hash) = sha256 {
         lines.push(format!("sha256={hash}"));
     }
+    if let Some(tag) = release_tag {
+        let value = tag.trim();
+        if !value.is_empty() {
+            lines.push(format!("release_tag={value}"));
+        }
+    }
     crate::log_if_err!(std::fs::write(meta_path, lines.join("\r\n")));
 }
 
-fn read_update_metadata(update_path: &Path) -> (Option<u64>, Option<String>) {
+fn read_update_metadata(update_path: &Path) -> (Option<u64>, Option<String>, Option<String>) {
     let meta_path = temp_update_meta_path(update_path);
     let content = std::fs::read_to_string(meta_path).ok();
     let Some(content) = content else {
-        return (None, None);
+        return (None, None, None);
     };
     let mut size = None;
     let mut hash = None;
+    let mut release_tag = None;
     for line in content.lines() {
         if let Some(rest) = line.strip_prefix("size=") {
             size = rest.trim().parse().ok();
@@ -612,9 +795,14 @@ fn read_update_metadata(update_path: &Path) -> (Option<u64>, Option<String>) {
             if !value.is_empty() {
                 hash = Some(value.to_string());
             }
+        } else if let Some(rest) = line.strip_prefix("release_tag=") {
+            let value = rest.trim();
+            if !value.is_empty() {
+                release_tag = Some(value.to_string());
+            }
         }
     }
-    (size, hash)
+    (size, hash, release_tag)
 }
 
 fn download_file<F: FnMut(u32)>(
@@ -857,7 +1045,11 @@ fn quote_arg(arg: &str) -> String {
     }
 }
 
-fn launch_self_updater(current_exe: &Path, new_exe: &Path) -> io::Result<()> {
+fn launch_self_updater(
+    current_exe: &Path,
+    new_exe: &Path,
+    release_tag: Option<&str>,
+) -> io::Result<()> {
     let pid = std::process::id();
     let mut last_err: Option<io::Error> = None;
     for updater_exe in runner_updater_candidates(current_exe) {
@@ -872,7 +1064,8 @@ fn launch_self_updater(current_exe: &Path, new_exe: &Path) -> io::Result<()> {
                     current_exe.display(),
                     new_exe.display()
                 ));
-                std::process::Command::new(updater_exe)
+                let mut command = std::process::Command::new(updater_exe);
+                command
                     .arg("--self-update")
                     .arg("--pid")
                     .arg(pid.to_string())
@@ -880,8 +1073,14 @@ fn launch_self_updater(current_exe: &Path, new_exe: &Path) -> io::Result<()> {
                     .arg(current_exe)
                     .arg("--new")
                     .arg(new_exe)
-                    .arg("--restart")
-                    .spawn()?;
+                    .arg("--restart");
+                if let Some(tag) = release_tag {
+                    let value = tag.trim();
+                    if !value.is_empty() {
+                        command.arg("--release-tag").arg(value);
+                    }
+                }
+                command.spawn()?;
                 return Ok(());
             }
             Err(err) => {
@@ -942,6 +1141,7 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
     let mut restart = false;
     let mut elevated = false;
     let mut schedule_retry = false;
+    let mut release_tag: Option<String> = None;
 
     let mut it = args.iter().peekable();
     while let Some(arg) = it.next() {
@@ -967,6 +1167,12 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
             "--restart" => restart = true,
             "--elevated" => elevated = true,
             "--schedule-retry" => schedule_retry = true,
+            "--release-tag" => {
+                let Some(value) = it.next() else {
+                    return Err("Missing --release-tag value".to_string());
+                };
+                release_tag = Some(value.to_string());
+            }
             _ => {}
         }
     }
@@ -1013,7 +1219,7 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
     ));
     let cross_volume = path_volume_label(&current) != path_volume_label(&new);
     log_debug(&format!("Self-update cross-volume: {cross_volume}"));
-    let (meta_size, meta_hash) = read_update_metadata(&new);
+    let (meta_size, meta_hash, meta_release_tag) = read_update_metadata(&new);
     if let Err(err) = stabilize_download(&new) {
         log_debug(&format!("Self-update: staged file unstable: {err}"));
         return Ok(EXIT_DOWNLOAD_FAILED);
@@ -1123,6 +1329,9 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
     }
     crate::log_if_err!(std::fs::remove_file(&new));
     crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&new)));
+    if let Some(tag) = release_tag.as_deref().or(meta_release_tag.as_deref()) {
+        persist_installed_release_tag(tag);
+    }
 
     let language = load_settings().language;
     if restart {
@@ -1607,7 +1816,7 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
         return;
     }
 
-    let (meta_size, meta_hash) = read_update_metadata(&pending);
+    let (meta_size, meta_hash, meta_release_tag) = read_update_metadata(&pending);
 
     // Early integrity check BEFORE showing any dialog - silently clean up corrupted files
     if let Err(err) = stabilize_download(&pending) {
@@ -1671,7 +1880,7 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
         return;
     }
 
-    if let Err(err) = launch_self_updater(&current_exe, &pending) {
+    if let Err(err) = launch_self_updater(&current_exe, &pending, meta_release_tag.as_deref()) {
         log_debug(&format!("Pending update: failed to launch updater: {err}"));
         show_update_error(language, UpdateError::Download);
         return;
@@ -1712,7 +1921,7 @@ pub(crate) fn cleanup_update_temp_on_start() {
                     true
                 } else {
                     // Check if this is an incomplete download by verifying integrity
-                    let (meta_size, meta_hash) = read_update_metadata(&path);
+                    let (meta_size, meta_hash, _meta_release_tag) = read_update_metadata(&path);
                     if let Some(expected_size) = meta_size {
                         // If we have metadata, check if size matches
                         meta.len() != expected_size

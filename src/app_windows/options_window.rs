@@ -112,6 +112,7 @@ const OPTIONS_ID_INDENT_MODE: usize = 6060;
 const OPTIONS_ID_TAB_WIDTH: usize = 6061;
 const OPTIONS_ID_SPACE_WIDTH: usize = 6062;
 const OPTIONS_ID_CHECK_UPDATES: usize = 6015;
+const OPTIONS_ID_CHECK_BETA_UPDATES: usize = 6105;
 const OPTIONS_ID_SEND_CRASH_REPORTS: usize = 6048;
 const OPTIONS_ID_USE_LEGACY_NAME: usize = 6057;
 const OPTIONS_ID_CONFIRM_DELETE_RSS_MODE: usize = 6066;
@@ -792,6 +793,7 @@ struct OptionsDialogState {
     combo_subtitle_mode: HWND,
     checkbox_move_cursor: HWND,
     checkbox_check_updates: HWND,
+    checkbox_check_beta_updates: HWND,
     checkbox_send_crash_reports: HWND,
     checkbox_use_legacy_name: HWND,
     checkbox_context_menu: HWND,
@@ -888,6 +890,7 @@ struct OptionsLabels {
     label_subtitle_mode: String,
     label_move_cursor: String,
     label_check_updates: String,
+    label_check_beta_updates: String,
     label_send_crash_reports: String,
     label_use_legacy_name: String,
     label_context_menu: String,
@@ -1070,6 +1073,14 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_subtitle_mode: i18n::tr(language, "options.label.subtitle_mode"),
         label_move_cursor: i18n::tr(language, "options.label.move_cursor"),
         label_check_updates: i18n::tr(language, "options.label.check_updates"),
+        label_check_beta_updates: {
+            let value = i18n::tr(language, "options.label.check_beta_updates");
+            if value == "options.label.check_beta_updates" {
+                "Check beta updates".to_string()
+            } else {
+                value
+            }
+        },
         label_send_crash_reports: i18n::tr(language, "options.label.send_crash_reports"),
         label_use_legacy_name: i18n::tr(language, "options.label.legacy_name"),
         label_context_menu: i18n::tr(language, "options.label.context_menu"),
@@ -3986,6 +3997,22 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 24;
 
+                let checkbox_check_beta_updates = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_check_beta_updates).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_CHECK_BETA_UPDATES as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
                 let checkbox_send_crash_reports = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -4459,6 +4486,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_subtitle_offset,
                     checkbox_move_cursor,
                     checkbox_check_updates,
+                    checkbox_check_beta_updates,
                     checkbox_send_crash_reports,
                     checkbox_use_legacy_name,
                     checkbox_context_menu,
@@ -4631,6 +4659,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     combo_subtitle_mode,
                     checkbox_move_cursor,
                     checkbox_check_updates,
+                    checkbox_check_beta_updates,
                     checkbox_send_crash_reports,
                     checkbox_use_legacy_name,
                     checkbox_context_menu,
@@ -5197,6 +5226,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             edit_subtitle_offset,
             checkbox_move_cursor,
             checkbox_check_updates,
+            checkbox_check_beta_updates,
             checkbox_send_crash_reports,
             checkbox_use_legacy_name,
             checkbox_context_menu,
@@ -5322,6 +5352,7 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.edit_subtitle_offset,
                 state.checkbox_move_cursor,
                 state.checkbox_check_updates,
+                state.checkbox_check_beta_updates,
                 state.checkbox_send_crash_reports,
                 state.checkbox_use_legacy_name,
                 state.checkbox_context_menu,
@@ -6268,6 +6299,16 @@ fn initialize_options_dialog(hwnd: HWND) {
             checkbox_check_updates,
             BM_SETCHECK,
             WPARAM(if settings.check_updates_on_startup {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_check_beta_updates,
+            BM_SETCHECK,
+            WPARAM(if settings.check_beta_updates_on_startup {
                 BST_CHECKED.0 as usize
             } else {
                 0
@@ -8369,6 +8410,7 @@ fn apply_options_dialog(hwnd: HWND) {
             edit_subtitle_offset,
             checkbox_move_cursor,
             checkbox_check_updates,
+            checkbox_check_beta_updates,
             checkbox_send_crash_reports,
             checkbox_use_legacy_name,
             checkbox_context_menu,
@@ -8457,6 +8499,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.edit_subtitle_offset,
                 state.checkbox_move_cursor,
                 state.checkbox_check_updates,
+                state.checkbox_check_beta_updates,
                 state.checkbox_send_crash_reports,
                 state.checkbox_use_legacy_name,
                 state.checkbox_context_menu,
@@ -8831,6 +8874,14 @@ fn apply_options_dialog(hwnd: HWND) {
         settings.check_updates_on_startup =
             SendMessageW(checkbox_check_updates, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
                 == BST_CHECKED.0;
+        settings.check_beta_updates_on_startup = SendMessageW(
+            checkbox_check_beta_updates,
+            BM_GETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0 as u32
+            == BST_CHECKED.0;
         settings.send_crash_reports = SendMessageW(
             checkbox_send_crash_reports,
             BM_GETCHECK,
@@ -9741,6 +9792,11 @@ fn layout_general_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
     y += OPTIONS_SECTION_GAP;
     y = layout_checkbox("checkbox_check_updates", state.checkbox_check_updates, y);
     y = layout_checkbox(
+        "checkbox_check_beta_updates",
+        state.checkbox_check_beta_updates,
+        y,
+    );
+    y = layout_checkbox(
         "checkbox_send_crash_reports",
         state.checkbox_send_crash_reports,
         y,
@@ -10648,6 +10704,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_network_proxy_password,
             state.edit_network_proxy_password,
             state.checkbox_check_updates,
+            state.checkbox_check_beta_updates,
             state.checkbox_send_crash_reports,
             state.checkbox_use_legacy_name,
             state.checkbox_context_menu,

@@ -209,6 +209,7 @@
   "options.button.browse": "Огляд...",
   "options.label.move_cursor": "Переміщувати курсор під час відтворення",
   "options.label.check_updates": "Перевіряти оновлення під час запуску",
+  "options.label.check_beta_updates": "Перевіряти бета-оновлення",
   "options.label.legacy_name": "Використовувати стару назву програми",
   "options.label.send_crash_reports": "Надсилати анонімні звіти про помилки",
   "options.label.context_menu": "Додати «Відкрити в Sonarpad» до контекстного меню",

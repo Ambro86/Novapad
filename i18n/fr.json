@@ -209,6 +209,7 @@
   "options.button.browse": "Parcourir...",
   "options.label.move_cursor": "Déplacer le curseur pendant la lecture",
   "options.label.check_updates": "Vérifier les mises à jour au démarrage",
+  "options.label.check_beta_updates": "Rechercher les mises à jour bêta",
   "options.label.legacy_name": "Utiliser le nom historique",
   "options.label.send_crash_reports": "Envoyer des rapports de plantage anonymes",
   "options.label.context_menu": "Ajouter \"Ouvrir avec Sonarpad\" au menu contextuel",

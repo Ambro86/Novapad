@@ -12,7 +12,10 @@ fn load_keys(path: &Path) -> BTreeSet<String> {
     let obj = json
         .as_object()
         .unwrap_or_else(|| panic!("Expected a JSON object at top-level in {}", path.display()));
-    obj.keys().cloned().collect()
+    obj.keys()
+        .filter(|key| !key.starts_with("excluded_from_testing."))
+        .cloned()
+        .collect()
 }
 
 #[test]

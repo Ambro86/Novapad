@@ -274,140 +274,62 @@ impl ShortcutAction {
 }
 
 fn shortcut_action_label(language: Language, action: ShortcutAction) -> String {
-    match language {
-        Language::Italian => match action {
-            ShortcutAction::ReadPauseResume => "Pausa/riprendi lettura".to_string(),
-            ShortcutAction::ReadStart => "Avvia lettura".to_string(),
-            ShortcutAction::ReadStop => "Ferma lettura".to_string(),
-            ShortcutAction::ExecuteFile => "Esegui file".to_string(),
-            ShortcutAction::Audiobook => "Registra audiolibro".to_string(),
-            ShortcutAction::BatchAudiobooks => "Registra audiolibri batch".to_string(),
-            ShortcutAction::RecordPodcast => "Registra podcast".to_string(),
-            ShortcutAction::ConvertAudio => "Converti audio".to_string(),
-            ShortcutAction::OpenRss => "Apri RSS".to_string(),
-            ShortcutAction::OpenPodcasts => "Apri podcast".to_string(),
-            ShortcutAction::OpenDictionary => "Apri dizionario".to_string(),
-            ShortcutAction::OpenOptions => "Apri opzioni".to_string(),
-            ShortcutAction::OpenTerminal => "Apri terminale".to_string(),
-            ShortcutAction::ImportWikipedia => "Cerca e importa da Wikipedia".to_string(),
-            ShortcutAction::ImportYoutube => "Importa trascrizione YouTube".to_string(),
-            ShortcutAction::Find => "Trova".to_string(),
-            ShortcutAction::QuoteLines => "Commenta righe".to_string(),
-            ShortcutAction::UnquoteLines => "Decommenta righe".to_string(),
-            ShortcutAction::MediaPrev => "Brano precedente".to_string(),
-            ShortcutAction::MediaNext => "Brano successivo".to_string(),
-            ShortcutAction::ChapterPrev => i18n::tr(language, "playback.chapter_prev"),
-            ShortcutAction::ChapterNext => i18n::tr(language, "playback.chapter_next"),
-        },
-        _ => match action {
-            ShortcutAction::ReadPauseResume => "Pause/resume reading".to_string(),
-            ShortcutAction::ReadStart => "Start reading".to_string(),
-            ShortcutAction::ReadStop => "Stop reading".to_string(),
-            ShortcutAction::ExecuteFile => "Execute file".to_string(),
-            ShortcutAction::Audiobook => "Record audiobook".to_string(),
-            ShortcutAction::BatchAudiobooks => "Batch audiobooks".to_string(),
-            ShortcutAction::RecordPodcast => "Record podcast".to_string(),
-            ShortcutAction::ConvertAudio => "Convert audio".to_string(),
-            ShortcutAction::OpenRss => "Open RSS".to_string(),
-            ShortcutAction::OpenPodcasts => "Open podcasts".to_string(),
-            ShortcutAction::OpenDictionary => "Open dictionary".to_string(),
-            ShortcutAction::OpenOptions => "Open options".to_string(),
-            ShortcutAction::OpenTerminal => "Open terminal".to_string(),
-            ShortcutAction::ImportWikipedia => "Search and import from Wikipedia".to_string(),
-            ShortcutAction::ImportYoutube => "Import YouTube transcript".to_string(),
-            ShortcutAction::Find => "Find".to_string(),
-            ShortcutAction::QuoteLines => "Quote lines".to_string(),
-            ShortcutAction::UnquoteLines => "Unquote lines".to_string(),
-            ShortcutAction::MediaPrev => "Previous track".to_string(),
-            ShortcutAction::MediaNext => "Next track".to_string(),
-            ShortcutAction::ChapterPrev => i18n::tr(language, "playback.chapter_prev"),
-            ShortcutAction::ChapterNext => i18n::tr(language, "playback.chapter_next"),
-        },
+    match action {
+        ShortcutAction::ChapterPrev => i18n::tr(language, "playback.chapter_prev"),
+        ShortcutAction::ChapterNext => i18n::tr(language, "playback.chapter_next"),
+        _ => i18n::tr(language, shortcut_action_i18n_key(action)),
     }
 }
 
-fn shortcut_tab_title(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Scorciatoie",
-        Language::Spanish => "Atajos",
-        Language::Portuguese => "Atalhos",
-        Language::French => "Raccourcis",
-        Language::Czech => "Klavesove zkratky",
-        Language::Polish => "Skroty",
-        Language::Serbian => "Precice",
-        Language::Ukrainian => "Gariachi klavishi",
-        _ => "Shortcuts",
+fn shortcut_action_i18n_key(action: ShortcutAction) -> &'static str {
+    match action {
+        ShortcutAction::ReadPauseResume => "options.shortcuts.action.read_pause_resume",
+        ShortcutAction::ReadStart => "options.shortcuts.action.read_start",
+        ShortcutAction::ReadStop => "options.shortcuts.action.read_stop",
+        ShortcutAction::ExecuteFile => "options.shortcuts.action.execute_file",
+        ShortcutAction::Audiobook => "options.shortcuts.action.audiobook",
+        ShortcutAction::BatchAudiobooks => "options.shortcuts.action.batch_audiobooks",
+        ShortcutAction::RecordPodcast => "options.shortcuts.action.record_podcast",
+        ShortcutAction::ConvertAudio => "options.shortcuts.action.convert_audio",
+        ShortcutAction::OpenRss => "options.shortcuts.action.open_rss",
+        ShortcutAction::OpenPodcasts => "options.shortcuts.action.open_podcasts",
+        ShortcutAction::OpenDictionary => "options.shortcuts.action.open_dictionary",
+        ShortcutAction::OpenOptions => "options.shortcuts.action.open_options",
+        ShortcutAction::OpenTerminal => "options.shortcuts.action.open_terminal",
+        ShortcutAction::ImportWikipedia => "options.shortcuts.action.import_wikipedia",
+        ShortcutAction::ImportYoutube => "options.shortcuts.action.import_youtube",
+        ShortcutAction::Find => "options.shortcuts.action.find",
+        ShortcutAction::QuoteLines => "options.shortcuts.action.quote_lines",
+        ShortcutAction::UnquoteLines => "options.shortcuts.action.unquote_lines",
+        ShortcutAction::MediaPrev => "options.shortcuts.action.media_prev",
+        ShortcutAction::MediaNext => "options.shortcuts.action.media_next",
+        ShortcutAction::ChapterPrev => "playback.chapter_prev",
+        ShortcutAction::ChapterNext => "playback.chapter_next",
     }
 }
 
-fn shortcuts_label_action(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Azione:",
-        Language::Spanish => "Accion:",
-        Language::Portuguese => "Acao:",
-        Language::French => "Action :",
-        Language::Czech => "Akce:",
-        Language::Polish => "Akcja:",
-        Language::Serbian => "Radnja:",
-        Language::Ukrainian => "Diia:",
-        _ => "Action:",
-    }
+fn shortcut_tab_title(language: Language) -> String {
+    i18n::tr(language, "options.shortcuts.tab")
 }
 
-fn shortcuts_label_value(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Combinazione:",
-        Language::Spanish => "Combinacion:",
-        Language::Portuguese => "Combinacao:",
-        Language::French => "Combinaison :",
-        Language::Czech => "Kombinace:",
-        Language::Polish => "Kombinacja:",
-        Language::Serbian => "Kombinacija:",
-        Language::Ukrainian => "Kombinatsiia:",
-        _ => "Combination:",
-    }
+fn shortcuts_label_action(language: Language) -> String {
+    i18n::tr(language, "options.shortcuts.label_action")
 }
 
-fn shortcuts_change_label(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Cambia...",
-        Language::Spanish => "Cambiar...",
-        Language::Portuguese => "Alterar...",
-        Language::French => "Modifier...",
-        Language::Czech => "Zmenit...",
-        Language::Polish => "Zmien...",
-        Language::Serbian => "Promeni...",
-        Language::Ukrainian => "Zminyty...",
-        _ => "Change...",
-    }
+fn shortcuts_label_value(language: Language) -> String {
+    i18n::tr(language, "options.shortcuts.label_combination")
 }
 
-fn shortcuts_reset_label(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Predefinito",
-        Language::Spanish => "Predeterminado",
-        Language::Portuguese => "Padrao",
-        Language::French => "Par defaut",
-        Language::Czech => "Vychozi",
-        Language::Polish => "Domyslne",
-        Language::Serbian => "Podrazumevano",
-        Language::Ukrainian => "Typovo",
-        _ => "Default",
-    }
+fn shortcuts_change_label(language: Language) -> String {
+    i18n::tr(language, "options.shortcuts.button_change")
 }
 
-fn shortcuts_reset_all_label(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "Reimposta tutte",
-        Language::Spanish => "Restablecer todo",
-        Language::Portuguese => "Repor tudo",
-        Language::French => "Tout reinitialiser",
-        Language::Czech => "Obnovit vse",
-        Language::Polish => "Resetuj wszystko",
-        Language::Serbian => "Vrati sve",
-        Language::Ukrainian => "Sknuty vse",
-        _ => "Reset all",
-    }
+fn shortcuts_reset_label(language: Language) -> String {
+    i18n::tr(language, "options.shortcuts.button_default")
+}
+
+fn shortcuts_reset_all_label(language: Language) -> String {
+    i18n::tr(language, "options.shortcuts.button_reset_all")
 }
 
 fn shortcut_binding_for_action(
@@ -1018,7 +940,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         tab_editor: i18n::tr(language, "options.tab.editor"),
         tab_audio: i18n::tr(language, "options.tab.audio"),
         tab_rss_podcast: i18n::tr(language, "options.tab.rss_podcast"),
-        tab_shortcuts: shortcut_tab_title(language).to_string(),
+        tab_shortcuts: shortcut_tab_title(language),
         label_language: i18n::tr(language, "options.label.language"),
         label_modified_marker_position: i18n::tr(
             language,
@@ -1110,11 +1032,11 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_network_proxy: i18n::tr(language, "options.label.network_proxy"),
         label_network_proxy_username: i18n::tr(language, "options.label.network_proxy_username"),
         label_network_proxy_password: i18n::tr(language, "options.label.network_proxy_password"),
-        label_shortcut_action: shortcuts_label_action(language).to_string(),
-        label_shortcut_value: shortcuts_label_value(language).to_string(),
-        label_shortcut_change: shortcuts_change_label(language).to_string(),
-        label_shortcut_reset: shortcuts_reset_label(language).to_string(),
-        label_shortcut_reset_all: shortcuts_reset_all_label(language).to_string(),
+        label_shortcut_action: shortcuts_label_action(language),
+        label_shortcut_value: shortcuts_label_value(language),
+        label_shortcut_change: shortcuts_change_label(language),
+        label_shortcut_reset: shortcuts_reset_label(language),
+        label_shortcut_reset_all: shortcuts_reset_all_label(language),
         label_audio_skip: i18n::tr(language, "options.label.audio_skip"),
         label_default_save_folder_kind: {
             let value = i18n::tr(language, "options.label.default_save_folder_kind");

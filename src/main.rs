@@ -2262,6 +2262,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.dictionary_entry_dialog.0 != 0
                 || state.wiktionary_window.0 != 0
                 || state.wikipedia_window.0 != 0
+                || state.bdciechi_window.0 != 0
                 || state.prompt_window.0 != 0
                 || state.podcast_window.0 != 0
                 || state.podcast_save_window.0 != 0
@@ -2367,6 +2368,7 @@ pub(crate) struct AppState {
     dictionary_entry_dialog: HWND,
     wiktionary_window: HWND,
     wikipedia_window: HWND,
+    bdciechi_window: HWND,
     prompt_window: HWND,
     podcast_window: HWND,
     podcast_save_window: HWND,
@@ -3165,6 +3167,12 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                     handled = true;
                     return;
                 }
+                if state.bdciechi_window.0 != 0
+                    && app_windows::bdciechi_window::handle_navigation(state.bdciechi_window, &msg)
+                {
+                    handled = true;
+                    return;
+                }
 
                 if state.dictionary_entry_dialog.0 != 0
                     && handle_accessibility(state.dictionary_entry_dialog, &msg)
@@ -3669,6 +3677,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     dictionary_entry_dialog: HWND(0),
                     wiktionary_window: HWND(0),
                     wikipedia_window: HWND(0),
+                    bdciechi_window: HWND(0),
                     prompt_window: HWND(0),
                     podcast_window: HWND(0),
                     rss_window: HWND(0),
@@ -5306,6 +5315,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_TOOLS_PODCASTS => {
                         log_debug("Menu: Podcasts");
                         app_windows::podcasts_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_BDCIECHI => {
+                        log_debug("Menu: bdCiechi");
+                        app_windows::bdciechi_window::open(hwnd);
                         LRESULT(0)
                     }
                     IDM_HELP_GUIDE => {
@@ -8897,6 +8911,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     let ctrl_down = (crate::get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
     let shift_down = (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
     let alt_down = (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+    if key == 'B' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_BDCIECHI);
+        return true;
+    }
     if key == 'S' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_STREAM_AUDIO);
         return true;

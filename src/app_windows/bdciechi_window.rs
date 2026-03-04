@@ -1,0 +1,1201 @@
+use crate::accessibility::{handle_accessibility, to_wide};
+use crate::i18n;
+use crate::settings::{self, Language};
+use crate::tools::bdciechi;
+use crate::with_state;
+use encoding_rs::WINDOWS_1252;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH};
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Controls::Dialogs::{
+    OFN_EXPLORER, OFN_HIDEREADONLY, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
+};
+use windows::Win32::UI::Controls::WC_COMBOBOXW;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN, VK_SPACE, VK_TAB,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWNLIST,
+    CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, ES_AUTOHSCROLL, ES_AUTOVSCROLL,
+    ES_MULTILINE, ES_PASSWORD, ES_READONLY, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW,
+    IDYES, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MESSAGEBOX_STYLE, RegisterClassW, SW_HIDE,
+    SW_SHOW, SetForegroundWindow, SetWindowLongPtrW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+};
+use windows::core::{PCWSTR, PWSTR, w};
+
+const BDC_CLASS_NAME: &str = "SonarpadBdCiechiWindow";
+
+const IDC_USER: usize = 9941;
+const IDC_PASS: usize = 9942;
+const IDC_LOGIN: usize = 9943;
+const IDC_SEARCH: usize = 9944;
+const IDC_SEARCH_BTN: usize = 9945;
+const IDC_LATEST_BTN: usize = 9946;
+const IDC_RESULTS_COMBO: usize = 9947;
+const IDC_DOWNLOAD_BTN: usize = 9948;
+const IDC_CLOSE_BTN: usize = 9949;
+const IDC_STATUS: usize = 9950;
+const IDC_SAMPLE_BTN: usize = 9951;
+const IDC_SAMPLE_EDIT: usize = 9952;
+const IDC_SAMPLE_CLOSE_BTN: usize = 9953;
+const WM_BDC_LOGIN_DONE: u32 = WM_APP + 240;
+
+struct LoginDonePayload {
+    username: String,
+    password: String,
+    nprov: String,
+    catalog_raw: String,
+    error: Option<String>,
+}
+
+struct BdState {
+    parent: HWND,
+    user_label: HWND,
+    pass_label: HWND,
+    user: HWND,
+    pass: HWND,
+    login: HWND,
+    search: HWND,
+    search_btn: HWND,
+    latest_btn: HWND,
+    results_combo: HWND,
+    download_btn: HWND,
+    sample_btn: HWND,
+    sample_edit: HWND,
+    sample_close_btn: HWND,
+    close_btn: HWND,
+    status: HWND,
+    username: String,
+    password: String,
+    nprov: String,
+    authenticated: bool,
+    catalog_rows: Vec<String>,
+    visible_indices: Vec<usize>,
+    login_announce_stop: Option<Arc<AtomicBool>>,
+}
+
+fn with_window_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+where
+    F: FnOnce(&mut BdState) -> R,
+{
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut BdState;
+    crate::with_raw_mut_ptr_safe(ptr, f)
+}
+
+fn app_language(parent: HWND) -> Language {
+    with_state(parent, |state| state.settings.language).unwrap_or_default()
+}
+
+fn tr(key: &str) -> String {
+    i18n::tr(
+        Language::Italian,
+        &format!("excluded_from_testing.bdciechi.{key}"),
+    )
+}
+
+fn set_status(state: &BdState, text: &str) {
+    crate::log_if_err!(crate::set_window_text_w_safe(
+        state.status,
+        PCWSTR(to_wide(text).as_ptr())
+    ));
+}
+
+fn set_sample_text(state: &BdState, text: &str) {
+    crate::log_if_err!(crate::set_window_text_w_safe(
+        state.sample_edit,
+        PCWSTR(to_wide(text).as_ptr())
+    ));
+}
+
+fn set_sample_visible(state: &BdState, visible: bool) {
+    let cmd = if visible { SW_SHOW } else { SW_HIDE };
+    crate::show_window_safe(state.sample_edit, cmd);
+    crate::show_window_safe(state.sample_close_btn, cmd);
+    crate::enable_window_safe(state.sample_edit, visible);
+    crate::enable_window_safe(state.sample_close_btn, visible);
+}
+
+fn close_sample_and_focus_search(state: &BdState) {
+    set_sample_visible(state, false);
+    crate::set_focus_safe(state.search);
+}
+
+fn stop_login_announcer(state: &mut BdState) {
+    if let Some(flag) = state.login_announce_stop.take() {
+        flag.store(true, Ordering::Relaxed);
+    }
+}
+
+fn enable_logged_controls(state: &BdState, enabled: bool) {
+    unsafe {
+        EnableWindow(state.search, enabled);
+        EnableWindow(state.search_btn, enabled);
+        EnableWindow(state.latest_btn, enabled);
+        EnableWindow(state.results_combo, enabled);
+        EnableWindow(state.download_btn, enabled);
+        EnableWindow(state.sample_btn, enabled);
+    }
+}
+
+fn read_edit_text(hwnd: HWND) -> String {
+    let len = crate::get_window_text_length_w_safe(hwnd);
+    if len <= 0 {
+        return String::new();
+    }
+    let mut buf = vec![0u16; (len + 1) as usize];
+    let read = crate::get_window_text_w_safe(hwnd, &mut buf);
+    if read <= 0 {
+        return String::new();
+    }
+    String::from_utf16_lossy(&buf[..read as usize])
+}
+
+fn sanitize_filename(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    for ch in name.chars() {
+        if matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*') {
+            out.push('_');
+        } else {
+            out.push(ch);
+        }
+    }
+    let trimmed = out.trim();
+    if trimmed.is_empty() {
+        "opera.txt".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn decode_book_text(bytes: &[u8]) -> String {
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        text.to_string()
+    } else {
+        let (decoded, _, _) = WINDOWS_1252.decode(bytes);
+        decoded.to_string()
+    }
+}
+
+fn suggested_name_from_info(info: &str, index: usize) -> String {
+    if let Some(path_field) = info.split(';').nth(3) {
+        let trimmed = path_field.trim();
+        if !trimmed.is_empty()
+            && let Some(name) = trimmed.rsplit('\\').next()
+        {
+            let name = sanitize_filename(name.trim());
+            if !name.is_empty() {
+                return name;
+            }
+        }
+    }
+    format!("opera_{index}.txt")
+}
+
+fn default_docs_folder(parent: HWND) -> PathBuf {
+    let configured = with_state(parent, |state| state.settings.documents_save_folder.clone())
+        .map(|p| p.trim().to_string())
+        .unwrap_or_default();
+    if configured.is_empty() {
+        PathBuf::from(settings::default_documents_save_folder())
+    } else {
+        PathBuf::from(configured)
+    }
+}
+
+fn save_as_dialog(owner: HWND, initial_dir: &Path, suggested_name: &str) -> Option<PathBuf> {
+    let filter = format!(
+        "{}\0*.txt\0{}\0*.*\0\0",
+        tr("save_filter_text"),
+        tr("save_filter_all")
+    );
+    let mut filter_wide: Vec<u16> = filter.encode_utf16().collect();
+    if filter_wide.last().copied() != Some(0) {
+        filter_wide.push(0);
+    }
+
+    let mut file_buf = [0u16; 1024];
+    let mut suggested_wide: Vec<u16> = suggested_name.encode_utf16().collect();
+    if suggested_wide.len() >= file_buf.len() {
+        suggested_wide.truncate(file_buf.len().saturating_sub(1));
+    }
+    for (i, ch) in suggested_wide.iter().enumerate() {
+        file_buf[i] = *ch;
+    }
+
+    let mut dir_wide: Vec<u16> = initial_dir.to_string_lossy().encode_utf16().collect();
+    if dir_wide.last().copied() != Some(0) {
+        dir_wide.push(0);
+    }
+
+    let mut ofn = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        hwndOwner: owner,
+        lpstrFilter: PCWSTR(filter_wide.as_ptr()),
+        lpstrFile: PWSTR(file_buf.as_mut_ptr()),
+        nMaxFile: file_buf.len() as u32,
+        lpstrInitialDir: PCWSTR(dir_wide.as_ptr()),
+        Flags: OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY,
+        ..Default::default()
+    };
+
+    if !crate::get_save_file_name_w_safe(&mut ofn).as_bool() {
+        return None;
+    }
+    let len = file_buf
+        .iter()
+        .position(|&c| c == 0)
+        .unwrap_or(file_buf.len());
+    if len == 0 {
+        None
+    } else {
+        Some(PathBuf::from(String::from_utf16_lossy(&file_buf[..len])))
+    }
+}
+
+fn show_results(state: &mut BdState, indices: Vec<usize>) {
+    state.visible_indices = indices;
+    crate::send_message_w_safe(state.results_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+
+    for idx in &state.visible_indices {
+        if let Some(row) = state.catalog_rows.get(*idx) {
+            let text = row.to_string();
+            crate::send_message_w_safe(
+                state.results_combo,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&text).as_ptr() as isize),
+            );
+        }
+    }
+
+    if !state.visible_indices.is_empty() {
+        crate::send_message_w_safe(state.results_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        unsafe {
+            SetFocus(state.results_combo);
+        }
+    }
+}
+
+fn do_login(hwnd: HWND) {
+    with_window_state(hwnd, |state| {
+        let username = read_edit_text(state.user).trim().to_string();
+        let password = read_edit_text(state.pass).trim().to_string();
+        if username.is_empty() || password.is_empty() {
+            let message = tr("status.enter_credentials");
+            set_status(state, &message);
+            crate::accessibility::screen_reader_speak(&message);
+            return;
+        }
+
+        let connecting = tr("status.connecting_catalog");
+        let in_progress = tr("status.connecting");
+        set_status(state, &connecting);
+        crate::accessibility::screen_reader_speak(&connecting);
+        crate::accessibility::screen_reader_speak(&in_progress);
+        stop_login_announcer(state);
+        let stop_flag = Arc::new(AtomicBool::new(false));
+        let running_speech = Arc::clone(&stop_flag);
+        let _speech_thread = std::thread::spawn(move || {
+            let mut say_connecting = true;
+            while !running_speech.load(Ordering::Relaxed) {
+                if say_connecting {
+                    crate::accessibility::screen_reader_speak(&tr("status.connecting"));
+                } else {
+                    crate::accessibility::screen_reader_speak(&tr("status.please_wait"));
+                }
+                say_connecting = !say_connecting;
+                std::thread::sleep(Duration::from_secs(2));
+            }
+        });
+        state.login_announce_stop = Some(stop_flag);
+        crate::enable_window_safe(state.user, false);
+        crate::enable_window_safe(state.pass, false);
+        crate::enable_window_safe(state.login, false);
+
+        let hwnd_val = hwnd.0;
+        std::thread::spawn(move || {
+            let payload = match bdciechi::identify(&username, &password)
+                .and_then(|id| bdciechi::fetch_catalog_list(&id.nprov).map(|c| (id.nprov, c)))
+            {
+                Ok((nprov, catalog_raw)) => LoginDonePayload {
+                    username,
+                    password,
+                    nprov,
+                    catalog_raw,
+                    error: None,
+                },
+                Err(err) => LoginDonePayload {
+                    username,
+                    password,
+                    nprov: String::new(),
+                    catalog_raw: String::new(),
+                    error: Some(err),
+                },
+            };
+            let payload_ptr = Box::into_raw(Box::new(payload));
+            if let Err(err) = crate::post_message_w_safe(
+                HWND(hwnd_val),
+                WM_BDC_LOGIN_DONE,
+                WPARAM(0),
+                LPARAM(payload_ptr as isize),
+            ) {
+                crate::log_debug(&format!("bdciechi login post message failed: {}", err));
+                let _unused_box = unsafe { Box::from_raw(payload_ptr) };
+            }
+        });
+    });
+}
+
+fn do_search(hwnd: HWND) {
+    with_window_state(hwnd, |state| {
+        set_sample_visible(state, false);
+        if !state.authenticated {
+            set_status(state, &tr("status.login_first"));
+            return;
+        }
+        let query = read_edit_text(state.search).trim().to_lowercase();
+        if query.is_empty() {
+            set_status(state, &tr("status.enter_search"));
+            return;
+        }
+        let mut indices = Vec::new();
+        for (idx, row) in state.catalog_rows.iter().enumerate() {
+            if row.to_lowercase().contains(&query) {
+                indices.push(idx);
+            }
+        }
+        if indices.is_empty() {
+            set_status(state, &tr("status.no_results"));
+            show_results(state, Vec::new());
+            return;
+        }
+        let count = indices.len();
+        show_results(state, indices);
+        set_status(
+            state,
+            &i18n::tr_f(
+                Language::Italian,
+                "excluded_from_testing.bdciechi.status.results_found",
+                &[("count", &count.to_string())],
+            ),
+        );
+    });
+}
+
+fn do_latest(hwnd: HWND) {
+    with_window_state(hwnd, |state| {
+        set_sample_visible(state, false);
+        if !state.authenticated {
+            set_status(state, &tr("status.login_first"));
+            return;
+        }
+        set_status(state, &tr("status.loading_latest"));
+        match bdciechi::fetch_latest_list(&state.nprov) {
+            Ok(raw) => {
+                let latest_rows = bdciechi::parse_catalog_records(&raw);
+                let mut indices = Vec::new();
+                for row in latest_rows {
+                    if let Some(idx) = state.catalog_rows.iter().position(|r| r == &row) {
+                        indices.push(idx);
+                    }
+                }
+                indices.sort_unstable();
+                indices.dedup();
+                if indices.is_empty() {
+                    set_status(state, &tr("status.no_latest"));
+                } else {
+                    let count = indices.len();
+                    show_results(state, indices);
+                    set_status(
+                        state,
+                        &i18n::tr_f(
+                            Language::Italian,
+                            "excluded_from_testing.bdciechi.status.latest_results",
+                            &[("count", &count.to_string())],
+                        ),
+                    );
+                }
+            }
+            Err(err) => set_status(
+                state,
+                &i18n::tr_f(
+                    Language::Italian,
+                    "excluded_from_testing.bdciechi.error.latest",
+                    &[("err", &err.to_string())],
+                ),
+            ),
+        }
+    });
+}
+
+fn download_selected(hwnd: HWND) {
+    with_window_state(hwnd, |state| {
+        if !state.authenticated {
+            set_status(state, &tr("status.login_first"));
+            return;
+        }
+        let sel =
+            crate::send_message_w_safe(state.results_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        if sel < 0 {
+            set_status(state, &tr("status.select_result"));
+            return;
+        }
+        let sel_idx = sel as usize;
+        if sel_idx >= state.visible_indices.len() {
+            set_status(state, &tr("status.invalid_selection"));
+            return;
+        }
+
+        let catalog_index = state.visible_indices[sel_idx];
+        let downloading = tr("status.downloading");
+        set_status(state, &downloading);
+        crate::accessibility::screen_reader_speak(&downloading);
+
+        let work = match bdciechi::download_work(
+            &state.username,
+            &state.password,
+            &catalog_index.to_string(),
+            false,
+        ) {
+            Ok(w) => w,
+            Err(err) => {
+                set_status(
+                    state,
+                    &i18n::tr_f(
+                        Language::Italian,
+                        "excluded_from_testing.bdciechi.error.download",
+                        &[("err", &err.to_string())],
+                    ),
+                );
+                return;
+            }
+        };
+
+        let mut docs_dir = default_docs_folder(state.parent);
+        if let Err(err) = fs::create_dir_all(&docs_dir) {
+            set_status(
+                state,
+                &i18n::tr_f(
+                    Language::Italian,
+                    "excluded_from_testing.bdciechi.error.documents_dir",
+                    &[("err", &err.to_string())],
+                ),
+            );
+            return;
+        }
+
+        let suggested = suggested_name_from_info(&work.info, catalog_index);
+        let Some(path) = save_as_dialog(state.parent, &docs_dir, &suggested) else {
+            set_status(state, &tr("status.save_cancelled"));
+            return;
+        };
+
+        if let Some(parent_dir) = path.parent() {
+            docs_dir = parent_dir.to_path_buf();
+            if let Err(err) = fs::create_dir_all(&docs_dir) {
+                set_status(
+                    state,
+                    &i18n::tr_f(
+                        Language::Italian,
+                        "excluded_from_testing.bdciechi.error.destination_dir",
+                        &[("err", &err.to_string())],
+                    ),
+                );
+                return;
+            }
+        }
+
+        if let Err(err) = fs::write(&path, &work.text) {
+            set_status(
+                state,
+                &i18n::tr_f(
+                    Language::Italian,
+                    "excluded_from_testing.bdciechi.error.save",
+                    &[("err", &err.to_string())],
+                ),
+            );
+            return;
+        }
+
+        set_status(
+            state,
+            &i18n::tr_f(
+                Language::Italian,
+                "excluded_from_testing.bdciechi.status.file_saved",
+                &[("path", &path.display().to_string())],
+            ),
+        );
+
+        let ask = crate::message_box_w_safe(
+            state.parent,
+            PCWSTR(to_wide(&tr("ask_open_saved")).as_ptr()),
+            PCWSTR(to_wide(&tr("title")).as_ptr()),
+            MESSAGEBOX_STYLE(MB_YESNO.0 | MB_ICONQUESTION.0),
+        );
+        if ask == IDYES {
+            crate::editor_manager::open_document(state.parent, &path);
+        }
+    });
+}
+
+fn sample_selected(hwnd: HWND) {
+    with_window_state(hwnd, |state| {
+        if !state.authenticated {
+            set_status(state, &tr("status.login_first"));
+            return;
+        }
+        let sel =
+            crate::send_message_w_safe(state.results_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        if sel < 0 {
+            set_status(state, &tr("status.select_result"));
+            return;
+        }
+        let sel_idx = sel as usize;
+        if sel_idx >= state.visible_indices.len() {
+            set_status(state, &tr("status.invalid_selection"));
+            return;
+        }
+
+        let catalog_index = state.visible_indices[sel_idx];
+        let sample_loading = tr("status.sample_loading");
+        set_status(state, &sample_loading);
+        crate::accessibility::screen_reader_speak(&sample_loading);
+
+        let work = match bdciechi::download_work(
+            &state.username,
+            &state.password,
+            &catalog_index.to_string(),
+            true,
+        ) {
+            Ok(w) => w,
+            Err(err) => {
+                set_status(
+                    state,
+                    &i18n::tr_f(
+                        Language::Italian,
+                        "excluded_from_testing.bdciechi.error.sample",
+                        &[("err", &err.to_string())],
+                    ),
+                );
+                return;
+            }
+        };
+
+        let file_name = suggested_name_from_info(&work.info, catalog_index);
+        let decoded = decode_book_text(&work.text);
+        let sample: String = decoded.chars().take(8_000).collect();
+        let composed = format!(
+            "{} {}\r\n\r\n{}",
+            tr("sample.file_label"),
+            file_name,
+            sample
+        );
+        set_sample_text(state, &composed);
+        set_sample_visible(state, true);
+        set_status(state, &tr("status.sample_ready"));
+        crate::set_focus_safe(state.sample_edit);
+    });
+}
+
+pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessaging::MSG) -> bool {
+    if msg.message == windows::Win32::UI::WindowsAndMessaging::WM_KEYDOWN {
+        let key = msg.wParam.0 as u32;
+        if key == VK_ESCAPE.0 as u32 {
+            let mut handled = false;
+            with_window_state(hwnd, |state| {
+                if msg.hwnd == state.sample_edit || msg.hwnd == state.sample_close_btn {
+                    close_sample_and_focus_search(state);
+                    handled = true;
+                }
+            });
+            if handled {
+                return true;
+            }
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
+            return true;
+        }
+        if key == VK_RETURN.0 as u32 {
+            let mut handled = false;
+            with_window_state(hwnd, |state| {
+                let target = msg.hwnd;
+                if target == state.user || target == state.pass || target == state.login {
+                    do_login(hwnd);
+                    handled = true;
+                } else if target == state.search || target == state.search_btn {
+                    do_search(hwnd);
+                    handled = true;
+                } else if target == state.latest_btn {
+                    do_latest(hwnd);
+                    handled = true;
+                } else if target == state.results_combo || target == state.download_btn {
+                    download_selected(hwnd);
+                    handled = true;
+                } else if target == state.sample_edit || target == state.sample_close_btn {
+                    close_sample_and_focus_search(state);
+                    handled = true;
+                } else if target == state.close_btn {
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                    handled = true;
+                }
+            });
+            if handled {
+                return true;
+            }
+        }
+        if key == VK_TAB.0 as u32 {
+            let mut handled = false;
+            with_window_state(hwnd, |state| {
+                if msg.hwnd == state.sample_edit {
+                    crate::set_focus_safe(state.sample_close_btn);
+                    handled = true;
+                }
+            });
+            if handled {
+                return true;
+            }
+        }
+        if key == VK_SPACE.0 as u32 {
+            let mut handled = false;
+            with_window_state(hwnd, |state| {
+                if msg.hwnd == state.sample_close_btn {
+                    close_sample_and_focus_search(state);
+                    handled = true;
+                }
+            });
+            if handled {
+                return true;
+            }
+        }
+    }
+    handle_accessibility(hwnd, msg)
+}
+
+pub fn open(parent: HWND) {
+    let language = app_language(parent);
+    if language != Language::Italian {
+        return;
+    }
+
+    unsafe {
+        let existing = with_state(parent, |state| state.bdciechi_window).unwrap_or(HWND(0));
+        if existing.0 != 0 {
+            SetForegroundWindow(existing);
+            return;
+        }
+
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(BDC_CLASS_NAME);
+
+        let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(bdc_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+
+        let init = Box::new(BdState {
+            parent,
+            user_label: HWND(0),
+            pass_label: HWND(0),
+            user: HWND(0),
+            pass: HWND(0),
+            login: HWND(0),
+            search: HWND(0),
+            search_btn: HWND(0),
+            latest_btn: HWND(0),
+            results_combo: HWND(0),
+            download_btn: HWND(0),
+            sample_btn: HWND(0),
+            sample_edit: HWND(0),
+            sample_close_btn: HWND(0),
+            close_btn: HWND(0),
+            status: HWND(0),
+            username: String::new(),
+            password: String::new(),
+            nprov: String::new(),
+            authenticated: false,
+            catalog_rows: Vec::new(),
+            visible_indices: Vec::new(),
+            login_announce_stop: None,
+        });
+        let init_ptr = Box::into_raw(init);
+
+        let title_w = to_wide(&tr("title"));
+        let hwnd = CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title_w.as_ptr()),
+            WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            760,
+            540,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(init_ptr as *const _),
+        );
+
+        if hwnd.0 == 0 {
+            let _unused_box = Box::from_raw(init_ptr);
+            return;
+        }
+
+        with_state(parent, |state| state.bdciechi_window = hwnd);
+    }
+}
+
+unsafe extern "system" fn bdc_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        crate::panic_guard::guard(
+            "bdc_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || bdc_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
+}
+
+fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let cs = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*cs).lpCreateParams as *mut BdState;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, init_ptr as isize);
+
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+
+                let user_label = CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&tr("label.username")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    14,
+                    90,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    hinstance,
+                    None,
+                );
+                let user = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    104,
+                    12,
+                    180,
+                    24,
+                    hwnd,
+                    HMENU(IDC_USER as isize),
+                    hinstance,
+                    None,
+                );
+
+                let pass_label = CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&tr("label.password")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    292,
+                    14,
+                    70,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    hinstance,
+                    None,
+                );
+                let pass = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
+                    364,
+                    12,
+                    180,
+                    24,
+                    hwnd,
+                    HMENU(IDC_PASS as isize),
+                    hinstance,
+                    None,
+                );
+
+                let login = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&tr("button.login")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    552,
+                    11,
+                    90,
+                    26,
+                    hwnd,
+                    HMENU(IDC_LOGIN as isize),
+                    hinstance,
+                    None,
+                );
+
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&tr("label.search")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    52,
+                    60,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    hinstance,
+                    None,
+                );
+                let search = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    76,
+                    50,
+                    280,
+                    24,
+                    hwnd,
+                    HMENU(IDC_SEARCH as isize),
+                    hinstance,
+                    None,
+                );
+
+                let search_btn = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&tr("button.search_catalog")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    364,
+                    49,
+                    130,
+                    26,
+                    hwnd,
+                    HMENU(IDC_SEARCH_BTN as isize),
+                    hinstance,
+                    None,
+                );
+
+                let latest_btn = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&tr("button.latest")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    500,
+                    49,
+                    120,
+                    26,
+                    hwnd,
+                    HMENU(IDC_LATEST_BTN as isize),
+                    hinstance,
+                    None,
+                );
+
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&tr("label.results")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    90,
+                    70,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    hinstance,
+                    None,
+                );
+                let results_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    76,
+                    88,
+                    544,
+                    260,
+                    hwnd,
+                    HMENU(IDC_RESULTS_COMBO as isize),
+                    hinstance,
+                    None,
+                );
+
+                let download_btn = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&tr("button.download_selected")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    76,
+                    128,
+                    150,
+                    26,
+                    hwnd,
+                    HMENU(IDC_DOWNLOAD_BTN as isize),
+                    hinstance,
+                    None,
+                );
+                let sample_btn = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&tr("button.sample_text")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    234,
+                    128,
+                    130,
+                    26,
+                    hwnd,
+                    HMENU(IDC_SAMPLE_BTN as isize),
+                    hinstance,
+                    None,
+                );
+
+                let close_btn = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&tr("button.close")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    530,
+                    128,
+                    90,
+                    26,
+                    hwnd,
+                    HMENU(IDC_CLOSE_BTN as isize),
+                    hinstance,
+                    None,
+                );
+
+                let status = CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&tr("status.login_prompt")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    170,
+                    730,
+                    24,
+                    hwnd,
+                    HMENU(IDC_STATUS as isize),
+                    hinstance,
+                    None,
+                );
+                let sample_edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE((ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY) as u32),
+                    12,
+                    200,
+                    730,
+                    300,
+                    hwnd,
+                    HMENU(IDC_SAMPLE_EDIT as isize),
+                    hinstance,
+                    None,
+                );
+                let sample_close_btn = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&tr("button.close")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    652,
+                    506,
+                    90,
+                    26,
+                    hwnd,
+                    HMENU(IDC_SAMPLE_CLOSE_BTN as isize),
+                    hinstance,
+                    None,
+                );
+
+                (*init_ptr).user = user;
+                (*init_ptr).user_label = user_label;
+                (*init_ptr).pass_label = pass_label;
+                (*init_ptr).pass = pass;
+                (*init_ptr).login = login;
+                (*init_ptr).search = search;
+                (*init_ptr).search_btn = search_btn;
+                (*init_ptr).latest_btn = latest_btn;
+                (*init_ptr).results_combo = results_combo;
+                (*init_ptr).download_btn = download_btn;
+                (*init_ptr).sample_btn = sample_btn;
+                (*init_ptr).sample_edit = sample_edit;
+                (*init_ptr).sample_close_btn = sample_close_btn;
+                (*init_ptr).close_btn = close_btn;
+                (*init_ptr).status = status;
+
+                enable_logged_controls(&*init_ptr, false);
+                set_sample_visible(&*init_ptr, false);
+                SetFocus(user);
+                LRESULT(0)
+            }
+            WM_KEYDOWN => {
+                let key = wparam.0 as u32;
+                if key == VK_ESCAPE.0 as u32 {
+                    let focus = GetFocus();
+                    with_window_state(hwnd, |state| {
+                        if focus == state.sample_edit || focus == state.sample_close_btn {
+                            close_sample_and_focus_search(state);
+                        } else {
+                            crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        }
+                    });
+                    return LRESULT(0);
+                }
+                if key == VK_RETURN.0 as u32 {
+                    let focus = GetFocus();
+                    with_window_state(hwnd, |state| {
+                        if focus == state.user || focus == state.pass || focus == state.login {
+                            do_login(hwnd);
+                        } else if focus == state.search || focus == state.search_btn {
+                            do_search(hwnd);
+                        } else if focus == state.latest_btn {
+                            do_latest(hwnd);
+                        } else if focus == state.results_combo || focus == state.download_btn {
+                            download_selected(hwnd);
+                        } else if focus == state.sample_edit || focus == state.sample_close_btn {
+                            close_sample_and_focus_search(state);
+                        } else if focus == state.close_btn {
+                            crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        }
+                    });
+                    return LRESULT(0);
+                }
+                if key == VK_SPACE.0 as u32 {
+                    let focus = GetFocus();
+                    with_window_state(hwnd, |state| {
+                        if focus == state.sample_close_btn {
+                            close_sample_and_focus_search(state);
+                        }
+                    });
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                match id {
+                    IDC_LOGIN => {
+                        do_login(hwnd);
+                        LRESULT(0)
+                    }
+                    IDC_SEARCH_BTN => {
+                        do_search(hwnd);
+                        LRESULT(0)
+                    }
+                    IDC_LATEST_BTN => {
+                        do_latest(hwnd);
+                        LRESULT(0)
+                    }
+                    IDC_DOWNLOAD_BTN => {
+                        download_selected(hwnd);
+                        LRESULT(0)
+                    }
+                    IDC_SAMPLE_BTN => {
+                        sample_selected(hwnd);
+                        LRESULT(0)
+                    }
+                    IDC_SAMPLE_CLOSE_BTN => {
+                        with_window_state(hwnd, |state| close_sample_and_focus_search(state));
+                        LRESULT(0)
+                    }
+                    IDC_CLOSE_BTN => {
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                }
+            }
+            WM_BDC_LOGIN_DONE => {
+                let payload_ptr = lparam.0 as *mut LoginDonePayload;
+                if payload_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let payload = Box::from_raw(payload_ptr);
+                with_window_state(hwnd, |state| {
+                    stop_login_announcer(state);
+                    crate::enable_window_safe(state.user, true);
+                    crate::enable_window_safe(state.pass, true);
+                    crate::enable_window_safe(state.login, true);
+                    if let Some(err) = &payload.error {
+                        set_status(
+                            state,
+                            &i18n::tr_f(
+                                Language::Italian,
+                                "excluded_from_testing.bdciechi.error.login_or_catalog",
+                                &[("err", err)],
+                            ),
+                        );
+                        crate::accessibility::screen_reader_speak(&tr("status.connection_error"));
+                        return;
+                    }
+                    state.username = payload.username.clone();
+                    state.password = payload.password.clone();
+                    state.nprov = payload.nprov.clone();
+                    state.catalog_rows = bdciechi::parse_catalog_records(&payload.catalog_raw);
+                    state.visible_indices.clear();
+                    state.authenticated = true;
+                    enable_logged_controls(state, true);
+                    crate::show_window_safe(state.user_label, SW_HIDE);
+                    crate::show_window_safe(state.pass_label, SW_HIDE);
+                    crate::show_window_safe(state.user, SW_HIDE);
+                    crate::show_window_safe(state.pass, SW_HIDE);
+                    crate::show_window_safe(state.login, SW_HIDE);
+                    set_status(
+                        state,
+                        &i18n::tr_f(
+                            Language::Italian,
+                            "excluded_from_testing.bdciechi.status.catalog_loaded",
+                            &[("count", &state.catalog_rows.len().to_string())],
+                        ),
+                    );
+                    crate::accessibility::screen_reader_speak(&tr("status.login_completed"));
+                    SetFocus(state.search);
+                });
+                LRESULT(0)
+            }
+            WM_DESTROY => LRESULT(0),
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut BdState;
+                if !ptr.is_null() {
+                    let mut state = Box::from_raw(ptr);
+                    stop_login_announcer(&mut state);
+                    with_state(state.parent, |s| s.bdciechi_window = HWND(0));
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
+    }
+}

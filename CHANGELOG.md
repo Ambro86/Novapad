@@ -1,5 +1,12 @@
 # Changelog
 
+Version 0.6.8 – 2026-03-04
+Bug fixes
+• Fixed a bug where the list of open files was shown in the Help menu instead of the Window menu.
+• Fixed a streaming edge case where playback could start but the “Downloading stream” dialog stayed open when the downloaded file already matched the target format.
+• Added embedded podcast chapter support from local media files (e.g., MP3 chapter metadata): when feed/URL chapters are unavailable, Sonarpad now loads chapters from the downloaded file in the background, so playback starts immediately and chapter data is applied as soon as it is ready.
+• Improved text encoding detection for Japanese `.txt` files: added a safe Shift_JIS/CP932 fallback for mojibake cases, while preserving existing UTF/diacritics/Chinese behavior.
+• Internal safety refactor: converted functions to safe implementations where possible and significantly reduced unsafe code lines.
 Version 0.6.7 – 2026-03-02
 Improvements
 • Updated Polish translation thanks to DJ Graco.
@@ -361,6 +368,7 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
+
 
 
 

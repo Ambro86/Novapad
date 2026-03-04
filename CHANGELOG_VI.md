@@ -1,5 +1,12 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.6.8 – 2026-03-04
+Sửa lỗi
+• Đã sửa lỗi khiến danh sách tệp đang mở hiển thị trong menu Trợ giúp thay vì menu Cửa sổ.
+• Đã sửa một trường hợp biên khi phát trực tuyến: phát âm thanh có thể bắt đầu nhưng cửa sổ “Đang tải streaming” vẫn mở khi tệp đã tải xuống đã đúng định dạng đích.
+• Đã bổ sung hỗ trợ chương podcast nhúng trong tệp media cục bộ (ví dụ metadata chương của MP3): khi feed/URL không cung cấp chương, Sonarpad sẽ nạp chương từ tệp đã tải ở chế độ nền, giúp phát bắt đầu ngay và áp dụng chương ngay khi sẵn sàng.
+• Đã cải thiện nhận diện mã hóa cho tệp `.txt` tiếng Nhật: thêm fallback Shift_JIS/CP932 an toàn cho các trường hợp mojibake, đồng thời giữ nguyên hành vi hiện có với UTF/diacritics/tiếng Trung.
+• Tái cấu trúc an toàn nội bộ: chuyển sang triển khai safe ở những nơi có thể và giảm mạnh số dòng mã unsafe.
 Phiên bản 0.6.7 – 2026-03-02
 Cải tiến
 • Đã cập nhật bản dịch tiếng Ba Lan nhờ DJ Graco.
@@ -362,6 +369,7 @@ Cải tiến
 
 ## 0.1.0 - 2025-12-25
 - Phiên bản phát hành đầu tiên: Cấu trúc dự án và tệp README.
+
 
 
 

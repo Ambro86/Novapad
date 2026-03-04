@@ -1,5 +1,12 @@
 # Changelog
 
+Versión 0.6.8 – 2026-03-04
+Correcciones
+• Corregido un error por el que la lista de archivos abiertos se mostraba en el menú Ayuda en lugar del menú Ventana.
+• Corregido un caso límite de streaming en el que la reproducción podía iniciarse pero la ventana “Descargando streaming” quedaba abierta cuando el archivo descargado ya coincidía con el formato de destino.
+• Añadido soporte para capítulos de podcast incrustados en archivos multimedia locales (por ejemplo, metadatos de capítulos MP3): cuando el feed/URL no ofrece capítulos, Sonarpad ahora los carga desde el archivo descargado en segundo plano, de modo que la reproducción comienza de inmediato y los capítulos se aplican en cuanto están listos.
+• Mejorada la detección de codificación para archivos japoneses `.txt`: se añadió un fallback seguro Shift_JIS/CP932 en casos de mojibake, preservando el comportamiento existente para UTF/diacríticos/chino.
+• Refactorización interna de seguridad: conversión a implementaciones seguras donde fue posible y reducción drástica de líneas de código unsafe.
 Versión 0.6.7 – 2026-03-02
 Mejoras
 • Traducción polaca actualizada gracias a DJ Graco.
@@ -356,6 +363,7 @@ Mejoras
 
 ## 0.1.0 - 2025-12-25
 - Version inicial: estructura del proyecto y README.
+
 
 
 

@@ -288,6 +288,19 @@ fn cjk_char_score(text: &str) -> usize {
         .count()
 }
 
+fn japanese_char_score(text: &str) -> usize {
+    text.chars()
+        .filter(|&ch| {
+            let code = ch as u32;
+            (0x3040..=0x309F).contains(&code) // Hiragana
+                || (0x30A0..=0x30FF).contains(&code) // Katakana
+                || (0xFF66..=0xFF9F).contains(&code) // Half-width Katakana
+                || (0x4E00..=0x9FFF).contains(&code) // CJK Unified Ideographs
+                || (0x3400..=0x4DBF).contains(&code) // CJK Ext A
+        })
+        .count()
+}
+
 fn mojibake_latin1_score(text: &str) -> usize {
     text.chars()
         .filter(|ch| {
@@ -350,6 +363,41 @@ fn mojibake_latin1_score(text: &str) -> usize {
         .count()
 }
 
+fn mojibake_cp1252_symbol_score(text: &str) -> usize {
+    text.chars()
+        .filter(|ch| {
+            matches!(
+                ch,
+                '‚' | 'ƒ'
+                    | '„'
+                    | '…'
+                    | '†'
+                    | '‡'
+                    | 'ˆ'
+                    | '‰'
+                    | 'Š'
+                    | '‹'
+                    | 'Œ'
+                    | 'Ž'
+                    | '‘'
+                    | '’'
+                    | '“'
+                    | '”'
+                    | '•'
+                    | '–'
+                    | '—'
+                    | '˜'
+                    | '™'
+                    | 'š'
+                    | '›'
+                    | 'œ'
+                    | 'ž'
+                    | 'Ÿ'
+            )
+        })
+        .count()
+}
+
 fn should_prefer_gb18030(current_text: &str, gb_text: &str) -> bool {
     let gb_cjk = cjk_char_score(gb_text);
     if gb_cjk < 4 {
@@ -374,6 +422,26 @@ fn should_prefer_gb18030(current_text: &str, gb_text: &str) -> bool {
         .max(1);
 
     mojibake_score >= 8 && mojibake_score * 3 >= letter_count
+}
+
+fn should_prefer_shift_jis(current_text: &str, shift_jis_text: &str) -> bool {
+    let sjis_jp = japanese_char_score(shift_jis_text);
+    if sjis_jp < 6 {
+        return false;
+    }
+
+    let current_jp = japanese_char_score(current_text);
+    if current_jp >= sjis_jp {
+        return false;
+    }
+
+    let replacement_count = shift_jis_text.chars().filter(|&c| c == '\u{FFFD}').count();
+    if replacement_count > 2 {
+        return false;
+    }
+
+    let cp1252_mojibake = mojibake_cp1252_symbol_score(current_text);
+    cp1252_mojibake >= 6
 }
 
 fn prefer_cp1250_for_language(language: Language) -> bool {
@@ -424,12 +492,21 @@ fn decode_ansi_best_effort(bytes: &[u8], language: Language) -> String {
         let (text, _, _) = enc.decode(bytes);
         text.into_owned()
     });
+    let shift_jis_text = Encoding::for_label(b"shift_jis").map(|enc| {
+        let (text, _, _) = enc.decode(bytes);
+        text.into_owned()
+    });
 
     let chosen = choose_ansi_decoding(language, &cp1250_text, &cp1252_text, acp_text.as_deref());
     if let Some(gb_text) = gb18030_text
         && should_prefer_gb18030(&chosen, &gb_text)
     {
         return gb_text;
+    }
+    if let Some(sjis_text) = shift_jis_text
+        && should_prefer_shift_jis(&chosen, &sjis_text)
+    {
+        return sjis_text;
     }
     chosen
 }
@@ -1251,8 +1328,8 @@ fn html_to_text(html: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        Language, WINDOWS_1250, WINDOWS_1252, choose_ansi_decoding, html_to_text,
-        is_epub_metadata_noise_line,
+        Language, WINDOWS_1250, WINDOWS_1252, choose_ansi_decoding, decode_ansi_best_effort,
+        html_to_text, is_epub_metadata_noise_line,
     };
 
     #[test]
@@ -1318,6 +1395,18 @@ mod tests {
         assert_eq!(chosen, cp1250_text);
         assert!(chosen.contains("Příliš"));
         assert!(chosen.contains("kůň"));
+    }
+
+    #[test]
+    fn decode_ansi_prefers_shift_jis_for_japanese_mojibake() {
+        let source = "これは日本語のテストファイルです。";
+        let shift_jis =
+            encoding_rs::Encoding::for_label(b"shift_jis").expect("shift_jis encoding available");
+        let (encoded, _, _) = shift_jis.encode(source);
+        let bytes = encoded.into_owned();
+
+        let decoded = decode_ansi_best_effort(&bytes, Language::Italian);
+        assert_eq!(decoded, source);
     }
 }
 

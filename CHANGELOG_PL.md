@@ -1,5 +1,12 @@
 # Dziennik zmian
 
+Wersja 0.6.8 – 2026-03-04
+Poprawki
+• Naprawiono błąd, przez który lista otwartych plików była wyświetlana w menu Pomoc zamiast w menu Okno.
+• Naprawiono przypadek brzegowy streamingu, w którym odtwarzanie mogło się rozpocząć, ale okno „Pobieranie streamingu” pozostawało otwarte, gdy pobrany plik już pasował do formatu docelowego.
+• Dodano obsługę osadzonych rozdziałów podcastów z lokalnych plików multimedialnych (np. metadanych rozdziałów MP3): gdy feed/URL nie udostępnia rozdziałów, Sonarpad ładuje je teraz w tle z pobranego pliku, dzięki czemu odtwarzanie startuje od razu, a rozdziały są stosowane, gdy tylko będą gotowe.
+• Ulepszono wykrywanie kodowania dla japońskich plików `.txt`: dodano bezpieczny fallback Shift_JIS/CP932 dla przypadków mojibake, z zachowaniem dotychczasowego działania dla UTF/diakrytyków/chińskiego.
+• Wewnętrzna refaktoryzacja bezpieczeństwa: konwersja do implementacji safe tam, gdzie to możliwe, oraz drastyczne zmniejszenie liczby linii kodu unsafe.
 Wersja 0.6.7 – 2026-03-02
 Ulepszenia
 • Zaktualizowano tłumaczenie polskie dzięki DJ Graco.
@@ -356,6 +363,7 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
+
 
 
 

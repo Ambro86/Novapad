@@ -208,7 +208,7 @@ const VOICE_PANEL_ID_INSERT_TAG: usize = 21011;
 const MAIN_STATUS_ID: usize = 22001;
 const VOICE_MENU_ID_ADD_FAVORITE: u32 = 9001;
 const VOICE_MENU_ID_REMOVE_FAVORITE: u32 = 9002;
-const WINDOW_MENU_INDEX: i32 = 7;
+const WINDOW_MENU_INDEX: i32 = 6;
 const WINDOW_DOC_MENU_BASE: usize = 11_000;
 const WINDOW_DOC_MENU_MAX: usize = 200;
 const WINDOW_DOC_MENU_SEPARATOR_ID: usize = 10_999;
@@ -1679,6 +1679,41 @@ pub(crate) fn prefetch_podcast_chapters(hwnd: HWND, key: String, url: String) {
                 LPARAM(Box::into_raw(msg) as isize),
             ));
         }
+    });
+}
+
+pub(crate) fn prefetch_podcast_chapters_from_file(hwnd: HWND, key: String, path: PathBuf) {
+    let should_fetch = with_state(hwnd, |state| {
+        !state.podcast_chapters_cache.contains_key(&key)
+    })
+    .unwrap_or(false);
+    if !should_fetch {
+        return;
+    }
+
+    let hwnd_copy = hwnd;
+    std::thread::spawn(move || {
+        let parsed = crate::podcast::chapters::parse_embedded_chapters_from_media(&path);
+        let chapters = if parsed.is_empty() {
+            None
+        } else {
+            Some(parsed)
+        };
+        if let Some(ref list) = chapters {
+            log_debug(&format!(
+                "podcast_chapters_local_ok key={} path={} count={}",
+                key,
+                path.display(),
+                list.len()
+            ));
+        }
+        let msg = Box::new(PodcastChaptersReady { key, chapters });
+        crate::log_if_err!(crate::post_message_w_safe(
+            hwnd_copy,
+            WM_PODCAST_CHAPTERS_READY,
+            WPARAM(0),
+            LPARAM(Box::into_raw(msg) as isize),
+        ));
     });
 }
 
@@ -3868,7 +3903,15 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 let msg = Box::from_raw(ptr);
                 let (apply_now, chapters, language, announce_unavailable, current_pos_ms) =
                     with_state(hwnd, |state| {
-                        let chapters = msg.chapters.clone();
+                        let incoming = msg.chapters.clone();
+                        let chapters = if incoming.is_none() {
+                            state
+                                .podcast_chapters_cache
+                                .get(&msg.key)
+                                .and_then(|cached| cached.clone())
+                        } else {
+                            incoming
+                        };
                         state
                             .podcast_chapters_cache
                             .insert(msg.key.clone(), chapters.clone());

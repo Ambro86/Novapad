@@ -762,6 +762,7 @@ struct PlayReadyMsg {
     enclosure_url: String,
     title: String,
     item_key: String,
+    chapters_prefetch_started: bool,
 }
 
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
@@ -2021,9 +2022,9 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
         return;
     }
     mark_episode_played_with_delayed_ui(hwnd, parent, play_key.clone());
+    let mut chapters_prefetch_started = false;
     if parent.0 != 0 {
         crate::set_pending_podcast_chapters_key(parent, Some(play_key.clone()));
-        let mut chapters_prefetch_started = false;
         if !episode.podlove_chapters.is_empty() {
             crate::cache_podcast_chapters(
                 parent,
@@ -2087,6 +2088,7 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
             enclosure_url: url.clone(),
             title: episode_title.clone(),
             item_key: play_key.clone(),
+            chapters_prefetch_started,
         });
         if let Err(e) = crate::post_message_w_safe(
             hwnd,
@@ -2218,6 +2220,7 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
                     enclosure_url: url.clone(),
                     title: episode_title.clone(),
                     item_key: play_key.clone(),
+                    chapters_prefetch_started,
                 });
                 unsafe {
                     if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool() {
@@ -2337,6 +2340,31 @@ fn podcast_cache_path(url: &str, mime: Option<&str>) -> PathBuf {
 
 fn podcast_cache_dir() -> PathBuf {
     settings::settings_dir().join("podcast cache")
+}
+
+fn cache_embedded_podcast_chapters_if_missing(
+    parent: HWND,
+    key: &str,
+    media_path: &Path,
+    skip_when_prefetch_started: bool,
+) {
+    if skip_when_prefetch_started {
+        return;
+    }
+
+    let has_cached = with_state(parent, |state| {
+        state
+            .podcast_chapters_cache
+            .get(key)
+            .and_then(|v| v.as_ref())
+            .is_some_and(|items| !items.is_empty())
+    })
+    .unwrap_or(false);
+    if has_cached {
+        return;
+    }
+
+    crate::prefetch_podcast_chapters_from_file(parent, key.to_string(), media_path.to_path_buf());
 }
 
 fn podcast_cache_marker_path(path: &Path) -> PathBuf {
@@ -7883,6 +7911,14 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 }
                 editor_manager::open_document(parent, &msg.path);
                 if parent.0 != 0 {
+                    if !msg.item_key.trim().is_empty() {
+                        cache_embedded_podcast_chapters_if_missing(
+                            parent,
+                            &msg.item_key,
+                            &msg.path,
+                            msg.chapters_prefetch_started,
+                        );
+                    }
                     editor_manager::mark_current_document_from_rss(parent, true);
                     crate::set_active_podcast_episode_info(
                         parent,

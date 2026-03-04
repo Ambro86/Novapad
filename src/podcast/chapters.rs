@@ -1,5 +1,7 @@
 use serde::Deserialize;
 use serde_json::Value;
+use std::path::Path;
+use std::process::Command;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chapter {
@@ -87,6 +89,63 @@ pub fn current_chapter_index(current_pos_ms: u64, chapters: &[Chapter]) -> Optio
 pub fn chapter_label(chapter: &Chapter) -> String {
     let seconds = chapter.start_ms / 1000;
     format!("{}  {}", format_time_hms(seconds), chapter.title)
+}
+
+pub fn parse_embedded_chapters_from_media(path: &Path) -> Vec<Chapter> {
+    let output = Command::new("ffprobe")
+        .arg("-v")
+        .arg("error")
+        .arg("-print_format")
+        .arg("json")
+        .arg("-show_chapters")
+        .arg(path)
+        .output();
+
+    let Ok(output) = output else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+
+    let Ok(json) = serde_json::from_slice::<Value>(&output.stdout) else {
+        return Vec::new();
+    };
+    let Some(chapters) = json.get("chapters").and_then(|v| v.as_array()) else {
+        return Vec::new();
+    };
+
+    let mut out = Vec::new();
+    for item in chapters {
+        let Some(start_num) = item
+            .get("start_time")
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<f64>().ok())
+        else {
+            continue;
+        };
+        if start_num < 0.0 {
+            continue;
+        }
+        let Some(title) = item
+            .get("tags")
+            .and_then(|tags| tags.get("title"))
+            .and_then(|t| t.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        else {
+            continue;
+        };
+        out.push(Chapter {
+            start_ms: (start_num * 1000.0).floor() as u64,
+            title: title.to_string(),
+            url: None,
+            image: None,
+        });
+    }
+    out.sort_by_key(|chapter| chapter.start_ms);
+    out.dedup_by_key(|chapter| chapter.start_ms);
+    out
 }
 
 fn parse_start_time(value: &Value) -> Option<u64> {

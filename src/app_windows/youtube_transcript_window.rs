@@ -3417,6 +3417,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             .map(|e| e.eq_ignore_ascii_case(target_ext))
             .unwrap_or(false)
         {
+            close_progress_dialog(progress);
             downloaded_path.clone()
         } else {
             let converted_path = downloaded_path.with_extension(target_ext);

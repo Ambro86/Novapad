@@ -132,11 +132,7 @@ fn parse_voice_tag_override(tag: &str, default_engine: TtsEngine) -> Option<Voic
     let mut pitch: Option<i32> = None;
     let mut volume: Option<i32> = None;
 
-    for (key, target) in [
-        ("speed", &mut rate),
-        ("pitch", &mut pitch),
-        ("volume", &mut volume),
-    ] {
+    for key in ["rate", "speed", "pitch", "volume"] {
         if let Some(pos) = lower.find(key)
             && let Some(eq_pos) = lower[pos..].find('=')
         {
@@ -148,12 +144,19 @@ fn parse_voice_tag_override(tag: &str, default_engine: TtsEngine) -> Option<Voic
                 val.split_whitespace().next().unwrap_or("")
             };
             if let Ok(parsed) = val.parse::<i32>() {
-                *target = Some(parsed);
+                match key {
+                    "rate" | "speed" => rate = Some(parsed),
+                    "pitch" => pitch = Some(parsed),
+                    "volume" => volume = Some(parsed),
+                    _ => {}
+                }
             }
         }
     }
 
-    const KNOWN_KEYS: &[&str] = &["engine", "tts", "voice", "name", "speed", "pitch", "volume"];
+    const KNOWN_KEYS: &[&str] = &[
+        "engine", "tts", "voice", "name", "rate", "speed", "pitch", "volume",
+    ];
     let is_known_attr = |token: &str| {
         let t = token.to_ascii_lowercase();
         KNOWN_KEYS.iter().any(|k| t.starts_with(&format!("{k}=")))
@@ -5209,9 +5212,9 @@ mod tests {
     use super::{
         TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, find_edge_split_idx,
         is_edge_text_usable, normalize_for_tts, parse_edge_binary_audio_payload,
-        parse_sapi4_part_index, prepare_tts_text, preview_for_log, sanitize_edge_text,
-        split_into_tts_chunks, split_long_sentence_edge_with_limit, split_text_for_engine,
-        split_voice_tag_spans, strip_dashed_lines,
+        parse_sapi4_part_index, parse_voice_tag_override, prepare_tts_text, preview_for_log,
+        sanitize_edge_text, split_into_tts_chunks, split_long_sentence_edge_with_limit,
+        split_text_for_engine, split_voice_tag_spans, strip_dashed_lines,
     };
 
     #[test]
@@ -5305,6 +5308,15 @@ mod tests {
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0].0, "\"Ciao & mondo\"");
         assert!(spans[0].1.is_some());
+    }
+
+    #[test]
+    fn parse_voice_tag_override_accepts_rate_pitch_volume() {
+        let tag = r#"engine="edge" voice="it-IT-DiegoNeural" rate="-80" pitch="8" volume="140""#;
+        let ov = parse_voice_tag_override(tag, TtsEngine::Edge).expect("override expected");
+        assert_eq!(ov.rate, Some(-80));
+        assert_eq!(ov.pitch, Some(8));
+        assert_eq!(ov.volume, Some(140));
     }
 
     #[test]

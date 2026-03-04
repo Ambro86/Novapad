@@ -134,3 +134,9 @@ fn reader_fixtures_meet_minimums() {
         );
     }
 }
+
+#[test]
+fn ukrainian_language_variant_is_exercised() {
+    let label = i18n::tr(settings::Language::Ukrainian, "reader.no_title");
+    assert_eq!(label, "No Title");
+}

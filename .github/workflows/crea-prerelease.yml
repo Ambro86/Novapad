@@ -62,18 +62,42 @@ jobs:
         path: ./artifacts
         github-token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Keep only sonarpad.exe
+    - name: Collect prerelease files
       run: |
         mkdir -p release_files
+        for artifact_dir in ./artifacts/*/; do
+          if [ -d "$artifact_dir" ]; then
+            find "$artifact_dir" -type f \( -name "*.exe" -o -name "*.msi" \) -print -exec cp "{}" release_files/ \;
+          fi
+        done
 
-        exe_path="$(find ./artifacts -type f -name 'sonarpad.exe' | head -n 1)"
-        if [ -z "$exe_path" ]; then
-          echo "ERROR: sonarpad.exe not found in downloaded artifacts"
+        file_count=$(find release_files -type f | wc -l)
+        if [ "$file_count" -eq 0 ]; then
+          echo "ERROR: no release files found in artifacts"
           find ./artifacts -maxdepth 3 -type f -print
           exit 1
         fi
 
-        cp "$exe_path" "release_files/sonarpad.exe"
+        for file in release_files/*-setup.exe; do
+          if [ -f "$file" ]; then
+            filename=$(basename "$file")
+            newname=$(echo "$filename" | sed -E "s/_(v)?[0-9]+(\\.[0-9]+)+_/_/")
+            if [ "$filename" != "$newname" ]; then
+              mv "$file" "release_files/$newname"
+            fi
+          fi
+        done
+
+        for file in release_files/*.msi; do
+          if [ -f "$file" ]; then
+            filename=$(basename "$file")
+            newname=$(echo "$filename" | sed -E "s/_(v)?[0-9]+(\\.[0-9]+)+_/_/")
+            if [ "$filename" != "$newname" ]; then
+              mv "$file" "release_files/$newname"
+            fi
+          fi
+        done
+
         ls -la release_files
 
     - name: Build prerelease notes from latest changelog section
@@ -116,7 +140,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         gh release create "${PRERELEASE_TAG}" \
-          "release_files/sonarpad.exe" \
+          release_files/* \
           --title "${PRERELEASE_TITLE}" \
           --notes-file prerelease_notes.md \
           --prerelease
@@ -127,4 +151,5 @@ jobs:
         echo "Tag: ${PRERELEASE_TAG}"
         echo "Build ID: ${{ steps.get_run.outputs.run_id }}"
         echo "Build SHA: ${{ steps.get_run.outputs.run_sha }}"
-        echo "Asset: sonarpad.exe"
+        echo "Assets:"
+        ls -la release_files | sed 's/^/  /'

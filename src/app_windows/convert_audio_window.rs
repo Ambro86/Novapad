@@ -662,6 +662,7 @@ fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                                 title: labels.title.clone(),
                                 in_progress: labels.status_running.clone(),
                                 cancel: i18n::tr(state.language, "podcast.save.cancel"),
+                                cancel_confirm: i18n::tr(state.language, "podcast.cancel_confirm"),
                             };
                             let dialog = podcast_save_window::open_with_labels(
                                 state.hwnd,

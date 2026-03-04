@@ -33,6 +33,7 @@ pub struct SaveDialogLabels {
     pub title: String,
     pub in_progress: String,
     pub cancel: String,
+    pub cancel_confirm: String,
 }
 
 struct SaveCreateParams {
@@ -59,6 +60,7 @@ fn save_labels(language: Language) -> SaveDialogLabels {
         title: i18n::tr(language, "podcast.save.title"),
         in_progress: i18n::tr(language, "podcast.save.in_progress"),
         cancel: i18n::tr(language, "podcast.save.cancel"),
+        cancel_confirm: i18n::tr(language, "podcast.cancel_confirm"),
     }
 }
 
@@ -482,9 +484,12 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 // Keep focus within Sonarpad when progress dialogs close (e.g. streaming
                 // download -> conversion handoff), avoiding transient desktop focus.
                 crate::set_foreground_window_safe(parent);
-                if let Err(_e) =
-                    crate::post_message_w_safe(parent, WM_PODCAST_SAVE_CLOSED, WPARAM(0), LPARAM(0))
-                {
+                if let Err(_e) = crate::post_message_w_safe(
+                    parent,
+                    WM_PODCAST_SAVE_CLOSED,
+                    WPARAM(0),
+                    LPARAM(hwnd.0),
+                ) {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }
             }
@@ -521,7 +526,7 @@ fn request_cancel(hwnd: HWND) {
         if state.cancel_requested {
             return;
         }
-        let msg = i18n::tr(state.language, "podcast.cancel_confirm");
+        let msg = state.labels.cancel_confirm.clone();
         let title = i18n::tr(state.language, "app.confirm_title");
         let msg_w = to_wide(&msg);
         let title_w = to_wide(&title);
@@ -547,7 +552,8 @@ fn request_cancel(hwnd: HWND) {
         let parent = crate::get_parent_safe(hwnd);
         if parent.0 != 0 {
             unsafe {
-                if let Err(_e) = PostMessageW(parent, WM_PODCAST_SAVE_CANCEL, WPARAM(0), LPARAM(0))
+                if let Err(_e) =
+                    PostMessageW(parent, WM_PODCAST_SAVE_CANCEL, WPARAM(0), LPARAM(hwnd.0))
                 {
                     crate::log_debug(&format!("Error: {:?}", _e));
                 }

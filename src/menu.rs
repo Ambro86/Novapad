@@ -82,6 +82,8 @@ pub const IDM_PLAYBACK_TRACK_PREV: usize = 8022;
 pub const IDM_PLAYBACK_TRACK_NEXT: usize = 8023;
 pub const IDM_PLAYBACK_SEEK_TO_START: usize = 8025;
 pub const IDM_PLAYBACK_SEEK_TO_END: usize = 8026;
+pub const IDM_PLAYBACK_TRANSCRIBE_CURRENT: usize = 8027;
+pub const IDM_PLAYBACK_TRANSCRIBE_CANCEL: usize = 8030;
 pub const IDM_PLAYBACK_ADD_SUBTITLES: usize = 8019;
 pub const IDM_PLAYBACK_REMOVE_SUBTITLES: usize = 8020;
 pub const IDM_PLAYBACK_CHAPTER_PREV: usize = 8012;
@@ -475,8 +477,12 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
             );
             let chapter_list = i18n::tr(language, "playback.chapter_list");
             let download_episode = i18n::tr(language, "playback.download_episode");
+            let transcribe_current = i18n::tr(language, "playback.transcribe_current");
+            let transcribe_cancel = i18n::tr(language, "playback.transcribe_cancel");
             let has_chapters = with_state(hwnd, |state| !state.active_podcast_chapters.is_empty())
                 .unwrap_or(false);
+            let transcribe_in_progress =
+                with_state(hwnd, |state| state.transcription_in_progress).unwrap_or(false);
             let (audio_tracks, selected_track) = with_state(hwnd, |state| {
                 (
                     state.available_audio_tracks.clone(),
@@ -561,6 +567,22 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     &download_episode,
                 );
             }
+            append_menu_string(
+                playback_menu,
+                MF_STRING,
+                IDM_PLAYBACK_TRANSCRIBE_CURRENT,
+                &transcribe_current,
+            );
+            append_menu_string(
+                playback_menu,
+                if transcribe_in_progress {
+                    MF_STRING
+                } else {
+                    MF_STRING | MF_GRAYED
+                },
+                IDM_PLAYBACK_TRANSCRIBE_CANCEL,
+                &transcribe_cancel,
+            );
             append_menu_string(
                 playback_menu,
                 if direct_stream_playback {

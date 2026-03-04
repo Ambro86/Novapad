@@ -2136,6 +2136,7 @@ fn open_progress_dialog(
         title: i18n::tr(language, title_key),
         in_progress: i18n::tr(language, status_key),
         cancel: i18n::tr(language, "podcast.save.cancel"),
+        cancel_confirm: i18n::tr(language, "podcast.cancel_confirm"),
     };
     crate::app_windows::podcast_save_window::open_with_labels(parent, language, labels, show_cancel)
 }

@@ -550,6 +550,8 @@ pub struct AppSettings {
     pub youtube_include_timestamps: bool,
     #[serde(default = "default_stream_audio_output_format")]
     pub stream_audio_default_format: String,
+    #[serde(default)]
+    pub whisper_model_profile: String,
     pub last_seen_changelog_version: String,
     pub favorite_voices: Vec<FavoriteVoice>,
     pub dictionary: Vec<DictionaryEntry>,
@@ -812,6 +814,7 @@ impl Default for AppSettings {
             podcast_index_api_secret: String::new(),
             youtube_include_timestamps: true,
             stream_audio_default_format: default_stream_audio_output_format(),
+            whisper_model_profile: String::new(),
             last_seen_changelog_version: String::new(),
             favorite_voices: Vec::new(),
             dictionary: Vec::new(),
@@ -1537,6 +1540,19 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
         ) {
             settings.stream_audio_default_format = default_stream_audio_output_format();
         }
+    }
+    settings.whisper_model_profile = settings.whisper_model_profile.trim().to_ascii_lowercase();
+    if matches!(
+        settings.whisper_model_profile.as_str(),
+        "tiny_q5_1" | "base_q5_1"
+    ) {
+        settings.whisper_model_profile = "small_q5_1".to_string();
+    }
+    if !matches!(
+        settings.whisper_model_profile.as_str(),
+        "" | "small_q5_1" | "medium_q5_0" | "large_v3_turbo_q5_0"
+    ) {
+        settings.whisper_model_profile.clear();
     }
     settings
         .dictionary_search_history

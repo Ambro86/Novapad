@@ -495,6 +495,13 @@ fn decode_ffmpeg_to_wav(path: &Path, stream_index: Option<i32>) -> Result<PathBu
     Ok(wav_path)
 }
 
+pub fn prepare_media_wav_for_transcription(
+    path: &Path,
+    stream_index: Option<i32>,
+) -> Result<PathBuf, String> {
+    decode_ffmpeg_to_wav(path, stream_index)
+}
+
 pub fn parse_time_input(input: &str) -> Result<u64, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {

@@ -67,7 +67,7 @@ use std::io::Write;
 use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
@@ -161,6 +161,7 @@ use crate::app_windows::find_in_files_window::{
     FindInFilesCache, apply_find_in_files_selection, focus_find_in_files_results,
 };
 use crate::podcast::chapters::Chapter;
+use crate::tools::whisper_transcribe::WhisperModel;
 
 const WM_PDF_LOADED: u32 = WM_APP + 1;
 const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
@@ -183,6 +184,8 @@ const WM_SHOW_CHANGELOG: u32 = WM_APP + 83;
 const WM_PODCAST_CHAPTERS_READY: u32 = WM_APP + 31;
 const WM_DICTIONARY_LOADED: u32 = WM_APP + 32;
 const WM_PODCAST_EPISODE_SAVE_RESULT: u32 = WM_APP + 33;
+const WM_WHISPER_TRANSCRIPTION_DONE: u32 = WM_APP + 34;
+const WM_WHISPER_TRANSCRIPTION_PROGRESS: u32 = WM_APP + 35;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
@@ -2104,6 +2107,308 @@ fn is_direct_stream_playback_active(hwnd: HWND) -> bool {
     }
 }
 
+#[derive(Clone, Copy)]
+enum TranscriptionProfile {
+    Small,
+    Medium,
+    Large,
+}
+
+fn map_profile_to_model(profile: TranscriptionProfile) -> WhisperModel {
+    match profile {
+        TranscriptionProfile::Small => WhisperModel::SmallQ51,
+        TranscriptionProfile::Medium => WhisperModel::MediumQ50,
+        TranscriptionProfile::Large => WhisperModel::LargeV3TurboQ50,
+    }
+}
+
+fn profile_from_setting(value: &str) -> Option<TranscriptionProfile> {
+    match value {
+        "tiny_q5_1" | "base_q5_1" | "small_q5_1" => Some(TranscriptionProfile::Small),
+        "medium_q5_0" => Some(TranscriptionProfile::Medium),
+        "large_v3_turbo_q5_0" => Some(TranscriptionProfile::Large),
+        _ => None,
+    }
+}
+
+fn profile_to_setting(profile: TranscriptionProfile) -> &'static str {
+    match profile {
+        TranscriptionProfile::Small => "small_q5_1",
+        TranscriptionProfile::Medium => "medium_q5_0",
+        TranscriptionProfile::Large => "large_v3_turbo_q5_0",
+    }
+}
+
+fn choose_whisper_profile_if_needed(
+    hwnd: HWND,
+    language: Language,
+) -> Option<TranscriptionProfile> {
+    if let Some(saved) = with_state(hwnd, |state| {
+        profile_from_setting(&state.settings.whisper_model_profile)
+    })
+    .flatten()
+    {
+        return Some(saved);
+    }
+
+    let selected = crate::app_windows::whisper_model_window::choose_whisper_model(hwnd, language)
+        .and_then(|s| profile_from_setting(&s));
+
+    if let Some(profile) = selected {
+        let to_store = profile_to_setting(profile).to_string();
+        if let Some(snapshot) = with_state(hwnd, |state| {
+            state.settings.whisper_model_profile = to_store;
+            state.settings.clone()
+        }) {
+            settings::save_settings(snapshot);
+        }
+    }
+
+    selected
+}
+
+fn cancel_whisper_transcription(hwnd: HWND) {
+    let language = with_state(hwnd, |state| {
+        if let Some(cancel) = state.transcription_cancel.as_ref() {
+            cancel.store(true, Ordering::Relaxed);
+        }
+        state.settings.language
+    })
+    .unwrap_or_default();
+    let msg = i18n::tr(language, "whisper.status.cancel_requested");
+    if !msg.is_empty() {
+        screen_reader_speak(&msg);
+    }
+}
+
+fn open_whisper_progress_window(hwnd: HWND, language: Language) {
+    let labels = app_windows::podcast_save_window::SaveDialogLabels {
+        title: i18n::tr(language, "whisper.progress_title"),
+        in_progress: i18n::tr(language, "whisper.status.transcribing"),
+        cancel: i18n::tr(language, "playback.transcribe_cancel"),
+        cancel_confirm: i18n::tr(language, "whisper.cancel_confirm"),
+    };
+    let dialog = app_windows::podcast_save_window::open_with_labels(hwnd, language, labels, true);
+    with_state(hwnd, |state| {
+        state.transcription_progress_window = dialog;
+    });
+}
+
+fn update_whisper_progress_window(hwnd: HWND, pct: usize) {
+    let dialog = with_state(hwnd, |state| state.transcription_progress_window).unwrap_or(HWND(0));
+    if dialog.0 != 0 {
+        crate::send_message_w_safe(
+            dialog,
+            app_windows::podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
+            WPARAM(pct.min(100)),
+            LPARAM(0),
+        );
+    }
+}
+
+fn close_whisper_progress_window(hwnd: HWND) {
+    let dialog = with_state(hwnd, |state| state.transcription_progress_window).unwrap_or(HWND(0));
+    if dialog.0 != 0 {
+        crate::send_message_w_safe(
+            dialog,
+            app_windows::podcast_save_window::WM_PODCAST_SAVE_DONE,
+            WPARAM(0),
+            LPARAM(0),
+        );
+    }
+    with_state(hwnd, |state| {
+        state.transcription_progress_window = HWND(0);
+    });
+}
+
+fn start_whisper_transcription(hwnd: HWND) {
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let Some(profile) = choose_whisper_profile_if_needed(hwnd, language) else {
+        return;
+    };
+    let media_info = with_state(hwnd, |state| {
+        let player = state.active_audiobook.as_ref()?;
+        let path = player.path.clone();
+        let stream_index = state.selected_audio_track;
+        Some((path, stream_index))
+    })
+    .flatten();
+
+    let Some((media_path, stream_index)) = media_info else {
+        screen_reader_speak(&i18n::tr(language, "whisper.error.no_active_media"));
+        return;
+    };
+
+    if is_direct_stream_url_path(&media_path) {
+        screen_reader_speak(&i18n::tr(
+            language,
+            "whisper.error.direct_stream_not_supported",
+        ));
+        return;
+    }
+
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    with_state(hwnd, |state| {
+        if let Some(prev) = state.transcription_cancel.take() {
+            prev.store(true, Ordering::Relaxed);
+        }
+        state.transcription_cancel = Some(cancel_flag.clone());
+        state.transcription_in_progress = true;
+    });
+    open_whisper_progress_window(hwnd, language);
+    update_whisper_progress_window(hwnd, 0);
+    crate::menu::update_playback_menu(hwnd, true);
+
+    let start_msg = i18n::tr(language, "whisper.status.starting");
+    if !start_msg.is_empty() {
+        screen_reader_speak(&start_msg);
+    }
+
+    std::thread::spawn(move || {
+        let result = (|| -> Result<WhisperTranscriptionResult, String> {
+            #[cfg(feature = "whisper_cuda")]
+            {
+                let cuda_dir = settings::settings_dir().join("cuda");
+                crate::tools::whisper_transcribe::ensure_cuda_runtime(&cuda_dir, &cancel_flag)?;
+            }
+            let models_dir = settings::settings_dir().join("models").join("whisper");
+            let model = map_profile_to_model(profile);
+            screen_reader_speak(&i18n::tr(language, "whisper.status.downloading_model"));
+            let model_path =
+                crate::tools::whisper_transcribe::ensure_model(&models_dir, model, &cancel_flag)?;
+            if cancel_flag.load(Ordering::Relaxed) {
+                return Ok(WhisperTranscriptionResult {
+                    title: String::new(),
+                    text: String::new(),
+                    error: None,
+                    cancelled: true,
+                });
+            }
+
+            screen_reader_speak(&i18n::tr(language, "whisper.status.preparing_audio"));
+            let wav_path = crate::audio_player::prepare_media_wav_for_transcription(
+                &media_path,
+                stream_index,
+            )?;
+
+            screen_reader_speak(&i18n::tr(language, "whisper.status.transcribing"));
+            let progress_last = Arc::new(AtomicI32::new(-1));
+            let progress_last_closure = Arc::clone(&progress_last);
+            let progress_callback: Box<dyn FnMut(i32)> = Box::new(move |pct| {
+                let clamped = pct.clamp(0, 100);
+                let prev = progress_last_closure.fetch_max(clamped, Ordering::Relaxed);
+                if clamped > prev {
+                    let _unused = post_message_w_safe(
+                        hwnd,
+                        WM_WHISPER_TRANSCRIPTION_PROGRESS,
+                        WPARAM(clamped as usize),
+                        LPARAM(0),
+                    );
+                }
+            });
+
+            let text = crate::tools::whisper_transcribe::transcribe_wav(
+                &model_path,
+                &wav_path,
+                false,
+                &cancel_flag,
+                Some(progress_callback),
+            )?;
+            if cancel_flag.load(Ordering::Relaxed) {
+                return Ok(WhisperTranscriptionResult {
+                    title: String::new(),
+                    text: String::new(),
+                    error: None,
+                    cancelled: true,
+                });
+            }
+            let _unused = post_message_w_safe(
+                hwnd,
+                WM_WHISPER_TRANSCRIPTION_PROGRESS,
+                WPARAM(100),
+                LPARAM(0),
+            );
+
+            let base_name = media_path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("audio");
+            let title = i18n::tr_f(language, "whisper.output_title", &[("name", base_name)]);
+            Ok(WhisperTranscriptionResult {
+                title,
+                text,
+                error: None,
+                cancelled: false,
+            })
+        })();
+
+        let payload = match result {
+            Ok(done) => done,
+            Err(err) => WhisperTranscriptionResult {
+                title: String::new(),
+                text: String::new(),
+                error: Some(err),
+                cancelled: cancel_flag.load(Ordering::Relaxed),
+            },
+        };
+        let ptr = Box::into_raw(Box::new(payload));
+        if let Err(err) = post_message_w_safe(
+            hwnd,
+            WM_WHISPER_TRANSCRIPTION_DONE,
+            WPARAM(0),
+            LPARAM(ptr as isize),
+        ) {
+            log_debug(&format!(
+                "Failed to post WM_WHISPER_TRANSCRIPTION_DONE: {err}"
+            ));
+            let _unused_box = unsafe { Box::from_raw(ptr) };
+        }
+    });
+}
+
+fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionResult) {
+    let language = with_state(hwnd, |state| {
+        state.transcription_in_progress = false;
+        state.transcription_cancel = None;
+        state.settings.language
+    })
+    .unwrap_or_default();
+    close_whisper_progress_window(hwnd);
+    crate::menu::update_playback_menu(hwnd, true);
+
+    if result.cancelled {
+        screen_reader_speak(&i18n::tr(language, "whisper.status.cancelled"));
+        return;
+    }
+    if let Some(err) = result.error {
+        let msg = i18n::tr_f(language, "whisper.error.failed", &[("err", &err)]);
+        screen_reader_speak(&msg);
+        return;
+    }
+
+    editor_manager::new_document(hwnd);
+    with_state(hwnd, |state| {
+        let idx = state.current;
+        let hwnd_tab = state.hwnd_tab;
+        if let Some(doc) = state.docs.get_mut(idx) {
+            doc.title = result.title.clone();
+            doc.path = None;
+            doc.dirty = false;
+            doc.format = FileFormat::Text(TextEncoding::Utf8);
+            editor_manager::set_edit_text(doc.hwnd_edit, &result.text);
+            editor_manager::update_tab_title(hwnd_tab, idx, &doc.title, false);
+        }
+    });
+    editor_manager::update_window_title(hwnd);
+    crate::log_if_err!(post_message_w_safe(
+        hwnd,
+        WM_FOCUS_EDITOR,
+        WPARAM(0),
+        LPARAM(0)
+    ));
+    screen_reader_speak(&i18n::tr(language, "whisper.status.completed"));
+}
+
 fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
     let disable_seek_rate_pitch = matches!(
         command,
@@ -2267,6 +2572,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.podcast_window.0 != 0
                 || state.podcast_save_window.0 != 0
                 || state.update_progress_window.0 != 0
+                || state.transcription_progress_window.0 != 0
                 || state.batch_audiobooks_window.0 != 0
                 || state.convert_audio_window.0 != 0
                 || state.podcasts_window.0 != 0
@@ -2293,6 +2599,7 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
             let audiobook_progress_in_foreground =
                 state.audiobook_progress.0 != 0 && foreground == state.audiobook_progress;
             state.update_progress_window.0 == 0
+                && state.transcription_progress_window.0 == 0
                 && state.podcast_window.0 == 0
                 && state.podcast_save_window.0 == 0
                 && !audiobook_progress_in_foreground
@@ -2373,6 +2680,7 @@ pub(crate) struct AppState {
     podcast_window: HWND,
     podcast_save_window: HWND,
     update_progress_window: HWND,
+    transcription_progress_window: HWND,
     batch_audiobooks_window: HWND,
     convert_audio_window: HWND,
     podcasts_window: HWND,
@@ -2422,6 +2730,8 @@ pub(crate) struct AppState {
     audio_playlist: Vec<PathBuf>,
     audio_playlist_index: Option<usize>,
     audio_ffmpeg_retry_for: Option<PathBuf>,
+    transcription_cancel: Option<Arc<AtomicBool>>,
+    transcription_in_progress: bool,
     voice_panel_visible: bool,
     voice_label_engine: HWND,
     voice_combo_engine: HWND,
@@ -2483,6 +2793,13 @@ pub(crate) struct PendingFindInFilesSelection {
 #[derive(Default, Serialize, Deserialize)]
 struct RecentFileStore {
     files: Vec<String>,
+}
+
+struct WhisperTranscriptionResult {
+    title: String,
+    text: String,
+    error: Option<String>,
+    cancelled: bool,
 }
 
 fn main() -> windows::core::Result<()> {
@@ -2862,6 +3179,18 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                     ));
                     continue;
                 }
+                let whisper_progress_hwnd =
+                    with_state(hwnd, |state| state.transcription_progress_window)
+                        .unwrap_or(HWND(0));
+                if whisper_progress_hwnd.0 != 0 {
+                    crate::log_if_err!(PostMessageW(
+                        whisper_progress_hwnd,
+                        WM_COMMAND,
+                        WPARAM(2),
+                        LPARAM(0)
+                    ));
+                    continue;
+                }
                 if let Some(hwnd_edit) = get_active_edit(hwnd)
                     && GetFocus() == hwnd_edit
                     && focus_find_in_files_results()
@@ -3112,6 +3441,15 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                 if state.update_progress_window.0 != 0
                     && app_windows::podcast_save_window::handle_navigation(
                         state.update_progress_window,
+                        &msg,
+                    )
+                {
+                    handled = true;
+                    return;
+                }
+                if state.transcription_progress_window.0 != 0
+                    && app_windows::podcast_save_window::handle_navigation(
+                        state.transcription_progress_window,
                         &msg,
                     )
                 {
@@ -3690,6 +4028,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     playback_menu: HMENU(0),
                     podcast_save_window: HWND(0),
                     update_progress_window: HWND(0),
+                    transcription_progress_window: HWND(0),
                     batch_audiobooks_window: HWND(0),
                     convert_audio_window: HWND(0),
 
@@ -3732,6 +4071,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     audio_playlist: Vec::new(),
                     audio_playlist_index: None,
                     audio_ffmpeg_retry_for: None,
+                    transcription_cancel: None,
+                    transcription_in_progress: false,
                     voice_panel_visible: false,
                     voice_label_engine: label_engine,
                     voice_combo_engine: combo_engine,
@@ -4068,6 +4409,19 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 LRESULT(0)
             }
+            WM_WHISPER_TRANSCRIPTION_DONE => {
+                let ptr = lparam.0 as *mut WhisperTranscriptionResult;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let payload = Box::from_raw(ptr);
+                apply_whisper_transcription_result(hwnd, *payload);
+                LRESULT(0)
+            }
+            WM_WHISPER_TRANSCRIPTION_PROGRESS => {
+                update_whisper_progress_window(hwnd, wparam.0.min(100));
+                LRESULT(0)
+            }
             WM_DICTIONARY_LOADED => {
                 if lparam.0 == 0 {
                     return LRESULT(0);
@@ -4168,6 +4522,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     title: i18n::tr(req.language, "updater.title"),
                     in_progress: i18n::tr(req.language, "podcast.save.in_progress"),
                     cancel: i18n::tr(req.language, "podcast.save.cancel"),
+                    cancel_confirm: i18n::tr(req.language, "podcast.cancel_confirm"),
                 };
                 let dialog = app_windows::podcast_save_window::open_with_labels(
                     hwnd,
@@ -4217,9 +4572,28 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 LRESULT(0)
             }
             app_windows::podcast_save_window::WM_PODCAST_SAVE_CLOSED => {
+                let closed_hwnd = HWND(lparam.0);
                 with_state(hwnd, |state| {
-                    state.update_progress_window = HWND(0);
+                    if state.update_progress_window == closed_hwnd {
+                        state.update_progress_window = HWND(0);
+                    }
+                    if state.transcription_progress_window == closed_hwnd {
+                        state.transcription_progress_window = HWND(0);
+                    }
                 });
+                LRESULT(0)
+            }
+            app_windows::podcast_save_window::WM_PODCAST_SAVE_CANCEL => {
+                let source_hwnd = HWND(lparam.0);
+                let is_whisper = with_state(hwnd, |state| {
+                    state.transcription_in_progress
+                        && source_hwnd.0 != 0
+                        && state.transcription_progress_window == source_hwnd
+                })
+                .unwrap_or(false);
+                if is_whisper {
+                    cancel_whisper_transcription(hwnd);
+                }
                 LRESULT(0)
             }
             WM_AUTO_UPDATE_CHECK => {
@@ -5072,6 +5446,14 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     }
                     IDM_PLAYBACK_DOWNLOAD_EPISODE => {
                         download_active_podcast_episode(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_TRANSCRIBE_CURRENT => {
+                        start_whisper_transcription(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_TRANSCRIBE_CANCEL => {
+                        cancel_whisper_transcription(hwnd);
                         LRESULT(0)
                     }
                     IDM_PLAYBACK_GO_TO_TIME => {

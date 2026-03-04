@@ -132,6 +132,10 @@
   "playback.chapter_list": "Lista capit&oli...\tAlt+Shift+L",
   "podcasts.chapters.title": "Elenco capitoli",
   "playback.download_episode": "Conserva episodio...",
+  "playback.transcribe_fast": "Trascrivi audio corrente (Veloce)",
+  "playback.transcribe_balanced": "Trascrivi audio corrente (Bilanciato)",
+  "playback.transcribe_hq": "Trascrivi audio corrente (Alta qualità)",
+  "playback.transcribe_cancel": "Annulla trascrizione",
   "playback.go_to_time": "Vai a&l tempo...\tCtrl+T",
   "playback.announce_time": "A&nnuncia tempo\tCtrl+I",
   "playback.add_subtitles": "Aggiungi &sottotitoli...",
@@ -1011,6 +1015,25 @@
   "stream_audio.invalid_format": "Formato non valido: {input}. Valori consentiti: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "URL non valido.",
   "stream_audio.no_output": "Nessun file riproducibile generato.",
+  "whisper.status.starting": "Avvio trascrizione...",
+  "whisper.status.downloading_model": "Download modello Whisper (se necessario)...",
+  "whisper.status.preparing_audio": "Preparazione audio per trascrizione...",
+  "whisper.status.transcribing": "Trascrizione in corso...",
+  "whisper.status.progress": "Trascrizione {pct} percento.",
+  "whisper.status.cancel_requested": "Richiesta annullamento trascrizione.",
+  "whisper.status.cancelled": "Trascrizione annullata.",
+  "whisper.status.completed": "Trascrizione completata.",
+  "whisper.error.no_active_media": "Nessun file multimediale attivo da trascrivere.",
+  "whisper.error.direct_stream_not_supported": "La trascrizione di streaming live/diretto non è ancora supportata.",
+  "whisper.error.failed": "Errore trascrizione: {err}",
+  "whisper.output_title": "Trascrizione - {name}",
+  "whisper.progress_title": "Trascrizione Whisper",
+  "whisper.cancel_confirm": "Vuoi annullare la trascrizione in corso?",
+  "whisper.model.dialog_title": "Modello Whisper",
+  "whisper.model.dialog_hint": "Scegli il modello per la trascrizione.\nSmall (predefinito) e consigliato per la maggior parte dei PC.\nMedium e Large offrono piu qualita ma richiedono piu RAM/CPU.",
+  "whisper.model.item.fast": "Small (predefinito) - ggml-small-q5_1 (~190 MB) - consigliati 4 GB RAM (8 GB meglio)",
+  "whisper.model.item.balanced": "Medium - ggml-medium-q5_0 (~540 MB) - consigliati 8 GB RAM (16 GB meglio)",
+  "whisper.model.item.hq": "Large v3 Turbo - ggml-large-v3-turbo-q5_0 (~574 MB) - consigliati 12-16 GB RAM (16 GB meglio)",
   "stream_audio.download_failed": "Errore durante il download dello streaming: {err}",
   "stream_audio.progress_title": "Download streaming",
   "stream_audio.progress_downloading": "Download dello streaming in corso...",
@@ -1073,9 +1096,8 @@
   "rss.error.retries_exhausted": "Numero massimo di tentativi raggiunto",
   "reader.no_title": "Nessun titolo",
   "reader.external_link": "Link esterno:\n{url}",
-  "options.lang.lt": "Lituano"
+  "options.lang.lt": "Lituano",
+  "playback.transcribe_current": "Trascrivi audio corrente",
+  "whisper.model.choice_intro": "Scelta modello Whisper (primo utilizzo): Small, Medium o Large.",
+  "whisper.model.choice_advanced": "Scelta modello Whisper avanzata disponibile nella casella elenco."
 }
-
-
-
-

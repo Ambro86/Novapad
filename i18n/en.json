@@ -132,6 +132,10 @@
   "playback.chapter_list": "Chapter &List...\tAlt+Shift+L",
   "podcasts.chapters.title": "Chapter List",
   "playback.download_episode": "Save Episode &As...",
+  "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
+  "playback.transcribe_hq": "Transcribe current audio (High quality)",
+  "playback.transcribe_cancel": "Cancel transcription",
   "playback.go_to_time": "Go t&o Time...\tCtrl+T",
   "playback.announce_time": "A&nnounce Time\tCtrl+I",
   "playback.add_subtitles": "Add &Subtitles...",
@@ -966,6 +970,25 @@
   "stream_audio.invalid_format": "Invalid format: {input}. Allowed: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "Invalid URL.",
   "stream_audio.no_output": "No playable output file was generated.",
+  "whisper.status.starting": "Starting transcription...",
+  "whisper.status.downloading_model": "Downloading Whisper model if needed...",
+  "whisper.status.preparing_audio": "Preparing audio for transcription...",
+  "whisper.status.transcribing": "Transcription in progress...",
+  "whisper.status.progress": "Transcription {pct} percent.",
+  "whisper.status.cancel_requested": "Transcription cancel requested.",
+  "whisper.status.cancelled": "Transcription cancelled.",
+  "whisper.status.completed": "Transcription completed.",
+  "whisper.error.no_active_media": "No active media to transcribe.",
+  "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
+  "whisper.error.failed": "Transcription error: {err}",
+  "whisper.output_title": "Transcription - {name}",
+  "whisper.progress_title": "Whisper transcription",
+  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "whisper.model.dialog_title": "Whisper model",
+  "whisper.model.dialog_hint": "Choose the transcription model.\nSmall (default) is recommended for most systems.\nMedium and Large provide better quality but need much more RAM/CPU.",
+  "whisper.model.item.fast": "Small (default) - ggml-small-q5_1 (~190 MB) - suggested 4 GB RAM (8 GB better)",
+  "whisper.model.item.balanced": "Medium - ggml-medium-q5_0 (~540 MB) - suggested 8 GB RAM (16 GB better)",
+  "whisper.model.item.hq": "Large v3 Turbo - ggml-large-v3-turbo-q5_0 (~574 MB) - suggested 12-16 GB RAM (16 GB better)",
   "stream_audio.download_failed": "Streaming download error: {err}",
   "stream_audio.progress_title": "Downloading stream",
   "stream_audio.progress_downloading": "Downloading stream...",
@@ -1028,9 +1051,8 @@
   "rss.error.retries_exhausted": "Retries exhausted",
   "reader.no_title": "No Title",
   "reader.external_link": "External link:\n{url}",
-  "options.lang.lt": "Lithuanian"
+  "options.lang.lt": "Lithuanian",
+  "playback.transcribe_current": "Transcribe current audio",
+  "whisper.model.choice_intro": "Whisper model selection (first use): Small, Medium, or Large.",
+  "whisper.model.choice_advanced": "Advanced Whisper model selection is available in the combo box."
 }
-
-
-
-

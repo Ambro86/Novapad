@@ -129,7 +129,10 @@
   "playback.chapter_list": "Danh sách &chương...\tAlt+Shift+L",
   "podcasts.chapters.title": "Danh sách chương",
   "playback.download_episode": "Lưu tập này...",
-  "playback.go_to_time": "Đi &tới thời gian...\tCtrl+T",
+    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
+  "playback.transcribe_hq": "Transcribe current audio (High quality)",
+  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "Đi &tới thời gian...\tCtrl+T",
   "playback.announce_time": "Th&ông báo thời gian\tCtrl+I",
   "playback.add_subtitles": "Thêm &phụ đề...",
   "playback.add_subtitles_no_media": "Không có tệp đa phương tiện đang hoạt động.",
@@ -966,7 +969,17 @@
   "stream_audio.invalid_format": "Định dạng không hợp lệ: {input}. Cho phép: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "URL không hợp lệ.",
   "stream_audio.no_output": "Không tạo được tệp đầu ra có thể phát.",
-  "stream_audio.download_failed": "Lỗi khi tải luồng phát trực tuyến: {err}",
+    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.downloading_model": "Downloading Whisper model if needed...",
+  "whisper.status.preparing_audio": "Preparing audio for transcription...",
+  "whisper.status.transcribing": "Transcription in progress...",
+  "whisper.status.cancel_requested": "Transcription cancel requested.",
+  "whisper.status.cancelled": "Transcription cancelled.",
+  "whisper.status.completed": "Transcription completed.",
+  "whisper.error.no_active_media": "No active media to transcribe.",
+  "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
+  "whisper.error.failed": "Transcription error: {err}",
+  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "Lỗi khi tải luồng phát trực tuyến: {err}",
   "stream_audio.progress_title": "Tải phát trực tuyến",
   "stream_audio.progress_downloading": "Đang tải luồng...",
   "stream_audio.ytdlp_progress_title": "Cập nhật yt-dlp",
@@ -1028,9 +1041,15 @@
   "rss.error.retries_exhausted": "Đã hết số lần thử lại",
   "reader.no_title": "Không có tiêu đề",
   "reader.external_link": "Liên kết ngoài:\n{url}",
-  "options.lang.lt": "Tiếng Litva"
+  "options.lang.lt": "Tiếng Litva",
+  "playback.transcribe_current": "Transcribe current audio",
+  "whisper.model.choice_intro": "Whisper model selection (first use).`n`nYes: Balanced (default, recommended).`n- Model: ggml-base-q5_1 (~60 MB)`n- Suggested: at least 8 GB RAM`n`nNo: choose Fast or High quality.`nCancel: abort transcription.",
+  "whisper.model.choice_advanced": "Choose Whisper model.`n`nYes: Fast`n- Model: ggml-tiny-q5_1 (~31 MB)`n- Suggested: about 1-2 GB RAM`n`nNo: High quality`n- Model: ggml-small-q5_1 (~190 MB)`n- Suggested: at least 16 GB RAM and a stronger CPU`n`nCancel: abort transcription.",
+  "whisper.model.dialog_title": "Whisper model",
+  "whisper.model.dialog_hint": "Choose the transcription model.\nBalanced is recommended for most systems.\nFast needs less RAM/CPU. High quality needs more RAM/CPU.",
+  "whisper.model.item.fast": "Fast - ggml-tiny-q5_1 (~31 MB) - about 1-2 GB RAM",
+  "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
+  "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
+  "whisper.status.progress": "Transcription {pct} percent.",
+  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?"
 }
-
-
-
-

@@ -112,7 +112,10 @@
   "playback.chapter_next": "下一章 Alt+Shift+N",
   "podcasts.chapters.title": "章节列表",
   "playback.download_episode": "保存剧集...",
-  "playback.go_to_time": "转到时间... Ctrl+T",
+    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
+  "playback.transcribe_hq": "Transcribe current audio (High quality)",
+  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "转到时间... Ctrl+T",
   "playback.add_subtitles": "添加字幕...",
   "playback.add_subtitles_no_media": "没有活动媒体文件。",
   "playback.add_subtitles_invalid": "不支持的字幕格式。",
@@ -922,7 +925,17 @@
   "stream_audio.invalid_format": "格式无效：{input}。允许格式：mp3、m4a、opus、wav、flac、mp4。",
   "stream_audio.invalid_url": "无效的URL。",
   "stream_audio.no_output": "未生成可播放的输出文件。",
-  "stream_audio.download_failed": "流媒体下载错误：{err}",
+    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.downloading_model": "Downloading Whisper model if needed...",
+  "whisper.status.preparing_audio": "Preparing audio for transcription...",
+  "whisper.status.transcribing": "Transcription in progress...",
+  "whisper.status.cancel_requested": "Transcription cancel requested.",
+  "whisper.status.cancelled": "Transcription cancelled.",
+  "whisper.status.completed": "Transcription completed.",
+  "whisper.error.no_active_media": "No active media to transcribe.",
+  "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
+  "whisper.error.failed": "Transcription error: {err}",
+  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "流媒体下载错误：{err}",
   "stream_audio.progress_title": "流媒体下载",
   "stream_audio.progress_downloading": "正在下载流...",
   "stream_audio.ytdlp_progress_title": "yt-dlp 更新",
@@ -1028,9 +1041,15 @@
   "voice.lang.ms": "马来语",
   "voice.lang.my": "缅甸语",
   "voice.lang.ps": "普什图语",
-  "voice.lang.su": "巽他语"
+  "voice.lang.su": "巽他语",
+  "playback.transcribe_current": "Transcribe current audio",
+  "whisper.model.choice_intro": "Whisper model selection (first use).`n`nYes: Balanced (default, recommended).`n- Model: ggml-base-q5_1 (~60 MB)`n- Suggested: at least 8 GB RAM`n`nNo: choose Fast or High quality.`nCancel: abort transcription.",
+  "whisper.model.choice_advanced": "Choose Whisper model.`n`nYes: Fast`n- Model: ggml-tiny-q5_1 (~31 MB)`n- Suggested: about 1-2 GB RAM`n`nNo: High quality`n- Model: ggml-small-q5_1 (~190 MB)`n- Suggested: at least 16 GB RAM and a stronger CPU`n`nCancel: abort transcription.",
+  "whisper.model.dialog_title": "Whisper model",
+  "whisper.model.dialog_hint": "Choose the transcription model.\nBalanced is recommended for most systems.\nFast needs less RAM/CPU. High quality needs more RAM/CPU.",
+  "whisper.model.item.fast": "Fast - ggml-tiny-q5_1 (~31 MB) - about 1-2 GB RAM",
+  "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
+  "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
+  "whisper.status.progress": "Transcription {pct} percent.",
+  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?"
 }
-
-
-
-

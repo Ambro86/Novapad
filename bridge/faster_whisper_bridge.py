@@ -23,6 +23,15 @@ def configure_stdio_utf8():
 
 def audio_duration_seconds(path):
     try:
+        import av  # type: ignore
+
+        with av.open(path) as container:
+            if container.duration is not None and container.duration > 0:
+                return float(container.duration) / float(av.time_base)
+    except Exception:
+        pass
+
+    try:
         with wave.open(path, "rb") as wav_file:
             rate = wav_file.getframerate()
             frames = wav_file.getnframes()

@@ -2340,12 +2340,21 @@ fn start_whisper_transcription(hwnd: HWND) {
             let mut progress_last = -1;
             let progress_callback: Box<dyn FnMut(i32) + Send> = Box::new(move |pct| {
                 let clamped = pct.clamp(0, 100);
-                if clamped > progress_last {
-                    progress_last = clamped;
+                // Keep UI progress monotonic from 20% (bridge start) to 99% (bridge end).
+                // Bridge emits 0..99 based on decoded audio position.
+                let mapped = if clamped <= 0 {
+                    20
+                } else if clamped >= 100 {
+                    99
+                } else {
+                    20 + ((clamped * 79 + 99) / 100)
+                };
+                if mapped > progress_last {
+                    progress_last = mapped;
                     let _unused = post_message_w_safe(
                         hwnd,
                         WM_WHISPER_TRANSCRIPTION_PROGRESS,
-                        WPARAM(clamped as usize),
+                        WPARAM(mapped as usize),
                         LPARAM(0),
                     );
                 }

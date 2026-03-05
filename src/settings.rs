@@ -1,5 +1,5 @@
 use crate::accessibility::to_wide;
-use crate::tools::rss::RssSource;
+use crate::tools::rss::{RssItem, RssSource};
 use serde::{Deserialize, Serialize};
 #[cfg(not(feature = "standalone"))]
 use std::ffi::OsStr;
@@ -158,6 +158,64 @@ pub enum TtsEngine {
     Sapi5,
     #[serde(rename = "sapi4")]
     Sapi4,
+}
+
+pub const DEFAULT_VOICE_PROFILE_NAME: &str = "Default";
+
+fn default_voice_profile_name() -> String {
+    DEFAULT_VOICE_PROFILE_NAME.to_string()
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct VoiceProfile {
+    pub name: String,
+    pub tts_engine: TtsEngine,
+    pub tts_voice: String,
+    pub tts_only_multilingual: bool,
+    pub tts_manual_tuning: bool,
+    pub tts_rate: i32,
+    pub tts_pitch: i32,
+    pub tts_volume: i32,
+    pub use_dialogue_voice: bool,
+    pub dialogue_tts_engine: TtsEngine,
+    pub dialogue_voice: String,
+    pub dialogue_voice_rate: i32,
+    pub dialogue_voice_pitch: i32,
+    pub dialogue_voice_volume: i32,
+    pub dialogue_use_secondary_voice: bool,
+    pub dialogue_secondary_tts_engine: TtsEngine,
+    pub dialogue_secondary_voice: String,
+    pub dialogue_secondary_voice_rate: i32,
+    pub dialogue_secondary_voice_pitch: i32,
+    pub dialogue_secondary_voice_volume: i32,
+}
+
+impl Default for VoiceProfile {
+    fn default() -> Self {
+        Self {
+            name: default_voice_profile_name(),
+            tts_engine: TtsEngine::Edge,
+            tts_voice: "it-IT-IsabellaNeural".to_string(),
+            tts_only_multilingual: false,
+            tts_manual_tuning: false,
+            tts_rate: 0,
+            tts_pitch: 0,
+            tts_volume: 100,
+            use_dialogue_voice: false,
+            dialogue_tts_engine: TtsEngine::Edge,
+            dialogue_voice: String::new(),
+            dialogue_voice_rate: 0,
+            dialogue_voice_pitch: 0,
+            dialogue_voice_volume: 100,
+            dialogue_use_secondary_voice: false,
+            dialogue_secondary_tts_engine: TtsEngine::Edge,
+            dialogue_secondary_voice: String::new(),
+            dialogue_secondary_voice_rate: 0,
+            dialogue_secondary_voice_pitch: 0,
+            dialogue_secondary_voice_volume: 100,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -575,6 +633,10 @@ pub struct AppSettings {
     pub tts_pitch: i32,
     pub tts_volume: i32,
     #[serde(default)]
+    pub voice_profiles: Vec<VoiceProfile>,
+    #[serde(default = "default_voice_profile_name")]
+    pub active_voice_profile: String,
+    #[serde(default)]
     pub editor_font_face: String,
     #[serde(default)]
     pub editor_read_only: bool,
@@ -626,6 +688,8 @@ pub struct AppSettings {
     pub spellcheck_fixed_language: String,
     #[serde(default)]
     pub rss_sources: Vec<RssSource>,
+    #[serde(default)]
+    pub rss_favorite_articles: Vec<RssItem>,
     #[serde(default)]
     pub podcast_sources: Vec<RssSource>,
     #[serde(default)]
@@ -696,6 +760,53 @@ pub struct AppSettings {
     /// Se true, usa il nome legacy "Novapad" per il titolo finestra e collegamenti.
     #[serde(default)]
     pub use_legacy_name: bool,
+}
+
+pub fn voice_profile_from_settings_fields(name: String, settings: &AppSettings) -> VoiceProfile {
+    VoiceProfile {
+        name,
+        tts_engine: settings.tts_engine,
+        tts_voice: settings.tts_voice.clone(),
+        tts_only_multilingual: settings.tts_only_multilingual,
+        tts_manual_tuning: settings.tts_manual_tuning,
+        tts_rate: settings.tts_rate,
+        tts_pitch: settings.tts_pitch,
+        tts_volume: settings.tts_volume,
+        use_dialogue_voice: settings.use_dialogue_voice,
+        dialogue_tts_engine: settings.dialogue_tts_engine,
+        dialogue_voice: settings.dialogue_voice.clone(),
+        dialogue_voice_rate: settings.dialogue_voice_rate,
+        dialogue_voice_pitch: settings.dialogue_voice_pitch,
+        dialogue_voice_volume: settings.dialogue_voice_volume,
+        dialogue_use_secondary_voice: settings.dialogue_use_secondary_voice,
+        dialogue_secondary_tts_engine: settings.dialogue_secondary_tts_engine,
+        dialogue_secondary_voice: settings.dialogue_secondary_voice.clone(),
+        dialogue_secondary_voice_rate: settings.dialogue_secondary_voice_rate,
+        dialogue_secondary_voice_pitch: settings.dialogue_secondary_voice_pitch,
+        dialogue_secondary_voice_volume: settings.dialogue_secondary_voice_volume,
+    }
+}
+
+pub fn apply_voice_profile_to_settings_fields(settings: &mut AppSettings, profile: &VoiceProfile) {
+    settings.tts_engine = profile.tts_engine;
+    settings.tts_voice = profile.tts_voice.clone();
+    settings.tts_only_multilingual = profile.tts_only_multilingual;
+    settings.tts_manual_tuning = profile.tts_manual_tuning;
+    settings.tts_rate = profile.tts_rate;
+    settings.tts_pitch = profile.tts_pitch;
+    settings.tts_volume = profile.tts_volume;
+    settings.use_dialogue_voice = profile.use_dialogue_voice;
+    settings.dialogue_tts_engine = profile.dialogue_tts_engine;
+    settings.dialogue_voice = profile.dialogue_voice.clone();
+    settings.dialogue_voice_rate = profile.dialogue_voice_rate;
+    settings.dialogue_voice_pitch = profile.dialogue_voice_pitch;
+    settings.dialogue_voice_volume = profile.dialogue_voice_volume;
+    settings.dialogue_use_secondary_voice = profile.dialogue_use_secondary_voice;
+    settings.dialogue_secondary_tts_engine = profile.dialogue_secondary_tts_engine;
+    settings.dialogue_secondary_voice = profile.dialogue_secondary_voice.clone();
+    settings.dialogue_secondary_voice_rate = profile.dialogue_secondary_voice_rate;
+    settings.dialogue_secondary_voice_pitch = profile.dialogue_secondary_voice_pitch;
+    settings.dialogue_secondary_voice_volume = profile.dialogue_secondary_voice_volume;
 }
 
 fn default_true() -> bool {
@@ -839,6 +950,8 @@ impl Default for AppSettings {
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            voice_profiles: Vec::new(),
+            active_voice_profile: default_voice_profile_name(),
             editor_font_face: String::new(),
             editor_read_only: false,
             show_voice_panel: false,
@@ -872,6 +985,7 @@ impl Default for AppSettings {
             spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,
             spellcheck_fixed_language: "en-US".to_string(),
             rss_sources: Vec::new(),
+            rss_favorite_articles: Vec::new(),
             rss_removed_default_en: Vec::new(),
             rss_default_en_keys: Vec::new(),
             rss_removed_default_it: Vec::new(),
@@ -1375,6 +1489,59 @@ fn known_folder_path(folder: &windows::core::GUID) -> Option<PathBuf> {
     }
 }
 
+fn normalize_voice_profiles(settings: &mut AppSettings) {
+    for profile in &mut settings.voice_profiles {
+        profile.name = profile.name.trim().to_string();
+    }
+    settings.voice_profiles.retain(|p| !p.name.is_empty());
+
+    let mut deduped: Vec<VoiceProfile> = Vec::with_capacity(settings.voice_profiles.len());
+    for profile in settings.voice_profiles.drain(..) {
+        if deduped
+            .iter()
+            .any(|p| p.name.eq_ignore_ascii_case(&profile.name))
+        {
+            continue;
+        }
+        deduped.push(profile);
+    }
+    settings.voice_profiles = deduped;
+
+    if !settings
+        .voice_profiles
+        .iter()
+        .any(|p| p.name.eq_ignore_ascii_case(DEFAULT_VOICE_PROFILE_NAME))
+    {
+        settings
+            .voice_profiles
+            .push(voice_profile_from_settings_fields(
+                DEFAULT_VOICE_PROFILE_NAME.to_string(),
+                settings,
+            ));
+    }
+
+    if settings.active_voice_profile.trim().is_empty() {
+        settings.active_voice_profile = DEFAULT_VOICE_PROFILE_NAME.to_string();
+    }
+
+    if !settings
+        .voice_profiles
+        .iter()
+        .any(|p| p.name.eq_ignore_ascii_case(&settings.active_voice_profile))
+    {
+        settings.active_voice_profile = DEFAULT_VOICE_PROFILE_NAME.to_string();
+    }
+
+    if let Some(profile) = settings
+        .voice_profiles
+        .iter()
+        .find(|p| p.name.eq_ignore_ascii_case(&settings.active_voice_profile))
+        .cloned()
+    {
+        apply_voice_profile_to_settings_fields(settings, &profile);
+    }
+}
+
 pub fn load_settings() -> AppSettings {
     let default_settings = AppSettings {
         language: system_language(),
@@ -1394,6 +1561,32 @@ pub fn load_settings() -> AppSettings {
     let normalized = normalize_settings(default_settings);
     save_settings(normalized.clone());
     normalized
+}
+
+fn rss_favorite_item_key(item: &RssItem) -> String {
+    if !item.guid.trim().is_empty() {
+        return item.guid.trim().to_string();
+    }
+    if !item.link.trim().is_empty() {
+        return item.link.trim().to_string();
+    }
+    item.title.trim().to_string()
+}
+
+fn normalize_rss_favorite_articles(items: &mut Vec<RssItem>) {
+    let mut seen = std::collections::HashSet::new();
+    items.retain_mut(|item| {
+        item.title = item.title.trim().to_string();
+        item.link = item.link.trim().to_string();
+        item.description = item.description.trim().to_string();
+        item.guid = item.guid.trim().to_string();
+        item.is_folder = false;
+        let key = rss_favorite_item_key(item);
+        if key.is_empty() {
+            return false;
+        }
+        seen.insert(key)
+    });
 }
 
 fn normalize_settings(mut settings: AppSettings) -> AppSettings {
@@ -1580,6 +1773,8 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.rss_cooldown_not_found_secs = settings.rss_cooldown_not_found_secs.clamp(300, 604_800);
     settings.rss_cooldown_rate_limited_secs =
         settings.rss_cooldown_rate_limited_secs.clamp(30, 3_600);
+    normalize_rss_favorite_articles(&mut settings.rss_favorite_articles);
+    normalize_voice_profiles(&mut settings);
     settings
 }
 

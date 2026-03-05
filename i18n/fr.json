@@ -186,7 +186,10 @@
   "options.label.modified_marker_position": "Position du marqueur de modification :",
   "options.label.open": "Comportement à l'ouverture :",
   "options.label.tts_engine": "Système de synthèse vocale :",
-  "options.label.voice": "Voix :",
+  "options.label.voice": "Voix :","options.label.voice_profile":"Profil vocal",
+"options.button.apply_selected_profile":"Appliquer le profil sélectionné",
+"options.button.add_profile":"Ajouter un profil",
+"options.button.delete_profile":"Supprimer",
   "options.label.voice_preview": "Aperçu de la voix",
   "options.label.insert_voice_tag": "Insérer la balise de voix",
   "options.label.tts_manual_tuning": "Réglage manuel de la voix",
@@ -634,6 +637,7 @@
   "podcast.gain.triple": "Triple volume",
   "podcast.gain.quadruple": "Quadruple volume",
   "rss.window.title": "RSS / Articles",
+  "rss.favorites.title": "Favoris",
   "rss.tree.add_source": "Ajouter une source",
   "rss.tree.import_txt": "Importer d'un fichier",
   "rss.tree.close": "Fermer",
@@ -660,8 +664,8 @@
   "rss.date.today": "aujourd'hui",
   "rss.date.yesterday": "hier",
   "rss.date.day_before_yesterday": "avant-hier",
-  "rss.reorder.move_up": "Monter",
-  "rss.reorder.move_down": "Descendre",
+  "rss.reorder.move_up": "Monter\tCtrl+Shift+Freccia Su",
+  "rss.reorder.move_down": "Descendre\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_top": "Déplacer tout en haut",
   "rss.reorder.move_bottom": "Déplacer tout en bas",
   "rss.reorder.move_to_position": "Déplacer à la position...",
@@ -804,8 +808,11 @@
   "options.spellcheck.lang.uk": "Ukrainien (Ukraine)",
   "options.tab.rss_podcast": "RSS et podcasts",
   "rss.context.share_email": "Partager par e-mail",
+  "rss.context.add_to_favorites": "Ajouter aux articles favoris",
   "rss.email.default_subject": "Article RSS",
   "rss.email.body_intro": "J'ai vu cette actualité qui pourrait t'intéresser :",
+  "rss.favorite_added": "Article ajouté aux favoris",
+  "rss.favorite_already_exists": "Article déjà dans les favoris",
   "find.replaced_count_one": "{count} remplacement effectué.",
   "find.replaced_count_many": "{count} remplacements effectués.",
   "dictionary.lookup.language": "Langue du dictionnaire :",
@@ -1061,3 +1068,9 @@
   "options.whisper_model.medium": "Moyen",
   "options.whisper_model.large": "Grand v3"
 }
+
+
+
+
+
+

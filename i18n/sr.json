@@ -186,7 +186,10 @@
   "options.label.modified_marker_position": "Pozicija izmenjenog obeleživača:",
   "options.label.open": "Način otvaranja:",
   "options.label.tts_engine": "Sistem za pretvaranje teksta u govor:",
-  "options.label.voice": "Glas:",
+  "options.label.voice": "Glas:","options.label.voice_profile":"Profil glasa",
+"options.button.apply_selected_profile":"Primeni izabrani profil",
+"options.button.add_profile":"Dodaj profil",
+"options.button.delete_profile":"Obriši",
   "options.label.voice_preview": "Pregled glasa",
   "options.label.insert_voice_tag": "Ubaci glasovnu oznaku.",
   "options.label.tts_manual_tuning": "Ručno prilagođavanje glasa",
@@ -633,6 +636,7 @@
   "podcast.gain.triple": "300% jačine zvuka",
   "podcast.gain.quadruple": "400% jačine zvuka",
   "rss.window.title": "RSS / članci",
+  "rss.favorites.title": "Omiljeno",
   "rss.tree.add_source": "Dodaj izvor",
   "rss.tree.import_txt": "Uvezi iz datoteke.",
   "rss.tree.close": "Zatvori",
@@ -659,8 +663,8 @@
   "rss.date.today": "danas",
   "rss.date.yesterday": "juče",
   "rss.date.day_before_yesterday": "prekjuče",
-  "rss.reorder.move_up": "Pomeri nagore.",
-  "rss.reorder.move_down": "Pomeri nadole.",
+  "rss.reorder.move_up": "Pomeri nagore.\tCtrl+Shift+Freccia Su",
+  "rss.reorder.move_down": "Pomeri nadole.\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_top": "Pomeri na vrh.",
   "rss.reorder.move_bottom": "Pomeri na dno.",
   "rss.reorder.move_to_position": "Pomeri na poziciju…",
@@ -804,8 +808,11 @@
   "options.spellcheck.lang.uk": "Ukrajinski (Ukrajina)",
   "options.tab.rss_podcast": "RSS i podkasti",
   "rss.context.share_email": "Podeli putem e-pošte",
+  "rss.context.add_to_favorites": "Dodaj u omiljene članke",
   "rss.email.default_subject": "RSS vest",
   "rss.email.body_intro": "Video sam ovu vest koja bi mogla da te zanima:",
+  "rss.favorite_added": "Članak je dodat u omiljene",
+  "rss.favorite_already_exists": "Članak je već u omiljenim",
   "find.replaced_count_one": "Izvršena je {count} zamena.",
   "find.replaced_count_many": "Izvršeno je {count} zamena.",
   "dictionary.lookup.language": "Jezik rečnika:",
@@ -1061,3 +1068,9 @@
   "options.whisper_model.medium": "Srednji",
   "options.whisper_model.large": "Veliki v3"
 }
+
+
+
+
+
+

@@ -68,13 +68,19 @@ pub struct RssSource {
     pub read_item_keys: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RssItem {
+    #[serde(default)]
     pub title: String,
+    #[serde(default)]
     pub link: String,
+    #[serde(default)]
     pub description: String,
+    #[serde(default)]
     pub is_folder: bool,
+    #[serde(default)]
     pub guid: String,
+    #[serde(default)]
     pub pub_date: Option<i64>,
 }
 

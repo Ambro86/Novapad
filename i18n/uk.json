@@ -186,7 +186,10 @@
   "options.label.modified_marker_position": "Позиція маркера змін:",
   "options.label.open": "Поведінка під час відкриття:",
   "options.label.tts_engine": "Система синтезу мовлення:",
-  "options.label.voice": "Голос:",
+  "options.label.voice": "Голос:","options.label.voice_profile":"Профіль голосу",
+"options.button.apply_selected_profile":"Застосувати вибраний профіль",
+"options.button.add_profile":"Додати профіль",
+"options.button.delete_profile":"Видалити",
   "options.label.voice_preview": "&Прослухати голос",
   "options.label.insert_voice_tag": "Вставити тег голосу",
   "options.label.tts_manual_tuning": "Ручне налаштування голосу",
@@ -633,6 +636,7 @@
   "podcast.gain.triple": "Потрійна гучність",
   "podcast.gain.quadruple": "Чотирикратна гучність",
   "rss.window.title": "RSS / Статті",
+  "rss.favorites.title": "Обране",
   "rss.tree.add_source": "Додати джерело",
   "rss.tree.import_txt": "Імпортувати з файлу",
   "rss.tree.close": "Закрити",
@@ -659,8 +663,8 @@
   "rss.date.today": "сьогодні",
   "rss.date.yesterday": "вчора",
   "rss.date.day_before_yesterday": "позавчора",
-  "rss.reorder.move_up": "Вгору",
-  "rss.reorder.move_down": "Вниз",
+  "rss.reorder.move_up": "Вгору\tCtrl+Shift+Freccia Su",
+  "rss.reorder.move_down": "Вниз\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_top": "На початок",
   "rss.reorder.move_bottom": "В кінець",
   "rss.reorder.move_to_position": "Перемістити на позицію...",
@@ -804,8 +808,11 @@
   "options.spellcheck.lang.uk": "Українська (Україна)",
   "options.tab.rss_podcast": "RSS і подкасти",
   "rss.context.share_email": "Надіслати електронною поштою",
+  "rss.context.add_to_favorites": "Додати до обраних статей",
   "rss.email.default_subject": "Стаття RSS",
   "rss.email.body_intro": "Ось новина, яка може вас зацікавити:",
+  "rss.favorite_added": "Статтю додано до обраного",
+  "rss.favorite_already_exists": "Стаття вже в обраному",
   "find.replaced_count_one": "Виконано {count} заміну.",
   "find.replaced_count_many": "Виконано {count} замін.",
   "dictionary.lookup.language": "Мова словника:",
@@ -1061,3 +1068,9 @@
   "options.whisper_model.medium": "Середній",
   "options.whisper_model.large": "Великий v3"
 }
+
+
+
+
+
+

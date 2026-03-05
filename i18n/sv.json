@@ -184,7 +184,10 @@
   "options.label.modified_marker_position": "Position för markering av ändring:",
   "options.label.open": "Öppna-beteende:",
   "options.label.tts_engine": "Text-till-tal-system:",
-  "options.label.voice": "Röst:",
+  "options.label.voice": "Röst:","options.label.voice_profile":"Röstprofil",
+"options.button.apply_selected_profile":"Använd vald profil",
+"options.button.add_profile":"Lägg till profil",
+"options.button.delete_profile":"Ta bort",
   "options.label.voice_preview": "Röstförhandsvisning",
   "options.label.insert_voice_tag": "Infoga rösttagg",
   "options.label.tts_manual_tuning": "Manuell röstjustering",
@@ -625,6 +628,7 @@
   "podcast.gain.triple": "Trippel volym",
   "podcast.gain.quadruple": "Fyrdubbel volym",
   "rss.window.title": "RSS / Artiklar",
+  "rss.favorites.title": "Favoriter",
   "rss.tree.add_source": "Lägg till källa",
   "rss.tree.import_txt": "Importera från fil",
   "rss.tree.close": "Stäng",
@@ -651,8 +655,8 @@
   "rss.date.today": "idag",
   "rss.date.yesterday": "igår",
   "rss.date.day_before_yesterday": "i förrgår",
-  "rss.reorder.move_up": "Flytta upp",
-  "rss.reorder.move_down": "Flytta ner",
+  "rss.reorder.move_up": "Flytta upp\tCtrl+Shift+Freccia Su",
+  "rss.reorder.move_down": "Flytta ner\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_top": "Flytta till toppen",
   "rss.reorder.move_bottom": "Flytta till botten",
   "rss.reorder.move_to_position": "Flytta till position...",
@@ -804,8 +808,11 @@
   "options.spellcheck.lang.uk": "Ukrainska (Ukraina)",
   "options.tab.rss_podcast": "RSS och poddar",
   "rss.context.share_email": "Dela via e-post",
+  "rss.context.add_to_favorites": "Lägg till i favoritartiklar",
   "rss.email.default_subject": "RSS-artikel",
   "rss.email.body_intro": "Jag såg den här nyheten som kan intressera dig:",
+  "rss.favorite_added": "Artikeln har lagts till i favoriter",
+  "rss.favorite_already_exists": "Artikeln finns redan i favoriter",
   "find.replaced_count_one": "{count} ersättning utförd.",
   "find.replaced_count_many": "{count} ersättningar utförda.",
   "dictionary.lookup.language": "Ordlistans språk:",
@@ -1061,3 +1068,9 @@
   "options.whisper_model.medium": "Medel",
   "options.whisper_model.large": "Stor v3"
 }
+
+
+
+
+
+

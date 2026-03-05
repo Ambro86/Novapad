@@ -183,7 +183,10 @@
   "options.label.modified_marker_position": "Vị trí dấu hiệu đã chỉnh sửa:",
   "options.label.open": "Cách thức mở tệp:",
   "options.label.tts_engine": "Hệ thống văn bản sang giọng nói (TTS):",
-  "options.label.voice": "Giọng đọc:",
+  "options.label.voice": "Giọng đọc:","options.label.voice_profile":"Hồ sơ giọng nói",
+"options.button.apply_selected_profile":"Áp dụng hồ sơ đã chọn",
+"options.button.add_profile":"Thêm hồ sơ",
+"options.button.delete_profile":"Xóa",
   "options.label.voice_preview": "Nghe thử giọng đọc",
   "options.label.insert_voice_tag": "Chèn thẻ giọng nói",
   "options.label.tts_manual_tuning": "Điều chỉnh giọng đọc thủ công",
@@ -619,6 +622,7 @@
   "podcast.gain.triple": "Gấp ba âm lượng",
   "podcast.gain.quadruple": "Gấp bốn âm lượng",
   "rss.window.title": "RSS / Bài viết",
+  "rss.favorites.title": "Yêu thích",
   "rss.tree.add_source": "Thêm nguồn",
   "rss.tree.import_txt": "Nhập từ tệp",
   "rss.tree.close": "Đóng",
@@ -645,8 +649,8 @@
   "rss.date.today": "hôm nay",
   "rss.date.yesterday": "hôm qua",
   "rss.date.day_before_yesterday": "hôm kia",
-  "rss.reorder.move_up": "Chuyển lên",
-  "rss.reorder.move_down": "Chuyển xuống",
+  "rss.reorder.move_up": "Chuyển lên\tCtrl+Shift+Freccia Su",
+  "rss.reorder.move_down": "Chuyển xuống\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_top": "Đưa lên đầu",
   "rss.reorder.move_bottom": "Đưa xuống cuối",
   "rss.reorder.move_to_position": "Di chuyển tới vị trí...",
@@ -804,8 +808,11 @@
   "options.spellcheck.lang.uk": "Tiếng Ukraina (Ukraina)",
   "options.tab.rss_podcast": "RSS và podcast",
   "rss.context.share_email": "Chia sẻ qua email",
+  "rss.context.add_to_favorites": "Thêm vào bài viết yêu thích",
   "rss.email.default_subject": "Bài viết RSS",
   "rss.email.body_intro": "Tôi thấy tin này có thể bạn sẽ quan tâm:",
+  "rss.favorite_added": "Đã thêm bài viết vào mục yêu thích",
+  "rss.favorite_already_exists": "Bài viết đã có trong mục yêu thích",
   "find.replaced_count_one": "Đã thay thế {count} mục.",
   "find.replaced_count_many": "Đã thay thế {count} mục.",
   "dictionary.lookup.language": "Ngôn ngữ từ điển:",
@@ -1061,3 +1068,9 @@
   "options.whisper_model.medium": "Trung bình",
   "options.whisper_model.large": "Lớn v3"
 }
+
+
+
+
+
+

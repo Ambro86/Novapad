@@ -5,6 +5,11 @@ Version 0.6.8 – 2026-03-04
 Novità
 • Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
 
+Améliorations
+• Ajout de la gestion des profils vocaux dans Options > Voix : il est possible d'ajouter, de renommer et de supprimer des profils.
+• Ajout dans le menu contextuel des articles RSS de l'action pour ajouter un article aux favoris.
+• La source RSS "Favoris" peut être supprimée et est recréée automatiquement lors du prochain ajout d'un article aux favoris.
+• Ajout de raccourcis clavier RSS pour déplacer les sources vers le haut/le bas : `Ctrl+Shift+Flèche haut` et `Ctrl+Shift+Flèche bas`.
 Correctifs
 • Correction d’un bug où la liste des fichiers ouverts s’affichait dans le menu Aide au lieu du menu Fenêtre.
 • Correction d’un cas limite de streaming où la lecture pouvait démarrer mais la fenêtre « Téléchargement du flux » restait ouverte lorsque le fichier téléchargé correspondait déjà au format cible.
@@ -52,6 +57,11 @@ Améliorations
 • Amélioration de la sélection des voix Microsoft dans Options > Voix et dans le panneau des voix de l’éditeur : ajout d’une liste de langue localisée pour filtrer les voix par langue, tout en conservant le mode « voix multilingues uniquement » comme une liste unique non séparée par langue (liste de langue masquée lorsqu’il est activé).
 • Ajout de la configuration de la voix pour les dialogues dans Options > Voix avec navigation complète au clavier (Tab), en réutilisant le même modèle de voix que l’interface principale (moteur, filtre de langue Edge, voix et vitesse/tonalité/volume avec libellés) ; ajout également d’une deuxième voix de dialogue optionnelle avec les mêmes contrôles (moteur, filtre de langue Edge, voix, vitesse/tonalité/volume) pour alterner les dialogues ; les règles de dialogue sont enregistrées dans la configuration `.ini`, sans modifier le texte du document.
 • Amélioration de l'étiquette Annuler : l'entrée Édition > Annuler affiche désormais l'action qui sera annulée (par exemple édition de texte, commenter/décommenter des lignes ou insertion de balise de voix), tout en restant indisponible lorsqu'il n'y a rien à annuler.
+Améliorations
+• Ajout de la gestion des profils vocaux dans Options > Voix : il est possible d'ajouter, de renommer et de supprimer des profils.
+• Ajout dans le menu contextuel des articles RSS de l'action pour ajouter un article aux favoris.
+• La source RSS "Favoris" peut être supprimée et est recréée automatiquement lors du prochain ajout d'un article aux favoris.
+• Ajout de raccourcis clavier RSS pour déplacer les sources vers le haut/le bas : `Ctrl+Shift+Flèche haut` et `Ctrl+Shift+Flèche bas`.
 Corrections de bugs
 • Correction de l'ouverture des fichiers RTF : les fichiers `.rtf` sont désormais extraits et affichés en texte lisible, au lieu du balisage RTF brut (ex. `{\\rtf1...}`).
 • Correction de l'ouverture des fichiers texte chinois encodés en GB18030/GBK : Sonarpad les détecte et les décode correctement, évitant le texte illisible (mojibake).
@@ -369,6 +379,10 @@ Améliorations
 
 ## 0.1.0 - 2025-12-25
 - Version initiale.
+
+
+
+
 
 
 

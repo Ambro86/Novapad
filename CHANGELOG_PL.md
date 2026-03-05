@@ -5,6 +5,11 @@ Wersja 0.6.8 – 2026-03-04
 Novità
 • Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
 
+Ulepszenia
+• Dodano zarządzanie profilami głosu w Opcje > Głos: profile można dodawać, zmieniać nazwę i usuwać.
+• Dodano w menu kontekstowym artykułów RSS akcję dodawania artykułu do ulubionych.
+• Źródło RSS "Ulubione" można usunąć; zostanie utworzone ponownie automatycznie po dodaniu nowego artykułu do ulubionych.
+• Dodano skróty klawiaturowe RSS do przenoszenia źródeł w górę/w dół: `Ctrl+Shift+Strzałka w górę` i `Ctrl+Shift+Strzałka w dół`.
 Poprawki
 • Naprawiono błąd, przez który lista otwartych plików była wyświetlana w menu Pomoc zamiast w menu Okno.
 • Naprawiono przypadek brzegowy streamingu, w którym odtwarzanie mogło się rozpocząć, ale okno „Pobieranie streamingu” pozostawało otwarte, gdy pobrany plik już pasował do formatu docelowego.
@@ -370,6 +375,9 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
+
+
+
 
 
 

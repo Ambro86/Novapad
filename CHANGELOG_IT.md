@@ -9,6 +9,11 @@ Miglioramenti
 • Ora il programma riesce a gestire Sostituisci tutto in modo massivo su file grandi con un gran numero di sostituzioni.
 • Aggiunto il pieno supporto della biblioteca BdCiechi, accessibile da Strumenti o con la scorciatoia Alt+Shift+B. E' possibile cercare, scaricare libri, leggere le ultime novità, scaricare un testo di assaggio. Quando verrà salvato un file è possibile aprirlo direttamente in Sonarpad e leggerlo con le voci di alta qualità presenti nel programma.
 
+Miglioramenti
+• Aggiunta in Opzioni > Voce la gestione dei profili voce: è possibile aggiungere, rinominare ed eliminare un profilo.
+• Aggiunta nel menu contestuale degli articoli RSS la voce per aggiungere l'articolo ai preferiti.
+• Introdotta la fonte RSS "Preferiti": può essere eliminata e viene ricreata automaticamente alla prossima aggiunta di un articolo ai preferiti.
+• Aggiunte le scorciatoie da tastiera RSS per spostare le fonti in alto/in basso: `Ctrl+Shift+Freccia su` e `Ctrl+Shift+Freccia giù`.
 Correzioni
 • Corretto un bug per cui l’elenco dei file aperti veniva mostrato nel menu Aiuto invece che nel menu Finestra.
 • Corretto un caso limite nello streaming in cui la riproduzione poteva partire ma la finestra “Download streaming” restava aperta quando il file scaricato era già nel formato di destinazione.
@@ -386,6 +391,9 @@ Miglioramenti
 ## 0.1.0 - 2025-12-25
 
 * Prima versione: struttura progetto e README iniziale.
+
+
+
 
 
 

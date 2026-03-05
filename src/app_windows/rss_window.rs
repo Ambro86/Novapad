@@ -27,15 +27,15 @@ use windows::Win32::UI::Controls::Dialogs::{
 };
 use windows::Win32::UI::Controls::{
     NM_RCLICK, NMHDR, NMTREEVIEWW, NMTVKEYDOWN, TVE_EXPAND, TVGN_CARET, TVGN_CHILD, TVGN_NEXT,
-    TVGN_PARENT, TVGN_ROOT, TVHITTESTINFO, TVI_LAST, TVI_ROOT, TVIF_PARAM, TVIF_TEXT,
+    TVGN_PARENT, TVGN_ROOT, TVHITTESTINFO, TVI_FIRST, TVI_LAST, TVI_ROOT, TVIF_PARAM, TVIF_TEXT,
     TVINSERTSTRUCTW, TVINSERTSTRUCTW_0, TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM,
     TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETITEMW, TVM_GETNEXTITEM, TVM_HITTEST, TVM_INSERTITEMW,
     TVM_SELECTITEM, TVM_SETITEMW, TVM_SORTCHILDRENCB, TVN_ITEMEXPANDINGW, TVN_KEYDOWN,
     TVN_SELCHANGEDW, TVSORTCB, WC_BUTTON,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE, VK_F10,
-    VK_MENU, VK_RETURN, VK_SHIFT, VK_TAB,
+    GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_DOWN, VK_ESCAPE,
+    VK_F10, VK_MENU, VK_RETURN, VK_SHIFT, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW,
@@ -81,6 +81,7 @@ const ID_CTX_SHARE_TWITTER: usize = 1203;
 const ID_CTX_SHARE_WHATSAPP: usize = 1204;
 const ID_CTX_SHARE_EMAIL: usize = 1205;
 const ID_CTX_PROPERTIES: usize = 1206;
+const ID_CTX_ADD_TO_FAVORITES: usize = 1207;
 
 const WM_RSS_FETCH_COMPLETE: u32 = WM_USER + 200;
 const WM_RSS_IMPORT_COMPLETE: u32 = WM_USER + 201;
@@ -114,6 +115,7 @@ const EM_SETSEL: u32 = 0x00B1;
 const EM_LIMITTEXT: u32 = 0x00C5;
 const INITIAL_LOAD_COUNT: usize = 5;
 const LOAD_MORE_COUNT: usize = 5;
+const RSS_FAVORITES_SOURCE_URL: &str = "sonarpad://rss/favorites";
 
 // Normalize article text before sending it to the editor:
 // - collapse multiple blank lines to a single blank line
@@ -298,6 +300,19 @@ fn rss_source_display_title(
     } else {
         base_title
     }
+}
+
+fn handle_move_shortcut(hwnd: HWND, move_up: bool) -> bool {
+    if selected_source_index(hwnd).is_some() {
+        let action = if move_up {
+            ReorderAction::Up
+        } else {
+            ReorderAction::Down
+        };
+        handle_reorder_action(hwnd, action);
+        return true;
+    }
+    move_selected_article_by_one(hwnd, move_up)
 }
 
 #[derive(Clone, Copy)]
@@ -973,6 +988,103 @@ fn select_newest_item_key(items: &[RssItem], removed_keys: &HashSet<String>) -> 
     best.map(|(_, _, key)| key)
 }
 
+fn is_favorites_source_url(url: &str) -> bool {
+    url.trim().eq_ignore_ascii_case(RSS_FAVORITES_SOURCE_URL)
+}
+
+fn is_favorites_source(source: &RssSource) -> bool {
+    is_favorites_source_url(&source.url)
+}
+
+fn favorites_source_title(language: crate::settings::Language) -> String {
+    i18n::tr(language, "rss.favorites.title")
+}
+
+fn ensure_favorites_source(parent: HWND) -> usize {
+    with_state(parent, |ps| {
+        if let Some(idx) = ps.settings.rss_sources.iter().position(is_favorites_source) {
+            if let Some(src) = ps.settings.rss_sources.get_mut(idx) {
+                let expected_title = favorites_source_title(ps.settings.language);
+                if src.title != expected_title {
+                    src.title = expected_title;
+                    src.user_title = true;
+                    crate::settings::save_settings(ps.settings.clone());
+                }
+            }
+            return idx;
+        }
+
+        let favorites = RssSource {
+            title: favorites_source_title(ps.settings.language),
+            url: RSS_FAVORITES_SOURCE_URL.to_string(),
+            kind: RssSourceType::Feed,
+            user_title: true,
+            unread: false,
+            cache: RssFeedCache::default(),
+            last_seen_guid: None,
+            last_updated: None,
+            removed_item_keys: Vec::new(),
+            read_item_keys: Vec::new(),
+        };
+        ps.settings.rss_sources.insert(0, favorites);
+        crate::settings::save_settings(ps.settings.clone());
+        0
+    })
+    .unwrap_or(0)
+}
+
+fn load_favorites_source_items(
+    hwnd: HWND,
+    hitem: windows::Win32::UI::Controls::HTREEITEM,
+    source_index: usize,
+) {
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+    let (items, saved_read_item_keys) = with_state(parent, |ps| {
+        let mut items = ps.settings.rss_favorite_articles.clone();
+        sort_items_by_date_desc(&mut items);
+        let read_keys = ps
+            .settings
+            .rss_sources
+            .get(source_index)
+            .map(|src| src.read_item_keys.iter().cloned().collect())
+            .unwrap_or_default();
+        (items, read_keys)
+    })
+    .unwrap_or_default();
+
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 != 0 {
+        loop {
+            let child = crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CHILD as usize),
+                LPARAM(hitem.0),
+            );
+            if child.0 == 0 {
+                break;
+            }
+            crate::send_message_w_safe(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+        }
+    }
+
+    with_rss_state(hwnd, |s| {
+        s.source_items.insert(
+            hitem.0,
+            SourceItemsState {
+                items,
+                loaded: 0,
+                read_item_keys: saved_read_item_keys,
+            },
+        );
+    });
+
+    let (initial_count, _next_count) = rss_page_sizes(parent);
+    load_more_items(hwnd, hitem, initial_count);
+}
 fn source_removed_keys_for_tree_item(
     hwnd: HWND,
     hitem: windows::Win32::UI::Controls::HTREEITEM,
@@ -1841,6 +1953,7 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
         let twitter_label = i18n::tr(language, "rss.context.share_twitter");
         let whatsapp_label = i18n::tr(language, "rss.context.share_whatsapp");
         let email_label = i18n::tr(language, "rss.context.share_email");
+        let add_to_favorites_label = i18n::tr(language, "rss.context.add_to_favorites");
         let properties_label = i18n::tr(language, "context.properties");
         let undo_label = i18n::tr(language, "edit.undo")
             .split('\t')
@@ -1848,14 +1961,33 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
             .unwrap_or_default()
             .to_string();
         let has_undo = with_rss_state(hwnd, |s| !s.removed_history.is_empty()).unwrap_or(false);
+        let is_favorites_source_node = source_index
+            .and_then(|idx| {
+                with_rss_state(hwnd, |s| {
+                    with_state(s.parent, |ps| {
+                        ps.settings
+                            .rss_sources
+                            .get(idx)
+                            .map(is_favorites_source)
+                            .unwrap_or(false)
+                    })
+                })
+                .flatten()
+            })
+            .unwrap_or(false);
 
         if let Ok(menu) = CreatePopupMenu()
             && menu.0 != 0
         {
             if is_source {
+                let source_action_flags = if is_favorites_source_node {
+                    MF_STRING | MF_GRAYED
+                } else {
+                    MF_STRING
+                };
                 if let Err(_e) = AppendMenuW(
                     menu,
-                    MF_STRING,
+                    source_action_flags,
                     ID_CTX_EDIT,
                     PCWSTR(to_wide(&edit_label).as_ptr()),
                 ) {}
@@ -1867,7 +1999,7 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
                 ) {}
                 if let Err(_e) = AppendMenuW(
                     menu,
-                    MF_STRING,
+                    source_action_flags,
                     ID_CTX_RETRY,
                     PCWSTR(to_wide(&retry_label).as_ptr()),
                 ) {}
@@ -2010,6 +2142,12 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
                     flags,
                     ID_CTX_SHARE_EMAIL,
                     PCWSTR(to_wide(&email_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_ADD_TO_FAVORITES,
+                    PCWSTR(to_wide(&add_to_favorites_label).as_ptr()),
                 ) {}
                 if let Err(_e) = AppendMenuW(
                     menu,
@@ -2292,8 +2430,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         if focus == hwnd_tree {
                             let already = with_rss_state(hwnd, |s| s.enter_guard).unwrap_or(false);
                             if !already {
-                                let shift_down =
-                                    GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16 != 0;
+                                let shift_down = GetKeyState(VK_SHIFT.0 as i32) < 0;
                                 with_rss_state(hwnd, |s| s.enter_guard = true);
                                 if let Err(_e) =
                                     PostMessageW(hwnd, WM_CLEAR_ENTER_GUARD, WPARAM(0), LPARAM(0))
@@ -2377,6 +2514,10 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     }
                     ID_CTX_SHARE_EMAIL => {
                         handle_article_action(hwnd, ArticleAction::ShareEmail);
+                        LRESULT(0)
+                    }
+                    ID_CTX_ADD_TO_FAVORITES => {
+                        handle_add_article_to_favorites(hwnd);
                         LRESULT(0)
                     }
                     ID_CTX_PROPERTIES => {
@@ -2501,6 +2642,16 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         }
                         TVN_KEYDOWN => {
                             let ptvkd = lparam.0 as *const NMTVKEYDOWN;
+                            let ctrl_down = GetKeyState(VK_CONTROL.0 as i32) < 0;
+                            let shift_down = GetKeyState(VK_SHIFT.0 as i32) < 0;
+                            if ctrl_down && shift_down && (*ptvkd).wVKey == VK_UP.0 {
+                                ignore_bool(handle_move_shortcut(hwnd, true));
+                                return LRESULT(1);
+                            }
+                            if ctrl_down && shift_down && (*ptvkd).wVKey == VK_DOWN.0 {
+                                ignore_bool(handle_move_shortcut(hwnd, false));
+                                return LRESULT(1);
+                            }
                             if (*ptvkd).wVKey
                                 == windows::Win32::UI::Input::KeyboardAndMouse::VK_RETURN.0
                             {
@@ -2508,8 +2659,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                     show_selected_properties(hwnd);
                                     return LRESULT(1);
                                 }
-                                let shift_down =
-                                    GetKeyState(VK_SHIFT.0 as i32) & 0x8000u16 as i16 != 0;
+                                let shift_down = GetKeyState(VK_SHIFT.0 as i32) < 0;
                                 with_rss_state(hwnd, |s| s.enter_guard = true);
                                 if let Err(_e) =
                                     PostMessageW(hwnd, WM_CLEAR_ENTER_GUARD, WPARAM(0), LPARAM(0))
@@ -2595,6 +2745,20 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         WPARAM(hwnd_tree.0 as usize),
                         LPARAM(-1),
                     ) {}
+                    return LRESULT(0);
+                }
+                if GetKeyState(VK_CONTROL.0 as i32) < 0
+                    && GetKeyState(VK_SHIFT.0 as i32) < 0
+                    && key == u32::from(VK_UP.0)
+                {
+                    ignore_bool(handle_move_shortcut(hwnd, true));
+                    return LRESULT(0);
+                }
+                if GetKeyState(VK_CONTROL.0 as i32) < 0
+                    && GetKeyState(VK_SHIFT.0 as i32) < 0
+                    && key == u32::from(VK_DOWN.0)
+                {
+                    ignore_bool(handle_move_shortcut(hwnd, false));
                     return LRESULT(0);
                 }
                 if key == 'Z' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
@@ -3077,6 +3241,16 @@ fn rss_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
         }
         if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
             let key = wparam.0 as u32;
+            if GetKeyState(VK_CONTROL.0 as i32) < 0
+                && GetKeyState(VK_SHIFT.0 as i32) < 0
+                && (key == u32::from(VK_UP.0) || key == u32::from(VK_DOWN.0))
+            {
+                let parent = GetParent(hwnd);
+                if parent.0 != 0 {
+                    ignore_bool(handle_move_shortcut(parent, key == u32::from(VK_UP.0)));
+                    return LRESULT(0);
+                }
+            }
             if key == 'C' as u32 && GetKeyState(VK_CONTROL.0 as i32) < 0 {
                 let parent = GetParent(hwnd);
                 if parent.0 != 0 {
@@ -3403,6 +3577,7 @@ fn set_source_unread(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM,
         let Some(idx) = source_idx else {
             return (hwnd_tree, None);
         };
+
         let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
         let title_opt = {
             with_state(parent, |ps| {
@@ -3454,6 +3629,27 @@ fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
             .unwrap_or(false)
     })
     .unwrap_or(false);
+
+    let favorites_source_idx = with_rss_state(hwnd, |s| {
+        if let Some(NodeData::Source(idx)) = s.node_data.get(&(hitem.0)) {
+            with_state(s.parent, |ps| {
+                ps.settings
+                    .rss_sources
+                    .get(*idx)
+                    .filter(|src| is_favorites_source(src))
+                    .map(|_| *idx)
+            })
+            .flatten()
+        } else {
+            None
+        }
+    })
+    .flatten();
+    if let Some(source_idx) = favorites_source_idx {
+        load_favorites_source_items(hwnd, hitem, source_idx);
+        set_source_unread(hwnd, hitem, false);
+        return;
+    }
 
     if has_loaded_items {
         // Items already loaded, mark as read now
@@ -3633,6 +3829,7 @@ fn start_background_unread_check(hwnd: HWND) {
                 .rss_sources
                 .iter()
                 .enumerate()
+                .filter(|(_, src)| !is_favorites_source(src))
                 .map(|(i, src)| {
                     (
                         i,
@@ -4502,6 +4699,9 @@ fn handle_delete(hwnd: HWND) {
                             }
                         }
                     }
+                    if is_favorites_source_url(&url) {
+                        ps.settings.rss_favorite_articles.clear();
+                    }
                     ps.settings.rss_sources.remove(idx);
                     delayed_target_source_idx = if ps.settings.rss_sources.is_empty() {
                         None
@@ -4994,6 +5194,21 @@ fn handle_edit_source(hwnd: HWND) {
         return;
     };
 
+    let source_is_favorites = with_rss_state(hwnd, |s| {
+        with_state(s.parent, |ps| {
+            ps.settings
+                .rss_sources
+                .get(idx)
+                .map(is_favorites_source)
+                .unwrap_or(false)
+        })
+    })
+    .flatten()
+    .unwrap_or(false);
+    if source_is_favorites {
+        return;
+    }
+
     let source_info = with_rss_state(hwnd, |s| {
         {
             with_state(s.parent, |ps| {
@@ -5040,10 +5255,14 @@ fn handle_retry_now(hwnd: HWND) {
     let source_info = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
         Some(NodeData::Source(idx)) => {
             with_state(s.parent, |ps| {
-                ps.settings
-                    .rss_sources
-                    .get(*idx)
-                    .map(|src| (src.url.clone(), src.kind.clone(), src.cache.clone()))
+                ps.settings.rss_sources.get(*idx).map(|src| {
+                    (
+                        src.url.clone(),
+                        src.kind.clone(),
+                        src.cache.clone(),
+                        is_favorites_source(src),
+                    )
+                })
             })
         }
         .flatten(),
@@ -5051,10 +5270,10 @@ fn handle_retry_now(hwnd: HWND) {
     })
     .flatten();
 
-    let Some((url, source_kind, cache)) = source_info else {
+    let Some((url, source_kind, cache, is_favorites)) = source_info else {
         return;
     };
-    if url.trim().is_empty() {
+    if is_favorites || url.trim().is_empty() {
         return;
     }
 
@@ -5242,6 +5461,238 @@ fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
     }
 }
 
+fn rebuild_source_children_from_state(
+    hwnd: HWND,
+    source_hitem: windows::Win32::UI::Controls::HTREEITEM,
+    select_key: &str,
+) -> Option<windows::Win32::UI::Controls::HTREEITEM> {
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 || source_hitem.0 == 0 {
+        return None;
+    }
+    let (language, announce_unread, unread_label_position, rss_date_mode, rss_time_mode) =
+        with_rss_state(hwnd, |s| {
+            with_state(s.parent, |ps| {
+                (
+                    ps.settings.language,
+                    ps.settings.announce_unread_rss_podcast_items,
+                    ps.settings.rss_podcast_unread_label_position,
+                    ps.settings.rss_articles_date_display,
+                    ps.settings.rss_articles_time_display,
+                )
+            })
+            .unwrap_or((
+                crate::settings::Language::English,
+                true,
+                crate::settings::RssPodcastUnreadLabelPosition::Before,
+                ListDateDisplayMode::Always,
+                ListTimeDisplayMode::Always,
+            ))
+        })
+        .unwrap_or((
+            crate::settings::Language::English,
+            true,
+            crate::settings::RssPodcastUnreadLabelPosition::Before,
+            ListDateDisplayMode::Always,
+            ListTimeDisplayMode::Always,
+        ));
+
+    crate::send_message_w_safe(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+    loop {
+        let child = crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CHILD as usize),
+            LPARAM(source_hitem.0),
+        );
+        if child.0 == 0 {
+            break;
+        }
+        with_rss_state(hwnd, |s| {
+            s.node_data.remove(&child.0);
+        });
+        crate::send_message_w_safe(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+    }
+
+    let selected_hitem = with_rss_state(hwnd, |s| {
+        let mut selected_hitem = windows::Win32::UI::Controls::HTREEITEM(0);
+        if let Some(state) = s.source_items.get(&source_hitem.0) {
+            let day_counts = build_day_counts(&state.items);
+            for entry in state.items.iter().take(state.loaded) {
+                if entry.title.trim().is_empty() {
+                    continue;
+                }
+                let item_unread = !state.read_item_keys.contains(&rss_item_key(entry));
+                let title_ctx = RssItemTitleContext {
+                    language,
+                    announce_unread,
+                    unread_label_position,
+                    date_mode: rss_date_mode,
+                    time_mode: rss_time_mode,
+                };
+                let display_title = rss_item_display_title(
+                    &entry.title,
+                    item_unread,
+                    entry.pub_date,
+                    has_multiple_items_same_day(entry.pub_date, &day_counts),
+                    title_ctx,
+                );
+                let text = to_wide(&display_title);
+                let mut tvis = TVINSERTSTRUCTW {
+                    hParent: source_hitem,
+                    hInsertAfter: TVI_LAST,
+                    Anonymous: TVINSERTSTRUCTW_0 {
+                        item: TVITEMW {
+                            mask: TVIF_TEXT
+                                | TVIF_PARAM
+                                | windows::Win32::UI::Controls::TVIF_CHILDREN,
+                            pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                            cChildren: TVITEMEXW_CHILDREN(if entry.is_folder { 1 } else { 0 }),
+                            lParam: LPARAM(0),
+                            ..Default::default()
+                        },
+                    },
+                };
+                let hchild = windows::Win32::UI::Controls::HTREEITEM(
+                    crate::send_message_w_safe(
+                        hwnd_tree,
+                        TVM_INSERTITEMW,
+                        WPARAM(0),
+                        LPARAM(&mut tvis as *mut _ as isize),
+                    )
+                    .0,
+                );
+                if hchild.0 != 0 {
+                    s.node_data.insert(hchild.0, NodeData::Item(entry.clone()));
+                    if rss_item_key(entry) == select_key {
+                        selected_hitem = hchild;
+                    }
+                }
+            }
+        }
+        selected_hitem
+    });
+    crate::send_message_w_safe(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+    selected_hitem
+}
+
+fn move_selected_article_by_one(hwnd: HWND, move_up: bool) -> bool {
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return false;
+    }
+    let hitem = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    if hitem.0 == 0 {
+        return false;
+    }
+    let Some(current_item) = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Item(item)) if !item.is_folder => Some(item.clone()),
+        _ => None,
+    })
+    .flatten() else {
+        return false;
+    };
+    let parent_hitem = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_PARENT as usize),
+            LPARAM(hitem.0),
+        )
+        .0,
+    );
+    if parent_hitem.0 == 0 {
+        return false;
+    }
+
+    let moved_key = rss_item_key(&current_item);
+    if moved_key.trim().is_empty() {
+        return false;
+    }
+    let (moved, source_index) = with_rss_state(hwnd, |s| {
+        let source_index = match s.node_data.get(&parent_hitem.0) {
+            Some(NodeData::Source(idx)) => Some(*idx),
+            _ => None,
+        };
+        let Some(state) = s.source_items.get_mut(&parent_hitem.0) else {
+            return (false, source_index);
+        };
+        let Some(cur_pos) = state
+            .items
+            .iter()
+            .position(|it| rss_item_key(it) == moved_key)
+        else {
+            return (false, source_index);
+        };
+        if cur_pos >= state.loaded {
+            return (false, source_index);
+        }
+        let target_pos = if move_up {
+            cur_pos.saturating_sub(1)
+        } else {
+            cur_pos + 1
+        };
+        if target_pos >= state.loaded || target_pos == cur_pos {
+            return (false, source_index);
+        }
+        state.items.swap(cur_pos, target_pos);
+        (true, source_index)
+    })
+    .unwrap_or((false, None));
+    if !moved {
+        return false;
+    }
+
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 != 0
+        && let Some(source_idx) = source_index
+    {
+        with_state(parent, |ps| {
+            if ps
+                .settings
+                .rss_sources
+                .get(source_idx)
+                .is_some_and(is_favorites_source)
+            {
+                let updated = with_rss_state(hwnd, |s| {
+                    s.source_items
+                        .get(&parent_hitem.0)
+                        .map(|state| state.items.clone())
+                })
+                .flatten()
+                .unwrap_or_default();
+                ps.settings.rss_favorite_articles = updated;
+                crate::settings::save_settings(ps.settings.clone());
+            }
+        });
+    }
+
+    if let Some(selected_hitem) = rebuild_source_children_from_state(hwnd, parent_hitem, &moved_key)
+    {
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_SELECTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(selected_hitem.0),
+        );
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_ENSUREVISIBLE,
+            WPARAM(0),
+            LPARAM(selected_hitem.0),
+        );
+    }
+    true
+}
+
 #[derive(Clone, Copy)]
 enum ArticleAction {
     OpenInBrowser,
@@ -5275,6 +5726,230 @@ fn selected_article_item(hwnd: HWND) -> Option<RssItem> {
     .flatten()
 }
 
+fn restore_article_tree_focus(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
+    if hitem.0 == 0 {
+        return;
+    }
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return;
+    }
+    let exists = with_rss_state(hwnd, |s| s.node_data.contains_key(&hitem.0)).unwrap_or(false);
+    if !exists {
+        return;
+    }
+    let parent_hitem = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(windows::Win32::UI::Controls::TVGN_PARENT as usize),
+            LPARAM(hitem.0),
+        )
+        .0,
+    );
+    unsafe {
+        // Force a real selection transition so screen readers (NVDA) announce the article again.
+        if parent_hitem.0 != 0 {
+            SendMessageW(
+                hwnd_tree,
+                TVM_SELECTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(parent_hitem.0),
+            );
+        }
+        SendMessageW(
+            hwnd_tree,
+            TVM_SELECTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(hitem.0),
+        );
+        SendMessageW(hwnd_tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(hitem.0));
+        if GetFocus() != hwnd_tree {
+            with_rss_state(hwnd, |s| s.suppress_focus_restore_once = true);
+            SetFocus(hwnd_tree);
+        }
+    }
+}
+fn insert_favorites_source_node_without_reload(
+    hwnd: HWND,
+) -> Option<windows::Win32::UI::Controls::HTREEITEM> {
+    let (hwnd_tree, parent) =
+        with_rss_state(hwnd, |s| (s.hwnd_tree, s.parent)).unwrap_or((HWND(0), HWND(0)));
+    if hwnd_tree.0 == 0 || parent.0 == 0 {
+        return None;
+    }
+    let (favorites_source, language, announce_unread, unread_label_position) =
+        with_state(parent, |ps| {
+            (
+                ps.settings.rss_sources.first().cloned(),
+                ps.settings.language,
+                ps.settings.announce_unread_rss_podcast_items,
+                ps.settings.rss_podcast_unread_label_position,
+            )
+        })
+        .unwrap_or((
+            None,
+            crate::settings::Language::default(),
+            true,
+            crate::settings::RssPodcastUnreadLabelPosition::default(),
+        ));
+    let favorites_source = favorites_source.filter(is_favorites_source)?;
+
+    with_rss_state(hwnd, |s| {
+        for node in s.node_data.values_mut() {
+            if let NodeData::Source(idx) = node {
+                *idx += 1;
+            }
+        }
+        if let Some(pending_edit) = s.pending_edit.as_mut() {
+            *pending_edit += 1;
+        }
+        for removed in &mut s.removed_history {
+            match removed {
+                RssLastRemoved::Source { index, .. } => *index += 1,
+                RssLastRemoved::Item { source_index, .. } => *source_index += 1,
+            }
+        }
+    });
+
+    let title = to_wide(&rss_source_display_title(
+        &favorites_source,
+        language,
+        announce_unread,
+        unread_label_position,
+    ));
+    let mut tvis = TVINSERTSTRUCTW {
+        hParent: TVI_ROOT,
+        hInsertAfter: TVI_FIRST,
+        Anonymous: TVINSERTSTRUCTW_0 {
+            item: TVITEMW {
+                mask: TVIF_TEXT | TVIF_PARAM | windows::Win32::UI::Controls::TVIF_CHILDREN,
+                pszText: windows::core::PWSTR(title.as_ptr() as *mut _),
+                cChildren: TVITEMEXW_CHILDREN(1),
+                lParam: LPARAM(0),
+                ..Default::default()
+            },
+        },
+    };
+    let hitem = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_INSERTITEMW,
+            WPARAM(0),
+            LPARAM(&mut tvis as *mut _ as isize),
+        )
+        .0,
+    );
+    if hitem.0 == 0 {
+        return None;
+    }
+    with_rss_state(hwnd, |s| {
+        s.node_data.insert(hitem.0, NodeData::Source(0));
+    });
+    Some(hitem)
+}
+
+fn handle_add_article_to_favorites(hwnd: HWND) {
+    let selected_article_hitem = with_rss_state(hwnd, |s| {
+        let hwnd_tree = s.hwnd_tree;
+        if hwnd_tree.0 == 0 {
+            return None;
+        }
+        let hitem = windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(0),
+            )
+            .0,
+        );
+        if hitem.0 == 0 {
+            return None;
+        }
+        if matches!(s.node_data.get(&hitem.0), Some(NodeData::Item(_))) {
+            Some(hitem)
+        } else {
+            None
+        }
+    })
+    .flatten();
+    let Some(mut item) = selected_article_item(hwnd) else {
+        return;
+    };
+    let key = rss_item_key(&item);
+    if key.trim().is_empty() {
+        return;
+    }
+    item.is_folder = false;
+    if item.guid.trim().is_empty() {
+        item.guid = key.clone();
+    }
+
+    let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+    let language = with_state(parent, |ps| ps.settings.language).unwrap_or_default();
+
+    let existed_before = with_state(parent, |ps| {
+        ps.settings.rss_sources.iter().any(is_favorites_source)
+    })
+    .unwrap_or(false);
+    let favorites_index = ensure_favorites_source(parent);
+    if !existed_before && insert_favorites_source_node_without_reload(hwnd).is_none() {
+        crate::log_debug("Failed to insert favorites RSS node in tree");
+    }
+    let mut added = false;
+    let mut already_exists = false;
+    with_state(parent, |ps| {
+        if ps
+            .settings
+            .rss_favorite_articles
+            .iter()
+            .any(|entry| rss_item_key(entry) == key)
+        {
+            already_exists = true;
+            return;
+        }
+
+        ps.settings.rss_favorite_articles.push(item.clone());
+        sort_items_by_date_desc(&mut ps.settings.rss_favorite_articles);
+        if let Some(src) = ps.settings.rss_sources.get_mut(favorites_index) {
+            src.unread = true;
+        }
+        crate::settings::save_settings(ps.settings.clone());
+        added = true;
+    });
+
+    if added {
+        let favorites_hitem = with_rss_state(hwnd, |s| {
+            s.node_data.iter().find_map(|(h, node)| {
+                if let NodeData::Source(i) = node
+                    && *i == favorites_index
+                {
+                    Some(windows::Win32::UI::Controls::HTREEITEM(*h))
+                } else {
+                    None
+                }
+            })
+        })
+        .flatten();
+
+        if let Some(hitem) = favorites_hitem {
+            with_rss_state(hwnd, |s| {
+                s.source_items.remove(&hitem.0);
+            });
+            set_source_unread(hwnd, hitem, true);
+        }
+        announce_rss_status(&i18n::tr(language, "rss.favorite_added"));
+    } else if already_exists {
+        announce_rss_status(&i18n::tr(language, "rss.favorite_already_exists"));
+    }
+    if let Some(hitem) = selected_article_hitem {
+        restore_article_tree_focus(hwnd, hitem);
+    }
+}
 fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     use windows::Win32::Foundation::HANDLE;
     use windows::Win32::System::Memory::GMEM_MOVEABLE;

@@ -187,7 +187,10 @@
   "options.label.modified_marker_position": "Modified marker position:",
   "options.label.open": "Open Behavior:",
   "options.label.tts_engine": "Text-to-Speech System:",
-  "options.label.voice": "Voice:",
+  "options.label.voice": "Voice:","options.label.voice_profile":"Voice profile",
+"options.button.apply_selected_profile":"Rename profile",
+"options.button.add_profile":"Add profile",
+"options.button.delete_profile":"Delete",
   "options.label.voice_preview": "Preview Voice",
   "options.label.insert_voice_tag": "Insert Voice Tag",
   "options.label.tts_manual_tuning": "Manual Voice Tuning",
@@ -634,6 +637,7 @@
   "podcast.gain.triple": "Triple volume",
   "podcast.gain.quadruple": "Quadruple volume",
   "rss.window.title": "RSS / Articles",
+  "rss.favorites.title": "Favorites",
   "rss.tree.add_source": "Add Source...",
   "rss.tree.import_txt": "Import from File...",
   "rss.tree.close": "Close",
@@ -660,8 +664,8 @@
   "rss.date.today": "Today",
   "rss.date.yesterday": "Yesterday",
   "rss.date.day_before_yesterday": "Day Before Yesterday",
-  "rss.reorder.move_up": "Move up",
-  "rss.reorder.move_down": "Move down",
+  "rss.reorder.move_up": "Move up\tCtrl+Shift+Freccia Su",
+  "rss.reorder.move_down": "Move down\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_top": "Move to top",
   "rss.reorder.move_bottom": "Move to bottom",
   "rss.reorder.move_to_position": "Move to position...",
@@ -805,8 +809,11 @@
   "options.spellcheck.lang.uk": "Ukrainian (Ukraine)",
   "options.tab.rss_podcast": "RSS and podcast",
   "rss.context.share_email": "Share by email",
+  "rss.context.add_to_favorites": "Add to favorite articles",
   "rss.email.default_subject": "RSS article",
   "rss.email.body_intro": "I saw this news that might interest you:",
+  "rss.favorite_added": "Article added to favorites",
+  "rss.favorite_already_exists": "Article already in favorites",
   "find.replaced_count_one": "{count} replacement made.",
   "find.replaced_count_many": "{count} replacements made.",
   "dictionary.lookup.language": "Dictionary language:",
@@ -1064,3 +1071,8 @@
   "options.whisper_model.medium": "Medium",
   "options.whisper_model.large": "Large v3"
 }
+
+
+
+
+

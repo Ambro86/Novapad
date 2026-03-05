@@ -5,10 +5,12 @@ use crate::editor_manager::{
     update_window_title,
 };
 use crate::settings::{
-    Language, ListDateDisplayMode, ListTimeDisplayMode, ModifiedMarkerPosition, OpenBehavior,
-    PodcastDeleteConfirmMode, RssDeleteConfirmMode, RssPodcastUnreadLabelPosition, ShortcutBinding,
-    ShortcutSettings, SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo,
-    format_shortcut, save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
+    DEFAULT_VOICE_PROFILE_NAME, Language, ListDateDisplayMode, ListTimeDisplayMode,
+    ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode, RssDeleteConfirmMode,
+    RssPodcastUnreadLabelPosition, ShortcutBinding, ShortcutSettings, SubtitleReadMode,
+    TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo, VoiceProfile, format_shortcut,
+    save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
+    voice_profile_from_settings_fields,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
 use reqwest::blocking::Client;
@@ -162,6 +164,10 @@ const OPTIONS_ID_SHORTCUT_VALUE: usize = 6071;
 const OPTIONS_ID_SHORTCUT_CHANGE: usize = 6072;
 const OPTIONS_ID_SHORTCUT_RESET: usize = 6073;
 const OPTIONS_ID_SHORTCUT_RESET_ALL: usize = 6074;
+const OPTIONS_ID_VOICE_PROFILE: usize = 6115;
+const OPTIONS_ID_RENAME_VOICE_PROFILE: usize = 6116;
+const OPTIONS_ID_ADD_VOICE_PROFILE: usize = 6117;
+const OPTIONS_ID_DELETE_VOICE_PROFILE: usize = 6118;
 
 const OPTIONS_ID_OK: usize = 6005;
 const OPTIONS_ID_CANCEL: usize = 6006;
@@ -595,17 +601,22 @@ struct OptionsDialogState {
     label_open: HWND,
     label_tts_engine: HWND,
     label_tts_voice_language: HWND,
+    label_voice_profile: HWND,
     label_voice: HWND,
     label_tts_speed: HWND,
     label_tts_pitch: HWND,
     label_tts_volume: HWND,
     button_tts_preview: HWND,
     button_tts_insert_tag: HWND,
+    button_rename_voice_profile: HWND,
+    button_add_voice_profile: HWND,
+    button_delete_voice_profile: HWND,
     combo_lang: HWND,
     combo_modified_marker_position: HWND,
     combo_open: HWND,
     combo_tts_engine: HWND,
     combo_tts_voice_language: HWND,
+    combo_voice_profile: HWND,
     combo_voice: HWND,
     combo_tts_speed: HWND,
     combo_tts_pitch: HWND,
@@ -763,6 +774,8 @@ struct OptionsDialogState {
     tts_voice_language_codes: Vec<String>,
     dialogue_voice_language_codes: Vec<String>,
     secondary_dialogue_voice_language_codes: Vec<String>,
+    voice_profiles: Vec<VoiceProfile>,
+    active_voice_profile_name: String,
     active_tab: i32,
     scroll_offsets: [i32; OPTIONS_TAB_COUNT as usize],
     content_heights: [i32; OPTIONS_TAB_COUNT as usize],
@@ -788,7 +801,11 @@ struct OptionsLabels {
     label_open: String,
     label_tts_engine: String,
     label_tts_voice_language: String,
+    label_voice_profile: String,
     label_voice: String,
+    button_rename_voice_profile: String,
+    button_add_voice_profile: String,
+    button_delete_voice_profile: String,
     label_multilingual: String,
     label_use_dialogue_voice: String,
     label_dialogue_voice: String,
@@ -968,7 +985,11 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_open: i18n::tr(language, "options.label.open"),
         label_tts_engine: i18n::tr(language, "options.label.tts_engine"),
         label_tts_voice_language: i18n::tr(language, "options.label.voice_language"),
+        label_voice_profile: i18n::tr(language, "options.label.voice_profile"),
         label_voice: i18n::tr(language, "options.label.voice"),
+        button_rename_voice_profile: i18n::tr(language, "options.button.apply_selected_profile"),
+        button_add_voice_profile: i18n::tr(language, "options.button.add_profile"),
+        button_delete_voice_profile: i18n::tr(language, "options.button.delete_profile"),
         label_multilingual: i18n::tr(language, "options.label.multilingual"),
         label_use_dialogue_voice: i18n::tr(language, "options.label.use_dialogue_voice"),
         label_dialogue_voice: i18n::tr(language, "options.label.dialogue_voice"),
@@ -1292,6 +1313,574 @@ fn collect_voice_language_codes(voices: &[VoiceInfo]) -> Vec<String> {
     codes
 }
 
+fn next_voice_profile_name(profiles: &[VoiceProfile]) -> String {
+    let mut n = 1usize;
+    loop {
+        let candidate = format!("Profilo {n}");
+        if !profiles
+            .iter()
+            .any(|p| p.name.eq_ignore_ascii_case(&candidate))
+        {
+            return candidate;
+        }
+        n += 1;
+    }
+}
+
+fn refresh_voice_profile_combo(hwnd: HWND) {
+    let Some((combo, profiles, active_name)) = with_options_state(hwnd, |state| {
+        (
+            state.combo_voice_profile,
+            state.voice_profiles.clone(),
+            state.active_voice_profile_name.clone(),
+        )
+    }) else {
+        return;
+    };
+
+    unsafe {
+        SendMessageW(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        let mut selected_index: usize = 0;
+        for (idx, profile) in profiles.iter().enumerate() {
+            let _added = SendMessageW(
+                combo,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&profile.name).as_ptr() as isize),
+            );
+            if profile.name.eq_ignore_ascii_case(&active_name) {
+                selected_index = idx;
+            }
+        }
+        if !profiles.is_empty() {
+            SendMessageW(combo, CB_SETCURSEL, WPARAM(selected_index), LPARAM(0));
+        }
+    }
+
+    update_voice_profile_delete_button_visibility(hwnd);
+}
+
+fn update_voice_profile_delete_button_visibility(hwnd: HWND) {
+    let Some((rename_button, delete_button, selected_name)) = with_options_state(hwnd, |state| {
+        let sel = unsafe {
+            SendMessageW(
+                state.combo_voice_profile,
+                CB_GETCURSEL,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0
+        };
+        let selected = if sel >= 0 {
+            state
+                .voice_profiles
+                .get(sel as usize)
+                .map(|p| p.name.clone())
+                .unwrap_or_else(|| DEFAULT_VOICE_PROFILE_NAME.to_string())
+        } else {
+            DEFAULT_VOICE_PROFILE_NAME.to_string()
+        };
+        (
+            state.button_rename_voice_profile,
+            state.button_delete_voice_profile,
+            selected,
+        )
+    }) else {
+        return;
+    };
+
+    let hide_actions = selected_name.eq_ignore_ascii_case(DEFAULT_VOICE_PROFILE_NAME);
+    crate::show_window_safe(rename_button, if hide_actions { SW_HIDE } else { SW_SHOW });
+    crate::show_window_safe(delete_button, if hide_actions { SW_HIDE } else { SW_SHOW });
+}
+
+fn voices_for_engine(parent: HWND, engine: TtsEngine) -> Vec<VoiceInfo> {
+    with_state(parent, |state| match engine {
+        TtsEngine::Edge => state.edge_voices.clone(),
+        TtsEngine::Sapi5 => state.sapi_voices.clone(),
+        TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
+    })
+    .unwrap_or_default()
+}
+
+fn select_voice_combo_by_short_name(combo: HWND, voices: &[VoiceInfo], short_name: &str) {
+    if short_name.trim().is_empty() {
+        return;
+    }
+    let count = unsafe { SendMessageW(combo, CB_GETCOUNT, WPARAM(0), LPARAM(0)).0 };
+    if count <= 0 {
+        return;
+    }
+    for idx in 0..count {
+        let voice_index = unsafe {
+            SendMessageW(combo, CB_GETITEMDATA, WPARAM(idx as usize), LPARAM(0)).0 as usize
+        };
+        if let Some(voice) = voices.get(voice_index)
+            && voice.short_name == short_name
+        {
+            unsafe {
+                SendMessageW(combo, CB_SETCURSEL, WPARAM(idx as usize), LPARAM(0));
+            }
+            break;
+        }
+    }
+}
+
+fn apply_selected_voice_profile(hwnd: HWND) {
+    let Some((
+        parent,
+        profile,
+        combo_tts_engine,
+        combo_dialogue_engine,
+        combo_dialogue_secondary_engine,
+        checkbox_multilingual,
+        checkbox_tts_manual,
+        checkbox_use_dialogue_voice,
+        checkbox_dialogue_use_secondary_voice,
+        combo_tts_speed,
+        combo_tts_pitch,
+        combo_tts_volume,
+        edit_tts_speed,
+        edit_tts_pitch,
+        edit_tts_volume,
+        combo_dialogue_voice_rate,
+        combo_dialogue_voice_pitch,
+        combo_dialogue_voice_volume,
+        edit_dialogue_voice_rate,
+        edit_dialogue_voice_pitch,
+        edit_dialogue_voice_volume,
+        combo_dialogue_secondary_voice_rate,
+        combo_dialogue_secondary_voice_pitch,
+        combo_dialogue_secondary_voice_volume,
+        edit_dialogue_secondary_voice_rate,
+        edit_dialogue_secondary_voice_pitch,
+        edit_dialogue_secondary_voice_volume,
+        combo_voice,
+        combo_dialogue_voice,
+        combo_dialogue_secondary_voice,
+    )) = with_options_state(hwnd, |state| {
+        let sel = unsafe {
+            SendMessageW(
+                state.combo_voice_profile,
+                CB_GETCURSEL,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0
+        };
+        let selected = if sel >= 0 {
+            state.voice_profiles.get(sel as usize).cloned()
+        } else {
+            None
+        };
+        (
+            state.parent,
+            selected,
+            state.combo_tts_engine,
+            state.combo_dialogue_engine,
+            state.combo_dialogue_secondary_engine,
+            state.checkbox_multilingual,
+            state.checkbox_tts_manual,
+            state.checkbox_use_dialogue_voice,
+            state.checkbox_dialogue_use_secondary_voice,
+            state.combo_tts_speed,
+            state.combo_tts_pitch,
+            state.combo_tts_volume,
+            state.edit_tts_speed,
+            state.edit_tts_pitch,
+            state.edit_tts_volume,
+            state.combo_dialogue_voice_rate,
+            state.combo_dialogue_voice_pitch,
+            state.combo_dialogue_voice_volume,
+            state.edit_dialogue_voice_rate,
+            state.edit_dialogue_voice_pitch,
+            state.edit_dialogue_voice_volume,
+            state.combo_dialogue_secondary_voice_rate,
+            state.combo_dialogue_secondary_voice_pitch,
+            state.combo_dialogue_secondary_voice_volume,
+            state.edit_dialogue_secondary_voice_rate,
+            state.edit_dialogue_secondary_voice_pitch,
+            state.edit_dialogue_secondary_voice_volume,
+            state.combo_voice,
+            state.combo_dialogue_voice,
+            state.combo_dialogue_secondary_voice,
+        )
+    })
+    else {
+        return;
+    };
+
+    let Some(profile) = profile else {
+        return;
+    };
+
+    unsafe {
+        let tts_engine_index = match profile.tts_engine {
+            TtsEngine::Edge => 0,
+            TtsEngine::Sapi5 => 1,
+            TtsEngine::Sapi4 => 2,
+        };
+        SendMessageW(
+            combo_tts_engine,
+            CB_SETCURSEL,
+            WPARAM(tts_engine_index),
+            LPARAM(0),
+        );
+
+        let dialogue_engine_index = match profile.dialogue_tts_engine {
+            TtsEngine::Edge => 0,
+            TtsEngine::Sapi5 => 1,
+            TtsEngine::Sapi4 => 2,
+        };
+        SendMessageW(
+            combo_dialogue_engine,
+            CB_SETCURSEL,
+            WPARAM(dialogue_engine_index),
+            LPARAM(0),
+        );
+
+        let dialogue_secondary_engine_index = match profile.dialogue_secondary_tts_engine {
+            TtsEngine::Edge => 0,
+            TtsEngine::Sapi5 => 1,
+            TtsEngine::Sapi4 => 2,
+        };
+        SendMessageW(
+            combo_dialogue_secondary_engine,
+            CB_SETCURSEL,
+            WPARAM(dialogue_secondary_engine_index),
+            LPARAM(0),
+        );
+
+        SendMessageW(
+            checkbox_multilingual,
+            BM_SETCHECK,
+            WPARAM(if profile.tts_only_multilingual {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_tts_manual,
+            BM_SETCHECK,
+            WPARAM(if profile.tts_manual_tuning {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_use_dialogue_voice,
+            BM_SETCHECK,
+            WPARAM(if profile.use_dialogue_voice {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_dialogue_use_secondary_voice,
+            BM_SETCHECK,
+            WPARAM(if profile.dialogue_use_secondary_voice {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+    }
+
+    select_combo_value(combo_tts_speed, profile.tts_rate);
+    select_combo_value(combo_tts_pitch, profile.tts_pitch);
+    select_combo_value(combo_tts_volume, profile.tts_volume);
+    select_combo_value(combo_dialogue_voice_rate, profile.dialogue_voice_rate);
+    select_combo_value(combo_dialogue_voice_pitch, profile.dialogue_voice_pitch);
+    select_combo_value(combo_dialogue_voice_volume, profile.dialogue_voice_volume);
+    select_combo_value(
+        combo_dialogue_secondary_voice_rate,
+        profile.dialogue_secondary_voice_rate,
+    );
+    select_combo_value(
+        combo_dialogue_secondary_voice_pitch,
+        profile.dialogue_secondary_voice_pitch,
+    );
+    select_combo_value(
+        combo_dialogue_secondary_voice_volume,
+        profile.dialogue_secondary_voice_volume,
+    );
+
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_tts_speed,
+        PCWSTR(to_wide(&tts_ui_value_from_internal(profile.tts_rate).to_string()).as_ptr()),
+    ) {
+        crate::log_debug(&format!("Failed to set tts speed edit from profile: {e}"));
+    }
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_tts_pitch,
+        PCWSTR(to_wide(&tts_ui_value_from_internal(profile.tts_pitch).to_string()).as_ptr()),
+    ) {
+        crate::log_debug(&format!("Failed to set tts pitch edit from profile: {e}"));
+    }
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_tts_volume,
+        PCWSTR(to_wide(&profile.tts_volume.to_string()).as_ptr()),
+    ) {
+        crate::log_debug(&format!("Failed to set tts volume edit from profile: {e}"));
+    }
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_dialogue_voice_rate,
+        PCWSTR(
+            to_wide(&tts_ui_value_from_internal(profile.dialogue_voice_rate).to_string()).as_ptr(),
+        ),
+    ) {
+        crate::log_debug(&format!(
+            "Failed to set dialogue rate edit from profile: {e}"
+        ));
+    }
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_dialogue_voice_pitch,
+        PCWSTR(
+            to_wide(&tts_ui_value_from_internal(profile.dialogue_voice_pitch).to_string()).as_ptr(),
+        ),
+    ) {
+        crate::log_debug(&format!(
+            "Failed to set dialogue pitch edit from profile: {e}"
+        ));
+    }
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_dialogue_voice_volume,
+        PCWSTR(to_wide(&profile.dialogue_voice_volume.to_string()).as_ptr()),
+    ) {
+        crate::log_debug(&format!(
+            "Failed to set dialogue volume edit from profile: {e}"
+        ));
+    }
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_dialogue_secondary_voice_rate,
+        PCWSTR(
+            to_wide(&tts_ui_value_from_internal(profile.dialogue_secondary_voice_rate).to_string())
+                .as_ptr(),
+        ),
+    ) {
+        crate::log_debug(&format!(
+            "Failed to set secondary dialogue rate edit from profile: {e}"
+        ));
+    }
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_dialogue_secondary_voice_pitch,
+        PCWSTR(
+            to_wide(
+                &tts_ui_value_from_internal(profile.dialogue_secondary_voice_pitch).to_string(),
+            )
+            .as_ptr(),
+        ),
+    ) {
+        crate::log_debug(&format!(
+            "Failed to set secondary dialogue pitch edit from profile: {e}"
+        ));
+    }
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_dialogue_secondary_voice_volume,
+        PCWSTR(to_wide(&profile.dialogue_secondary_voice_volume.to_string()).as_ptr()),
+    ) {
+        crate::log_debug(&format!(
+            "Failed to set secondary dialogue volume edit from profile: {e}"
+        ));
+    }
+
+    if with_options_state(hwnd, |state| {
+        state.active_voice_profile_name = profile.name.clone();
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access options state when applying profile");
+    }
+
+    update_tts_manual_visibility(hwnd);
+    refresh_voices(hwnd);
+    update_dialogue_voice_visibility(hwnd);
+    let tts_voices = voices_for_engine(parent, profile.tts_engine);
+    let dialogue_voices = voices_for_engine(parent, profile.dialogue_tts_engine);
+    let dialogue_secondary_voices =
+        voices_for_engine(parent, profile.dialogue_secondary_tts_engine);
+    select_voice_combo_by_short_name(combo_voice, &tts_voices, &profile.tts_voice);
+    select_voice_combo_by_short_name(
+        combo_dialogue_voice,
+        &dialogue_voices,
+        &profile.dialogue_voice,
+    );
+    select_voice_combo_by_short_name(
+        combo_dialogue_secondary_voice,
+        &dialogue_secondary_voices,
+        &profile.dialogue_secondary_voice,
+    );
+    relayout_active_tab_content(hwnd);
+    update_voice_profile_delete_button_visibility(hwnd);
+}
+
+fn unique_voice_profile_name_for_rename(
+    base_name: &str,
+    profiles: &[VoiceProfile],
+    skip_index: usize,
+) -> String {
+    let requested = base_name.trim();
+    if requested.is_empty() {
+        return String::new();
+    }
+    let exists = |name: &str| {
+        profiles
+            .iter()
+            .enumerate()
+            .any(|(idx, profile)| idx != skip_index && profile.name.eq_ignore_ascii_case(name))
+    };
+    if !exists(requested) {
+        return requested.to_string();
+    }
+    let mut n = 2usize;
+    loop {
+        let candidate = format!("{requested} {n}");
+        if !exists(&candidate) {
+            return candidate;
+        }
+        n += 1;
+    }
+}
+
+fn rename_selected_voice_profile(hwnd: HWND) {
+    let Some((parent, selected_index, selected_name)) = with_options_state(hwnd, |state| {
+        let sel = unsafe {
+            SendMessageW(
+                state.combo_voice_profile,
+                CB_GETCURSEL,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0
+        };
+        if sel < 0 {
+            return None;
+        }
+        let idx = sel as usize;
+        state
+            .voice_profiles
+            .get(idx)
+            .map(|profile| (state.parent, idx, profile.name.clone()))
+    })
+    .flatten() else {
+        return;
+    };
+    if selected_name.eq_ignore_ascii_case(DEFAULT_VOICE_PROFILE_NAME) {
+        return;
+    }
+
+    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+    let title = i18n::tr(language, "options.button.apply_selected_profile");
+    let body = i18n::tr(language, "options.label.voice_profile");
+    let Some(new_name_input) = crate::app_windows::prompt_window::prompt_user(
+        hwnd,
+        &title,
+        &body,
+        &selected_name,
+        language,
+    ) else {
+        return;
+    };
+    let requested_name = new_name_input.trim().to_string();
+    if requested_name.is_empty() {
+        return;
+    }
+
+    let updated = with_options_state(hwnd, |state| {
+        if selected_index >= state.voice_profiles.len() {
+            return;
+        }
+        if state.voice_profiles[selected_index]
+            .name
+            .eq_ignore_ascii_case(DEFAULT_VOICE_PROFILE_NAME)
+        {
+            return;
+        }
+        let old_name = state.voice_profiles[selected_index].name.clone();
+        let renamed = unique_voice_profile_name_for_rename(
+            &requested_name,
+            &state.voice_profiles,
+            selected_index,
+        );
+        if renamed.is_empty() {
+            return;
+        }
+        state.voice_profiles[selected_index].name = renamed.clone();
+        if state
+            .active_voice_profile_name
+            .eq_ignore_ascii_case(&old_name)
+        {
+            state.active_voice_profile_name = renamed;
+        }
+    });
+    if updated.is_none() {
+        crate::log_debug("Failed to access options state when renaming profile");
+        return;
+    }
+    refresh_voice_profile_combo(hwnd);
+    update_voice_profile_delete_button_visibility(hwnd);
+    if let Some(combo_voice_profile) = with_options_state(hwnd, |state| state.combo_voice_profile) {
+        crate::set_focus_safe(combo_voice_profile);
+    }
+}
+
+fn add_voice_profile(hwnd: HWND) {
+    let updated = with_options_state(hwnd, |state| {
+        let profile = VoiceProfile {
+            name: next_voice_profile_name(&state.voice_profiles),
+            ..Default::default()
+        };
+        state.voice_profiles.push(profile);
+    });
+    if updated.is_none() {
+        crate::log_debug("Failed to access options state when adding profile");
+        return;
+    }
+    refresh_voice_profile_combo(hwnd);
+    update_voice_profile_delete_button_visibility(hwnd);
+}
+
+fn delete_selected_voice_profile(hwnd: HWND) {
+    let updated = with_options_state(hwnd, |state| {
+        let sel = unsafe {
+            SendMessageW(
+                state.combo_voice_profile,
+                CB_GETCURSEL,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0
+        };
+        if sel < 0 {
+            return;
+        }
+        let idx = sel as usize;
+        if idx >= state.voice_profiles.len() {
+            return;
+        }
+        if state.voice_profiles[idx]
+            .name
+            .eq_ignore_ascii_case(DEFAULT_VOICE_PROFILE_NAME)
+        {
+            return;
+        }
+        state.voice_profiles.remove(idx);
+        state.active_voice_profile_name = DEFAULT_VOICE_PROFILE_NAME.to_string();
+    });
+    if updated.is_none() {
+        crate::log_debug("Failed to access options state when deleting profile");
+        return;
+    }
+    refresh_voice_profile_combo(hwnd);
+    update_voice_profile_delete_button_visibility(hwnd);
+}
 pub fn open(parent: HWND) {
     unsafe {
         let existing = with_state(parent, |state| state.options_dialog).unwrap_or(HWND(0));
@@ -1981,6 +2570,82 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     None,
                 );
                 y += 40;
+
+                let label_voice_profile = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_voice_profile).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_voice_profile = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_VOICE_PROFILE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let button_rename_voice_profile = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.button_rename_voice_profile).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_RENAME_VOICE_PROFILE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let button_add_voice_profile = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.button_add_voice_profile).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y,
+                    145,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_ADD_VOICE_PROFILE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let button_delete_voice_profile = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.button_delete_voice_profile).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    325,
+                    y,
+                    145,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DELETE_VOICE_PROFILE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
 
                 let label_tts_engine = CreateWindowExW(
                     Default::default(),
@@ -4488,6 +5153,11 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     combo_tts_engine,
                     label_tts_voice_language,
                     combo_tts_voice_language,
+                    label_voice_profile,
+                    combo_voice_profile,
+                    button_rename_voice_profile,
+                    button_add_voice_profile,
+                    button_delete_voice_profile,
                     label_voice,
                     combo_voice,
                     label_tts_speed,
@@ -4664,17 +5334,22 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     label_open,
                     label_tts_engine,
                     label_tts_voice_language,
+                    label_voice_profile,
                     label_voice,
                     label_tts_speed,
                     label_tts_pitch,
                     label_tts_volume,
                     button_tts_preview,
                     button_tts_insert_tag,
+                    button_rename_voice_profile,
+                    button_add_voice_profile,
+                    button_delete_voice_profile,
                     combo_lang,
                     combo_modified_marker_position,
                     combo_open,
                     combo_tts_engine,
                     combo_tts_voice_language,
+                    combo_voice_profile,
                     combo_voice,
                     combo_tts_speed,
                     combo_tts_pitch,
@@ -4832,6 +5507,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     tts_voice_language_codes: Vec::new(),
                     dialogue_voice_language_codes: Vec::new(),
                     secondary_dialogue_voice_language_codes: Vec::new(),
+                    voice_profiles: Vec::new(),
+                    active_voice_profile_name: DEFAULT_VOICE_PROFILE_NAME.to_string(),
                     active_tab: OPTIONS_TAB_GENERAL,
                     scroll_offsets: [0; OPTIONS_TAB_COUNT as usize],
                     content_heights: [0; OPTIONS_TAB_COUNT as usize],
@@ -4906,6 +5583,25 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     }
                     OPTIONS_ID_TTS_INSERT_TAG => {
                         insert_voice_tag_from_options(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_VOICE_PROFILE => {
+                        if code == CBN_SELCHANGE {
+                            // Selecting a profile immediately loads its voice settings in the form.
+                            apply_selected_voice_profile(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_RENAME_VOICE_PROFILE => {
+                        rename_selected_voice_profile(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_ADD_VOICE_PROFILE => {
+                        add_voice_profile(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_DELETE_VOICE_PROFILE => {
+                        delete_selected_voice_profile(hwnd);
                         LRESULT(0)
                     }
                     OPTIONS_ID_TTS_ENGINE => {
@@ -5183,6 +5879,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     let focus = GetFocus();
                     let is_tts_combo = with_options_state(hwnd, |state| {
                         focus == state.combo_voice
+                            || focus == state.combo_voice_profile
                             || focus == state.combo_tts_voice_language
                             || focus == state.combo_dialogue_voice
                             || focus == state.combo_dialogue_voice_language
@@ -5555,6 +6252,34 @@ fn initialize_options_dialog(hwnd: HWND) {
             settings.dialogue_allow_multiline = cfg.allow_multiline;
         }
         let labels = options_labels(settings.language);
+
+        let mut voice_profiles = settings.voice_profiles.clone();
+        if !voice_profiles
+            .iter()
+            .any(|p| p.name.eq_ignore_ascii_case(DEFAULT_VOICE_PROFILE_NAME))
+        {
+            voice_profiles.push(voice_profile_from_settings_fields(
+                DEFAULT_VOICE_PROFILE_NAME.to_string(),
+                &settings,
+            ));
+        }
+        let mut active_voice_profile_name = settings.active_voice_profile.trim().to_string();
+        if active_voice_profile_name.is_empty()
+            || !voice_profiles
+                .iter()
+                .any(|p| p.name.eq_ignore_ascii_case(&active_voice_profile_name))
+        {
+            active_voice_profile_name = DEFAULT_VOICE_PROFILE_NAME.to_string();
+        }
+        if with_options_state(hwnd, |state| {
+            state.voice_profiles = voice_profiles;
+            state.active_voice_profile_name = active_voice_profile_name;
+        })
+        .is_none()
+        {
+            crate::log_debug("Failed to initialize voice profile state");
+        }
+        refresh_voice_profile_combo(hwnd);
 
         SendMessageW(combo_lang, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         SendMessageW(
@@ -9714,6 +10439,41 @@ fn apply_options_dialog(hwnd: HWND) {
             crate::log_debug(&format!("Failed to save dialogue config: {}", err));
         }
 
+        let (mut dialog_profiles, mut active_profile_name) = with_options_state(hwnd, |state| {
+            (
+                state.voice_profiles.clone(),
+                state.active_voice_profile_name.clone(),
+            )
+        })
+        .unwrap_or((Vec::new(), DEFAULT_VOICE_PROFILE_NAME.to_string()));
+
+        if active_profile_name.trim().is_empty() {
+            active_profile_name = DEFAULT_VOICE_PROFILE_NAME.to_string();
+        }
+        if !dialog_profiles
+            .iter()
+            .any(|p| p.name.eq_ignore_ascii_case(DEFAULT_VOICE_PROFILE_NAME))
+        {
+            dialog_profiles.push(voice_profile_from_settings_fields(
+                DEFAULT_VOICE_PROFILE_NAME.to_string(),
+                &settings,
+            ));
+        }
+
+        let current_profile =
+            voice_profile_from_settings_fields(active_profile_name.clone(), &settings);
+        if let Some(existing) = dialog_profiles
+            .iter_mut()
+            .find(|p| p.name.eq_ignore_ascii_case(&active_profile_name))
+        {
+            *existing = current_profile;
+        } else {
+            dialog_profiles.push(current_profile);
+        }
+
+        settings.active_voice_profile = active_profile_name;
+        settings.voice_profiles = dialog_profiles;
+
         if with_state(parent, |state| {
             state.settings = settings.clone();
         })
@@ -10138,6 +10898,36 @@ fn layout_general_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
 
 fn layout_voice_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
     let mut y = OPTIONS_CONTENT_TOP - scroll_offset;
+    y = layout_label_control(
+        "label_voice_profile",
+        state.label_voice_profile,
+        "combo_voice_profile",
+        state.combo_voice_profile,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_button_compact(
+        "button_rename_voice_profile",
+        state.button_rename_voice_profile,
+        y,
+    );
+    move_control_best_effort(
+        "button_add_voice_profile",
+        state.button_add_voice_profile,
+        OPTIONS_CONTROL_X,
+        y,
+        (OPTIONS_CONTROL_WIDTH - 10) / 2,
+        OPTIONS_BUTTON_HEIGHT,
+    );
+    move_control_best_effort(
+        "button_delete_voice_profile",
+        state.button_delete_voice_profile,
+        OPTIONS_CONTROL_X + (OPTIONS_CONTROL_WIDTH - 10) / 2 + 10,
+        y,
+        (OPTIONS_CONTROL_WIDTH - 10) / 2,
+        OPTIONS_BUTTON_HEIGHT,
+    );
+    y += OPTIONS_ROW_HEIGHT;
     y = layout_label_control(
         "label_tts_engine",
         state.label_tts_engine,
@@ -11070,6 +11860,11 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_tts_engine,
             state.label_tts_voice_language,
             state.combo_tts_voice_language,
+            state.label_voice_profile,
+            state.combo_voice_profile,
+            state.button_rename_voice_profile,
+            state.button_add_voice_profile,
+            state.button_delete_voice_profile,
             state.label_voice,
             state.combo_voice,
             state.label_tts_speed,
@@ -11261,6 +12056,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
         refresh_voices(hwnd);
         update_tts_manual_visibility(hwnd);
         update_dialogue_voice_visibility(hwnd);
+        update_voice_profile_delete_button_visibility(hwnd);
     } else if index == OPTIONS_TAB_EDITOR {
         update_indentation_visibility(hwnd);
     } else if index == OPTIONS_TAB_SHORTCUTS {

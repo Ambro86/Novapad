@@ -162,7 +162,10 @@
   "options.label.modified_marker_position": "标记位置已修改：",
   "options.label.open": "打开方式：",
   "options.label.tts_engine": "文本转语音系统：",
-  "options.label.voice": "声音：",
+  "options.label.voice": "声音：","options.label.voice_profile":"语音配置",
+"options.button.apply_selected_profile":"应用所选配置",
+"options.button.add_profile":"添加配置",
+"options.button.delete_profile":"删除",
   "options.label.voice_preview": "语音预览",
   "options.label.insert_voice_tag": "插入语音标签",
   "options.label.tts_manual_tuning": "手动语音调谐",
@@ -604,6 +607,7 @@
   "podcast.gain.triple": "三倍音量",
   "podcast.gain.quadruple": "四倍音量",
   "rss.window.title": "RSS / 文章",
+  "rss.favorites.title": "收藏",
   "rss.tree.add_source": "添加来源",
   "rss.tree.import_txt": "从文件导入",
   "rss.tree.close": "关闭",
@@ -630,8 +634,8 @@
   "rss.date.today": "今天",
   "rss.date.yesterday": "昨天",
   "rss.date.day_before_yesterday": "前天",
-  "rss.reorder.move_up": "往上移动",
-  "rss.reorder.move_down": "往下移动",
+  "rss.reorder.move_up": "往上移动\tCtrl+Shift+Freccia Su",
+  "rss.reorder.move_down": "往下移动\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_top": "移至顶部",
   "rss.reorder.move_bottom": "移至底部",
   "rss.reorder.move_to_position": "移动到位置...",
@@ -770,8 +774,11 @@
   "options.spellcheck.lang.uk": "乌克兰语（乌克兰）",
   "options.tab.rss_podcast": "RSS与播客",
   "rss.context.share_email": "通过电子邮件分享",
+  "rss.context.add_to_favorites": "添加到收藏文章",
   "rss.email.default_subject": "RSS文章",
   "rss.email.body_intro": "我看到这条新闻，你可能会感兴趣：",
+  "rss.favorite_added": "文章已添加到收藏",
+  "rss.favorite_already_exists": "文章已在收藏中",
   "find.replaced_count_one": "{count} 已完成替换。",
   "find.replaced_count_many": "{count} 已完成替换。",
   "dictionary.lookup.language": "词典语言：",
@@ -1061,3 +1068,9 @@
   "options.whisper_model.medium": "中型",
   "options.whisper_model.large": "大型 v3"
 }
+
+
+
+
+
+

@@ -187,6 +187,10 @@
   "options.label.open": "Atviras elgesys:",
   "options.label.tts_engine": "Teksto į kalbą sistema:",
   "options.label.voice": "Balsas:",
+  "options.label.voice_profile": "Balso profilis",
+  "options.button.apply_selected_profile": "Taikyti pasirinktą profilį",
+  "options.button.add_profile": "Pridėti profilį",
+  "options.button.delete_profile": "Ištrinti",
   "options.label.voice_preview": "Peržiūrėti balsą",
   "options.label.insert_voice_tag": "Įterpti balso žymą",
   "options.label.tts_manual_tuning": "Rankinis balso derinimas",
@@ -633,6 +637,7 @@
   "podcast.gain.triple": "Trigubas tūris",
   "podcast.gain.quadruple": "Keturis kartus didesnis tūris",
   "rss.window.title": "RSS / Straipsniai",
+  "rss.favorites.title": "Parankiniai",
   "rss.tree.add_source": "Pridėti šaltinį...",
   "rss.tree.import_txt": "Importuoti iš failo...",
   "rss.tree.close": "Uždaryti",
@@ -659,8 +664,8 @@
   "rss.date.today": "Šiandien",
   "rss.date.yesterday": "Vakar",
   "rss.date.day_before_yesterday": "Priešvakar",
-  "rss.reorder.move_up": "Pereiti aukštyn",
-  "rss.reorder.move_down": "Pereiti žemyn",
+  "rss.reorder.move_up": "Pereiti aukštyn\tCtrl+Shift+Freccia Su",
+  "rss.reorder.move_down": "Pereiti žemyn\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_top": "Perkelti į viršų",
   "rss.reorder.move_bottom": "Perkelti į apačią",
   "rss.reorder.move_to_position": "Perkelti į poziciją...",
@@ -804,8 +809,11 @@
   "options.spellcheck.lang.uk": "Ukrainiečių (Ukraina)",
   "options.tab.rss_podcast": "RSS ir podcast",
   "rss.context.share_email": "Dalytis el. paštu",
+  "rss.context.add_to_favorites": "Pridėti prie mėgstamų straipsnių",
   "rss.email.default_subject": "RSS straipsnis",
   "rss.email.body_intro": "Pamačiau šią naujieną, kuri galėtų jus sudominti:",
+  "rss.favorite_added": "Straipsnis pridėtas prie parankinių",
+  "rss.favorite_already_exists": "Straipsnis jau yra parankiniuose",
   "find.replaced_count_one": "{count} pakeistas.",
   "find.replaced_count_many": "{count} pakeitimai atlikti.",
   "dictionary.lookup.language": "Žodyno kalba:",
@@ -1061,3 +1069,9 @@
   "options.whisper_model.medium": "Vidutinis",
   "options.whisper_model.large": "Didelis v3"
 }
+
+
+
+
+
+

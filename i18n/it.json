@@ -187,7 +187,10 @@
   "options.label.modified_marker_position": "Posizione indicatore modificato:",
   "options.label.open": "Apertura file:",
   "options.label.tts_engine": "Sistema sintesi vocale:",
-  "options.label.voice": "Voce:",
+  "options.label.voice": "Voce:","options.label.voice_profile":"Profilo voce",
+"options.button.apply_selected_profile":"Rinomina profilo",
+"options.button.add_profile":"Aggiungi profilo",
+"options.button.delete_profile":"Elimina",
   "options.label.voice_preview": "Anteprima voce",
   "options.label.insert_voice_tag": "Inserisci tag voce",
   "options.label.tts_manual_tuning": "Regolazione manuale voce",
@@ -634,6 +637,7 @@
   "podcast.gain.triple": "Il triplo del volume",
   "podcast.gain.quadruple": "Il quadruplo del volume",
   "rss.window.title": "RSS / Articoli",
+  "rss.favorites.title": "Preferiti",
   "rss.tree.add_source": "Aggiungi Fonte",
   "rss.tree.import_txt": "Importa da file",
   "rss.tree.close": "Chiudi",
@@ -660,8 +664,8 @@
   "rss.date.today": "oggi",
   "rss.date.yesterday": "ieri",
   "rss.date.day_before_yesterday": "l'altro ieri",
-  "rss.reorder.move_up": "Sposta su",
-  "rss.reorder.move_down": "Sposta giù",
+  "rss.reorder.move_up": "Sposta su\tCtrl+Shift+Freccia Su",
+  "rss.reorder.move_down": "Sposta giù\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_top": "Sposta in cima",
   "rss.reorder.move_bottom": "Sposta in fondo",
   "rss.reorder.move_to_position": "Sposta alla posizione...",
@@ -805,8 +809,11 @@
   "options.spellcheck.lang.uk": "Ucraino (Ucraina)",
   "options.tab.rss_podcast": "RSS e podcast",
   "rss.context.share_email": "Condividi via email",
+  "rss.context.add_to_favorites": "Aggiungi agli articoli preferiti",
   "rss.email.default_subject": "Articolo RSS",
   "rss.email.body_intro": "Ho visto questa notizia che potrebbe interessarti:",
+  "rss.favorite_added": "Articolo aggiunto ai preferiti",
+  "rss.favorite_already_exists": "Articolo già nei preferiti",
   "find.replaced_count_one": "Eseguita {count} sostituzione.",
   "find.replaced_count_many": "Eseguite {count} sostituzioni.",
   "dictionary.lookup.language": "Lingua dizionario:",
@@ -1109,3 +1116,8 @@
   "options.whisper_model.medium": "Medio (medium)",
   "options.whisper_model.large": "Grande v3 (large)"
 }
+
+
+
+
+

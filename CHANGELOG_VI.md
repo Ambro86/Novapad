@@ -5,6 +5,11 @@ Phiên bản 0.6.8 – 2026-03-04
 Novità
 • Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
 
+Cải tiến
+• Đã thêm quản lý hồ sơ giọng nói trong Tùy chọn > Giọng nói: có thể thêm, đổi tên và xóa hồ sơ.
+• Đã thêm hành động trong menu ngữ cảnh bài RSS để thêm bài viết vào mục yêu thích.
+• Nguồn RSS "Yêu thích" có thể bị xóa và sẽ được tạo lại tự động khi thêm bài viết mới vào mục yêu thích.
+• Đã thêm phím tắt RSS để di chuyển nguồn lên/xuống: `Ctrl+Shift+Mũi tên lên` và `Ctrl+Shift+Mũi tên xuống`.
 Sửa lỗi
 • Đã sửa lỗi khiến danh sách tệp đang mở hiển thị trong menu Trợ giúp thay vì menu Cửa sổ.
 • Đã sửa một trường hợp biên khi phát trực tuyến: phát âm thanh có thể bắt đầu nhưng cửa sổ “Đang tải streaming” vẫn mở khi tệp đã tải xuống đã đúng định dạng đích.
@@ -376,6 +381,9 @@ Cải tiến
 
 ## 0.1.0 - 2025-12-25
 - Phiên bản phát hành đầu tiên: Cấu trúc dự án và tệp README.
+
+
+
 
 
 

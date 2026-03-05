@@ -186,7 +186,10 @@
   "options.label.modified_marker_position": "Pozice značky změny:",
   "options.label.open": "Chování při otevírání:",
   "options.label.tts_engine": "Systém převodu textu na řeč:",
-  "options.label.voice": "Hlas:",
+  "options.label.voice": "Hlas:","options.label.voice_profile":"Profil hlasu",
+"options.button.apply_selected_profile":"Použít vybraný profil",
+"options.button.add_profile":"Přidat profil",
+"options.button.delete_profile":"Smazat",
   "options.label.voice_preview": "Ukázka hlasu",
   "options.label.insert_voice_tag": "Vložit tag hlasu",
   "options.label.tts_manual_tuning": "Ruční ladění hlasu",
@@ -634,6 +637,7 @@
   "podcast.gain.triple": "Trojnásobná hlasitost",
   "podcast.gain.quadruple": "Čtyřnásobná hlasitost",
   "rss.window.title": "RSS / Články",
+  "rss.favorites.title": "Oblíbené",
   "rss.tree.add_source": "Přidat zdroj",
   "rss.tree.import_txt": "Importovat ze souboru",
   "rss.tree.close": "Zavřít",
@@ -660,8 +664,8 @@
   "rss.date.today": "dnes",
   "rss.date.yesterday": "včera",
   "rss.date.day_before_yesterday": "předevčírem",
-  "rss.reorder.move_up": "Posunout nahoru",
-  "rss.reorder.move_down": "Posunout dolů",
+  "rss.reorder.move_up": "Posunout nahoru\tCtrl+Shift+Freccia Su",
+  "rss.reorder.move_down": "Posunout dolů\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_top": "Posunout na začátek",
   "rss.reorder.move_bottom": "Posunout na konec",
   "rss.reorder.move_to_position": "Posunout na pozici...",
@@ -804,8 +808,11 @@
   "options.spellcheck.lang.uk": "Ukrajinština (Ukrajina)",
   "options.tab.rss_podcast": "RSS a podcasty",
   "rss.context.share_email": "Sdílet e-mailem",
+  "rss.context.add_to_favorites": "Přidat do oblíbených článků",
   "rss.email.default_subject": "RSS článek",
   "rss.email.body_intro": "Viděl jsem tento článek, mohl by tě zajímat:",
+  "rss.favorite_added": "Článek byl přidán do oblíbených",
+  "rss.favorite_already_exists": "Článek už je v oblíbených",
   "find.replaced_count_one": "Provedena {count} nahrada.",
   "find.replaced_count_many": "Provedeno {count} nahrad.",
   "dictionary.lookup.language": "Jazyk slovníku:",
@@ -1061,3 +1068,9 @@
   "options.whisper_model.medium": "Střední (medium)",
   "options.whisper_model.large": "Velký v3 (large)"
 }
+
+
+
+
+
+

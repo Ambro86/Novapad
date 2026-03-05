@@ -1051,5 +1051,13 @@
   "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
   "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
   "whisper.status.progress": "Transcription {pct} percent.",
-  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?"
+  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "options.tab.ai_transcription": "AI i transkripcija",
+  "options.label.whisper_model": "Whisper model:",
+  "options.label.whisper_cuda": "Omogući CUDA (za Nvidia GPU)",
+  "options.label.whisper_keep_original_language": "Zadrži originalni jezik zvuka",
+  "options.label.whisper_include_timestamps": "Uključi vremenske oznake u transkripciju",
+  "options.whisper_model.small": "Mali",
+  "options.whisper_model.medium": "Srednji",
+  "options.whisper_model.large": "Veliki v3"
 }

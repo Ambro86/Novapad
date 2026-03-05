@@ -12,9 +12,9 @@
 Estende il classico editor di testo con il supporto a più formati di documento,
 funzionalità avanzate di accessibilità e capacità di Text-to-Speech (TTS).
 
-Include inoltre un **player MP3 per audiolibri**, un **sistema di segnalibri per testo e audio**
-e la possibilit… di **creare audiolibri direttamente dal testo utilizzando le voci Microsoft (Edge Neural) e SAPI5**,
-oltre alla **registrazione podcast da microfono e audio di sistema**.
+Include inoltre un **player media/audiolibri**, un **sistema di segnalibri per testo e audio**
+e la possibilita' di **creare audiolibri direttamente dal testo utilizzando le voci Microsoft (Edge Neural) e SAPI5**,
+la **trascrizione audio con Whisper/faster-whisper** e la **registrazione podcast da microfono e audio di sistema**.
 
 > ⚠️ **Avviso di licenza**
 > Questo progetto è **source-available ma NON open source**.
@@ -41,11 +41,17 @@ oltre alla **registrazione podcast da microfono e audio di sistema**.
   - Supporto voci Microsoft e SAPI5/OneCore per lettura e salvataggio audiolibri
   - Aggiunta di voci ai preferiti e cambio rapido durante la lettura
   - Dizionario con sostituzioni personalizzate applicate alla lettura e agli audiolibri
-- **Player MP3 (audiolibri)**
-  - Apertura e riproduzione di file MP3
+- **Riproduzione media e streaming**
+  - Apertura e riproduzione di file media locali (inclusi audiolibri MP3)
+  - Apertura e riproduzione da URL streaming diretti
   - Avanzamento e riavvolgimento con i tasti freccia
   - Play/Pausa con la barra spaziatrice
   - Volume su/giù con i tasti freccia
+- **Trascrizione audio (Whisper / faster-whisper)**
+  - Trascrizione dell'audio/media attualmente in riproduzione
+  - Timestamp opzionali nell'output
+  - Accelerazione CUDA opzionale (GPU NVIDIA) con download runtime
+  - Download automatico bridge/modelli al primo utilizzo
 - **Segnalibri**
   - Creazione e gestione di segnalibri sia per file di testo sia per la riproduzione MP3
   - Salto rapido alle posizioni salvate nei documenti o nell'audio
@@ -59,6 +65,7 @@ oltre alla **registrazione podcast da microfono e audio di sistema**.
   - Registra in batch (Ctrl+Shift+B)
   - Registra podcast (Ctrl+Shift+R)
   - Converti audio (Ctrl+Shift+A)
+  - Trascrivi audio/media corrente
 - **Accessibilità**
   Progettato per funzionare correttamente con screen reader
   come NVDA e JAWS.
@@ -130,6 +137,14 @@ e sono soggette ai termini di servizio Microsoft.
 **L’uso commerciale è espressamente vietato.**
 
 Per i dettagli completi fare riferimento al file `LICENSE`.
+
+## Binari di terze parti e avvisi
+
+Il progetto include binari di terze parti (ad esempio DLL BASS e file runtime CUDA opzionali) e può scaricare altri componenti di terze parti a runtime.
+
+Vedi [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) per elenco e riferimenti upstream.
+
+In caso di redistribuzione dei binari, la conformità alle licenze e ai termini di redistribuzione delle terze parti è responsabilità di chi distribuisce.
 
 ---
 

@@ -1,15 +1,21 @@
 # Changelog
 
 Version 0.6.8 – 2026-03-04
+
+Novità
+• Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
+
 Bug fixes
 • Fixed a bug where the list of open files was shown in the Help menu instead of the Window menu.
 • Fixed a streaming edge case where playback could start but the “Downloading stream” dialog stayed open when the downloaded file already matched the target format.
+• Fixed MP3 streaming conversion behavior: when the stream is already MP3 and the user selects an explicit MP3 bitrate (for example 128 kbps), Sonarpad now re-encodes to the selected bitrate instead of skipping conversion.
 • Added embedded podcast chapter support from local media files (e.g., MP3 chapter metadata): when feed/URL chapters are unavailable, Sonarpad now loads chapters from the downloaded file in the background, so playback starts immediately and chapter data is applied as soon as it is ready.
 • Fixed dialogue voice tuning: speed/pitch/volume settings are now correctly applied for both the first and second dialogue voices during synthesis.
 • Improved text encoding detection for Japanese `.txt` files: added a safe Shift_JIS/CP932 fallback for mojibake cases, while preserving existing UTF/diacritics/Chinese behavior.
 • Internal safety refactor: converted functions to safe implementations where possible and significantly reduced unsafe code lines.
 Version 0.6.7 – 2026-03-02
 Improvements
+• Ora il programma riesce a gestire Sostituisci tutto in modo massivo su file grandi con un gran numero di sostituzioni.
 • Updated Polish translation thanks to DJ Graco.
 • Added Lithuanian translation.
 • Added Chinese translation.
@@ -369,6 +375,7 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
+
 
 
 

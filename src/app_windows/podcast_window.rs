@@ -701,7 +701,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     Default::default(),
                     WC_BUTTON,
                     PCWSTR(to_wide(&labels.resume).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    WS_CHILD,
                     220,
                     465,
                     90,
@@ -1607,6 +1607,7 @@ fn update_format_controls(state: &PodcastState) {
 
 fn update_recording_controls(state: &PodcastState) {
     unsafe {
+        let labels = labels(state.language);
         let has_sources = is_checked(state.include_mic) || is_checked(state.include_system);
         let status = state
             .recorder
@@ -1615,10 +1616,19 @@ fn update_recording_controls(state: &PodcastState) {
             .unwrap_or(RecorderStatus::Idle);
         let recording = matches!(status, RecorderStatus::Recording);
         let paused = matches!(status, RecorderStatus::Paused);
+        let pause_label = if paused { labels.resume } else { labels.pause };
+        let pause_wide = to_wide(&pause_label);
 
         EnableWindow(state.start_button, has_sources && !recording && !paused);
         EnableWindow(state.pause_button, recording || paused);
-        EnableWindow(state.resume_button, paused);
+        if let Err(_e) = SetWindowTextW(state.pause_button, PCWSTR(pause_wide.as_ptr())) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
+        EnableWindow(state.resume_button, false);
+        ShowWindow(
+            state.resume_button,
+            windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
+        );
         EnableWindow(state.stop_button, recording || paused);
     }
 }

@@ -958,10 +958,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         tab_editor: i18n::tr(language, "options.tab.editor"),
         tab_audio: i18n::tr(language, "options.tab.audio"),
         tab_rss_podcast: i18n::tr(language, "options.tab.rss_podcast"),
-        tab_ai_transcription: match language {
-            Language::Italian => "AI e trascrizione".to_string(),
-            _ => "AI and Transcription".to_string(),
-        },
+        tab_ai_transcription: i18n::tr(language, "options.tab.ai_transcription"),
         tab_shortcuts: shortcut_tab_title(language),
         label_language: i18n::tr(language, "options.label.language"),
         label_modified_marker_position: i18n::tr(
@@ -1135,34 +1132,19 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_podcast_time_display: i18n::tr(language, "options.label.podcast_time_display"),
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
-        label_whisper_model: match language {
-            Language::Italian => "Modello Whisper:".to_string(),
-            _ => "Whisper model:".to_string(),
-        },
-        label_whisper_cuda: match language {
-            Language::Italian => "Attiva CUDA (per schede video Nvidia)".to_string(),
-            _ => "Enable CUDA (for Nvidia GPUs)".to_string(),
-        },
-        label_whisper_keep_original_language: match language {
-            Language::Italian => "Mantieni lingua originale dell'audio".to_string(),
-            _ => "Keep original audio language".to_string(),
-        },
-        label_whisper_include_timestamps: match language {
-            Language::Italian => "Includi timestamp nella trascrizione".to_string(),
-            _ => "Include timestamps in transcription".to_string(),
-        },
-        whisper_model_small: match language {
-            Language::Italian => "Piccolo (small)".to_string(),
-            _ => "Small".to_string(),
-        },
-        whisper_model_medium: match language {
-            Language::Italian => "Medio (medium)".to_string(),
-            _ => "Medium".to_string(),
-        },
-        whisper_model_large: match language {
-            Language::Italian => "Grande v3 (large)".to_string(),
-            _ => "Large v3".to_string(),
-        },
+        label_whisper_model: i18n::tr(language, "options.label.whisper_model"),
+        label_whisper_cuda: i18n::tr(language, "options.label.whisper_cuda"),
+        label_whisper_keep_original_language: i18n::tr(
+            language,
+            "options.label.whisper_keep_original_language",
+        ),
+        label_whisper_include_timestamps: i18n::tr(
+            language,
+            "options.label.whisper_include_timestamps",
+        ),
+        whisper_model_small: i18n::tr(language, "options.whisper_model.small"),
+        whisper_model_medium: i18n::tr(language, "options.whisper_model.medium"),
+        whisper_model_large: i18n::tr(language, "options.whisper_model.large"),
         label_podcastindex_signup: i18n::tr(language, "options.button.podcastindex_signup"),
         lang_it: i18n::tr(language, "options.lang.it"),
         lang_en: i18n::tr(language, "options.lang.en"),

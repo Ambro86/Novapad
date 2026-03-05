@@ -1099,5 +1099,13 @@
   "options.lang.lt": "Lituano",
   "playback.transcribe_current": "Trascrivi audio corrente",
   "whisper.model.choice_intro": "Scelta modello Whisper (primo utilizzo): Small, Medium o Large.",
-  "whisper.model.choice_advanced": "Scelta modello Whisper avanzata disponibile nella casella elenco."
+  "whisper.model.choice_advanced": "Scelta modello Whisper avanzata disponibile nella casella elenco.",
+  "options.tab.ai_transcription": "AI e trascrizione",
+  "options.label.whisper_model": "Modello Whisper:",
+  "options.label.whisper_cuda": "Attiva CUDA (per schede video Nvidia)",
+  "options.label.whisper_keep_original_language": "Mantieni lingua originale dell'audio",
+  "options.label.whisper_include_timestamps": "Includi timestamp nella trascrizione",
+  "options.whisper_model.small": "Piccolo (small)",
+  "options.whisper_model.medium": "Medio (medium)",
+  "options.whisper_model.large": "Grande v3 (large)"
 }

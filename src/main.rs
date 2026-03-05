@@ -2213,7 +2213,7 @@ fn cancel_whisper_transcription(hwnd: HWND) {
     crate::set_focus_safe(hwnd);
 }
 
-fn open_whisper_progress_window(hwnd: HWND, language: Language) {
+pub(crate) fn open_whisper_progress_window(hwnd: HWND, language: Language) {
     let labels = app_windows::podcast_save_window::SaveDialogLabels {
         title: i18n::tr(language, "whisper.progress_title"),
         in_progress: i18n::tr(language, "whisper.status.transcribing"),
@@ -2226,7 +2226,7 @@ fn open_whisper_progress_window(hwnd: HWND, language: Language) {
     });
 }
 
-fn update_whisper_progress_window(hwnd: HWND, pct: usize) {
+pub(crate) fn update_whisper_progress_window(hwnd: HWND, pct: usize) {
     let dialog = with_state(hwnd, |state| state.transcription_progress_window).unwrap_or(HWND(0));
     if dialog.0 != 0 {
         crate::send_message_w_safe(
@@ -2238,7 +2238,7 @@ fn update_whisper_progress_window(hwnd: HWND, pct: usize) {
     }
 }
 
-fn close_whisper_progress_window(hwnd: HWND) {
+pub(crate) fn close_whisper_progress_window(hwnd: HWND) {
     let dialog = with_state(hwnd, |state| state.transcription_progress_window).unwrap_or(HWND(0));
     if dialog.0 != 0 {
         crate::send_message_w_safe(
@@ -2662,6 +2662,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.prompt_window.0 != 0
                 || state.podcast_window.0 != 0
                 || state.podcast_save_window.0 != 0
+                || state.replace_progress_window.0 != 0
                 || state.update_progress_window.0 != 0
                 || state.transcription_progress_window.0 != 0
                 || state.batch_audiobooks_window.0 != 0
@@ -2693,6 +2694,7 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
                 && state.transcription_progress_window.0 == 0
                 && state.podcast_window.0 == 0
                 && state.podcast_save_window.0 == 0
+                && state.replace_progress_window.0 == 0
                 && !audiobook_progress_in_foreground
                 && !is_reader_mode
         })
@@ -2770,6 +2772,7 @@ pub(crate) struct AppState {
     prompt_window: HWND,
     podcast_window: HWND,
     podcast_save_window: HWND,
+    replace_progress_window: HWND,
     update_progress_window: HWND,
     transcription_progress_window: HWND,
     batch_audiobooks_window: HWND,
@@ -2795,6 +2798,8 @@ pub(crate) struct AppState {
     find_whole_word: bool,
     find_replace_in_selection: bool,
     find_replace_in_all_docs: bool,
+    replace_cancel_requested: bool,
+    replace_cancel_token: Option<Arc<AtomicBool>>,
     pdf_loading: Vec<PdfLoadingState>,
     next_timer_id: usize,
     tts_session: Option<TtsSession>,
@@ -3529,6 +3534,15 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                     handled = true;
                     return;
                 }
+                if state.replace_progress_window.0 != 0
+                    && app_windows::podcast_save_window::handle_navigation(
+                        state.replace_progress_window,
+                        &msg,
+                    )
+                {
+                    handled = true;
+                    return;
+                }
                 if state.update_progress_window.0 != 0
                     && app_windows::podcast_save_window::handle_navigation(
                         state.update_progress_window,
@@ -4118,6 +4132,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     go_to_time_dialog: HWND(0),
                     playback_menu: HMENU(0),
                     podcast_save_window: HWND(0),
+                    replace_progress_window: HWND(0),
                     update_progress_window: HWND(0),
                     transcription_progress_window: HWND(0),
                     batch_audiobooks_window: HWND(0),
@@ -4136,6 +4151,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     find_whole_word: false,
                     find_replace_in_selection: false,
                     find_replace_in_all_docs: false,
+                    replace_cancel_requested: false,
+                    replace_cancel_token: None,
                     pdf_loading: Vec::new(),
                     next_timer_id: 1,
                     tts_session: None,
@@ -4671,20 +4688,41 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     if state.transcription_progress_window == closed_hwnd {
                         state.transcription_progress_window = HWND(0);
                     }
+                    if state.replace_progress_window == closed_hwnd {
+                        state.replace_progress_window = HWND(0);
+                        state.replace_cancel_requested = false;
+                        state.replace_cancel_token = None;
+                    }
                 });
                 LRESULT(0)
             }
             app_windows::podcast_save_window::WM_PODCAST_SAVE_CANCEL => {
                 let source_hwnd = HWND(lparam.0);
+                let is_replace = with_state(hwnd, |state| {
+                    source_hwnd.0 != 0 && state.replace_progress_window == source_hwnd
+                })
+                .unwrap_or(false);
                 let is_whisper = with_state(hwnd, |state| {
                     state.transcription_in_progress
                         && source_hwnd.0 != 0
                         && state.transcription_progress_window == source_hwnd
                 })
                 .unwrap_or(false);
+                if is_replace {
+                    with_state(hwnd, |state| {
+                        state.replace_cancel_requested = true;
+                        if let Some(token) = state.replace_cancel_token.as_ref() {
+                            token.store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
+                    });
+                }
                 if is_whisper {
                     cancel_whisper_transcription(hwnd);
                 }
+                LRESULT(0)
+            }
+            search::WM_REPLACE_ALL_PROGRESS => {
+                search::handle_replace_all_progress(hwnd, wparam);
                 LRESULT(0)
             }
             WM_AUTO_UPDATE_CHECK => {
@@ -4703,6 +4741,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 if !has_secondary_window_open(hwnd) {
                     app_windows::help_window::open_changelog(hwnd);
                 }
+                LRESULT(0)
+            }
+            search::WM_REPLACE_ALL_DONE => {
+                search::handle_replace_all_done(hwnd, lparam);
                 LRESULT(0)
             }
             WM_PDF_LOADED => {

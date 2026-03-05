@@ -95,6 +95,20 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     handle_accessibility(hwnd, msg)
 }
 
+pub fn focus_cancel_button(hwnd: HWND) {
+    if with_save_state(hwnd, |state| {
+        if state.cancel_button.0 != 0 {
+            crate::set_focus_safe(state.cancel_button);
+        } else {
+            crate::set_focus_safe(state.label);
+        }
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access save state for focus");
+    }
+}
+
 pub fn open(parent: HWND) -> HWND {
     unsafe {
         let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);

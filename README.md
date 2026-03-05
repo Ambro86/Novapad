@@ -12,9 +12,9 @@
 It extends traditional text editing with multi-format document support,
 advanced accessibility features, and Text-to-Speech (TTS) capabilities.
 
-It also includes an integrated **MP3 audiobook player**, a **bookmark system for both text and audio**,
-and the ability to **create audiobooks directly from text using Microsoft voices (Edge Neural) and SAPI5**,
-plus **podcast recording from microphone and system audio**.
+It also includes an integrated **media/audiobook player**, a **bookmark system for both text and audio**,
+the ability to **create audiobooks directly from text using Microsoft voices (Edge Neural) and SAPI5**,
+**audio transcription with Whisper/faster-whisper**, and **podcast recording from microphone and system audio**.
 
 > ⚠️ **License Notice**
 > This project is **source-available but NOT open source**.
@@ -39,11 +39,17 @@ plus **podcast recording from microphone and system audio**.
   - Supports both Microsoft voices and SAPI5/OneCore for playback and audiobook saving
   - Add voices to favorites and switch quickly during reading
   - Dictionary with user-defined word replacements applied during reading and audiobook creation
-- **MP3 Audiobook Player**
-  - Open and play MP3 files
+- **Media and Streaming Playback**
+  - Open and play local media files (including MP3 audiobooks)
+  - Open and play direct streaming URLs
   - Seek forward/backward using arrow keys
   - Play/Pause with the Space bar
   - Volume up/down using arrow keys
+- **Audio Transcription (Whisper / faster-whisper)**
+  - Transcribe the currently playing audio/media
+  - Optional timestamped transcript output
+  - Optional CUDA acceleration (NVIDIA GPUs) with runtime package download
+  - Automatic bridge/model download on first use
 - **Bookmarks**
   - Create and manage bookmarks for both text files and MP3 playback
   - Quickly jump to saved positions in documents or audio
@@ -57,6 +63,7 @@ plus **podcast recording from microphone and system audio**.
   - Batch audiobooks (Ctrl+Shift+B)
   - Record podcast (Ctrl+Shift+R)
   - Convert Audio (Ctrl+Shift+A)
+  - Transcribe current audio/media
 - **Accessibility-Focused**
   Designed to work correctly with screen readers such as NVDA and JAWS.
 - **Accessible Terminal**
@@ -121,6 +128,14 @@ Microsoft Terms of Service.
 **Commercial usage is explicitly prohibited.**
 
 Refer to the `LICENSE` file for full terms.
+
+## Third-Party Binaries and Notices
+
+This project includes third-party binaries (for example BASS-related DLLs and optional CUDA runtime files) and may download additional third-party assets at runtime.
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details and upstream references.
+
+If you redistribute binaries, you are responsible for compliance with all third-party licenses and redistribution terms.
 
 ---
 

@@ -1,15 +1,21 @@
 # Changelog
 
 Versão 0.6.8 – 2026-03-04
+
+Novità
+• Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
+
 Correções
 • Corrigido um erro em que a lista de ficheiros abertos era mostrada no menu Ajuda em vez do menu Janela.
 • Corrigido um caso limite no streaming em que a reprodução podia iniciar, mas a janela “Transferência de streaming” permanecia aberta quando o ficheiro descarregado já correspondia ao formato de destino.
+• Corrigido o comportamento de conversão no streaming MP3: quando o stream já está em MP3 e o utilizador escolhe um bitrate MP3 explícito (por exemplo 128 kbps), o Sonarpad agora recodifica para o bitrate selecionado em vez de saltar a conversão.
 • Adicionado suporte a capítulos de podcast incorporados em ficheiros multimédia locais (por exemplo, metadados de capítulos MP3): quando o feed/URL não fornece capítulos, o Sonarpad passa a carregá-los do ficheiro descarregado em segundo plano, permitindo início imediato da reprodução e aplicação dos capítulos assim que ficam disponíveis.
 • Corrigido um erro nas vozes de diálogo: os parâmetros de velocidade/tom/volume da primeira e da segunda voz de diálogo são agora aplicados corretamente durante a síntese.
 • Melhorada a deteção de codificação para ficheiros japoneses `.txt`: adicionado fallback seguro Shift_JIS/CP932 em casos de mojibake, preservando o comportamento existente para UTF/diacríticos/chinês.
 • Refatoração interna de segurança: conversão para implementações safe sempre que possível e redução drástica das linhas de código unsafe.
 Versão 0.6.7 – 2026-03-02
 Melhorias
+• Ora il programma riesce a gestire Sostituisci tutto in modo massivo su file grandi con un gran numero di sostituzioni.
 • Tradução polaca atualizada graças ao DJ Graco.
 • Adicionada a tradução lituana.
 • Adicionada a tradução chinesa.
@@ -370,6 +376,7 @@ Melhorias
 
 ## 0.1.0 - 2025-12-25
 - Versao inicial: estrutura do projeto e README.
+
 
 
 

@@ -1,15 +1,21 @@
 # Journal des modifications
 
 Version 0.6.8 – 2026-03-04
+
+Novità
+• Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
+
 Correctifs
 • Correction d’un bug où la liste des fichiers ouverts s’affichait dans le menu Aide au lieu du menu Fenêtre.
 • Correction d’un cas limite de streaming où la lecture pouvait démarrer mais la fenêtre « Téléchargement du flux » restait ouverte lorsque le fichier téléchargé correspondait déjà au format cible.
+• Correction du comportement de conversion en streaming MP3 : lorsque le flux est déjà en MP3 et que l’utilisateur choisit un bitrate MP3 explicite (par exemple 128 kbps), Sonarpad réencode désormais au bitrate sélectionné au lieu d’ignorer la conversion.
 • Ajout de la prise en charge des chapitres de podcast intégrés dans les fichiers multimédias locaux (par ex. métadonnées de chapitres MP3) : lorsque le flux/URL ne fournit pas de chapitres, Sonarpad les charge désormais depuis le fichier téléchargé en arrière-plan, ce qui permet de démarrer la lecture immédiatement puis d’appliquer les chapitres dès qu’ils sont disponibles.
 • Correction d’un bug des voix de dialogue : les paramètres vitesse/tonalité/volume de la première et de la seconde voix de dialogue sont désormais correctement appliqués pendant la synthèse.
 • Amélioration de la détection d’encodage pour les fichiers japonais `.txt` : ajout d’un fallback Shift_JIS/CP932 sûr en cas de mojibake, tout en préservant le comportement existant pour UTF/diacritiques/chinois.
 • Refactorisation interne de sûreté : conversion vers des implémentations safe lorsque possible et réduction drastique des lignes de code unsafe.
 Version 0.6.7 – 2026-03-02
 Améliorations
+• Ora il programma riesce a gestire Sostituisci tutto in modo massivo su file grandi con un gran numero di sostituzioni.
 • Mise à jour de la traduction polonaise grâce à DJ Graco.
 • Ajout de la traduction lituanienne.
 • Ajout de la traduction chinoise.
@@ -363,6 +369,7 @@ Améliorations
 
 ## 0.1.0 - 2025-12-25
 - Version initiale.
+
 
 
 

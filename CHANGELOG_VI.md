@@ -1,15 +1,21 @@
 # Nhật ký thay đổi
 
 Phiên bản 0.6.8 – 2026-03-04
+
+Novità
+• Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
+
 Sửa lỗi
 • Đã sửa lỗi khiến danh sách tệp đang mở hiển thị trong menu Trợ giúp thay vì menu Cửa sổ.
 • Đã sửa một trường hợp biên khi phát trực tuyến: phát âm thanh có thể bắt đầu nhưng cửa sổ “Đang tải streaming” vẫn mở khi tệp đã tải xuống đã đúng định dạng đích.
+• Đã sửa hành vi chuyển đổi với streaming MP3: khi luồng đã là MP3 và người dùng chọn bitrate MP3 cụ thể (ví dụ 128 kbps), Sonarpad giờ sẽ mã hóa lại theo bitrate đã chọn thay vì bỏ qua bước chuyển đổi.
 • Đã bổ sung hỗ trợ chương podcast nhúng trong tệp media cục bộ (ví dụ metadata chương của MP3): khi feed/URL không cung cấp chương, Sonarpad sẽ nạp chương từ tệp đã tải ở chế độ nền, giúp phát bắt đầu ngay và áp dụng chương ngay khi sẵn sàng.
 • Đã sửa lỗi giọng hội thoại: các tham số tốc độ/cao độ/âm lượng của giọng hội thoại thứ nhất và thứ hai giờ được áp dụng đúng trong quá trình tổng hợp giọng nói.
 • Đã cải thiện nhận diện mã hóa cho tệp `.txt` tiếng Nhật: thêm fallback Shift_JIS/CP932 an toàn cho các trường hợp mojibake, đồng thời giữ nguyên hành vi hiện có với UTF/diacritics/tiếng Trung.
 • Tái cấu trúc an toàn nội bộ: chuyển sang triển khai safe ở những nơi có thể và giảm mạnh số dòng mã unsafe.
 Phiên bản 0.6.7 – 2026-03-02
 Cải tiến
+• Ora il programma riesce a gestire Sostituisci tutto in modo massivo su file grandi con un gran numero di sostituzioni.
 • Đã cập nhật bản dịch tiếng Ba Lan nhờ DJ Graco.
 • Đã thêm bản dịch tiếng Litva.
 • Đã thêm bản dịch tiếng Trung.
@@ -370,6 +376,7 @@ Cải tiến
 
 ## 0.1.0 - 2025-12-25
 - Phiên bản phát hành đầu tiên: Cấu trúc dự án và tệp README.
+
 
 
 

@@ -3412,12 +3412,19 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         .as_audio_convert_settings(dialog_data.quality)
     {
         let target_ext = dialog_data.format.extension().unwrap_or("mp3");
-        if downloaded_path
+        let same_extension = downloaded_path
             .extension()
             .and_then(|e| e.to_str())
             .map(|e| e.eq_ignore_ascii_case(target_ext))
-            .unwrap_or(false)
-        {
+            .unwrap_or(false);
+        let must_reencode_mp3 = matches!(
+            (dialog_data.format, dialog_data.quality),
+            (
+                StreamOutputFormat::Mp3,
+                StreamQualitySelection::BitrateKbps(_)
+            )
+        );
+        if same_extension && !must_reencode_mp3 {
             close_progress_dialog(progress);
             downloaded_path.clone()
         } else {

@@ -1,12 +1,18 @@
 use crate::accessibility::{EM_REPLACESEL, EM_SCROLLCARET, to_wide};
+use crate::app_windows::podcast_save_window::{
+    self, SaveDialogLabels, WM_PODCAST_SAVE_DONE, WM_PODCAST_SAVE_PROGRESS,
+};
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
 use crate::settings::{Language, find_title, text_not_found_message};
 use crate::{get_active_edit, show_error, show_info, with_state};
 use fancy_regex::Regex;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use windows::Win32::Foundation::HINSTANCE;
-use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+use windows::Win32::Foundation::{BOOL, HWND, LPARAM, WPARAM};
 use windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT;
+use windows::Win32::Graphics::Gdi::InvalidateRect;
 use windows::Win32::UI::Controls::Dialogs::{
     FINDREPLACE_FLAGS, FINDREPLACEW, FR_DIALOGTERM, FR_DOWN, FR_ENABLEHOOK, FR_FINDNEXT,
     FR_HIDEMATCHCASE, FR_HIDEWHOLEWORD, FR_MATCHCASE, FR_REPLACE, FR_REPLACEALL, FR_WHOLEWORD,
@@ -20,12 +26,14 @@ use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, GetClientRect, GetWindowRect,
     HMENU, MB_ICONWARNING, MB_OK, SWP_NOMOVE, SWP_NOZORDER, SendMessageW, SetWindowPos,
-    WINDOW_STYLE, WM_COMMAND, WM_GETTEXTLENGTH, WM_INITDIALOG, WM_SETFONT,
+    WINDOW_STYLE, WM_APP, WM_COMMAND, WM_GETTEXTLENGTH, WM_INITDIALOG, WM_SETFONT, WM_SETREDRAW,
 };
 use windows::core::{PCWSTR, PWSTR};
 
 pub const FIND_DIALOG_ID: isize = 1;
 pub const REPLACE_DIALOG_ID: isize = 2;
+pub const WM_REPLACE_ALL_DONE: u32 = WM_APP + 191;
+pub const WM_REPLACE_ALL_PROGRESS: u32 = WM_APP + 192;
 const FIND_ID_REGEX: isize = 5101;
 const FIND_ID_DOT_MATCHES_NEWLINE: isize = 5102;
 const FIND_ID_WRAP_AROUND: isize = 5103;
@@ -33,6 +41,20 @@ const FIND_ID_MATCH_CASE: isize = 5106;
 const FIND_ID_WHOLE_WORD: isize = 5107;
 const REPLACE_ID_IN_SELECTION: isize = 5104;
 const REPLACE_ID_IN_ALL_DOCS: isize = 5105;
+struct ReplaceAllDone {
+    progress: HWND,
+    language: Language,
+    count: usize,
+    canceled: bool,
+    patches: Vec<ReplacePatch>,
+}
+
+struct ReplacePatch {
+    hwnd_edit: HWND,
+    start_utf16: i32,
+    end_utf16: i32,
+    replaced: String,
+}
 
 #[derive(Copy, Clone)]
 pub struct FindOptions {
@@ -323,6 +345,83 @@ fn replaced_count_message(language: Language, count: usize) -> String {
     i18n::tr_f(language, key, &[("count", &count.to_string())])
 }
 
+fn suspend_edit_redraw(hwnd_edit: HWND) {
+    unsafe {
+        SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+    }
+}
+
+fn resume_edit_redraw(hwnd_edit: HWND) {
+    unsafe {
+        SendMessageW(hwnd_edit, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+        if !InvalidateRect(hwnd_edit, None, BOOL(1)).as_bool() {
+            crate::log_debug("InvalidateRect failed after replace all");
+        }
+    }
+}
+
+fn open_replace_progress_window(parent: HWND, language: Language) -> HWND {
+    let replace_raw = i18n::tr(language, "edit.replace");
+    let replace_title = replace_raw
+        .split('\t')
+        .next()
+        .unwrap_or("")
+        .replace('&', "")
+        .replace("...", "")
+        .trim()
+        .to_string();
+    let labels = SaveDialogLabels {
+        title: if replace_title.is_empty() {
+            i18n::tr(language, "app.find_title")
+        } else {
+            replace_title
+        },
+        in_progress: i18n::tr(language, "podcast.save.in_progress"),
+        cancel: i18n::tr(language, "podcast.save.cancel"),
+        cancel_confirm: i18n::tr(language, "podcast.cancel_confirm"),
+    };
+    let dialog = podcast_save_window::open_with_labels(parent, language, labels, true);
+    with_state(parent, |state| {
+        state.replace_progress_window = dialog;
+        state.replace_cancel_requested = false;
+    });
+    if dialog.0 != 0 {
+        crate::set_foreground_window_safe(dialog);
+        crate::app_windows::podcast_save_window::focus_cancel_button(dialog);
+        let _unused = crate::post_message_w_safe(
+            dialog,
+            windows::Win32::UI::WindowsAndMessaging::WM_SETFOCUS,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        let _unused = crate::post_message_w_safe(dialog, crate::WM_NULL, WPARAM(0), LPARAM(0));
+        crate::app_windows::podcast_save_window::focus_cancel_button(dialog);
+    }
+    dialog
+}
+
+fn close_replace_progress_window(parent: HWND, dialog: HWND) {
+    if dialog.0 != 0 {
+        crate::send_message_w_safe(dialog, WM_PODCAST_SAVE_DONE, WPARAM(0), LPARAM(0));
+    }
+    with_state(parent, |state| {
+        state.replace_progress_window = HWND(0);
+        state.replace_cancel_requested = false;
+    });
+}
+
+fn update_replace_progress_window(parent: HWND, pct: usize) {
+    let dialog = with_state(parent, |state| state.replace_progress_window).unwrap_or(HWND(0));
+    if dialog.0 != 0 {
+        let _unused = crate::post_message_w_safe(
+            dialog,
+            WM_PODCAST_SAVE_PROGRESS,
+            WPARAM(pct.min(100)),
+            LPARAM(0),
+        );
+    }
+}
+
 pub fn find_next(
     hwnd: HWND,
     hwnd_edit: HWND,
@@ -467,87 +566,128 @@ pub fn replace_all(
     flags: FINDREPLACE_FLAGS,
     options: &FindOptions,
 ) {
-    unsafe {
-        if options.use_regex {
-            replace_all_regex(hwnd, hwnd_edit, search, replace, flags, options);
-            return;
+    if options.use_regex {
+        replace_all_regex(hwnd, hwnd_edit, search, replace, flags, options);
+        return;
+    }
+    if search.is_empty() {
+        return;
+    }
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let replace_dialog = with_state(hwnd, |state| state.replace_dialog).unwrap_or(HWND(0));
+    if replace_dialog.0 != 0 {
+        crate::send_message_w_safe(
+            replace_dialog,
+            windows::Win32::UI::WindowsAndMessaging::WM_CLOSE,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        with_state(hwnd, |state| {
+            state.replace_dialog = HWND(0);
+            state.replace_replace = None;
+        });
+    }
+    let progress = open_replace_progress_window(hwnd, language);
+    update_replace_progress_window(hwnd, 0);
+    let search_owned = search.to_string();
+    let replace_owned = replace.to_string();
+    let replace_in_all_docs = options.replace_in_all_docs;
+    let replace_in_selection = options.replace_in_selection;
+    let mut jobs: Vec<(HWND, String, i32, i32)> = Vec::new();
+    if replace_in_all_docs {
+        let edits = with_state(hwnd, |state| {
+            state
+                .docs
+                .iter()
+                .map(|doc| (doc.hwnd_edit, get_edit_text(doc.hwnd_edit)))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+        for (hwnd_doc, text) in edits {
+            let total_utf16 = byte_index_to_utf16(&text, text.len());
+            jobs.push((hwnd_doc, text, 0, total_utf16));
         }
-        if options.replace_in_all_docs {
-            replace_all_in_all_docs(hwnd, search, replace, flags);
-            return;
-        }
-        if options.replace_in_selection {
-            replace_all_in_selection(hwnd, hwnd_edit, search, replace, flags);
-            return;
-        }
-        if search.is_empty() {
-            return;
-        }
-        let mut start = 0i32;
-        let mut count = 0usize;
-        let replace_wide = to_wide(replace);
-        let search_wide = to_wide(search);
-
-        loop {
-            let mut ft = FINDTEXTEXW {
-                chrg: CHARRANGE {
-                    cpMin: start,
-                    cpMax: -1,
-                },
-                lpstrText: PCWSTR(search_wide.as_ptr()),
-                chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
-            };
-
-            let res = SendMessageW(
+    } else if replace_in_selection {
+        let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
+        unsafe {
+            SendMessageW(
                 hwnd_edit,
-                EM_FINDTEXTEXW,
-                WPARAM(flags.0 as usize),
-                LPARAM(&mut ft as *mut _ as isize),
+                EM_EXGETSEL,
+                WPARAM(0),
+                LPARAM(&mut cr as *mut _ as isize),
             );
-
-            if res.0 != -1 {
-                SendMessageW(
-                    hwnd_edit,
-                    EM_EXSETSEL,
-                    WPARAM(0),
-                    LPARAM(&mut ft.chrgText as *mut _ as isize),
-                );
-                SendMessageW(
-                    hwnd_edit,
-                    EM_REPLACESEL,
-                    WPARAM(1),
-                    LPARAM(replace_wide.as_ptr() as isize),
-                );
-                count += 1;
-
-                let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-                SendMessageW(
-                    hwnd_edit,
-                    EM_EXGETSEL,
-                    WPARAM(0),
-                    LPARAM(&mut cr as *mut _ as isize),
-                );
-                start = cr.cpMax;
-            } else {
+        }
+        if cr.cpMin != cr.cpMax {
+            jobs.push((hwnd_edit, get_edit_text(hwnd_edit), cr.cpMin, cr.cpMax));
+        }
+    } else {
+        let text = get_edit_text(hwnd_edit);
+        let total_utf16 = byte_index_to_utf16(&text, text.len());
+        jobs.push((hwnd_edit, text, 0, total_utf16));
+    }
+    let total_utf16_all: i32 = jobs.iter().map(|(_, _, s, e)| (e - s).max(0)).sum();
+    let cancel_token = Arc::new(AtomicBool::new(false));
+    with_state(hwnd, |state| {
+        state.replace_cancel_token = Some(cancel_token.clone());
+        state.replace_cancel_requested = false;
+    });
+    std::thread::spawn(move || {
+        let mut patches = Vec::new();
+        let mut total_count = 0usize;
+        let mut processed_utf16 = 0i32;
+        let mut last_pct = 0usize;
+        for (hwnd_doc, text, start_utf16, end_utf16) in jobs {
+            if cancel_token.load(Ordering::Relaxed) {
                 break;
             }
-        }
-
-        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-        if count == 0 {
-            let message = to_wide(&text_not_found_message(language));
-            let title = to_wide(&find_title(language));
-            crate::message_box_modal(
-                hwnd,
-                PCWSTR(message.as_ptr()),
-                PCWSTR(title.as_ptr()),
-                MB_OK | MB_ICONWARNING,
+            let (count, patch) = compute_replace_patch(
+                &text,
+                &search_owned,
+                &replace_owned,
+                flags,
+                start_utf16,
+                end_utf16,
             );
-        } else {
-            let message = replaced_count_message(language, count);
-            show_info(hwnd, language, &message);
+            if count > 0
+                && let Some((patch_start, patch_end, replaced)) = patch
+            {
+                patches.push(ReplacePatch {
+                    hwnd_edit: hwnd_doc,
+                    start_utf16: patch_start,
+                    end_utf16: patch_end,
+                    replaced,
+                });
+            }
+            total_count += count;
+            processed_utf16 += (end_utf16 - start_utf16).max(0);
+            if total_utf16_all > 0 {
+                let pct = ((processed_utf16 as i64 * 100) / total_utf16_all as i64) as usize;
+                if pct > last_pct {
+                    last_pct = pct;
+                    let _unused = crate::post_message_w_safe(
+                        hwnd,
+                        WM_REPLACE_ALL_PROGRESS,
+                        WPARAM(pct),
+                        LPARAM(0),
+                    );
+                }
+            }
         }
-    }
+        let canceled = cancel_token.load(Ordering::Relaxed);
+        let done = Box::new(ReplaceAllDone {
+            progress,
+            language,
+            count: total_count,
+            canceled,
+            patches,
+        });
+        let _unused = crate::post_message_w_safe(
+            hwnd,
+            WM_REPLACE_ALL_DONE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(done) as isize),
+        );
+    });
 }
 
 fn get_find_options(hwnd: HWND) -> FindOptions {
@@ -1170,141 +1310,89 @@ fn replace_all_regex(
     }
 }
 
-fn replace_all_in_all_docs(hwnd: HWND, search: &str, replace: &str, flags: FINDREPLACE_FLAGS) {
-    let edits = {
-        with_state(hwnd, |state| {
-            state
-                .docs
-                .iter()
-                .map(|doc| doc.hwnd_edit)
-                .collect::<Vec<_>>()
-        })
-    }
-    .unwrap_or_default();
-    let mut total_count = 0usize;
-    for hwnd_doc in edits {
-        total_count += replace_all_in_range(hwnd_doc, search, replace, flags, 0, -1);
-    }
-    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
-    if total_count == 0 {
-        let message = to_wide(&text_not_found_message(language));
-        let title = to_wide(&find_title(language));
-        crate::message_box_modal(
-            hwnd,
-            PCWSTR(message.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONWARNING,
-        );
-    } else {
-        let message = replaced_count_message(language, total_count);
-        show_info(hwnd, language, &message);
-    }
-}
-
-fn replace_all_in_selection(
-    hwnd: HWND,
-    hwnd_edit: HWND,
-    search: &str,
-    replace: &str,
-    flags: FINDREPLACE_FLAGS,
-) {
-    let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-    unsafe {
-        SendMessageW(
-            hwnd_edit,
-            EM_EXGETSEL,
-            WPARAM(0),
-            LPARAM(&mut cr as *mut _ as isize),
-        );
-    }
-    if cr.cpMin == cr.cpMax {
-        return;
-    }
-    let count = replace_all_in_range(hwnd_edit, search, replace, flags, cr.cpMin, cr.cpMax);
-    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
-    if count == 0 {
-        let message = to_wide(&text_not_found_message(language));
-        let title = to_wide(&find_title(language));
-        crate::message_box_modal(
-            hwnd,
-            PCWSTR(message.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONWARNING,
-        );
-    } else {
-        let message = replaced_count_message(language, count);
-        show_info(hwnd, language, &message);
-    }
-}
-
-fn replace_all_in_range(
-    hwnd_edit: HWND,
+fn compute_replace_patch(
+    text: &str,
     search: &str,
     replace: &str,
     flags: FINDREPLACE_FLAGS,
     start_utf16: i32,
     end_utf16: i32,
-) -> usize {
+) -> (usize, Option<(i32, i32, String)>) {
     if search.is_empty() {
-        return 0;
+        return (0, None);
     }
-    let mut start = start_utf16;
-    let mut end = end_utf16;
-    let mut count = 0usize;
-    let replace_wide = to_wide(replace);
-    let search_wide = to_wide(search);
-    let replace_len = replace.chars().map(|c| c.len_utf16() as i32).sum::<i32>();
+    let total_utf16 = byte_index_to_utf16(text, text.len());
+    let range_start = start_utf16.clamp(0, total_utf16);
+    let range_end = end_utf16.clamp(range_start, total_utf16);
+    if range_start >= range_end {
+        return (0, None);
+    }
 
-    loop {
-        let mut ft = FINDTEXTEXW {
-            chrg: CHARRANGE {
-                cpMin: start,
-                cpMax: end,
-            },
-            lpstrText: PCWSTR(search_wide.as_ptr()),
-            chrgText: CHARRANGE { cpMin: 0, cpMax: 0 },
-        };
-        let res = crate::send_message_w_safe(
-            hwnd_edit,
-            EM_FINDTEXTEXW,
-            WPARAM(flags.0 as usize),
-            LPARAM(&mut ft as *mut _ as isize),
-        );
-        if res.0 == -1 {
-            break;
+    let start_byte = utf16_index_to_byte(text, range_start);
+    let end_byte = utf16_index_to_byte(text, range_end);
+    let segment = &text[start_byte..end_byte];
+
+    let match_case = (flags & FR_MATCHCASE) != FINDREPLACE_FLAGS(0);
+    let whole_word = (flags & FR_WHOLEWORD) != FINDREPLACE_FLAGS(0);
+    let (count, replaced) =
+        replace_plain_text_bulk(segment, search, replace, match_case, whole_word);
+    if count == 0 {
+        (0, None)
+    } else {
+        (count, Some((range_start, range_end, replaced)))
+    }
+}
+
+fn replace_plain_text_bulk(
+    text: &str,
+    search: &str,
+    replace: &str,
+    match_case: bool,
+    whole_word: bool,
+) -> (usize, String) {
+    if search.is_empty() || text.is_empty() {
+        return (0, text.to_string());
+    }
+    if match_case && !whole_word {
+        let count = text.matches(search).count();
+        if count == 0 {
+            return (0, text.to_string());
         }
-        unsafe {
-            SendMessageW(
-                hwnd_edit,
-                EM_EXSETSEL,
-                WPARAM(0),
-                LPARAM(&mut ft.chrgText as *mut _ as isize),
-            );
-            SendMessageW(
-                hwnd_edit,
-                EM_REPLACESEL,
-                WPARAM(1),
-                LPARAM(replace_wide.as_ptr() as isize),
-            );
-        }
-        count += 1;
-        let match_len = ft.chrgText.cpMax - ft.chrgText.cpMin;
-        let delta = replace_len - match_len;
-        let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-        unsafe {
-            SendMessageW(
-                hwnd_edit,
-                EM_EXGETSEL,
-                WPARAM(0),
-                LPARAM(&mut cr as *mut _ as isize),
-            );
-        }
-        start = cr.cpMax;
-        if end != -1 {
-            end += delta;
+        return (count, text.replace(search, replace));
+    }
+
+    let escaped = escape_regex_literal(search);
+    let mut pattern = if whole_word {
+        format!(r"\b{}\b", escaped)
+    } else {
+        escaped
+    };
+    if !match_case {
+        pattern = format!("(?i){pattern}");
+    }
+    let Ok(regex) = Regex::new(&pattern) else {
+        return (0, text.to_string());
+    };
+    let count = regex.find_iter(text).count();
+    if count == 0 {
+        return (0, text.to_string());
+    }
+    let replaced = regex.replace_all(text, replace).to_string();
+    (count, replaced)
+}
+
+fn escape_regex_literal(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '\\' | '.' | '+' | '*' | '?' | '(' | ')' | '[' | ']' | '{' | '}' | '^' | '$' | '|' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
         }
     }
-    count
+    out
 }
 
 fn replace_range_text(hwnd_edit: HWND, start_utf16: i32, end_utf16: i32, text: &str) {
@@ -1328,6 +1416,48 @@ fn replace_range_text(hwnd_edit: HWND, start_utf16: i32, end_utf16: i32, text: &
             WPARAM(1),
             LPARAM(wide.as_ptr() as isize),
         );
+    }
+}
+
+pub fn handle_replace_all_progress(hwnd: HWND, wparam: WPARAM) {
+    update_replace_progress_window(hwnd, wparam.0.min(100));
+}
+
+pub fn handle_replace_all_done(hwnd: HWND, lparam: LPARAM) {
+    if lparam.0 == 0 {
+        return;
+    }
+    let done = unsafe { Box::from_raw(lparam.0 as *mut ReplaceAllDone) };
+    with_state(hwnd, |state| {
+        state.replace_cancel_token = None;
+        state.replace_cancel_requested = false;
+    });
+    close_replace_progress_window(hwnd, done.progress);
+    if done.canceled {
+        return;
+    }
+    for patch in done.patches {
+        suspend_edit_redraw(patch.hwnd_edit);
+        replace_range_text(
+            patch.hwnd_edit,
+            patch.start_utf16,
+            patch.end_utf16,
+            &patch.replaced,
+        );
+        resume_edit_redraw(patch.hwnd_edit);
+    }
+    if done.count == 0 {
+        let message = to_wide(&text_not_found_message(done.language));
+        let title = to_wide(&find_title(done.language));
+        crate::message_box_modal(
+            hwnd,
+            PCWSTR(message.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONWARNING,
+        );
+    } else {
+        let message = replaced_count_message(done.language, done.count);
+        show_info(hwnd, done.language, &message);
     }
 }
 

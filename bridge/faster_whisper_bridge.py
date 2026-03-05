@@ -78,6 +78,16 @@ def candidate_backends():
     return [("cpu", "int8")]
 
 
+def format_timestamp(seconds):
+    total = max(0, int(seconds))
+    hours = total // 3600
+    minutes = (total % 3600) // 60
+    secs = total % 60
+    if hours > 0:
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    return f"{minutes:02d}:{secs:02d}"
+
+
 def main():
     configure_stdio_utf8()
     parser = argparse.ArgumentParser()
@@ -85,6 +95,7 @@ def main():
     parser.add_argument("--model", required=True, help="small | medium | large-v3")
     parser.add_argument("--language", default="", help="Language code, e.g. it")
     parser.add_argument("--download-root", default="", help="Model cache directory")
+    parser.add_argument("--timestamps", action="store_true", help="Include segment timestamps")
     args = parser.parse_args()
 
     if not os.path.isfile(args.input):
@@ -135,14 +146,18 @@ def main():
         for segment in segments:
             text = (segment.text or "").strip()
             if text:
-                parts.append(text)
+                if args.timestamps:
+                    start_ts = format_timestamp(getattr(segment, "start", 0.0) or 0.0)
+                    parts.append(f"[{start_ts}] {text}")
+                else:
+                    parts.append(text)
             if total_duration > 0 and segment.end is not None:
                 pct = int((float(segment.end) / total_duration) * 100.0)
                 if pct > last_progress:
                     last_progress = max(0, min(99, pct))
                     print(f"PROGRESS:{last_progress}", flush=True)
 
-        transcript = " ".join(parts).strip()
+        transcript = ("\n".join(parts) if args.timestamps else " ".join(parts)).strip()
         language = ""
         try:
             language = getattr(info, "language", "") or ""

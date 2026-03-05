@@ -558,6 +558,8 @@ pub struct AppSettings {
     pub whisper_cuda_enabled: bool,
     #[serde(default)]
     pub whisper_keep_original_language: bool,
+    #[serde(default)]
+    pub whisper_include_timestamps: bool,
     pub last_seen_changelog_version: String,
     pub favorite_voices: Vec<FavoriteVoice>,
     pub dictionary: Vec<DictionaryEntry>,
@@ -824,6 +826,7 @@ impl Default for AppSettings {
             whisper_model_profile: String::new(),
             whisper_cuda_enabled: false,
             whisper_keep_original_language: false,
+            whisper_include_timestamps: false,
             last_seen_changelog_version: String::new(),
             favorite_voices: Vec::new(),
             dictionary: Vec::new(),

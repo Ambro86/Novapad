@@ -445,12 +445,18 @@ pub fn apply_dialogue_tags_from_settings(text: &str, settings: &AppSettings) -> 
         closing_quote: settings.dialogue_closing_quote.clone(),
         allow_multiline: settings.dialogue_allow_multiline,
     };
-    let cfg = if let Some(file_cfg) = load_dialogue_voice_config() {
-        crate::log_debug("Dialogue tagging: using dialogue.ini configuration");
-        file_cfg
-    } else {
+    let has_settings_dialogue_config = !fallback.voice.trim().is_empty()
+        && !fallback.opening_quote.trim().is_empty()
+        && !fallback.closing_quote.trim().is_empty();
+    let cfg = if has_settings_dialogue_config {
         crate::log_debug("Dialogue tagging: using in-memory settings configuration");
         fallback
+    } else if let Some(file_cfg) = load_dialogue_voice_config() {
+        crate::log_debug("Dialogue tagging: using legacy dialogue.ini fallback");
+        file_cfg
+    } else {
+        crate::log_debug("Dialogue tagging: no valid dialogue configuration found");
+        return text.to_string();
     };
     apply_dialogue_tags(text, &cfg)
 }

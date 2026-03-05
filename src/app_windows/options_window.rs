@@ -105,6 +105,7 @@ const OPTIONS_ID_PODCASTINDEX_SIGNUP: usize = 6037;
 const OPTIONS_ID_WHISPER_MODEL: usize = 6111;
 const OPTIONS_ID_WHISPER_CUDA: usize = 6112;
 const OPTIONS_ID_WHISPER_KEEP_ORIGINAL_LANGUAGE: usize = 6113;
+const OPTIONS_ID_WHISPER_INCLUDE_TIMESTAMPS: usize = 6114;
 const OPTIONS_ID_DICTIONARY_TRANSLATION: usize = 6038;
 const OPTIONS_ID_WIKIPEDIA_LANGUAGE: usize = 6040;
 const OPTIONS_ID_INTERPRETER_PATH: usize = 6041;
@@ -657,6 +658,7 @@ struct OptionsDialogState {
     combo_whisper_model: HWND,
     checkbox_whisper_cuda: HWND,
     checkbox_whisper_keep_original_language: HWND,
+    checkbox_whisper_include_timestamps: HWND,
     button_podcastindex_signup: HWND,
     checkbox_multilingual: HWND,
     checkbox_use_dialogue_voice: HWND,
@@ -878,6 +880,7 @@ struct OptionsLabels {
     label_whisper_model: String,
     label_whisper_cuda: String,
     label_whisper_keep_original_language: String,
+    label_whisper_include_timestamps: String,
     whisper_model_small: String,
     whisper_model_medium: String,
     whisper_model_large: String,
@@ -1143,6 +1146,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_whisper_keep_original_language: match language {
             Language::Italian => "Mantieni lingua originale dell'audio".to_string(),
             _ => "Keep original audio language".to_string(),
+        },
+        label_whisper_include_timestamps: match language {
+            Language::Italian => "Includi timestamp nella trascrizione".to_string(),
+            _ => "Include timestamps in transcription".to_string(),
         },
         whisper_model_small: match language {
             Language::Italian => "Piccolo (small)".to_string(),
@@ -3679,6 +3686,21 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     None,
                 );
                 y += 30;
+                let checkbox_whisper_include_timestamps = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_whisper_include_timestamps).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    420,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_WHISPER_INCLUDE_TIMESTAMPS as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
 
                 let button_podcastindex_signup = CreateWindowExW(
                     Default::default(),
@@ -4541,6 +4563,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     combo_whisper_model,
                     checkbox_whisper_cuda,
                     checkbox_whisper_keep_original_language,
+                    checkbox_whisper_include_timestamps,
                     button_podcastindex_signup,
                     checkbox_tts_manual,
                     checkbox_multilingual,
@@ -4722,6 +4745,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     combo_whisper_model,
                     checkbox_whisper_cuda,
                     checkbox_whisper_keep_original_language,
+                    checkbox_whisper_include_timestamps,
                     button_podcastindex_signup,
                     checkbox_multilingual,
                     checkbox_use_dialogue_voice,
@@ -5527,7 +5551,12 @@ fn initialize_options_dialog(hwnd: HWND) {
         };
 
         let mut settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
-        if let Some(cfg) = crate::dialogue_voice::load_dialogue_voice_config() {
+        let missing_dialogue_settings = settings.dialogue_voice.trim().is_empty()
+            || settings.dialogue_opening_quote.trim().is_empty()
+            || settings.dialogue_closing_quote.trim().is_empty();
+        if missing_dialogue_settings
+            && let Some(cfg) = crate::dialogue_voice::load_dialogue_voice_config()
+        {
             settings.dialogue_tts_engine = cfg.engine;
             settings.dialogue_voice = cfg.voice;
             settings.dialogue_use_secondary_voice = cfg.use_secondary_voice;
@@ -7085,6 +7114,20 @@ fn initialize_options_dialog(hwnd: HWND) {
                 checkbox_whisper_keep_original_language,
                 BM_SETCHECK,
                 WPARAM(if settings.whisper_keep_original_language {
+                    BST_CHECKED.0 as usize
+                } else {
+                    0
+                }),
+                LPARAM(0),
+            );
+        }
+        if let Some(checkbox_whisper_include_timestamps) =
+            with_options_state(hwnd, |state| state.checkbox_whisper_include_timestamps)
+        {
+            SendMessageW(
+                checkbox_whisper_include_timestamps,
+                BM_SETCHECK,
+                WPARAM(if settings.whisper_include_timestamps {
                     BST_CHECKED.0 as usize
                 } else {
                     0
@@ -9656,6 +9699,18 @@ fn apply_options_dialog(hwnd: HWND) {
             .0 as u32
                 == BST_CHECKED.0;
         }
+        if let Some(checkbox_whisper_include_timestamps) =
+            with_options_state(hwnd, |state| state.checkbox_whisper_include_timestamps)
+        {
+            settings.whisper_include_timestamps = SendMessageW(
+                checkbox_whisper_include_timestamps,
+                BM_GETCHECK,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0 as u32
+                == BST_CHECKED.0;
+        }
 
         let dialogue_cfg = crate::dialogue_voice::DialogueVoiceConfig {
             engine: settings.dialogue_tts_engine,
@@ -10743,6 +10798,11 @@ fn layout_ai_transcription_tab(state: &OptionsDialogState, scroll_offset: i32) -
         state.checkbox_whisper_keep_original_language,
         y,
     );
+    y = layout_checkbox(
+        "checkbox_whisper_include_timestamps",
+        state.checkbox_whisper_include_timestamps,
+        y,
+    );
     y + scroll_offset
 }
 
@@ -11195,6 +11255,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_whisper_model,
             state.checkbox_whisper_cuda,
             state.checkbox_whisper_keep_original_language,
+            state.checkbox_whisper_include_timestamps,
         ] {
             crate::show_window_safe(
                 control,

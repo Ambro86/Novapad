@@ -53,6 +53,11 @@ struct BridgeOutput {
     error: String,
 }
 
+pub struct BridgeProgressCallbacks {
+    pub download: Option<Box<dyn FnMut(i32) + Send>>,
+    pub transcription: Option<Box<dyn FnMut(i32) + Send>>,
+}
+
 fn handle_bridge_line(
     line: &str,
     progress: &mut Option<Box<dyn FnMut(i32) + Send>>,
@@ -143,7 +148,12 @@ fn strip_amara_signature(text: &str) -> String {
         }
     }
 
-    cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
+    cleaned
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn bridge_install_path() -> PathBuf {
@@ -188,6 +198,7 @@ fn download_bridge_binary_from_url(
     url: &str,
     target_path: &Path,
     cancel: &Arc<AtomicBool>,
+    download_progress: &mut Option<Box<dyn FnMut(i32) + Send>>,
 ) -> Result<(), String> {
     let parent = target_path
         .parent()
@@ -216,6 +227,9 @@ fn download_bridge_binary_from_url(
     let mut out =
         fs::File::create(&part_path).map_err(|e| format!("create bridge .part failed: {e}"))?;
     let mut buf = vec![0u8; 128 * 1024];
+    let total_bytes = response.content_length();
+    let mut downloaded_bytes: u64 = 0;
+    let mut last_pct = -1;
     loop {
         if cancel.load(Ordering::Relaxed) {
             if let Err(err) = fs::remove_file(&part_path) {
@@ -231,18 +245,37 @@ fn download_bridge_binary_from_url(
         }
         out.write_all(&buf[..read])
             .map_err(|e| format!("bridge write failed: {e}"))?;
+        downloaded_bytes = downloaded_bytes.saturating_add(read as u64);
+        if let Some(total) = total_bytes
+            && total > 0
+        {
+            let pct = ((downloaded_bytes.saturating_mul(100)) / total).clamp(0, 100) as i32;
+            if pct > last_pct {
+                last_pct = pct;
+                if let Some(cb) = download_progress.as_mut() {
+                    cb(pct);
+                }
+            }
+        }
     }
     out.flush()
         .map_err(|e| format!("bridge flush failed: {e}"))?;
     fs::rename(&part_path, target_path).map_err(|e| format!("bridge finalize failed: {e}"))?;
+    if let Some(cb) = download_progress.as_mut() {
+        cb(100);
+    }
     Ok(())
 }
 
-fn download_bridge_binary(target_path: &Path, cancel: &Arc<AtomicBool>) -> Result<(), String> {
+fn download_bridge_binary(
+    target_path: &Path,
+    cancel: &Arc<AtomicBool>,
+    download_progress: &mut Option<Box<dyn FnMut(i32) + Send>>,
+) -> Result<(), String> {
     let mut last_err = String::new();
     for url in BRIDGE_DOWNLOAD_URLS {
         crate::log_debug(&format!("Transcription: downloading bridge from {}", url));
-        match download_bridge_binary_from_url(url, target_path, cancel) {
+        match download_bridge_binary_from_url(url, target_path, cancel, download_progress) {
             Ok(()) => match is_valid_bridge_exe(target_path) {
                 Ok(true) => return Ok(()),
                 Ok(false) => {
@@ -271,7 +304,10 @@ fn download_bridge_binary(target_path: &Path, cancel: &Arc<AtomicBool>) -> Resul
     }
 }
 
-fn ensure_bridge_binary(cancel: &Arc<AtomicBool>) -> Result<PathBuf, String> {
+fn ensure_bridge_binary(
+    cancel: &Arc<AtomicBool>,
+    download_progress: &mut Option<Box<dyn FnMut(i32) + Send>>,
+) -> Result<PathBuf, String> {
     #[cfg(debug_assertions)]
     {
         let mut local_candidates: Vec<PathBuf> = Vec::new();
@@ -342,7 +378,7 @@ fn ensure_bridge_binary(cancel: &Arc<AtomicBool>) -> Result<PathBuf, String> {
             }
         }
     }
-    download_bridge_binary(&bridge_path, cancel)?;
+    download_bridge_binary(&bridge_path, cancel, download_progress)?;
     crate::log_debug(&format!(
         "Transcription: bridge ready at {}",
         bridge_path.display()
@@ -489,6 +525,7 @@ fn spawn_bridge_process(
     wav_path: &Path,
     model: BridgeModel,
     language: Option<Language>,
+    include_timestamps: bool,
     work_dir: &Path,
     cuda_dir: Option<&Path>,
 ) -> Result<std::process::Child, String> {
@@ -507,6 +544,9 @@ fn spawn_bridge_process(
     if let Some(language) = language {
         args.push("--language".to_string());
         args.push(language_code(language).to_string());
+    }
+    if include_timestamps {
+        args.push("--timestamps".to_string());
     }
 
     let mut command = Command::new(bridge_path);
@@ -542,11 +582,13 @@ fn select_and_spawn_bridge(
     wav_path: &Path,
     model: BridgeModel,
     language: Option<Language>,
+    include_timestamps: bool,
     cancel: &Arc<AtomicBool>,
+    bridge_download_progress: &mut Option<Box<dyn FnMut(i32) + Send>>,
     use_cuda_runtime: bool,
 ) -> Result<std::process::Child, String> {
     let work_dir = crate::settings::settings_dir();
-    let bridge_path = ensure_bridge_binary(cancel)?;
+    let bridge_path = ensure_bridge_binary(cancel, bridge_download_progress)?;
     let cuda_dir = if use_cuda_runtime {
         Some(ensure_cuda_runtime(cancel)?)
     } else {
@@ -557,6 +599,7 @@ fn select_and_spawn_bridge(
         wav_path,
         model,
         language,
+        include_timestamps,
         &work_dir,
         cuda_dir.as_deref(),
     )
@@ -566,11 +609,20 @@ pub fn transcribe_wav(
     wav_path: &Path,
     model: BridgeModel,
     language: Option<Language>,
+    include_timestamps: bool,
     use_cuda_runtime: bool,
     cancel: &Arc<AtomicBool>,
-    mut progress: Option<Box<dyn FnMut(i32) + Send>>,
+    mut progress_callbacks: BridgeProgressCallbacks,
 ) -> Result<String, String> {
-    let mut child = select_and_spawn_bridge(wav_path, model, language, cancel, use_cuda_runtime)?;
+    let mut child = select_and_spawn_bridge(
+        wav_path,
+        model,
+        language,
+        include_timestamps,
+        cancel,
+        &mut progress_callbacks.download,
+        use_cuda_runtime,
+    )?;
 
     let stdout = child
         .stdout
@@ -630,7 +682,11 @@ pub fn transcribe_wav(
 
         match line_rx.recv_timeout(Duration::from_millis(150)) {
             Ok(line) => {
-                handle_bridge_line(&line, &mut progress, &mut bridge_result);
+                handle_bridge_line(
+                    &line,
+                    &mut progress_callbacks.transcription,
+                    &mut bridge_result,
+                );
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => {}
@@ -647,7 +703,11 @@ pub fn transcribe_wav(
         return Err("bridge stdout thread panicked".to_string());
     }
     while let Ok(line) = line_rx.try_recv() {
-        handle_bridge_line(&line, &mut progress, &mut bridge_result);
+        handle_bridge_line(
+            &line,
+            &mut progress_callbacks.transcription,
+            &mut bridge_result,
+        );
     }
     if let Err(_panic) = stderr_thread.join() {
         return Err("bridge stderr thread panicked".to_string());

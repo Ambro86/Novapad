@@ -2257,6 +2257,8 @@ fn start_whisper_transcription(hwnd: HWND) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let whisper_keep_original_language =
         with_state(hwnd, |state| state.settings.whisper_keep_original_language).unwrap_or(false);
+    let whisper_include_timestamps =
+        with_state(hwnd, |state| state.settings.whisper_include_timestamps).unwrap_or(false);
     let whisper_cuda_enabled =
         with_state(hwnd, |state| state.settings.whisper_cuda_enabled).unwrap_or(false);
     let Some(whisper_profile) = choose_whisper_profile_if_needed(hwnd, language) else {
@@ -2341,6 +2343,22 @@ fn start_whisper_transcription(hwnd: HWND) {
             } else {
                 Some(language)
             };
+            let mut download_progress_last = -1;
+            let bridge_download_progress_callback: Box<dyn FnMut(i32) + Send> =
+                Box::new(move |pct| {
+                    let clamped = pct.clamp(0, 100);
+                    // Bridge download occupies 0..19% of overall progress.
+                    let mapped = ((clamped * 19 + 99) / 100).clamp(0, 19);
+                    if mapped > download_progress_last {
+                        download_progress_last = mapped;
+                        let _unused = post_message_w_safe(
+                            hwnd,
+                            WM_WHISPER_TRANSCRIPTION_PROGRESS,
+                            WPARAM(mapped as usize),
+                            LPARAM(0),
+                        );
+                    }
+                });
             let mut progress_last = -1;
             let progress_callback: Box<dyn FnMut(i32) + Send> = Box::new(move |pct| {
                 let clamped = pct.clamp(0, 100);
@@ -2368,9 +2386,13 @@ fn start_whisper_transcription(hwnd: HWND) {
                 &input_path,
                 model,
                 forced_language,
+                whisper_include_timestamps,
                 whisper_cuda_enabled,
                 &cancel_flag,
-                Some(progress_callback),
+                crate::tools::faster_whisper_bridge::BridgeProgressCallbacks {
+                    download: Some(bridge_download_progress_callback),
+                    transcription: Some(progress_callback),
+                },
             )?;
             crate::log_debug(&format!(
                 "Transcription: bridge completed text_len={}",

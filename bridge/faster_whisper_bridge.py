@@ -28,6 +28,20 @@ def audio_duration_seconds(path):
         with av.open(path) as container:
             if container.duration is not None and container.duration > 0:
                 return float(container.duration) / float(av.time_base)
+            for stream in container.streams.audio:
+                if (
+                    stream.duration is not None
+                    and stream.duration > 0
+                    and stream.time_base is not None
+                ):
+                    return float(stream.duration * stream.time_base)
+                if (
+                    stream.frames is not None
+                    and stream.frames > 0
+                    and stream.rate is not None
+                    and float(stream.rate) > 0.0
+                ):
+                    return float(stream.frames) / float(stream.rate)
     except Exception:
         pass
 

@@ -2223,6 +2223,8 @@ fn close_whisper_progress_window(hwnd: HWND) {
 
 fn start_whisper_transcription(hwnd: HWND) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let whisper_cuda_enabled =
+        with_state(hwnd, |state| state.settings.whisper_cuda_enabled).unwrap_or(false);
     let Some(whisper_profile) = choose_whisper_profile_if_needed(hwnd, language) else {
         return;
     };
@@ -2312,6 +2314,7 @@ fn start_whisper_transcription(hwnd: HWND) {
                 &wav_path,
                 model,
                 language,
+                whisper_cuda_enabled,
                 &cancel_flag,
                 Some(progress_callback),
             )?;

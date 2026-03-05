@@ -103,6 +103,7 @@ const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
 const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
 const OPTIONS_ID_PODCASTINDEX_SIGNUP: usize = 6037;
 const OPTIONS_ID_WHISPER_MODEL: usize = 6111;
+const OPTIONS_ID_WHISPER_CUDA: usize = 6112;
 const OPTIONS_ID_DICTIONARY_TRANSLATION: usize = 6038;
 const OPTIONS_ID_WIKIPEDIA_LANGUAGE: usize = 6040;
 const OPTIONS_ID_INTERPRETER_PATH: usize = 6041;
@@ -653,6 +654,7 @@ struct OptionsDialogState {
     edit_podcastindex_secret: HWND,
     label_whisper_model: HWND,
     combo_whisper_model: HWND,
+    checkbox_whisper_cuda: HWND,
     button_podcastindex_signup: HWND,
     checkbox_multilingual: HWND,
     checkbox_use_dialogue_voice: HWND,
@@ -872,6 +874,7 @@ struct OptionsLabels {
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
     label_whisper_model: String,
+    label_whisper_cuda: String,
     whisper_model_small: String,
     whisper_model_medium: String,
     whisper_model_large: String,
@@ -1129,6 +1132,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_whisper_model: match language {
             Language::Italian => "Modello Whisper:".to_string(),
             _ => "Whisper model:".to_string(),
+        },
+        label_whisper_cuda: match language {
+            Language::Italian => "Attiva CUDA (per schede video Nvidia)".to_string(),
+            _ => "Enable CUDA (for Nvidia GPUs)".to_string(),
         },
         whisper_model_small: match language {
             Language::Italian => "Piccolo (small)".to_string(),
@@ -3635,6 +3642,21 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     );
                 }
                 SendMessageW(combo_whisper_model, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+                let checkbox_whisper_cuda = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_whisper_cuda).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_WHISPER_CUDA as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
 
                 let button_podcastindex_signup = CreateWindowExW(
                     Default::default(),
@@ -4495,6 +4517,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_podcastindex_secret,
                     label_whisper_model,
                     combo_whisper_model,
+                    checkbox_whisper_cuda,
                     button_podcastindex_signup,
                     checkbox_tts_manual,
                     checkbox_multilingual,
@@ -4674,6 +4697,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_podcastindex_secret,
                     label_whisper_model,
                     combo_whisper_model,
+                    checkbox_whisper_cuda,
                     button_podcastindex_signup,
                     checkbox_multilingual,
                     checkbox_use_dialogue_voice,
@@ -7016,6 +7040,20 @@ fn initialize_options_dialog(hwnd: HWND) {
             WPARAM(whisper_index),
             LPARAM(0),
         );
+        if let Some(checkbox_whisper_cuda) =
+            with_options_state(hwnd, |state| state.checkbox_whisper_cuda)
+        {
+            SendMessageW(
+                checkbox_whisper_cuda,
+                BM_SETCHECK,
+                WPARAM(if settings.whisper_cuda_enabled {
+                    BST_CHECKED.0 as usize
+                } else {
+                    0
+                }),
+                LPARAM(0),
+            );
+        }
 
         refresh_voices(hwnd);
     }
@@ -9561,6 +9599,13 @@ fn apply_options_dialog(hwnd: HWND) {
             2 => "large_v3_turbo_q5_0".to_string(),
             _ => "small_q5_1".to_string(),
         };
+        if let Some(checkbox_whisper_cuda) =
+            with_options_state(hwnd, |state| state.checkbox_whisper_cuda)
+        {
+            settings.whisper_cuda_enabled =
+                SendMessageW(checkbox_whisper_cuda, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+                    == BST_CHECKED.0;
+        }
 
         let dialogue_cfg = crate::dialogue_voice::DialogueVoiceConfig {
             engine: settings.dialogue_tts_engine,
@@ -10642,6 +10687,7 @@ fn layout_ai_transcription_tab(state: &OptionsDialogState, scroll_offset: i32) -
         y,
         OPTIONS_COMBO_HEIGHT,
     );
+    y = layout_checkbox("checkbox_whisper_cuda", state.checkbox_whisper_cuda, y);
     y + scroll_offset
 }
 
@@ -11089,7 +11135,11 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             crate::show_window_safe(control, if show_shortcuts { SW_SHOW } else { SW_HIDE });
         }
 
-        for control in [state.label_whisper_model, state.combo_whisper_model] {
+        for control in [
+            state.label_whisper_model,
+            state.combo_whisper_model,
+            state.checkbox_whisper_cuda,
+        ] {
             crate::show_window_safe(
                 control,
                 if show_ai_transcription {

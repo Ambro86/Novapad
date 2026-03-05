@@ -554,6 +554,8 @@ pub struct AppSettings {
     pub stream_audio_default_format: String,
     #[serde(default)]
     pub whisper_model_profile: String,
+    #[serde(default)]
+    pub whisper_cuda_enabled: bool,
     pub last_seen_changelog_version: String,
     pub favorite_voices: Vec<FavoriteVoice>,
     pub dictionary: Vec<DictionaryEntry>,
@@ -818,6 +820,7 @@ impl Default for AppSettings {
             youtube_include_timestamps: true,
             stream_audio_default_format: default_stream_audio_output_format(),
             whisper_model_profile: String::new(),
+            whisper_cuda_enabled: false,
             last_seen_changelog_version: String::new(),
             favorite_voices: Vec::new(),
             dictionary: Vec::new(),

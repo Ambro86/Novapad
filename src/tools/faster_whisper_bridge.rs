@@ -16,10 +16,16 @@ use std::{fs, io::Write};
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const BRIDGE_FILE_NAME: &str = "faster_whisper_bridge.exe";
 const BRIDGE_MIN_VALID_SIZE_BYTES: u64 = 1_000_000;
+const CUDA_PACKAGE_FILE_NAME: &str = "whisper-cuda-runtime-win64-cu12.zip";
 const BRIDGE_DOWNLOAD_URLS: [&str; 2] = [
     "https://github.com/Ambro86/Sonarpad/raw/master/dll/faster_whisper_bridge.exe",
     "https://raw.githubusercontent.com/Ambro86/Sonarpad/master/dll/faster_whisper_bridge.exe",
 ];
+const CUDA_PACKAGE_URLS: [&str; 2] = [
+    "https://github.com/Ambro86/Sonarpad/raw/master/dll/whisper-cuda-runtime-win64-cu12.zip",
+    "https://raw.githubusercontent.com/Ambro86/Sonarpad/master/dll/whisper-cuda-runtime-win64-cu12.zip",
+];
+const CUDA_REQUIRED_DLLS: [&str; 3] = ["cublas64_12.dll", "cudart64_12.dll", "cudnn64_9.dll"];
 
 #[derive(Clone, Copy)]
 pub enum BridgeModel {
@@ -144,6 +150,22 @@ fn bridge_install_path() -> PathBuf {
     crate::settings::settings_dir()
         .join("tools")
         .join(BRIDGE_FILE_NAME)
+}
+
+fn cuda_runtime_dir() -> PathBuf {
+    crate::settings::settings_dir().join("tools").join("cuda")
+}
+
+fn cuda_package_path() -> PathBuf {
+    crate::settings::settings_dir()
+        .join("tools")
+        .join(CUDA_PACKAGE_FILE_NAME)
+}
+
+fn has_required_cuda_runtime(cuda_dir: &Path) -> bool {
+    CUDA_REQUIRED_DLLS
+        .iter()
+        .all(|name| cuda_dir.join(name).is_file())
 }
 
 fn is_valid_bridge_exe(path: &Path) -> Result<bool, String> {
@@ -279,12 +301,147 @@ fn ensure_bridge_binary(cancel: &Arc<AtomicBool>) -> Result<PathBuf, String> {
     Ok(bridge_path)
 }
 
+fn download_cuda_package_from_url(
+    url: &str,
+    target_path: &Path,
+    cancel: &Arc<AtomicBool>,
+) -> Result<(), String> {
+    let parent = target_path
+        .parent()
+        .ok_or_else(|| "invalid CUDA package target path".to_string())?;
+    fs::create_dir_all(parent).map_err(|e| format!("create tools dir failed: {e}"))?;
+
+    let client = Client::builder()
+        .connect_timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(60 * 30))
+        .build()
+        .map_err(|e| format!("http client build failed: {e}"))?;
+
+    let mut response = client
+        .get(url)
+        .header(USER_AGENT, "Sonarpad/whisper-cuda-runtime")
+        .send()
+        .map_err(|e| format!("CUDA package request failed: {e}"))?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "CUDA package download failed: HTTP {}",
+            response.status()
+        ));
+    }
+
+    let part_path = target_path.with_extension("zip.part");
+    let mut out = fs::File::create(&part_path)
+        .map_err(|e| format!("create CUDA package .part failed: {e}"))?;
+    let mut buf = vec![0u8; 256 * 1024];
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            if let Err(err) = fs::remove_file(&part_path) {
+                crate::log_debug(&format!("CUDA package .part cleanup failed: {err}"));
+            }
+            return Err("cancelled".to_string());
+        }
+        let read = response
+            .read(&mut buf)
+            .map_err(|e| format!("CUDA package read failed: {e}"))?;
+        if read == 0 {
+            break;
+        }
+        out.write_all(&buf[..read])
+            .map_err(|e| format!("CUDA package write failed: {e}"))?;
+    }
+    out.flush()
+        .map_err(|e| format!("CUDA package flush failed: {e}"))?;
+    fs::rename(&part_path, target_path)
+        .map_err(|e| format!("CUDA package finalize failed: {e}"))?;
+    Ok(())
+}
+
+fn download_cuda_package(target_path: &Path, cancel: &Arc<AtomicBool>) -> Result<(), String> {
+    let mut last_err = String::new();
+    for url in CUDA_PACKAGE_URLS {
+        crate::log_debug(&format!(
+            "Transcription: downloading CUDA runtime from {}",
+            url
+        ));
+        match download_cuda_package_from_url(url, target_path, cancel) {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                last_err = err;
+            }
+        }
+    }
+    if last_err.is_empty() {
+        Err("CUDA package download failed".to_string())
+    } else {
+        Err(last_err)
+    }
+}
+
+fn extract_cuda_runtime(zip_path: &Path, target_dir: &Path) -> Result<(), String> {
+    fs::create_dir_all(target_dir).map_err(|e| format!("create CUDA dir failed: {e}"))?;
+    let file = fs::File::open(zip_path).map_err(|e| format!("open CUDA package failed: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("read CUDA zip archive failed: {e}"))?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("read CUDA zip entry failed: {e}"))?;
+        let name = entry.name().to_ascii_lowercase();
+        if !name.ends_with(".dll") {
+            continue;
+        }
+        let Some(file_name) = Path::new(entry.name()).file_name() else {
+            continue;
+        };
+        let out_path = target_dir.join(file_name);
+        let mut out_file =
+            fs::File::create(&out_path).map_err(|e| format!("write CUDA DLL failed: {e}"))?;
+        std::io::copy(&mut entry, &mut out_file)
+            .map_err(|e| format!("extract CUDA DLL failed: {e}"))?;
+    }
+    Ok(())
+}
+
+fn ensure_cuda_runtime(cancel: &Arc<AtomicBool>) -> Result<PathBuf, String> {
+    let cuda_dir = cuda_runtime_dir();
+    if has_required_cuda_runtime(&cuda_dir) {
+        return Ok(cuda_dir);
+    }
+
+    if cuda_dir.exists()
+        && let Err(err) = fs::remove_dir_all(&cuda_dir)
+    {
+        crate::log_debug(&format!(
+            "Transcription: failed to clear incomplete CUDA dir {}: {err}",
+            cuda_dir.display()
+        ));
+    }
+    fs::create_dir_all(&cuda_dir).map_err(|e| format!("create CUDA dir failed: {e}"))?;
+
+    let package_path = cuda_package_path();
+    if !package_path.is_file() {
+        download_cuda_package(&package_path, cancel)?;
+    }
+
+    extract_cuda_runtime(&package_path, &cuda_dir)?;
+    if !has_required_cuda_runtime(&cuda_dir) {
+        return Err("CUDA runtime package missing required DLLs".to_string());
+    }
+    crate::log_debug(&format!(
+        "Transcription: CUDA runtime ready at {}",
+        cuda_dir.display()
+    ));
+    Ok(cuda_dir)
+}
+
 fn spawn_bridge_process(
     bridge_path: &Path,
     wav_path: &Path,
     model: BridgeModel,
     language: Language,
     work_dir: &Path,
+    cuda_dir: Option<&Path>,
 ) -> Result<std::process::Child, String> {
     let model_name = model.as_name();
     let lang = language_code(language);
@@ -305,6 +462,20 @@ fn spawn_bridge_process(
     let mut command = Command::new(bridge_path);
     command.args(&args);
 
+    if let Some(cuda_dir) = cuda_dir {
+        let mut path_entries = vec![cuda_dir.display().to_string()];
+        if let Some(existing) = std::env::var_os("PATH") {
+            path_entries.push(existing.to_string_lossy().to_string());
+        }
+        command
+            .env("PATH", path_entries.join(";"))
+            .env("SONARPAD_FORCE_CUDA", "1");
+        crate::log_debug(&format!(
+            "Transcription: CUDA runtime detected at {}",
+            cuda_dir.display()
+        ));
+    }
+
     command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -322,20 +493,34 @@ fn select_and_spawn_bridge(
     model: BridgeModel,
     language: Language,
     cancel: &Arc<AtomicBool>,
+    use_cuda_runtime: bool,
 ) -> Result<std::process::Child, String> {
     let work_dir = crate::settings::settings_dir();
     let bridge_path = ensure_bridge_binary(cancel)?;
-    spawn_bridge_process(&bridge_path, wav_path, model, language, &work_dir)
+    let cuda_dir = if use_cuda_runtime {
+        Some(ensure_cuda_runtime(cancel)?)
+    } else {
+        None
+    };
+    spawn_bridge_process(
+        &bridge_path,
+        wav_path,
+        model,
+        language,
+        &work_dir,
+        cuda_dir.as_deref(),
+    )
 }
 
 pub fn transcribe_wav(
     wav_path: &Path,
     model: BridgeModel,
     language: Language,
+    use_cuda_runtime: bool,
     cancel: &Arc<AtomicBool>,
     mut progress: Option<Box<dyn FnMut(i32) + Send>>,
 ) -> Result<String, String> {
-    let mut child = select_and_spawn_bridge(wav_path, model, language, cancel)?;
+    let mut child = select_and_spawn_bridge(wav_path, model, language, cancel, use_cuda_runtime)?;
 
     let stdout = child
         .stdout

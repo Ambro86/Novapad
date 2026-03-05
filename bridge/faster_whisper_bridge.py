@@ -33,15 +33,26 @@ def audio_duration_seconds(path):
         return 0.0
 
 
-def choose_device():
+def candidate_backends():
+    force_cuda = os.environ.get("SONARPAD_FORCE_CUDA", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+    if force_cuda:
+        return [("cuda", "int8_float16"), ("cpu", "int8")]
+
     try:
         import torch  # type: ignore
 
         if torch.cuda.is_available():
-            return "cuda", "int8_float16"
+            return [("cuda", "int8_float16"), ("cpu", "int8")]
     except Exception:
         pass
-    return "cpu", "int8"
+
+    return [("cpu", "int8")]
 
 
 def main():
@@ -64,15 +75,28 @@ def main():
         return 1
 
     try:
-        device, compute_type = choose_device()
-        model_kwargs = {
-            "device": device,
-            "compute_type": compute_type,
-        }
-        if args.download_root:
-            model_kwargs["download_root"] = args.download_root
+        model = None
+        selected_device = "cpu"
+        selected_compute_type = "int8"
+        last_init_error = ""
+        for device, compute_type in candidate_backends():
+            model_kwargs = {
+                "device": device,
+                "compute_type": compute_type,
+            }
+            if args.download_root:
+                model_kwargs["download_root"] = args.download_root
+            try:
+                model = WhisperModel(args.model, **model_kwargs)
+                selected_device = device
+                selected_compute_type = compute_type
+                break
+            except Exception as exc:
+                last_init_error = f"{device}/{compute_type}: {exc}"
 
-        model = WhisperModel(args.model, **model_kwargs)
+        if model is None:
+            print_json({"ok": False, "error": f"model init failed: {last_init_error}"})
+            return 1
         total_duration = audio_duration_seconds(args.input)
         last_progress = 0
 
@@ -102,7 +126,15 @@ def main():
         except Exception:
             language = ""
 
-        print_json({"ok": True, "text": transcript, "language": language})
+        print_json(
+            {
+                "ok": True,
+                "text": transcript,
+                "language": language,
+                "backend": selected_device,
+                "compute_type": selected_compute_type,
+            }
+        )
         return 0
     except Exception as exc:
         print_json({"ok": False, "error": str(exc)})

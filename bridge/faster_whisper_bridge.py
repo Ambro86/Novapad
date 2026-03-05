@@ -58,9 +58,9 @@ def candidate_backends():
 def main():
     configure_stdio_utf8()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True, help="Path to WAV file")
+    parser.add_argument("--input", required=True, help="Path to audio file")
     parser.add_argument("--model", required=True, help="small | medium | large-v3")
-    parser.add_argument("--language", default="it", help="Language code, e.g. it")
+    parser.add_argument("--language", default="", help="Language code, e.g. it")
     parser.add_argument("--download-root", default="", help="Model cache directory")
     args = parser.parse_args()
 

@@ -2083,6 +2083,34 @@ fn is_stream_cache_media(path: &Path) -> bool {
     false
 }
 
+fn supports_direct_whisper_input(path: &Path, stream_index: Option<i32>) -> bool {
+    if is_direct_stream_url_path(path) {
+        return false;
+    }
+    // If the user selected a non-default track, keep ffmpeg conversion path to preserve track choice.
+    if stream_index.is_some_and(|idx| idx > 0) {
+        return false;
+    }
+    let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+        return false;
+    };
+    matches!(
+        ext.to_ascii_lowercase().as_str(),
+        "wav"
+            | "mp3"
+            | "flac"
+            | "ogg"
+            | "opus"
+            | "m4a"
+            | "aac"
+            | "wma"
+            | "webm"
+            | "mp4"
+            | "mkv"
+            | "mov"
+    )
+}
+
 fn is_direct_stream_playback_active(hwnd: HWND) -> bool {
     {
         with_state(hwnd, |state| {
@@ -2223,6 +2251,8 @@ fn close_whisper_progress_window(hwnd: HWND) {
 
 fn start_whisper_transcription(hwnd: HWND) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let whisper_keep_original_language =
+        with_state(hwnd, |state| state.settings.whisper_keep_original_language).unwrap_or(false);
     let whisper_cuda_enabled =
         with_state(hwnd, |state| state.settings.whisper_cuda_enabled).unwrap_or(false);
     let Some(whisper_profile) = choose_whisper_profile_if_needed(hwnd, language) else {
@@ -2268,8 +2298,14 @@ fn start_whisper_transcription(hwnd: HWND) {
 
     std::thread::spawn(move || {
         let result = (|| -> Result<WhisperTranscriptionResult, String> {
-            crate::log_debug("Transcription: preparing WAV for faster-whisper bridge");
-            let wav_path = {
+            let input_path = if supports_direct_whisper_input(&media_path, stream_index) {
+                crate::log_debug(&format!(
+                    "Transcription: using direct media input {}",
+                    media_path.display()
+                ));
+                media_path.clone()
+            } else {
+                crate::log_debug("Transcription: preparing WAV for faster-whisper bridge");
                 screen_reader_speak(&i18n::tr(language, "whisper.status.preparing_audio"));
                 let _unused = post_message_w_safe(
                     hwnd,
@@ -2296,6 +2332,11 @@ fn start_whisper_transcription(hwnd: HWND) {
                 LPARAM(0),
             );
             screen_reader_speak(&i18n::tr(language, "whisper.status.transcribing"));
+            let forced_language = if whisper_keep_original_language {
+                None
+            } else {
+                Some(language)
+            };
             let mut progress_last = -1;
             let progress_callback: Box<dyn FnMut(i32) + Send> = Box::new(move |pct| {
                 let clamped = pct.clamp(0, 100);
@@ -2311,9 +2352,9 @@ fn start_whisper_transcription(hwnd: HWND) {
             });
 
             let text = crate::tools::faster_whisper_bridge::transcribe_wav(
-                &wav_path,
+                &input_path,
                 model,
-                language,
+                forced_language,
                 whisper_cuda_enabled,
                 &cancel_flag,
                 Some(progress_callback),

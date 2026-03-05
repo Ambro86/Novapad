@@ -104,6 +104,7 @@ const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
 const OPTIONS_ID_PODCASTINDEX_SIGNUP: usize = 6037;
 const OPTIONS_ID_WHISPER_MODEL: usize = 6111;
 const OPTIONS_ID_WHISPER_CUDA: usize = 6112;
+const OPTIONS_ID_WHISPER_KEEP_ORIGINAL_LANGUAGE: usize = 6113;
 const OPTIONS_ID_DICTIONARY_TRANSLATION: usize = 6038;
 const OPTIONS_ID_WIKIPEDIA_LANGUAGE: usize = 6040;
 const OPTIONS_ID_INTERPRETER_PATH: usize = 6041;
@@ -655,6 +656,7 @@ struct OptionsDialogState {
     label_whisper_model: HWND,
     combo_whisper_model: HWND,
     checkbox_whisper_cuda: HWND,
+    checkbox_whisper_keep_original_language: HWND,
     button_podcastindex_signup: HWND,
     checkbox_multilingual: HWND,
     checkbox_use_dialogue_voice: HWND,
@@ -875,6 +877,7 @@ struct OptionsLabels {
     label_podcastindex_secret: String,
     label_whisper_model: String,
     label_whisper_cuda: String,
+    label_whisper_keep_original_language: String,
     whisper_model_small: String,
     whisper_model_medium: String,
     whisper_model_large: String,
@@ -1136,6 +1139,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_whisper_cuda: match language {
             Language::Italian => "Attiva CUDA (per schede video Nvidia)".to_string(),
             _ => "Enable CUDA (for Nvidia GPUs)".to_string(),
+        },
+        label_whisper_keep_original_language: match language {
+            Language::Italian => "Mantieni lingua originale dell'audio".to_string(),
+            _ => "Keep original audio language".to_string(),
         },
         whisper_model_small: match language {
             Language::Italian => "Piccolo (small)".to_string(),
@@ -3657,6 +3664,21 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     None,
                 );
                 y += 30;
+                let checkbox_whisper_keep_original_language = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_whisper_keep_original_language).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    420,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_WHISPER_KEEP_ORIGINAL_LANGUAGE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
 
                 let button_podcastindex_signup = CreateWindowExW(
                     Default::default(),
@@ -4518,6 +4540,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     label_whisper_model,
                     combo_whisper_model,
                     checkbox_whisper_cuda,
+                    checkbox_whisper_keep_original_language,
                     button_podcastindex_signup,
                     checkbox_tts_manual,
                     checkbox_multilingual,
@@ -4698,6 +4721,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     label_whisper_model,
                     combo_whisper_model,
                     checkbox_whisper_cuda,
+                    checkbox_whisper_keep_original_language,
                     button_podcastindex_signup,
                     checkbox_multilingual,
                     checkbox_use_dialogue_voice,
@@ -7047,6 +7071,20 @@ fn initialize_options_dialog(hwnd: HWND) {
                 checkbox_whisper_cuda,
                 BM_SETCHECK,
                 WPARAM(if settings.whisper_cuda_enabled {
+                    BST_CHECKED.0 as usize
+                } else {
+                    0
+                }),
+                LPARAM(0),
+            );
+        }
+        if let Some(checkbox_whisper_keep_original_language) =
+            with_options_state(hwnd, |state| state.checkbox_whisper_keep_original_language)
+        {
+            SendMessageW(
+                checkbox_whisper_keep_original_language,
+                BM_SETCHECK,
+                WPARAM(if settings.whisper_keep_original_language {
                     BST_CHECKED.0 as usize
                 } else {
                     0
@@ -9606,6 +9644,18 @@ fn apply_options_dialog(hwnd: HWND) {
                 SendMessageW(checkbox_whisper_cuda, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
                     == BST_CHECKED.0;
         }
+        if let Some(checkbox_whisper_keep_original_language) =
+            with_options_state(hwnd, |state| state.checkbox_whisper_keep_original_language)
+        {
+            settings.whisper_keep_original_language = SendMessageW(
+                checkbox_whisper_keep_original_language,
+                BM_GETCHECK,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0 as u32
+                == BST_CHECKED.0;
+        }
 
         let dialogue_cfg = crate::dialogue_voice::DialogueVoiceConfig {
             engine: settings.dialogue_tts_engine,
@@ -10688,6 +10738,11 @@ fn layout_ai_transcription_tab(state: &OptionsDialogState, scroll_offset: i32) -
         OPTIONS_COMBO_HEIGHT,
     );
     y = layout_checkbox("checkbox_whisper_cuda", state.checkbox_whisper_cuda, y);
+    y = layout_checkbox(
+        "checkbox_whisper_keep_original_language",
+        state.checkbox_whisper_keep_original_language,
+        y,
+    );
     y + scroll_offset
 }
 
@@ -11139,6 +11194,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_whisper_model,
             state.combo_whisper_model,
             state.checkbox_whisper_cuda,
+            state.checkbox_whisper_keep_original_language,
         ] {
             crate::show_window_safe(
                 control,

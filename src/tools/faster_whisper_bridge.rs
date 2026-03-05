@@ -439,25 +439,26 @@ fn spawn_bridge_process(
     bridge_path: &Path,
     wav_path: &Path,
     model: BridgeModel,
-    language: Language,
+    language: Option<Language>,
     work_dir: &Path,
     cuda_dir: Option<&Path>,
 ) -> Result<std::process::Child, String> {
     let model_name = model.as_name();
-    let lang = language_code(language);
     let download_root = crate::settings::settings_dir()
         .join("models")
         .join("faster-whisper");
-    let args = vec![
+    let mut args = vec![
         "--input".to_string(),
         wav_path.display().to_string(),
         "--model".to_string(),
         model_name.to_string(),
-        "--language".to_string(),
-        lang.to_string(),
         "--download-root".to_string(),
         download_root.display().to_string(),
     ];
+    if let Some(language) = language {
+        args.push("--language".to_string());
+        args.push(language_code(language).to_string());
+    }
 
     let mut command = Command::new(bridge_path);
     command.args(&args);
@@ -491,7 +492,7 @@ fn spawn_bridge_process(
 fn select_and_spawn_bridge(
     wav_path: &Path,
     model: BridgeModel,
-    language: Language,
+    language: Option<Language>,
     cancel: &Arc<AtomicBool>,
     use_cuda_runtime: bool,
 ) -> Result<std::process::Child, String> {
@@ -515,7 +516,7 @@ fn select_and_spawn_bridge(
 pub fn transcribe_wav(
     wav_path: &Path,
     model: BridgeModel,
-    language: Language,
+    language: Option<Language>,
     use_cuda_runtime: bool,
     cancel: &Arc<AtomicBool>,
     mut progress: Option<Box<dyn FnMut(i32) + Send>>,

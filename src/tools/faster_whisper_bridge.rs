@@ -95,6 +95,51 @@ fn decode_bridge_text(bytes: &[u8]) -> String {
     }
 }
 
+fn remove_case_insensitive_all(input: &str, needle: &str) -> String {
+    if needle.is_empty() {
+        return input.to_string();
+    }
+    let mut output = input.to_string();
+    loop {
+        let lower = output.to_ascii_lowercase();
+        let Some(pos) = lower.find(needle) else {
+            break;
+        };
+        let end = pos + needle.len();
+        output.replace_range(pos..end, "");
+    }
+    output
+}
+
+fn strip_amara_signature(text: &str) -> String {
+    let mut cleaned = text.to_string();
+
+    for needle in [
+        "sottotitoli creati dalla comunità amara.org",
+        "sottotitoli creati dalla comunita amara.org",
+        "sottotitoli creati dalla comunità amara org",
+        "sottotitoli creati dalla comunita amara org",
+        "subtitles created by the amara.org community",
+        "subtitles created by the amara org community",
+        "subtitles by the amara.org community",
+        "subtitles by the amara org community",
+    ] {
+        cleaned = remove_case_insensitive_all(&cleaned, needle);
+    }
+
+    let lower = cleaned.to_ascii_lowercase();
+    for tail in ["amara.org", "amara org"] {
+        if let Some(pos) = lower.rfind(tail)
+            && lower.len().saturating_sub(pos) <= 96
+        {
+            cleaned.truncate(pos);
+            break;
+        }
+    }
+
+    cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 fn bridge_install_path() -> PathBuf {
     crate::settings::settings_dir()
         .join("tools")
@@ -380,7 +425,7 @@ pub fn transcribe_wav(
 
     if let Some(result) = bridge_result {
         if result.ok {
-            return Ok(result.text);
+            return Ok(strip_amara_signature(&result.text));
         }
         if !result.error.trim().is_empty() {
             return Err(result.error);

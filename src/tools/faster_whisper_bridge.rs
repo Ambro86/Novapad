@@ -272,10 +272,59 @@ fn download_bridge_binary(target_path: &Path, cancel: &Arc<AtomicBool>) -> Resul
 }
 
 fn ensure_bridge_binary(cancel: &Arc<AtomicBool>) -> Result<PathBuf, String> {
+    #[cfg(debug_assertions)]
+    {
+        let mut local_candidates: Vec<PathBuf> = Vec::new();
+        if let Ok(exe_path) = std::env::current_exe()
+            && let Some(repo_root) = exe_path
+                .parent()
+                .and_then(|p| p.parent())
+                .and_then(|p| p.parent())
+        {
+            local_candidates.push(repo_root.join("dll").join(BRIDGE_FILE_NAME));
+        }
+        if let Ok(cwd) = std::env::current_dir() {
+            local_candidates.push(cwd.join("dll").join(BRIDGE_FILE_NAME));
+        }
+
+        for candidate in local_candidates {
+            if candidate.is_file() {
+                match is_valid_bridge_exe(&candidate) {
+                    Ok(true) => {
+                        crate::log_debug(&format!(
+                            "Transcription: using local debug bridge {}",
+                            candidate.display()
+                        ));
+                        return Ok(candidate);
+                    }
+                    Ok(false) => {
+                        crate::log_debug(&format!(
+                            "Transcription: local debug bridge invalid {}",
+                            candidate.display()
+                        ));
+                    }
+                    Err(err) => {
+                        crate::log_debug(&format!(
+                            "Transcription: local debug bridge check failed {}: {}",
+                            candidate.display(),
+                            err
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
     let bridge_path = bridge_install_path();
     if bridge_path.exists() {
         match is_valid_bridge_exe(&bridge_path) {
-            Ok(true) => return Ok(bridge_path),
+            Ok(true) => {
+                crate::log_debug(&format!(
+                    "Transcription: using cached bridge {}",
+                    bridge_path.display()
+                ));
+                return Ok(bridge_path);
+            }
             Ok(false) => {
                 crate::log_debug("Transcription: existing bridge invalid, re-downloading");
                 if let Err(err) = fs::remove_file(&bridge_path) {

@@ -2207,6 +2207,10 @@ fn cancel_whisper_transcription(hwnd: HWND) {
     if !msg.is_empty() {
         screen_reader_speak(&msg);
     }
+    // Close the progress dialog immediately and return focus to Sonarpad.
+    close_whisper_progress_window(hwnd);
+    crate::set_foreground_window_safe(hwnd);
+    crate::set_focus_safe(hwnd);
 }
 
 fn open_whisper_progress_window(hwnd: HWND, language: Language) {

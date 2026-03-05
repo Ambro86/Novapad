@@ -1,4 +1,5 @@
 use crate::settings::Language;
+use encoding_rs::WINDOWS_1252;
 use reqwest::blocking::Client;
 use reqwest::header::USER_AGENT;
 use serde::Deserialize;
@@ -14,8 +15,11 @@ use std::{fs, io::Write};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const BRIDGE_FILE_NAME: &str = "faster_whisper_bridge.exe";
-const BRIDGE_DOWNLOAD_URL: &str =
-    "https://raw.githubusercontent.com/Ambro86/Sonarpad/master/dll/faster_whisper_bridge.exe";
+const BRIDGE_MIN_VALID_SIZE_BYTES: u64 = 1_000_000;
+const BRIDGE_DOWNLOAD_URLS: [&str; 2] = [
+    "https://github.com/Ambro86/Sonarpad/raw/master/dll/faster_whisper_bridge.exe",
+    "https://raw.githubusercontent.com/Ambro86/Sonarpad/master/dll/faster_whisper_bridge.exe",
+];
 
 #[derive(Clone, Copy)]
 pub enum BridgeModel {
@@ -81,13 +85,43 @@ fn language_code(language: Language) -> &'static str {
     }
 }
 
+fn decode_bridge_text(bytes: &[u8]) -> String {
+    match std::str::from_utf8(bytes) {
+        Ok(text) => text.to_string(),
+        Err(_) => {
+            let (decoded, _, _) = WINDOWS_1252.decode(bytes);
+            decoded.into_owned()
+        }
+    }
+}
+
 fn bridge_install_path() -> PathBuf {
     crate::settings::settings_dir()
         .join("tools")
         .join(BRIDGE_FILE_NAME)
 }
 
-fn download_bridge_binary(target_path: &Path, cancel: &Arc<AtomicBool>) -> Result<(), String> {
+fn is_valid_bridge_exe(path: &Path) -> Result<bool, String> {
+    let meta = fs::metadata(path).map_err(|e| format!("bridge stat failed: {e}"))?;
+    if meta.len() < BRIDGE_MIN_VALID_SIZE_BYTES {
+        return Ok(false);
+    }
+    let mut file = fs::File::open(path).map_err(|e| format!("bridge open failed: {e}"))?;
+    let mut header = [0u8; 2];
+    let read = file
+        .read(&mut header)
+        .map_err(|e| format!("bridge read failed: {e}"))?;
+    if read < 2 {
+        return Ok(false);
+    }
+    Ok(header == [b'M', b'Z'])
+}
+
+fn download_bridge_binary_from_url(
+    url: &str,
+    target_path: &Path,
+    cancel: &Arc<AtomicBool>,
+) -> Result<(), String> {
     let parent = target_path
         .parent()
         .ok_or_else(|| "invalid bridge target path".to_string())?;
@@ -100,7 +134,7 @@ fn download_bridge_binary(target_path: &Path, cancel: &Arc<AtomicBool>) -> Resul
         .map_err(|e| format!("http client build failed: {e}"))?;
 
     let mut response = client
-        .get(BRIDGE_DOWNLOAD_URL)
+        .get(url)
         .header(USER_AGENT, "Sonarpad/faster-whisper-bridge")
         .send()
         .map_err(|e| format!("bridge download request failed: {e}"))?;
@@ -137,18 +171,61 @@ fn download_bridge_binary(target_path: &Path, cancel: &Arc<AtomicBool>) -> Resul
     Ok(())
 }
 
+fn download_bridge_binary(target_path: &Path, cancel: &Arc<AtomicBool>) -> Result<(), String> {
+    let mut last_err = String::new();
+    for url in BRIDGE_DOWNLOAD_URLS {
+        crate::log_debug(&format!("Transcription: downloading bridge from {}", url));
+        match download_bridge_binary_from_url(url, target_path, cancel) {
+            Ok(()) => match is_valid_bridge_exe(target_path) {
+                Ok(true) => return Ok(()),
+                Ok(false) => {
+                    if let Err(err) = fs::remove_file(target_path) {
+                        crate::log_debug(&format!("invalid bridge cleanup failed: {err}"));
+                    }
+                    last_err =
+                        format!("downloaded bridge is not a valid Windows executable from {url}");
+                }
+                Err(err) => {
+                    if let Err(remove_err) = fs::remove_file(target_path) {
+                        crate::log_debug(&format!("invalid bridge cleanup failed: {remove_err}"));
+                    }
+                    last_err = err;
+                }
+            },
+            Err(err) => {
+                last_err = err;
+            }
+        }
+    }
+    if last_err.is_empty() {
+        Err("bridge download failed".to_string())
+    } else {
+        Err(last_err)
+    }
+}
+
 fn ensure_bridge_binary(cancel: &Arc<AtomicBool>) -> Result<PathBuf, String> {
     let bridge_path = bridge_install_path();
-    if bridge_path.exists()
-        && let Ok(meta) = fs::metadata(&bridge_path)
-        && meta.len() > 0
-    {
-        return Ok(bridge_path);
+    if bridge_path.exists() {
+        match is_valid_bridge_exe(&bridge_path) {
+            Ok(true) => return Ok(bridge_path),
+            Ok(false) => {
+                crate::log_debug("Transcription: existing bridge invalid, re-downloading");
+                if let Err(err) = fs::remove_file(&bridge_path) {
+                    crate::log_debug(&format!("invalid bridge removal failed: {err}"));
+                }
+            }
+            Err(err) => {
+                crate::log_debug(&format!(
+                    "Transcription: existing bridge validation failed: {}",
+                    err
+                ));
+                if let Err(remove_err) = fs::remove_file(&bridge_path) {
+                    crate::log_debug(&format!("invalid bridge removal failed: {remove_err}"));
+                }
+            }
+        }
     }
-    crate::log_debug(&format!(
-        "Transcription: bridge missing, downloading from {}",
-        BRIDGE_DOWNLOAD_URL
-    ));
     download_bridge_binary(&bridge_path, cancel)?;
     crate::log_debug(&format!(
         "Transcription: bridge ready at {}",
@@ -233,7 +310,7 @@ pub fn transcribe_wav(
             match reader.read_until(b'\n', &mut line) {
                 Ok(0) => break,
                 Ok(_) => {
-                    let trimmed = String::from_utf8_lossy(&line).trim().to_string();
+                    let trimmed = decode_bridge_text(&line).trim().to_string();
                     if !trimmed.is_empty() && line_tx.send(trimmed).is_err() {
                         break;
                     }
@@ -249,11 +326,15 @@ pub fn transcribe_wav(
     let (err_tx, err_rx) = mpsc::channel::<String>();
     let stderr_thread = std::thread::spawn(move || {
         let mut reader = BufReader::new(stderr);
-        let mut text = String::new();
-        if let Err(err) = reader.read_to_string(&mut text) {
-            text = format!("stderr read failed: {err}");
+        let mut raw = Vec::new();
+        let text = if let Err(err) = reader.read_to_end(&mut raw) {
+            format!("stderr read failed: {err}")
+        } else {
+            decode_bridge_text(&raw)
+        };
+        if err_tx.send(text).is_err() {
+            crate::log_debug("bridge stderr channel send failed");
         }
-        let _ignore = err_tx.send(text);
     });
 
     let mut bridge_result: Option<BridgeOutput> = None;

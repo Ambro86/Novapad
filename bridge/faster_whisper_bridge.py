@@ -10,6 +10,17 @@ def print_json(payload):
     print(json.dumps(payload, ensure_ascii=False), flush=True)
 
 
+def configure_stdio_utf8():
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
 def audio_duration_seconds(path):
     try:
         with wave.open(path, "rb") as wav_file:
@@ -34,6 +45,7 @@ def choose_device():
 
 
 def main():
+    configure_stdio_utf8()
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, help="Path to WAV file")
     parser.add_argument("--model", required=True, help="small | medium | large-v3")

@@ -1647,27 +1647,6 @@ pub fn decrypt_podcast_index_secret(secret: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
-pub fn encrypt_gemini_api_key(secret: &str) -> String {
-    if secret.trim().is_empty() {
-        return String::new();
-    }
-    dpapi_protect(secret.as_bytes())
-        .map(hex::encode)
-        .unwrap_or_default()
-}
-
-pub fn decrypt_gemini_api_key(secret: &str) -> Option<String> {
-    if secret.trim().is_empty() {
-        return None;
-    }
-    let decoded = match hex::decode(secret) {
-        Ok(decoded) => decoded,
-        Err(_) => return Some(secret.to_string()),
-    };
-    let bytes = dpapi_unprotect(&decoded)?;
-    String::from_utf8(bytes).ok()
-}
-
 pub fn save_settings(settings: AppSettings) {
     apply_network_proxy_settings(&settings);
     let path = get_settings_path();

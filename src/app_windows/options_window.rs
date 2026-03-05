@@ -102,7 +102,7 @@ const OPTIONS_ID_PODCAST_CACHE_LIMIT: usize = 6030;
 const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
 const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
 const OPTIONS_ID_PODCASTINDEX_SIGNUP: usize = 6037;
-const OPTIONS_ID_GEMINI_API_KEY: usize = 6111;
+const OPTIONS_ID_WHISPER_MODEL: usize = 6111;
 const OPTIONS_ID_DICTIONARY_TRANSLATION: usize = 6038;
 const OPTIONS_ID_WIKIPEDIA_LANGUAGE: usize = 6040;
 const OPTIONS_ID_INTERPRETER_PATH: usize = 6041;
@@ -174,8 +174,9 @@ const OPTIONS_TAB_VOICE: i32 = 1;
 const OPTIONS_TAB_EDITOR: i32 = 2;
 const OPTIONS_TAB_AUDIO: i32 = 3;
 const OPTIONS_TAB_RSS_PODCAST: i32 = 4;
-const OPTIONS_TAB_SHORTCUTS: i32 = 5;
-const OPTIONS_TAB_COUNT: i32 = 6;
+const OPTIONS_TAB_AI_TRANSCRIPTION: i32 = 5;
+const OPTIONS_TAB_SHORTCUTS: i32 = 6;
+const OPTIONS_TAB_COUNT: i32 = 7;
 const OPTIONS_CONTENT_TOP: i32 = 50;
 const OPTIONS_MARGIN_X: i32 = 20;
 const OPTIONS_LABEL_WIDTH: i32 = 245;
@@ -650,8 +651,8 @@ struct OptionsDialogState {
     edit_podcastindex_key: HWND,
     label_podcastindex_secret: HWND,
     edit_podcastindex_secret: HWND,
-    label_gemini_api_key: HWND,
-    edit_gemini_api_key: HWND,
+    label_whisper_model: HWND,
+    combo_whisper_model: HWND,
     button_podcastindex_signup: HWND,
     checkbox_multilingual: HWND,
     checkbox_use_dialogue_voice: HWND,
@@ -774,6 +775,7 @@ struct OptionsLabels {
     tab_editor: String,
     tab_audio: String,
     tab_rss_podcast: String,
+    tab_ai_transcription: String,
     tab_shortcuts: String,
     label_language: String,
     label_modified_marker_position: String,
@@ -869,7 +871,10 @@ struct OptionsLabels {
     label_podcast_time_display: String,
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
-    label_gemini_api_key: String,
+    label_whisper_model: String,
+    whisper_model_small: String,
+    whisper_model_medium: String,
+    whisper_model_large: String,
     label_podcastindex_signup: String,
     lang_it: String,
     lang_en: String,
@@ -944,6 +949,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         tab_editor: i18n::tr(language, "options.tab.editor"),
         tab_audio: i18n::tr(language, "options.tab.audio"),
         tab_rss_podcast: i18n::tr(language, "options.tab.rss_podcast"),
+        tab_ai_transcription: match language {
+            Language::Italian => "AI e trascrizione".to_string(),
+            _ => "AI and Transcription".to_string(),
+        },
         tab_shortcuts: shortcut_tab_title(language),
         label_language: i18n::tr(language, "options.label.language"),
         label_modified_marker_position: i18n::tr(
@@ -1117,7 +1126,22 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_podcast_time_display: i18n::tr(language, "options.label.podcast_time_display"),
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
-        label_gemini_api_key: "Gemini API key:".to_string(),
+        label_whisper_model: match language {
+            Language::Italian => "Modello Whisper:".to_string(),
+            _ => "Whisper model:".to_string(),
+        },
+        whisper_model_small: match language {
+            Language::Italian => "Piccolo (small)".to_string(),
+            _ => "Small".to_string(),
+        },
+        whisper_model_medium: match language {
+            Language::Italian => "Medio (medium)".to_string(),
+            _ => "Medium".to_string(),
+        },
+        whisper_model_large: match language {
+            Language::Italian => "Grande v3 (large)".to_string(),
+            _ => "Large v3".to_string(),
+        },
         label_podcastindex_signup: i18n::tr(language, "options.button.podcastindex_signup"),
         lang_it: i18n::tr(language, "options.lang.it"),
         lang_en: i18n::tr(language, "options.lang.en"),
@@ -1845,6 +1869,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     labels.tab_editor.clone(),
                     labels.tab_audio.clone(),
                     labels.tab_rss_podcast.clone(),
+                    labels.tab_ai_transcription.clone(),
                     labels.tab_shortcuts.clone(),
                 ];
                 for (index, label) in tab_labels.iter().enumerate() {
@@ -3567,11 +3592,11 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 30;
 
-                let label_gemini_api_key = CreateWindowExW(
+                let label_whisper_model = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
-                    PCWSTR(to_wide(&labels.label_gemini_api_key).as_ptr()),
-                    WS_CHILD,
+                    PCWSTR(to_wide(&labels.label_whisper_model).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
                     20,
                     y,
                     140,
@@ -3581,21 +3606,35 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     HINSTANCE(0),
                     None,
                 );
-                let edit_gemini_api_key = CreateWindowExW(
+                let combo_whisper_model = CreateWindowExW(
                     WS_EX_CLIENTEDGE,
-                    w!("EDIT"),
+                    WC_COMBOBOXW,
                     PCWSTR::null(),
-                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     170,
                     y - 2,
                     300,
                     22,
                     hwnd,
-                    HMENU(OPTIONS_ID_GEMINI_API_KEY as isize),
+                    HMENU(OPTIONS_ID_WHISPER_MODEL as isize),
                     HINSTANCE(0),
                     None,
                 );
                 y += 30;
+
+                for model_label in [
+                    labels.whisper_model_small.as_str(),
+                    labels.whisper_model_medium.as_str(),
+                    labels.whisper_model_large.as_str(),
+                ] {
+                    SendMessageW(
+                        combo_whisper_model,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(model_label).as_ptr() as isize),
+                    );
+                }
+                SendMessageW(combo_whisper_model, CB_SETCURSEL, WPARAM(0), LPARAM(0));
 
                 let button_podcastindex_signup = CreateWindowExW(
                     Default::default(),
@@ -4454,8 +4493,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_podcastindex_key,
                     label_podcastindex_secret,
                     edit_podcastindex_secret,
-                    label_gemini_api_key,
-                    edit_gemini_api_key,
+                    label_whisper_model,
+                    combo_whisper_model,
                     button_podcastindex_signup,
                     checkbox_tts_manual,
                     checkbox_multilingual,
@@ -4633,8 +4672,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_podcastindex_key,
                     label_podcastindex_secret,
                     edit_podcastindex_secret,
-                    label_gemini_api_key,
-                    edit_gemini_api_key,
+                    label_whisper_model,
+                    combo_whisper_model,
                     button_podcastindex_signup,
                     checkbox_multilingual,
                     checkbox_use_dialogue_voice,
@@ -5222,8 +5261,8 @@ fn initialize_options_dialog(hwnd: HWND) {
             edit_podcastindex_key,
             _label_podcastindex_secret,
             edit_podcastindex_secret,
-            _label_gemini_api_key,
-            edit_gemini_api_key,
+            _label_whisper_model,
+            combo_whisper_model,
             _button_podcastindex_signup,
             checkbox_tts_manual,
             checkbox_multilingual,
@@ -5351,8 +5390,8 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.edit_podcastindex_key,
                 state.label_podcastindex_secret,
                 state.edit_podcastindex_secret,
-                state.label_gemini_api_key,
-                state.edit_gemini_api_key,
+                state.label_whisper_model,
+                state.combo_whisper_model,
                 state.button_podcastindex_signup,
                 state.checkbox_tts_manual,
                 state.checkbox_multilingual,
@@ -6966,12 +7005,17 @@ fn initialize_options_dialog(hwnd: HWND) {
         {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        let gemini_key =
-            crate::settings::decrypt_gemini_api_key(&settings.gemini_api_key).unwrap_or_default();
-        if let Err(_e) = SetWindowTextW(edit_gemini_api_key, PCWSTR(to_wide(&gemini_key).as_ptr()))
-        {
-            crate::log_debug(&format!("Error: {:?}", _e));
-        }
+        let whisper_index = match settings.whisper_model_profile.as_str() {
+            "medium_q5_0" => 1usize,
+            "large_v3_turbo_q5_0" => 2usize,
+            _ => 0usize,
+        };
+        SendMessageW(
+            combo_whisper_model,
+            CB_SETCURSEL,
+            WPARAM(whisper_index),
+            LPARAM(0),
+        );
 
         refresh_voices(hwnd);
     }
@@ -8486,7 +8530,7 @@ fn apply_options_dialog(hwnd: HWND) {
             combo_podcast_time_display,
             edit_podcastindex_key,
             edit_podcastindex_secret,
-            edit_gemini_api_key,
+            combo_whisper_model,
             checkbox_tts_manual,
             checkbox_multilingual,
             checkbox_use_dialogue_voice,
@@ -8576,7 +8620,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.combo_podcast_time_display,
                 state.edit_podcastindex_key,
                 state.edit_podcastindex_secret,
-                state.edit_gemini_api_key,
+                state.combo_whisper_model,
                 state.checkbox_tts_manual,
                 state.checkbox_multilingual,
                 state.checkbox_use_dialogue_voice,
@@ -9511,18 +9555,12 @@ fn apply_options_dialog(hwnd: HWND) {
                     crate::settings::encrypt_podcast_index_secret(trimmed);
             }
         }
-        let gemini_key_len = GetWindowTextLengthW(edit_gemini_api_key);
-        if gemini_key_len >= 0 {
-            let mut buf = vec![0u16; (gemini_key_len + 1) as usize];
-            let read = GetWindowTextW(edit_gemini_api_key, &mut buf);
-            let text = String::from_utf16_lossy(&buf[..read as usize]);
-            let trimmed = text.trim();
-            if trimmed.is_empty() {
-                settings.gemini_api_key.clear();
-            } else {
-                settings.gemini_api_key = crate::settings::encrypt_gemini_api_key(trimmed);
-            }
-        }
+        let whisper_sel = SendMessageW(combo_whisper_model, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        settings.whisper_model_profile = match whisper_sel {
+            1 => "medium_q5_0".to_string(),
+            2 => "large_v3_turbo_q5_0".to_string(),
+            _ => "small_q5_1".to_string(),
+        };
 
         let dialogue_cfg = crate::dialogue_voice::DialogueVoiceConfig {
             engine: settings.dialogue_tts_engine,
@@ -10594,6 +10632,19 @@ fn layout_rss_podcast_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32
     y + scroll_offset
 }
 
+fn layout_ai_transcription_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
+    let mut y = OPTIONS_CONTENT_TOP - scroll_offset;
+    y = layout_label_control(
+        "label_whisper_model",
+        state.label_whisper_model,
+        "combo_whisper_model",
+        state.combo_whisper_model,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
+    y + scroll_offset
+}
+
 fn layout_shortcuts_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
     let mut y = OPTIONS_CONTENT_TOP - scroll_offset;
     y = layout_label_control(
@@ -10669,6 +10720,7 @@ fn layout_tab_content(state: &OptionsDialogState, index: i32, scroll_offset: i32
         OPTIONS_TAB_EDITOR => layout_editor_tab(state, scroll_offset),
         OPTIONS_TAB_AUDIO => layout_audio_tab(state, scroll_offset),
         OPTIONS_TAB_RSS_PODCAST => layout_rss_podcast_tab(state, scroll_offset),
+        OPTIONS_TAB_AI_TRANSCRIPTION => layout_ai_transcription_tab(state, scroll_offset),
         OPTIONS_TAB_SHORTCUTS => layout_shortcuts_tab(state, scroll_offset),
         _ => OPTIONS_CONTENT_TOP,
     }
@@ -10841,6 +10893,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
         let show_editor = index == OPTIONS_TAB_EDITOR;
         let show_audio = index == OPTIONS_TAB_AUDIO;
         let show_rss_podcast = index == OPTIONS_TAB_RSS_PODCAST;
+        let show_ai_transcription = index == OPTIONS_TAB_AI_TRANSCRIPTION;
         let show_shortcuts = index == OPTIONS_TAB_SHORTCUTS;
 
         for control in [
@@ -11035,6 +11088,17 @@ fn set_active_tab(hwnd: HWND, index: i32) {
         ] {
             crate::show_window_safe(control, if show_shortcuts { SW_SHOW } else { SW_HIDE });
         }
+
+        for control in [state.label_whisper_model, state.combo_whisper_model] {
+            crate::show_window_safe(
+                control,
+                if show_ai_transcription {
+                    SW_SHOW
+                } else {
+                    SW_HIDE
+                },
+            );
+        }
     })
     .is_none()
     {
@@ -11105,6 +11169,7 @@ fn focus_tab_first(hwnd: HWND, index: i32) {
         OPTIONS_TAB_EDITOR => state.checkbox_word_wrap,
         OPTIONS_TAB_AUDIO => state.combo_audio_skip,
         OPTIONS_TAB_RSS_PODCAST => state.combo_confirm_delete_rss_mode,
+        OPTIONS_TAB_AI_TRANSCRIPTION => state.combo_whisper_model,
         OPTIONS_TAB_SHORTCUTS => state.combo_shortcut_action,
         _ => HWND(0),
     })

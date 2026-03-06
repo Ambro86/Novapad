@@ -8,11 +8,11 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use windows::Win32::Foundation::{HANDLE, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{HANDLE, HGLOBAL, HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{GetDC, GetTextMetricsW, HFONT, ReleaseDC, TEXTMETRICW};
 use windows::Win32::Storage::FileSystem::ReadFile;
 use windows::Win32::System::DataExchange::{
-    CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
+    CloseClipboard, EmptyClipboard, GetClipboardData, OpenClipboard, SetClipboardData,
 };
 use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -662,6 +662,60 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         }
 
         let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+        if ctrl_down && msg.wParam.0 as u32 == 'V' as u32 {
+            let mut handled = false;
+            if with_prompt_state(hwnd, |state| {
+                if focus != state.input {
+                    return;
+                }
+                let Some(mut pasted) = read_clipboard_text(state.input) else {
+                    return;
+                };
+                if !pasted.contains('\n') && !pasted.contains('\r') {
+                    return;
+                }
+                pasted = pasted.replace("\r\n", "\n").replace('\r', "\n");
+                let existing = {
+                    let len = crate::get_window_text_length_w_safe(state.input);
+                    if len <= 0 {
+                        String::new()
+                    } else {
+                        let mut buffer = vec![0u16; (len + 1) as usize];
+                        let read = crate::get_window_text_w_safe(state.input, &mut buffer);
+                        String::from_utf16_lossy(&buffer[..read as usize])
+                    }
+                };
+                let combined = if existing.is_empty() {
+                    pasted
+                } else if pasted.starts_with('\n') {
+                    format!("{existing}{pasted}")
+                } else {
+                    format!("{existing}\n{pasted}")
+                };
+                let payload = if state.program_is_codex {
+                    combined
+                } else {
+                    combined.replace('\n', "\r\n")
+                };
+                if let Some(session) = state.session.as_ref() {
+                    if !session.write_input(&payload) {
+                        crate::log_debug("Failed to write pasted multiline input");
+                    } else {
+                        if let Err(e) = crate::set_window_text_w_safe(state.input, PCWSTR::null()) {
+                            crate::log_debug(&format!("Failed to clear prompt input: {e}"));
+                        }
+                        handled = true;
+                    }
+                }
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access prompt state");
+            }
+            if handled {
+                return true;
+            }
+        }
         if ctrl_down && msg.wParam.0 as u32 == 'C' as u32 {
             if with_prompt_state(hwnd, |state| {
                 if focus == state.output {
@@ -1318,6 +1372,46 @@ where
         windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
     ) as *mut PromptState;
     crate::with_raw_mut_ptr_safe(ptr, f)
+}
+
+fn read_clipboard_text(hwnd_owner: HWND) -> Option<String> {
+    unsafe {
+        const CF_UNICODETEXT: u32 = 13;
+        if OpenClipboard(hwnd_owner).is_err() {
+            return None;
+        }
+        let result = (|| {
+            let handle = match GetClipboardData(CF_UNICODETEXT) {
+                Ok(h) => h,
+                Err(e) => {
+                    crate::log_debug(&format!("GetClipboardData failed: {}", e));
+                    return None;
+                }
+            };
+            if handle.0 == 0 {
+                return None;
+            }
+            let hglobal = HGLOBAL(handle.0 as *mut std::ffi::c_void);
+            let ptr = GlobalLock(hglobal) as *const u16;
+            if ptr.is_null() {
+                return None;
+            }
+
+            let mut len = 0usize;
+            while *ptr.add(len) != 0 {
+                len += 1;
+            }
+            let text = String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len));
+            if let Err(e) = GlobalUnlock(hglobal) {
+                crate::log_debug(&format!("GlobalUnlock failed: {}", e));
+            }
+            Some(text)
+        })();
+        if let Err(e) = CloseClipboard() {
+            crate::log_debug(&format!("CloseClipboard failed: {}", e));
+        }
+        result
+    }
 }
 
 fn copy_output_selection(hwnd_output: HWND) {

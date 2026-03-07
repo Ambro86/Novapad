@@ -218,6 +218,7 @@
   "options.label.send_crash_reports": "Skicka anonyma felrapporter",
   "options.label.context_menu": "Lägg till \"Öppna med Sonarpad\" i snabbmenyn",
   "options.label.confirm_delete_rss_podcast": "Begär bekräftelse innan RSS/Podcast-objekt tas bort",
+  "options.label.rss_show_article_preview": "Show selected article directly in the RSS window",
   "options.label.announce_unread_rss_podcast": "Meddela status oläst/ospelat för RSS/poddar",
   "context_menu.open_with": "Öppna med Sonarpad",
   "context_menu.spelling_ok": "Stavning: OK",

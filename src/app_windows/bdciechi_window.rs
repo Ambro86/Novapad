@@ -655,6 +655,9 @@ pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessagi
                 if msg.hwnd == state.sample_edit {
                     crate::set_focus_safe(state.sample_close_btn);
                     handled = true;
+                } else if msg.hwnd == state.sample_close_btn {
+                    crate::set_focus_safe(state.sample_edit);
+                    handled = true;
                 }
             });
             if handled {
@@ -1101,6 +1104,17 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     });
                     return LRESULT(0);
                 }
+                if key == VK_TAB.0 as u32 {
+                    let focus = GetFocus();
+                    with_window_state(hwnd, |state| {
+                        if focus == state.sample_edit {
+                            crate::set_focus_safe(state.sample_close_btn);
+                        } else if focus == state.sample_close_btn {
+                            crate::set_focus_safe(state.sample_edit);
+                        }
+                    });
+                    return LRESULT(0);
+                }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_COMMAND => {
@@ -1158,6 +1172,7 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             ),
                         );
                         crate::accessibility::screen_reader_speak(&tr("status.connection_error"));
+                        crate::set_focus_safe(state.user);
                         return;
                     }
                     state.username = payload.username.clone();

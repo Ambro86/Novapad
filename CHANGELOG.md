@@ -10,6 +10,7 @@ Improvements
 • Added RSS favorite articles: from the article context menu you can add items to a dedicated Favorites feed.
 • The Favorites RSS feed can be deleted and is recreated automatically when a new article is added to favorites.
 • Added RSS keyboard shortcuts to move feeds up/down: `Ctrl+Shift+Up Arrow` and `Ctrl+Shift+Down Arrow`.
+• Improved the RSS window with a built-in article preview, so article text can be reviewed directly there and reached quickly with Tab before opening the full article in the editor.
 Bug fixes
 • Fixed a bug where the list of open files was shown in the Help menu instead of the Window menu.
 • Fixed a streaming edge case where playback could start but the “Downloading stream” dialog stayed open when the downloaded file already matched the target format.

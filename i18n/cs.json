@@ -220,6 +220,7 @@
   "options.label.send_crash_reports": "Odesílat anonymní hlášení o chybách",
   "options.label.context_menu": "Přidat \"Otevřít v Sonarpadu\" do kontextového menu",
   "options.label.confirm_delete_rss_podcast": "Požadovat potvrzení před odstraněním položek RSS/Podcast",
+  "options.label.rss_show_article_preview": "Show selected article directly in the RSS window",
   "options.label.announce_unread_rss_podcast": "Oznamovat stav nepřečteno/nepřehráno pro RSS/Podcasty",
   "options.label.file_associations": "Asociace souborů:",
   "options.button.manage_associations": "Nastavit jako výchozí aplikaci...",

@@ -127,6 +127,7 @@ const OPTIONS_ID_ANNOUNCE_UNREAD_RSS_PODCAST: usize = 6067;
 const OPTIONS_ID_UNREAD_LABEL_POSITION: usize = 6078;
 const OPTIONS_ID_CONFIRM_DELETE_PODCAST_MODE: usize = 6068;
 const OPTIONS_ID_RSS_QUICK_COPY_MODE: usize = 6069;
+const OPTIONS_ID_RSS_SHOW_ARTICLE_PREVIEW: usize = 6119;
 const OPTIONS_ID_RSS_DATE_DISPLAY: usize = 6083;
 const OPTIONS_ID_RSS_TIME_DISPLAY: usize = 6084;
 const OPTIONS_ID_PODCAST_DATE_DISPLAY: usize = 6085;
@@ -650,6 +651,7 @@ struct OptionsDialogState {
     edit_subtitle_offset: HWND,
     label_podcast_cache_limit: HWND,
     edit_podcast_cache_limit: HWND,
+    checkbox_rss_show_article_preview: HWND,
     checkbox_announce_unread_rss_podcast: HWND,
     label_unread_label_position: HWND,
     combo_unread_label_position: HWND,
@@ -886,6 +888,7 @@ struct OptionsLabels {
     label_subtitle_ducking: String,
     label_subtitle_offset: String,
     label_podcast_cache_limit: String,
+    label_rss_show_article_preview: String,
     label_announce_unread_rss_podcast: String,
     label_unread_label_position: String,
     label_rss_date_display: String,
@@ -1142,6 +1145,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_subtitle_ducking: i18n::tr(language, "options.label.subtitle_ducking"),
         label_subtitle_offset: i18n::tr(language, "options.label.subtitle_offset"),
         label_podcast_cache_limit: i18n::tr(language, "options.label.podcast_cache_limit"),
+        label_rss_show_article_preview: i18n::tr(
+            language,
+            "options.label.rss_show_article_preview",
+        ),
         label_announce_unread_rss_podcast: i18n::tr(
             language,
             "options.label.announce_unread_rss_podcast",
@@ -4031,6 +4038,22 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 30;
 
+                let checkbox_rss_show_article_preview = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_rss_show_article_preview).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    360,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_RSS_SHOW_ARTICLE_PREVIEW as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 28;
+
                 let checkbox_announce_unread_rss_podcast = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -5196,6 +5219,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_subtitle_offset,
                     label_podcast_cache_limit,
                     edit_podcast_cache_limit,
+                    checkbox_rss_show_article_preview,
                     checkbox_announce_unread_rss_podcast,
                     label_unread_label_position,
                     combo_unread_label_position,
@@ -5383,6 +5407,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_subtitle_offset,
                     label_podcast_cache_limit,
                     edit_podcast_cache_limit,
+                    checkbox_rss_show_article_preview,
                     checkbox_announce_unread_rss_podcast,
                     label_unread_label_position,
                     combo_unread_label_position,
@@ -5997,6 +6022,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             checkbox_subtitle_ducking,
             _label_podcast_cache_limit,
             edit_podcast_cache_limit,
+            checkbox_rss_show_article_preview,
             checkbox_announce_unread_rss_podcast,
             _label_unread_label_position,
             combo_unread_label_position,
@@ -6126,6 +6152,7 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.checkbox_subtitle_ducking,
                 state.label_podcast_cache_limit,
                 state.edit_podcast_cache_limit,
+                state.checkbox_rss_show_article_preview,
                 state.checkbox_announce_unread_rss_podcast,
                 state.label_unread_label_position,
                 state.combo_unread_label_position,
@@ -7323,6 +7350,16 @@ fn initialize_options_dialog(hwnd: HWND) {
             combo_rss_quick_copy_mode,
             CB_SETCURSEL,
             WPARAM(rss_quick_copy_idx),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_rss_show_article_preview,
+            BM_SETCHECK,
+            WPARAM(if settings.rss_show_article_preview {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
             LPARAM(0),
         );
         SendMessageW(
@@ -9348,6 +9385,7 @@ fn apply_options_dialog(hwnd: HWND) {
             checkbox_audio_split_epub_chapters,
             checkbox_subtitle_ducking,
             edit_podcast_cache_limit,
+            checkbox_rss_show_article_preview,
             checkbox_announce_unread_rss_podcast,
             combo_unread_label_position,
             combo_rss_date_display,
@@ -9438,6 +9476,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.checkbox_audio_split_epub_chapters,
                 state.checkbox_subtitle_ducking,
                 state.edit_podcast_cache_limit,
+                state.checkbox_rss_show_article_preview,
                 state.checkbox_announce_unread_rss_podcast,
                 state.combo_unread_label_position,
                 state.combo_rss_date_display,
@@ -9927,6 +9966,14 @@ fn apply_options_dialog(hwnd: HWND) {
             3 => crate::settings::RssQuickCopyMode::All,
             _ => crate::settings::RssQuickCopyMode::Title,
         };
+        settings.rss_show_article_preview = SendMessageW(
+            checkbox_rss_show_article_preview,
+            BM_GETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0 as u32
+            == BST_CHECKED.0;
         settings.confirm_delete_rss_podcast =
             !matches!(settings.rss_delete_confirm_mode, RssDeleteConfirmMode::None)
                 || !matches!(
@@ -11477,6 +11524,11 @@ fn layout_rss_podcast_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32
         OPTIONS_COMBO_HEIGHT,
     );
     y = layout_checkbox(
+        "checkbox_rss_show_article_preview",
+        state.checkbox_rss_show_article_preview,
+        y,
+    );
+    y = layout_checkbox(
         "checkbox_announce_unread_rss_podcast",
         state.checkbox_announce_unread_rss_podcast,
         y,
@@ -11995,6 +12047,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_rss_quick_copy_mode,
             state.label_podcast_cache_limit,
             state.edit_podcast_cache_limit,
+            state.checkbox_rss_show_article_preview,
             state.checkbox_announce_unread_rss_podcast,
             state.label_unread_label_position,
             state.combo_unread_label_position,

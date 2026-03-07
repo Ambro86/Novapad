@@ -670,6 +670,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub rss_quick_copy_mode: RssQuickCopyMode,
     #[serde(default = "default_true")]
+    pub rss_show_article_preview: bool,
+    #[serde(default = "default_true")]
     pub announce_unread_rss_podcast_items: bool,
     #[serde(default)]
     pub rss_podcast_unread_label_position: RssPodcastUnreadLabelPosition,
@@ -974,6 +976,7 @@ impl Default for AppSettings {
             rss_delete_confirm_mode: RssDeleteConfirmMode::Both,
             podcast_delete_confirm_mode: PodcastDeleteConfirmMode::Both,
             rss_quick_copy_mode: RssQuickCopyMode::Title,
+            rss_show_article_preview: true,
             announce_unread_rss_podcast_items: true,
             rss_podcast_unread_label_position: RssPodcastUnreadLabelPosition::Before,
             rss_articles_date_display: ListDateDisplayMode::Always,

@@ -221,6 +221,7 @@
   "options.label.send_crash_reports": "Send Anonymous Crash Reports",
   "options.label.context_menu": "Add \"Open with Sonarpad\" to the context menu",
   "options.label.confirm_delete_rss_podcast": "Ask Confirmation Before Deleting RSS/Podcast Items",
+  "options.label.rss_show_article_preview": "Show selected article directly in the RSS window",
   "options.label.announce_unread_rss_podcast": "Announce Unread/Unplayed Status for RSS/Podcasts",
   "options.label.file_associations": "File Associations:",
   "options.button.manage_associations": "Set as Default Application...",

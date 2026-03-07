@@ -25,10 +25,11 @@ use windows::Win32::UI::Controls::Dialogs::{
     OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST,
     OPENFILENAMEW,
 };
+use windows::Win32::UI::Controls::RichEdit::MSFTEDIT_CLASS;
 use windows::Win32::UI::Controls::{
-    NM_RCLICK, NMHDR, NMTREEVIEWW, NMTVKEYDOWN, TVE_EXPAND, TVGN_CARET, TVGN_CHILD, TVGN_NEXT,
-    TVGN_PARENT, TVGN_ROOT, TVHITTESTINFO, TVI_FIRST, TVI_LAST, TVI_ROOT, TVIF_PARAM, TVIF_TEXT,
-    TVINSERTSTRUCTW, TVINSERTSTRUCTW_0, TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM,
+    EM_SETREADONLY, NM_RCLICK, NMHDR, NMTREEVIEWW, NMTVKEYDOWN, TVE_EXPAND, TVGN_CARET, TVGN_CHILD,
+    TVGN_NEXT, TVGN_PARENT, TVGN_ROOT, TVHITTESTINFO, TVI_FIRST, TVI_LAST, TVI_ROOT, TVIF_PARAM,
+    TVIF_TEXT, TVINSERTSTRUCTW, TVINSERTSTRUCTW_0, TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM,
     TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETITEMW, TVM_GETNEXTITEM, TVM_HITTEST, TVM_INSERTITEMW,
     TVM_SELECTITEM, TVM_SETITEMW, TVM_SORTCHILDRENCB, TVN_ITEMEXPANDINGW, TVN_KEYDOWN,
     TVN_SELCHANGEDW, TVSORTCB, WC_BUTTON,
@@ -39,16 +40,17 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW,
-    CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, ES_AUTOHSCROLL,
-    EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgItem, GetParent,
-    GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONINFORMATION, MB_ICONQUESTION,
-    MB_OK, MB_YESNOCANCEL, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW, OBJID_CLIENT,
-    PostMessageW, RegisterClassW, SW_HIDE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
-    WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WNDCLASSW, WNDPROC,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE, WS_VSCROLL,
+    CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, ES_AUTOHSCROLL, ES_AUTOVSCROLL,
+    ES_MULTILINE, EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgItem,
+    GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONINFORMATION,
+    MB_ICONQUESTION, MB_OK, MB_YESNOCANCEL, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
+    MessageBoxW, MoveWindow, OBJID_CLIENT, PostMessageW, RegisterClassW, SB_TOP, SW_HIDE, SW_SHOW,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
+    TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT,
+    WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WM_VSCROLL, WNDCLASSW, WNDPROC, WS_CAPTION,
+    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -62,6 +64,7 @@ const ID_BTN_CLOSE: usize = 1003;
 const ID_BTN_IMPORT: usize = 1004;
 const ID_BTN_EXPORT: usize = 1005;
 const ID_BTN_SEARCH: usize = 1006;
+const ID_EDIT_ARTICLE_PREVIEW: usize = 1007;
 const ID_CTX_EDIT: usize = 1101;
 const ID_CTX_DELETE: usize = 1102;
 const ID_CTX_RETRY: usize = 1103;
@@ -92,11 +95,13 @@ pub(crate) const WM_RSS_SHOW_CONTEXT: u32 = WM_USER + 205;
 const WM_RSS_BACKGROUND_CHECK_COMPLETE: u32 = WM_USER + 206;
 const WM_RSS_MARK_ITEM_READ_UI: u32 = WM_USER + 207;
 const WM_RSS_SELECT_SOURCE_DELAYED: u32 = WM_USER + 208;
+const WM_RSS_PREVIEW_COMPLETE: u32 = WM_USER + 209;
 const ADD_GUARD_TIMER_ID: usize = 1;
 const EM_REPLACESEL: u32 = 0x00C2;
 const REORDER_EDIT_ID: usize = 1401;
 const REORDER_OK_ID: usize = 1402;
 const REORDER_CANCEL_ID: usize = 1403;
+const EM_SCROLLCARET: u32 = 0x00B7;
 const SEARCH_EDIT_ID: usize = 1501;
 const SEARCH_OK_ID: usize = 1502;
 const SEARCH_CANCEL_ID: usize = 1503;
@@ -1730,6 +1735,7 @@ pub(crate) fn sync_default_sources_for_settings(
 struct RssWindowState {
     parent: HWND,
     hwnd_tree: HWND,
+    hwnd_preview: HWND,
     hwnd_import: HWND,
     hwnd_export: HWND,
     node_data: HashMap<isize, NodeData>,
@@ -1745,6 +1751,8 @@ struct RssWindowState {
     removed_history: Vec<RssLastRemoved>,
     suppress_tree_selection_events: bool,
     suppress_focus_restore_once: bool,
+    preview_proc: WNDPROC,
+    preview_request_seq: u64,
 }
 
 #[derive(Clone)]
@@ -1784,6 +1792,143 @@ struct AddDialogInit {
 
 struct SearchDialogInit {
     parent: HWND,
+}
+
+struct PreviewResult {
+    request_seq: u64,
+    text: String,
+}
+
+fn rss_article_preview_enabled(hwnd: HWND) -> bool {
+    with_rss_state(hwnd, |s| {
+        with_state(s.parent, |ps| ps.settings.rss_show_article_preview).unwrap_or(true)
+    })
+    .unwrap_or(true)
+}
+
+fn set_preview_text(hwnd_preview: HWND, text: &str) {
+    if hwnd_preview.0 == 0 {
+        return;
+    }
+    crate::log_if_err!(crate::set_window_text_w_safe(
+        hwnd_preview,
+        PCWSTR(to_wide(text).as_ptr())
+    ));
+}
+
+fn article_preview_fallback_text(item: &RssItem) -> String {
+    let mut parts = Vec::new();
+    if !item.title.trim().is_empty() {
+        parts.push(item.title.trim().to_string());
+    }
+    if !item.link.trim().is_empty() {
+        parts.push(item.link.trim().to_string());
+    }
+    normalize_article_text(&parts.join("\n\n"))
+}
+
+fn update_preview_layout(hwnd: HWND) {
+    let (hwnd_tree, hwnd_preview) =
+        with_rss_state(hwnd, |s| (s.hwnd_tree, s.hwnd_preview)).unwrap_or((HWND(0), HWND(0)));
+    if hwnd_tree.0 == 0 || hwnd_preview.0 == 0 {
+        return;
+    }
+
+    let show_preview = rss_article_preview_enabled(hwnd);
+    let (tree_height, preview_cmd) = if show_preview {
+        (320, SW_SHOW)
+    } else {
+        (500, SW_HIDE)
+    };
+
+    unsafe {
+        crate::log_if_err!(MoveWindow(hwnd_tree, 10, 10, 460, tree_height, true));
+    }
+    crate::show_window_safe(hwnd_preview, preview_cmd);
+    crate::enable_window_safe(hwnd_preview, show_preview);
+    if show_preview {
+        unsafe {
+            crate::log_if_err!(MoveWindow(hwnd_preview, 10, 340, 460, 170, true));
+        }
+    }
+}
+
+fn request_article_preview(hwnd: HWND, item: RssItem) {
+    let Some((parent, request_seq, hwnd_preview)) = with_rss_state(hwnd, |s| {
+        s.preview_request_seq = s.preview_request_seq.wrapping_add(1);
+        (s.parent, s.preview_request_seq, s.hwnd_preview)
+    }) else {
+        return;
+    };
+
+    let fallback = article_preview_fallback_text(&item);
+    set_preview_text(hwnd_preview, &fallback);
+
+    if parent.0 != 0 {
+        ensure_rss_http(parent);
+    }
+
+    let url = item.link.clone();
+    let title = item.title.clone();
+    let description = item.description.clone();
+    let language = if parent.0 != 0 {
+        with_state(parent, |state| state.settings.language).unwrap_or_default()
+    } else {
+        crate::settings::Language::default()
+    };
+
+    std::thread::spawn(move || {
+        let rt = match tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(rt) => rt,
+            Err(err) => {
+                crate::log_debug(&format!("Failed to build tokio runtime: {}", err));
+                return;
+            }
+        };
+
+        let text = match rt.block_on(crate::tools::rss::fetch_article_text(
+            &url,
+            &title,
+            &description,
+            language,
+        )) {
+            Ok(text) => normalize_article_text(&text),
+            Err(err) => {
+                crate::log_debug(&format!(
+                    "rss_preview_fallback url=\"{}\" error=\"{}\"",
+                    url, err
+                ));
+                fallback
+            }
+        };
+
+        let payload = Box::new(PreviewResult { request_seq, text });
+        let _unused = crate::post_message_w_safe(
+            hwnd,
+            WM_RSS_PREVIEW_COMPLETE,
+            WPARAM(0),
+            LPARAM(Box::into_raw(payload) as isize),
+        );
+    });
+}
+
+fn refresh_article_preview_for_selection(hwnd: HWND) {
+    let hwnd_preview = with_rss_state(hwnd, |s| s.hwnd_preview).unwrap_or(HWND(0));
+    if hwnd_preview.0 == 0 {
+        return;
+    }
+    if !rss_article_preview_enabled(hwnd) {
+        set_preview_text(hwnd_preview, "");
+        return;
+    }
+    let Some(item) = selected_article_item(hwnd) else {
+        set_preview_text(hwnd_preview, "");
+        return;
+    };
+    request_article_preview(hwnd, item);
 }
 
 pub fn open(parent: HWND) {
@@ -2221,6 +2366,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 let state = Box::new(RssWindowState {
                     parent,
                     hwnd_tree: HWND(0),
+                    hwnd_preview: HWND(0),
                     hwnd_import: HWND(0),
                     hwnd_export: HWND(0),
                     node_data: HashMap::new(),
@@ -2236,6 +2382,8 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     removed_history: Vec::new(),
                     suppress_tree_selection_events: false,
                     suppress_focus_restore_once: false,
+                    preview_proc: None,
+                    preview_request_seq: 0,
                 });
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
 
@@ -2272,11 +2420,18 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 if !ptr.is_null() {
                     let parent = (*ptr).parent;
                     let hwnd_tree = (*ptr).hwnd_tree;
+                    let hwnd_preview = (*ptr).hwnd_preview;
                     if hwnd_tree.0 != 0
                         && let Some(proc) = (*ptr).tree_proc
                     {
                         let proc_ptr = proc as usize;
                         SetWindowLongPtrW(hwnd_tree, GWLP_WNDPROC, proc_ptr as isize);
+                    }
+                    if hwnd_preview.0 != 0
+                        && let Some(proc) = (*ptr).preview_proc
+                    {
+                        let proc_ptr = proc as usize;
+                        SetWindowLongPtrW(hwnd_preview, GWLP_WNDPROC, proc_ptr as isize);
                     }
                     if parent.0 != 0 {
                         force_focus_editor_on_parent(parent);
@@ -2638,6 +2793,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             let pnmtv = lparam.0 as *const NMTREEVIEWW;
                             let hitem = (*pnmtv).itemNew.hItem;
                             handle_selection_changed(hwnd, hitem);
+                            refresh_article_preview_for_selection(hwnd);
                             LRESULT(0)
                         }
                         TVN_KEYDOWN => {
@@ -2769,6 +2925,25 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     ignore_bool(handle_rss_quick_copy(hwnd));
                     return LRESULT(0);
                 }
+                if key == u32::from(VK_TAB.0)
+                    && GetKeyState(VK_SHIFT.0 as i32) >= 0
+                    && rss_article_preview_enabled(hwnd)
+                    && selected_article_item(hwnd).is_some()
+                {
+                    let hwnd_preview = with_rss_state(hwnd, |s| s.hwnd_preview).unwrap_or(HWND(0));
+                    if hwnd_preview.0 != 0 {
+                        SetFocus(hwnd_preview);
+                        SendMessageW(hwnd_preview, EM_SETSEL, WPARAM(0), LPARAM(0));
+                        SendMessageW(
+                            hwnd_preview,
+                            WM_VSCROLL,
+                            WPARAM(SB_TOP.0 as usize),
+                            LPARAM(0),
+                        );
+                        SendMessageW(hwnd_preview, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+                        return LRESULT(0);
+                    }
+                }
                 if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
                     show_selected_properties(hwnd);
                     return LRESULT(0);
@@ -2796,6 +2971,20 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 let ptr = lparam.0 as *mut FetchResult;
                 let res = *Box::from_raw(ptr);
                 process_fetch_result(hwnd, res);
+                LRESULT(0)
+            }
+            WM_RSS_PREVIEW_COMPLETE => {
+                let ptr = lparam.0 as *mut PreviewResult;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let res = *Box::from_raw(ptr);
+                with_rss_state(hwnd, |s| {
+                    if res.request_seq != s.preview_request_seq {
+                        return;
+                    }
+                    set_preview_text(s.hwnd_preview, &res.text);
+                });
                 LRESULT(0)
             }
             WM_RSS_BACKGROUND_CHECK_COMPLETE => {
@@ -3294,6 +3483,53 @@ fn rss_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
     }
 }
 
+unsafe extern "system" fn rss_preview_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    crate::panic_guard::guard(
+        "rss_preview_wndproc",
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
+        || rss_preview_wndproc_inner(hwnd, msg, wparam, lparam),
+    )
+}
+
+fn rss_preview_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        if msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN {
+            let key = wparam.0 as u32;
+            if key == u32::from(VK_TAB.0) {
+                let parent = GetParent(hwnd);
+                if parent.0 != 0 {
+                    let target = if GetKeyState(VK_SHIFT.0 as i32) < 0 {
+                        with_rss_state(parent, |s| s.hwnd_tree).unwrap_or(HWND(0))
+                    } else {
+                        GetDlgItem(parent, ID_BTN_ADD as i32)
+                    };
+                    if target.0 != 0 {
+                        SetFocus(target);
+                        return LRESULT(0);
+                    }
+                }
+            }
+        }
+
+        let parent = GetParent(hwnd);
+        let prev_proc = if parent.0 != 0 {
+            with_rss_state(parent, |s| s.preview_proc).unwrap_or(None)
+        } else {
+            None
+        };
+        if let Some(proc) = prev_proc {
+            CallWindowProcW(Some(proc), hwnd, msg, wparam, lparam)
+        } else {
+            DefWindowProcW(hwnd, msg, wparam, lparam)
+        }
+    }
+}
+
 fn create_controls(hwnd: HWND) {
     unsafe {
         let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
@@ -3327,6 +3563,39 @@ fn create_controls(hwnd: HWND) {
             with_rss_state(hwnd, |s| {
                 s.tree_proc = mem::transmute::<isize, WNDPROC>(old)
             });
+        }
+
+        let hwnd_preview = CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            MSFTEDIT_CLASS,
+            PCWSTR::null(),
+            WS_CHILD
+                | WS_VISIBLE
+                | WS_TABSTOP
+                | WS_VSCROLL
+                | WINDOW_STYLE((ES_MULTILINE | ES_AUTOVSCROLL) as u32),
+            10,
+            340,
+            460,
+            170,
+            hwnd,
+            HMENU(ID_EDIT_ARTICLE_PREVIEW as isize),
+            hinstance,
+            None,
+        );
+        if hwnd_preview.0 != 0 {
+            let proc_ptr = rss_preview_wndproc as *const () as usize;
+            let old = SetWindowLongPtrW(hwnd_preview, GWLP_WNDPROC, proc_ptr as isize);
+            with_rss_state(hwnd, |s| {
+                s.preview_proc = mem::transmute::<isize, WNDPROC>(old)
+            });
+            SendMessageW(
+                hwnd_preview,
+                EM_LIMITTEXT,
+                WPARAM(0x7FFF_FFFEusize),
+                LPARAM(0),
+            );
+            SendMessageW(hwnd_preview, EM_SETREADONLY, WPARAM(1), LPARAM(0));
         }
 
         let language = with_rss_state(hwnd, |s| {
@@ -3402,6 +3671,7 @@ fn create_controls(hwnd: HWND) {
 
         with_rss_state(hwnd, |s| {
             s.hwnd_tree = hwnd_tree;
+            s.hwnd_preview = hwnd_preview;
             s.hwnd_import = hwnd_import;
             s.hwnd_export = hwnd_export;
         });
@@ -3412,12 +3682,19 @@ fn create_controls(hwnd: HWND) {
         .unwrap_or(HFONT(0));
         if hfont.0 != 0 {
             SendMessageW(hwnd_tree, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            SendMessageW(
+                hwnd_preview,
+                WM_SETFONT,
+                WPARAM(hfont.0 as usize),
+                LPARAM(1),
+            );
             SendMessageW(hwnd_add, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             SendMessageW(hwnd_import, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             SendMessageW(hwnd_export, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             SendMessageW(hwnd_close, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
         }
 
+        update_preview_layout(hwnd);
         SetFocus(hwnd_tree);
     }
 }

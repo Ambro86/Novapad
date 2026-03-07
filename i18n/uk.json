@@ -220,6 +220,7 @@
   "options.label.send_crash_reports": "Надсилати анонімні звіти про помилки",
   "options.label.context_menu": "Додати «Відкрити в Sonarpad» до контекстного меню",
   "options.label.confirm_delete_rss_podcast": "Підтверджувати видалення елементів RSS чи подкастів",
+  "options.label.rss_show_article_preview": "Show selected article directly in the RSS window",
   "options.label.announce_unread_rss_podcast": "Озвучувати стан «непрочитано» / «не відтворено» для RSS або подкастів",
   "options.label.file_associations": "Асоціації файлів:",
   "options.button.manage_associations": "Призначити типовою програмою...",

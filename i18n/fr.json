@@ -220,6 +220,7 @@
   "options.label.send_crash_reports": "Envoyer des rapports de plantage anonymes",
   "options.label.context_menu": "Ajouter \"Ouvrir avec Sonarpad\" au menu contextuel",
   "options.label.confirm_delete_rss_podcast": "Demander une confirmation avant de supprimer des éléments RSS/Podcast",
+  "options.label.rss_show_article_preview": "Show selected article directly in the RSS window",
   "options.label.announce_unread_rss_podcast": "Annoncer l'état non lu/non joué pour RSS/Podcasts",
   "options.label.file_associations": "Associations de fichiers :",
   "options.button.manage_associations": "Définir comme application par défaut...",

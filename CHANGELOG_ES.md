@@ -10,6 +10,7 @@ Mejoras
 • Añadida la acción del menú contextual de artículos RSS para añadir un artículo a favoritos.
 • La fuente RSS "Favoritos" puede eliminarse y se recrea automáticamente al añadir un nuevo artículo a favoritos.
 • Añadidos atajos de teclado RSS para mover las fuentes arriba/abajo: `Ctrl+Shift+Flecha arriba` y `Ctrl+Shift+Flecha abajo`.
+• Mejorada la ventana RSS con una vista previa integrada del artículo, para consultar el texto directamente allí y alcanzarlo rápidamente con Tab antes de abrir el artículo completo en el editor.
 Correcciones
 • Corregido un error por el que la lista de archivos abiertos se mostraba en el menú Ayuda en lugar del menú Ventana.
 • Corregido un caso límite de streaming en el que la reproducción podía iniciarse pero la ventana “Descargando streaming” quedaba abierta cuando el archivo descargado ya coincidía con el formato de destino.

@@ -10,6 +10,7 @@ Améliorations
 • Ajout dans le menu contextuel des articles RSS de l'action pour ajouter un article aux favoris.
 • La source RSS "Favoris" peut être supprimée et est recréée automatiquement lors du prochain ajout d'un article aux favoris.
 • Ajout de raccourcis clavier RSS pour déplacer les sources vers le haut/le bas : `Ctrl+Shift+Flèche haut` et `Ctrl+Shift+Flèche bas`.
+• Amélioration de la fenêtre RSS avec un aperçu d'article intégré, afin de consulter directement le texte dans la fenêtre et d'y accéder rapidement avec Tab avant d'ouvrir l'article complet dans l'éditeur.
 Correctifs
 • Correction d’un bug où la liste des fichiers ouverts s’affichait dans le menu Aide au lieu du menu Fenêtre.
 • Correction d’un cas limite de streaming où la lecture pouvait démarrer mais la fenêtre « Téléchargement du flux » restait ouverte lorsque le fichier téléchargé correspondait déjà au format cible.

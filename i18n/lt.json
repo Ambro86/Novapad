@@ -221,6 +221,7 @@
   "options.label.send_crash_reports": "Siųsti anonimiškas avarijų ataskaitas",
   "options.label.context_menu": "Pridėti „Atidaryti su Sonarpad“ į kontekstinį meniu",
   "options.label.confirm_delete_rss_podcast": "Prieš ištrindami RSS/podcast elementus paprašykite patvirtinimo",
+  "options.label.rss_show_article_preview": "Show selected article directly in the RSS window",
   "options.label.announce_unread_rss_podcast": "Pranešti apie neskaitytą/neperklausytą RSS/podcastų būseną",
   "options.label.file_associations": "Failų susiejimai:",
   "options.button.manage_associations": "Nustatyti kaip numatytąją programą...",

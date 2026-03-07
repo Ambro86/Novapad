@@ -221,6 +221,7 @@
   "options.label.send_crash_reports": "Invia segnalazioni di crash anonime",
   "options.label.context_menu": "Aggiungi \"Apri con Sonarpad\" al menu contestuale",
   "options.label.confirm_delete_rss_podcast": "Chiedi conferma prima di eliminare elementi RSS/Podcast",
+  "options.label.rss_show_article_preview": "Mostra l'articolo selezionato direttamente nella finestra RSS",
   "options.label.announce_unread_rss_podcast": "Annuncia stato non letto/non riprodotto per RSS/Podcast",
   "options.label.file_associations": "Associazioni file:",
   "options.button.manage_associations": "Imposta come applicazione predefinita...",

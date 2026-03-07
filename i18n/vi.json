@@ -211,6 +211,7 @@
   "options.label.send_crash_reports": "Gửi báo cáo lỗi ẩn danh",
   "options.label.context_menu": "Thêm \"Mở bằng Sonarpad\" vào menu chuột phải",
   "options.label.confirm_delete_rss_podcast": "Yêu cầu xác nhận trước khi xóa mục RSS/Podcast",
+  "options.label.rss_show_article_preview": "Show selected article directly in the RSS window",
   "options.label.announce_unread_rss_podcast": "Thông báo trạng thái chưa đọc/chưa phát cho RSS/Podcast",
   "context_menu.open_with": "Mở bằng Sonarpad",
   "context_menu.spelling_ok": "Chính tả: OK",

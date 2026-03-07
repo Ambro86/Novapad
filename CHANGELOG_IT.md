@@ -8,6 +8,7 @@ Novità
 Miglioramenti
 • Ora il programma riesce a gestire Sostituisci tutto in modo massivo su file grandi con un gran numero di sostituzioni.
 • Aggiunto il pieno supporto della biblioteca BdCiechi, accessibile da Strumenti o con la scorciatoia Alt+Shift+B. E' possibile cercare, scaricare libri, leggere le ultime novità, scaricare un testo di assaggio. Quando verrà salvato un file è possibile aprirlo direttamente in Sonarpad e leggerlo con le voci di alta qualità presenti nel programma.
+• Migliorata la finestra RSS con un'anteprima articolo integrata, così il testo può essere consultato direttamente lì e raggiunto rapidamente con Tab prima di aprire l'articolo completo nell'editor.
 
 Miglioramenti
 • Aggiunta in Opzioni > Voce la gestione dei profili voce: è possibile aggiungere, rinominare ed eliminare un profilo.

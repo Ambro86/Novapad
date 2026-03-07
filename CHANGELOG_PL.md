@@ -10,6 +10,7 @@ Ulepszenia
 • Dodano w menu kontekstowym artykułów RSS akcję dodawania artykułu do ulubionych.
 • Źródło RSS "Ulubione" można usunąć; zostanie utworzone ponownie automatycznie po dodaniu nowego artykułu do ulubionych.
 • Dodano skróty klawiaturowe RSS do przenoszenia źródeł w górę/w dół: `Ctrl+Shift+Strzałka w górę` i `Ctrl+Shift+Strzałka w dół`.
+• Ulepszono okno RSS, dodając zintegrowany podgląd artykułu, dzięki czemu tekst można przeglądać bezpośrednio tam i szybko przejść do niego klawiszem Tab przed otwarciem pełnego artykułu w edytorze.
 Poprawki
 • Naprawiono błąd, przez który lista otwartych plików była wyświetlana w menu Pomoc zamiast w menu Okno.
 • Naprawiono przypadek brzegowy streamingu, w którym odtwarzanie mogło się rozpocząć, ale okno „Pobieranie streamingu” pozostawało otwarte, gdy pobrany plik już pasował do formatu docelowego.

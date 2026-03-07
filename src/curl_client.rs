@@ -1,5 +1,8 @@
 use curl::easy::{Easy, List};
 use std::ffi::CString;
+use std::fs::OpenOptions;
+use std::io::{Error, Seek, SeekFrom, Write};
+use std::path::Path;
 use std::time::Duration;
 
 fn log_profile(_profile: &str, _url: &str, _status: &str) {
@@ -35,6 +38,26 @@ fn parse_content_length_header(header_line: &[u8]) -> Option<u64> {
         return None;
     }
     value.trim().parse::<u64>().ok().filter(|v| *v > 0)
+}
+
+fn parse_http_status_header(header_line: &[u8]) -> Option<u32> {
+    let text = std::str::from_utf8(header_line).ok()?.trim();
+    let mut parts = text.split_whitespace();
+    let version = parts.next()?;
+    if !version.starts_with("HTTP/") {
+        return None;
+    }
+    parts.next()?.parse::<u32>().ok()
+}
+
+fn parse_content_range_total(header_line: &[u8]) -> Option<u64> {
+    let text = std::str::from_utf8(header_line).ok()?.trim();
+    let (name, value) = text.split_once(':')?;
+    if !name.eq_ignore_ascii_case("content-range") {
+        return None;
+    }
+    let (_, total) = value.trim().split_once('/')?;
+    total.trim().parse::<u64>().ok().filter(|v| *v > 0)
 }
 
 fn apply_tls_ca(easy: &mut Easy) -> anyhow::Result<()> {
@@ -130,6 +153,15 @@ impl CurlClient {
             Err(e) => log_profile("IPHONE_SAFARI", url, &format!("error: {}", e)),
         }
         result
+    }
+
+    pub fn fetch_url_to_file_with_progress<F: FnMut(u32)>(
+        url: &str,
+        destination: &Path,
+        resume_from: u64,
+        progress_cb: F,
+    ) -> Result<u64, Box<dyn std::error::Error>> {
+        Self::fetch_iphone_to_file(url, destination, resume_from, progress_cb)
     }
 
     pub fn post_form_impersonated(
@@ -240,6 +272,159 @@ impl CurlClient {
             data.len()
         ));
         Ok(data)
+    }
+
+    fn fetch_iphone_to_file<F: FnMut(u32)>(
+        url: &str,
+        destination: &Path,
+        resume_from: u64,
+        mut progress_cb: F,
+    ) -> Result<u64, Box<dyn std::error::Error>> {
+        crate::log_debug(&format!(
+            "Curl: fetch_iphone_to_file starting for {} resume_from={}",
+            url, resume_from
+        ));
+        let mut easy = Easy::new();
+        easy.url(url)?;
+        easy.follow_location(true)?;
+        easy.timeout(Duration::from_secs(600))?;
+        easy.connect_timeout(Duration::from_secs(30))?;
+        easy.accept_encoding("gzip, deflate, br")?;
+        easy.pipewait(true)?;
+        easy.cookie_file("")?;
+        easy.progress(true)?;
+        if resume_from > 0 {
+            easy.range(&format!("{resume_from}-"))?;
+        }
+
+        apply_tls_ca(&mut easy)?;
+
+        easy.ssl_cipher_list("ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305")?;
+
+        let mut list = List::new();
+        list.append("User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1")?;
+        list.append("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")?;
+        list.append("Accept-Language: it-IT,it;q=0.9,en-US;q=0.8")?;
+        list.append("Upgrade-Insecure-Requests: 1")?;
+        list.append("Connection: keep-alive")?;
+        easy.http_headers(list)?;
+
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(destination)?;
+        let file = std::cell::RefCell::new(file);
+        if resume_from > 0 {
+            file.borrow_mut().seek(SeekFrom::Start(resume_from))?;
+        }
+
+        crate::log_debug("Curl: starting perform...");
+        let mut last_log_mb = 0;
+        let mut last_pct = 0u32;
+        let status_code = std::cell::Cell::new(0u32);
+        let content_length = std::cell::Cell::new(0u64);
+        let content_range_total = std::cell::Cell::new(0u64);
+        let effective_resume = std::cell::Cell::new(resume_from);
+        let downloaded_this_request = std::cell::Cell::new(0u64);
+        let reset_to_zero = std::cell::Cell::new(false);
+        let write_error = std::cell::RefCell::new(None::<String>);
+        {
+            let mut transfer = easy.transfer();
+            transfer.header_function(|header| {
+                if let Some(status) = parse_http_status_header(header) {
+                    status_code.set(status);
+                }
+                if let Some(len) = parse_content_length_header(header) {
+                    content_length.set(len);
+                }
+                if let Some(total) = parse_content_range_total(header) {
+                    content_range_total.set(total);
+                }
+                true
+            })?;
+            transfer.write_function(|new_data| {
+                if resume_from > 0 && !reset_to_zero.get() && status_code.get() == 200 {
+                    let reset_result = {
+                        let mut writer = file.borrow_mut();
+                        writer
+                            .set_len(0)
+                            .and_then(|_| writer.seek(SeekFrom::Start(0)).map(|_| ()))
+                    };
+                    if let Err(err) = reset_result {
+                        *write_error.borrow_mut() = Some(err.to_string());
+                        return Err(curl::easy::WriteError::Pause);
+                    }
+                    effective_resume.set(0);
+                    downloaded_this_request.set(0);
+                    reset_to_zero.set(true);
+                    crate::log_debug(
+                        "Curl: resume request ignored by server, restarting file from zero",
+                    );
+                }
+
+                {
+                    let mut writer = file.borrow_mut();
+                    if let Err(err) = writer.write_all(new_data) {
+                        *write_error.borrow_mut() = Some(err.to_string());
+                        return Err(curl::easy::WriteError::Pause);
+                    }
+                }
+
+                let downloaded = downloaded_this_request
+                    .get()
+                    .saturating_add(new_data.len() as u64);
+                downloaded_this_request.set(downloaded);
+                let written_total = effective_resume.get().saturating_add(downloaded);
+                let current_mb = (written_total / (1024 * 1024)) as usize;
+                if current_mb > last_log_mb && current_mb.is_multiple_of(5) {
+                    crate::log_debug(&format!("Curl: downloaded {} MB...", current_mb));
+                    last_log_mb = current_mb;
+                }
+                Ok(new_data.len())
+            })?;
+            transfer.progress_function(|dltotal, dlnow, _, _| {
+                let total = if content_range_total.get() > 0 {
+                    content_range_total.get() as f64
+                } else if dltotal > 0.0 {
+                    dltotal + effective_resume.get() as f64
+                } else if content_length.get() > 0 {
+                    content_length.get() as f64 + effective_resume.get() as f64
+                } else {
+                    0.0
+                };
+
+                if total > 0.0 {
+                    let downloaded_now = if status_code.get() == 200 {
+                        dlnow
+                    } else {
+                        dlnow + effective_resume.get() as f64
+                    };
+                    let pct = (downloaded_now / total * 100.0) as u32;
+                    if pct > last_pct {
+                        last_pct = pct;
+                        progress_cb(pct);
+                    }
+                }
+                true
+            })?;
+            if let Err(err) = transfer.perform() {
+                if let Some(message) = write_error.borrow_mut().take() {
+                    return Err(Box::new(Error::other(message)));
+                }
+                return Err(err.into());
+            }
+        }
+
+        file.borrow_mut().flush()?;
+        let final_len = file.borrow().metadata()?.len();
+        crate::log_debug(&format!(
+            "Curl: perform finished, wrote {} bytes to {}",
+            final_len,
+            destination.display()
+        ));
+        Ok(final_len)
     }
 }
 

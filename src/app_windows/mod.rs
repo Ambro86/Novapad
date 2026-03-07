@@ -5,6 +5,7 @@ pub mod bdciechi_window;
 pub mod bookmarks_window;
 pub mod convert_audio_window;
 pub mod dictionary_window;
+pub mod feedback_window;
 pub mod find_in_files_window;
 pub mod go_to_time_window;
 pub mod help_window;

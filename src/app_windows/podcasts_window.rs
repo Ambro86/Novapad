@@ -2108,6 +2108,17 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
     let cache_limit_mb =
         { with_state(parent, |s| s.settings.podcast_cache_limit_mb) }.unwrap_or(500);
     let cache_dir = podcast_cache_dir();
+    let file_path = podcast_cache_path(&url, enclosure_type.as_deref());
+    let partial_file_path = podcast_partial_cache_path(&file_path);
+    if let Some(parent_dir) = file_path.parent()
+        && let Err(e) = std::fs::create_dir_all(parent_dir)
+    {
+        crate::log_debug(&format!(
+            "Failed to create podcast directory {}: {}",
+            parent_dir.display(),
+            e
+        ));
+    }
     with_podcast_state(hwnd, |s| {
         s.download_in_progress = true;
         s.last_download_progress_pct = 0;
@@ -2116,49 +2127,42 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
 
     std::thread::spawn(move || {
         log_debug(&format!("Podcast thread: starting download for {}", url));
-        unsafe {
-            if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool() {
-                PostMessageW(
-                    hwnd_copy,
-                    WM_PODCAST_DOWNLOAD_PROGRESS,
-                    WPARAM(0),
-                    LPARAM(0),
-                )
-                .ok();
-            }
-        }
         let mut last_reported_pct = 0u32;
         let mut attempt: u32 = 0;
-        let bytes = loop {
+        let downloaded_len = loop {
             attempt += 1;
-            let result = rss::fetch_url_bytes_with_progress(&url, |pct| {
-                // Avoid announcing "100%" before file write/finalization is truly done.
-                // Final completion is announced via "podcasts.download_completed".
-                let announced_pct = pct.min(90);
-                if announced_pct >= last_reported_pct + 10 {
-                    last_reported_pct = (announced_pct / 10) * 10;
-                    unsafe {
-                        if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool() {
-                            PostMessageW(
-                                hwnd_copy,
-                                WM_PODCAST_DOWNLOAD_PROGRESS,
-                                WPARAM(last_reported_pct as usize),
-                                LPARAM(0),
-                            )
-                            .ok();
-                        }
+            let resume_from = std::fs::metadata(&partial_file_path)
+                .map(|meta| meta.len())
+                .unwrap_or(0);
+            if attempt == 1 && resume_from == 0 {
+                unsafe {
+                    if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool() {
+                        PostMessageW(
+                            hwnd_copy,
+                            WM_PODCAST_DOWNLOAD_PROGRESS,
+                            WPARAM(0),
+                            LPARAM(0),
+                        )
+                        .ok();
                     }
                 }
-            });
-            match result {
-                Ok(bytes) => break Ok(bytes),
-                Err(err) => {
-                    crate::log_debug(&format!(
-                        "podcasts_download_attempt_failed attempt={} url={} err={}",
-                        attempt, url, err
-                    ));
-                    if attempt < 5 {
-                        last_reported_pct = 0;
+            }
+            if resume_from > 0 {
+                log_debug(&format!(
+                    "Podcast thread: resuming partial download for {} from {} bytes",
+                    url, resume_from
+                ));
+            }
+            let result = rss::download_url_to_file_with_progress(
+                &url,
+                &partial_file_path,
+                resume_from,
+                |pct| {
+                    // Avoid announcing "100%" before file write/finalization is truly done.
+                    // Final completion is announced via "podcasts.download_completed".
+                    let announced_pct = pct.min(90);
+                    if announced_pct >= last_reported_pct + 10 {
+                        last_reported_pct = (announced_pct / 10) * 10;
                         unsafe {
                             if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy)
                                 .as_bool()
@@ -2166,10 +2170,37 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
                                 PostMessageW(
                                     hwnd_copy,
                                     WM_PODCAST_DOWNLOAD_PROGRESS,
-                                    WPARAM(0),
+                                    WPARAM(last_reported_pct as usize),
                                     LPARAM(0),
                                 )
                                 .ok();
+                            }
+                        }
+                    }
+                },
+            );
+            match result {
+                Ok(len) => break Ok(len),
+                Err(err) => {
+                    crate::log_debug(&format!(
+                        "podcasts_download_attempt_failed attempt={} url={} partial_bytes={} err={}",
+                        attempt, url, resume_from, err
+                    ));
+                    if attempt < 5 {
+                        if resume_from == 0 {
+                            last_reported_pct = 0;
+                            unsafe {
+                                if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy)
+                                    .as_bool()
+                                {
+                                    PostMessageW(
+                                        hwnd_copy,
+                                        WM_PODCAST_DOWNLOAD_PROGRESS,
+                                        WPARAM(0),
+                                        LPARAM(0),
+                                    )
+                                    .ok();
+                                }
                             }
                         }
                         std::thread::sleep(std::time::Duration::from_millis(
@@ -2181,13 +2212,22 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
                 }
             }
         };
-        let bytes = match bytes {
-            Ok(b) => {
-                log_debug(&format!("podcasts_download_ok len={} url={}", b.len(), url));
-                b
+        let downloaded_len = match downloaded_len {
+            Ok(len) => {
+                log_debug(&format!("podcasts_download_ok len={} url={}", len, url));
+                len
             }
             Err(err) => {
                 log_debug(&format!("podcasts_download_error {}: {}", url, err));
+                if let Err(remove_err) = std::fs::remove_file(&partial_file_path)
+                    && remove_err.kind() != std::io::ErrorKind::NotFound
+                {
+                    log_debug(&format!(
+                        "Failed to remove partial podcast file {}: {}",
+                        partial_file_path.display(),
+                        remove_err
+                    ));
+                }
                 unsafe {
                     if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool()
                         && let Err(e) =
@@ -2199,20 +2239,14 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
                 return;
             }
         };
-        let file_path = podcast_cache_path(&url, enclosure_type.as_deref());
         log_debug(&format!("podcasts_cache_path: {}", file_path.display()));
-        if let Some(parent_dir) = file_path.parent()
-            && let Err(e) = std::fs::create_dir_all(parent_dir)
-        {
-            crate::log_debug(&format!(
-                "Failed to create podcast directory {}: {}",
-                parent_dir.display(),
-                e
-            ));
-        }
-        match std::fs::write(&file_path, bytes) {
+        match std::fs::rename(&partial_file_path, &file_path) {
             Ok(_) => {
-                log_debug(&format!("podcasts_write_ok: {}", file_path.display()));
+                log_debug(&format!(
+                    "podcasts_write_ok: {} len={}",
+                    file_path.display(),
+                    downloaded_len
+                ));
                 let limit_bytes = cache_limit_mb as u64 * 1024 * 1024;
                 enforce_podcast_cache_limit(&cache_dir, limit_bytes, Some(&file_path));
                 let msg = Box::new(PlayReadyMsg {
@@ -2241,10 +2275,20 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
             }
             Err(err) => {
                 log_debug(&format!(
-                    "Failed to write podcast cache file {}: {}",
+                    "Failed to finalize podcast cache file {} from {}: {}",
                     file_path.display(),
+                    partial_file_path.display(),
                     err
                 ));
+                if let Err(remove_err) = std::fs::remove_file(&partial_file_path)
+                    && remove_err.kind() != std::io::ErrorKind::NotFound
+                {
+                    log_debug(&format!(
+                        "Failed to remove partial podcast file after finalize error {}: {}",
+                        partial_file_path.display(),
+                        remove_err
+                    ));
+                }
                 unsafe {
                     if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy).as_bool()
                         && let Err(e) =
@@ -2340,6 +2384,10 @@ fn podcast_cache_path(url: &str, mime: Option<&str>) -> PathBuf {
 
 fn podcast_cache_dir() -> PathBuf {
     settings::settings_dir().join("podcast cache")
+}
+
+fn podcast_partial_cache_path(file_path: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.part", file_path.to_string_lossy()))
 }
 
 fn cache_embedded_podcast_chapters_if_missing(
@@ -7958,7 +8006,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 let (language, should_announce) = with_podcast_state(hwnd, |s| {
                     let language = s.language;
                     let should = if pct == 0 {
-                        true
+                        s.last_download_progress_pct == 0 && s.last_download_progress_at.is_none()
                     } else if pct >= 100 {
                         s.last_download_progress_pct < 100
                     } else if pct > s.last_download_progress_pct {

@@ -2653,6 +2653,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.help_window.0 != 0
                 || state.changelog_window.0 != 0
                 || state.donations_window.0 != 0
+                || state.feedback_window.0 != 0
                 || state.bookmarks_window.0 != 0
                 || state.dictionary_window.0 != 0
                 || state.dictionary_entry_dialog.0 != 0
@@ -2763,6 +2764,7 @@ pub(crate) struct AppState {
     help_window: HWND,
     changelog_window: HWND,
     donations_window: HWND,
+    feedback_window: HWND,
     bookmarks_window: HWND,
     dictionary_window: HWND,
     dictionary_entry_dialog: HWND,
@@ -3410,6 +3412,7 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                         || state.help_window.0 != 0
                         || state.changelog_window.0 != 0
                         || state.donations_window.0 != 0
+                        || state.feedback_window.0 != 0
                         || state.dictionary_window.0 != 0
                         || state.podcast_window.0 != 0;
                     let secondary_open = secondary_open
@@ -3464,6 +3467,12 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                         state.go_to_time_dialog,
                         &msg,
                     )
+                {
+                    handled = true;
+                    return;
+                }
+                if state.feedback_window.0 != 0
+                    && app_windows::feedback_window::handle_navigation(state.feedback_window, &msg)
                 {
                     handled = true;
                     return;
@@ -4115,6 +4124,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     help_window: HWND(0),
                     changelog_window: HWND(0),
                     donations_window: HWND(0),
+                    feedback_window: HWND(0),
                     bookmarks_window: HWND(0),
                     dictionary_window: HWND(0),
                     dictionary_entry_dialog: HWND(0),
@@ -5845,6 +5855,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_HELP_CHANGELOG => {
                         log_debug("Menu: Changelog");
                         app_windows::help_window::open_changelog(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_HELP_FEEDBACK => {
+                        log_debug("Menu: Feedback");
+                        app_windows::feedback_window::open(hwnd);
                         LRESULT(0)
                     }
                     IDM_HELP_DONATIONS => {

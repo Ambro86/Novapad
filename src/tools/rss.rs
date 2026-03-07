@@ -1315,17 +1315,26 @@ pub async fn fetch_url_bytes(
     }
 }
 
-pub fn fetch_url_bytes_with_progress<F: FnMut(u32)>(
+pub fn download_url_to_file_with_progress<F: FnMut(u32)>(
     url: &str,
+    destination: &std::path::Path,
+    resume_from: u64,
     progress_cb: F,
-) -> Result<Vec<u8>, String> {
+) -> Result<u64, String> {
     let url_str = normalize_url(url);
     log_debug(&format!(
-        "fetch_url_bytes_with_progress: calling impersonated for {}",
-        url_str
+        "download_url_to_file_with_progress: calling impersonated for {} resume_from={} destination={}",
+        url_str,
+        resume_from,
+        destination.display()
     ));
-    crate::curl_client::CurlClient::fetch_url_impersonated_with_progress(&url_str, progress_cb)
-        .map_err(|e| e.to_string())
+    crate::curl_client::CurlClient::fetch_url_to_file_with_progress(
+        &url_str,
+        destination,
+        resume_from,
+        progress_cb,
+    )
+    .map_err(|e| e.to_string())
 }
 
 pub async fn fetch_article_text(

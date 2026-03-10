@@ -16,6 +16,7 @@ mod settings {
         Serbian,
         Ukrainian,
         Lithuanian,
+        Russian,
         Chinese,
     }
 }
@@ -36,6 +37,7 @@ mod i18n {
                 Language::Polish => "Brak tytułu".to_string(),
                 Language::Serbian => "Bez naslova".to_string(),
                 Language::Lithuanian => "Be pavadinimo".to_string(),
+                Language::Russian => "Без названия".to_string(),
                 Language::Chinese => "无标题".to_string(),
                 Language::Ukrainian | Language::English => "No Title".to_string(),
             },
@@ -50,6 +52,7 @@ mod i18n {
                 Language::Polish => "Link zewnętrzny:\n{url}".to_string(),
                 Language::Serbian => "Spoljašnji link:\n{url}".to_string(),
                 Language::Lithuanian => "Išorinė nuoroda:\n{url}".to_string(),
+                Language::Russian => "Внешняя ссылка:\n{url}".to_string(),
                 Language::Chinese => "外部链接：\n{url}".to_string(),
                 Language::Ukrainian | Language::English => "External link:\n{url}".to_string(),
             },

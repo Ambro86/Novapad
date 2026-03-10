@@ -794,6 +794,10 @@
   "options.split.by_time": "Na osnovu vremena",
   "options.label.audio_split_minutes": "Trajanje segmenta (minuti):",
   "options.label.audio_split_start_number": "Početni broj:",
+  "options.label.audiobook_part_naming": "Format naziva delova audio-knjige",
+  "options.choice.audiobook_part_naming.title_number": "Naslov + broj",
+  "options.choice.audiobook_part_naming.number_only": "Samo broj",
+  "options.choice.audiobook_part_naming.number_title": "Broj + naslov",
   "options.label.indentation": "Uvlačenje:",
   "options.indent.default": "Podrazumevano (klasično)",
   "options.indent.tabs": "Koristi tabove.",
@@ -1075,6 +1079,7 @@
   "options.whisper_model.medium": "Srednji",
   "options.whisper_model.large": "Veliki v3"
 }
+
 
 
 

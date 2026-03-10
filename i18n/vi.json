@@ -794,6 +794,10 @@
   "options.split.by_time": "Theo thời gian",
   "options.label.audio_split_minutes": "Thời lượng mỗi phần (phút):",
   "options.label.audio_split_start_number": "Số bắt đầu:",
+  "options.label.audiobook_part_naming": "Định dạng tên phần của sách nói",
+  "options.choice.audiobook_part_naming.title_number": "Tiêu đề + số",
+  "options.choice.audiobook_part_naming.number_only": "Chỉ số",
+  "options.choice.audiobook_part_naming.number_title": "Số + tiêu đề",
   "options.label.indentation": "Thụt lề:",
   "options.indent.default": "Mặc định (cổ điển)",
   "options.indent.tabs": "Dùng tab",
@@ -1075,6 +1079,7 @@
   "options.whisper_model.medium": "Trung bình",
   "options.whisper_model.large": "Lớn v3"
 }
+
 
 
 

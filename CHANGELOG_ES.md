@@ -7,6 +7,7 @@ Novità
 
 Mejoras
 • Añadida la gestión de perfiles de voz en Opciones > Voz: se pueden añadir, renombrar y eliminar perfiles.
+• Añadida en Opciones > Audio una nueva opción para elegir el formato del nombre de las partes del audiolibro: `Título + número`, `Solo número` o `Número + título`.
 • Añadida la acción del menú contextual de artículos RSS para añadir un artículo a favoritos.
 • La fuente RSS "Favoritos" puede eliminarse y se recrea automáticamente al añadir un nuevo artículo a favoritos.
 • Añadidos atajos de teclado RSS para mover las fuentes arriba/abajo: `Ctrl+Shift+Flecha arriba` y `Ctrl+Shift+Flecha abajo`.

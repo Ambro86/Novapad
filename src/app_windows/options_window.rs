@@ -5,11 +5,11 @@ use crate::editor_manager::{
     update_window_title,
 };
 use crate::settings::{
-    DEFAULT_VOICE_PROFILE_NAME, Language, ListDateDisplayMode, ListTimeDisplayMode,
-    ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode, RssDeleteConfirmMode,
-    RssPodcastUnreadLabelPosition, ShortcutBinding, ShortcutSettings, SubtitleReadMode,
-    TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo, VoiceProfile, format_shortcut,
-    save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
+    AudiobookPartNamingMode, DEFAULT_VOICE_PROFILE_NAME, Language, ListDateDisplayMode,
+    ListTimeDisplayMode, ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode,
+    RssDeleteConfirmMode, RssPodcastUnreadLabelPosition, ShortcutBinding, ShortcutSettings,
+    SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo, VoiceProfile,
+    format_shortcut, save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
     voice_profile_from_settings_fields,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
@@ -93,6 +93,7 @@ const OPTIONS_ID_AUDIOBOOK_SAVE_FOLDER_BROWSE: usize = 6065;
 const OPTIONS_ID_DEFAULT_SAVE_FOLDER_KIND: usize = 6110;
 const OPTIONS_ID_AUDIO_SPLIT_MINUTES: usize = 6058;
 const OPTIONS_ID_AUDIO_SPLIT_START_NUMBER: usize = 6059;
+const OPTIONS_ID_AUDIOBOOK_PART_NAMING: usize = 6120;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
 const OPTIONS_ID_AUDIO_SPLIT_PARTS_COUNT: usize = 6087;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
@@ -643,6 +644,8 @@ struct OptionsDialogState {
     edit_audio_split_parts_count: HWND,
     label_audio_split_start_number: HWND,
     combo_audio_split_start_number: HWND,
+    label_audiobook_part_naming: HWND,
+    combo_audiobook_part_naming: HWND,
     label_audio_split_text: HWND,
     edit_audio_split_text: HWND,
     checkbox_audio_split_requires_newline: HWND,
@@ -883,9 +886,13 @@ struct OptionsLabels {
     label_audio_split_minutes: String,
     label_audio_split_parts_count: String,
     label_audio_split_start_number: String,
+    label_audiobook_part_naming: String,
     label_audio_split_text: String,
     label_audio_split_requires_newline: String,
     label_audio_split_epub_chapters: String,
+    option_audiobook_part_naming_title_number: String,
+    option_audiobook_part_naming_number_only: String,
+    option_audiobook_part_naming_number_title: String,
     label_subtitle_ducking: String,
     label_subtitle_offset: String,
     label_podcast_cache_limit: String,
@@ -1134,6 +1141,7 @@ fn options_labels(language: Language) -> OptionsLabels {
             language,
             "options.label.audio_split_start_number",
         ),
+        label_audiobook_part_naming: i18n::tr(language, "options.label.audiobook_part_naming"),
         label_audio_split_text: i18n::tr(language, "options.label.audio_split_text"),
         label_audio_split_requires_newline: i18n::tr(
             language,
@@ -1142,6 +1150,18 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_audio_split_epub_chapters: i18n::tr(
             language,
             "options.label.audio_split_epub_chapters",
+        ),
+        option_audiobook_part_naming_title_number: i18n::tr(
+            language,
+            "options.choice.audiobook_part_naming.title_number",
+        ),
+        option_audiobook_part_naming_number_only: i18n::tr(
+            language,
+            "options.choice.audiobook_part_naming.number_only",
+        ),
+        option_audiobook_part_naming_number_title: i18n::tr(
+            language,
+            "options.choice.audiobook_part_naming.number_title",
         ),
         label_subtitle_ducking: i18n::tr(language, "options.label.subtitle_ducking"),
         label_subtitle_offset: i18n::tr(language, "options.label.subtitle_offset"),
@@ -3781,6 +3801,36 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 34;
 
+                let label_audiobook_part_naming = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_audiobook_part_naming).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_audiobook_part_naming = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    140,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIOBOOK_PART_NAMING as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+
                 let label_audio_split_text = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
@@ -5211,6 +5261,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_audio_split_parts_count,
                     label_audio_split_start_number,
                     combo_audio_split_start_number,
+                    label_audiobook_part_naming,
+                    combo_audiobook_part_naming,
                     label_audio_split_text,
                     edit_audio_split_text,
                     checkbox_audio_split_requires_newline,
@@ -5399,6 +5451,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_audio_split_parts_count,
                     label_audio_split_start_number,
                     combo_audio_split_start_number,
+                    label_audiobook_part_naming,
+                    combo_audiobook_part_naming,
                     label_audio_split_text,
                     edit_audio_split_text,
                     checkbox_audio_split_requires_newline,
@@ -6016,6 +6070,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             combo_audio_split_minutes,
             edit_audio_split_parts_count,
             combo_audio_split_start_number,
+            combo_audiobook_part_naming,
             _label_audio_split_text,
             edit_audio_split_text,
             checkbox_audio_split_requires_newline,
@@ -6146,6 +6201,7 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.combo_audio_split_minutes,
                 state.edit_audio_split_parts_count,
                 state.combo_audio_split_start_number,
+                state.combo_audiobook_part_naming,
                 state.label_audio_split_text,
                 state.edit_audio_split_text,
                 state.checkbox_audio_split_requires_newline,
@@ -7805,6 +7861,52 @@ fn initialize_options_dialog(hwnd: HWND) {
             LPARAM(0),
         );
 
+        SendMessageW(
+            combo_audiobook_part_naming,
+            CB_RESETCONTENT,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        let naming_options = [
+            (
+                AudiobookPartNamingMode::TitleNumber,
+                labels.option_audiobook_part_naming_title_number.clone(),
+            ),
+            (
+                AudiobookPartNamingMode::NumberOnly,
+                labels.option_audiobook_part_naming_number_only.clone(),
+            ),
+            (
+                AudiobookPartNamingMode::NumberTitle,
+                labels.option_audiobook_part_naming_number_title.clone(),
+            ),
+        ];
+        let mut selected_naming_idx = 0usize;
+        for (mode, label) in naming_options {
+            let idx = SendMessageW(
+                combo_audiobook_part_naming,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            )
+            .0 as usize;
+            SendMessageW(
+                combo_audiobook_part_naming,
+                CB_SETITEMDATA,
+                WPARAM(idx),
+                LPARAM(mode as isize),
+            );
+            if mode == settings.audiobook_part_naming_mode {
+                selected_naming_idx = idx;
+            }
+        }
+        SendMessageW(
+            combo_audiobook_part_naming,
+            CB_SETCURSEL,
+            WPARAM(selected_naming_idx),
+            LPARAM(0),
+        );
+
         let split_text_wide = to_wide(&settings.audiobook_split_text);
         if let Err(_e) = SetWindowTextW(edit_audio_split_text, PCWSTR(split_text_wide.as_ptr())) {
             crate::log_debug(&format!("Error: {:?}", _e));
@@ -9381,6 +9483,7 @@ fn apply_options_dialog(hwnd: HWND) {
             combo_audio_split_minutes,
             edit_audio_split_parts_count,
             combo_audio_split_start_number,
+            combo_audiobook_part_naming,
             edit_audio_split_text,
             checkbox_audio_split_requires_newline,
             checkbox_audio_split_epub_chapters,
@@ -9472,6 +9575,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.combo_audio_split_minutes,
                 state.edit_audio_split_parts_count,
                 state.combo_audio_split_start_number,
+                state.combo_audiobook_part_naming,
                 state.edit_audio_split_text,
                 state.checkbox_audio_split_requires_newline,
                 state.checkbox_audio_split_epub_chapters,
@@ -10362,6 +10466,28 @@ fn apply_options_dialog(hwnd: HWND) {
             )
             .0 as u32;
             settings.audiobook_split_start_number = start_number.clamp(1, 99);
+        }
+
+        let naming_sel = SendMessageW(
+            combo_audiobook_part_naming,
+            CB_GETCURSEL,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0;
+        if naming_sel >= 0 {
+            let naming_mode = SendMessageW(
+                combo_audiobook_part_naming,
+                CB_GETITEMDATA,
+                WPARAM(naming_sel as usize),
+                LPARAM(0),
+            )
+            .0 as u32;
+            settings.audiobook_part_naming_mode = match naming_mode {
+                1 => AudiobookPartNamingMode::NumberOnly,
+                2 => AudiobookPartNamingMode::NumberTitle,
+                _ => AudiobookPartNamingMode::TitleNumber,
+            };
         }
 
         let text_len = GetWindowTextLengthW(edit_audio_split_text);
@@ -11463,6 +11589,14 @@ fn layout_audio_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
             OPTIONS_COMBO_HEIGHT,
         );
     }
+    y = layout_label_control(
+        "label_audiobook_part_naming",
+        state.label_audiobook_part_naming,
+        "combo_audiobook_part_naming",
+        state.combo_audiobook_part_naming,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
     if show_parts_split {
         y = layout_label_control(
             "label_audio_split_parts_count",
@@ -12046,6 +12180,8 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_audio_split_parts_count,
             state.label_audio_split_start_number,
             state.combo_audio_split_start_number,
+            state.label_audiobook_part_naming,
+            state.combo_audiobook_part_naming,
             state.label_audio_split_text,
             state.edit_audio_split_text,
             state.checkbox_audio_split_requires_newline,

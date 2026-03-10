@@ -42,13 +42,13 @@ use crate::file_handler::{
     read_spreadsheet_text,
 };
 use crate::i18n;
-use crate::settings::{DictionaryEntry, Language, TtsEngine};
+use crate::settings::{AudiobookPartNamingMode, DictionaryEntry, Language, TtsEngine};
 use crate::tts_engine::{
     MixedAudiobookConfig, TtsChunk, build_audiobook_parts_by_positions,
     build_audiobook_parts_from_sections, build_mixed_audiobook_parts_by_positions,
-    build_mixed_audiobook_parts_from_sections, collect_marker_entries, has_voice_tags,
-    prepare_tts_text, render_mixed_audiobook_part, run_tts_audiobook_part, split_into_tts_chunks,
-    split_text, strip_dashed_lines,
+    build_mixed_audiobook_parts_from_sections, collect_marker_entries,
+    format_audiobook_part_filename, has_voice_tags, prepare_tts_text, render_mixed_audiobook_part,
+    run_tts_audiobook_part, split_into_tts_chunks, split_text, strip_dashed_lines,
 };
 use crate::{log_debug, sanitize_filename, show_error, with_state};
 
@@ -227,6 +227,7 @@ struct TtsSettings {
     audiobook_split_by_time: bool,
     audiobook_split_minutes: u32,
     audiobook_split_start_number: u32,
+    audiobook_part_naming_mode: AudiobookPartNamingMode,
     audiobook_m4b_bitrate: u32,
     tts_engine: TtsEngine,
     dictionary: Vec<DictionaryEntry>,
@@ -1520,6 +1521,7 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             audiobook_split_by_time: state.settings.audiobook_split_by_time,
             audiobook_split_minutes: state.settings.audiobook_split_minutes,
             audiobook_split_start_number: state.settings.audiobook_split_start_number,
+            audiobook_part_naming_mode: state.settings.audiobook_part_naming_mode,
             audiobook_m4b_bitrate: state.settings.audiobook_m4b_bitrate,
             tts_engine: state.settings.tts_engine,
             dictionary: state.settings.dictionary.clone(),
@@ -1539,6 +1541,7 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             audiobook_split_by_time: false,
             audiobook_split_minutes: 5,
             audiobook_split_start_number: 1,
+            audiobook_part_naming_mode: AudiobookPartNamingMode::TitleNumber,
             audiobook_m4b_bitrate: 128,
             tts_engine: TtsEngine::Edge,
             dictionary: Vec::new(),
@@ -1904,7 +1907,13 @@ fn export_single_audiobook(
         if parts.is_empty() {
             return Err(crate::settings::tts_no_text_message(tts.language));
         }
-        let output_paths = build_output_paths(input, parts.len(), batch_settings, tts.language)?;
+        let output_paths = build_output_paths(
+            input,
+            parts.len(),
+            batch_settings,
+            tts.audiobook_part_naming_mode,
+            tts.language,
+        )?;
         match export_parts_mixed(&parts, &output_paths, tts, cancel.clone()) {
             Ok(()) => {
                 if split_by_time {
@@ -1938,7 +1947,13 @@ fn export_single_audiobook(
         if parts.is_empty() {
             return Err(crate::settings::tts_no_text_message(tts.language));
         }
-        let output_paths = build_output_paths(input, parts.len(), batch_settings, tts.language)?;
+        let output_paths = build_output_paths(
+            input,
+            parts.len(),
+            batch_settings,
+            tts.audiobook_part_naming_mode,
+            tts.language,
+        )?;
         match export_parts(&parts, &output_paths, tts, cancel.clone(), sapi_voice) {
             Ok(()) => {
                 if split_by_time {
@@ -2083,6 +2098,7 @@ fn build_output_paths(
     input: &Path,
     parts_len: usize,
     settings: &BatchSettings,
+    naming_mode: AudiobookPartNamingMode,
     language: Language,
 ) -> Result<Vec<PathBuf>, String> {
     let base = input
@@ -2114,7 +2130,7 @@ fn build_output_paths(
     let mut outputs = Vec::new();
     for idx in 0..parts_len {
         let file_name = if parts_len > 1 {
-            format!("{base_name} - {:0width$}.{ext}", idx + 1, width = width)
+            format_audiobook_part_filename(&base_name, ext, (idx + 1) as u32, width, naming_mode)
         } else {
             format!("{base_name}.{ext}")
         };
@@ -2194,6 +2210,7 @@ fn export_parts(
                     progress_hwnd: HWND(0),
                     cancel: cancel.clone(),
                     language: tts.language,
+                    part_naming_mode: tts.audiobook_part_naming_mode,
                     audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
                     rate: tts.tts_rate,
                     pitch: tts.tts_pitch,
@@ -2380,6 +2397,7 @@ fn export_parts_mixed(
             progress_hwnd: HWND(0),
             cancel: cancel.clone(),
             language: tts.language,
+            part_naming_mode: tts.audiobook_part_naming_mode,
             audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
             rate: tts.tts_rate,
             pitch: tts.tts_pitch,

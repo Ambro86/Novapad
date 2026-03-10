@@ -7,6 +7,7 @@ Novità
 
 Cải tiến
 • Đã thêm quản lý hồ sơ giọng nói trong Tùy chọn > Giọng nói: có thể thêm, đổi tên và xóa hồ sơ.
+• Đã thêm trong Tùy chọn > Âm thanh một lựa chọn mới cho định dạng tên phần của sách nói: `Tiêu đề + số`, `Chỉ số` hoặc `Số + tiêu đề`.
 • Đã thêm hành động trong menu ngữ cảnh bài RSS để thêm bài viết vào mục yêu thích.
 • Nguồn RSS "Yêu thích" có thể bị xóa và sẽ được tạo lại tự động khi thêm bài viết mới vào mục yêu thích.
 • Đã thêm phím tắt RSS để di chuyển nguồn lên/xuống: `Ctrl+Shift+Mũi tên lên` và `Ctrl+Shift+Mũi tên xuống`.

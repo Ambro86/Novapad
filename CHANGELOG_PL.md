@@ -7,6 +7,7 @@ Novità
 
 Ulepszenia
 • Dodano zarządzanie profilami głosu w Opcje > Głos: profile można dodawać, zmieniać nazwę i usuwać.
+• Dodano w Opcje > Audio nową możliwość wyboru formatu nazwy części audiobooka: `Tytuł + numer`, `Tylko numer` albo `Numer + tytuł`.
 • Dodano w menu kontekstowym artykułów RSS akcję dodawania artykułu do ulubionych.
 • Źródło RSS "Ulubione" można usunąć; zostanie utworzone ponownie automatycznie po dodaniu nowego artykułu do ulubionych.
 • Dodano skróty klawiaturowe RSS do przenoszenia źródeł w górę/w dół: `Ctrl+Shift+Strzałka w górę` i `Ctrl+Shift+Strzałka w dół`.

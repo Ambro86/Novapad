@@ -7,6 +7,7 @@ Novità
 
 Improvements
 • Added voice profiles in Options > Voice: profiles can be added, renamed, and deleted.
+• Added a new option in Options > Audio to choose the audiobook part naming format: `Title + number`, `Number only`, or `Number + title`.
 • Added RSS favorite articles: from the article context menu you can add items to a dedicated Favorites feed.
 • The Favorites RSS feed can be deleted and is recreated automatically when a new article is added to favorites.
 • Added RSS keyboard shortcuts to move feeds up/down: `Ctrl+Shift+Up Arrow` and `Ctrl+Shift+Down Arrow`.

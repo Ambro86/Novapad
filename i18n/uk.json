@@ -794,6 +794,10 @@
   "options.split.by_time": "За часом",
   "options.label.audio_split_minutes": "Тривалість фрагмента (хв):",
   "options.label.audio_split_start_number": "Початковий номер фрагмента:",
+  "options.label.audiobook_part_naming": "Формат назв частин аудіокниги",
+  "options.choice.audiobook_part_naming.title_number": "Назва + номер",
+  "options.choice.audiobook_part_naming.number_only": "Лише номер",
+  "options.choice.audiobook_part_naming.number_title": "Номер + назва",
   "options.label.indentation": "Відступ:",
   "options.indent.default": "Типовий (класичний)",
   "options.indent.tabs": "Табулятори",
@@ -1075,6 +1079,7 @@
   "options.whisper_model.medium": "Середній",
   "options.whisper_model.large": "Великий v3"
 }
+
 
 
 

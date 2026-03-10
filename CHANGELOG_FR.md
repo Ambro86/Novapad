@@ -7,6 +7,7 @@ Novità
 
 Améliorations
 • Ajout de la gestion des profils vocaux dans Options > Voix : il est possible d'ajouter, de renommer et de supprimer des profils.
+• Ajout dans Options > Audio d’un nouveau choix pour le format du nom des parties du livre audio : `Titre + numéro`, `Numéro uniquement` ou `Numéro + titre`.
 • Ajout dans le menu contextuel des articles RSS de l'action pour ajouter un article aux favoris.
 • La source RSS "Favoris" peut être supprimée et est recréée automatiquement lors du prochain ajout d'un article aux favoris.
 • Ajout de raccourcis clavier RSS pour déplacer les sources vers le haut/le bas : `Ctrl+Shift+Flèche haut` et `Ctrl+Shift+Flèche bas`.

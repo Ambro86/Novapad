@@ -334,6 +334,17 @@ pub enum ListTimeDisplayMode {
     OnlyIfMultipleSameDay,
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum AudiobookPartNamingMode {
+    #[serde(rename = "title_number")]
+    #[default]
+    TitleNumber,
+    #[serde(rename = "number_only")]
+    NumberOnly,
+    #[serde(rename = "number_title")]
+    NumberTitle,
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShortcutBinding {
     pub ctrl: bool,
@@ -575,6 +586,8 @@ pub struct AppSettings {
     pub audiobook_split_minutes: u32,
     #[serde(default = "default_audiobook_split_start_number")]
     pub audiobook_split_start_number: u32,
+    #[serde(default)]
+    pub audiobook_part_naming_mode: AudiobookPartNamingMode,
     #[serde(default)]
     pub subtitle_read_mode: SubtitleReadMode,
     #[serde(default)]
@@ -911,6 +924,7 @@ impl Default for AppSettings {
             audiobook_split_by_time: false,
             audiobook_split_minutes: default_audiobook_split_minutes(),
             audiobook_split_start_number: default_audiobook_split_start_number(),
+            audiobook_part_naming_mode: AudiobookPartNamingMode::TitleNumber,
             subtitle_read_mode: SubtitleReadMode::User,
             subtitle_offset_ms: 0,
             subtitle_mix_export_on_play: true,

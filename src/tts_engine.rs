@@ -3,7 +3,8 @@ use crate::file_handler::{is_epub_path, read_epub_chapters};
 use crate::i18n;
 use crate::settings;
 use crate::settings::{
-    AudiobookResult, DictionaryEntry, Language, TRUSTED_CLIENT_TOKEN, TtsEngine,
+    AudiobookPartNamingMode, AudiobookResult, DictionaryEntry, Language, TRUSTED_CLIENT_TOKEN,
+    TtsEngine,
 };
 use crate::{get_active_edit, log_debug, save_audio_dialog, show_error, with_state};
 use chrono::Local;
@@ -343,6 +344,7 @@ pub struct AudiobookCommonOptions<'a> {
     pub progress_hwnd: HWND,
     pub cancel: Arc<AtomicBool>,
     pub language: Language,
+    pub part_naming_mode: AudiobookPartNamingMode,
     pub audiobook_bitrate_kbps: u32,
     pub rate: i32,
     pub pitch: i32,
@@ -1946,7 +1948,28 @@ async fn download_edge_chunk_ws_with_retry(
     Err(last_err.unwrap_or_else(|| "Edge WS: chunk download failed".to_string()))
 }
 
-fn time_split_part_output(base: &Path, part_index: u32, start_number: u32) -> PathBuf {
+pub(crate) fn format_audiobook_part_filename(
+    stem: &str,
+    ext: &str,
+    number: u32,
+    width: usize,
+    naming_mode: AudiobookPartNamingMode,
+) -> String {
+    match naming_mode {
+        AudiobookPartNamingMode::TitleNumber => {
+            format!("{stem} Part {number:0width$}.{ext}")
+        }
+        AudiobookPartNamingMode::NumberOnly => format!("{number:0width$}.{ext}"),
+        AudiobookPartNamingMode::NumberTitle => format!("{number:0width$} - {stem}.{ext}"),
+    }
+}
+
+fn time_split_part_output(
+    base: &Path,
+    part_index: u32,
+    start_number: u32,
+    naming_mode: AudiobookPartNamingMode,
+) -> PathBuf {
     const TIME_SPLIT_PART_WIDTH: usize = 4;
     let stem = base
         .file_stem()
@@ -1959,13 +1982,21 @@ fn time_split_part_output(base: &Path, part_index: u32, start_number: u32) -> Pa
         .filter(|s| !s.is_empty())
         .unwrap_or("mp3");
     let number = start_number.saturating_add(part_index);
-    base.with_file_name(format!(
-        "{stem} Part {number:0width$}.{ext}",
-        width = TIME_SPLIT_PART_WIDTH
+    base.with_file_name(format_audiobook_part_filename(
+        stem,
+        ext,
+        number,
+        TIME_SPLIT_PART_WIDTH,
+        naming_mode,
     ))
 }
 
-fn split_part_output(base: &Path, part_index: usize, total_parts: usize) -> PathBuf {
+fn split_part_output(
+    base: &Path,
+    part_index: usize,
+    total_parts: usize,
+    naming_mode: AudiobookPartNamingMode,
+) -> PathBuf {
     let stem = base
         .file_stem()
         .and_then(|s| s.to_str())
@@ -1977,11 +2008,38 @@ fn split_part_output(base: &Path, part_index: usize, total_parts: usize) -> Path
         .filter(|s| !s.is_empty())
         .unwrap_or("mp3");
     let width = std::cmp::max(2, total_parts.to_string().len());
-    let number = part_index + 1;
-    base.with_file_name(format!("{stem} Part {number:0width$}.{ext}"))
+    let number = (part_index + 1) as u32;
+    base.with_file_name(format_audiobook_part_filename(
+        stem,
+        ext,
+        number,
+        width,
+        naming_mode,
+    ))
 }
 
-fn collect_split_part_files(base: &Path) -> Result<Vec<PathBuf>, String> {
+fn parse_part_index_from_stem(
+    stem_name: &str,
+    stem: &str,
+    naming_mode: AudiobookPartNamingMode,
+) -> Option<usize> {
+    match naming_mode {
+        AudiobookPartNamingMode::TitleNumber => stem_name
+            .strip_prefix(&format!("{stem} Part "))?
+            .parse::<usize>()
+            .ok(),
+        AudiobookPartNamingMode::NumberOnly => stem_name.parse::<usize>().ok(),
+        AudiobookPartNamingMode::NumberTitle => stem_name
+            .strip_suffix(&format!(" - {stem}"))?
+            .parse::<usize>()
+            .ok(),
+    }
+}
+
+fn collect_split_part_files(
+    base: &Path,
+    naming_mode: AudiobookPartNamingMode,
+) -> Result<Vec<PathBuf>, String> {
     let stem = base
         .file_stem()
         .and_then(|s| s.to_str())
@@ -1991,7 +2049,6 @@ fn collect_split_part_files(base: &Path) -> Result<Vec<PathBuf>, String> {
         .and_then(|s| s.to_str())
         .map(|s| s.to_ascii_lowercase())
         .unwrap_or_else(|| "m4b".to_string());
-    let prefix = format!("{stem} Part ");
     let parent = base
         .parent()
         .ok_or_else(|| "Output path has no parent directory".to_string())?;
@@ -2008,13 +2065,7 @@ fn collect_split_part_files(base: &Path) -> Result<Vec<PathBuf>, String> {
         if !path_ext.eq_ignore_ascii_case(&ext) {
             continue;
         }
-        if !stem_name.starts_with(&prefix) {
-            continue;
-        }
-        let Some(num_str) = stem_name.strip_prefix(&prefix) else {
-            continue;
-        };
-        let Ok(idx) = num_str.parse::<usize>() else {
+        let Some(idx) = parse_part_index_from_stem(stem_name, stem, naming_mode) else {
             continue;
         };
         if idx == 0 {
@@ -2334,8 +2385,12 @@ fn run_split_audiobook_by_time_edge(
                     {
                         crate::log_debug(&format!("Failed to finalize time-split wav: {}", e));
                     }
-                    let part_output =
-                        time_split_part_output(options.output, part_index, start_number);
+                    let part_output = time_split_part_output(
+                        options.output,
+                        part_index,
+                        start_number,
+                        options.part_naming_mode,
+                    );
                     finish_time_split_part(
                         &part_output,
                         wav_path.take(),
@@ -2350,8 +2405,12 @@ fn run_split_audiobook_by_time_edge(
                 }
 
                 if part_writer.is_none() && wav_writer.is_none() {
-                    let part_output =
-                        time_split_part_output(options.output, part_index, start_number);
+                    let part_output = time_split_part_output(
+                        options.output,
+                        part_index,
+                        start_number,
+                        options.part_naming_mode,
+                    );
                     if is_aac || is_mp3 {
                         let tmp_wav = part_output.with_extension("wav.tmp");
                         wav_path = Some(tmp_wav.clone());
@@ -2417,7 +2476,12 @@ fn run_split_audiobook_by_time_edge(
             crate::log_debug(&format!("Failed to finalize time-split wav: {}", e));
         }
         if next_to_write > 0 {
-            let part_output = time_split_part_output(options.output, part_index, start_number);
+            let part_output = time_split_part_output(
+                options.output,
+                part_index,
+                start_number,
+                options.part_naming_mode,
+            );
             finish_time_split_part(&part_output, wav_path.take(), &options, is_aac, is_mp3)?;
         }
         Ok(())
@@ -2482,7 +2546,12 @@ fn run_split_audiobook_by_time_sapi(
             {
                 crate::log_debug(&format!("Failed to finalize time-split wav: {}", e));
             }
-            let part_output = time_split_part_output(options.output, part_index, start_number);
+            let part_output = time_split_part_output(
+                options.output,
+                part_index,
+                start_number,
+                options.part_naming_mode,
+            );
             finish_time_split_part(&part_output, wav_path.take(), &options, is_aac, is_mp3)?;
             part_index = part_index.saturating_add(1);
             current_duration = 0.0;
@@ -2491,7 +2560,12 @@ fn run_split_audiobook_by_time_sapi(
         }
 
         if wav_writer.is_none() {
-            let part_output = time_split_part_output(options.output, part_index, start_number);
+            let part_output = time_split_part_output(
+                options.output,
+                part_index,
+                start_number,
+                options.part_naming_mode,
+            );
             if is_aac || is_mp3 {
                 let tmp_wav = part_output.with_extension("wav.tmp");
                 wav_path = Some(tmp_wav.clone());
@@ -2549,7 +2623,12 @@ fn run_split_audiobook_by_time_sapi(
         crate::log_debug(&format!("Failed to finalize time-split wav: {}", e));
     }
     if !chunks.is_empty() {
-        let part_output = time_split_part_output(options.output, part_index, start_number);
+        let part_output = time_split_part_output(
+            options.output,
+            part_index,
+            start_number,
+            options.part_naming_mode,
+        );
         finish_time_split_part(&part_output, wav_path.take(), &options, is_aac, is_mp3)?;
     }
 
@@ -4000,6 +4079,7 @@ fn start_audiobook_with_text(
         audiobook_split_by_time,
         audiobook_split_minutes,
         audiobook_split_start_number,
+        audiobook_part_naming_mode,
         initial_audiobook_m4b_bitrate,
         tts_engine,
         dictionary,
@@ -4019,6 +4099,7 @@ fn start_audiobook_with_text(
                 state.settings.audiobook_split_by_time,
                 state.settings.audiobook_split_minutes,
                 state.settings.audiobook_split_start_number,
+                state.settings.audiobook_part_naming_mode,
                 state.settings.audiobook_m4b_bitrate,
                 state.settings.tts_engine,
                 state.settings.dictionary.clone(),
@@ -4039,6 +4120,7 @@ fn start_audiobook_with_text(
         false,
         5,
         1,
+        AudiobookPartNamingMode::TitleNumber,
         128,
         TtsEngine::Edge,
         Vec::new(),
@@ -4371,6 +4453,7 @@ fn start_audiobook_with_text(
             progress_hwnd,
             cancel: cancel_clone,
             language,
+            part_naming_mode: audiobook_part_naming_mode,
             audiobook_bitrate_kbps: audiobook_m4b_bitrate,
             rate: tts_rate,
             pitch: tts_pitch,
@@ -4378,6 +4461,7 @@ fn start_audiobook_with_text(
             sapi4_threads,
             finalize_progress_steps: finalize_progress_steps_per_part,
         };
+        let part_naming_mode = options.part_naming_mode;
         let engine_name = match tts_engine {
             TtsEngine::Edge => "edge",
             TtsEngine::Sapi5 => "sapi5",
@@ -4402,7 +4486,12 @@ fn start_audiobook_with_text(
                             continue;
                         }
                         let part_output = if parts_len > 1 && emit_part_files {
-                            split_part_output(options.output, part_idx, parts_len)
+                            split_part_output(
+                                options.output,
+                                part_idx,
+                                parts_len,
+                                options.part_naming_mode,
+                            )
                         } else {
                             options.output.to_path_buf()
                         };
@@ -4424,7 +4513,12 @@ fn start_audiobook_with_text(
                     let parts_len = parts.len();
                     for (part_idx, part_chunks) in parts.iter().enumerate() {
                         let part_output = if parts_len > 1 && emit_part_files {
-                            split_part_output(options.output, part_idx, parts_len)
+                            split_part_output(
+                                options.output,
+                                part_idx,
+                                parts_len,
+                                options.part_naming_mode,
+                            )
                         } else {
                             options.output.to_path_buf()
                         };
@@ -4532,8 +4626,17 @@ fn start_audiobook_with_text(
                 .filter(|s| !s.is_empty())
                 .unwrap_or("mp3");
             const TIME_SPLIT_PART_WIDTH: usize = 4;
-            let pattern = final_output
-                .with_file_name(format!("{stem} Part %0{TIME_SPLIT_PART_WIDTH}d.{ext}"));
+            let pattern = final_output.with_file_name(match part_naming_mode {
+                AudiobookPartNamingMode::TitleNumber => {
+                    format!("{stem} Part %0{TIME_SPLIT_PART_WIDTH}d.{ext}")
+                }
+                AudiobookPartNamingMode::NumberOnly => {
+                    format!("%0{TIME_SPLIT_PART_WIDTH}d.{ext}")
+                }
+                AudiobookPartNamingMode::NumberTitle => {
+                    format!("%0{TIME_SPLIT_PART_WIDTH}d - {stem}.{ext}")
+                }
+            });
             let segment_seconds = split_minutes.saturating_mul(60);
             result = crate::ffmpeg_export::segment_audio_file(
                 &final_output,
@@ -4553,7 +4656,7 @@ fn start_audiobook_with_text(
 
         let mut success = result.is_ok();
         if success && aac_with_chapters {
-            match collect_split_part_files(&work_output_for_cleanup) {
+            match collect_split_part_files(&work_output_for_cleanup, part_naming_mode) {
                 Ok(part_files) if part_files.len() > 1 => {
                     match merge_m4b_parts_with_chapters(
                         &part_files,
@@ -4796,7 +4899,7 @@ fn run_split_audiobook(
         let part_chunks = &chunks[start_idx..end_idx];
 
         let part_output = if parts > 1 {
-            split_part_output(options.output, part_idx, parts)
+            split_part_output(options.output, part_idx, parts, options.part_naming_mode)
         } else {
             options.output.to_path_buf()
         };
@@ -4808,6 +4911,7 @@ fn run_split_audiobook(
             progress_hwnd: options.progress_hwnd,
             cancel: options.cancel.clone(),
             language: options.language,
+            part_naming_mode: options.part_naming_mode,
             audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
@@ -4833,7 +4937,12 @@ fn run_marker_split_audiobook(
             continue;
         }
         let part_output = if parts_len > 1 {
-            split_part_output(options.output, part_idx, parts_len)
+            split_part_output(
+                options.output,
+                part_idx,
+                parts_len,
+                options.part_naming_mode,
+            )
         } else {
             options.output.to_path_buf()
         };
@@ -4844,6 +4953,7 @@ fn run_marker_split_audiobook(
             progress_hwnd: options.progress_hwnd,
             cancel: options.cancel.clone(),
             language: options.language,
+            part_naming_mode: options.part_naming_mode,
             audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
@@ -4887,7 +4997,12 @@ fn run_split_sapi4_audiobook(
 
         let part_chunks = &chunks[start_idx..end_idx];
         let part_output = if parts_count > 1 {
-            split_part_output(options.output, part_idx, parts_count)
+            split_part_output(
+                options.output,
+                part_idx,
+                parts_count,
+                options.part_naming_mode,
+            )
         } else {
             options.output.to_path_buf()
         };
@@ -4898,6 +5013,7 @@ fn run_split_sapi4_audiobook(
             progress_hwnd: options.progress_hwnd,
             cancel: options.cancel.clone(),
             language: options.language,
+            part_naming_mode: options.part_naming_mode,
             audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
@@ -4928,7 +5044,12 @@ fn run_marker_split_sapi4_audiobook(
         }
 
         let part_output = if parts.len() > 1 {
-            split_part_output(options.output, part_idx, parts.len())
+            split_part_output(
+                options.output,
+                part_idx,
+                parts.len(),
+                options.part_naming_mode,
+            )
         } else {
             options.output.to_path_buf()
         };
@@ -4939,6 +5060,7 @@ fn run_marker_split_sapi4_audiobook(
             progress_hwnd: options.progress_hwnd,
             cancel: options.cancel.clone(),
             language: options.language,
+            part_naming_mode: options.part_naming_mode,
             audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
@@ -5942,7 +6064,7 @@ fn run_split_sapi_audiobook(
         let part_chunks = &chunks[start_idx..end_idx];
 
         let part_output = if parts > 1 {
-            split_part_output(options.output, part_idx, parts)
+            split_part_output(options.output, part_idx, parts, options.part_naming_mode)
         } else {
             options.output.to_path_buf()
         };
@@ -5960,6 +6082,7 @@ fn run_split_sapi_audiobook(
                 progress_hwnd: options.progress_hwnd,
                 cancel: options.cancel.clone(),
                 language: options.language,
+                part_naming_mode: options.part_naming_mode,
                 audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
                 rate: options.rate,
                 pitch: options.pitch,
@@ -6051,7 +6174,12 @@ fn run_marker_split_sapi_audiobook(
             continue;
         }
         let part_output = if parts_len > 1 {
-            split_part_output(options.output, part_idx, parts_len)
+            split_part_output(
+                options.output,
+                part_idx,
+                parts_len,
+                options.part_naming_mode,
+            )
         } else {
             options.output.to_path_buf()
         };
@@ -6069,6 +6197,7 @@ fn run_marker_split_sapi_audiobook(
                 progress_hwnd: options.progress_hwnd,
                 cancel: options.cancel.clone(),
                 language: options.language,
+                part_naming_mode: options.part_naming_mode,
                 audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
                 rate: options.rate,
                 pitch: options.pitch,

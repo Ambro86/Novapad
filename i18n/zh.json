@@ -760,6 +760,10 @@
   "options.split.by_time": "基于时间",
   "options.label.audio_split_minutes": "分段时长（分钟）：",
   "options.label.audio_split_start_number": "起始编号：",
+  "options.label.audiobook_part_naming": "有声书部分命名格式",
+  "options.choice.audiobook_part_naming.title_number": "标题 + 编号",
+  "options.choice.audiobook_part_naming.number_only": "仅编号",
+  "options.choice.audiobook_part_naming.number_title": "编号 + 标题",
   "options.label.indentation": "缩进：",
   "options.indent.default": "默认（经典）",
   "options.indent.tabs": "使用制表符",
@@ -1075,6 +1079,7 @@
   "options.whisper_model.medium": "中型",
   "options.whisper_model.large": "大型 v3"
 }
+
 
 
 

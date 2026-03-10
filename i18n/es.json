@@ -788,6 +788,10 @@
   "options.split.by_time": "Por tiempo",
   "options.label.audio_split_minutes": "Duración de la parte (minutos):",
   "options.label.audio_split_start_number": "Número inicial:",
+  "options.label.audiobook_part_naming": "Formato del nombre de partes del audiolibro",
+  "options.choice.audiobook_part_naming.title_number": "Título + número",
+  "options.choice.audiobook_part_naming.number_only": "Solo número",
+  "options.choice.audiobook_part_naming.number_title": "Número + título",
   "options.label.indentation": "Indentación:",
   "options.indent.default": "Predeterminada (clásica)",
   "options.indent.tabs": "Usar tabulaciones",
@@ -1075,6 +1079,7 @@
   "options.whisper_model.medium": "Medio",
   "options.whisper_model.large": "Grande v3"
 }
+
 
 
 

@@ -1011,6 +1011,10 @@
   "convert_audio.save_title": "Guardar áudio convertido",
   "options.label.audio_split_minutes": "Duração da parte (minutos):",
   "options.label.audio_split_start_number": "Número inicial:",
+  "options.label.audiobook_part_naming": "Formato do nome das partes do audiolivro",
+  "options.choice.audiobook_part_naming.title_number": "Título + número",
+  "options.choice.audiobook_part_naming.number_only": "Somente número",
+  "options.choice.audiobook_part_naming.number_title": "Número + título",
   "options.label.audio_split_epub_chapters": "Dividir EPUB por capítulos",
   "dialog.save_audio_split_folder": "Criar pasta para as partes",
   "menu.stream_audio": "Reproduzir áudio em streaming...\tAlt+Shift+S",
@@ -1075,6 +1079,7 @@
   "options.whisper_model.medium": "Médio",
   "options.whisper_model.large": "Grande v3"
 }
+
 
 
 

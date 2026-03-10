@@ -42,16 +42,16 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCOUNT,
     CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
     CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
-    DefWindowProcW, ES_AUTOHSCROLL, ES_PASSWORD, ES_READONLY, GWLP_USERDATA, GetClientRect,
-    GetParent, GetScrollInfo, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
-    IDC_ARROW, LoadCursorW, MB_ICONWARNING, MB_OK, MSG, MessageBoxW, MoveWindow, PostMessageW,
-    RegisterClassW, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION,
-    SB_THUMBTRACK, SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS, SIF_RANGE, SIF_TRACKPOS,
-    SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFONT, WM_VSCROLL,
-    WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    DefWindowProcW, ES_AUTOHSCROLL, ES_PASSWORD, ES_READONLY, GWLP_USERDATA, GetClassNameW,
+    GetClientRect, GetParent, GetScrollInfo, GetWindowLongPtrW, GetWindowTextLengthW,
+    GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MB_ICONWARNING, MB_OK, MSG, MessageBoxW,
+    MoveWindow, PostMessageW, RegisterClassW, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN,
+    SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS,
+    SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
+    WM_SETFONT, WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -197,6 +197,7 @@ const OPTIONS_ROW_HEIGHT_COMPACT: i32 = 26;
 const OPTIONS_CHECKBOX_HEIGHT: i32 = 22;
 const OPTIONS_BUTTON_HEIGHT: i32 = 28;
 const OPTIONS_COMBO_HEIGHT: i32 = 28;
+const OPTIONS_COMBO_DROPDOWN_HEIGHT: i32 = 180;
 const OPTIONS_EDIT_HEIGHT: i32 = 24;
 const OPTIONS_SECTION_GAP: i32 = 12;
 const OPTIONS_SCROLL_LINE: i32 = 32;
@@ -10754,9 +10755,29 @@ fn move_control_best_effort(name: &str, hwnd: HWND, x: i32, y: i32, w: i32, h: i
         return;
     }
     unsafe {
-        if MoveWindow(hwnd, x, y, w, h, true).is_err() {
+        let actual_height = adjusted_control_height(hwnd, h);
+        if MoveWindow(hwnd, x, y, w, actual_height, true).is_err() {
             crate::log_debug(&format!("MoveWindow failed for {}", name));
         }
+    }
+}
+
+fn adjusted_control_height(hwnd: HWND, height: i32) -> i32 {
+    if height != OPTIONS_COMBO_HEIGHT || !is_combo_box(hwnd) {
+        return height;
+    }
+    OPTIONS_COMBO_DROPDOWN_HEIGHT
+}
+
+fn is_combo_box(hwnd: HWND) -> bool {
+    unsafe {
+        let mut class_name = [0u16; 32];
+        let len = GetClassNameW(hwnd, &mut class_name);
+        if len == 0 {
+            return false;
+        }
+        let class_name = String::from_utf16_lossy(&class_name[..len as usize]);
+        class_name.eq_ignore_ascii_case("ComboBox")
     }
 }
 

@@ -15,7 +15,9 @@ Poprawki
 • Naprawiono błąd, przez który lista otwartych plików była wyświetlana w menu Pomoc zamiast w menu Okno.
 • Naprawiono przypadek brzegowy streamingu, w którym odtwarzanie mogło się rozpocząć, ale okno „Pobieranie streamingu” pozostawało otwarte, gdy pobrany plik już pasował do formatu docelowego.
 • Naprawiono zachowanie konwersji dla streamingu MP3: gdy strumień jest już w MP3 i użytkownik wybierze jawny bitrate MP3 (np. 128 kbps), Sonarpad teraz ponownie koduje do wybranego bitrate zamiast pomijać konwersję.
+• Naprawiono skrót `Alt+Shift+L`: teraz poprawnie otwiera listę rozdziałów podczas odtwarzania.
 • Dodano obsługę osadzonych rozdziałów podcastów z lokalnych plików multimedialnych (np. metadanych rozdziałów MP3): gdy feed/URL nie udostępnia rozdziałów, Sonarpad ładuje je teraz w tle z pobranego pliku, dzięki czemu odtwarzanie startuje od razu, a rozdziały są stosowane, gdy tylko będą gotowe.
+• Naprawiono wczytywanie rozdziałów dla pobranych odcinków podcastów otwieranych jako zwykłe lokalne pliki multimedialne: osadzone rozdziały są teraz dostępne także w tym przypadku, a nie tylko po uruchomieniu odtwarzania z okna Podcasty.
 • Naprawiono błąd głosów dialogowych: parametry szybkości/tonu/głośności dla pierwszego i drugiego głosu dialogowego są teraz poprawnie stosowane podczas syntezy.
 • Ulepszono wykrywanie kodowania dla japońskich plików `.txt`: dodano bezpieczny fallback Shift_JIS/CP932 dla przypadków mojibake, z zachowaniem dotychczasowego działania dla UTF/diakrytyków/chińskiego.
 • Wewnętrzna refaktoryzacja bezpieczeństwa: konwersja do implementacji safe tam, gdzie to możliwe, oraz drastyczne zmniejszenie liczby linii kodu unsafe.

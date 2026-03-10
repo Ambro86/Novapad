@@ -15,7 +15,9 @@ Correctifs
 • Correction d’un bug où la liste des fichiers ouverts s’affichait dans le menu Aide au lieu du menu Fenêtre.
 • Correction d’un cas limite de streaming où la lecture pouvait démarrer mais la fenêtre « Téléchargement du flux » restait ouverte lorsque le fichier téléchargé correspondait déjà au format cible.
 • Correction du comportement de conversion en streaming MP3 : lorsque le flux est déjà en MP3 et que l’utilisateur choisit un bitrate MP3 explicite (par exemple 128 kbps), Sonarpad réencode désormais au bitrate sélectionné au lieu d’ignorer la conversion.
+• Correction du raccourci `Alt+Shift+L` : il ouvre désormais correctement la liste des chapitres pendant la lecture.
 • Ajout de la prise en charge des chapitres de podcast intégrés dans les fichiers multimédias locaux (par ex. métadonnées de chapitres MP3) : lorsque le flux/URL ne fournit pas de chapitres, Sonarpad les charge désormais depuis le fichier téléchargé en arrière-plan, ce qui permet de démarrer la lecture immédiatement puis d’appliquer les chapitres dès qu’ils sont disponibles.
+• Correction du chargement des chapitres pour les épisodes de podcast téléchargés et ouverts comme de simples fichiers multimédias locaux : les chapitres intégrés sont désormais disponibles aussi dans ce cas, et pas seulement quand la lecture démarre depuis la fenêtre Podcasts.
 • Correction d’un bug des voix de dialogue : les paramètres vitesse/tonalité/volume de la première et de la seconde voix de dialogue sont désormais correctement appliqués pendant la synthèse.
 • Amélioration de la détection d’encodage pour les fichiers japonais `.txt` : ajout d’un fallback Shift_JIS/CP932 sûr en cas de mojibake, tout en préservant le comportement existant pour UTF/diacritiques/chinois.
 • Refactorisation interne de sûreté : conversion vers des implémentations safe lorsque possible et réduction drastique des lignes de code unsafe.

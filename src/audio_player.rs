@@ -894,7 +894,15 @@ pub fn start_audiobook_playback(hwnd: HWND, path: &Path) {
                 state.audio_playlist_index = Some(state.audio_playlist.len().saturating_sub(1));
             }
         });
+        if path_buf.is_file() {
+            let chapter_key = crate::local_media_chapters_key(&path_buf);
+            crate::set_pending_podcast_chapters_key(hwnd, Some(chapter_key.clone()));
+            crate::prefetch_podcast_chapters_from_file(hwnd, chapter_key, path_buf.clone());
+        } else {
+            crate::set_pending_podcast_chapters_key(hwnd, None);
+        }
         crate::reset_active_podcast_chapters_for_playback(hwnd);
+        crate::activate_pending_podcast_chapters(hwnd);
 
         // List available audio tracks and store them in state
         let audio_tracks = match crate::ffmpeg_source::list_audio_streams(path) {
@@ -1144,10 +1152,23 @@ pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
                     player.accumulated_seconds = new_pos as u64;
                     player.start_instant = std::time::Instant::now();
                     player.is_paused = false;
-                    if !player.play() {
+                    if !player.play() || player.output.is_stopped() {
                         log_debug(
                             "Audio player: failed to resume after seek_audiobook direct seek",
                         );
+                        player.subtitle_cancel.store(true, Ordering::Relaxed);
+                        player.stop();
+                        return Some(SeekAction::Restart {
+                            path: player.path.clone(),
+                            current_pos: new_pos as u64,
+                            duration: audiobook_duration_secs(&player.path),
+                            speed: player.speed,
+                            pitch: player.pitch,
+                            paused: false,
+                            volume: player.volume,
+                            muted: player.muted,
+                            prev_volume: player.prev_volume,
+                        });
                     }
                     state.active_audiobook = Some(player);
                     return Some(SeekAction::Direct);
@@ -1239,10 +1260,13 @@ pub fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
                     player.accumulated_seconds = seconds;
                     player.start_instant = std::time::Instant::now();
                     player.is_paused = false;
-                    if !player.play() {
+                    if !player.play() || player.output.is_stopped() {
                         log_debug(
                             "Audio player: failed to resume after seek_audiobook_to direct seek",
                         );
+                        player.subtitle_cancel.store(true, Ordering::Relaxed);
+                        player.stop();
+                        return Some(SeekToAction::Restart(player.path.clone()));
                     }
                     return Some(SeekToAction::Direct);
                 }

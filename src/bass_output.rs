@@ -234,6 +234,14 @@ impl BassOutput {
             let play_ok = bass_channel_play_safe(api, handle, 0);
             if play_ok == 0 {
                 log_bass_error(api, "BASS_ChannelPlay");
+                let free_ok = bass_stream_free_safe(api, handle);
+                if free_ok == 0 {
+                    log_bass_error(api, "BASS_StreamFree (play-fail)");
+                }
+                return Err(format!(
+                    "BASS_ChannelPlay failed (error {})",
+                    bass_error(api)
+                ));
             }
         }
 

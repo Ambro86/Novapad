@@ -933,16 +933,6 @@ fn confirm_menu_action(hwnd: HWND, key: &str) {
     }
 }
 
-fn announce_menu_action_screen_reader(hwnd: HWND, key: &str) {
-    let language = { with_state(hwnd, |state| state.settings.language).unwrap_or_default() };
-    let label = i18n::tr(language, key);
-    let cleaned = clean_menu_label(&label);
-    if !cleaned.is_empty() {
-        let message = i18n::tr_f(language, "app.action_completed", &[("action", &cleaned)]);
-        crate::accessibility::screen_reader_speak(&message);
-    }
-}
-
 fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
     let lang = match language {
         Language::Italian => "it",
@@ -1722,6 +1712,10 @@ pub(crate) fn prefetch_podcast_chapters_from_file(hwnd: HWND, key: String, path:
             LPARAM(Box::into_raw(msg) as isize),
         ));
     });
+}
+
+pub(crate) fn local_media_chapters_key(path: &Path) -> String {
+    format!("file_chapters:{}", path.to_string_lossy())
 }
 
 pub(crate) fn cache_podcast_chapters(hwnd: HWND, key: String, chapters: Vec<Chapter>) {
@@ -4405,11 +4399,12 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                                 );
                             }
                             state.active_podcast_chapters.clear();
+                            let announce_unavailable = !msg.key.starts_with("file_chapters:");
                             return (
                                 true,
                                 Vec::new(),
                                 state.settings.language,
-                                true,
+                                announce_unavailable,
                                 audiobook_position_ms_from_state(state),
                             );
                         }
@@ -5342,7 +5337,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_EDIT_SELECT_ALL => {
                         log_debug("Menu: Select All");
                         editor_manager::select_all_active_edit(hwnd);
-                        announce_menu_action_screen_reader(hwnd, "edit.select_all");
+                        // announce_menu_action_screen_reader(hwnd, "edit.select_all");
                         LRESULT(0)
                     }
                     IDM_EDIT_FIND => {
@@ -9447,6 +9442,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     }
     if key == 'S' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_STREAM_AUDIO);
+        return true;
+    }
+    if key == 'L' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_PLAYBACK_CHAPTER_LIST);
         return true;
     }
 

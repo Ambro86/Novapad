@@ -15,7 +15,9 @@ Bug fixes
 • Fixed a bug where the list of open files was shown in the Help menu instead of the Window menu.
 • Fixed a streaming edge case where playback could start but the “Downloading stream” dialog stayed open when the downloaded file already matched the target format.
 • Fixed MP3 streaming conversion behavior: when the stream is already MP3 and the user selects an explicit MP3 bitrate (for example 128 kbps), Sonarpad now re-encodes to the selected bitrate instead of skipping conversion.
+• Fixed the `Alt+Shift+L` shortcut: it now correctly opens the chapter list during playback.
 • Added embedded podcast chapter support from local media files (e.g., MP3 chapter metadata): when feed/URL chapters are unavailable, Sonarpad now loads chapters from the downloaded file in the background, so playback starts immediately and chapter data is applied as soon as it is ready.
+• Fixed chapter loading for downloaded podcast episodes opened as normal local media files: embedded chapters are now available there too, not only when playback starts from the Podcasts window.
 • Fixed dialogue voice tuning: speed/pitch/volume settings are now correctly applied for both the first and second dialogue voices during synthesis.
 • Improved text encoding detection for Japanese `.txt` files: added a safe Shift_JIS/CP932 fallback for mojibake cases, while preserving existing UTF/diacritics/Chinese behavior.
 • Internal safety refactor: converted functions to safe implementations where possible and significantly reduced unsafe code lines.

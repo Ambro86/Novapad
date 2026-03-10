@@ -19,7 +19,9 @@ Correzioni
 • Corretto un bug per cui l’elenco dei file aperti veniva mostrato nel menu Aiuto invece che nel menu Finestra.
 • Corretto un caso limite nello streaming in cui la riproduzione poteva partire ma la finestra “Download streaming” restava aperta quando il file scaricato era già nel formato di destinazione.
 • Corretto il comportamento di conversione nello streaming MP3: quando lo stream è già MP3 e l’utente sceglie un bitrate MP3 esplicito (ad esempio 128 kbps), Sonarpad ora ricodifica al bitrate selezionato invece di saltare la conversione.
+• Corretta la scorciatoia `Alt+Shift+L`: ora apre correttamente la lista capitoli durante la riproduzione.
 • Aggiunto il supporto ai capitoli podcast embedded nei file multimediali locali (es. metadati capitoli MP3): quando feed/URL non forniscono capitoli, Sonarpad li legge dal file scaricato in background, così la riproduzione parte subito e i capitoli vengono applicati appena disponibili.
+• Corretta la lettura dei capitoli per gli episodi podcast scaricati e aperti come normali file multimediali locali: i capitoli embedded sono ora disponibili anche in questo caso, non solo avviando la riproduzione dalla finestra Podcast.
 • Corretto un bug nelle voci dialoghi: i parametri di velocità/tono/volume della prima e della seconda voce dialoghi ora vengono applicati correttamente durante la sintesi.
 • Migliorato il rilevamento codifica per file `.txt` giapponesi: aggiunto fallback sicuro Shift_JIS/CP932 nei casi di mojibake, preservando il comportamento esistente su UTF/diacritici/cinese.
 • Refactor interno sulla sicurezza: conversione a implementazioni safe dove possibile e riduzione drastica delle righe di codice unsafe.

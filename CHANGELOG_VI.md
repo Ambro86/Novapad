@@ -2,11 +2,12 @@
 
 Phiên bản 0.6.8 – 2026-03-04
 
-Novità
-• Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
+Có gì mới
+• Đã thêm một mục mới trong menu Phát để chép lời bất kỳ tệp âm thanh hoặc video nào bằng Whisper. Trong Tùy chọn có một phần mới tên là “AI và Chuyển lời”, nơi bạn có thể chọn mô hình, bật hỗ trợ CUDA tùy chọn cho card đồ họa NVIDIA, giữ nguyên ngôn ngữ gốc và bật hoặc tắt dấu thời gian.
 
 Cải tiến
 • Đã thêm quản lý hồ sơ giọng nói trong Tùy chọn > Giọng nói: có thể thêm, đổi tên và xóa hồ sơ.
+• Đã mở rộng trong Tùy chọn > Âm thanh các lựa chọn cho khoảng tua lùi khi phát, với các giá trị mới từ 1 giây đến 2 giờ.
 • Đã thêm bản dịch tiếng Nga nhờ Dmitriy.
 • Đã thêm trong Tùy chọn > Âm thanh một lựa chọn mới cho định dạng tên phần của sách nói: `Tiêu đề + số`, `Chỉ số` hoặc `Số + tiêu đề`.
 • Đã thêm hành động trong menu ngữ cảnh bài RSS để thêm bài viết vào mục yêu thích.

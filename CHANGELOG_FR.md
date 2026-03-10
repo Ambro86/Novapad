@@ -2,11 +2,12 @@
 
 Version 0.6.8 – 2026-03-04
 
-Novità
-• Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
+Nouveautés
+• Ajout d’un nouvel élément dans le menu Lecture permettant de transcrire n’importe quel fichier audio ou vidéo avec Whisper. Une nouvelle section « IA et transcription » est désormais disponible dans Options, où vous pouvez choisir le modèle, activer la prise en charge optionnelle de CUDA pour les cartes graphiques NVIDIA, conserver la langue d’origine et activer ou désactiver les horodatages.
 
 Améliorations
 • Ajout de la gestion des profils vocaux dans Options > Voix : il est possible d'ajouter, de renommer et de supprimer des profils.
+• Extension dans Options > Audio des choix pour l’intervalle de retour arrière pendant la lecture, avec de nouvelles valeurs allant de 1 seconde à 2 heures.
 • Ajout de la traduction russe grâce à Dmitriy.
 • Ajout dans Options > Audio d’un nouveau choix pour le format du nom des parties du livre audio : `Titre + numéro`, `Numéro uniquement` ou `Numéro + titre`.
 • Ajout dans le menu contextuel des articles RSS de l'action pour ajouter un article aux favoris.

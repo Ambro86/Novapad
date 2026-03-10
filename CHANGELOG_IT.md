@@ -12,6 +12,7 @@ Miglioramenti
 
 Miglioramenti
 • Aggiunta in Opzioni > Voce la gestione dei profili voce: è possibile aggiungere, rinominare ed eliminare un profilo.
+• Ampliate in Opzioni > Audio le scelte per l'intervallo di riavvolgimento durante la riproduzione, con nuovi valori da 1 secondo fino a 2 ore.
 • Aggiunta la traduzione russa grazie a Dmitriy.
 • Aggiunta in Opzioni > Audio una nuova scelta per il formato nome delle parti audiolibro: `Titolo + numero`, `Solo numero` oppure `Numero + titolo`.
 • Aggiunta nel menu contestuale degli articoli RSS la voce per aggiungere l'articolo ai preferiti.

@@ -7671,13 +7671,32 @@ fn initialize_options_dialog(hwnd: HWND) {
 
         SendMessageW(combo_audio_skip, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         let skip_options = [
+            (1, "1 s"),
+            (2, "2 s"),
+            (3, "3 s"),
+            (4, "4 s"),
+            (5, "5 s"),
+            (6, "6 s"),
+            (7, "7 s"),
+            (8, "8 s"),
+            (9, "9 s"),
             (10, "10 s"),
+            (15, "15 s"),
+            (20, "20 s"),
             (30, "30 s"),
+            (45, "45 s"),
             (60, "1 m"),
+            (90, "1.5 m"),
             (120, "2 m"),
+            (180, "3 m"),
             (300, "5 m"),
+            (600, "10 m"),
+            (900, "15 m"),
+            (1800, "30 m"),
+            (3600, "1 h"),
+            (7200, "2 h"),
         ];
-        let mut selected_idx = 2;
+        let mut selected_idx = 0;
         for (secs, label) in skip_options.iter() {
             let idx = SendMessageW(
                 combo_audio_skip,
@@ -7692,7 +7711,7 @@ fn initialize_options_dialog(hwnd: HWND) {
                 WPARAM(idx),
                 LPARAM(*secs as isize),
             );
-            if *secs == settings.audiobook_skip_seconds {
+            if *secs == 60 || *secs == settings.audiobook_skip_seconds {
                 selected_idx = idx;
             }
         }

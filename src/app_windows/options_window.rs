@@ -925,6 +925,7 @@ struct OptionsLabels {
     lang_sr: String,
     lang_uk: String,
     lang_lt: String,
+    lang_ru: String,
     lang_zh: String,
     marker_position_end: String,
     marker_position_beginning: String,
@@ -950,6 +951,7 @@ struct OptionsLabels {
     spellcheck_lang_pt_br: String,
     spellcheck_lang_fr: String,
     spellcheck_lang_de: String,
+    spellcheck_lang_ru: String,
     dictionary_translation_auto: String,
     dictionary_translation_none: String,
     wikipedia_language_auto: String,
@@ -1228,6 +1230,14 @@ fn options_labels(language: Language) -> OptionsLabels {
                 value
             }
         },
+        lang_ru: {
+            let value = i18n::tr(language, "options.lang.ru");
+            if value == "options.lang.ru" {
+                "Russian".to_string()
+            } else {
+                value
+            }
+        },
         lang_zh: {
             let value = i18n::tr(language, "options.lang.zh");
             if value == "options.lang.zh" {
@@ -1260,6 +1270,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         spellcheck_lang_pt_br: i18n::tr(language, "options.spellcheck.lang.pt_br"),
         spellcheck_lang_fr: i18n::tr(language, "options.spellcheck.lang.fr"),
         spellcheck_lang_de: i18n::tr(language, "options.spellcheck.lang.de"),
+        spellcheck_lang_ru: i18n::tr(language, "options.spellcheck.lang.ru"),
         dictionary_translation_auto: i18n::tr(language, "options.dictionary_translation.auto"),
         dictionary_translation_none: i18n::tr(language, "options.dictionary_translation.none"),
         wikipedia_language_auto: i18n::tr(language, "options.wikipedia_language.auto"),
@@ -1319,6 +1330,7 @@ fn localized_voice_language_name(language: Language, labels: &OptionsLabels, cod
         "sr" => labels.lang_sr.clone(),
         "uk" => labels.lang_uk.clone(),
         "lt" => labels.lang_lt.clone(),
+        "ru" => labels.lang_ru.clone(),
         "zh" => labels.lang_zh.clone(),
         "de" => match language {
             Language::Italian => "Tedesco".to_string(),
@@ -6442,6 +6454,12 @@ fn initialize_options_dialog(hwnd: HWND) {
             combo_lang,
             CB_ADDSTRING,
             WPARAM(0),
+            LPARAM(to_wide(&labels.lang_ru).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
             LPARAM(to_wide(&labels.lang_zh).as_ptr() as isize),
         );
 
@@ -6458,7 +6476,8 @@ fn initialize_options_dialog(hwnd: HWND) {
             Language::Serbian => 9,
             Language::Ukrainian => 10,
             Language::Lithuanian => 11,
-            Language::Chinese => 12,
+            Language::Russian => 12,
+            Language::Chinese => 13,
         };
         SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
@@ -7020,6 +7039,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             (labels.spellcheck_lang_fr.clone(), "fr-FR"),
             (labels.spellcheck_lang_de.clone(), "de-DE"),
             ("Polski (Polska)".to_string(), "pl-PL"),
+            (labels.spellcheck_lang_ru.clone(), "ru-RU"),
         ];
         let mut selected_idx = 0;
         let current_val = if settings.spellcheck_language_mode
@@ -7069,6 +7089,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             (labels.lang_fr.clone(), "fr"),
             (labels.lang_uk.clone(), "uk"),
             (labels.lang_lt.clone(), "lt"),
+            (labels.lang_ru.clone(), "ru"),
             (labels.lang_zh.clone(), "zh"),
         ];
         let current_dict_lang = settings
@@ -7113,6 +7134,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             (labels.lang_fr.clone(), "fr"),
             (labels.lang_uk.clone(), "uk"),
             (labels.lang_lt.clone(), "lt"),
+            (labels.lang_ru.clone(), "ru"),
             (labels.lang_zh.clone(), "zh"),
         ];
         let current_wikipedia_lang = settings.wikipedia_language.trim().to_ascii_lowercase();
@@ -9751,7 +9773,8 @@ fn apply_options_dialog(hwnd: HWND) {
             9 => Language::Serbian,
             10 => Language::Ukrainian,
             11 => Language::Lithuanian,
-            12 => Language::Chinese,
+            12 => Language::Russian,
+            13 => Language::Chinese,
             _ => Language::Italian,
         };
 
@@ -9895,6 +9918,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 6 => "fr-FR",
                 7 => "de-DE",
                 8 => "pl-PL",
+                9 => "ru-RU",
                 _ => "en-US",
             };
             settings.spellcheck_fixed_language = val.to_string();
@@ -9908,7 +9932,8 @@ fn apply_options_dialog(hwnd: HWND) {
         )
         .0;
         let dict_values = [
-            "auto", "none", "it", "en", "es", "pt", "vi", "cs", "pl", "fr",
+            "auto", "none", "it", "en", "es", "pt", "sv", "vi", "cs", "pl", "fr", "uk", "lt", "ru",
+            "zh",
         ];
         settings.dictionary_translation_language = if dict_sel >= 0 {
             dict_values
@@ -9920,7 +9945,9 @@ fn apply_options_dialog(hwnd: HWND) {
         };
 
         let wiki_sel = SendMessageW(combo_wikipedia_language, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-        let wiki_values = ["auto", "it", "en", "es", "pt", "vi", "cs", "pl", "fr"];
+        let wiki_values = [
+            "auto", "it", "en", "es", "pt", "sv", "vi", "cs", "pl", "fr", "uk", "lt", "ru", "zh",
+        ];
         settings.wikipedia_language = if wiki_sel >= 0 {
             wiki_values
                 .get(wiki_sel as usize)

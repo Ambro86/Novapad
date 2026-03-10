@@ -129,10 +129,11 @@
   "playback.chapter_list": "Danh sách &chương...\tAlt+Shift+L",
   "podcasts.chapters.title": "Danh sách chương",
   "playback.download_episode": "Lưu tập này...",
-    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_fast": "Transcribe current audio (Fast)",
   "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
   "playback.transcribe_hq": "Transcribe current audio (High quality)",
-  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "Đi &tới thời gian...\tCtrl+T",
+  "playback.transcribe_cancel": "Cancel transcription",
+  "playback.go_to_time": "Đi &tới thời gian...\tCtrl+T",
   "playback.announce_time": "Th&ông báo thời gian\tCtrl+I",
   "playback.add_subtitles": "Thêm &phụ đề...",
   "playback.add_subtitles_no_media": "Không có tệp đa phương tiện đang hoạt động.",
@@ -184,10 +185,11 @@
   "options.label.modified_marker_position": "Vị trí dấu hiệu đã chỉnh sửa:",
   "options.label.open": "Cách thức mở tệp:",
   "options.label.tts_engine": "Hệ thống văn bản sang giọng nói (TTS):",
-  "options.label.voice": "Giọng đọc:","options.label.voice_profile":"Hồ sơ giọng nói",
-"options.button.apply_selected_profile":"Áp dụng hồ sơ đã chọn",
-"options.button.add_profile":"Thêm hồ sơ",
-"options.button.delete_profile":"Xóa",
+  "options.label.voice": "Giọng đọc:",
+  "options.label.voice_profile": "Hồ sơ giọng nói",
+  "options.button.apply_selected_profile": "Áp dụng hồ sơ đã chọn",
+  "options.button.add_profile": "Thêm hồ sơ",
+  "options.button.delete_profile": "Xóa",
   "options.label.voice_preview": "Nghe thử giọng đọc",
   "options.label.insert_voice_tag": "Chèn thẻ giọng nói",
   "options.label.tts_manual_tuning": "Điều chỉnh giọng đọc thủ công",
@@ -452,6 +454,7 @@
   "about.title": "Giới thiệu phần mềm",
   "about.message": "Sonarpad là trình soạn thảo văn bản cho Windows hỗ trợ nhiều định dạng. Phần mềm có thể mở TXT, PDF, DOCX, EPUB và các tệp bảng tính; đọc văn bản bằng TTS, tạo và phát sách nói MP3.",
   "audiobook.progress": "Đang tạo sách nói. Tiến độ: {pct}%",
+  "audiobook.finalizing_progress": "Đang hoàn tất sách nói. Tiến độ: {pct}%",
   "audiobook.title": "Đang tạo sách nói",
   "audiobook.cancel": "Hủy bỏ",
   "audiobook.cancel_confirm": "Bạn có chắc chắn muốn hủy quá trình tạo sách nói không?",
@@ -895,7 +898,8 @@
   "options.shortcuts.action.quote_lines": "Quote lines",
   "options.shortcuts.action.unquote_lines": "Unquote lines",
   "options.shortcuts.action.media_prev": "Previous track",
-  "options.shortcuts.action.media_next": "Next track",  "options.shortcuts.capture_hint": "Nhấn phím tắt (trừ Alt)...",
+  "options.shortcuts.action.media_next": "Next track",
+  "options.shortcuts.capture_hint": "Nhấn phím tắt (trừ Alt)...",
   "options.shortcuts.duplicate_error": "Tổ hợp phím {shortcut} đã được gán cho: {action}.",
   "voice_panel.label_language": "Ngôn ngữ giọng nói:",
   "options.label.voice_language": "Ngôn ngữ giọng nói:",
@@ -987,7 +991,7 @@
   "stream_audio.invalid_format": "Định dạng không hợp lệ: {input}. Cho phép: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "URL không hợp lệ.",
   "stream_audio.no_output": "Không tạo được tệp đầu ra có thể phát.",
-    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",
   "whisper.status.transcribing": "Transcription in progress...",
@@ -997,7 +1001,8 @@
   "whisper.error.no_active_media": "No active media to transcribe.",
   "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
   "whisper.error.failed": "Transcription error: {err}",
-  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "Lỗi khi tải luồng phát trực tuyến: {err}",
+  "whisper.output_title": "Transcription - {name}",
+  "stream_audio.download_failed": "Lỗi khi tải luồng phát trực tuyến: {err}",
   "stream_audio.progress_title": "Tải phát trực tuyến",
   "stream_audio.progress_downloading": "Đang tải luồng...",
   "stream_audio.ytdlp_progress_title": "Cập nhật yt-dlp",
@@ -1069,7 +1074,8 @@
   "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
   "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
   "whisper.status.progress": "Transcription {pct} percent.",
-  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "whisper.progress_title": "Whisper transcription",
+  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
   "options.tab.ai_transcription": "AI và phiên âm",
   "options.label.whisper_model": "Mô hình Whisper:",
   "options.label.whisper_cuda": "Bật CUDA (cho GPU Nvidia)",
@@ -1077,12 +1083,7 @@
   "options.label.whisper_include_timestamps": "Bao gồm mốc thời gian trong bản phiên âm",
   "options.whisper_model.small": "Nhỏ",
   "options.whisper_model.medium": "Trung bình",
-  "options.whisper_model.large": "Lớn v3"
+  "options.whisper_model.large": "Lớn v3",
+  "options.lang.ru": "Tiếng Nga",
+  "options.spellcheck.lang.ru": "Tiếng Nga (Nga)"
 }
-
-
-
-
-
-
-

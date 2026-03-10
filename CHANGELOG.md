@@ -7,6 +7,7 @@ Novità
 
 Improvements
 • Added voice profiles in Options > Voice: profiles can be added, renamed, and deleted.
+• Added Russian translation thanks to Dmitriy.
 • Added a new option in Options > Audio to choose the audiobook part naming format: `Title + number`, `Number only`, or `Number + title`.
 • Added RSS favorite articles: from the article context menu you can add items to a dedicated Favorites feed.
 • The Favorites RSS feed can be deleted and is recreated automatically when a new article is added to favorites.
@@ -19,6 +20,8 @@ Bug fixes
 • Fixed the `Alt+Shift+L` shortcut: it now correctly opens the chapter list during playback.
 • Added embedded podcast chapter support from local media files (e.g., MP3 chapter metadata): when feed/URL chapters are unavailable, Sonarpad now loads chapters from the downloaded file in the background, so playback starts immediately and chapter data is applied as soon as it is ready.
 • Fixed chapter loading for downloaded podcast episodes opened as normal local media files: embedded chapters are now available there too, not only when playback starts from the Podcasts window.
+• Fixed MP3 audiobook finalization for SAPI4 and SAPI5: final output is now finalized correctly to avoid incomplete or fragile files after long exports.
+• Added an explicit finalization progress bar for all audiobook creation modes: after the creation phase, Sonarpad now announces and shows a dedicated finalization phase with visible progress.
 • Fixed dialogue voice tuning: speed/pitch/volume settings are now correctly applied for both the first and second dialogue voices during synthesis.
 • Improved text encoding detection for Japanese `.txt` files: added a safe Shift_JIS/CP932 fallback for mojibake cases, while preserving existing UTF/diacritics/Chinese behavior.
 • Internal safety refactor: converted functions to safe implementations where possible and significantly reduced unsafe code lines.

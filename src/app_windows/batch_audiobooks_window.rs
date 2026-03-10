@@ -2216,7 +2216,6 @@ fn export_parts(
                     pitch: tts.tts_pitch,
                     volume: tts.tts_volume,
                     sapi4_threads: None,
-                    finalize_progress_steps: 0,
                 };
                 run_tts_audiobook_part(part_chunks, &mut progress, &options)?;
             }
@@ -2403,7 +2402,6 @@ fn export_parts_mixed(
             pitch: tts.tts_pitch,
             volume: tts.tts_volume,
             sapi4_threads: None,
-            finalize_progress_steps: 0,
         };
         let config = MixedAudiobookConfig {
             main_engine: tts.tts_engine,

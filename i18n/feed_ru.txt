@@ -1,0 +1,8 @@
+Lenta.ru | https://lenta.ru/rss/
+Вести.ru | https://www.vesti.ru/vesti.rss
+РБК | https://rssexport.rbc.ru/rbcnews/news/20/full.rss
+Коммерсантъ | https://www.kommersant.ru/RSS/main.xml
+ТАСС | https://tass.ru/rss/v2.xml
+РИА Новости | https://ria.ru/export/rss2/index.xml
+Газета.Ru | https://www.gazeta.ru/export/rss/lenta.xml
+iXBT.com | https://www.ixbt.com/export/news.rss

@@ -80,6 +80,7 @@ fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
         Language::Polish => "pl",
         Language::French => "fr",
         Language::Serbian => "sr",
+        Language::Russian => "ru",
         Language::Chinese => "zh",
     };
     format!(
@@ -198,6 +199,7 @@ fn language_from_code(code: &str, fallback: Language) -> Language {
         "sr" => Language::Serbian,
         "uk" => Language::Ukrainian,
         "lt" => Language::Lithuanian,
+        "ru" => Language::Russian,
         "zh" => Language::Chinese,
         _ => fallback,
     }

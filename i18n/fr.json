@@ -132,10 +132,11 @@
   "playback.chapter_list": "Liste des c&hapitres...\tAlt+Shift+L",
   "podcasts.chapters.title": "Liste des chapitres",
   "playback.download_episode": "Enregistrer l'épisode...",
-    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_fast": "Transcribe current audio (Fast)",
   "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
   "playback.transcribe_hq": "Transcribe current audio (High quality)",
-  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "Aller au &temps...\tCtrl+T",
+  "playback.transcribe_cancel": "Cancel transcription",
+  "playback.go_to_time": "Aller au &temps...\tCtrl+T",
   "playback.announce_time": "A&nnoncer le temps\tCtrl+I",
   "playback.add_subtitles": "Ajouter des &sous-titres...",
   "playback.add_subtitles_no_media": "Aucun média actif.",
@@ -187,10 +188,11 @@
   "options.label.modified_marker_position": "Position du marqueur de modification :",
   "options.label.open": "Comportement à l'ouverture :",
   "options.label.tts_engine": "Système de synthèse vocale :",
-  "options.label.voice": "Voix :","options.label.voice_profile":"Profil vocal",
-"options.button.apply_selected_profile":"Appliquer le profil sélectionné",
-"options.button.add_profile":"Ajouter un profil",
-"options.button.delete_profile":"Supprimer",
+  "options.label.voice": "Voix :",
+  "options.label.voice_profile": "Profil vocal",
+  "options.button.apply_selected_profile": "Appliquer le profil sélectionné",
+  "options.button.add_profile": "Ajouter un profil",
+  "options.button.delete_profile": "Supprimer",
   "options.label.voice_preview": "Aperçu de la voix",
   "options.label.insert_voice_tag": "Insérer la balise de voix",
   "options.label.tts_manual_tuning": "Réglage manuel de la voix",
@@ -463,6 +465,7 @@
   "about.title": "À propos du programme",
   "about.message": "Sonarpad est un éditeur de texte pour Windows avec prise en charge de plusieurs formats. Il ouvre les fichiers TXT, PDF, DOCX, EPUB et les feuilles de calcul ; lit le texte avec TTS, crée des audiolivres MP3 et lit les audiolivres. Version : {version}. Auteur : Ambrogio Riili.",
   "audiobook.progress": "Création du livre audio. Progression : {pct} %",
+  "audiobook.finalizing_progress": "Finalisation du livre audio. Progression : {pct} %",
   "audiobook.title": "Création de livre audio",
   "audiobook.sapi4_threads_title": "Processus SAPI4",
   "audiobook.sapi4_threads_body": "Combien de processus simultanés souhaitez-vous utiliser pour accélérer la création ? (Recommandé : 10-30).\nNote : un nombre trop élevé peut ralentir le système ou provoquer des erreurs dans le moteur SAPI4.",
@@ -895,7 +898,8 @@
   "options.shortcuts.action.quote_lines": "Quote lines",
   "options.shortcuts.action.unquote_lines": "Unquote lines",
   "options.shortcuts.action.media_prev": "Previous track",
-  "options.shortcuts.action.media_next": "Next track",  "options.shortcuts.capture_hint": "Appuyez sur la combinaison (sauf Alt)...",
+  "options.shortcuts.action.media_next": "Next track",
+  "options.shortcuts.capture_hint": "Appuyez sur la combinaison (sauf Alt)...",
   "options.shortcuts.duplicate_error": "Le raccourci {shortcut} est déjà assigné à : {action}.",
   "voice_panel.label_language": "Langue de la voix :",
   "options.label.voice_language": "Langue de la voix :",
@@ -987,7 +991,7 @@
   "stream_audio.invalid_format": "Format invalide : {input}. Autorisés : mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "URL invalide.",
   "stream_audio.no_output": "Aucun fichier lisible n'a été généré.",
-    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",
   "whisper.status.transcribing": "Transcription in progress...",
@@ -997,7 +1001,8 @@
   "whisper.error.no_active_media": "No active media to transcribe.",
   "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
   "whisper.error.failed": "Transcription error: {err}",
-  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "Erreur de téléchargement du flux : {err}",
+  "whisper.output_title": "Transcription - {name}",
+  "stream_audio.download_failed": "Erreur de téléchargement du flux : {err}",
   "stream_audio.progress_title": "Téléchargement du flux",
   "stream_audio.progress_downloading": "Téléchargement du flux...",
   "stream_audio.ytdlp_progress_title": "Mise à jour de yt-dlp",
@@ -1069,7 +1074,8 @@
   "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
   "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
   "whisper.status.progress": "Transcription {pct} percent.",
-  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "whisper.progress_title": "Whisper transcription",
+  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
   "options.tab.ai_transcription": "IA et transcription",
   "options.label.whisper_model": "Modèle Whisper :",
   "options.label.whisper_cuda": "Activer CUDA (pour GPU Nvidia)",
@@ -1077,12 +1083,7 @@
   "options.label.whisper_include_timestamps": "Inclure les horodatages dans la transcription",
   "options.whisper_model.small": "Petit",
   "options.whisper_model.medium": "Moyen",
-  "options.whisper_model.large": "Grand v3"
+  "options.whisper_model.large": "Grand v3",
+  "options.lang.ru": "Russe",
+  "options.spellcheck.lang.ru": "Russe (Russie)"
 }
-
-
-
-
-
-
-

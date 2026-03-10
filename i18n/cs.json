@@ -132,10 +132,11 @@
   "playback.chapter_list": "Seznam &kapitol...\tAlt+Shift+L",
   "podcasts.chapters.title": "Seznam kapitol",
   "playback.download_episode": "Uložit epizodu...",
-    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_fast": "Transcribe current audio (Fast)",
   "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
   "playback.transcribe_hq": "Transcribe current audio (High quality)",
-  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "Přejít na ča&s...\tCtrl+T",
+  "playback.transcribe_cancel": "Cancel transcription",
+  "playback.go_to_time": "Přejít na ča&s...\tCtrl+T",
   "playback.announce_time": "Ohlásit č&as\tCtrl+I",
   "playback.add_subtitles": "Přidat &titulky...",
   "playback.add_subtitles_no_media": "Žádný aktivní mediální soubor.",
@@ -187,10 +188,11 @@
   "options.label.modified_marker_position": "Pozice značky změny:",
   "options.label.open": "Chování při otevírání:",
   "options.label.tts_engine": "Systém převodu textu na řeč:",
-  "options.label.voice": "Hlas:","options.label.voice_profile":"Profil hlasu",
-"options.button.apply_selected_profile":"Použít vybraný profil",
-"options.button.add_profile":"Přidat profil",
-"options.button.delete_profile":"Smazat",
+  "options.label.voice": "Hlas:",
+  "options.label.voice_profile": "Profil hlasu",
+  "options.button.apply_selected_profile": "Použít vybraný profil",
+  "options.button.add_profile": "Přidat profil",
+  "options.button.delete_profile": "Smazat",
   "options.label.voice_preview": "Ukázka hlasu",
   "options.label.insert_voice_tag": "Vložit tag hlasu",
   "options.label.tts_manual_tuning": "Ruční ladění hlasu",
@@ -463,6 +465,7 @@
   "about.title": "O programu",
   "about.message": "Sonarpad je textový editor pro Windows s podporou více formátů. Otevírá soubory TXT, PDF, DOCX, EPUB a tabulky; čte text pomocí TTS, vytváří audioknihy MP3 a přehrává audioknihy. Verze: {version}. Autor: Ambrogio Riili.",
   "audiobook.progress": "Vytváření audioknihy. Průběh: {pct}%",
+  "audiobook.finalizing_progress": "Dokončování audioknihy. Průběh: {pct}%",
   "audiobook.title": "Vytváření audioknihy",
   "audiobook.sapi4_threads_title": "Procesy SAPI4",
   "audiobook.sapi4_threads_body": "Kolik souběžných procesů chcete použít k urychlení vytváření? (Doporučeno: 10-30).\nPoznámka: příliš mnoho procesů může zpomalit systém nebo způsobit chyby v SAPI4.",
@@ -895,7 +898,8 @@
   "options.shortcuts.action.quote_lines": "Quote lines",
   "options.shortcuts.action.unquote_lines": "Unquote lines",
   "options.shortcuts.action.media_prev": "Previous track",
-  "options.shortcuts.action.media_next": "Next track",  "options.shortcuts.capture_hint": "Stiskněte kombinaci (kromě Alt)...",
+  "options.shortcuts.action.media_next": "Next track",
+  "options.shortcuts.capture_hint": "Stiskněte kombinaci (kromě Alt)...",
   "options.shortcuts.duplicate_error": "Klávesová zkratka {shortcut} je již přiřazena k: {action}.",
   "voice_panel.label_language": "Jazyk hlasu:",
   "options.label.voice_language": "Jazyk hlasu:",
@@ -987,7 +991,7 @@
   "stream_audio.invalid_format": "Neplatný formát: {input}. Povolené: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "Neplatná URL.",
   "stream_audio.no_output": "Nebyl vytvořen žádný přehratelný výstupní soubor.",
-    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",
   "whisper.status.transcribing": "Transcription in progress...",
@@ -997,7 +1001,8 @@
   "whisper.error.no_active_media": "No active media to transcribe.",
   "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
   "whisper.error.failed": "Transcription error: {err}",
-  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "Chyba stahování streamu: {err}",
+  "whisper.output_title": "Transcription - {name}",
+  "stream_audio.download_failed": "Chyba stahování streamu: {err}",
   "stream_audio.progress_title": "Stahování streamu",
   "stream_audio.progress_downloading": "Stahování streamu...",
   "stream_audio.ytdlp_progress_title": "Aktualizace yt-dlp",
@@ -1069,7 +1074,8 @@
   "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
   "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
   "whisper.status.progress": "Transcription {pct} percent.",
-  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "whisper.progress_title": "Whisper transcription",
+  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
   "options.tab.ai_transcription": "AI a přepis",
   "options.label.whisper_model": "Model Whisper:",
   "options.label.whisper_cuda": "Povolit CUDA (pro grafické karty Nvidia)",
@@ -1077,12 +1083,7 @@
   "options.label.whisper_include_timestamps": "Zahrnout časové značky do přepisu",
   "options.whisper_model.small": "Malý (small)",
   "options.whisper_model.medium": "Střední (medium)",
-  "options.whisper_model.large": "Velký v3 (large)"
+  "options.whisper_model.large": "Velký v3 (large)",
+  "options.lang.ru": "Ruština",
+  "options.spellcheck.lang.ru": "Ruština (Rusko)"
 }
-
-
-
-
-
-
-

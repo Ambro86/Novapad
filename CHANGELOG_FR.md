@@ -7,6 +7,7 @@ Novità
 
 Améliorations
 • Ajout de la gestion des profils vocaux dans Options > Voix : il est possible d'ajouter, de renommer et de supprimer des profils.
+• Ajout de la traduction russe grâce à Dmitriy.
 • Ajout dans Options > Audio d’un nouveau choix pour le format du nom des parties du livre audio : `Titre + numéro`, `Numéro uniquement` ou `Numéro + titre`.
 • Ajout dans le menu contextuel des articles RSS de l'action pour ajouter un article aux favoris.
 • La source RSS "Favoris" peut être supprimée et est recréée automatiquement lors du prochain ajout d'un article aux favoris.
@@ -19,6 +20,8 @@ Correctifs
 • Correction du raccourci `Alt+Shift+L` : il ouvre désormais correctement la liste des chapitres pendant la lecture.
 • Ajout de la prise en charge des chapitres de podcast intégrés dans les fichiers multimédias locaux (par ex. métadonnées de chapitres MP3) : lorsque le flux/URL ne fournit pas de chapitres, Sonarpad les charge désormais depuis le fichier téléchargé en arrière-plan, ce qui permet de démarrer la lecture immédiatement puis d’appliquer les chapitres dès qu’ils sont disponibles.
 • Correction du chargement des chapitres pour les épisodes de podcast téléchargés et ouverts comme de simples fichiers multimédias locaux : les chapitres intégrés sont désormais disponibles aussi dans ce cas, et pas seulement quand la lecture démarre depuis la fenêtre Podcasts.
+• Correction de la finalisation des livres audio MP3 avec SAPI4 et SAPI5 : le fichier final est désormais finalisé correctement, ce qui évite les fichiers incomplets ou fragiles après de longues exportations.
+• Ajout d’une barre de progression explicite pour la phase de finalisation dans tous les modes de création de livres audio : après la phase de création, Sonarpad annonce et affiche la finalisation avec une progression visible.
 • Correction d’un bug des voix de dialogue : les paramètres vitesse/tonalité/volume de la première et de la seconde voix de dialogue sont désormais correctement appliqués pendant la synthèse.
 • Amélioration de la détection d’encodage pour les fichiers japonais `.txt` : ajout d’un fallback Shift_JIS/CP932 sûr en cas de mojibake, tout en préservant le comportement existant pour UTF/diacritiques/chinois.
 • Refactorisation interne de sûreté : conversion vers des implémentations safe lorsque possible et réduction drastique des lignes de code unsafe.

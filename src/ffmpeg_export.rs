@@ -123,7 +123,6 @@ fn ensure_tts_cache(
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
                         sapi4_threads: None,
-                        finalize_progress_steps: 0,
                     };
                     let config = tts_engine::MixedAudiobookConfig {
                         main_engine: settings.tts_engine,
@@ -175,7 +174,6 @@ fn ensure_tts_cache(
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
                         sapi4_threads: None,
-                        finalize_progress_steps: 0,
                     };
                     let config = tts_engine::MixedAudiobookConfig {
                         main_engine: settings.tts_engine,
@@ -219,7 +217,6 @@ fn ensure_tts_cache(
                         pitch: settings.tts_pitch,
                         volume: settings.tts_volume,
                         sapi4_threads: None,
-                        finalize_progress_steps: 0,
                     };
                     let config = tts_engine::MixedAudiobookConfig {
                         main_engine: settings.tts_engine,

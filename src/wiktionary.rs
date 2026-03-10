@@ -1034,6 +1034,7 @@ fn language_to_code(language: Language) -> &'static str {
         Language::Polish => "pl",
         Language::French => "fr",
         Language::Serbian => "sr",
+        Language::Russian => "ru",
         Language::Chinese => "zh",
     }
 }
@@ -1060,6 +1061,7 @@ fn translation_target(language: Language, preference: &str) -> Option<String> {
         "pl" => "pl",
         "fr" => "fr",
         "lt" => "lt",
+        "ru" => "ru",
         "zh" => "zh",
         _ => {
             return match language {

@@ -7,6 +7,7 @@ Novità
 
 Cải tiến
 • Đã thêm quản lý hồ sơ giọng nói trong Tùy chọn > Giọng nói: có thể thêm, đổi tên và xóa hồ sơ.
+• Đã thêm bản dịch tiếng Nga nhờ Dmitriy.
 • Đã thêm trong Tùy chọn > Âm thanh một lựa chọn mới cho định dạng tên phần của sách nói: `Tiêu đề + số`, `Chỉ số` hoặc `Số + tiêu đề`.
 • Đã thêm hành động trong menu ngữ cảnh bài RSS để thêm bài viết vào mục yêu thích.
 • Nguồn RSS "Yêu thích" có thể bị xóa và sẽ được tạo lại tự động khi thêm bài viết mới vào mục yêu thích.
@@ -19,6 +20,8 @@ Sửa lỗi
 • Đã sửa phím tắt `Alt+Shift+L`: giờ đây phím này mở đúng danh sách chương trong khi phát.
 • Đã bổ sung hỗ trợ chương podcast nhúng trong tệp media cục bộ (ví dụ metadata chương của MP3): khi feed/URL không cung cấp chương, Sonarpad sẽ nạp chương từ tệp đã tải ở chế độ nền, giúp phát bắt đầu ngay và áp dụng chương ngay khi sẵn sàng.
 • Đã sửa việc nạp chương cho các tập podcast đã tải xuống rồi mở như tệp media cục bộ thông thường: các chương nhúng giờ cũng khả dụng trong trường hợp này, không chỉ khi bắt đầu phát từ cửa sổ Podcast.
+• Đã sửa bước hoàn tất cuối cùng của sách nói MP3 với SAPI4 và SAPI5: tệp đầu ra cuối cùng giờ được hoàn tất đúng cách, tránh các tệp không đầy đủ hoặc kém ổn định sau các lần xuất dài.
+• Đã thêm thanh tiến trình rõ ràng cho giai đoạn hoàn tất trong mọi chế độ tạo sách nói: sau giai đoạn tạo, Sonarpad giờ thông báo và hiển thị riêng giai đoạn hoàn tất với tiến trình nhìn thấy được.
 • Đã sửa lỗi giọng hội thoại: các tham số tốc độ/cao độ/âm lượng của giọng hội thoại thứ nhất và thứ hai giờ được áp dụng đúng trong quá trình tổng hợp giọng nói.
 • Đã cải thiện nhận diện mã hóa cho tệp `.txt` tiếng Nhật: thêm fallback Shift_JIS/CP932 an toàn cho các trường hợp mojibake, đồng thời giữ nguyên hành vi hiện có với UTF/diacritics/tiếng Trung.
 • Tái cấu trúc an toàn nội bộ: chuyển sang triển khai safe ở những nơi có thể và giảm mạnh số dòng mã unsafe.

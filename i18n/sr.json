@@ -132,10 +132,11 @@
   "playback.chapter_list": "Lista &poglavlja...\tAlt+Shift+L",
   "podcasts.chapters.title": "Lista poglavlja",
   "playback.download_episode": "Sačuvaj epizodu...",
-    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_fast": "Transcribe current audio (Fast)",
   "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
   "playback.transcribe_hq": "Transcribe current audio (High quality)",
-  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "Idi na &vreme...\tCtrl+T",
+  "playback.transcribe_cancel": "Cancel transcription",
+  "playback.go_to_time": "Idi na &vreme...\tCtrl+T",
   "playback.announce_time": "&Najavi vreme\tCtrl+I",
   "playback.add_subtitles": "&Dodaj titlove...",
   "playback.add_subtitles_no_media": "Nijedna medijska datoteka nije aktivna.",
@@ -187,10 +188,11 @@
   "options.label.modified_marker_position": "Pozicija izmenjenog obeleživača:",
   "options.label.open": "Način otvaranja:",
   "options.label.tts_engine": "Sistem za pretvaranje teksta u govor:",
-  "options.label.voice": "Glas:","options.label.voice_profile":"Profil glasa",
-"options.button.apply_selected_profile":"Primeni izabrani profil",
-"options.button.add_profile":"Dodaj profil",
-"options.button.delete_profile":"Obriši",
+  "options.label.voice": "Glas:",
+  "options.label.voice_profile": "Profil glasa",
+  "options.button.apply_selected_profile": "Primeni izabrani profil",
+  "options.button.add_profile": "Dodaj profil",
+  "options.button.delete_profile": "Obriši",
   "options.label.voice_preview": "Pregled glasa",
   "options.label.insert_voice_tag": "Ubaci glasovnu oznaku.",
   "options.label.tts_manual_tuning": "Ručno prilagođavanje glasa",
@@ -463,6 +465,7 @@
   "about.title": "O programu",
   "about.message": "Sonarpad je Windows uređivač teksta sa podrškom za više formata. Otvara TXT, PDF, DOCX, EPUB i proračunske tabele; čita tekst pomoću TTS‑a, pravi MP3 audio-knjige i reprodukuje audio-knjige. Verzija: {version}. Autor: Ambrogio Riili.",
   "audiobook.progress": "Kreiranje audio-knjige. Napredak: {pct}%",
+  "audiobook.finalizing_progress": "Završavanje audio-knjige. Napredak: {pct}%",
   "audiobook.title": "Kreiranje audio-knjige",
   "audiobook.sapi4_threads_title": "SAPI4 procesi",
   "audiobook.sapi4_threads_body": "Koliko istovremenih procesa želiš da koristiš za ubrzanje kreiranja? (Preporučeno: 10–30).\nNapomena: previše procesa može usporiti sistem ili izazvati greške u SAPI4 mehanizmu.",
@@ -895,7 +898,8 @@
   "options.shortcuts.action.quote_lines": "Quote lines",
   "options.shortcuts.action.unquote_lines": "Unquote lines",
   "options.shortcuts.action.media_prev": "Previous track",
-  "options.shortcuts.action.media_next": "Next track",  "options.shortcuts.capture_hint": "Pritisni prečicu (bez Alt)...",
+  "options.shortcuts.action.media_next": "Next track",
+  "options.shortcuts.capture_hint": "Pritisni prečicu (bez Alt)...",
   "options.shortcuts.duplicate_error": "Prečica {shortcut} je već dodeljena akciji: {action}.",
   "voice_panel.label_language": "Jezik glasa:",
   "options.label.voice_language": "Jezik glasa:",
@@ -987,7 +991,7 @@
   "stream_audio.invalid_format": "Nevažeći format: {input}. Dozvoljeno: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "Nevažeći URL.",
   "stream_audio.no_output": "Nije generisana nijedna izlazna datoteka za reprodukciju.",
-    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",
   "whisper.status.transcribing": "Transcription in progress...",
@@ -997,7 +1001,8 @@
   "whisper.error.no_active_media": "No active media to transcribe.",
   "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
   "whisper.error.failed": "Transcription error: {err}",
-  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "Greška pri preuzimanju striminga: {err}",
+  "whisper.output_title": "Transcription - {name}",
+  "stream_audio.download_failed": "Greška pri preuzimanju striminga: {err}",
   "stream_audio.progress_title": "Preuzimanje striminga",
   "stream_audio.progress_downloading": "Preuzimanje striminga...",
   "stream_audio.ytdlp_progress_title": "Ažuriranje yt-dlp",
@@ -1069,7 +1074,8 @@
   "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
   "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
   "whisper.status.progress": "Transcription {pct} percent.",
-  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "whisper.progress_title": "Whisper transcription",
+  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
   "options.tab.ai_transcription": "AI i transkripcija",
   "options.label.whisper_model": "Whisper model:",
   "options.label.whisper_cuda": "Omogući CUDA (za Nvidia GPU)",
@@ -1077,12 +1083,7 @@
   "options.label.whisper_include_timestamps": "Uključi vremenske oznake u transkripciju",
   "options.whisper_model.small": "Mali",
   "options.whisper_model.medium": "Srednji",
-  "options.whisper_model.large": "Veliki v3"
+  "options.whisper_model.large": "Veliki v3",
+  "options.lang.ru": "Ruski",
+  "options.spellcheck.lang.ru": "Ruski (Rusija)"
 }
-
-
-
-
-
-
-

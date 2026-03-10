@@ -130,10 +130,11 @@
   "playback.chapter_list": "Kapitel&lista...\tAlt+Shift+L",
   "podcasts.chapters.title": "Kapitellista",
   "playback.download_episode": "Spara avsnitt...",
-    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_fast": "Transcribe current audio (Fast)",
   "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
   "playback.transcribe_hq": "Transcribe current audio (High quality)",
-  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "Gå ti&ll tid...\tCtrl+T",
+  "playback.transcribe_cancel": "Cancel transcription",
+  "playback.go_to_time": "Gå ti&ll tid...\tCtrl+T",
   "playback.announce_time": "A&vissera tid\tCtrl+I",
   "playback.add_subtitles": "Lägg till &undertexter...",
   "playback.add_subtitles_no_media": "Ingen mediefil är aktiv.",
@@ -185,10 +186,11 @@
   "options.label.modified_marker_position": "Position för markering av ändring:",
   "options.label.open": "Öppna-beteende:",
   "options.label.tts_engine": "Text-till-tal-system:",
-  "options.label.voice": "Röst:","options.label.voice_profile":"Röstprofil",
-"options.button.apply_selected_profile":"Använd vald profil",
-"options.button.add_profile":"Lägg till profil",
-"options.button.delete_profile":"Ta bort",
+  "options.label.voice": "Röst:",
+  "options.label.voice_profile": "Röstprofil",
+  "options.button.apply_selected_profile": "Använd vald profil",
+  "options.button.add_profile": "Lägg till profil",
+  "options.button.delete_profile": "Ta bort",
   "options.label.voice_preview": "Röstförhandsvisning",
   "options.label.insert_voice_tag": "Infoga rösttagg",
   "options.label.tts_manual_tuning": "Manuell röstjustering",
@@ -459,6 +461,7 @@
   "about.title": "Om programmet",
   "about.message": "Sonarpad är en textredigerare för Windows med stöd för flera format. Den öppnar TXT, PDF, DOCX, EPUB och kalkylbladsfiler; läser text med talsyntes, skapar MP3-ljudböcker och spelar upp ljudböcker. Version: {version}. Författare: Ambrogio Riili.",
   "audiobook.progress": "Skapar ljudbok. Förlopp: {pct}%",
+  "audiobook.finalizing_progress": "Slutför ljudbok. Förlopp: {pct}%",
   "audiobook.title": "Skapar ljudbok",
   "audiobook.cancel": "Avbryt",
   "audiobook.cancel_confirm": "Är du säker på att du vill avbryta skapandet av ljudboken?",
@@ -895,7 +898,8 @@
   "options.shortcuts.action.quote_lines": "Quote lines",
   "options.shortcuts.action.unquote_lines": "Unquote lines",
   "options.shortcuts.action.media_prev": "Previous track",
-  "options.shortcuts.action.media_next": "Next track",  "options.shortcuts.capture_hint": "Tryck på kortkommandot (utom Alt)...",
+  "options.shortcuts.action.media_next": "Next track",
+  "options.shortcuts.capture_hint": "Tryck på kortkommandot (utom Alt)...",
   "options.shortcuts.duplicate_error": "Genvägen {shortcut} är redan tilldelad till: {action}.",
   "voice_panel.label_language": "Röstspråk:",
   "options.label.voice_language": "Röstspråk:",
@@ -987,7 +991,7 @@
   "stream_audio.invalid_format": "Ogiltigt format: {input}. Tillåtna: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "Ogiltig URL.",
   "stream_audio.no_output": "Ingen uppspelningsbar utdatafil skapades.",
-    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",
   "whisper.status.transcribing": "Transcription in progress...",
@@ -997,7 +1001,8 @@
   "whisper.error.no_active_media": "No active media to transcribe.",
   "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
   "whisper.error.failed": "Transcription error: {err}",
-  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "Fel vid nedladdning av stream: {err}",
+  "whisper.output_title": "Transcription - {name}",
+  "stream_audio.download_failed": "Fel vid nedladdning av stream: {err}",
   "stream_audio.progress_title": "Nedladdning av stream",
   "stream_audio.progress_downloading": "Laddar ner stream...",
   "stream_audio.ytdlp_progress_title": "yt-dlp uppdatering",
@@ -1069,7 +1074,8 @@
   "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
   "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
   "whisper.status.progress": "Transcription {pct} percent.",
-  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "whisper.progress_title": "Whisper transcription",
+  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
   "options.tab.ai_transcription": "AI och transkribering",
   "options.label.whisper_model": "Whisper-modell:",
   "options.label.whisper_cuda": "Aktivera CUDA (för Nvidia GPU)",
@@ -1077,12 +1083,7 @@
   "options.label.whisper_include_timestamps": "Inkludera tidsstämplar i transkriptionen",
   "options.whisper_model.small": "Liten",
   "options.whisper_model.medium": "Medel",
-  "options.whisper_model.large": "Stor v3"
+  "options.whisper_model.large": "Stor v3",
+  "options.lang.ru": "Ryska",
+  "options.spellcheck.lang.ru": "Ryska (Ryssland)"
 }
-
-
-
-
-
-
-

@@ -21,6 +21,7 @@ fn language_hint(language: crate::settings::Language) -> &'static str {
         crate::settings::Language::Serbian => "Serbian",
         crate::settings::Language::Ukrainian => "Ukrainian",
         crate::settings::Language::Lithuanian => "Lithuanian",
+        crate::settings::Language::Russian => "Russian",
         crate::settings::Language::Chinese => "Chinese",
     }
 }

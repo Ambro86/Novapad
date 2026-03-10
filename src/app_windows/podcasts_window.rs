@@ -422,6 +422,7 @@ fn format_timestamp_for_list(
         crate::settings::Language::French => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Serbian => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::Ukrainian => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Russian => ("%d.%m.%Y", "%H:%M"),
     };
     let show_date = matches!(date_mode, ListDateDisplayMode::Always);
     let show_time = match time_mode {
@@ -473,6 +474,7 @@ fn format_timestamp_for_language(
         crate::settings::Language::French => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Serbian => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::Ukrainian => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Russian => ("%d.%m.%Y", "%H:%M"),
     };
     let now = Local::now().date_naive();
     let item_day = dt.date_naive();
@@ -8119,7 +8121,11 @@ const APPLE_LIMIT: u32 = 50;
 fn apple_country_for_language(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
-        Language::Ukrainian | Language::Lithuanian | Language::Chinese | Language::English => "us",
+        Language::Ukrainian
+        | Language::Lithuanian
+        | Language::Russian
+        | Language::Chinese
+        | Language::English => "us",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "se",
@@ -8134,7 +8140,11 @@ fn apple_country_for_language(language: Language) -> &'static str {
 fn podcastindex_language_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
-        Language::Ukrainian | Language::Lithuanian | Language::Chinese | Language::English => "en",
+        Language::Ukrainian
+        | Language::Lithuanian
+        | Language::Russian
+        | Language::Chinese
+        | Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "sv",
@@ -8191,7 +8201,11 @@ fn apple_categories(language: Language) -> Vec<Category> {
             "True crime",
             "TV e film",
         ),
-        Language::Ukrainian | Language::Lithuanian | Language::Chinese | Language::English => (
+        Language::Ukrainian
+        | Language::Lithuanian
+        | Language::Russian
+        | Language::Chinese
+        | Language::English => (
             "Arts",
             "Business",
             "Comedy",
@@ -8575,7 +8589,11 @@ fn apple_subcategories(language: Language) -> Vec<Category> {
             (1563, "Recensioni di film"),
             (1561, "Recensioni TV"),
         ],
-        Language::Ukrainian | Language::Lithuanian | Language::Chinese | Language::English => &[
+        Language::Ukrainian
+        | Language::Lithuanian
+        | Language::Russian
+        | Language::Chinese
+        | Language::English => &[
             // Arts
             (1482, "Books"),
             (1402, "Design"),
@@ -9675,7 +9693,11 @@ fn podcastindex_categories(language: Language) -> Vec<Category> {
             (111, "Gioco di ruolo"),
             (112, "Cryptocurrency"),
         ],
-        Language::Ukrainian | Language::Lithuanian | Language::Chinese | Language::English => &[
+        Language::Ukrainian
+        | Language::Lithuanian
+        | Language::Russian
+        | Language::Chinese
+        | Language::English => &[
             (1, "Arts"),
             (2, "Books"),
             (3, "Design"),

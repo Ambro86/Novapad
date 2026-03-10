@@ -36,6 +36,7 @@ const DONATIONS_PL: &str = include_str!("../../donations_pl.txt");
 const DONATIONS_FR: &str = include_str!("../../donations_fr.txt");
 const DONATIONS_SR: &str = include_str!("../../donations_sr.txt");
 const DONATIONS_LT: &str = include_str!("../../donations_lt.txt");
+const DONATIONS_RU: &str = include_str!("../../donations_ru.txt");
 const DONATIONS_ZH: &str = include_str!("../../donations_zh.txt");
 
 fn read_override_text(file_name: &str) -> Option<String> {
@@ -420,6 +421,7 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                         Language::Serbian => read_override_text("guida_sr.txt")
                             .unwrap_or_else(|| include_str!("../../guida_sr.txt").to_string()),
                         Language::Lithuanian => include_str!("../../guida_lt.txt").to_string(),
+                        Language::Russian => include_str!("../../guida_ru.txt").to_string(),
                         Language::Chinese => include_str!("../../guida_zh.txt").to_string(),
                     },
                     HelpWindowKind::Changelog => match init.language {
@@ -436,6 +438,7 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                         Language::French => include_str!("../../CHANGELOG_FR.md").to_string(),
                         Language::Serbian => include_str!("../../CHANGELOG.md").to_string(),
                         Language::Lithuanian => include_str!("../../CHANGELOG.md").to_string(),
+                        Language::Russian => include_str!("../../CHANGELOG_RU.md").to_string(),
                         Language::Chinese => include_str!("../../CHANGELOG.md").to_string(),
                     },
                     HelpWindowKind::Donations => donations_content(init.language),
@@ -584,6 +587,7 @@ fn donations_content(language: Language) -> String {
             read_override_text("donations_sr.txt").unwrap_or_else(|| DONATIONS_SR.to_string())
         }
         Language::Lithuanian => DONATIONS_LT.to_string(),
+        Language::Russian => DONATIONS_RU.to_string(),
         Language::Chinese => DONATIONS_ZH.to_string(),
     }
 }

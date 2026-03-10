@@ -7,6 +7,7 @@ Novità
 
 Mejoras
 • Añadida la gestión de perfiles de voz en Opciones > Voz: se pueden añadir, renombrar y eliminar perfiles.
+• Añadida la traducción rusa gracias a Dmitriy.
 • Añadida en Opciones > Audio una nueva opción para elegir el formato del nombre de las partes del audiolibro: `Título + número`, `Solo número` o `Número + título`.
 • Añadida la acción del menú contextual de artículos RSS para añadir un artículo a favoritos.
 • La fuente RSS "Favoritos" puede eliminarse y se recrea automáticamente al añadir un nuevo artículo a favoritos.
@@ -19,6 +20,8 @@ Correcciones
 • Corregido el atajo `Alt+Shift+L`: ahora abre correctamente la lista de capítulos durante la reproducción.
 • Añadido soporte para capítulos de podcast incrustados en archivos multimedia locales (por ejemplo, metadatos de capítulos MP3): cuando el feed/URL no ofrece capítulos, Sonarpad ahora los carga desde el archivo descargado en segundo plano, de modo que la reproducción comienza de inmediato y los capítulos se aplican en cuanto están listos.
 • Corregida la carga de capítulos para episodios de podcast descargados y abiertos como archivos multimedia locales normales: los capítulos incrustados ahora también están disponibles en ese caso, no solo al iniciar la reproducción desde la ventana Podcasts.
+• Corregida la finalización de audiolibros MP3 con SAPI4 y SAPI5: el archivo final ahora se finaliza correctamente, evitando archivos incompletos o frágiles después de exportaciones largas.
+• Añadida una barra de progreso explícita para la fase de finalización en todos los modos de creación de audiolibros: después de la creación, Sonarpad anuncia y muestra la finalización con progreso visible.
 • Corregido un error en las voces de diálogo: los parámetros de velocidad/tono/volumen de la primera y segunda voz de diálogo ahora se aplican correctamente durante la síntesis.
 • Mejorada la detección de codificación para archivos japoneses `.txt`: se añadió un fallback seguro Shift_JIS/CP932 en casos de mojibake, preservando el comportamiento existente para UTF/diacríticos/chino.
 • Refactorización interna de seguridad: conversión a implementaciones seguras donde fue posible y reducción drástica de líneas de código unsafe.

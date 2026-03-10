@@ -92,6 +92,7 @@ fn language_code(language: Language) -> &'static str {
         Language::Serbian => "sr",
         Language::Ukrainian => "uk",
         Language::Lithuanian => "lt",
+        Language::Russian => "ru",
         Language::Chinese => "zh",
     }
 }

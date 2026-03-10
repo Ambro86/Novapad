@@ -188,10 +188,11 @@
   "options.label.modified_marker_position": "Posizione indicatore modificato:",
   "options.label.open": "Apertura file:",
   "options.label.tts_engine": "Sistema sintesi vocale:",
-  "options.label.voice": "Voce:","options.label.voice_profile":"Profilo voce",
-"options.button.apply_selected_profile":"Rinomina profilo",
-"options.button.add_profile":"Aggiungi profilo",
-"options.button.delete_profile":"Elimina",
+  "options.label.voice": "Voce:",
+  "options.label.voice_profile": "Profilo voce",
+  "options.button.apply_selected_profile": "Rinomina profilo",
+  "options.button.add_profile": "Aggiungi profilo",
+  "options.button.delete_profile": "Elimina",
   "options.label.voice_preview": "Anteprima voce",
   "options.label.insert_voice_tag": "Inserisci tag voce",
   "options.label.tts_manual_tuning": "Regolazione manuale voce",
@@ -464,6 +465,7 @@
   "about.title": "Informazioni sul programma",
   "about.message": "Sonarpad è un editor di testo per Windows con supporto multi-formato. Apre file TXT, PDF, DOCX, EPUB e fogli di calcolo; legge il testo con sintesi vocale, crea audiolibri MP3 e riproduce audiolibri. Versione: {version}. Autore: Ambrogio Riili.",
   "audiobook.progress": "Creazione audiolibro in corso. Avanzamento: {pct}%",
+  "audiobook.finalizing_progress": "Finalizzazione audiolibro in corso. Avanzamento: {pct}%",
   "audiobook.title": "Creazione Audiolibro",
   "audiobook.sapi4_threads_title": "Processi SAPI4",
   "audiobook.sapi4_threads_body": "Quanti processi contemporanei vuoi usare per velocizzare la creazione? (Consigliato: 10-30).\nNota: un numero troppo alto potrebbe rallentare il sistema o causare errori nel motore vocale SAPI4.",
@@ -896,7 +898,8 @@
   "options.shortcuts.action.quote_lines": "Commenta righe",
   "options.shortcuts.action.unquote_lines": "Decommenta righe",
   "options.shortcuts.action.media_prev": "Brano precedente",
-  "options.shortcuts.action.media_next": "Brano successivo",  "options.shortcuts.capture_hint": "Premi la combinazione di tasti (tranne Alt)...",
+  "options.shortcuts.action.media_next": "Brano successivo",
+  "options.shortcuts.capture_hint": "Premi la combinazione di tasti (tranne Alt)...",
   "options.shortcuts.duplicate_error": "La combinazione {shortcut} è già assegnata a: {action}.",
   "excluded_from_testing.bdciechi.title": "bdCiechi",
   "excluded_from_testing.bdciechi.save_filter_text": "File di testo (*.txt)",
@@ -1125,11 +1128,7 @@
   "options.label.whisper_include_timestamps": "Includi timestamp nella trascrizione",
   "options.whisper_model.small": "Piccolo (small)",
   "options.whisper_model.medium": "Medio (medium)",
-  "options.whisper_model.large": "Grande v3 (large)"
+  "options.whisper_model.large": "Grande v3 (large)",
+  "options.lang.ru": "Russo",
+  "options.spellcheck.lang.ru": "Russo (Russia)"
 }
-
-
-
-
-
-

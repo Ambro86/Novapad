@@ -134,6 +134,8 @@ pub enum Language {
     Ukrainian,
     #[serde(rename = "lt")]
     Lithuanian,
+    #[serde(rename = "ru")]
+    Russian,
     #[serde(rename = "zh")]
     Chinese,
 }
@@ -1367,6 +1369,9 @@ fn system_language() -> Language {
         }
         if lower.starts_with("lt") {
             return Language::Lithuanian;
+        }
+        if lower.starts_with("ru") {
+            return Language::Russian;
         }
         if lower.starts_with("zh") {
             return Language::Chinese;

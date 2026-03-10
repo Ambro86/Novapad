@@ -12,6 +12,7 @@ Miglioramenti
 
 Miglioramenti
 • Aggiunta in Opzioni > Voce la gestione dei profili voce: è possibile aggiungere, rinominare ed eliminare un profilo.
+• Aggiunta la traduzione russa grazie a Dmitriy.
 • Aggiunta in Opzioni > Audio una nuova scelta per il formato nome delle parti audiolibro: `Titolo + numero`, `Solo numero` oppure `Numero + titolo`.
 • Aggiunta nel menu contestuale degli articoli RSS la voce per aggiungere l'articolo ai preferiti.
 • Introdotta la fonte RSS "Preferiti": può essere eliminata e viene ricreata automaticamente alla prossima aggiunta di un articolo ai preferiti.
@@ -23,6 +24,8 @@ Correzioni
 • Corretta la scorciatoia `Alt+Shift+L`: ora apre correttamente la lista capitoli durante la riproduzione.
 • Aggiunto il supporto ai capitoli podcast embedded nei file multimediali locali (es. metadati capitoli MP3): quando feed/URL non forniscono capitoli, Sonarpad li legge dal file scaricato in background, così la riproduzione parte subito e i capitoli vengono applicati appena disponibili.
 • Corretta la lettura dei capitoli per gli episodi podcast scaricati e aperti come normali file multimediali locali: i capitoli embedded sono ora disponibili anche in questo caso, non solo avviando la riproduzione dalla finestra Podcast.
+• Corretta la finalizzazione degli audiolibri MP3 con SAPI4 e SAPI5: il file finale viene ora finalizzato correttamente, evitando file incompleti o fragili dopo esportazioni lunghe.
+• Aggiunta una barra di progresso esplicita per la fase di finalizzazione in tutte le modalità di creazione degli audiolibri: dopo la creazione, Sonarpad annuncia e mostra la finalizzazione con avanzamento visibile.
 • Corretto un bug nelle voci dialoghi: i parametri di velocità/tono/volume della prima e della seconda voce dialoghi ora vengono applicati correttamente durante la sintesi.
 • Migliorato il rilevamento codifica per file `.txt` giapponesi: aggiunto fallback sicuro Shift_JIS/CP932 nei casi di mojibake, preservando il comportamento esistente su UTF/diacritici/cinese.
 • Refactor interno sulla sicurezza: conversione a implementazioni safe dove possibile e riduzione drastica delle righe di codice unsafe.

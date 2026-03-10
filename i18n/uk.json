@@ -132,10 +132,11 @@
   "playback.chapter_list": "&Список глав...\tAlt+Shift+L",
   "podcasts.chapters.title": "Список глав",
   "playback.download_episode": "Зберегти епізод...",
-    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_fast": "Transcribe current audio (Fast)",
   "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
   "playback.transcribe_hq": "Transcribe current audio (High quality)",
-  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "Перейти до &часу...\tCtrl+T",
+  "playback.transcribe_cancel": "Cancel transcription",
+  "playback.go_to_time": "Перейти до &часу...\tCtrl+T",
   "playback.announce_time": "О&голосити час\tCtrl+I",
   "playback.add_subtitles": "Додати &субтитри...",
   "playback.add_subtitles_no_media": "Активний медіафайл відсутній.",
@@ -187,10 +188,11 @@
   "options.label.modified_marker_position": "Позиція маркера змін:",
   "options.label.open": "Поведінка під час відкриття:",
   "options.label.tts_engine": "Система синтезу мовлення:",
-  "options.label.voice": "Голос:","options.label.voice_profile":"Профіль голосу",
-"options.button.apply_selected_profile":"Застосувати вибраний профіль",
-"options.button.add_profile":"Додати профіль",
-"options.button.delete_profile":"Видалити",
+  "options.label.voice": "Голос:",
+  "options.label.voice_profile": "Профіль голосу",
+  "options.button.apply_selected_profile": "Застосувати вибраний профіль",
+  "options.button.add_profile": "Додати профіль",
+  "options.button.delete_profile": "Видалити",
   "options.label.voice_preview": "&Прослухати голос",
   "options.label.insert_voice_tag": "Вставити тег голосу",
   "options.label.tts_manual_tuning": "Ручне налаштування голосу",
@@ -463,6 +465,7 @@
   "about.title": "Про програму",
   "about.message": "Sonarpad — це текстовий редактор для Windows з підтримкою багатьох форматів. Відкриває TXT, PDF, DOCX, EPUB та таблиці; читає текст за допомогою синтезу мовлення, створює MP3-аудіокниги та відтворює їх. Версія: {version}. Автор: Ambrogio Riili.",
   "audiobook.progress": "Створення аудіокниги. Перебіг: {pct}%",
+  "audiobook.finalizing_progress": "Завершення аудіокниги. Перебіг: {pct}%",
   "audiobook.title": "Створення аудіокниги",
   "audiobook.sapi4_threads_title": "Процеси SAPI4",
   "audiobook.sapi4_threads_body": "Скільки паралельних процесів використовувати для прискорення створення? (Рекомендовано: 10-30).\nПримітка: занадто велика кількість процесів може уповільнити систему або спричинити помилки в рушії SAPI4.",
@@ -895,7 +898,8 @@
   "options.shortcuts.action.quote_lines": "Quote lines",
   "options.shortcuts.action.unquote_lines": "Unquote lines",
   "options.shortcuts.action.media_prev": "Previous track",
-  "options.shortcuts.action.media_next": "Next track",  "options.shortcuts.capture_hint": "Натисніть комбінацію клавіш (крім Alt)...",
+  "options.shortcuts.action.media_next": "Next track",
+  "options.shortcuts.capture_hint": "Натисніть комбінацію клавіш (крім Alt)...",
   "options.shortcuts.duplicate_error": "Комбінація {shortcut} вже призначена для: {action}.",
   "voice_panel.label_language": "Мова голосу:",
   "options.label.voice_language": "Мова голосу:",
@@ -987,7 +991,7 @@
   "stream_audio.invalid_format": "Недійсний формат: {input}. Допустимі значення: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "Недійсний URL.",
   "stream_audio.no_output": "Не створено жодного файлу для відтворення.",
-    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",
   "whisper.status.transcribing": "Transcription in progress...",
@@ -997,7 +1001,8 @@
   "whisper.error.no_active_media": "No active media to transcribe.",
   "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
   "whisper.error.failed": "Transcription error: {err}",
-  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "Помилка завантаження потоку: {err}",
+  "whisper.output_title": "Transcription - {name}",
+  "stream_audio.download_failed": "Помилка завантаження потоку: {err}",
   "stream_audio.progress_title": "Завантаження потоку",
   "stream_audio.progress_downloading": "Завантаження потоку...",
   "stream_audio.ytdlp_progress_title": "Оновлення yt-dlp",
@@ -1069,7 +1074,8 @@
   "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
   "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
   "whisper.status.progress": "Transcription {pct} percent.",
-  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "whisper.progress_title": "Whisper transcription",
+  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
   "options.tab.ai_transcription": "ШІ та транскрипція",
   "options.label.whisper_model": "Модель Whisper:",
   "options.label.whisper_cuda": "Увімкнути CUDA (для відеокарт Nvidia)",
@@ -1077,12 +1083,7 @@
   "options.label.whisper_include_timestamps": "Додати часові мітки до транскрипції",
   "options.whisper_model.small": "Малий",
   "options.whisper_model.medium": "Середній",
-  "options.whisper_model.large": "Великий v3"
+  "options.whisper_model.large": "Великий v3",
+  "options.lang.ru": "Російська",
+  "options.spellcheck.lang.ru": "Російська (Росія)"
 }
-
-
-
-
-
-
-

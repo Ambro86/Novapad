@@ -7,6 +7,7 @@ Novità
 
 Ulepszenia
 • Dodano zarządzanie profilami głosu w Opcje > Głos: profile można dodawać, zmieniać nazwę i usuwać.
+• Dodano tłumaczenie rosyjskie dzięki Dmitriyowi.
 • Dodano w Opcje > Audio nową możliwość wyboru formatu nazwy części audiobooka: `Tytuł + numer`, `Tylko numer` albo `Numer + tytuł`.
 • Dodano w menu kontekstowym artykułów RSS akcję dodawania artykułu do ulubionych.
 • Źródło RSS "Ulubione" można usunąć; zostanie utworzone ponownie automatycznie po dodaniu nowego artykułu do ulubionych.
@@ -19,6 +20,8 @@ Poprawki
 • Naprawiono skrót `Alt+Shift+L`: teraz poprawnie otwiera listę rozdziałów podczas odtwarzania.
 • Dodano obsługę osadzonych rozdziałów podcastów z lokalnych plików multimedialnych (np. metadanych rozdziałów MP3): gdy feed/URL nie udostępnia rozdziałów, Sonarpad ładuje je teraz w tle z pobranego pliku, dzięki czemu odtwarzanie startuje od razu, a rozdziały są stosowane, gdy tylko będą gotowe.
 • Naprawiono wczytywanie rozdziałów dla pobranych odcinków podcastów otwieranych jako zwykłe lokalne pliki multimedialne: osadzone rozdziały są teraz dostępne także w tym przypadku, a nie tylko po uruchomieniu odtwarzania z okna Podcasty.
+• Naprawiono finalizację audiobooków MP3 w SAPI4 i SAPI5: plik końcowy jest teraz poprawnie finalizowany, co zapobiega niepełnym lub niestabilnym plikom po długich eksportach.
+• Dodano wyraźny pasek postępu dla etapu finalizacji we wszystkich trybach tworzenia audiobooków: po zakończeniu tworzenia Sonarpad ogłasza i pokazuje osobną fazę finalizacji z widocznym postępem.
 • Naprawiono błąd głosów dialogowych: parametry szybkości/tonu/głośności dla pierwszego i drugiego głosu dialogowego są teraz poprawnie stosowane podczas syntezy.
 • Ulepszono wykrywanie kodowania dla japońskich plików `.txt`: dodano bezpieczny fallback Shift_JIS/CP932 dla przypadków mojibake, z zachowaniem dotychczasowego działania dla UTF/diakrytyków/chińskiego.
 • Wewnętrzna refaktoryzacja bezpieczeństwa: konwersja do implementacji safe tam, gdzie to możliwe, oraz drastyczne zmniejszenie liczby linii kodu unsafe.

@@ -476,6 +476,7 @@ fn author_prefix(language: Language) -> &'static str {
         Language::Vietnamese => "Bởi",
         Language::Serbian => "Autor",
         Language::Lithuanian => "Autorius",
+        Language::Russian => "Автор",
         Language::Chinese => "作者",
     }
 }
@@ -849,6 +850,7 @@ mod tests {
             Language::French,
             Language::Serbian,
             Language::Lithuanian,
+            Language::Russian,
             Language::Chinese,
         ];
 
@@ -866,6 +868,7 @@ mod tests {
                 Language::French => "French",
                 Language::Serbian => "Serbian",
                 Language::Lithuanian => "Lithuanian",
+                Language::Russian => "Russian",
                 Language::Chinese => "Chinese",
             };
             assert!(

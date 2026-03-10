@@ -350,7 +350,6 @@ pub struct AudiobookCommonOptions<'a> {
     pub pitch: i32,
     pub volume: i32,
     pub sapi4_threads: Option<u32>,
-    pub finalize_progress_steps: usize,
 }
 
 fn post_audiobook_progress(hwnd: HWND, current: usize) {
@@ -364,17 +363,52 @@ fn post_audiobook_progress(hwnd: HWND, current: usize) {
     }
 }
 
-fn advance_finalize_progress(
-    options: &AudiobookCommonOptions<'_>,
-    current_global_progress: &mut usize,
-    remaining_steps: &mut usize,
-) {
-    if *remaining_steps == 0 {
+fn set_audiobook_progress_total(hwnd: HWND, total: usize) {
+    if hwnd.0 == 0 {
         return;
     }
-    *current_global_progress = current_global_progress.saturating_add(1);
-    post_audiobook_progress(options.progress_hwnd, *current_global_progress);
-    *remaining_steps = remaining_steps.saturating_sub(1);
+    unsafe {
+        if let Err(e) = PostMessageW(
+            hwnd,
+            crate::app_windows::audiobook_window::WM_SET_PROGRESS_TOTAL,
+            WPARAM(total.max(1)),
+            LPARAM(0),
+        ) {
+            crate::log_debug(&format!("Failed to post WM_SET_PROGRESS_TOTAL: {}", e));
+        }
+    }
+}
+
+fn set_audiobook_progress_phase(hwnd: HWND, finalizing: bool) {
+    if hwnd.0 == 0 {
+        return;
+    }
+    unsafe {
+        if let Err(e) = PostMessageW(
+            hwnd,
+            crate::app_windows::audiobook_window::WM_SET_PROGRESS_PHASE,
+            WPARAM(usize::from(finalizing)),
+            LPARAM(0),
+        ) {
+            crate::log_debug(&format!("Failed to post WM_SET_PROGRESS_PHASE: {}", e));
+        }
+    }
+}
+
+fn post_finalization_progress_range(
+    progress_hwnd: HWND,
+    progress_10000: u32,
+    start: usize,
+    span: usize,
+    total: usize,
+) {
+    if progress_hwnd.0 == 0 || total == 0 || span == 0 {
+        return;
+    }
+    let clamped = progress_10000.min(10_000) as usize;
+    let offset = (clamped * span) / 10_000;
+    let current = (start + offset).min(total.saturating_sub(1));
+    post_audiobook_progress(progress_hwnd, current);
 }
 
 fn cancelled_message(language: Language) -> String {
@@ -4363,45 +4397,7 @@ fn start_audiobook_with_text(
     } else {
         chunks.len()
     };
-    let output_extension = output
-        .extension()
-        .and_then(|s| s.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    let is_aac_output =
-        output_extension == "m4b" || output_extension == "m4a" || output_extension == "mp4";
-    let expected_output_parts = if let Some(parts) = &mixed_marker_parts {
-        parts.iter().filter(|p| !p.is_empty()).count().max(1)
-    } else if let Some(parts) = &marker_parts {
-        parts.iter().filter(|p| !p.is_empty()).count().max(1)
-    } else if split_parts > 1 {
-        std::cmp::min(split_parts as usize, chunks_len).max(1)
-    } else {
-        1usize
-    };
-    // Per-part finalize progress steps consumed inside run_tts_audiobook_part.
-    let finalize_progress_steps_per_part =
-        if tts_engine == TtsEngine::Edge && is_aac_output && expected_multi_file_split {
-            // One step per part conversion to avoid hitting 100% before the last chapter conversion.
-            1usize
-        } else if tts_engine == TtsEngine::Edge
-            && !split_by_time
-            && split_parts == 0
-            && marker_parts.is_none()
-            && mixed_marker_parts.is_none()
-            && !expected_multi_file_split
-        {
-            4usize
-        } else {
-            0usize
-        };
-    let extra_progress_steps =
-        if tts_engine == TtsEngine::Edge && is_aac_output && expected_multi_file_split {
-            expected_output_parts
-        } else {
-            finalize_progress_steps_per_part
-        };
-    let progress_total = chunks_len.saturating_add(extra_progress_steps);
+    let progress_total = chunks_len;
 
     let cancel_token = Arc::new(AtomicBool::new(false));
     let progress_hwnd = {
@@ -4459,7 +4455,6 @@ fn start_audiobook_with_text(
             pitch: tts_pitch,
             volume: tts_volume,
             sapi4_threads,
-            finalize_progress_steps: finalize_progress_steps_per_part,
         };
         let part_naming_mode = options.part_naming_mode;
         let engine_name = match tts_engine {
@@ -4917,7 +4912,6 @@ fn run_split_audiobook(
             pitch: options.pitch,
             volume: options.volume,
             sapi4_threads: options.sapi4_threads,
-            finalize_progress_steps: 0,
         };
 
         run_tts_audiobook_part(part_chunks, &mut current_global_progress, &part_options)?;
@@ -4959,7 +4953,6 @@ fn run_marker_split_audiobook(
             pitch: options.pitch,
             volume: options.volume,
             sapi4_threads: options.sapi4_threads,
-            finalize_progress_steps: 0,
         };
 
         run_tts_audiobook_part(part_chunks, &mut current_global_progress, &part_options)?;
@@ -5019,7 +5012,6 @@ fn run_split_sapi4_audiobook(
             pitch: options.pitch,
             volume: options.volume,
             sapi4_threads: options.sapi4_threads,
-            finalize_progress_steps: 0,
         };
 
         run_sapi4_parallel_part(
@@ -5066,7 +5058,6 @@ fn run_marker_split_sapi4_audiobook(
             pitch: options.pitch,
             volume: options.volume,
             sapi4_threads: options.sapi4_threads,
-            finalize_progress_steps: 0,
         };
 
         run_sapi4_parallel_part(
@@ -5269,8 +5260,13 @@ fn run_sapi4_parallel_part(
     });
 
     let result = if is_mp3 {
-        // Fast binary join for MP3
-        merge_and_finalize_sapi4_mp3(&produced_files, options.output, options.language)
+        merge_and_finalize_sapi4_mp3(
+            &produced_files,
+            options.output,
+            options.language,
+            options.audiobook_bitrate_kbps,
+            options.progress_hwnd,
+        )
     } else {
         // This covers M4B (AAC) and standard WAV.
         // For M4B, it joins WAV chunks and then encodes to AAC in one pass.
@@ -5315,18 +5311,61 @@ fn parse_sapi4_part_index(name: &str) -> usize {
 fn merge_and_finalize_sapi4_mp3(
     mp3_files: &[PathBuf],
     output: &Path,
-    _language: Language,
+    language: Language,
+    bitrate_kbps: u32,
+    progress_hwnd: HWND,
 ) -> Result<(), String> {
     if mp3_files.is_empty() {
         return Ok(());
     }
 
-    let mut out_file = std::fs::File::create(output).map_err(|e| e.to_string())?;
+    let output_name = output
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audiobook.mp3");
+    let concat_output = output.with_file_name(format!("{output_name}.concat.tmp.mp3"));
+
+    let mut out_file = std::fs::File::create(&concat_output).map_err(|e| e.to_string())?;
     for path in mp3_files {
         let mut in_file = std::fs::File::open(path).map_err(|e| e.to_string())?;
         std::io::copy(&mut in_file, &mut out_file).map_err(|e| e.to_string())?;
     }
-    Ok(())
+
+    set_audiobook_progress_phase(progress_hwnd, true);
+    set_audiobook_progress_total(progress_hwnd, 100);
+    post_audiobook_progress(progress_hwnd, 0);
+    let settings = crate::ffmpeg_export::ConvertAudioSettings {
+        format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
+        quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(bitrate_kbps),
+    };
+    let mut last_progress = 0usize;
+    let mut progress = |p: u32| {
+        let current = ((p as usize) / 100).min(99);
+        if current > last_progress {
+            last_progress = current;
+            post_audiobook_progress(progress_hwnd, current);
+        }
+    };
+    let convert_result = crate::ffmpeg_export::convert_audio_file(
+        &concat_output,
+        output,
+        &settings,
+        None,
+        Some(&mut progress),
+    );
+    if let Err(err) = std::fs::remove_file(&concat_output) {
+        crate::log_debug(&format!(
+            "Failed to remove temporary concatenated MP3 {:?}: {}",
+            concat_output, err
+        ));
+    }
+    match convert_result {
+        Ok(()) => {
+            post_audiobook_progress(progress_hwnd, 100);
+            Ok(())
+        }
+        Err(err) => Err(i18n::tr_f(language, "sapi5.mf_error", &[("err", &err)])),
+    }
 }
 
 #[cfg(test)]
@@ -5880,7 +5919,7 @@ fn run_sapi5_parallel_part(
     let parts_shared = Arc::new(Mutex::new(internal_parts.into_iter()));
     let mut handles = Vec::new();
 
-    for _ in 0..worker_count {
+    for _worker_idx in 0..worker_count {
         let tx = tx.clone();
         let parts_shared = parts_shared.clone();
         let progress_counter = progress_counter.clone();
@@ -6027,7 +6066,13 @@ fn run_sapi5_parallel_part(
         }
     }
 
-    merge_and_finalize_sapi4_mp3(&produced_files, options.output, options.language)?;
+    merge_and_finalize_sapi4_mp3(
+        &produced_files,
+        options.output,
+        options.language,
+        options.audiobook_bitrate_kbps,
+        options.progress_hwnd,
+    )?;
     if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
         crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", e));
     }
@@ -6088,7 +6133,6 @@ fn run_split_sapi_audiobook(
                 pitch: options.pitch,
                 volume: options.volume,
                 sapi4_threads: options.sapi4_threads,
-                finalize_progress_steps: 0,
             };
             run_sapi5_parallel_part(part_chunks, &mut current_global_progress, &part_options)?;
             continue;
@@ -6203,7 +6247,6 @@ fn run_marker_split_sapi_audiobook(
                 pitch: options.pitch,
                 volume: options.volume,
                 sapi4_threads: options.sapi4_threads,
-                finalize_progress_steps: 0,
             };
             run_sapi5_parallel_part(part_chunks, &mut current_global_progress, &part_options)?;
             continue;
@@ -6282,7 +6325,6 @@ pub(crate) fn run_tts_audiobook_part(
     current_global_progress: &mut usize,
     options: &AudiobookCommonOptions,
 ) -> Result<(), String> {
-    let mut remaining_finalize_progress_steps = options.finalize_progress_steps;
     let is_lithuanian_voice = options.voice.to_ascii_lowercase().starts_with("lt-");
     const LT_EDGE_MAX_BYTES: usize = 900;
 
@@ -6404,11 +6446,9 @@ pub(crate) fn run_tts_audiobook_part(
     let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
 
     if is_aac {
-        advance_finalize_progress(
-            options,
-            current_global_progress,
-            &mut remaining_finalize_progress_steps,
-        );
+        set_audiobook_progress_phase(options.progress_hwnd, true);
+        set_audiobook_progress_total(options.progress_hwnd, 200);
+        post_audiobook_progress(options.progress_hwnd, 0);
         let source_mp3 = options.output.with_extension("edge_source.tmp.mp3");
         let source_wav = options.output.with_extension("edge_source.tmp.wav");
         if let Err(e) = std::fs::rename(options.output, &source_mp3) {
@@ -6430,11 +6470,7 @@ pub(crate) fn run_tts_audiobook_part(
             );
             write_wav_from_pcm(&source_wav, &resampled, target_rate, target_channels)
         })();
-        advance_finalize_progress(
-            options,
-            current_global_progress,
-            &mut remaining_finalize_progress_steps,
-        );
+        post_audiobook_progress(options.progress_hwnd, 100);
         if let Err(err) = wav_result {
             crate::log_debug(&format!(
                 "AAC post-process skipped: WAV conversion failed: {}",
@@ -6465,7 +6501,9 @@ pub(crate) fn run_tts_audiobook_part(
                 options.audiobook_bitrate_kbps,
             ),
         };
-        let mut ffmpeg_progress = |_p: u32| {};
+        let mut ffmpeg_progress = |p: u32| {
+            post_finalization_progress_range(options.progress_hwnd, p, 100, 99, 200);
+        };
         let convert_result = crate::ffmpeg_export::convert_audio_file(
             &source_wav,
             options.output,
@@ -6473,11 +6511,7 @@ pub(crate) fn run_tts_audiobook_part(
             None,
             Some(&mut ffmpeg_progress),
         );
-        advance_finalize_progress(
-            options,
-            current_global_progress,
-            &mut remaining_finalize_progress_steps,
-        );
+        post_audiobook_progress(options.progress_hwnd, 199);
         if let Err(err) = convert_result {
             crate::log_if_err!(std::fs::remove_file(options.output));
             if let Err(restore_err) = std::fs::rename(&source_mp3, options.output) {
@@ -6510,17 +6544,11 @@ pub(crate) fn run_tts_audiobook_part(
         } else {
             crate::log_debug("Keeping AAC edge temp files (debug mode)");
         }
-        advance_finalize_progress(
-            options,
-            current_global_progress,
-            &mut remaining_finalize_progress_steps,
-        );
+        post_audiobook_progress(options.progress_hwnd, 200);
     } else if is_mp3 {
-        advance_finalize_progress(
-            options,
-            current_global_progress,
-            &mut remaining_finalize_progress_steps,
-        );
+        set_audiobook_progress_phase(options.progress_hwnd, true);
+        set_audiobook_progress_total(options.progress_hwnd, 200);
+        post_audiobook_progress(options.progress_hwnd, 0);
         let source_mp3 = options.output.with_extension("edge_source.tmp.mp3");
         let source_wav = options.output.with_extension("edge_source.tmp.wav");
         if let Err(e) = std::fs::rename(options.output, &source_mp3) {
@@ -6534,12 +6562,15 @@ pub(crate) fn run_tts_audiobook_part(
         const MP3_TO_WAV_MAX_ATTEMPTS: usize = 12;
         let mut wav_result = Err("MP3->WAV conversion not attempted".to_string());
         for attempt in 1..=MP3_TO_WAV_MAX_ATTEMPTS {
+            let mut wav_progress = |p: u32| {
+                post_finalization_progress_range(options.progress_hwnd, p, 0, 99, 200);
+            };
             wav_result = crate::ffmpeg_export::convert_audio_file_with_channels(
                 &source_mp3,
                 &source_wav,
                 &wav_settings,
                 None,
-                None,
+                Some(&mut wav_progress),
                 Some(2),
             );
             if wav_result.is_ok() {
@@ -6563,11 +6594,7 @@ pub(crate) fn run_tts_audiobook_part(
                 std::thread::sleep(std::time::Duration::from_millis(300));
             }
         }
-        advance_finalize_progress(
-            options,
-            current_global_progress,
-            &mut remaining_finalize_progress_steps,
-        );
+        post_audiobook_progress(options.progress_hwnd, 100);
         if let Err(err) = wav_result {
             crate::log_if_err!(std::fs::remove_file(options.output));
             if let Err(restore_err) = std::fs::rename(&source_mp3, options.output) {
@@ -6605,6 +6632,7 @@ pub(crate) fn run_tts_audiobook_part(
             let pct = (p / 100).min(100);
             if pct != last_convert_pct {
                 last_convert_pct = pct;
+                post_finalization_progress_range(options.progress_hwnd, p, 100, 99, 200);
             }
         };
         const MP3_REENCODE_MAX_ATTEMPTS: usize = 12;
@@ -6640,11 +6668,7 @@ pub(crate) fn run_tts_audiobook_part(
                 std::thread::sleep(std::time::Duration::from_millis(300));
             }
         }
-        advance_finalize_progress(
-            options,
-            current_global_progress,
-            &mut remaining_finalize_progress_steps,
-        );
+        post_audiobook_progress(options.progress_hwnd, 199);
         if let Err(err) = reencode_result {
             crate::log_if_err!(std::fs::remove_file(options.output));
             if let Err(restore_err) = std::fs::rename(&source_mp3, options.output) {
@@ -6684,11 +6708,7 @@ pub(crate) fn run_tts_audiobook_part(
         } else {
             crate::log_debug("Keeping MP3 edge temp files (debug mode)");
         }
-        advance_finalize_progress(
-            options,
-            current_global_progress,
-            &mut remaining_finalize_progress_steps,
-        );
+        post_audiobook_progress(options.progress_hwnd, 200);
     }
 
     Ok(())

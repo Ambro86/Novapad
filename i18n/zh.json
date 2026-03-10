@@ -112,10 +112,11 @@
   "playback.chapter_next": "下一章 Alt+Shift+N",
   "podcasts.chapters.title": "章节列表",
   "playback.download_episode": "保存剧集...",
-    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_fast": "Transcribe current audio (Fast)",
   "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
   "playback.transcribe_hq": "Transcribe current audio (High quality)",
-  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "转到时间... Ctrl+T",
+  "playback.transcribe_cancel": "Cancel transcription",
+  "playback.go_to_time": "转到时间... Ctrl+T",
   "playback.add_subtitles": "添加字幕...",
   "playback.add_subtitles_no_media": "没有活动媒体文件。",
   "playback.add_subtitles_invalid": "不支持的字幕格式。",
@@ -163,10 +164,11 @@
   "options.label.modified_marker_position": "标记位置已修改：",
   "options.label.open": "打开方式：",
   "options.label.tts_engine": "文本转语音系统：",
-  "options.label.voice": "声音：","options.label.voice_profile":"语音配置",
-"options.button.apply_selected_profile":"应用所选配置",
-"options.button.add_profile":"添加配置",
-"options.button.delete_profile":"删除",
+  "options.label.voice": "声音：",
+  "options.label.voice_profile": "语音配置",
+  "options.button.apply_selected_profile": "应用所选配置",
+  "options.button.add_profile": "添加配置",
+  "options.button.delete_profile": "删除",
   "options.label.voice_preview": "语音预览",
   "options.label.insert_voice_tag": "插入语音标签",
   "options.label.tts_manual_tuning": "手动语音调谐",
@@ -437,6 +439,7 @@
   "about.title": "关于该项目",
   "about.message": "Sonarpad是一款支持多格式的Windows文本编辑器。它可打开TXT、PDF、DOCX、EPUB及电子表格文件；通过语音合成技术朗读文本，创建MP3有声书并播放有声内容。版本号：{version}。作者：Ambrogio Riili。",
   "audiobook.progress": "创建有声书。进度：{pct}%",
+  "audiobook.finalizing_progress": "正在完成有声书。进度：{pct}%",
   "audiobook.title": "创建有声读物",
   "audiobook.sapi4_threads_title": "SAPI4 进程",
   "audiobook.sapi4_threads_body": "您希望使用多少个并发进程来加速创建过程？（推荐：10-30）。注意：进程过多可能导致系统运行缓慢或引发SAPI4引擎错误。",
@@ -857,7 +860,8 @@
   "options.shortcuts.action.quote_lines": "添加引用行",
   "options.shortcuts.action.unquote_lines": "移除引用行",
   "options.shortcuts.action.media_prev": "上一个媒体",
-  "options.shortcuts.action.media_next": "下一个媒体",  "options.shortcuts.capture_hint": "按下快捷键（Alt键除外）...",
+  "options.shortcuts.action.media_next": "下一个媒体",
+  "options.shortcuts.capture_hint": "按下快捷键（Alt键除外）...",
   "options.shortcuts.duplicate_error": "快捷方式 {shortcut} 已分配给：{action}。",
   "voice_panel.label_language": "语音语言：",
   "options.label.voice_language": "语音语言：",
@@ -943,7 +947,7 @@
   "stream_audio.invalid_format": "格式无效：{input}。允许格式：mp3、m4a、opus、wav、flac、mp4。",
   "stream_audio.invalid_url": "无效的URL。",
   "stream_audio.no_output": "未生成可播放的输出文件。",
-    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",
   "whisper.status.transcribing": "Transcription in progress...",
@@ -953,7 +957,8 @@
   "whisper.error.no_active_media": "No active media to transcribe.",
   "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
   "whisper.error.failed": "Transcription error: {err}",
-  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "流媒体下载错误：{err}",
+  "whisper.output_title": "Transcription - {name}",
+  "stream_audio.download_failed": "流媒体下载错误：{err}",
   "stream_audio.progress_title": "流媒体下载",
   "stream_audio.progress_downloading": "正在下载流...",
   "stream_audio.ytdlp_progress_title": "yt-dlp 更新",
@@ -1069,7 +1074,8 @@
   "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
   "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
   "whisper.status.progress": "Transcription {pct} percent.",
-  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "whisper.progress_title": "Whisper transcription",
+  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
   "options.tab.ai_transcription": "AI 和转录",
   "options.label.whisper_model": "Whisper 模型：",
   "options.label.whisper_cuda": "启用 CUDA（用于 Nvidia 显卡）",
@@ -1077,12 +1083,7 @@
   "options.label.whisper_include_timestamps": "在转录中包含时间戳",
   "options.whisper_model.small": "小型",
   "options.whisper_model.medium": "中型",
-  "options.whisper_model.large": "大型 v3"
+  "options.whisper_model.large": "大型 v3",
+  "options.lang.ru": "俄语",
+  "options.spellcheck.lang.ru": "俄语（俄罗斯）"
 }
-
-
-
-
-
-
-

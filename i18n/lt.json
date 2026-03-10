@@ -132,10 +132,11 @@
   "playback.chapter_list": "Skyrius ir sąrašas... Alt+Shift+L",
   "podcasts.chapters.title": "Skyrių sąrašas",
   "playback.download_episode": "Išsaugoti epizodą kaip...",
-    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_fast": "Transcribe current audio (Fast)",
   "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
   "playback.transcribe_hq": "Transcribe current audio (High quality)",
-  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "Eik į t&o Laikas... Ctrl+T",
+  "playback.transcribe_cancel": "Cancel transcription",
+  "playback.go_to_time": "Eik į t&o Laikas... Ctrl+T",
   "playback.announce_time": "Pranešti laiką Ctrl+I",
   "playback.add_subtitles": "Pridėti subtitrus...",
   "playback.add_subtitles_no_media": "Nėra aktyvių medijos failų.",
@@ -464,6 +465,7 @@
   "about.title": "Apie programą",
   "about.message": "Sonarpad yra Windows tekstų redaktorius, palaikantis įvairius formatus. Jis atidaro TXT, PDF, DOCX, EPUB ir skaičiuoklės failus; skaito tekstą naudodamas TTS, kuria MP3 garso knygas ir atkuria garso knygas. Versija: {version}. Autorius: Ambrogio Riili.",
   "audiobook.progress": "Garso knygos kūrimas. Pažanga: {pct}%",
+  "audiobook.finalizing_progress": "Garso knygos užbaigimas. Pažanga: {pct}%",
   "audiobook.title": "Garso knygos kūrimas",
   "audiobook.sapi4_threads_title": "SAPI4 procesai",
   "audiobook.sapi4_threads_body": "Kiek vienu metu vykstančių procesų norite naudoti, kad pagreitintumėte kūrimą? (Rekomenduojama: 10–30). Pastaba: per daug procesų gali sulėtinti sistemą arba sukelti klaidas SAPI4 variklyje.",
@@ -896,7 +898,8 @@
   "options.shortcuts.action.quote_lines": "Quote lines",
   "options.shortcuts.action.unquote_lines": "Unquote lines",
   "options.shortcuts.action.media_prev": "Previous track",
-  "options.shortcuts.action.media_next": "Next track",  "options.shortcuts.capture_hint": "Paspauskite sparčiąją klavišą (išskyrus Alt)...",
+  "options.shortcuts.action.media_next": "Next track",
+  "options.shortcuts.capture_hint": "Paspauskite sparčiąją klavišą (išskyrus Alt)...",
   "options.shortcuts.duplicate_error": "Sutrumpinimas {shortcut} jau priskirtas: {action}.",
   "voice_panel.label_language": "Balso kalba:",
   "options.label.voice_language": "Balso kalba:",
@@ -988,7 +991,7 @@
   "stream_audio.invalid_format": "Neteisingas formatas: {input}. Leidžiami formatai: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "Neteisingas URL adresas.",
   "stream_audio.no_output": "Nebuvo sukurtas atkuriamas išvesties failas.",
-    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",
   "whisper.status.transcribing": "Transcription in progress...",
@@ -998,7 +1001,8 @@
   "whisper.error.no_active_media": "No active media to transcribe.",
   "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
   "whisper.error.failed": "Transcription error: {err}",
-  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "Srautinio atsisiuntimo klaida: {err}",
+  "whisper.output_title": "Transcription - {name}",
+  "stream_audio.download_failed": "Srautinio atsisiuntimo klaida: {err}",
   "stream_audio.progress_title": "Srauto atsisiuntimas",
   "stream_audio.progress_downloading": "Atsisiunčiama transliacija...",
   "stream_audio.ytdlp_progress_title": "yt-dlp atnaujinimas",
@@ -1070,7 +1074,8 @@
   "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
   "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
   "whisper.status.progress": "Transcription {pct} percent.",
-  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "whisper.progress_title": "Whisper transcription",
+  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
   "options.tab.ai_transcription": "DI ir transkripcija",
   "options.label.whisper_model": "Whisper modelis:",
   "options.label.whisper_cuda": "Įjungti CUDA (Nvidia vaizdo plokštėms)",
@@ -1078,12 +1083,7 @@
   "options.label.whisper_include_timestamps": "Įtraukti laiko žymes į transkripciją",
   "options.whisper_model.small": "Mažas",
   "options.whisper_model.medium": "Vidutinis",
-  "options.whisper_model.large": "Didelis v3"
+  "options.whisper_model.large": "Didelis v3",
+  "options.lang.ru": "Rusų",
+  "options.spellcheck.lang.ru": "Rusų (Rusija)"
 }
-
-
-
-
-
-
-

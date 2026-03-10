@@ -128,10 +128,11 @@
   "playback.chapter_list": "Lista de capítu&los...\tAlt+Shift+L",
   "podcasts.chapters.title": "Lista de capítulos",
   "playback.download_episode": "Guardar episódio...",
-    "playback.transcribe_fast": "Transcribe current audio (Fast)",
+  "playback.transcribe_fast": "Transcribe current audio (Fast)",
   "playback.transcribe_balanced": "Transcribe current audio (Balanced)",
   "playback.transcribe_hq": "Transcribe current audio (High quality)",
-  "playback.transcribe_cancel": "Cancel transcription",  "playback.go_to_time": "Ir a&o tempo...\tCtrl+T",
+  "playback.transcribe_cancel": "Cancel transcription",
+  "playback.go_to_time": "Ir a&o tempo...\tCtrl+T",
   "playback.announce_time": "A&nunciar tempo\tCtrl+I",
   "playback.add_subtitles": "Adicionar &legendas...",
   "playback.add_subtitles_no_media": "Nenhum ficheiro de multimédia ativo.",
@@ -181,10 +182,11 @@
   "options.label.modified_marker_position": "Posição do marcador de modificação:",
   "options.label.open": "Comportamento de abertura:",
   "options.label.tts_engine": "Sistema de voz:",
-  "options.label.voice": "Voz:","options.label.voice_profile":"Perfil de voz",
-"options.button.apply_selected_profile":"Aplicar perfil selecionado",
-"options.button.add_profile":"Adicionar perfil",
-"options.button.delete_profile":"Eliminar",
+  "options.label.voice": "Voz:",
+  "options.label.voice_profile": "Perfil de voz",
+  "options.button.apply_selected_profile": "Aplicar perfil selecionado",
+  "options.button.add_profile": "Adicionar perfil",
+  "options.button.delete_profile": "Eliminar",
   "options.label.voice_preview": "Prévia da voz",
   "options.label.insert_voice_tag": "Inserir tag de voz",
   "options.label.tts_manual_tuning": "Ajuste manual da voz",
@@ -443,6 +445,7 @@
   "about.title": "Sobre o programa",
   "about.message": "Sonarpad é um editor de texto para Windows com suporte a vários formatos. Abre TXT, PDF, DOCX, EPUB e folhas de cálculo; lê texto com TTS, cria audiolivros MP3 e reproduz audiolivros. Versão: {version}. Autor: Ambrogio Riili.",
   "audiobook.progress": "A criar audiolivro. Progresso: {pct}%",
+  "audiobook.finalizing_progress": "A finalizar audiolivro. Progresso: {pct}%",
   "audiobook.title": "A criar audiolivro",
   "audiobook.cancel": "Cancelar",
   "audiobook.cancel_confirm": "Tem a certeza de que deseja cancelar a criação do audiolivro?",
@@ -845,7 +848,8 @@
   "options.shortcuts.action.quote_lines": "Quote lines",
   "options.shortcuts.action.unquote_lines": "Unquote lines",
   "options.shortcuts.action.media_prev": "Previous track",
-  "options.shortcuts.action.media_next": "Next track",  "options.shortcuts.capture_hint": "Pressione a combinação (exceto Alt)...",
+  "options.shortcuts.action.media_next": "Next track",
+  "options.shortcuts.capture_hint": "Pressione a combinação (exceto Alt)...",
   "options.shortcuts.duplicate_error": "A combinação {shortcut} já está atribuída a: {action}.",
   "voice_panel.label_language": "Idioma da voz:",
   "options.label.voice_language": "Idioma da voz:",
@@ -1025,7 +1029,7 @@
   "stream_audio.invalid_format": "Formato inválido: {input}. Permitidos: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "URL inválido.",
   "stream_audio.no_output": "Nenhum ficheiro de saída reproduzível foi gerado.",
-    "whisper.status.starting": "Starting transcription...",
+  "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",
   "whisper.status.transcribing": "Transcription in progress...",
@@ -1035,7 +1039,8 @@
   "whisper.error.no_active_media": "No active media to transcribe.",
   "whisper.error.direct_stream_not_supported": "Live/direct streaming transcription is not supported yet.",
   "whisper.error.failed": "Transcription error: {err}",
-  "whisper.output_title": "Transcription - {name}",  "stream_audio.download_failed": "Erro ao transferir streaming: {err}",
+  "whisper.output_title": "Transcription - {name}",
+  "stream_audio.download_failed": "Erro ao transferir streaming: {err}",
   "stream_audio.progress_title": "Transferência de streaming",
   "stream_audio.progress_downloading": "A transferir o streaming...",
   "stream_audio.ytdlp_progress_title": "Atualização do yt-dlp",
@@ -1069,7 +1074,8 @@
   "whisper.model.item.balanced": "Balanced (default) - ggml-base-q5_1 (~60 MB) - at least 8 GB RAM",
   "whisper.model.item.hq": "High quality - ggml-small-q5_1 (~190 MB) - at least 16 GB RAM and stronger CPU",
   "whisper.status.progress": "Transcription {pct} percent.",
-  "whisper.progress_title": "Whisper transcription",  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
+  "whisper.progress_title": "Whisper transcription",
+  "whisper.cancel_confirm": "Do you want to cancel the transcription in progress?",
   "options.tab.ai_transcription": "IA e transcrição",
   "options.label.whisper_model": "Modelo Whisper:",
   "options.label.whisper_cuda": "Ativar CUDA (para GPUs Nvidia)",
@@ -1077,12 +1083,7 @@
   "options.label.whisper_include_timestamps": "Incluir marcas de tempo na transcrição",
   "options.whisper_model.small": "Pequeno",
   "options.whisper_model.medium": "Médio",
-  "options.whisper_model.large": "Grande v3"
+  "options.whisper_model.large": "Grande v3",
+  "options.lang.ru": "Russo",
+  "options.spellcheck.lang.ru": "Russo (Rússia)"
 }
-
-
-
-
-
-
-

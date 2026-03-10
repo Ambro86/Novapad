@@ -947,6 +947,7 @@ fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
         Language::Serbian => "sr",
         Language::Ukrainian => "uk",
         Language::Lithuanian => "lt",
+        Language::Russian => "ru",
         Language::Chinese => "zh",
     };
     format!(
@@ -6081,6 +6082,14 @@ fn localized_voice_language_name(language: Language, code: &str) -> String {
             let value = from_i18n("options.lang.lt");
             if value == "options.lang.lt" {
                 "Lithuanian".to_string()
+            } else {
+                value
+            }
+        }
+        "ru" => {
+            let value = from_i18n("options.lang.ru");
+            if value == "options.lang.ru" {
+                "Russian".to_string()
             } else {
                 value
             }

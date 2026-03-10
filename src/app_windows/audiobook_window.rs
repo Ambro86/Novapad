@@ -21,6 +21,13 @@ const PROGRESS_CLASS_NAME: &str = "SonarpadProgress";
 const PROGRESS_ID_CANCEL: usize = 8001;
 const WM_UPDATE_PROGRESS: u32 = WM_APP + 6;
 pub const WM_SET_PROGRESS_TOTAL: u32 = WM_APP + 8;
+pub const WM_SET_PROGRESS_PHASE: u32 = WM_APP + 9;
+
+#[derive(Clone, Copy)]
+enum ProgressPhase {
+    Creating,
+    Finalizing,
+}
 
 struct ProgressDialogState {
     parent: HWND,
@@ -30,10 +37,15 @@ struct ProgressDialogState {
     total: usize,
     current: usize,
     language: Language,
+    phase: ProgressPhase,
 }
 
-fn progress_text(language: Language, pct: usize) -> String {
-    i18n::tr_f(language, "audiobook.progress", &[("pct", &pct.to_string())])
+fn progress_text(language: Language, phase: ProgressPhase, pct: usize) -> String {
+    let key = match phase {
+        ProgressPhase::Creating => "audiobook.progress",
+        ProgressPhase::Finalizing => "audiobook.finalizing_progress",
+    };
+    i18n::tr_f(language, key, &[("pct", &pct.to_string())])
 }
 
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
@@ -156,7 +168,7 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
             let parent = crate::hwnd_from_create_struct_lparam_safe(create_struct);
             let language =
                 { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
-            let label_text = progress_text(language, 0);
+            let label_text = progress_text(language, ProgressPhase::Creating, 0);
             let cancel_text = i18n::tr(language, "audiobook.cancel");
 
             let label = unsafe {
@@ -218,6 +230,7 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
                 total: 0,
                 current: 0,
                 language,
+                phase: ProgressPhase::Creating,
             });
             crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
 
@@ -263,7 +276,7 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
                 crate::send_message_w_safe(state.hwnd_pb, PBM_SETPOS, WPARAM(current), LPARAM(0));
                 if state.total > 0 {
                     let pct = ((current * 100) / state.total).min(100);
-                    let text = progress_text(state.language, pct);
+                    let text = progress_text(state.language, state.phase, pct);
                     let wide = to_wide(&text);
                     if let Err(e) =
                         crate::set_window_text_w_safe(state.hwnd_text, PCWSTR(wide.as_ptr()))
@@ -281,7 +294,7 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
         WM_SET_PROGRESS_TOTAL => {
             let total = wparam.0.max(1);
             if with_progress_state(hwnd, |state| {
-                if state.total != total {
+                if state.total != total || state.current != 0 {
                     state.total = total;
                     state.current = 0;
                     unsafe {
@@ -293,11 +306,45 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
                         );
                         SendMessageW(state.hwnd_pb, PBM_SETPOS, WPARAM(0), LPARAM(0));
                     }
+                    let text = progress_text(state.language, state.phase, 0);
+                    let wide = to_wide(&text);
+                    if let Err(e) =
+                        crate::set_window_text_w_safe(state.hwnd_text, PCWSTR(wide.as_ptr()))
+                    {
+                        crate::log_debug(&format!("Failed to set status text: {}", e));
+                    }
                 }
             })
             .is_none()
             {
                 crate::log_debug("Failed to access audiobook state for SET_TOTAL");
+            }
+            LRESULT(0)
+        }
+        WM_SET_PROGRESS_PHASE => {
+            let phase = if wparam.0 == 1 {
+                ProgressPhase::Finalizing
+            } else {
+                ProgressPhase::Creating
+            };
+            if with_progress_state(hwnd, |state| {
+                state.phase = phase;
+                let pct = if state.total > 0 {
+                    ((state.current * 100) / state.total).min(100)
+                } else {
+                    0
+                };
+                let text = progress_text(state.language, state.phase, pct);
+                let wide = to_wide(&text);
+                if let Err(e) =
+                    crate::set_window_text_w_safe(state.hwnd_text, PCWSTR(wide.as_ptr()))
+                {
+                    crate::log_debug(&format!("Failed to set status text: {}", e));
+                }
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access audiobook state for SET_PHASE");
             }
             LRESULT(0)
         }

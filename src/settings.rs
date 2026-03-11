@@ -675,6 +675,8 @@ pub struct AppSettings {
     pub bdciechi_username: String,
     #[serde(default)]
     pub bdciechi_password: String,
+    #[serde(default)]
+    pub bdciechi_last_successful_login_unix: i64,
     pub prompt_auto_scroll: bool,
     pub prompt_strip_ansi: bool,
     pub prompt_beep_on_idle: bool,
@@ -990,6 +992,7 @@ impl Default for AppSettings {
             remember_bdciechi_credentials: false,
             bdciechi_username: String::new(),
             bdciechi_password: String::new(),
+            bdciechi_last_successful_login_unix: 0,
             prompt_auto_scroll: true,
             prompt_strip_ansi: true,
             prompt_beep_on_idle: true,
@@ -1582,8 +1585,21 @@ pub fn load_settings() -> AppSettings {
     let path = get_settings_path();
     if path.exists()
         && let Ok(data) = std::fs::read_to_string(&path)
-        && let Ok(settings) = serde_json::from_str(&data)
+        && let Ok(mut settings) = serde_json::from_str::<AppSettings>(&data)
     {
+        if settings.remember_bdciechi_credentials && !settings.bdciechi_password.trim().is_empty() {
+            match decrypt_bdciechi_password(&settings.bdciechi_password) {
+                Some(password) => settings.bdciechi_password = password,
+                None => {
+                    crate::log_debug(
+                        "Failed to decrypt stored BDCiechi password; clearing saved credentials",
+                    );
+                    settings.bdciechi_username.clear();
+                    settings.bdciechi_password.clear();
+                    settings.bdciechi_last_successful_login_unix = 0;
+                }
+            }
+        }
         let normalized = normalize_settings(settings);
         save_settings(normalized.clone());
         return normalized;
@@ -1629,6 +1645,7 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if !settings.remember_bdciechi_credentials {
         settings.bdciechi_username.clear();
         settings.bdciechi_password.clear();
+        settings.bdciechi_last_successful_login_unix = 0;
     }
     settings.dialogue_opening_quote = settings.dialogue_opening_quote.trim().to_string();
     settings.dialogue_closing_quote = settings.dialogue_closing_quote.trim().to_string();
@@ -1888,15 +1905,44 @@ pub fn decrypt_podcast_index_secret(secret: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
+pub fn encrypt_bdciechi_password(password: &str) -> String {
+    if password.trim().is_empty() {
+        return String::new();
+    }
+    dpapi_protect(password.as_bytes())
+        .map(hex::encode)
+        .unwrap_or_default()
+}
+
+pub fn decrypt_bdciechi_password(password: &str) -> Option<String> {
+    if password.trim().is_empty() {
+        return None;
+    }
+    let decoded = match hex::decode(password) {
+        Ok(decoded) => decoded,
+        Err(_) => return Some(password.to_string()),
+    };
+    let bytes = dpapi_unprotect(&decoded)?;
+    String::from_utf8(bytes).ok()
+}
+
 pub fn save_settings(settings: AppSettings) {
     apply_network_proxy_settings(&settings);
+    let mut persisted = settings;
+    if persisted.remember_bdciechi_credentials {
+        persisted.bdciechi_password = encrypt_bdciechi_password(&persisted.bdciechi_password);
+    } else {
+        persisted.bdciechi_username.clear();
+        persisted.bdciechi_password.clear();
+        persisted.bdciechi_last_successful_login_unix = 0;
+    }
     let path = get_settings_path();
     if let Some(parent) = path.parent()
         && let Err(e) = std::fs::create_dir_all(parent)
     {
         crate::log_debug(&format!("Failed to create settings directory: {}", e));
     }
-    match serde_json::to_string_pretty(&settings) {
+    match serde_json::to_string_pretty(&persisted) {
         Ok(json) => {
             if let Err(e) = std::fs::write(&path, json) {
                 crate::log_debug(&format!(

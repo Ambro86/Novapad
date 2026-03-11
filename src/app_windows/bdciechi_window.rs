@@ -4,6 +4,7 @@ use crate::i18n;
 use crate::settings::{self, Language, save_settings};
 use crate::tools::bdciechi;
 use crate::with_state;
+use chrono::Utc;
 use encoding_rs::WINDOWS_1252;
 use sha2::Digest;
 use std::fs;
@@ -49,6 +50,7 @@ const IDC_SAMPLE_BTN: usize = 9951;
 const IDC_SAMPLE_EDIT: usize = 9952;
 const IDC_SAMPLE_CLOSE_BTN: usize = 9953;
 const WM_BDC_LOGIN_DONE: u32 = WM_APP + 240;
+const BDCIECHI_CREDENTIAL_MAX_AGE_SECS: i64 = 30 * 24 * 60 * 60;
 
 struct LoginDonePayload {
     username: String,
@@ -134,11 +136,11 @@ fn close_sample_and_focus_search(state: &BdState) {
 }
 
 fn close_bdc_window_and_focus_editor(hwnd: HWND) {
-    let close_from_login = with_window_state(hwnd, |state| {
-        state.focus_editor_on_close = !state.authenticated;
-        (!state.authenticated, state.parent)
+    let parent = with_window_state(hwnd, |state| {
+        state.focus_editor_on_close = true;
+        state.parent
     });
-    if let Some((true, parent)) = close_from_login {
+    if let Some(parent) = parent {
         crate::show_window_safe(hwnd, SW_HIDE);
         with_state(parent, |state| state.bdciechi_window = HWND(0));
         crate::restore_editor_focus(parent);
@@ -215,15 +217,23 @@ fn sync_bdc_session(
     });
 }
 
-fn persist_bdc_credentials(parent: HWND, remember: bool, username: &str, password: &str) {
+fn persist_bdc_credentials(
+    parent: HWND,
+    remember: bool,
+    username: &str,
+    password: &str,
+    last_successful_login_unix: i64,
+) {
     let snapshot = with_state(parent, |state| {
         state.settings.remember_bdciechi_credentials = remember;
         if remember {
             state.settings.bdciechi_username = username.to_string();
             state.settings.bdciechi_password = password.to_string();
+            state.settings.bdciechi_last_successful_login_unix = last_successful_login_unix;
         } else {
             state.settings.bdciechi_username.clear();
             state.settings.bdciechi_password.clear();
+            state.settings.bdciechi_last_successful_login_unix = 0;
         }
         state.settings.clone()
     });
@@ -258,11 +268,46 @@ fn decode_book_text(bytes: &[u8]) -> String {
     }
 }
 
+fn fold_search_char(ch: char) -> char {
+    match ch {
+        'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' | 'ā' | 'ă' | 'ą' => 'a',
+        'ç' | 'ć' | 'ĉ' | 'ċ' | 'č' => 'c',
+        'ď' | 'đ' => 'd',
+        'è' | 'é' | 'ê' | 'ë' | 'ē' | 'ĕ' | 'ė' | 'ę' | 'ě' => 'e',
+        'ĝ' | 'ğ' | 'ġ' | 'ģ' => 'g',
+        'ĥ' | 'ħ' => 'h',
+        'ì' | 'í' | 'î' | 'ï' | 'ĩ' | 'ī' | 'ĭ' | 'į' | 'ı' => 'i',
+        'ĵ' => 'j',
+        'ķ' => 'k',
+        'ĺ' | 'ļ' | 'ľ' | 'ŀ' | 'ł' => 'l',
+        'ñ' | 'ń' | 'ņ' | 'ň' | 'ŉ' | 'ŋ' => 'n',
+        'ò' | 'ó' | 'ô' | 'õ' | 'ö' | 'ø' | 'ō' | 'ŏ' | 'ő' => 'o',
+        'ŕ' | 'ŗ' | 'ř' => 'r',
+        'ś' | 'ŝ' | 'ş' | 'š' => 's',
+        'ţ' | 'ť' | 'ŧ' => 't',
+        'ù' | 'ú' | 'û' | 'ü' | 'ũ' | 'ū' | 'ŭ' | 'ů' | 'ű' | 'ų' => 'u',
+        'ŵ' => 'w',
+        'ý' | 'ÿ' | 'ŷ' => 'y',
+        'ź' | 'ż' | 'ž' => 'z',
+        'æ' => 'a',
+        'œ' => 'o',
+        _ => ch,
+    }
+}
+
+fn normalize_search_text(text: &str) -> String {
+    text.chars()
+        .flat_map(|ch| ch.to_lowercase())
+        .map(fold_search_char)
+        .collect()
+}
+
 fn tokenize_search_terms(text: &str) -> Vec<String> {
-    text.split_whitespace()
+    normalize_search_text(text)
+        .split_whitespace()
         .map(str::trim)
         .filter(|term| !term.is_empty())
-        .map(|term| term.to_lowercase())
+        .map(ToOwned::to_owned)
         .collect()
 }
 
@@ -270,8 +315,8 @@ fn row_matches_query(row: &str, query_terms: &[String]) -> bool {
     if query_terms.is_empty() {
         return false;
     }
-    let row_lower = row.to_lowercase();
-    query_terms.iter().all(|term| row_lower.contains(term))
+    let normalized_row = normalize_search_text(row);
+    query_terms.iter().all(|term| normalized_row.contains(term))
 }
 
 fn suggested_name_from_info(info: &str, index: usize) -> String {
@@ -351,6 +396,14 @@ fn catalog_hash(raw: &str) -> String {
     let mut hasher = sha2::Sha256::new();
     hasher.update(raw.as_bytes());
     format!("{:x}", hasher.finalize())
+}
+
+fn bdciechi_credentials_expired(last_successful_login_unix: i64) -> bool {
+    if last_successful_login_unix <= 0 {
+        return true;
+    }
+    let now = Utc::now().timestamp();
+    now.saturating_sub(last_successful_login_unix) > BDCIECHI_CREDENTIAL_MAX_AGE_SECS
 }
 
 fn ensure_bdciechi_download_dir(parent: HWND) -> Result<PathBuf, String> {
@@ -633,21 +686,21 @@ fn do_latest(hwnd: HWND) {
 }
 
 fn download_selected(hwnd: HWND) {
-    with_window_state(hwnd, |state| {
+    let open_after_download = with_window_state(hwnd, |state| {
         if !state.authenticated {
             set_status(state, &tr("status.login_first"));
-            return;
+            return None;
         }
         let sel =
             crate::send_message_w_safe(state.results_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
         if sel < 0 {
             set_status(state, &tr("status.select_result"));
-            return;
+            return None;
         }
         let sel_idx = sel as usize;
         if sel_idx >= state.visible_indices.len() {
             set_status(state, &tr("status.invalid_selection"));
-            return;
+            return None;
         }
 
         let catalog_index = state.visible_indices[sel_idx];
@@ -671,7 +724,7 @@ fn download_selected(hwnd: HWND) {
                         &[("err", &err.to_string())],
                     ),
                 );
-                return;
+                return None;
             }
         };
 
@@ -686,14 +739,14 @@ fn download_selected(hwnd: HWND) {
                         &[("err", &err)],
                     ),
                 );
-                return;
+                return None;
             }
         };
 
         let suggested = suggested_name_from_info(&work.info, catalog_index);
         let Some(path) = save_as_dialog(state.parent, &docs_dir, &suggested) else {
             set_status(state, &tr("status.save_cancelled"));
-            return;
+            return None;
         };
 
         if let Some(parent_dir) = path.parent() {
@@ -707,7 +760,7 @@ fn download_selected(hwnd: HWND) {
                         &[("err", &err.to_string())],
                     ),
                 );
-                return;
+                return None;
             }
         }
 
@@ -720,7 +773,7 @@ fn download_selected(hwnd: HWND) {
                     &[("err", &err.to_string())],
                 ),
             );
-            return;
+            return None;
         }
 
         set_status(
@@ -739,9 +792,16 @@ fn download_selected(hwnd: HWND) {
             MESSAGEBOX_STYLE(MB_YESNO.0 | MB_ICONQUESTION.0),
         );
         if ask == IDYES {
-            crate::editor_manager::open_document(state.parent, &path);
+            Some((state.parent, path))
+        } else {
+            None
         }
     });
+
+    if let Some(Some((parent, path))) = open_after_download {
+        crate::editor_manager::open_document(parent, &path);
+        close_bdc_window_and_focus_editor(hwnd);
+    }
 }
 
 fn sample_selected(hwnd: HWND) {
@@ -920,6 +980,7 @@ pub fn open(parent: HWND) {
             remembered,
             remembered_username,
             remembered_password,
+            remembered_last_successful_login_unix,
         ) = with_state(parent, |state| {
             (
                 state.bdciechi_session_username.clone(),
@@ -930,6 +991,7 @@ pub fn open(parent: HWND) {
                 state.settings.remember_bdciechi_credentials,
                 state.settings.bdciechi_username.clone(),
                 state.settings.bdciechi_password.clone(),
+                state.settings.bdciechi_last_successful_login_unix,
             )
         })
         .unwrap_or_else(|| {
@@ -942,8 +1004,18 @@ pub fn open(parent: HWND) {
                 false,
                 String::new(),
                 String::new(),
+                0,
             )
         });
+
+        let remembered_credentials_valid = remembered
+            && !bdciechi_credentials_expired(remembered_last_successful_login_unix)
+            && !remembered_username.trim().is_empty()
+            && !remembered_password.trim().is_empty();
+
+        if remembered && !remembered_credentials_valid {
+            persist_bdc_credentials(parent, true, "", "", 0);
+        }
 
         let (username, password, nprov, authenticated, catalog_rows) =
             if session_authenticated && !session_catalog_rows.is_empty() {
@@ -956,8 +1028,16 @@ pub fn open(parent: HWND) {
                 )
             } else {
                 (
-                    remembered_username,
-                    remembered_password,
+                    if remembered_credentials_valid {
+                        remembered_username
+                    } else {
+                        String::new()
+                    },
+                    if remembered_credentials_valid {
+                        remembered_password
+                    } else {
+                        String::new()
+                    },
                     String::new(),
                     false,
                     cached_catalog_rows,
@@ -1503,11 +1583,13 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         true,
                     );
                     if state.remember_credentials {
+                        let now = Utc::now().timestamp();
                         persist_bdc_credentials(
                             state.parent,
                             true,
                             &state.username,
                             &state.password,
+                            now,
                         );
                     } else if !payload.auto_login {
                         let ask = crate::message_box_w_safe(
@@ -1518,14 +1600,16 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         );
                         if ask == IDYES {
                             state.remember_credentials = true;
+                            let now = Utc::now().timestamp();
                             persist_bdc_credentials(
                                 state.parent,
                                 true,
                                 &state.username,
                                 &state.password,
+                                now,
                             );
                         } else {
-                            persist_bdc_credentials(state.parent, false, "", "");
+                            persist_bdc_credentials(state.parent, false, "", "", 0);
                         }
                     }
                     set_status(
@@ -1570,5 +1654,32 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
             }
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalize_search_text, row_matches_query, tokenize_search_terms};
+
+    #[test]
+    fn bdciechi_search_normalizes_accents_in_query() {
+        assert_eq!(tokenize_search_terms("Giosuè città"), ["giosue", "citta"]);
+    }
+
+    #[test]
+    fn bdciechi_search_matches_rows_without_diacritic_input() {
+        let terms = tokenize_search_terms("giosue citta");
+        assert!(row_matches_query(
+            "Giosuè Carducci - Le città invisibili",
+            &terms
+        ));
+    }
+
+    #[test]
+    fn bdciechi_search_normalization_keeps_plain_ascii() {
+        assert_eq!(
+            normalize_search_text("autore titolo 123"),
+            "autore titolo 123"
+        );
     }
 }

@@ -295,6 +295,17 @@ fn notify_active_editor_focus(hwnd: HWND, notify_when_audiobook: bool) {
     }
 }
 
+fn reactivate_bdciechi_window(hwnd: HWND) -> bool {
+    let bdc_window = with_state(hwnd, |state| state.bdciechi_window).unwrap_or(HWND(0));
+    if bdc_window.0 == 0 || !is_window_handle_valid(bdc_window) {
+        return false;
+    }
+    show_window_safe(bdc_window, SW_SHOW);
+    set_foreground_window_safe(bdc_window);
+    send_message_w_safe(bdc_window, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+    true
+}
+
 pub(crate) fn focus_editor(hwnd: HWND) {
     if has_secondary_window_open(hwnd) {
         return;
@@ -2736,6 +2747,7 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
                 state.audiobook_progress.0 != 0 && foreground == state.audiobook_progress;
             state.update_progress_window.0 == 0
                 && state.transcription_progress_window.0 == 0
+                && state.bdciechi_window.0 == 0
                 && state.podcast_window.0 == 0
                 && state.podcast_save_window.0 == 0
                 && state.replace_progress_window.0 == 0
@@ -2785,6 +2797,16 @@ fn schedule_editor_focus_retry(hwnd: HWND) {
         if SetTimer(hwnd, FOCUS_EDITOR_TIMER_ID4, 600, None) == 0 {
             crate::log_debug("Failed to set FOCUS_EDITOR_TIMER_ID4");
         }
+    }
+}
+
+pub(crate) fn restore_editor_focus(hwnd: HWND) {
+    bring_window_to_foreground(hwnd);
+    if should_force_editor_focus_on_foreground(hwnd) {
+        force_active_editor_focus(hwnd);
+        schedule_editor_focus_retry(hwnd);
+    } else {
+        focus_editor(hwnd);
     }
 }
 
@@ -4347,9 +4369,14 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
             }
             WM_ACTIVATE => {
                 let is_activating = (wparam.0 & 0xFFFF) != 0;
-                if is_activating && should_force_editor_focus_on_foreground(hwnd) {
-                    force_active_editor_focus(hwnd);
-                    schedule_editor_focus_retry(hwnd);
+                if is_activating {
+                    if reactivate_bdciechi_window(hwnd) {
+                        return LRESULT(0);
+                    }
+                    if should_force_editor_focus_on_foreground(hwnd) {
+                        force_active_editor_focus(hwnd);
+                        schedule_editor_focus_retry(hwnd);
+                    }
                 }
                 LRESULT(0)
             }

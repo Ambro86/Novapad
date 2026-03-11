@@ -1,3 +1,4 @@
+use crate::WM_FOCUS_EDITOR;
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::i18n;
 use crate::settings::{self, Language, save_settings};
@@ -24,10 +25,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWNLIST,
     CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, ES_AUTOHSCROLL, ES_AUTOVSCROLL,
     ES_MULTILINE, ES_PASSWORD, ES_READONLY, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW,
-    IDYES, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MESSAGEBOX_STYLE, RegisterClassW, SW_HIDE,
-    SW_SHOW, SetForegroundWindow, SetWindowLongPtrW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    IDYES, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MESSAGEBOX_STYLE, RegisterClassW, SC_CLOSE,
+    SW_HIDE, SW_SHOW, SetForegroundWindow, SetWindowLongPtrW, WINDOW_STYLE, WM_APP, WM_CLOSE,
+    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SYSCOMMAND,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -79,6 +81,7 @@ struct BdState {
     nprov: String,
     authenticated: bool,
     remember_credentials: bool,
+    focus_editor_on_close: bool,
     catalog_rows: Vec<String>,
     visible_indices: Vec<usize>,
     login_announce_stop: Option<Arc<AtomicBool>>,
@@ -128,6 +131,19 @@ fn set_sample_visible(state: &BdState, visible: bool) {
 fn close_sample_and_focus_search(state: &BdState) {
     set_sample_visible(state, false);
     crate::set_focus_safe(state.search);
+}
+
+fn close_bdc_window_and_focus_editor(hwnd: HWND) {
+    let close_from_login = with_window_state(hwnd, |state| {
+        state.focus_editor_on_close = !state.authenticated;
+        (!state.authenticated, state.parent)
+    });
+    if let Some((true, parent)) = close_from_login {
+        crate::show_window_safe(hwnd, SW_HIDE);
+        with_state(parent, |state| state.bdciechi_window = HWND(0));
+        crate::restore_editor_focus(parent);
+    }
+    crate::log_if_err!(crate::destroy_window_safe(hwnd));
 }
 
 fn stop_login_announcer(state: &mut BdState) {
@@ -801,7 +817,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessagi
             if handled {
                 return true;
             }
-            crate::log_if_err!(crate::destroy_window_safe(hwnd));
+            close_bdc_window_and_focus_editor(hwnd);
             return true;
         }
         if key == VK_RETURN.0 as u32 {
@@ -824,7 +840,7 @@ pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessagi
                     close_sample_and_focus_search(state);
                     handled = true;
                 } else if target == state.close_btn {
-                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                    close_bdc_window_and_focus_editor(hwnd);
                     handled = true;
                 }
             });
@@ -970,6 +986,7 @@ pub fn open(parent: HWND) {
             nprov,
             authenticated,
             remember_credentials: remembered,
+            focus_editor_on_close: false,
             catalog_rows,
             visible_indices: Vec::new(),
             login_announce_stop: None,
@@ -1337,7 +1354,12 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         if focus == state.sample_edit || focus == state.sample_close_btn {
                             close_sample_and_focus_search(state);
                         } else {
-                            crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                            crate::send_message_w_safe(
+                                hwnd,
+                                WM_COMMAND,
+                                WPARAM(IDC_CLOSE_BTN),
+                                LPARAM(0),
+                            );
                         }
                     });
                     return LRESULT(0);
@@ -1389,6 +1411,17 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 });
                 LRESULT(0)
             }
+            WM_CLOSE => {
+                close_bdc_window_and_focus_editor(hwnd);
+                LRESULT(0)
+            }
+            WM_SYSCOMMAND => {
+                if (wparam.0 & 0xFFF0) == SC_CLOSE as usize {
+                    close_bdc_window_and_focus_editor(hwnd);
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
                 match id {
@@ -1417,7 +1450,7 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         LRESULT(0)
                     }
                     IDC_CLOSE_BTN => {
-                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        close_bdc_window_and_focus_editor(hwnd);
                         LRESULT(0)
                     }
                     _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -1520,6 +1553,18 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     let mut state = Box::from_raw(ptr);
                     stop_login_announcer(&mut state);
                     with_state(state.parent, |s| s.bdciechi_window = HWND(0));
+                    if state.focus_editor_on_close {
+                        let parent = state.parent;
+                        std::thread::spawn(move || {
+                            std::thread::sleep(Duration::from_millis(120));
+                            crate::log_if_err!(crate::post_message_w_safe(
+                                parent,
+                                WM_FOCUS_EDITOR,
+                                WPARAM(0),
+                                LPARAM(0),
+                            ));
+                        });
+                    }
                 }
                 LRESULT(0)
             }

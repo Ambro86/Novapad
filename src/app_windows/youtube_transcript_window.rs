@@ -132,6 +132,9 @@ struct Labels {
     ytdlp_prompt_download: String,
     ytdlp_download_failed: String,
     ytdlp_update_failed: String,
+    ytdlp_found_in_path: String,
+    ytdlp_path_update_download_local: String,
+    ytdlp_path_update_keep_system: String,
 }
 
 #[derive(Clone)]
@@ -160,6 +163,12 @@ fn labels(language: Language) -> Labels {
         ytdlp_prompt_download: i18n::tr(language, "youtube.ytdlp_prompt_download"),
         ytdlp_download_failed: i18n::tr(language, "youtube.ytdlp_download_failed"),
         ytdlp_update_failed: i18n::tr(language, "youtube.ytdlp_update_failed"),
+        ytdlp_found_in_path: i18n::tr(language, "youtube.ytdlp_found_in_path"),
+        ytdlp_path_update_download_local: i18n::tr(
+            language,
+            "youtube.ytdlp_path_update_download_local",
+        ),
+        ytdlp_path_update_keep_system: i18n::tr(language, "youtube.ytdlp_path_update_keep_system"),
     }
 }
 
@@ -3530,10 +3539,24 @@ fn ensure_ytdlp_available(
     language: Language,
     labels: &Labels,
 ) -> Result<Option<PathBuf>, String> {
-    let path = settings_dir().join(YTDLP_EXE_NAME);
-    if path.exists() {
-        check_ytdlp_update(hwnd, language, labels, &path);
-        return Ok(Some(path));
+    let local_path = settings_dir().join(YTDLP_EXE_NAME);
+    if local_path.exists() {
+        check_ytdlp_update(hwnd, language, labels, &local_path);
+        return Ok(Some(local_path));
+    }
+    if let Some(path_in_system) = find_ytdlp_in_path() {
+        crate::log_debug(&format!(
+            "{} {}",
+            labels.ytdlp_found_in_path,
+            path_in_system.display()
+        ));
+        return Ok(Some(check_ytdlp_path_update(
+            hwnd,
+            language,
+            labels,
+            &path_in_system,
+            &local_path,
+        )));
     }
     let title = to_wide(&confirm_title(language));
     let message = to_wide(&labels.ytdlp_prompt_download);
@@ -3553,12 +3576,93 @@ fn ensure_ytdlp_available(
         "stream_audio.ytdlp_progress_downloading",
         false,
     );
-    let download_result = download_ytdlp_with_progress(&path, |pct| report_progress(progress, pct));
+    let download_result =
+        download_ytdlp_with_progress(&local_path, |pct| report_progress(progress, pct));
     close_progress_dialog(progress);
     match download_result {
-        Ok(()) => Ok(Some(path)),
+        Ok(()) => Ok(Some(local_path)),
         Err(err) => Err(err),
     }
+}
+
+fn find_ytdlp_in_path() -> Option<PathBuf> {
+    let path_var = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path_var) {
+        let candidate = dir.join(YTDLP_EXE_NAME);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn check_ytdlp_path_update(
+    hwnd: HWND,
+    language: Language,
+    labels: &Labels,
+    path_in_system: &Path,
+    local_path: &Path,
+) -> PathBuf {
+    if YTDLP_UPDATE_CHECKED.swap(true, Ordering::SeqCst) {
+        return path_in_system.to_path_buf();
+    }
+    let installed = match ytdlp_installed_version(path_in_system) {
+        Ok(version) => version,
+        Err(err) => {
+            crate::log_debug(&format!("yt-dlp PATH version read failed: {}", err));
+            return path_in_system.to_path_buf();
+        }
+    };
+    let latest = match fetch_latest_ytdlp_version() {
+        Ok(version) => version,
+        Err(err) => {
+            crate::log_debug(&format!("yt-dlp latest version fetch failed: {}", err));
+            return path_in_system.to_path_buf();
+        }
+    };
+    if compare_versions(&installed, &latest) != Some(CmpOrdering::Less) {
+        return path_in_system.to_path_buf();
+    }
+
+    let prompt = i18n::tr_f(
+        language,
+        "youtube.ytdlp_path_update_prompt",
+        &[("current", &installed), ("latest", &latest)],
+    );
+    crate::log_debug(&format!(
+        "{} / {}",
+        labels.ytdlp_path_update_download_local, labels.ytdlp_path_update_keep_system
+    ));
+    let title = to_wide(&confirm_title(language));
+    let message = to_wide(&prompt);
+    let response = crate::message_box_w_safe(
+        hwnd,
+        PCWSTR(message.as_ptr()),
+        PCWSTR(title.as_ptr()),
+        MB_YESNO | MB_ICONQUESTION,
+    );
+    if response != IDYES {
+        return path_in_system.to_path_buf();
+    }
+
+    let progress = open_progress_dialog(
+        hwnd,
+        language,
+        "stream_audio.ytdlp_progress_title",
+        "stream_audio.ytdlp_progress_downloading",
+        false,
+    );
+    let result = download_ytdlp_with_progress(local_path, |pct| report_progress(progress, pct));
+    close_progress_dialog(progress);
+    if let Err(err) = result {
+        crate::log_debug(&format!(
+            "yt-dlp local download from PATH prompt failed: {}",
+            err
+        ));
+        show_error(hwnd, language, &labels.ytdlp_update_failed);
+        return path_in_system.to_path_buf();
+    }
+    local_path.to_path_buf()
 }
 
 fn check_ytdlp_update(hwnd: HWND, language: Language, labels: &Labels, path: &Path) {

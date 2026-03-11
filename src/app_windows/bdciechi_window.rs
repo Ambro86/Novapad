@@ -1,9 +1,10 @@
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::i18n;
-use crate::settings::{self, Language};
+use crate::settings::{self, Language, save_settings};
 use crate::tools::bdciechi;
 use crate::with_state;
 use encoding_rs::WINDOWS_1252;
+use sha2::Digest;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -25,7 +26,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     ES_MULTILINE, ES_PASSWORD, ES_READONLY, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW,
     IDYES, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MESSAGEBOX_STYLE, RegisterClassW, SW_HIDE,
     SW_SHOW, SetForegroundWindow, SetWindowLongPtrW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
     WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR, w};
@@ -52,6 +53,7 @@ struct LoginDonePayload {
     password: String,
     nprov: String,
     catalog_raw: String,
+    auto_login: bool,
     error: Option<String>,
 }
 
@@ -76,6 +78,7 @@ struct BdState {
     password: String,
     nprov: String,
     authenticated: bool,
+    remember_credentials: bool,
     catalog_rows: Vec<String>,
     visible_indices: Vec<usize>,
     login_announce_stop: Option<Arc<AtomicBool>>,
@@ -144,6 +147,28 @@ fn enable_logged_controls(state: &BdState, enabled: bool) {
     }
 }
 
+fn set_login_controls_visible(state: &BdState, visible: bool) {
+    let cmd = if visible { SW_SHOW } else { SW_HIDE };
+    for control in [
+        state.user_label,
+        state.pass_label,
+        state.user,
+        state.pass,
+        state.login,
+    ] {
+        crate::show_window_safe(control, cmd);
+        crate::enable_window_safe(control, visible);
+    }
+}
+
+fn focus_primary_bdc_control(state: &BdState) {
+    if state.authenticated {
+        crate::set_focus_safe(state.search);
+    } else {
+        crate::set_focus_safe(state.user);
+    }
+}
+
 fn read_edit_text(hwnd: HWND) -> String {
     let len = crate::get_window_text_length_w_safe(hwnd);
     if len <= 0 {
@@ -155,6 +180,40 @@ fn read_edit_text(hwnd: HWND) -> String {
         return String::new();
     }
     String::from_utf16_lossy(&buf[..read as usize])
+}
+
+fn sync_bdc_session(
+    parent: HWND,
+    username: &str,
+    password: &str,
+    nprov: &str,
+    catalog_rows: &[String],
+    authenticated: bool,
+) {
+    let _updated = with_state(parent, |state| {
+        state.bdciechi_session_username = username.to_string();
+        state.bdciechi_session_password = password.to_string();
+        state.bdciechi_session_nprov = nprov.to_string();
+        state.bdciechi_session_catalog_rows = catalog_rows.to_vec();
+        state.bdciechi_session_authenticated = authenticated;
+    });
+}
+
+fn persist_bdc_credentials(parent: HWND, remember: bool, username: &str, password: &str) {
+    let snapshot = with_state(parent, |state| {
+        state.settings.remember_bdciechi_credentials = remember;
+        if remember {
+            state.settings.bdciechi_username = username.to_string();
+            state.settings.bdciechi_password = password.to_string();
+        } else {
+            state.settings.bdciechi_username.clear();
+            state.settings.bdciechi_password.clear();
+        }
+        state.settings.clone()
+    });
+    if let Some(settings) = snapshot {
+        save_settings(settings);
+    }
 }
 
 fn sanitize_filename(name: &str) -> String {
@@ -183,6 +242,22 @@ fn decode_book_text(bytes: &[u8]) -> String {
     }
 }
 
+fn tokenize_search_terms(text: &str) -> Vec<String> {
+    text.split_whitespace()
+        .map(str::trim)
+        .filter(|term| !term.is_empty())
+        .map(|term| term.to_lowercase())
+        .collect()
+}
+
+fn row_matches_query(row: &str, query_terms: &[String]) -> bool {
+    if query_terms.is_empty() {
+        return false;
+    }
+    let row_lower = row.to_lowercase();
+    query_terms.iter().all(|term| row_lower.contains(term))
+}
+
 fn suggested_name_from_info(info: &str, index: usize) -> String {
     if let Some(path_field) = info.split(';').nth(3) {
         let trimmed = path_field.trim();
@@ -206,6 +281,83 @@ fn default_docs_folder(parent: HWND) -> PathBuf {
         PathBuf::from(settings::default_documents_save_folder())
     } else {
         PathBuf::from(configured)
+    }
+}
+
+fn bdciechi_fallback_download_dir() -> PathBuf {
+    settings::settings_dir().join("bdciechi").join("downloads")
+}
+
+fn bdciechi_catalog_cache_path() -> PathBuf {
+    settings::settings_dir()
+        .join("bdciechi")
+        .join("catalog_cache.txt")
+}
+
+fn load_bdciechi_catalog_cache() -> Option<String> {
+    let path = bdciechi_catalog_cache_path();
+    match fs::read_to_string(&path) {
+        Ok(raw) if !raw.trim().is_empty() => Some(raw),
+        Ok(_) => None,
+        Err(err) => {
+            crate::log_debug(&format!(
+                "bdciechi: failed to read catalog cache {}: {}",
+                path.display(),
+                err
+            ));
+            None
+        }
+    }
+}
+
+fn save_bdciechi_catalog_cache(raw: &str) {
+    let path = bdciechi_catalog_cache_path();
+    if let Some(parent) = path.parent()
+        && let Err(err) = fs::create_dir_all(parent)
+    {
+        crate::log_debug(&format!(
+            "bdciechi: failed to create cache dir {}: {}",
+            parent.display(),
+            err
+        ));
+        return;
+    }
+    if let Err(err) = fs::write(&path, raw) {
+        crate::log_debug(&format!(
+            "bdciechi: failed to write catalog cache {}: {}",
+            path.display(),
+            err
+        ));
+    }
+}
+
+fn catalog_hash(raw: &str) -> String {
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(raw.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn ensure_bdciechi_download_dir(parent: HWND) -> Result<PathBuf, String> {
+    let docs_dir = default_docs_folder(parent);
+    match fs::create_dir_all(&docs_dir) {
+        Ok(()) => Ok(docs_dir),
+        Err(primary_err) => {
+            let fallback_dir = bdciechi_fallback_download_dir();
+            match fs::create_dir_all(&fallback_dir) {
+                Ok(()) => {
+                    crate::log_debug(&format!(
+                        "bdciechi: documents dir unavailable ({}), using fallback {}",
+                        primary_err,
+                        fallback_dir.display()
+                    ));
+                    Ok(fallback_dir)
+                }
+                Err(fallback_err) => Err(format!(
+                    "{primary_err}; fallback {}: {fallback_err}",
+                    fallback_dir.display()
+                )),
+            }
+        }
     }
 }
 
@@ -283,7 +435,7 @@ fn show_results(state: &mut BdState, indices: Vec<usize>) {
     }
 }
 
-fn do_login(hwnd: HWND) {
+fn do_login_impl(hwnd: HWND, auto_login: bool) {
     with_window_state(hwnd, |state| {
         let username = read_edit_text(state.user).trim().to_string();
         let password = read_edit_text(state.pass).trim().to_string();
@@ -329,6 +481,7 @@ fn do_login(hwnd: HWND) {
                     password,
                     nprov,
                     catalog_raw,
+                    auto_login,
                     error: None,
                 },
                 Err(err) => LoginDonePayload {
@@ -336,6 +489,7 @@ fn do_login(hwnd: HWND) {
                     password,
                     nprov: String::new(),
                     catalog_raw: String::new(),
+                    auto_login,
                     error: Some(err),
                 },
             };
@@ -353,6 +507,25 @@ fn do_login(hwnd: HWND) {
     });
 }
 
+fn do_login(hwnd: HWND) {
+    do_login_impl(hwnd, false);
+}
+
+fn apply_authenticated_state(state: &mut BdState) {
+    state.visible_indices.clear();
+    state.authenticated = true;
+    enable_logged_controls(state, true);
+    set_login_controls_visible(state, false);
+    set_status(
+        state,
+        &i18n::tr_f(
+            Language::Italian,
+            "excluded_from_testing.bdciechi.status.catalog_loaded",
+            &[("count", &state.catalog_rows.len().to_string())],
+        ),
+    );
+}
+
 fn do_search(hwnd: HWND) {
     with_window_state(hwnd, |state| {
         set_sample_visible(state, false);
@@ -360,20 +533,28 @@ fn do_search(hwnd: HWND) {
             set_status(state, &tr("status.login_first"));
             return;
         }
-        let query = read_edit_text(state.search).trim().to_lowercase();
-        if query.is_empty() {
+        let query = read_edit_text(state.search);
+        let query_terms = tokenize_search_terms(&query);
+        if query_terms.is_empty() {
             set_status(state, &tr("status.enter_search"));
             return;
         }
         let mut indices = Vec::new();
         for (idx, row) in state.catalog_rows.iter().enumerate() {
-            if row.to_lowercase().contains(&query) {
+            if row_matches_query(row, &query_terms) {
                 indices.push(idx);
             }
         }
         if indices.is_empty() {
-            set_status(state, &tr("status.no_results"));
+            let message = tr("status.no_results");
+            set_status(state, &message);
             show_results(state, Vec::new());
+            crate::message_box_w_safe(
+                hwnd,
+                PCWSTR(to_wide(&message).as_ptr()),
+                PCWSTR(to_wide(&tr("title")).as_ptr()),
+                Default::default(),
+            );
             return;
         }
         let count = indices.len();
@@ -478,18 +659,20 @@ fn download_selected(hwnd: HWND) {
             }
         };
 
-        let mut docs_dir = default_docs_folder(state.parent);
-        if let Err(err) = fs::create_dir_all(&docs_dir) {
-            set_status(
-                state,
-                &i18n::tr_f(
-                    Language::Italian,
-                    "excluded_from_testing.bdciechi.error.documents_dir",
-                    &[("err", &err.to_string())],
-                ),
-            );
-            return;
-        }
+        let mut docs_dir = match ensure_bdciechi_download_dir(state.parent) {
+            Ok(path) => path,
+            Err(err) => {
+                set_status(
+                    state,
+                    &i18n::tr_f(
+                        Language::Italian,
+                        "excluded_from_testing.bdciechi.error.documents_dir",
+                        &[("err", &err)],
+                    ),
+                );
+                return;
+            }
+        };
 
         let suggested = suggested_name_from_info(&work.info, catalog_index);
         let Some(path) = save_as_dialog(state.parent, &docs_dir, &suggested) else {
@@ -708,6 +891,63 @@ pub fn open(parent: HWND) {
         };
         RegisterClassW(&wc);
 
+        let cached_catalog_rows = load_bdciechi_catalog_cache()
+            .map(|raw| bdciechi::parse_catalog_records(&raw))
+            .unwrap_or_default();
+
+        let (
+            session_username,
+            session_password,
+            session_nprov,
+            session_catalog_rows,
+            session_authenticated,
+            remembered,
+            remembered_username,
+            remembered_password,
+        ) = with_state(parent, |state| {
+            (
+                state.bdciechi_session_username.clone(),
+                state.bdciechi_session_password.clone(),
+                state.bdciechi_session_nprov.clone(),
+                state.bdciechi_session_catalog_rows.clone(),
+                state.bdciechi_session_authenticated,
+                state.settings.remember_bdciechi_credentials,
+                state.settings.bdciechi_username.clone(),
+                state.settings.bdciechi_password.clone(),
+            )
+        })
+        .unwrap_or_else(|| {
+            (
+                String::new(),
+                String::new(),
+                String::new(),
+                Vec::new(),
+                false,
+                false,
+                String::new(),
+                String::new(),
+            )
+        });
+
+        let (username, password, nprov, authenticated, catalog_rows) =
+            if session_authenticated && !session_catalog_rows.is_empty() {
+                (
+                    session_username,
+                    session_password,
+                    session_nprov,
+                    true,
+                    session_catalog_rows,
+                )
+            } else {
+                (
+                    remembered_username,
+                    remembered_password,
+                    String::new(),
+                    false,
+                    cached_catalog_rows,
+                )
+            };
+
         let init = Box::new(BdState {
             parent,
             user_label: HWND(0),
@@ -725,11 +965,12 @@ pub fn open(parent: HWND) {
             sample_close_btn: HWND(0),
             close_btn: HWND(0),
             status: HWND(0),
-            username: String::new(),
-            password: String::new(),
-            nprov: String::new(),
-            authenticated: false,
-            catalog_rows: Vec::new(),
+            username,
+            password,
+            nprov,
+            authenticated,
+            remember_credentials: remembered,
+            catalog_rows,
             visible_indices: Vec::new(),
             login_announce_stop: None,
         });
@@ -1058,9 +1299,34 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 (*init_ptr).close_btn = close_btn;
                 (*init_ptr).status = status;
 
-                enable_logged_controls(&*init_ptr, false);
+                crate::log_if_err!(crate::set_window_text_w_safe(
+                    user,
+                    PCWSTR(to_wide(&(*init_ptr).username).as_ptr())
+                ));
+                crate::log_if_err!(crate::set_window_text_w_safe(
+                    pass,
+                    PCWSTR(to_wide(&(*init_ptr).password).as_ptr())
+                ));
+
                 set_sample_visible(&*init_ptr, false);
-                SetFocus(user);
+                if (*init_ptr).authenticated {
+                    apply_authenticated_state(&mut *init_ptr);
+                    SetFocus(search);
+                } else {
+                    enable_logged_controls(&*init_ptr, false);
+                    set_login_controls_visible(&*init_ptr, true);
+                    if !(*init_ptr).catalog_rows.is_empty() {
+                        set_status(&*init_ptr, &tr("status.cached_catalog_loaded"));
+                    }
+                    if (*init_ptr).remember_credentials
+                        && !(*init_ptr).username.trim().is_empty()
+                        && !(*init_ptr).password.trim().is_empty()
+                    {
+                        do_login_impl(hwnd, true);
+                    } else {
+                        SetFocus(user);
+                    }
+                }
                 LRESULT(0)
             }
             WM_KEYDOWN => {
@@ -1117,6 +1383,12 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
+            WM_SETFOCUS => {
+                with_window_state(hwnd, |state| {
+                    focus_primary_bdc_control(state);
+                });
+                LRESULT(0)
+            }
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
                 match id {
@@ -1163,6 +1435,7 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     crate::enable_window_safe(state.pass, true);
                     crate::enable_window_safe(state.login, true);
                     if let Some(err) = &payload.error {
+                        sync_bdc_session(state.parent, "", "", "", &[], false);
                         set_status(
                             state,
                             &i18n::tr_f(
@@ -1178,24 +1451,64 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     state.username = payload.username.clone();
                     state.password = payload.password.clone();
                     state.nprov = payload.nprov.clone();
+                    let cached_hash = load_bdciechi_catalog_cache()
+                        .map(|raw| catalog_hash(&raw))
+                        .unwrap_or_default();
+                    let remote_hash = catalog_hash(&payload.catalog_raw);
+                    let catalog_changed = cached_hash != remote_hash;
                     state.catalog_rows = bdciechi::parse_catalog_records(&payload.catalog_raw);
-                    state.visible_indices.clear();
-                    state.authenticated = true;
-                    enable_logged_controls(state, true);
-                    crate::show_window_safe(state.user_label, SW_HIDE);
-                    crate::show_window_safe(state.pass_label, SW_HIDE);
-                    crate::show_window_safe(state.user, SW_HIDE);
-                    crate::show_window_safe(state.pass, SW_HIDE);
-                    crate::show_window_safe(state.login, SW_HIDE);
+                    if catalog_changed {
+                        save_bdciechi_catalog_cache(&payload.catalog_raw);
+                    }
+                    apply_authenticated_state(state);
+                    sync_bdc_session(
+                        state.parent,
+                        &state.username,
+                        &state.password,
+                        &state.nprov,
+                        &state.catalog_rows,
+                        true,
+                    );
+                    if state.remember_credentials {
+                        persist_bdc_credentials(
+                            state.parent,
+                            true,
+                            &state.username,
+                            &state.password,
+                        );
+                    } else if !payload.auto_login {
+                        let ask = crate::message_box_w_safe(
+                            hwnd,
+                            PCWSTR(to_wide(&tr("ask_remember_credentials")).as_ptr()),
+                            PCWSTR(to_wide(&tr("title")).as_ptr()),
+                            MESSAGEBOX_STYLE(MB_YESNO.0 | MB_ICONQUESTION.0),
+                        );
+                        if ask == IDYES {
+                            state.remember_credentials = true;
+                            persist_bdc_credentials(
+                                state.parent,
+                                true,
+                                &state.username,
+                                &state.password,
+                            );
+                        } else {
+                            persist_bdc_credentials(state.parent, false, "", "");
+                        }
+                    }
                     set_status(
                         state,
                         &i18n::tr_f(
                             Language::Italian,
-                            "excluded_from_testing.bdciechi.status.catalog_loaded",
+                            if catalog_changed {
+                                "excluded_from_testing.bdciechi.status.catalog_updated"
+                            } else {
+                                "excluded_from_testing.bdciechi.status.catalog_already_current"
+                            },
                             &[("count", &state.catalog_rows.len().to_string())],
                         ),
                     );
                     crate::accessibility::screen_reader_speak(&tr("status.login_completed"));
+                    SetForegroundWindow(hwnd);
                     SetFocus(state.search);
                 });
                 LRESULT(0)

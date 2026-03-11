@@ -5,7 +5,7 @@ use reqwest::blocking::Client;
 use std::time::Duration;
 
 const BASE_URL: &str = "https://www.bdciechi.it/route.php";
-const IDEN_SP: &str = "SP";
+const IDEN_SP: &str = "SP-test";
 
 pub struct IdentifyResponse {
     pub nprov: String,
@@ -153,14 +153,14 @@ pub fn download_work(
         .to_vec();
 
     if bytes.starts_with(b"!") {
-        let text = String::from_utf8_lossy(&bytes).to_string();
+        let text = decode_server_text(&bytes);
         if is_protocol_error(&text) {
             return Err(text);
         }
     }
 
     if let Some(pos) = bytes.iter().position(|b| *b == 26u8) {
-        let info = String::from_utf8_lossy(&bytes[..pos]).to_string();
+        let info = decode_server_text(&bytes[..pos]);
         let text = bytes[pos + 1..].to_vec();
         return Ok(WorkResponse { info, text });
     }
@@ -169,4 +169,15 @@ pub fn download_work(
         info: String::new(),
         text: bytes,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_server_text;
+
+    #[test]
+    fn decode_server_text_preserves_cp1252_accents() {
+        let bytes = b"libro Perch\xe9 NO.txt";
+        assert_eq!(decode_server_text(bytes), "libro Perché NO.txt");
+    }
 }

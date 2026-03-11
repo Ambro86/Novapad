@@ -1421,6 +1421,92 @@ fn post_podcast_episode_save_result(hwnd: HWND, payload: PodcastEpisodeSaveResul
     }
 }
 
+fn podcast_partial_cache_path(file_path: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.part", file_path.to_string_lossy()))
+}
+
+fn download_podcast_episode_cache_with_resume(
+    url: &str,
+    cache_path: &Path,
+    language: Language,
+) -> Result<(), String> {
+    if let Some(parent) = cache_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+
+    let partial_file_path = podcast_partial_cache_path(cache_path);
+    let mut last_reported_pct = 0u32;
+    let mut attempt: u32 = 0;
+
+    loop {
+        attempt += 1;
+        let resume_from = std::fs::metadata(&partial_file_path)
+            .map(|meta| meta.len())
+            .unwrap_or(0);
+        if resume_from > 0 {
+            log_debug(&format!(
+                "podcast_episode_save: resuming partial download from {} bytes for {}",
+                resume_from, url
+            ));
+        }
+
+        let result = crate::tools::rss::download_url_to_file_with_progress(
+            url,
+            &partial_file_path,
+            resume_from,
+            |pct| {
+                let announced_pct = pct.min(90);
+                if announced_pct >= last_reported_pct + 10 {
+                    last_reported_pct = (announced_pct / 10) * 10;
+                    let msg = i18n::tr_f(
+                        language,
+                        "podcasts.download_progress",
+                        &[("pct", &last_reported_pct.to_string())],
+                    );
+                    screen_reader_speak(&msg);
+                }
+            },
+        );
+
+        match result {
+            Ok(_) => {
+                std::fs::rename(&partial_file_path, cache_path).map_err(|err| {
+                    format!(
+                        "failed to finalize cache file {} from {}: {}",
+                        cache_path.display(),
+                        partial_file_path.display(),
+                        err
+                    )
+                })?;
+                return Ok(());
+            }
+            Err(err) => {
+                log_debug(&format!(
+                    "podcast_episode_save_attempt_failed attempt={} url={} partial_bytes={} err={}",
+                    attempt, url, resume_from, err
+                ));
+                if attempt < 5 {
+                    if resume_from == 0 {
+                        last_reported_pct = 0;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(500u64 * attempt as u64));
+                    continue;
+                }
+                if let Err(remove_err) = std::fs::remove_file(&partial_file_path)
+                    && remove_err.kind() != std::io::ErrorKind::NotFound
+                {
+                    log_debug(&format!(
+                        "Failed to remove partial podcast save file {}: {}",
+                        partial_file_path.display(),
+                        remove_err
+                    ));
+                }
+                return Err(err);
+            }
+        }
+    }
+}
+
 pub(crate) fn download_podcast_episode(
     hwnd: HWND,
     url: Option<String>,
@@ -1487,47 +1573,9 @@ pub(crate) fn download_podcast_episode(
                 "podcast_episode_save: cache missing, downloading from {}",
                 url
             ));
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .ok();
-            let bytes = if let Some(rt) = rt {
-                rt.block_on(crate::tools::rss::fetch_url_bytes(
-                    url,
-                    crate::tools::rss::RssFetchConfig::default(),
-                ))
-            } else {
-                let err = "failed to create async runtime".to_string();
-                log_debug(&format!("podcast_episode_save_failed {}", err));
-                post_podcast_episode_save_result(
-                    hwnd_copy,
-                    PodcastEpisodeSaveResult {
-                        language,
-                        target_path: target.clone(),
-                        error: Some(err),
-                    },
-                );
-                return;
-            };
-            match bytes {
-                Ok(b) => {
-                    if let Some(parent) = cache_path.parent() {
-                        crate::log_if_err!(std::fs::create_dir_all(parent));
-                    }
-                    if let Err(e) = std::fs::write(cache_path, b) {
-                        let err = format!("failed to write to cache: {}", e);
-                        log_debug(&format!("podcast_episode_save: {}", err));
-                        post_podcast_episode_save_result(
-                            hwnd_copy,
-                            PodcastEpisodeSaveResult {
-                                language,
-                                target_path: target.clone(),
-                                error: Some(err),
-                            },
-                        );
-                        return;
-                    }
-                }
+            screen_reader_speak(&i18n::tr(language, "podcasts.loading"));
+            match download_podcast_episode_cache_with_resume(url, cache_path, language) {
+                Ok(()) => {}
                 Err(e) => {
                     let err = format!("download failed: {}", e);
                     log_debug(&format!("podcast_episode_save: {}", err));
@@ -2766,6 +2814,11 @@ pub(crate) struct AppState {
     wiktionary_window: HWND,
     wikipedia_window: HWND,
     bdciechi_window: HWND,
+    bdciechi_session_username: String,
+    bdciechi_session_password: String,
+    bdciechi_session_nprov: String,
+    bdciechi_session_catalog_rows: Vec<String>,
+    bdciechi_session_authenticated: bool,
     prompt_window: HWND,
     podcast_window: HWND,
     podcast_save_window: HWND,
@@ -3004,7 +3057,6 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
             save_settings(settings.clone());
         }
         crate::settings::sync_start_menu_shortcuts(&settings);
-        let file_to_open = extra_paths.first().cloned();
         if !extra_paths.is_empty() && settings.open_behavior == OpenBehavior::NewTab {
             let existing = FindWindowW(class_name, PCWSTR::null());
             if existing.0 != 0 {
@@ -3032,7 +3084,7 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
                 return Ok(());
             }
         }
-        let lp_param = &file_to_open as *const Option<String> as *const std::ffi::c_void;
+        let lp_param = &extra_paths as *const Vec<String> as *const std::ffi::c_void;
 
         let title_wide = to_wide(crate::settings::app_display_name(&settings));
         let hwnd = CreateWindowExW(
@@ -4126,6 +4178,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     wiktionary_window: HWND(0),
                     wikipedia_window: HWND(0),
                     bdciechi_window: HWND(0),
+                    bdciechi_session_username: String::new(),
+                    bdciechi_session_password: String::new(),
+                    bdciechi_session_nprov: String::new(),
+                    bdciechi_session_catalog_rows: Vec::new(),
+                    bdciechi_session_authenticated: false,
                     prompt_window: HWND(0),
                     podcast_window: HWND(0),
                     rss_window: HWND(0),
@@ -4248,15 +4305,22 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
 
                 let create_struct = lparam.0 as *const CREATESTRUCTW;
-                let lp_create_params = (*create_struct).lpCreateParams as *const Option<String>;
-                let file_to_open = if !lp_create_params.is_null() {
-                    (*lp_create_params).as_ref()
+                let lp_create_params = (*create_struct).lpCreateParams as *const Vec<String>;
+                let file_paths: Vec<PathBuf> = if !lp_create_params.is_null() {
+                    (*lp_create_params).iter().map(PathBuf::from).collect()
                 } else {
-                    None
+                    Vec::new()
                 };
 
-                if let Some(path_str) = file_to_open {
-                    editor_manager::open_document(hwnd, Path::new(path_str));
+                if file_paths.len() > 1 && file_paths.iter().all(|path| is_audio_path(path)) {
+                    queue_audio_files_and_play(hwnd, file_paths);
+                    ShowWindow(hwnd, SW_SHOWMAXIMIZED);
+                    bring_window_to_foreground(hwnd);
+
+                    notify_active_editor_focus(hwnd, true);
+                    crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
+                } else if let Some(path) = file_paths.first() {
+                    editor_manager::open_document(hwnd, path);
                     ShowWindow(hwnd, SW_SHOWMAXIMIZED);
                     bring_window_to_foreground(hwnd);
 
@@ -5906,12 +5970,16 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     };
                     let joined_paths = String::from_utf16_lossy(&slice[..len]);
                     if !joined_paths.is_empty() {
-                        for path_str in joined_paths.split('|') {
-                            if !path_str.is_empty() {
-                                editor_manager::open_document_from_copydata(
-                                    hwnd,
-                                    Path::new(path_str),
-                                );
+                        let paths: Vec<PathBuf> = joined_paths
+                            .split('|')
+                            .filter(|path_str| !path_str.is_empty())
+                            .map(PathBuf::from)
+                            .collect();
+                        if paths.iter().all(|path| is_audio_path(path)) {
+                            queue_audio_files_and_play(hwnd, paths);
+                        } else {
+                            for path in paths {
+                                editor_manager::open_document_from_copydata(hwnd, &path);
                             }
                         }
                         ShowWindow(hwnd, SW_SHOWMAXIMIZED);

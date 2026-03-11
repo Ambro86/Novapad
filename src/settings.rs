@@ -669,6 +669,12 @@ pub struct AppSettings {
     pub network_proxy_username: String,
     #[serde(default)]
     pub network_proxy_password: String,
+    #[serde(default)]
+    pub remember_bdciechi_credentials: bool,
+    #[serde(default)]
+    pub bdciechi_username: String,
+    #[serde(default)]
+    pub bdciechi_password: String,
     pub prompt_auto_scroll: bool,
     pub prompt_strip_ansi: bool,
     pub prompt_beep_on_idle: bool,
@@ -981,6 +987,9 @@ impl Default for AppSettings {
             network_proxy_url: String::new(),
             network_proxy_username: String::new(),
             network_proxy_password: String::new(),
+            remember_bdciechi_credentials: false,
+            bdciechi_username: String::new(),
+            bdciechi_password: String::new(),
             prompt_auto_scroll: true,
             prompt_strip_ansi: true,
             prompt_beep_on_idle: true,
@@ -1615,6 +1624,12 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.network_proxy_url = settings.network_proxy_url.trim().to_string();
     settings.network_proxy_username = settings.network_proxy_username.trim().to_string();
     settings.network_proxy_password = settings.network_proxy_password.trim().to_string();
+    settings.bdciechi_username = settings.bdciechi_username.trim().to_string();
+    settings.bdciechi_password = settings.bdciechi_password.trim().to_string();
+    if !settings.remember_bdciechi_credentials {
+        settings.bdciechi_username.clear();
+        settings.bdciechi_password.clear();
+    }
     settings.dialogue_opening_quote = settings.dialogue_opening_quote.trim().to_string();
     settings.dialogue_closing_quote = settings.dialogue_closing_quote.trim().to_string();
     if settings.dialogue_opening_quote.is_empty() || settings.dialogue_opening_quote == "\"" {

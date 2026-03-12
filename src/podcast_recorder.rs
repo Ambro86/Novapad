@@ -558,14 +558,21 @@ fn rename_atomic(src: &Path, dest: &Path) -> Result<(), String> {
 }
 
 fn keep_awake_loop(stop: Arc<AtomicBool>) -> Result<(), String> {
+    const KEEP_AWAKE_REFRESH: Duration = Duration::from_secs(30);
+    const KEEP_AWAKE_POLL: Duration = Duration::from_millis(200);
+
     unsafe {
         SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
     }
+    let mut last_refresh = Instant::now();
     while !stop.load(Ordering::SeqCst) {
-        thread::sleep(Duration::from_secs(30));
-        unsafe {
-            SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+        if last_refresh.elapsed() >= KEEP_AWAKE_REFRESH {
+            unsafe {
+                SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+            }
+            last_refresh = Instant::now();
         }
+        thread::sleep(KEEP_AWAKE_POLL);
     }
     unsafe {
         SetThreadExecutionState(ES_CONTINUOUS);

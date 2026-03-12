@@ -8,6 +8,9 @@
 - [Portable (EXE)](https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad.exe)
 - [Installer (Setup)](https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad_x64-setup.exe)
 - [Installer (MSI)](https://github.com/Ambro86/Sonarpad/releases/latest/download/sonarpad_x64_en-US.msi)
+- [Mac Apple Silicon (DMG)](https://github.com/Ambro86/Sonarpad-Mac/releases/latest/download/Sonarpad-macOS-AppleSilicon.dmg)
+- [Mac Intel (DMG)](https://github.com/Ambro86/Sonarpad-Mac/releases/latest/download/Sonarpad-macOS-Intel.dmg)
+- [Mac project](https://github.com/Ambro86/Sonarpad-Mac/)
 **Sonarpad** is a modern, feature-rich Notepad alternative for Windows, built with Rust.
 It extends traditional text editing with multi-format document support,
 advanced accessibility features, and Text-to-Speech (TTS) capabilities.

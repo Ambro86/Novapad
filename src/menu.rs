@@ -138,6 +138,7 @@ pub const IDM_TOOLS_DICTIONARY_LOOKUP: usize = 5007;
 pub const IDM_TOOLS_WIKIPEDIA_IMPORT: usize = 5008;
 pub const IDM_TOOLS_STREAM_AUDIO: usize = 5009;
 pub const IDM_TOOLS_BDCIECHI: usize = 5010;
+pub const IDM_TOOLS_TOGGLE_DICTATION: usize = 5011;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;

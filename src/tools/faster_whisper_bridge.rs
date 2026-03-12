@@ -615,6 +615,14 @@ pub fn transcribe_wav(
     cancel: &Arc<AtomicBool>,
     mut progress_callbacks: BridgeProgressCallbacks,
 ) -> Result<String, String> {
+    crate::log_debug(&format!(
+        "Bridge: transcribe_wav start wav={} model={} cuda={} timestamps={} language={}",
+        wav_path.display(),
+        model.as_name(),
+        use_cuda_runtime,
+        include_timestamps,
+        language.map(language_code).unwrap_or("auto")
+    ));
     let mut child = select_and_spawn_bridge(
         wav_path,
         model,
@@ -624,6 +632,7 @@ pub fn transcribe_wav(
         &mut progress_callbacks.download,
         use_cuda_runtime,
     )?;
+    crate::log_debug("Bridge: process spawned");
 
     let stdout = child
         .stdout
@@ -644,6 +653,7 @@ pub fn transcribe_wav(
                 Ok(0) => break,
                 Ok(_) => {
                     let trimmed = decode_bridge_text(&line).trim().to_string();
+                    crate::log_debug(&format!("Bridge: stdout line '{}'", trimmed));
                     if !trimmed.is_empty() && line_tx.send(trimmed).is_err() {
                         break;
                     }
@@ -676,6 +686,7 @@ pub fn transcribe_wav(
     loop {
         if cancel.load(Ordering::Relaxed) {
             cancelled = true;
+            crate::log_debug("Bridge: cancellation requested, killing process");
             if let Err(err) = child.kill() {
                 crate::log_debug(&format!("bridge kill failed: {err}"));
             }
@@ -683,6 +694,7 @@ pub fn transcribe_wav(
 
         match line_rx.recv_timeout(Duration::from_millis(150)) {
             Ok(line) => {
+                crate::log_debug("Bridge: received stdout payload");
                 handle_bridge_line(
                     &line,
                     &mut progress_callbacks.transcription,
@@ -690,47 +702,63 @@ pub fn transcribe_wav(
                 );
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {}
-            Err(mpsc::RecvTimeoutError::Disconnected) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                crate::log_debug("Bridge: stdout channel disconnected");
+            }
         }
 
         match child.try_wait() {
-            Ok(Some(_)) => break,
+            Ok(Some(status)) => {
+                crate::log_debug(&format!("Bridge: process exited with status {}", status));
+                break;
+            }
             Ok(None) => {}
             Err(err) => return Err(format!("bridge wait failed: {err}")),
         }
     }
 
+    crate::log_debug("Bridge: joining stdout thread");
     if let Err(_panic) = stdout_thread.join() {
         return Err("bridge stdout thread panicked".to_string());
     }
     while let Ok(line) = line_rx.try_recv() {
+        crate::log_debug("Bridge: draining pending stdout payload");
         handle_bridge_line(
             &line,
             &mut progress_callbacks.transcription,
             &mut bridge_result,
         );
     }
+    crate::log_debug("Bridge: joining stderr thread");
     if let Err(_panic) = stderr_thread.join() {
         return Err("bridge stderr thread panicked".to_string());
     }
     let stderr_text = err_rx.recv().unwrap_or_default();
+    if !stderr_text.trim().is_empty() {
+        crate::log_debug(&format!("Bridge: stderr '{}'", stderr_text.trim()));
+    }
 
     if cancelled || cancel.load(Ordering::Relaxed) {
+        crate::log_debug("Bridge: returning cancelled");
         return Err("cancelled".to_string());
     }
 
     if let Some(result) = bridge_result {
         if result.ok {
+            crate::log_debug("Bridge: returning successful transcript");
             return Ok(strip_amara_signature(&result.text));
         }
         if !result.error.trim().is_empty() {
+            crate::log_debug(&format!("Bridge: returning error '{}'", result.error));
             return Err(result.error);
         }
     }
 
     if stderr_text.trim().is_empty() {
+        crate::log_debug("Bridge: returning no transcript error");
         Err("bridge returned no transcript".to_string())
     } else {
+        crate::log_debug("Bridge: returning stderr as error");
         Err(stderr_text)
     }
 }

@@ -20,8 +20,7 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     IDYES, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_SETFOREGROUND, MB_YESNO,
-    MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, SetForegroundWindow, ShowWindow,
-    WM_CLOSE,
+    MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, WM_CLOSE,
 };
 use windows::core::{HSTRING, PCWSTR};
 
@@ -1340,14 +1339,9 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
             .spawn()
         {
             Ok(_) => {
-                let owner = wait_for_main_window(std::time::Duration::from_secs(8));
-                if owner.0 != 0 {
-                    unsafe {
-                        ShowWindow(owner, SW_SHOW);
-                        let _ignored = SetForegroundWindow(owner);
-                    }
-                }
-                show_update_info_for_owner(language, UpdateInfo::Completed, owner);
+                log_debug(
+                    "Self-update: restart succeeded; skipping completion dialog handoff to avoid blocking the new instance.",
+                );
             }
             Err(err) => {
                 crate::log_if_err!(restore_backup(&current));
@@ -1966,19 +1960,6 @@ fn show_update_info_for_owner(language: Language, info: UpdateInfo, owner: HWND)
         &title,
         MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
     );
-}
-
-fn wait_for_main_window(timeout: std::time::Duration) -> HWND {
-    let deadline = std::time::Instant::now() + timeout;
-    while std::time::Instant::now() < deadline {
-        let class_name = to_wide("SonarpadWin32");
-        let hwnd = crate::find_window_w_safe(PCWSTR(class_name.as_ptr()), PCWSTR::null());
-        if hwnd.0 != 0 {
-            return hwnd;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
-    HWND(0)
 }
 
 fn show_update_message(

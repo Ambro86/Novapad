@@ -5,7 +5,7 @@ use reqwest::blocking::Client;
 use std::time::Duration;
 
 const BASE_URL: &str = "https://www.bdciechi.it/route.php";
-const IDEN_SP: &str = "SP-test";
+const IDEN_SP: &str = "SP";
 
 pub struct IdentifyResponse {
     pub nprov: String,

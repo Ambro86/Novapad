@@ -4,10 +4,13 @@ Versione 0.6.8 – 2026-03-04
 
 Novità
 • Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
+• Aggiunta la possibilità di usare la dettatura vocale offline, con le stesse modalità della trascrizione audio. Per impostazione predefinita si preme `Ctrl+Shift+Spazio` per avviare la dettatura e si preme la stessa scorciatoia per terminarla; il tasto rapido è personalizzabile nelle Opzioni.
+• Sonarpad è disponibile anche su Mac, anche se con un set di funzioni parziale. Link al progetto: https://github.com/Ambro86/Sonarpad-Mac
 
 Miglioramenti
 • Ora il programma riesce a gestire Sostituisci tutto in modo massivo su file grandi con un gran numero di sostituzioni.
 • Aggiunto il pieno supporto della biblioteca BdCiechi, accessibile da Strumenti o con la scorciatoia Alt+Shift+B. E' possibile cercare, scaricare libri, leggere le ultime novità, scaricare un testo di assaggio. Quando verrà salvato un file è possibile aprirlo direttamente in Sonarpad e leggerlo con le voci di alta qualità presenti nel programma.
+• Diversi miglioramenti alla biblioteca BdCiechi grazie alla collaborazione con Giuliano Artico: login e password possono essere memorizzati in Sonarpad per 30 giorni, dopo i quali è necessario effettuare nuovamente l'accesso; se invece l'utente sceglie di non memorizzare i dati, finché Sonarpad resta aperto questi vengono riutilizzati senza doverli digitare di nuovo. La ricerca delle opere è stata normalizzata correggendo gli accenti non immessi, quindi ad esempio cercando `giosue` viene trovata anche `Giosuè`. Corretto inoltre un problema per cui, alla riapertura di BdCiechi, la finestra non si riattivava correttamente. Il catalogo della BdCiechi viene ora scaricato solo al primo utilizzo e aggiornato successivamente solo quando necessario.
 • Migliorata la finestra RSS con un'anteprima articolo integrata, così il testo può essere consultato direttamente lì e raggiunto rapidamente con Tab prima di aprire l'articolo completo nell'editor.
 
 Miglioramenti

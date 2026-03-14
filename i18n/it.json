@@ -890,6 +890,7 @@
   "options.shortcuts.action.audiobook": "Registra audiolibro",
   "options.shortcuts.action.batch_audiobooks": "Registra audiolibri batch",
   "options.shortcuts.action.record_podcast": "Registra podcast",
+  "options.shortcuts.action.dictation": "Dettatura vocale",
   "options.shortcuts.action.convert_audio": "Converti audio",
   "options.shortcuts.action.open_rss": "Apri RSS",
   "options.shortcuts.action.open_podcasts": "Apri podcast",

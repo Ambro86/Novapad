@@ -23,6 +23,7 @@ const FEEDBACK_CLASS_NAME: &str = "SonarpadFeedback";
 const FEEDBACK_ID_SUBJECT: usize = 7101;
 const FEEDBACK_ID_MESSAGE: usize = 7102;
 const FEEDBACK_ID_SEND: usize = 7103;
+const FEEDBACK_ID_CANCEL: usize = 7104;
 const FEEDBACK_TARGET: &str = "ambro86@gmail.com";
 
 struct FeedbackState {
@@ -30,6 +31,7 @@ struct FeedbackState {
     subject_edit: HWND,
     message_edit: HWND,
     send_button: HWND,
+    cancel_button: HWND,
     prev_focus: HWND,
 }
 
@@ -38,6 +40,7 @@ struct FeedbackLabels {
     subject: String,
     message: String,
     send: String,
+    cancel: String,
     open_mail_error: String,
 }
 
@@ -47,6 +50,7 @@ fn labels_for(language: Language) -> FeedbackLabels {
         subject: i18n::tr(language, "feedback.label.subject"),
         message: i18n::tr(language, "feedback.label.message"),
         send: i18n::tr(language, "feedback.button.send"),
+        cancel: i18n::tr(language, "go_to_time.cancel"),
         open_mail_error: i18n::tr(language, "feedback.error.open_mail"),
     }
 }
@@ -81,6 +85,7 @@ pub fn open(parent: HWND) {
             subject_edit: HWND(0),
             message_edit: HWND(0),
             send_button: HWND(0),
+            cancel_button: HWND(0),
             prev_focus: GetFocus(),
         });
         let state_ptr = Box::into_raw(state);
@@ -206,7 +211,7 @@ fn feedback_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
                     w!("BUTTON"),
                     PCWSTR(to_wide(&labels.send).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                    406,
+                    308,
                     278,
                     90,
                     28,
@@ -215,16 +220,35 @@ fn feedback_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
                     hinstance,
                     None,
                 );
+                let cancel_button = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&labels.cancel).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    406,
+                    278,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(FEEDBACK_ID_CANCEL as isize),
+                    hinstance,
+                    None,
+                );
 
                 (*init_ptr).subject_edit = subject_edit;
                 (*init_ptr).message_edit = message_edit;
                 (*init_ptr).send_button = send_button;
+                (*init_ptr).cancel_button = cancel_button;
                 SetFocus(subject_edit);
                 LRESULT(0)
             }
             WM_COMMAND => {
                 if (wparam.0 & 0xffff) == FEEDBACK_ID_SEND {
                     send_feedback(hwnd);
+                    return LRESULT(0);
+                }
+                if (wparam.0 & 0xffff) == FEEDBACK_ID_CANCEL {
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -276,17 +300,21 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             if with_feedback_state(hwnd, |state| {
                 let focused = GetFocus();
                 let target = if shift_down {
-                    if focused == state.send_button {
+                    if focused == state.cancel_button {
+                        state.send_button
+                    } else if focused == state.send_button {
                         state.message_edit
                     } else if focused == state.message_edit {
                         state.subject_edit
                     } else {
-                        state.send_button
+                        state.cancel_button
                     }
                 } else if focused == state.subject_edit {
                     state.message_edit
                 } else if focused == state.message_edit {
                     state.send_button
+                } else if focused == state.send_button {
+                    state.cancel_button
                 } else {
                     state.subject_edit
                 };

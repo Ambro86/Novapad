@@ -15,15 +15,36 @@ use std::{fs, io::Write};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const BRIDGE_FILE_NAME: &str = "faster_whisper_bridge.exe";
+const BRIDGE_ARCHIVE_FILE_NAME: &str = "faster_whisper_bridge.zip";
 const BRIDGE_MIN_VALID_SIZE_BYTES: u64 = 1_000_000;
 const CUDA_PACKAGE_FILE_NAME: &str = "whisper-cuda-runtime-win64-cu12.zip";
-const BRIDGE_DOWNLOAD_URLS: [&str; 2] = [
-    "https://github.com/Ambro86/Sonarpad/raw/master/dll/faster_whisper_bridge.exe",
-    "https://raw.githubusercontent.com/Ambro86/Sonarpad/master/dll/faster_whisper_bridge.exe",
+const BRIDGE_ARCHIVE_PART_FILE_NAMES: [&str; 2] = [
+    "faster_whisper_bridge.zip.001",
+    "faster_whisper_bridge.zip.002",
 ];
-const CUDA_PACKAGE_URLS: [&str; 2] = [
-    "https://github.com/Ambro86/Sonarpad/raw/master/dll/whisper-cuda-runtime-win64-cu12.zip",
-    "https://raw.githubusercontent.com/Ambro86/Sonarpad/master/dll/whisper-cuda-runtime-win64-cu12.zip",
+const CUDA_PACKAGE_PART_FILE_NAMES: [&str; 2] = [
+    "whisper-cuda-runtime-win64-cu12.zip.001",
+    "whisper-cuda-runtime-win64-cu12.zip.002",
+];
+const BRIDGE_ARCHIVE_PART_DOWNLOAD_URLS: [[&str; 2]; 2] = [
+    [
+        "https://github.com/Ambro86/Sonarpad/raw/master/dll/faster_whisper_bridge.zip.001",
+        "https://raw.githubusercontent.com/Ambro86/Sonarpad/master/dll/faster_whisper_bridge.zip.001",
+    ],
+    [
+        "https://github.com/Ambro86/Sonarpad/raw/master/dll/faster_whisper_bridge.zip.002",
+        "https://raw.githubusercontent.com/Ambro86/Sonarpad/master/dll/faster_whisper_bridge.zip.002",
+    ],
+];
+const CUDA_PACKAGE_PART_DOWNLOAD_URLS: [[&str; 2]; 2] = [
+    [
+        "https://github.com/Ambro86/Sonarpad/raw/master/dll/whisper-cuda-runtime-win64-cu12.zip.001",
+        "https://raw.githubusercontent.com/Ambro86/Sonarpad/master/dll/whisper-cuda-runtime-win64-cu12.zip.001",
+    ],
+    [
+        "https://github.com/Ambro86/Sonarpad/raw/master/dll/whisper-cuda-runtime-win64-cu12.zip.002",
+        "https://raw.githubusercontent.com/Ambro86/Sonarpad/master/dll/whisper-cuda-runtime-win64-cu12.zip.002",
+    ],
 ];
 const CUDA_REQUIRED_DLLS: [&str; 3] = ["cublas64_12.dll", "cudart64_12.dll", "cudnn64_9.dll"];
 
@@ -173,6 +194,36 @@ fn cuda_package_path() -> PathBuf {
         .join(CUDA_PACKAGE_FILE_NAME)
 }
 
+fn bridge_archive_path() -> PathBuf {
+    crate::settings::settings_dir()
+        .join("tools")
+        .join(BRIDGE_ARCHIVE_FILE_NAME)
+}
+
+fn repo_dll_dir_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(exe_path) = std::env::current_exe()
+        && let Some(repo_root) = exe_path
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+    {
+        candidates.push(repo_root.join("dll"));
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("dll"));
+    }
+    candidates
+}
+
+fn split_part_paths(base_dir: &Path, file_names: &[&str]) -> Vec<PathBuf> {
+    file_names.iter().map(|name| base_dir.join(name)).collect()
+}
+
+fn all_files_exist(paths: &[PathBuf]) -> bool {
+    paths.iter().all(|path| path.is_file())
+}
+
 fn has_required_cuda_runtime(cuda_dir: &Path) -> bool {
     CUDA_REQUIRED_DLLS
         .iter()
@@ -195,15 +246,94 @@ fn is_valid_bridge_exe(path: &Path) -> Result<bool, String> {
     Ok(header == [b'M', b'Z'])
 }
 
-fn download_bridge_binary_from_url(
+fn join_split_parts(part_paths: &[PathBuf], target_path: &Path) -> Result<(), String> {
+    let parent = target_path
+        .parent()
+        .ok_or_else(|| "invalid joined target path".to_string())?;
+    fs::create_dir_all(parent).map_err(|e| format!("create join dir failed: {e}"))?;
+    let part_path = target_path.with_extension("join.part");
+    let mut out =
+        fs::File::create(&part_path).map_err(|e| format!("create joined .part failed: {e}"))?;
+    for input_path in part_paths {
+        let mut input =
+            fs::File::open(input_path).map_err(|e| format!("open split part failed: {e}"))?;
+        std::io::copy(&mut input, &mut out).map_err(|e| format!("join split part failed: {e}"))?;
+    }
+    out.flush()
+        .map_err(|e| format!("flush joined file failed: {e}"))?;
+    fs::rename(&part_path, target_path).map_err(|e| format!("finalize joined file failed: {e}"))?;
+    Ok(())
+}
+
+fn extract_bridge_archive(archive_path: &Path, target_path: &Path) -> Result<(), String> {
+    let file =
+        fs::File::open(archive_path).map_err(|e| format!("open bridge archive failed: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("read bridge zip archive failed: {e}"))?;
+    let mut found = false;
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("read bridge zip entry failed: {e}"))?;
+        let Some(file_name) = Path::new(entry.name()).file_name() else {
+            continue;
+        };
+        if !file_name
+            .to_string_lossy()
+            .eq_ignore_ascii_case(BRIDGE_FILE_NAME)
+        {
+            continue;
+        }
+        let parent = target_path
+            .parent()
+            .ok_or_else(|| "invalid bridge extract target path".to_string())?;
+        fs::create_dir_all(parent).map_err(|e| format!("create bridge dir failed: {e}"))?;
+        let part_path = target_path.with_extension("exe.part");
+        let mut out = fs::File::create(&part_path)
+            .map_err(|e| format!("create extracted bridge failed: {e}"))?;
+        std::io::copy(&mut entry, &mut out)
+            .map_err(|e| format!("extract bridge executable failed: {e}"))?;
+        out.flush()
+            .map_err(|e| format!("flush extracted bridge failed: {e}"))?;
+        fs::rename(&part_path, target_path)
+            .map_err(|e| format!("finalize extracted bridge failed: {e}"))?;
+        found = true;
+        break;
+    }
+    if !found {
+        return Err("bridge archive missing executable".to_string());
+    }
+    Ok(())
+}
+
+fn try_restore_from_local_split_parts(
+    part_file_names: &[&str],
+    joined_target_path: &Path,
+) -> Result<bool, String> {
+    for base_dir in repo_dll_dir_candidates() {
+        let part_paths = split_part_paths(&base_dir, part_file_names);
+        if all_files_exist(&part_paths) {
+            crate::log_debug(&format!(
+                "Transcription: restoring local split asset from {}",
+                base_dir.display()
+            ));
+            join_split_parts(&part_paths, joined_target_path)?;
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn download_file_from_url(
     url: &str,
     target_path: &Path,
     cancel: &Arc<AtomicBool>,
+    user_agent: &str,
     download_progress: &mut Option<Box<dyn FnMut(i32) + Send>>,
 ) -> Result<(), String> {
     let parent = target_path
         .parent()
-        .ok_or_else(|| "invalid bridge target path".to_string())?;
+        .ok_or_else(|| "invalid download target path".to_string())?;
     fs::create_dir_all(parent).map_err(|e| format!("create tools dir failed: {e}"))?;
 
     let client = Client::builder()
@@ -214,19 +344,16 @@ fn download_bridge_binary_from_url(
 
     let mut response = client
         .get(url)
-        .header(USER_AGENT, "Sonarpad/faster-whisper-bridge")
+        .header(USER_AGENT, user_agent)
         .send()
-        .map_err(|e| format!("bridge download request failed: {e}"))?;
+        .map_err(|e| format!("download request failed: {e}"))?;
     if !response.status().is_success() {
-        return Err(format!(
-            "bridge download failed: HTTP {}",
-            response.status()
-        ));
+        return Err(format!("download failed: HTTP {}", response.status()));
     }
 
-    let part_path = target_path.with_extension("exe.part");
+    let part_path = target_path.with_extension("download.part");
     let mut out =
-        fs::File::create(&part_path).map_err(|e| format!("create bridge .part failed: {e}"))?;
+        fs::File::create(&part_path).map_err(|e| format!("create download .part failed: {e}"))?;
     let mut buf = vec![0u8; 128 * 1024];
     let total_bytes = response.content_length();
     let mut downloaded_bytes: u64 = 0;
@@ -234,18 +361,18 @@ fn download_bridge_binary_from_url(
     loop {
         if cancel.load(Ordering::Relaxed) {
             if let Err(err) = fs::remove_file(&part_path) {
-                crate::log_debug(&format!("bridge .part cleanup failed: {err}"));
+                crate::log_debug(&format!("download .part cleanup failed: {err}"));
             }
             return Err("cancelled".to_string());
         }
         let read = response
             .read(&mut buf)
-            .map_err(|e| format!("bridge download read failed: {e}"))?;
+            .map_err(|e| format!("download read failed: {e}"))?;
         if read == 0 {
             break;
         }
         out.write_all(&buf[..read])
-            .map_err(|e| format!("bridge write failed: {e}"))?;
+            .map_err(|e| format!("download write failed: {e}"))?;
         downloaded_bytes = downloaded_bytes.saturating_add(read as u64);
         if let Some(total) = total_bytes
             && total > 0
@@ -260,12 +387,27 @@ fn download_bridge_binary_from_url(
         }
     }
     out.flush()
-        .map_err(|e| format!("bridge flush failed: {e}"))?;
-    fs::rename(&part_path, target_path).map_err(|e| format!("bridge finalize failed: {e}"))?;
+        .map_err(|e| format!("download flush failed: {e}"))?;
+    fs::rename(&part_path, target_path).map_err(|e| format!("download finalize failed: {e}"))?;
     if let Some(cb) = download_progress.as_mut() {
         cb(100);
     }
     Ok(())
+}
+
+fn download_bridge_binary_from_url(
+    url: &str,
+    target_path: &Path,
+    cancel: &Arc<AtomicBool>,
+    download_progress: &mut Option<Box<dyn FnMut(i32) + Send>>,
+) -> Result<(), String> {
+    download_file_from_url(
+        url,
+        target_path,
+        cancel,
+        "Sonarpad/faster-whisper-bridge",
+        download_progress,
+    )
 }
 
 fn download_bridge_binary(
@@ -273,35 +415,55 @@ fn download_bridge_binary(
     cancel: &Arc<AtomicBool>,
     download_progress: &mut Option<Box<dyn FnMut(i32) + Send>>,
 ) -> Result<(), String> {
+    let archive_path = bridge_archive_path();
+    if !archive_path.is_file()
+        && try_restore_from_local_split_parts(&BRIDGE_ARCHIVE_PART_FILE_NAMES, &archive_path)?
+    {
+        extract_bridge_archive(&archive_path, target_path)?;
+        return Ok(());
+    }
+
     let mut last_err = String::new();
-    for url in BRIDGE_DOWNLOAD_URLS {
-        crate::log_debug(&format!("Transcription: downloading bridge from {}", url));
-        match download_bridge_binary_from_url(url, target_path, cancel, download_progress) {
-            Ok(()) => match is_valid_bridge_exe(target_path) {
-                Ok(true) => return Ok(()),
-                Ok(false) => {
-                    if let Err(err) = fs::remove_file(target_path) {
-                        crate::log_debug(&format!("invalid bridge cleanup failed: {err}"));
-                    }
-                    last_err =
-                        format!("downloaded bridge is not a valid Windows executable from {url}");
+    let mut part_paths = Vec::new();
+    for (index, urls) in BRIDGE_ARCHIVE_PART_DOWNLOAD_URLS.iter().enumerate() {
+        let part_path = archive_path.with_extension(format!("zip.part{}", index + 1));
+        let mut part_ok = false;
+        for url in urls {
+            crate::log_debug(&format!(
+                "Transcription: downloading bridge part from {}",
+                url
+            ));
+            match download_bridge_binary_from_url(url, &part_path, cancel, download_progress) {
+                Ok(()) => {
+                    part_ok = true;
+                    break;
                 }
                 Err(err) => {
-                    if let Err(remove_err) = fs::remove_file(target_path) {
-                        crate::log_debug(&format!("invalid bridge cleanup failed: {remove_err}"));
-                    }
                     last_err = err;
                 }
-            },
-            Err(err) => {
-                last_err = err;
             }
         }
+        if !part_ok {
+            return if last_err.is_empty() {
+                Err("bridge archive part download failed".to_string())
+            } else {
+                Err(last_err)
+            };
+        }
+        part_paths.push(part_path);
     }
-    if last_err.is_empty() {
-        Err("bridge download failed".to_string())
-    } else {
-        Err(last_err)
+
+    join_split_parts(&part_paths, &archive_path)?;
+    for part_path in part_paths {
+        if let Err(err) = fs::remove_file(&part_path) {
+            crate::log_debug(&format!("bridge part cleanup failed: {err}"));
+        }
+    }
+    extract_bridge_archive(&archive_path, target_path)?;
+    match is_valid_bridge_exe(target_path) {
+        Ok(true) => Ok(()),
+        Ok(false) => Err("joined bridge archive did not contain a valid executable".to_string()),
+        Err(err) => Err(err),
     }
 }
 
@@ -311,20 +473,10 @@ fn ensure_bridge_binary(
 ) -> Result<PathBuf, String> {
     #[cfg(debug_assertions)]
     {
-        let mut local_candidates: Vec<PathBuf> = Vec::new();
-        if let Ok(exe_path) = std::env::current_exe()
-            && let Some(repo_root) = exe_path
-                .parent()
-                .and_then(|p| p.parent())
-                .and_then(|p| p.parent())
+        for candidate in repo_dll_dir_candidates()
+            .into_iter()
+            .map(|dir| dir.join(BRIDGE_FILE_NAME))
         {
-            local_candidates.push(repo_root.join("dll").join(BRIDGE_FILE_NAME));
-        }
-        if let Ok(cwd) = std::env::current_dir() {
-            local_candidates.push(cwd.join("dll").join(BRIDGE_FILE_NAME));
-        }
-
-        for candidate in local_candidates {
             if candidate.is_file() {
                 match is_valid_bridge_exe(&candidate) {
                     Ok(true) => {
@@ -392,75 +544,58 @@ fn download_cuda_package_from_url(
     target_path: &Path,
     cancel: &Arc<AtomicBool>,
 ) -> Result<(), String> {
-    let parent = target_path
-        .parent()
-        .ok_or_else(|| "invalid CUDA package target path".to_string())?;
-    fs::create_dir_all(parent).map_err(|e| format!("create tools dir failed: {e}"))?;
-
-    let client = Client::builder()
-        .connect_timeout(Duration::from_secs(30))
-        .timeout(Duration::from_secs(60 * 30))
-        .build()
-        .map_err(|e| format!("http client build failed: {e}"))?;
-
-    let mut response = client
-        .get(url)
-        .header(USER_AGENT, "Sonarpad/whisper-cuda-runtime")
-        .send()
-        .map_err(|e| format!("CUDA package request failed: {e}"))?;
-    if !response.status().is_success() {
-        return Err(format!(
-            "CUDA package download failed: HTTP {}",
-            response.status()
-        ));
-    }
-
-    let part_path = target_path.with_extension("zip.part");
-    let mut out = fs::File::create(&part_path)
-        .map_err(|e| format!("create CUDA package .part failed: {e}"))?;
-    let mut buf = vec![0u8; 256 * 1024];
-    loop {
-        if cancel.load(Ordering::Relaxed) {
-            if let Err(err) = fs::remove_file(&part_path) {
-                crate::log_debug(&format!("CUDA package .part cleanup failed: {err}"));
-            }
-            return Err("cancelled".to_string());
-        }
-        let read = response
-            .read(&mut buf)
-            .map_err(|e| format!("CUDA package read failed: {e}"))?;
-        if read == 0 {
-            break;
-        }
-        out.write_all(&buf[..read])
-            .map_err(|e| format!("CUDA package write failed: {e}"))?;
-    }
-    out.flush()
-        .map_err(|e| format!("CUDA package flush failed: {e}"))?;
-    fs::rename(&part_path, target_path)
-        .map_err(|e| format!("CUDA package finalize failed: {e}"))?;
-    Ok(())
+    let mut progress = None;
+    download_file_from_url(
+        url,
+        target_path,
+        cancel,
+        "Sonarpad/whisper-cuda-runtime",
+        &mut progress,
+    )
 }
 
 fn download_cuda_package(target_path: &Path, cancel: &Arc<AtomicBool>) -> Result<(), String> {
+    if try_restore_from_local_split_parts(&CUDA_PACKAGE_PART_FILE_NAMES, target_path)? {
+        return Ok(());
+    }
+
     let mut last_err = String::new();
-    for url in CUDA_PACKAGE_URLS {
-        crate::log_debug(&format!(
-            "Transcription: downloading CUDA runtime from {}",
-            url
-        ));
-        match download_cuda_package_from_url(url, target_path, cancel) {
-            Ok(()) => return Ok(()),
-            Err(err) => {
-                last_err = err;
+    let mut part_paths = Vec::new();
+    for (index, urls) in CUDA_PACKAGE_PART_DOWNLOAD_URLS.iter().enumerate() {
+        let part_path = target_path.with_extension(format!("zip.part{}", index + 1));
+        let mut part_ok = false;
+        for url in urls {
+            crate::log_debug(&format!(
+                "Transcription: downloading CUDA runtime part from {}",
+                url
+            ));
+            match download_cuda_package_from_url(url, &part_path, cancel) {
+                Ok(()) => {
+                    part_ok = true;
+                    break;
+                }
+                Err(err) => {
+                    last_err = err;
+                }
             }
         }
+        if !part_ok {
+            return if last_err.is_empty() {
+                Err("CUDA package part download failed".to_string())
+            } else {
+                Err(last_err)
+            };
+        }
+        part_paths.push(part_path);
     }
-    if last_err.is_empty() {
-        Err("CUDA package download failed".to_string())
-    } else {
-        Err(last_err)
+
+    join_split_parts(&part_paths, target_path)?;
+    for part_path in part_paths {
+        if let Err(err) = fs::remove_file(&part_path) {
+            crate::log_debug(&format!("CUDA part cleanup failed: {err}"));
+        }
     }
+    Ok(())
 }
 
 fn extract_cuda_runtime(zip_path: &Path, target_dir: &Path) -> Result<(), String> {

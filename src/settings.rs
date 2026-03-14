@@ -250,6 +250,15 @@ pub enum PodcastFormat {
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum PodcastSearchProvider {
+    #[serde(rename = "itunes")]
+    #[default]
+    Itunes,
+    #[serde(rename = "podcastindex")]
+    PodcastIndex,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum SubtitleReadMode {
     #[serde(rename = "off")]
     #[default]
@@ -376,6 +385,7 @@ pub struct ShortcutSettings {
     pub audiobook: ShortcutBinding,
     pub batch_audiobooks: ShortcutBinding,
     pub record_podcast: ShortcutBinding,
+    pub dictation: ShortcutBinding,
     pub convert_audio: ShortcutBinding,
     pub open_rss: ShortcutBinding,
     pub open_podcasts: ShortcutBinding,
@@ -403,6 +413,7 @@ impl Default for ShortcutSettings {
             audiobook: ShortcutBinding::new(true, false, false, 'R' as u16),
             batch_audiobooks: ShortcutBinding::new(true, true, false, 'B' as u16),
             record_podcast: ShortcutBinding::new(true, true, false, 'R' as u16),
+            dictation: ShortcutBinding::new(true, true, false, 0x20),
             convert_audio: ShortcutBinding::new(true, true, false, 'A' as u16),
             open_rss: ShortcutBinding::new(true, true, false, 'U' as u16),
             open_podcasts: ShortcutBinding::new(true, true, false, 'P' as u16),
@@ -622,6 +633,8 @@ pub struct AppSettings {
     pub show_media_save_confirmation: bool,
     pub podcast_index_api_key: String,
     pub podcast_index_api_secret: String,
+    #[serde(default)]
+    pub podcast_search_provider: PodcastSearchProvider,
     #[serde(default)]
     pub gemini_api_key: String,
     pub youtube_include_timestamps: bool,
@@ -964,6 +977,7 @@ impl Default for AppSettings {
             show_media_save_confirmation: true,
             podcast_index_api_key: String::new(),
             podcast_index_api_secret: String::new(),
+            podcast_search_provider: PodcastSearchProvider::Itunes,
             gemini_api_key: String::new(),
             youtube_include_timestamps: true,
             stream_audio_default_format: default_stream_audio_output_format(),
@@ -1682,6 +1696,14 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.documents_save_folder = settings.documents_save_folder.trim().to_string();
     if settings.documents_save_folder.is_empty() {
         settings.documents_save_folder = default_documents_save_folder();
+    }
+    if settings.podcast_index_api_key.trim().is_empty()
+        || decrypt_podcast_index_secret(&settings.podcast_index_api_secret)
+            .unwrap_or_default()
+            .trim()
+            .is_empty()
+    {
+        settings.podcast_search_provider = PodcastSearchProvider::Itunes;
     }
     if settings
         .podcast_save_folder

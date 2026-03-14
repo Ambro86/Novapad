@@ -2,7 +2,9 @@ use crate::accessibility::{handle_accessibility, nvda_speak, to_wide};
 use crate::app_windows::help_window;
 use crate::editor_manager;
 use crate::i18n;
-use crate::settings::{self, Language, ListDateDisplayMode, ListTimeDisplayMode, confirm_title};
+use crate::settings::{
+    self, Language, ListDateDisplayMode, ListTimeDisplayMode, PodcastSearchProvider, confirm_title,
+};
 use crate::tools::rss::{self, PodcastEpisode, RssSource, RssSourceType};
 use crate::{log_debug, with_state};
 use chrono::{Local, NaiveDate, TimeZone};
@@ -2701,6 +2703,41 @@ fn selected_search_provider(hwnd: HWND) -> SearchProvider {
         SearchProvider::PodcastIndex
     } else {
         SearchProvider::Itunes
+    }
+}
+
+fn podcastindex_credentials_available(parent: HWND) -> bool {
+    with_state(parent, |ps| {
+        let key = ps.settings.podcast_index_api_key.trim();
+        let secret = settings::decrypt_podcast_index_secret(&ps.settings.podcast_index_api_secret)
+            .unwrap_or_default();
+        !key.is_empty() && !secret.trim().is_empty()
+    })
+    .unwrap_or(false)
+}
+
+fn persisted_search_provider(parent: HWND) -> SearchProvider {
+    with_state(parent, |ps| match ps.settings.podcast_search_provider {
+        PodcastSearchProvider::PodcastIndex => SearchProvider::PodcastIndex,
+        PodcastSearchProvider::Itunes => SearchProvider::Itunes,
+    })
+    .unwrap_or(SearchProvider::Itunes)
+}
+
+fn save_search_provider(parent: HWND, provider: SearchProvider) {
+    let mut changed = false;
+    with_state(parent, |ps| {
+        let next = match provider {
+            SearchProvider::Itunes => PodcastSearchProvider::Itunes,
+            SearchProvider::PodcastIndex => PodcastSearchProvider::PodcastIndex,
+        };
+        if ps.settings.podcast_search_provider != next {
+            ps.settings.podcast_search_provider = next;
+            changed = true;
+        }
+    });
+    if changed && let Some(settings) = with_state(parent, |ps| ps.settings.clone()) {
+        settings::save_settings(settings);
     }
 }
 
@@ -6843,6 +6880,8 @@ fn create_controls(hwnd: HWND) {
             with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
             "podcasts.search.provider.podcastindex",
         );
+        let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+        let show_search_provider = parent.0 != 0 && podcastindex_credentials_available(parent);
         let hwnd_search_provider = CreateWindowExW(
             WS_EX_CLIENTEDGE,
             w!("COMBOBOX"),
@@ -6859,20 +6898,42 @@ fn create_controls(hwnd: HWND) {
         );
         if hwnd_search_provider.0 != 0 {
             let itunes_wide = to_wide(&provider_itunes);
-            let podcastindex_wide = to_wide(&provider_podcastindex);
             SendMessageW(
                 hwnd_search_provider,
                 CB_ADDSTRING,
                 WPARAM(0),
                 LPARAM(itunes_wide.as_ptr() as isize),
             );
-            SendMessageW(
-                hwnd_search_provider,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(podcastindex_wide.as_ptr() as isize),
-            );
-            SendMessageW(hwnd_search_provider, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            if show_search_provider {
+                let podcastindex_wide = to_wide(&provider_podcastindex);
+                SendMessageW(
+                    hwnd_search_provider,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(podcastindex_wide.as_ptr() as isize),
+                );
+                let provider_index = if matches!(
+                    persisted_search_provider(parent),
+                    SearchProvider::PodcastIndex
+                ) {
+                    1
+                } else {
+                    0
+                };
+                SendMessageW(
+                    hwnd_search_provider,
+                    CB_SETCURSEL,
+                    WPARAM(provider_index),
+                    LPARAM(0),
+                );
+            } else {
+                SendMessageW(hwnd_search_provider, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+                EnableWindow(hwnd_search_provider, false);
+                crate::show_window_safe(
+                    hwnd_search_provider,
+                    windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
+                );
+            }
         }
 
         let hwnd_search_button = CreateWindowExW(
@@ -7072,12 +7133,18 @@ fn resize_controls(hwnd: HWND) {
     let results_h = 140;
     let button_h = 26;
     let button_rows = 3;
+    let show_search_provider = {
+        let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+        parent.0 != 0 && podcastindex_credentials_available(parent)
+    };
+    let provider_rows = if show_search_provider { 1 } else { 0 };
     let tree_h = (height
         - margin * 2
         - spacing * 8
         - label_h
         - search_h
-        - search_h
+        - (search_h * provider_rows)
+        - (spacing * provider_rows)
         - search_button_h
         - results_h
         - button_h * button_rows)
@@ -7139,15 +7206,17 @@ fn resize_controls(hwnd: HWND) {
                 true,
             ));
             y += search_h + spacing;
-            crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
-                controls.3,
-                margin,
-                y,
-                width - margin * 2,
-                search_h,
-                true,
-            ));
-            y += search_h + spacing;
+            if show_search_provider {
+                crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+                    controls.3,
+                    margin,
+                    y,
+                    width - margin * 2,
+                    search_h,
+                    true,
+                ));
+                y += search_h + spacing;
+            }
             let button_total_w = (width - margin * 2).max(0);
             let button_w = ((button_total_w - spacing) / 2).max(120);
             crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
@@ -7430,6 +7499,13 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                                 language,
                                 "podcasts.categories.source.label",
                             ));
+                            return LRESULT(0);
+                        }
+                        if code == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE as u16 {
+                            let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+                            if parent.0 != 0 {
+                                save_search_provider(parent, selected_search_provider(hwnd));
+                            }
                             return LRESULT(0);
                         }
                         LRESULT(0)

@@ -4,6 +4,8 @@ Version 0.6.8 – 2026-03-04
 
 Nouveautés
 • Ajout d’un nouvel élément dans le menu Lecture permettant de transcrire n’importe quel fichier audio ou vidéo avec Whisper. Une nouvelle section « IA et transcription » est désormais disponible dans Options, où vous pouvez choisir le modèle, activer la prise en charge optionnelle de CUDA pour les cartes graphiques NVIDIA, conserver la langue d’origine et activer ou désactiver les horodatages.
+• Ajout de la dictée vocale hors ligne, avec le même fonctionnement que la transcription audio. Par défaut, appuyez sur `Ctrl+Shift+Espace` pour démarrer la dictée puis appuyez à nouveau sur le même raccourci pour l’arrêter ; ce raccourci peut être personnalisé dans les Options.
+• Sonarpad est désormais disponible aussi sur Mac, même avec un ensemble de fonctions partiel. Lien du projet : https://github.com/Ambro86/Sonarpad-Mac
 
 Améliorations
 • Ajout de la gestion des profils vocaux dans Options > Voix : il est possible d'ajouter, de renommer et de supprimer des profils.

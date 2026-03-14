@@ -4,6 +4,8 @@ Phiên bản 0.6.8 – 2026-03-04
 
 Có gì mới
 • Đã thêm một mục mới trong menu Phát để chép lời bất kỳ tệp âm thanh hoặc video nào bằng Whisper. Trong Tùy chọn có một phần mới tên là “AI và Chuyển lời”, nơi bạn có thể chọn mô hình, bật hỗ trợ CUDA tùy chọn cho card đồ họa NVIDIA, giữ nguyên ngôn ngữ gốc và bật hoặc tắt dấu thời gian.
+• Đã thêm khả năng dùng đọc chính tả bằng giọng nói ngoại tuyến, với cách hoạt động giống như chép lời âm thanh. Mặc định, nhấn `Ctrl+Shift+Space` để bắt đầu đọc chính tả và nhấn lại đúng phím tắt đó để kết thúc; có thể tùy chỉnh phím tắt trong phần Tùy chọn.
+• Sonarpad hiện cũng đã có bản cho Mac, dù hiện chỉ hỗ trợ một phần chức năng. Liên kết dự án: https://github.com/Ambro86/Sonarpad-Mac
 
 Cải tiến
 • Đã thêm quản lý hồ sơ giọng nói trong Tùy chọn > Giọng nói: có thể thêm, đổi tên và xóa hồ sơ.

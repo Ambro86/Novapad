@@ -4,6 +4,8 @@ Version 0.6.8 – 2026-03-04
 
 What's New
 • Added a new item to the Play menu that lets you transcribe any audio or video file with Whisper. A new “AI and Transcription” section is now available in Options, where you can choose the model, enable optional CUDA support for NVIDIA graphics cards, preserve the original language, and enable or disable timestamps.
+• Added offline voice dictation, using the same workflow as audio transcription. By default, press `Ctrl+Shift+Space` to start dictation and press the same shortcut again to stop it; the shortcut can be customized in Options.
+• Sonarpad is now also available on Mac with a subset of features. Project link: https://github.com/Ambro86/Sonarpad-Mac
 
 Improvements
 • Added voice profiles in Options > Voice: profiles can be added, renamed, and deleted.

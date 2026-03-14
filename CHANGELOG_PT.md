@@ -4,6 +4,8 @@ Versão 0.6.8 – 2026-03-04
 
 Novidades
 • Adicionado um novo item no menu Reproduzir que permite transcrever qualquer ficheiro de áudio ou vídeo com o Whisper. Nas Opções existe uma nova secção chamada «IA e Transcrição», onde é possível escolher o modelo, ativar o suporte opcional a CUDA para placas gráficas NVIDIA, manter o idioma original e ativar ou desativar as marcas temporais.
+• Adicionada a possibilidade de usar ditado por voz offline, com o mesmo funcionamento da transcrição de áudio. Por predefinição, prima `Ctrl+Shift+Espaço` para iniciar o ditado e prima o mesmo atalho novamente para o terminar; o atalho pode ser personalizado nas Opções.
+• O Sonarpad está agora disponível também no Mac, embora com um conjunto de funcionalidades parcial. Ligação do projeto: https://github.com/Ambro86/Sonarpad-Mac
 
 Melhorias
 • Adicionada a gestão de perfis de voz em Opções > Voz: é possível adicionar, renomear e eliminar perfis.

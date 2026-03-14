@@ -852,6 +852,7 @@
   "options.shortcuts.action.audiobook": "创建有声书",
   "options.shortcuts.action.batch_audiobooks": "批量创建有声书",
   "options.shortcuts.action.record_podcast": "录制播客",
+  "options.shortcuts.action.dictation": "语音听写",
   "options.shortcuts.action.convert_audio": "转换音频",
   "options.shortcuts.action.open_rss": "打开 RSS",
   "options.shortcuts.action.open_podcasts": "打开播客",

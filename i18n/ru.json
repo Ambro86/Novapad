@@ -879,6 +879,7 @@
   "options.shortcuts.action.audiobook": "Записать аудиокнигу",
   "options.shortcuts.action.batch_audiobooks": "Пакетное создание аудиокниг",
   "options.shortcuts.action.record_podcast": "Записать подкаст",
+  "options.shortcuts.action.dictation": "Голосовая диктовка",
   "options.shortcuts.action.convert_audio": "Конвертировать аудио",
   "options.shortcuts.action.open_rss": "Открыть RSS",
   "options.shortcuts.action.open_podcasts": "Открыть подкасты",

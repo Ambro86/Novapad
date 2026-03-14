@@ -890,6 +890,7 @@
   "options.shortcuts.action.audiobook": "Record audiobook",
   "options.shortcuts.action.batch_audiobooks": "Batch audiobooks",
   "options.shortcuts.action.record_podcast": "Record podcast",
+  "options.shortcuts.action.dictation": "Голосове диктування",
   "options.shortcuts.action.convert_audio": "Convert audio",
   "options.shortcuts.action.open_rss": "Open RSS",
   "options.shortcuts.action.open_podcasts": "Open podcasts",

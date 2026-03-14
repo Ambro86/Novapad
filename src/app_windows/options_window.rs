@@ -244,6 +244,7 @@ enum ShortcutAction {
     Audiobook,
     BatchAudiobooks,
     RecordPodcast,
+    Dictation,
     ConvertAudio,
     OpenRss,
     OpenPodcasts,
@@ -262,7 +263,7 @@ enum ShortcutAction {
 }
 
 impl ShortcutAction {
-    const ALL: [ShortcutAction; 22] = [
+    const ALL: [ShortcutAction; 23] = [
         ShortcutAction::ReadPauseResume,
         ShortcutAction::ReadStart,
         ShortcutAction::ReadStop,
@@ -270,6 +271,7 @@ impl ShortcutAction {
         ShortcutAction::Audiobook,
         ShortcutAction::BatchAudiobooks,
         ShortcutAction::RecordPodcast,
+        ShortcutAction::Dictation,
         ShortcutAction::ConvertAudio,
         ShortcutAction::OpenRss,
         ShortcutAction::OpenPodcasts,
@@ -305,6 +307,7 @@ fn shortcut_action_i18n_key(action: ShortcutAction) -> &'static str {
         ShortcutAction::Audiobook => "options.shortcuts.action.audiobook",
         ShortcutAction::BatchAudiobooks => "options.shortcuts.action.batch_audiobooks",
         ShortcutAction::RecordPodcast => "options.shortcuts.action.record_podcast",
+        ShortcutAction::Dictation => "options.shortcuts.action.dictation",
         ShortcutAction::ConvertAudio => "options.shortcuts.action.convert_audio",
         ShortcutAction::OpenRss => "options.shortcuts.action.open_rss",
         ShortcutAction::OpenPodcasts => "options.shortcuts.action.open_podcasts",
@@ -359,6 +362,7 @@ fn shortcut_binding_for_action(
         ShortcutAction::Audiobook => settings.audiobook,
         ShortcutAction::BatchAudiobooks => settings.batch_audiobooks,
         ShortcutAction::RecordPodcast => settings.record_podcast,
+        ShortcutAction::Dictation => settings.dictation,
         ShortcutAction::ConvertAudio => settings.convert_audio,
         ShortcutAction::OpenRss => settings.open_rss,
         ShortcutAction::OpenPodcasts => settings.open_podcasts,
@@ -390,6 +394,7 @@ fn set_shortcut_binding_for_action(
         ShortcutAction::Audiobook => settings.audiobook = binding,
         ShortcutAction::BatchAudiobooks => settings.batch_audiobooks = binding,
         ShortcutAction::RecordPodcast => settings.record_podcast = binding,
+        ShortcutAction::Dictation => settings.dictation = binding,
         ShortcutAction::ConvertAudio => settings.convert_audio = binding,
         ShortcutAction::OpenRss => settings.open_rss = binding,
         ShortcutAction::OpenPodcasts => settings.open_podcasts = binding,

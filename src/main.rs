@@ -112,7 +112,7 @@ use windows::Win32::UI::Controls::{
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
     VK_F1, VK_F2, VK_F3, VK_F4, VK_F7, VK_F8, VK_F9, VK_F10, VK_MEDIA_PLAY_PAUSE, VK_MENU, VK_NEXT,
-    VK_OEM_COMMA, VK_OEM_PERIOD, VK_PRIOR, VK_RETURN, VK_SHIFT, VK_SPACE, VK_TAB,
+    VK_OEM_COMMA, VK_OEM_PERIOD, VK_PRIOR, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -9917,11 +9917,6 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         dispatch_shortcut_command(hwnd, IDM_PLAYBACK_CHAPTER_LIST);
         return true;
     }
-    if key == VK_SPACE.0 && ctrl_down && shift_down && !alt_down {
-        dispatch_shortcut_command(hwnd, IDM_TOOLS_TOGGLE_DICTATION);
-        return true;
-    }
-
     if shortcut_matches_message(shortcuts.read_pause_resume, msg) {
         dispatch_shortcut_command(hwnd, IDM_FILE_READ_PAUSE);
         return true;
@@ -9948,6 +9943,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     }
     if shortcut_matches_message(shortcuts.record_podcast, msg) {
         dispatch_shortcut_command(hwnd, IDM_FILE_PODCAST);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.dictation, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_TOGGLE_DICTATION);
         return true;
     }
     if shortcut_matches_message(shortcuts.convert_audio, msg) {

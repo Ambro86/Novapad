@@ -194,8 +194,6 @@ const FOCUS_EDITOR_TIMER_ID4: usize = 4;
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
 const AUDIO_PLAYLIST_TIMER_ID: usize = 7;
-const DICTATION_CHUNK_TIMER_ID: usize = 8;
-const DICTATION_CHUNK_MS: u32 = 2000;
 const SPELLCHECK_HIGHLIGHT_DEBOUNCE_MS: u32 = 100;
 const PDF_OCR_PROMPT_TIMEOUT_COPYDATA_SECS: u64 = 30;
 const COPYDATA_OPEN_FILE: usize = 1;
@@ -2573,11 +2571,10 @@ fn insert_text_into_edit(hwnd_edit: HWND, text: &str) -> bool {
 }
 
 fn apply_dictation_result(hwnd: HWND, result: DictationResult) {
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     log_debug(&format!(
-        "Dictation: UI result session={} chunk={} finalize={} cancelled={} error_present={} text_chars={} target_edit={:?}",
+        "Dictation: UI result session={} cancelled={} error_present={} text_chars={} target_edit={:?}",
         result.session_id,
-        result.chunk_index,
-        result.finalize_session,
         result.cancelled,
         result.error.is_some(),
         result.text.chars().count(),
@@ -2589,36 +2586,28 @@ fn apply_dictation_result(hwnd: HWND, result: DictationResult) {
         return;
     }
 
-    if result.finalize_session {
-        let announce_complete = with_state(hwnd, |state| {
-            let should_announce =
-                !state.dictation_transcribing && state.dictation_pending_chunks == 0;
-            state.dictation_cancel = None;
-            state.dictation_chunk_sender = None;
-            state.dictation_target_edit = HWND(0);
-            should_announce
-        })
-        .unwrap_or(false);
-        if announce_complete {
-            screen_reader_speak("Dictation stopped.");
-        }
-        return;
-    }
-
     with_state(hwnd, |state| {
-        state.dictation_pending_chunks = state.dictation_pending_chunks.saturating_sub(1);
+        state.dictation_transcribing = false;
+        state.dictation_cancel = None;
+        state.dictation_target_edit = HWND(0);
     });
+    close_whisper_progress_window(hwnd);
 
     if result.cancelled {
+        screen_reader_speak(&i18n::tr(language, "dictation.status.cancelled"));
         return;
     }
     if let Some(err) = result.error {
-        screen_reader_speak(&format!("Dictation failed: {err}"));
+        screen_reader_speak(&i18n::tr_f(
+            language,
+            "dictation.error.failed",
+            &[("err", &err)],
+        ));
         return;
     }
     let trimmed = result.text.trim();
     if trimmed.is_empty() {
-        screen_reader_speak("No speech detected.");
+        screen_reader_speak(&i18n::tr(language, "dictation.error.no_speech"));
         return;
     }
 
@@ -2634,7 +2623,7 @@ fn apply_dictation_result(hwnd: HWND, result: DictationResult) {
         active_edit
     };
     if target_edit.0 == 0 {
-        screen_reader_speak("No active editor for dictation.");
+        screen_reader_speak(&i18n::tr(language, "dictation.error.no_active_editor"));
         return;
     }
 
@@ -2644,8 +2633,9 @@ fn apply_dictation_result(hwnd: HWND, result: DictationResult) {
     }
     if insert_text_into_edit(target_edit, &text) {
         set_focus_safe(target_edit);
+        screen_reader_speak(&i18n::tr(language, "dictation.status.inserted"));
     } else {
-        screen_reader_speak("Failed to insert dictated text.");
+        screen_reader_speak(&i18n::tr(language, "dictation.error.insert_failed"));
     }
 }
 
@@ -2668,42 +2658,85 @@ fn dictation_language_name(language: Language) -> &'static str {
     }
 }
 
-fn start_dictation_chunk_worker(
+fn start_dictation_recorder_from_state(
     hwnd: HWND,
-    session_id: u64,
-    cancel: Arc<AtomicBool>,
-    target_edit: HWND,
-) -> mpsc::Sender<DictationChunkJob> {
-    let (tx, rx) = mpsc::channel::<DictationChunkJob>();
-    std::thread::spawn(move || {
-        while let Ok(job) = rx.recv() {
+) -> Result<podcast_recorder::RecorderHandle, String> {
+    let config = with_state(hwnd, |state| {
+        crate::tools::dictation::DictationRecordingConfig {
+            mic_device_id: state.settings.dictation_microphone_device_id.clone(),
+            mic_gain: state.settings.podcast_microphone_gain,
+        }
+    })
+    .ok_or_else(|| "Dictation settings unavailable.".to_string())?;
+    crate::tools::dictation::start_recording(&config)
+}
+
+fn toggle_voice_dictation(hwnd: HWND) {
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let recording = with_state(hwnd, |state| state.dictation_recorder.is_some()).unwrap_or(false);
+    if recording {
+        let (recorder, target_edit, whisper_cuda_enabled, forced_language, cancel, session_id) =
+            with_state(hwnd, |state| {
+                let recorder = state.dictation_recorder.take();
+                state.dictation_transcribing = recorder.is_some();
+                let cancel = Arc::new(AtomicBool::new(false));
+                state.dictation_cancel = if recorder.is_some() {
+                    Some(cancel.clone())
+                } else {
+                    None
+                };
+                (
+                    recorder,
+                    state.dictation_target_edit,
+                    state.settings.whisper_cuda_enabled,
+                    if state.settings.whisper_keep_original_language {
+                        None
+                    } else {
+                        Some(state.settings.language)
+                    },
+                    cancel,
+                    state.dictation_session_id,
+                )
+            })
+            .unwrap_or((
+                None,
+                HWND(0),
+                false,
+                Some(language),
+                Arc::new(AtomicBool::new(false)),
+                0,
+            ));
+        let Some(recorder) = recorder else {
+            return;
+        };
+        open_whisper_progress_window(hwnd, language);
+        update_whisper_progress_window(hwnd, 0);
+        screen_reader_speak(&i18n::tr(language, "dictation.status.transcribing"));
+        std::thread::spawn(move || {
             let started = Instant::now();
             let result = (|| -> Result<DictationResult, String> {
-                let file_size = std::fs::metadata(&job.input_path)
-                    .map(|meta| meta.len())
-                    .unwrap_or(0);
-                match crate::tools::dictation::wav_duration_seconds(&job.input_path) {
+                let path = recorder.stop()?;
+                let file_size = std::fs::metadata(&path).map(|meta| meta.len()).unwrap_or(0);
+                match crate::tools::dictation::wav_duration_seconds(&path) {
                     Ok(seconds) => log_debug(&format!(
-                        "Dictation: bridge start session={} chunk={} path={} size={} duration_secs={:.2} model=small cuda={} forced_language={}",
-                        job.session_id,
-                        job.chunk_index,
-                        job.input_path.display(),
+                        "Dictation: bridge start session={} path={} size={} duration_secs={:.2} model=small cuda={} forced_language={}",
+                        session_id,
+                        path.display(),
                         file_size,
                         seconds,
-                        job.whisper_cuda_enabled,
-                        job.forced_language
+                        whisper_cuda_enabled,
+                        forced_language
                             .map(dictation_language_name)
                             .unwrap_or("auto")
                     )),
                     Err(err) => log_debug(&format!(
-                        "Dictation: bridge start session={} chunk={} path={} size={} duration_unknown err={} model=small cuda={} forced_language={}",
-                        job.session_id,
-                        job.chunk_index,
-                        job.input_path.display(),
+                        "Dictation: bridge start session={} path={} size={} duration_unknown err={} model=small cuda={} forced_language={}",
+                        session_id,
+                        path.display(),
                         file_size,
                         err,
-                        job.whisper_cuda_enabled,
-                        job.forced_language
+                        whisper_cuda_enabled,
+                        forced_language
                             .map(dictation_language_name)
                             .unwrap_or("auto")
                     )),
@@ -2711,56 +2744,72 @@ fn start_dictation_chunk_worker(
                 let mut progress_last = -1;
                 let progress_callback: Box<dyn FnMut(i32) + Send> = Box::new(move |pct| {
                     let clamped = pct.clamp(0, 100);
-                    if clamped > progress_last {
-                        progress_last = clamped;
-                        log_debug(&format!(
-                            "Dictation: bridge transcription progress session={} chunk={} progress={}%",
-                            job.session_id, job.chunk_index, clamped
-                        ));
+                    let mapped = if clamped <= 0 {
+                        20
+                    } else if clamped >= 100 {
+                        99
+                    } else {
+                        20 + ((clamped * 79 + 99) / 100)
+                    };
+                    if mapped > progress_last {
+                        progress_last = mapped;
+                        let _unused = post_message_w_safe(
+                            hwnd,
+                            WM_WHISPER_TRANSCRIPTION_PROGRESS,
+                            WPARAM(mapped as usize),
+                            LPARAM(0),
+                        );
                     }
                 });
+                let _unused = post_message_w_safe(
+                    hwnd,
+                    WM_WHISPER_TRANSCRIPTION_PROGRESS,
+                    WPARAM(20),
+                    LPARAM(0),
+                );
                 let text = crate::tools::faster_whisper_bridge::transcribe_wav(
-                    &job.input_path,
+                    &path,
                     BridgeModel::Small,
-                    job.forced_language,
+                    forced_language,
                     false,
-                    job.whisper_cuda_enabled,
+                    whisper_cuda_enabled,
                     &cancel,
                     crate::tools::faster_whisper_bridge::BridgeProgressCallbacks {
                         download: None,
                         transcription: Some(progress_callback),
                     },
                 )?;
+                if let Err(err) = std::fs::remove_file(&path) {
+                    log_debug(&format!("Dictation temp cleanup failed: {err}"));
+                }
+                let _unused = post_message_w_safe(
+                    hwnd,
+                    WM_WHISPER_TRANSCRIPTION_PROGRESS,
+                    WPARAM(100),
+                    LPARAM(0),
+                );
                 log_debug(&format!(
-                    "Dictation: bridge completed session={} chunk={} in {:?}, chars={}",
-                    job.session_id,
-                    job.chunk_index,
+                    "Dictation: single transcription completed session={} in {:?}, chars={}",
+                    session_id,
                     started.elapsed(),
                     text.chars().count()
                 ));
                 Ok(DictationResult {
-                    session_id: job.session_id,
-                    chunk_index: job.chunk_index,
+                    session_id,
                     text,
                     error: None,
                     cancelled: cancel.load(Ordering::Relaxed),
                     target_edit,
-                    finalize_session: false,
                 })
             })();
-            if let Err(err) = std::fs::remove_file(&job.input_path) {
-                log_debug(&format!("Dictation temp cleanup failed: {err}"));
-            }
             let payload = match result {
                 Ok(done) => done,
                 Err(err) => DictationResult {
-                    session_id: job.session_id,
-                    chunk_index: job.chunk_index,
+                    session_id,
                     text: String::new(),
                     error: Some(err),
                     cancelled: cancel.load(Ordering::Relaxed),
                     target_edit,
-                    finalize_session: false,
                 },
             };
             let ptr = Box::into_raw(Box::new(payload));
@@ -2770,199 +2819,44 @@ fn start_dictation_chunk_worker(
                 log_debug(&format!("Failed to post WM_DICTATION_DONE: {err}"));
                 let _unused_box = unsafe { Box::from_raw(ptr) };
             }
-        }
-
-        let payload = DictationResult {
-            session_id,
-            chunk_index: u64::MAX,
-            text: String::new(),
-            error: None,
-            cancelled: cancel.load(Ordering::Relaxed),
-            target_edit,
-            finalize_session: true,
-        };
-        let ptr = Box::into_raw(Box::new(payload));
-        if let Err(err) =
-            post_message_w_safe(hwnd, WM_DICTATION_DONE, WPARAM(0), LPARAM(ptr as isize))
-        {
-            log_debug(&format!(
-                "Failed to post WM_DICTATION_DONE finalizer: {err}"
-            ));
-            let _unused_box = unsafe { Box::from_raw(ptr) };
-        }
-    });
-    tx
-}
-
-fn start_dictation_recorder_from_state(
-    hwnd: HWND,
-) -> Result<podcast_recorder::RecorderHandle, String> {
-    let config = with_state(hwnd, |state| {
-        crate::tools::dictation::DictationRecordingConfig {
-            mic_device_id: state.settings.podcast_microphone_device_id.clone(),
-            mic_gain: state.settings.podcast_microphone_gain,
-        }
-    })
-    .ok_or_else(|| "Dictation settings unavailable.".to_string())?;
-    crate::tools::dictation::start_recording(&config)
-}
-
-fn queue_dictation_chunk(
-    hwnd: HWND,
-    path: PathBuf,
-    whisper_cuda_enabled: bool,
-    forced_language: Option<Language>,
-) -> Result<(), String> {
-    let (sender, session_id, chunk_index) = with_state(hwnd, |state| {
-        let sender = state.dictation_chunk_sender.clone();
-        let session_id = state.dictation_session_id;
-        let chunk_index = state.dictation_next_chunk_index;
-        if sender.is_some() {
-            state.dictation_next_chunk_index = state.dictation_next_chunk_index.saturating_add(1);
-            state.dictation_pending_chunks = state.dictation_pending_chunks.saturating_add(1);
-        }
-        (sender, session_id, chunk_index)
-    })
-    .unwrap_or((None, 0, 0));
-    let Some(sender) = sender else {
-        return Err("Dictation worker unavailable.".to_string());
-    };
-    sender
-        .send(DictationChunkJob {
-            session_id,
-            chunk_index,
-            input_path: path,
-            whisper_cuda_enabled,
-            forced_language,
-        })
-        .map_err(|err| format!("Dictation queue send failed: {err}"))
-}
-
-fn rotate_dictation_chunk(hwnd: HWND, continue_recording: bool) {
-    let (recorder, whisper_cuda_enabled, forced_language) = with_state(hwnd, |state| {
-        let recorder = state.dictation_recorder.take();
-        let whisper_cuda_enabled = state.settings.whisper_cuda_enabled;
-        let forced_language = if state.settings.whisper_keep_original_language {
-            None
-        } else {
-            Some(state.settings.language)
-        };
-        (recorder, whisper_cuda_enabled, forced_language)
-    })
-    .unwrap_or((None, false, None));
-    let Some(recorder) = recorder else {
-        return;
-    };
-
-    match recorder.stop() {
-        Ok(path) => {
-            let restart_result = if continue_recording {
-                start_dictation_recorder_from_state(hwnd)
-            } else {
-                Err(String::new())
-            };
-            if continue_recording {
-                match restart_result {
-                    Ok(next_recorder) => {
-                        with_state(hwnd, |state| {
-                            state.dictation_recorder = Some(next_recorder);
-                        });
-                    }
-                    Err(err) => {
-                        kill_timer_best_effort(
-                            hwnd,
-                            DICTATION_CHUNK_TIMER_ID,
-                            "KillTimer DICTATION_CHUNK",
-                        );
-                        with_state(hwnd, |state| {
-                            state.dictation_chunk_sender = None;
-                        });
-                        screen_reader_speak(&format!("Dictation failed to continue: {err}"));
-                    }
-                }
-            }
-            if let Err(err) =
-                queue_dictation_chunk(hwnd, path, whisper_cuda_enabled, forced_language)
-            {
-                log_debug(&format!("Dictation queue failed: {err}"));
-                if continue_recording {
-                    kill_timer_best_effort(
-                        hwnd,
-                        DICTATION_CHUNK_TIMER_ID,
-                        "KillTimer DICTATION_CHUNK",
-                    );
-                    with_state(hwnd, |state| {
-                        state.dictation_recorder = None;
-                        state.dictation_chunk_sender = None;
-                    });
-                }
-            }
-        }
-        Err(err) => {
-            log_debug(&format!("Dictation recorder stop failed: {err}"));
-            kill_timer_best_effort(hwnd, DICTATION_CHUNK_TIMER_ID, "KillTimer DICTATION_CHUNK");
-            with_state(hwnd, |state| {
-                state.dictation_chunk_sender = None;
-            });
-            screen_reader_speak(&format!("Dictation failed: {err}"));
-        }
-    }
-}
-
-fn toggle_voice_dictation(hwnd: HWND) {
-    let recording = with_state(hwnd, |state| state.dictation_recorder.is_some()).unwrap_or(false);
-    if recording {
-        kill_timer_best_effort(hwnd, DICTATION_CHUNK_TIMER_ID, "KillTimer DICTATION_CHUNK");
-        with_state(hwnd, |state| {
-            state.dictation_transcribing = false;
-            state.dictation_chunk_sender = None;
         });
-        rotate_dictation_chunk(hwnd, false);
-        screen_reader_speak("Dictation stopping.");
         return;
     }
 
     if with_state(hwnd, |state| state.dictation_transcribing).unwrap_or(false) {
         log_debug("Dictation: toggle ignored because transcription is still running");
-        screen_reader_speak("Dictation is still processing.");
+        screen_reader_speak(&i18n::tr(language, "dictation.status.processing"));
         return;
     }
     let Some(target_edit) = get_active_edit(hwnd) else {
-        screen_reader_speak("No active editor for dictation.");
+        screen_reader_speak(&i18n::tr(language, "dictation.error.no_active_editor"));
         return;
     };
 
-    let cancel = Arc::new(AtomicBool::new(false));
     let session_id = with_state(hwnd, |state| {
         state.dictation_session_id = state.dictation_session_id.saturating_add(1);
         state.dictation_session_id
     })
     .unwrap_or(1);
-    let sender = start_dictation_chunk_worker(hwnd, session_id, cancel.clone(), target_edit);
 
     match start_dictation_recorder_from_state(hwnd) {
         Ok(recorder) => {
-            if unsafe { SetTimer(hwnd, DICTATION_CHUNK_TIMER_ID, DICTATION_CHUNK_MS, None) } == 0 {
-                screen_reader_speak("Dictation timer failed to start.");
-                return;
-            }
             with_state(hwnd, |state| {
                 state.dictation_recorder = Some(recorder);
-                state.dictation_chunk_sender = Some(sender);
                 state.dictation_target_edit = target_edit;
-                state.dictation_cancel = Some(cancel);
-                state.dictation_transcribing = true;
-                state.dictation_next_chunk_index = 0;
-                state.dictation_pending_chunks = 0;
             });
             log_debug(&format!(
-                "Dictation: streaming started session={} target_edit={:?}",
+                "Dictation: recording started session={} target_edit={:?}",
                 session_id, target_edit
             ));
-            screen_reader_speak("Dictation started.");
+            screen_reader_speak(&i18n::tr(language, "dictation.status.started"));
         }
         Err(err) => {
-            screen_reader_speak(&format!("Dictation failed to start: {err}"));
+            screen_reader_speak(&i18n::tr_f(
+                language,
+                "dictation.error.start_failed",
+                &[("err", &err)],
+            ));
         }
     }
 }
@@ -3314,13 +3208,10 @@ pub(crate) struct AppState {
     transcription_cancel: Option<Arc<AtomicBool>>,
     transcription_in_progress: bool,
     dictation_recorder: Option<podcast_recorder::RecorderHandle>,
-    dictation_chunk_sender: Option<mpsc::Sender<DictationChunkJob>>,
     dictation_target_edit: HWND,
     dictation_cancel: Option<Arc<AtomicBool>>,
     dictation_transcribing: bool,
     dictation_session_id: u64,
-    dictation_next_chunk_index: u64,
-    dictation_pending_chunks: usize,
     voice_panel_visible: bool,
     voice_label_engine: HWND,
     voice_combo_engine: HWND,
@@ -3391,22 +3282,12 @@ struct WhisperTranscriptionResult {
     cancelled: bool,
 }
 
-struct DictationChunkJob {
-    session_id: u64,
-    chunk_index: u64,
-    input_path: PathBuf,
-    whisper_cuda_enabled: bool,
-    forced_language: Option<Language>,
-}
-
 struct DictationResult {
     session_id: u64,
-    chunk_index: u64,
     text: String,
     error: Option<String>,
     cancelled: bool,
     target_edit: HWND,
-    finalize_session: bool,
 }
 
 fn main() -> windows::core::Result<()> {
@@ -4705,13 +4586,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     transcription_cancel: None,
                     transcription_in_progress: false,
                     dictation_recorder: None,
-                    dictation_chunk_sender: None,
                     dictation_target_edit: HWND(0),
                     dictation_cancel: None,
                     dictation_transcribing: false,
                     dictation_session_id: 0,
-                    dictation_next_chunk_index: 0,
-                    dictation_pending_chunks: 0,
                     voice_panel_visible: false,
                     voice_label_engine: label_engine,
                     voice_combo_engine: combo_engine,
@@ -4895,10 +4773,6 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 if wparam.0 == AUDIO_PLAYLIST_TIMER_ID {
                     handle_audio_playlist_timer(hwnd);
-                    return LRESULT(0);
-                }
-                if wparam.0 == DICTATION_CHUNK_TIMER_ID {
-                    rotate_dictation_chunk(hwnd, true);
                     return LRESULT(0);
                 }
                 handle_pdf_loading_timer(hwnd, wparam.0);

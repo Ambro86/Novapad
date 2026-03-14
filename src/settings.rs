@@ -601,6 +601,8 @@ pub struct AppSettings {
     pub podcast_include_microphone: bool,
     pub podcast_microphone_device_id: String,
     pub podcast_microphone_gain: f32,
+    #[serde(default = "default_podcast_device_id")]
+    pub dictation_microphone_device_id: String,
     pub podcast_include_system_audio: bool,
     pub podcast_system_device_id: String,
     pub podcast_system_gain: f32,
@@ -886,6 +888,10 @@ fn default_stream_audio_output_format() -> String {
     "auto".to_string()
 }
 
+fn default_podcast_device_id() -> String {
+    PODCAST_DEVICE_DEFAULT.to_string()
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         AppSettings {
@@ -942,6 +948,7 @@ impl Default for AppSettings {
             podcast_include_microphone: true,
             podcast_microphone_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
             podcast_microphone_gain: 1.5,
+            dictation_microphone_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
             podcast_include_system_audio: true,
             podcast_system_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
             podcast_system_gain: 1.0,
@@ -1813,6 +1820,11 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
         "" | "small_q5_1" | "medium_q5_0" | "large_v3_turbo_q5_0"
     ) {
         settings.whisper_model_profile.clear();
+    }
+    settings.dictation_microphone_device_id =
+        settings.dictation_microphone_device_id.trim().to_string();
+    if settings.dictation_microphone_device_id.is_empty() {
+        settings.dictation_microphone_device_id = default_podcast_device_id();
     }
     settings
         .dictionary_search_history

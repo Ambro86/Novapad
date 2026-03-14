@@ -109,6 +109,7 @@ const OPTIONS_ID_WHISPER_MODEL: usize = 6111;
 const OPTIONS_ID_WHISPER_CUDA: usize = 6112;
 const OPTIONS_ID_WHISPER_KEEP_ORIGINAL_LANGUAGE: usize = 6113;
 const OPTIONS_ID_WHISPER_INCLUDE_TIMESTAMPS: usize = 6114;
+const OPTIONS_ID_DICTATION_MICROPHONE: usize = 6121;
 const OPTIONS_ID_DICTIONARY_TRANSLATION: usize = 6038;
 const OPTIONS_ID_WIKIPEDIA_LANGUAGE: usize = 6040;
 const OPTIONS_ID_INTERPRETER_PATH: usize = 6041;
@@ -676,6 +677,8 @@ struct OptionsDialogState {
     checkbox_whisper_cuda: HWND,
     checkbox_whisper_keep_original_language: HWND,
     checkbox_whisper_include_timestamps: HWND,
+    label_dictation_microphone: HWND,
+    combo_dictation_microphone: HWND,
     button_podcastindex_signup: HWND,
     checkbox_multilingual: HWND,
     checkbox_use_dialogue_voice: HWND,
@@ -780,6 +783,7 @@ struct OptionsDialogState {
     tts_voice_language_codes: Vec<String>,
     dialogue_voice_language_codes: Vec<String>,
     secondary_dialogue_voice_language_codes: Vec<String>,
+    dictation_microphone_device_ids: Vec<String>,
     voice_profiles: Vec<VoiceProfile>,
     active_voice_profile_name: String,
     active_tab: i32,
@@ -909,6 +913,8 @@ struct OptionsLabels {
     label_whisper_cuda: String,
     label_whisper_keep_original_language: String,
     label_whisper_include_timestamps: String,
+    label_dictation_microphone: String,
+    option_podcast_device_default: String,
     whisper_model_small: String,
     whisper_model_medium: String,
     whisper_model_large: String,
@@ -1193,6 +1199,8 @@ fn options_labels(language: Language) -> OptionsLabels {
             language,
             "options.label.whisper_include_timestamps",
         ),
+        label_dictation_microphone: i18n::tr(language, "podcast.mic_device"),
+        option_podcast_device_default: i18n::tr(language, "podcast.device.default"),
         whisper_model_small: i18n::tr(language, "options.whisper_model.small"),
         whisper_model_medium: i18n::tr(language, "options.whisper_model.medium"),
         whisper_model_large: i18n::tr(language, "options.whisper_model.large"),
@@ -4435,6 +4443,75 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 30;
 
+                let label_dictation_microphone = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dictation_microphone).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dictation_microphone = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DICTATION_MICROPHONE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let default_index = SendMessageW(
+                    combo_dictation_microphone,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.option_podcast_device_default).as_ptr() as isize),
+                )
+                .0 as usize;
+                SendMessageW(
+                    combo_dictation_microphone,
+                    CB_SETITEMDATA,
+                    WPARAM(default_index),
+                    LPARAM(0),
+                );
+                let mut dictation_microphone_device_ids =
+                    vec![crate::settings::PODCAST_DEVICE_DEFAULT.to_string()];
+                if let Ok(devices) = crate::podcast_recorder::list_input_devices() {
+                    for device in devices {
+                        let idx = SendMessageW(
+                            combo_dictation_microphone,
+                            CB_ADDSTRING,
+                            WPARAM(0),
+                            LPARAM(to_wide(&device.name).as_ptr() as isize),
+                        )
+                        .0 as usize;
+                        SendMessageW(
+                            combo_dictation_microphone,
+                            CB_SETITEMDATA,
+                            WPARAM(idx),
+                            LPARAM(dictation_microphone_device_ids.len() as isize),
+                        );
+                        dictation_microphone_device_ids.push(device.id);
+                    }
+                }
+                SendMessageW(
+                    combo_dictation_microphone,
+                    CB_SETCURSEL,
+                    WPARAM(0),
+                    LPARAM(0),
+                );
+                y += 30;
+
                 let button_podcastindex_signup = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -5305,6 +5382,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_whisper_cuda,
                     checkbox_whisper_keep_original_language,
                     checkbox_whisper_include_timestamps,
+                    label_dictation_microphone,
+                    combo_dictation_microphone,
                     button_podcastindex_signup,
                     checkbox_tts_manual,
                     checkbox_multilingual,
@@ -5495,6 +5574,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_whisper_cuda,
                     checkbox_whisper_keep_original_language,
                     checkbox_whisper_include_timestamps,
+                    label_dictation_microphone,
+                    combo_dictation_microphone,
                     button_podcastindex_signup,
                     checkbox_multilingual,
                     checkbox_use_dialogue_voice,
@@ -5599,6 +5680,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     tts_voice_language_codes: Vec::new(),
                     dialogue_voice_language_codes: Vec::new(),
                     secondary_dialogue_voice_language_codes: Vec::new(),
+                    dictation_microphone_device_ids,
                     voice_profiles: Vec::new(),
                     active_voice_profile_name: DEFAULT_VOICE_PROFILE_NAME.to_string(),
                     active_tab: OPTIONS_TAB_GENERAL,
@@ -6108,6 +6190,8 @@ fn initialize_options_dialog(hwnd: HWND) {
             edit_podcastindex_secret,
             _label_whisper_model,
             combo_whisper_model,
+            _label_dictation_microphone,
+            _combo_dictation_microphone,
             _button_podcastindex_signup,
             checkbox_tts_manual,
             checkbox_multilingual,
@@ -6239,6 +6323,8 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.edit_podcastindex_secret,
                 state.label_whisper_model,
                 state.combo_whisper_model,
+                state.label_dictation_microphone,
+                state.combo_dictation_microphone,
                 state.button_podcastindex_signup,
                 state.checkbox_tts_manual,
                 state.checkbox_multilingual,
@@ -8020,6 +8106,23 @@ fn initialize_options_dialog(hwnd: HWND) {
                 } else {
                     0
                 }),
+                LPARAM(0),
+            );
+        }
+        if let Some((combo_dictation_microphone, device_ids)) = with_options_state(hwnd, |state| {
+            (
+                state.combo_dictation_microphone,
+                state.dictation_microphone_device_ids.clone(),
+            )
+        }) {
+            let selected = device_ids
+                .iter()
+                .position(|id| id == &settings.dictation_microphone_device_id)
+                .unwrap_or(0);
+            SendMessageW(
+                combo_dictation_microphone,
+                CB_SETCURSEL,
+                WPARAM(selected),
                 LPARAM(0),
             );
         }
@@ -10638,6 +10741,24 @@ fn apply_options_dialog(hwnd: HWND) {
             .0 as u32
                 == BST_CHECKED.0;
         }
+        if let Some((combo_dictation_microphone, device_ids)) = with_options_state(hwnd, |state| {
+            (
+                state.combo_dictation_microphone,
+                state.dictation_microphone_device_ids.clone(),
+            )
+        }) {
+            let sel = SendMessageW(
+                combo_dictation_microphone,
+                CB_GETCURSEL,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0;
+            settings.dictation_microphone_device_id = device_ids
+                .get(sel.max(0) as usize)
+                .cloned()
+                .unwrap_or_else(|| crate::settings::PODCAST_DEVICE_DEFAULT.to_string());
+        }
 
         let dialogue_cfg = crate::dialogue_voice::DialogueVoiceConfig {
             engine: settings.dialogue_tts_engine,
@@ -12289,6 +12410,8 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_whisper_cuda,
             state.checkbox_whisper_keep_original_language,
             state.checkbox_whisper_include_timestamps,
+            state.label_dictation_microphone,
+            state.combo_dictation_microphone,
         ] {
             crate::show_window_safe(
                 control,

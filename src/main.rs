@@ -181,6 +181,7 @@ pub const WM_UPDATE_PROGRESS_CLOSE: u32 = WM_APP + 86;
 const WM_AUTO_UPDATE_CHECK: u32 = WM_APP + 81;
 const WM_CHECK_PENDING_UPDATE: u32 = WM_APP + 82;
 const WM_SHOW_CHANGELOG: u32 = WM_APP + 83;
+const WM_SHOW_UPDATE_COMPLETED: u32 = WM_APP + 87;
 const WM_PODCAST_CHAPTERS_READY: u32 = WM_APP + 31;
 const WM_DICTIONARY_LOADED: u32 = WM_APP + 32;
 const WM_PODCAST_EPISODE_SAVE_RESULT: u32 = WM_APP + 33;
@@ -3318,6 +3319,11 @@ fn main() -> windows::core::Result<()> {
         println!("Sonarpad {}", env!("CARGO_PKG_VERSION"));
         std::process::exit(0);
     }
+    let show_update_completed = args.iter().any(|arg| arg == "--after-update-completed");
+    let filtered_args: Vec<String> = args
+        .into_iter()
+        .filter(|arg| arg != "--after-update-completed")
+        .collect();
     updater::cleanup_backup_on_start();
     updater::cleanup_update_lock_on_start();
     updater::cleanup_update_temp_on_start();
@@ -3335,7 +3341,7 @@ fn main() -> windows::core::Result<()> {
     sentry_integration::install_panic_hook();
 
     // Error boundary: cattura errori fatali
-    if let Err(e) = run_app(&args) {
+    if let Err(e) = run_app(&filtered_args, show_update_completed) {
         sentry_integration::capture_fatal_windows_error("run_app", &e);
         sentry_integration::flush(2);
         return Err(e);
@@ -3353,6 +3359,7 @@ fn print_cli_help() {
     println!("  -h, --help         Show this help message and exit");
     println!("  --version          Show version and exit");
     println!("  --self-update      Internal updater mode (do not use manually)");
+    println!("  --after-update-completed  Internal updater handoff (do not use manually)");
     println!();
     println!("Arguments:");
     println!("  FILES...           One or more files to open");
@@ -3368,7 +3375,7 @@ fn is_large_text_editor(hwnd: HWND, hwnd_edit: HWND) -> bool {
 }
 
 /// Core dell'applicazione - separato per error boundary
-fn run_app(args: &[String]) -> windows::core::Result<()> {
+fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Result<()> {
     unsafe {
         crate::log_if_err!(LoadLibraryW(w!("Msftedit.dll")));
         let hinstance = HINSTANCE(GetModuleHandleW(None)?.0);
@@ -3454,6 +3461,20 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
             WPARAM(0),
             LPARAM(0)
         ));
+        if show_update_completed {
+            let hwnd_val = hwnd.0;
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(1200));
+                if let Err(e) = PostMessageW(
+                    HWND(hwnd_val),
+                    WM_SHOW_UPDATE_COMPLETED,
+                    WPARAM(0),
+                    LPARAM(0),
+                ) {
+                    crate::log_debug(&format!("Failed to post update completed message: {}", e));
+                }
+            });
+        }
 
         let mut show_changelog = false;
         let mut cleanup_legacy_context_menu = false;
@@ -3486,8 +3507,8 @@ fn run_app(args: &[String]) -> windows::core::Result<()> {
             });
         }
 
-        let check_updates =
-            with_state(hwnd, |state| state.settings.check_updates_on_startup).unwrap_or(true);
+        let check_updates = !show_update_completed
+            && with_state(hwnd, |state| state.settings.check_updates_on_startup).unwrap_or(true);
         if check_updates {
             let hwnd_val = hwnd.0;
             std::thread::spawn(move || {
@@ -5172,6 +5193,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 if !has_secondary_window_open(hwnd) {
                     app_windows::help_window::open_changelog(hwnd);
                 }
+                LRESULT(0)
+            }
+            WM_SHOW_UPDATE_COMPLETED => {
+                bring_window_to_foreground(hwnd);
+                updater::show_update_completed_dialog(hwnd);
                 LRESULT(0)
             }
             search::WM_REPLACE_ALL_DONE => {

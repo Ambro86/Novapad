@@ -141,6 +141,21 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
     ));
     thread::spawn(move || {
         if let Err(e) = std::panic::catch_unwind(move || {
+            let current_exe = match std::env::current_exe() {
+                Ok(path) => path,
+                Err(err) => {
+                    log_debug(&format!("Update check: current exe not available: {err}"));
+                    if interactive {
+                        show_update_error_with_url(
+                            language,
+                            "updater.error.access",
+                            DIRECT_DOWNLOAD_URL,
+                        );
+                    }
+                    return;
+                }
+            };
+
             log_debug("Update check: fetching latest release...");
             let latest = match fetch_latest_release(include_beta_updates) {
                 Ok(info) => info,
@@ -176,20 +191,6 @@ pub(crate) fn check_for_update(hwnd: HWND, interactive: bool) {
             };
             let sha_asset = select_sha256_asset(&latest.assets, &asset.name);
 
-            let current_exe = match std::env::current_exe() {
-                Ok(path) => path,
-                Err(err) => {
-                    log_debug(&format!("Update check: current exe not available: {err}"));
-                    if interactive {
-                        show_update_error_with_url(
-                            language,
-                            "updater.error.access",
-                            DIRECT_DOWNLOAD_URL,
-                        );
-                    }
-                    return;
-                }
-            };
             if let Err(err) = probe_dir_writable(&current_exe) {
                 log_debug(&format!(
                     "Update check: exe dir not writable: {err} class={}",
@@ -1334,13 +1335,12 @@ pub(crate) fn run_self_update(args: &[String]) -> Result<i32, String> {
 
     let language = load_settings().language;
     if restart {
-        match std::process::Command::new(&current)
-            .current_dir(dir)
-            .spawn()
-        {
+        let mut command = std::process::Command::new(&current);
+        command.current_dir(dir).arg("--after-update-completed");
+        match command.spawn() {
             Ok(_) => {
                 log_debug(
-                    "Self-update: restart succeeded; skipping completion dialog handoff to avoid blocking the new instance.",
+                    "Self-update: restart succeeded and handed off completion dialog to the new instance.",
                 );
             }
             Err(err) => {
@@ -1938,6 +1938,23 @@ pub(crate) fn cleanup_update_temp_on_start() {
                 }
             }
         }
+    }
+}
+
+pub(crate) fn show_update_completed_dialog(owner: HWND) {
+    let language = with_state(owner, |state| state.settings.language)
+        .unwrap_or_else(|| load_settings().language);
+    let text = i18n::tr(language, "updater.info.completed");
+    let title = i18n::tr(language, "updater.title");
+    let msg = HSTRING::from(text);
+    let tit = HSTRING::from(title);
+    unsafe {
+        let _ignored = MessageBoxW(
+            owner,
+            &msg,
+            &tit,
+            MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
+        );
     }
 }
 

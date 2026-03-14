@@ -27,3 +27,21 @@ sapi4_bridge/stdout.txt
 sapi4_bridge/test_input.txt
 sapi4_bridge/tentativi.txt
 src/tools/fetch_fn.txt
+
+# Local release assets, kept out of Git and uploaded via GitHub Releases
+dll/faster_whisper_bridge.exe
+dll/whisper-cuda-runtime-win64-cu12.zip
+dll/faster_whisper_bridge.zip.001
+dll/faster_whisper_bridge.zip.002
+dll/whisper-cuda-runtime-win64-cu12.zip.001
+dll/whisper-cuda-runtime-win64-cu12.zip.002
+dll/whisper-cuda-runtime-win64-cu12.zip.003
+dll/whisper-cuda-runtime-win64-cu12.zip.004
+dll/whisper-cuda-runtime-win64-cu12.zip.005
+dll/whisper-cuda-runtime-win64-cu12.zip.006
+dll/whisper-cuda-runtime-win64-cu12.zip.007
+dll/whisper-cuda-runtime-win64-cu12.zip.008
+dll/whisper-cuda-runtime-win64-cu12.zip.009
+dll/whisper-cuda-runtime-win64-cu12.zip.010
+dll/whisper-cuda-runtime-win64-cu12.zip.011
+dll/whisper-cuda-runtime-win64-cu12.zip.012

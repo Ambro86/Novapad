@@ -2438,7 +2438,7 @@ fn start_whisper_transcription(hwnd: HWND) {
                 }
             });
 
-            let text = crate::tools::faster_whisper_bridge::transcribe_wav(
+            let text = crate::tools::faster_whisper_bridge::transcribe_wav_with_shared_worker(
                 &input_path,
                 model,
                 forced_language,
@@ -2633,7 +2633,17 @@ fn apply_dictation_result(hwnd: HWND, result: DictationResult) {
         text.push(' ');
     }
     if insert_text_into_edit(target_edit, &text) {
+        bring_window_to_foreground(hwnd);
         set_focus_safe(target_edit);
+        send_message_w_safe(target_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+        send_message_w_safe(target_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+        crate::log_if_err!(post_message_w_safe(
+            hwnd,
+            WM_NEXTDLGCTL,
+            WPARAM(target_edit.0 as usize),
+            LPARAM(1)
+        ));
+        restore_editor_focus(hwnd);
         screen_reader_speak(&i18n::tr(language, "dictation.status.inserted"));
     } else {
         screen_reader_speak(&i18n::tr(language, "dictation.error.insert_failed"));
@@ -2676,37 +2686,48 @@ fn toggle_voice_dictation(hwnd: HWND) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let recording = with_state(hwnd, |state| state.dictation_recorder.is_some()).unwrap_or(false);
     if recording {
-        let (recorder, target_edit, whisper_cuda_enabled, forced_language, cancel, session_id) =
-            with_state(hwnd, |state| {
-                let recorder = state.dictation_recorder.take();
-                state.dictation_transcribing = recorder.is_some();
-                let cancel = Arc::new(AtomicBool::new(false));
-                state.dictation_cancel = if recorder.is_some() {
-                    Some(cancel.clone())
-                } else {
+        let (
+            recorder,
+            target_edit,
+            whisper_model,
+            whisper_cuda_enabled,
+            forced_language,
+            cancel,
+            session_id,
+        ) = with_state(hwnd, |state| {
+            let recorder = state.dictation_recorder.take();
+            state.dictation_transcribing = recorder.is_some();
+            let cancel = Arc::new(AtomicBool::new(false));
+            state.dictation_cancel = if recorder.is_some() {
+                Some(cancel.clone())
+            } else {
+                None
+            };
+            (
+                recorder,
+                state.dictation_target_edit,
+                profile_from_setting(&state.settings.whisper_model_profile)
+                    .map(map_profile_to_bridge_model)
+                    .unwrap_or(BridgeModel::Small),
+                state.settings.whisper_cuda_enabled,
+                if state.settings.whisper_keep_original_language {
                     None
-                };
-                (
-                    recorder,
-                    state.dictation_target_edit,
-                    state.settings.whisper_cuda_enabled,
-                    if state.settings.whisper_keep_original_language {
-                        None
-                    } else {
-                        Some(state.settings.language)
-                    },
-                    cancel,
-                    state.dictation_session_id,
-                )
-            })
-            .unwrap_or((
-                None,
-                HWND(0),
-                false,
-                Some(language),
-                Arc::new(AtomicBool::new(false)),
-                0,
-            ));
+                } else {
+                    Some(state.settings.language)
+                },
+                cancel,
+                state.dictation_session_id,
+            )
+        })
+        .unwrap_or((
+            None,
+            HWND(0),
+            BridgeModel::Small,
+            false,
+            Some(language),
+            Arc::new(AtomicBool::new(false)),
+            0,
+        ));
         let Some(recorder) = recorder else {
             return;
         };
@@ -2720,22 +2741,32 @@ fn toggle_voice_dictation(hwnd: HWND) {
                 let file_size = std::fs::metadata(&path).map(|meta| meta.len()).unwrap_or(0);
                 match crate::tools::dictation::wav_duration_seconds(&path) {
                     Ok(seconds) => log_debug(&format!(
-                        "Dictation: bridge start session={} path={} size={} duration_secs={:.2} model=small cuda={} forced_language={}",
+                        "Dictation: bridge start session={} path={} size={} duration_secs={:.2} model={} cuda={} forced_language={}",
                         session_id,
                         path.display(),
                         file_size,
                         seconds,
+                        match whisper_model {
+                            BridgeModel::Small => "small",
+                            BridgeModel::Medium => "medium",
+                            BridgeModel::LargeV3 => "large-v3",
+                        },
                         whisper_cuda_enabled,
                         forced_language
                             .map(dictation_language_name)
                             .unwrap_or("auto")
                     )),
                     Err(err) => log_debug(&format!(
-                        "Dictation: bridge start session={} path={} size={} duration_unknown err={} model=small cuda={} forced_language={}",
+                        "Dictation: bridge start session={} path={} size={} duration_unknown err={} model={} cuda={} forced_language={}",
                         session_id,
                         path.display(),
                         file_size,
                         err,
+                        match whisper_model {
+                            BridgeModel::Small => "small",
+                            BridgeModel::Medium => "medium",
+                            BridgeModel::LargeV3 => "large-v3",
+                        },
                         whisper_cuda_enabled,
                         forced_language
                             .map(dictation_language_name)
@@ -2768,9 +2799,9 @@ fn toggle_voice_dictation(hwnd: HWND) {
                     WPARAM(20),
                     LPARAM(0),
                 );
-                let text = crate::tools::faster_whisper_bridge::transcribe_wav(
+                let text = crate::tools::faster_whisper_bridge::transcribe_wav_with_shared_worker(
                     &path,
-                    BridgeModel::Small,
+                    whisper_model,
                     forced_language,
                     false,
                     whisper_cuda_enabled,
@@ -2842,10 +2873,22 @@ fn toggle_voice_dictation(hwnd: HWND) {
 
     match start_dictation_recorder_from_state(hwnd) {
         Ok(recorder) => {
+            let whisper_model = with_state(hwnd, |state| {
+                profile_from_setting(&state.settings.whisper_model_profile)
+                    .map(map_profile_to_bridge_model)
+                    .unwrap_or(BridgeModel::Small)
+            })
+            .unwrap_or(BridgeModel::Small);
+            let whisper_cuda_enabled =
+                with_state(hwnd, |state| state.settings.whisper_cuda_enabled).unwrap_or(false);
             with_state(hwnd, |state| {
                 state.dictation_recorder = Some(recorder);
                 state.dictation_target_edit = target_edit;
             });
+            crate::tools::faster_whisper_bridge::prewarm_shared_worker(
+                whisper_model,
+                whisper_cuda_enabled,
+            );
             log_debug(&format!(
                 "Dictation: recording started session={} target_edit={:?}",
                 session_id, target_edit

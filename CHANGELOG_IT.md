@@ -4,7 +4,7 @@ Versione 0.6.8 – 2026-03-04
 
 Novità
 • Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
-• Aggiunta la possibilità di usare la dettatura vocale offline, con le stesse modalità della trascrizione audio. Per impostazione predefinita si preme `Ctrl+Shift+Spazio` per avviare la dettatura e si preme la stessa scorciatoia per terminarla; il tasto rapido è personalizzabile nelle Opzioni.
+• Aggiunta la possibilità di usare la dettatura vocale offline, con le stesse modalità della trascrizione audio. Per impostazione predefinita si preme `Ctrl+Shift+Spazio` per avviare la dettatura e si preme la stessa scorciatoia per terminarla; il tasto rapido è personalizzabile nelle Opzioni. Dalla seconda attivazione la dettatura risulta più veloce, perché il motore resta già pronto in memoria; su PC con meno di 4 GB di RAM questo precaricamento e riutilizzo vengono disattivati automaticamente.
 • Sonarpad è disponibile anche su Mac, anche se con un set di funzioni parziale. Link al progetto: https://github.com/Ambro86/Sonarpad-Mac
 
 Miglioramenti

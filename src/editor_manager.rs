@@ -4384,6 +4384,7 @@ pub fn try_close_app(hwnd: HWND) -> bool {
     if let Err(e) = crate::ffmpeg_export::cleanup_tts_artifacts() {
         crate::log_debug(&e);
     }
+    crate::tools::faster_whisper_bridge::shutdown_shared_worker();
     crate::log_if_err!(crate::destroy_window_safe(hwnd));
     true
 }

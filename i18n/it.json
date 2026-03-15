@@ -948,6 +948,7 @@
   "excluded_from_testing.bdciechi.ask_remember_credentials": "Vuoi ricordare le credenziali bdCiechi anche alla riapertura di Sonarpad?",
   "excluded_from_testing.bdciechi.ask_open_saved": "File salvato. Vuoi aprirlo in Sonarpad?",
   "excluded_from_testing.bdciechi.error.latest": "Errore ultime novità: {err}",
+  "excluded_from_testing.bdciechi.error.search": "Errore ricerca catalogo: {err}",
   "excluded_from_testing.bdciechi.error.download": "Errore download: {err}",
   "excluded_from_testing.bdciechi.error.documents_dir": "Errore cartella Documenti: {err}",
   "excluded_from_testing.bdciechi.error.destination_dir": "Errore cartella di destinazione: {err}",

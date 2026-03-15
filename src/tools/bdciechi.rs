@@ -11,6 +11,12 @@ pub struct IdentifyResponse {
     pub nprov: String,
 }
 
+pub struct UtcCatalogResponse {
+    pub server_utc: String,
+    pub catalog_date: String,
+    pub catalog_ubound: usize,
+}
+
 pub struct WorkResponse {
     pub info: String,
     pub text: Vec<u8>,
@@ -120,6 +126,45 @@ pub fn fetch_latest_list(nprov: &str) -> Result<String, String> {
     Ok(body)
 }
 
+pub fn fetch_catalog_utc(nprov: &str) -> Result<UtcCatalogResponse, String> {
+    let url = format!("{BASE_URL}?-utc;@{};{}", nprov, rnd());
+    let bytes = client()?
+        .get(&url)
+        .send()
+        .and_then(|resp| resp.error_for_status())
+        .map_err(|err| err.to_string())?
+        .bytes()
+        .map_err(|err| err.to_string())?;
+    let body = decode_server_text(&bytes);
+    if is_protocol_error(&body) {
+        return Err(body);
+    }
+
+    let mut parts = body.split(';').map(str::trim);
+    let server_utc = parts
+        .next()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Risposta UTC non valida".to_string())?
+        .to_string();
+    let catalog_date = parts
+        .next()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Data catalogo UTC non valida".to_string())?
+        .to_string();
+    let catalog_ubound = parts
+        .next()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Numero opere UTC non valido".to_string())?
+        .parse::<usize>()
+        .map_err(|_| "Numero opere UTC non valido".to_string())?;
+
+    Ok(UtcCatalogResponse {
+        server_utc,
+        catalog_date,
+        catalog_ubound,
+    })
+}
+
 pub fn parse_catalog_records(raw: &str) -> Vec<String> {
     raw.lines()
         .map(str::trim)
@@ -173,11 +218,23 @@ pub fn download_work(
 
 #[cfg(test)]
 mod tests {
-    use super::decode_server_text;
+    use super::{UtcCatalogResponse, decode_server_text};
 
     #[test]
     fn decode_server_text_preserves_cp1252_accents() {
         let bytes = b"libro Perch\xe9 NO.txt";
         assert_eq!(decode_server_text(bytes), "libro Perché NO.txt");
+    }
+
+    #[test]
+    fn utc_catalog_response_fields_are_stored() {
+        let response = UtcCatalogResponse {
+            server_utc: "2026-03-15 12.00.00".to_string(),
+            catalog_date: "2026-03-15".to_string(),
+            catalog_ubound: 42,
+        };
+        assert_eq!(response.server_utc, "2026-03-15 12.00.00");
+        assert_eq!(response.catalog_date, "2026-03-15");
+        assert_eq!(response.catalog_ubound, 42);
     }
 }

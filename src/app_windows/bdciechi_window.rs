@@ -260,12 +260,59 @@ fn sanitize_filename(name: &str) -> String {
 }
 
 fn decode_book_text(bytes: &[u8]) -> String {
-    if let Ok(text) = std::str::from_utf8(bytes) {
+    let decoded = if let Ok(text) = std::str::from_utf8(bytes) {
         text.to_string()
     } else {
         let (decoded, _, _) = WINDOWS_1252.decode(bytes);
         decoded.to_string()
+    };
+    repair_utf8_mojibake(&decoded)
+}
+
+fn utf8_mojibake_score(text: &str) -> usize {
+    text.chars()
+        .filter(|ch| matches!(ch, 'Ã' | 'Â' | 'â' | '€' | '™' | 'œ' | 'ž'))
+        .count()
+}
+
+fn repair_utf8_mojibake(text: &str) -> String {
+    let original_score = utf8_mojibake_score(text);
+    if original_score == 0 {
+        return text.to_string();
     }
+
+    let (encoded, _, had_unmappables) = WINDOWS_1252.encode(text);
+    if !had_unmappables
+        && let Ok(repaired) = String::from_utf8(encoded.into_owned())
+        && utf8_mojibake_score(&repaired) < original_score
+    {
+        return repaired;
+    }
+
+    repair_common_mojibake_sequences(text)
+}
+
+fn repair_common_mojibake_sequences(text: &str) -> String {
+    text.replace("â€™", "’")
+        .replace("â€˜", "‘")
+        .replace("â€œ", "“")
+        .replace("â€", "”")
+        .replace("â€“", "–")
+        .replace("â€”", "—")
+        .replace("â€¦", "…")
+        .replace("Â ", " ")
+        .replace("Ã ", "à")
+        .replace("Ã¨", "è")
+        .replace("Ã©", "é")
+        .replace("Ã¬", "ì")
+        .replace("Ã²", "ò")
+        .replace("Ã¹", "ù")
+        .replace("Ã€", "À")
+        .replace("Ãˆ", "È")
+        .replace("Ã‰", "É")
+        .replace("ÃŒ", "Ì")
+        .replace("Ã’", "Ò")
+        .replace("Ã™", "Ù")
 }
 
 fn fold_search_char(ch: char) -> char {
@@ -396,6 +443,69 @@ fn catalog_hash(raw: &str) -> String {
     let mut hasher = sha2::Sha256::new();
     hasher.update(raw.as_bytes());
     format!("{:x}", hasher.finalize())
+}
+
+fn catalog_cache_date(raw: &str) -> Option<String> {
+    raw.lines()
+        .map(str::trim)
+        .find(|line| line.starts_with('[') && line.ends_with(']') && line.contains('/'))
+        .map(|line| line.trim_start_matches('[').trim_end_matches(']'))
+        .and_then(|date| {
+            let mut parts = date.split('/');
+            let day = parts.next()?.trim();
+            let month = parts.next()?.trim();
+            let year = parts.next()?.trim();
+            if parts.next().is_some() {
+                return None;
+            }
+            let day_num = day.parse::<u32>().ok()?;
+            let month_num = month.parse::<u32>().ok()?;
+            let year_num = year.parse::<u32>().ok()?;
+            Some(format!("{year_num:04}-{month_num:02}-{day_num:02}"))
+        })
+}
+
+fn refresh_catalog_if_needed(state: &mut BdState) -> Result<bool, String> {
+    let utc_info = bdciechi::fetch_catalog_utc(&state.nprov)?;
+    crate::log_debug(&format!(
+        "bdciechi: utc check server_utc={} catalog_date={} catalog_ubound={}",
+        utc_info.server_utc, utc_info.catalog_date, utc_info.catalog_ubound
+    ));
+
+    let current_count = state.catalog_rows.len();
+    let current_ubound = current_count.saturating_sub(1);
+    let cached_catalog_date =
+        load_bdciechi_catalog_cache().and_then(|raw| catalog_cache_date(&raw));
+    let catalog_date_matches =
+        cached_catalog_date.as_deref() == Some(utc_info.catalog_date.as_str());
+    let catalog_count_matches = if current_count == 0 {
+        false
+    } else {
+        current_ubound == utc_info.catalog_ubound
+    };
+
+    if catalog_date_matches && catalog_count_matches {
+        return Ok(false);
+    }
+
+    let catalog_raw = bdciechi::fetch_catalog_list(&state.nprov)?;
+    let cached_hash = load_bdciechi_catalog_cache()
+        .map(|raw| catalog_hash(&raw))
+        .unwrap_or_default();
+    let remote_hash = catalog_hash(&catalog_raw);
+    state.catalog_rows = bdciechi::parse_catalog_records(&catalog_raw);
+    if cached_hash != remote_hash {
+        save_bdciechi_catalog_cache(&catalog_raw);
+    }
+    sync_bdc_session(
+        state.parent,
+        &state.username,
+        &state.password,
+        &state.nprov,
+        &state.catalog_rows,
+        true,
+    );
+    Ok(true)
 }
 
 fn bdciechi_credentials_expired(last_successful_login_unix: i64) -> bool {
@@ -602,6 +712,17 @@ fn do_search(hwnd: HWND) {
             set_status(state, &tr("status.login_first"));
             return;
         }
+        if let Err(err) = refresh_catalog_if_needed(state) {
+            set_status(
+                state,
+                &i18n::tr_f(
+                    Language::Italian,
+                    "excluded_from_testing.bdciechi.error.search",
+                    &[("err", &err.to_string())],
+                ),
+            );
+            return;
+        }
         let query = read_edit_text(state.search);
         let query_terms = tokenize_search_terms(&query);
         if query_terms.is_empty() {
@@ -647,6 +768,17 @@ fn do_latest(hwnd: HWND) {
             return;
         }
         set_status(state, &tr("status.loading_latest"));
+        if let Err(err) = refresh_catalog_if_needed(state) {
+            set_status(
+                state,
+                &i18n::tr_f(
+                    Language::Italian,
+                    "excluded_from_testing.bdciechi.error.latest",
+                    &[("err", &err.to_string())],
+                ),
+            );
+            return;
+        }
         match bdciechi::fetch_latest_list(&state.nprov) {
             Ok(raw) => {
                 let latest_rows = bdciechi::parse_catalog_records(&raw);
@@ -703,10 +835,53 @@ fn download_selected(hwnd: HWND) {
             return None;
         }
 
-        let catalog_index = state.visible_indices[sel_idx];
+        let selected_row = match state
+            .visible_indices
+            .get(sel_idx)
+            .and_then(|idx| state.catalog_rows.get(*idx))
+            .cloned()
+        {
+            Some(row) => row,
+            None => {
+                set_status(state, &tr("status.invalid_selection"));
+                return None;
+            }
+        };
+
         let downloading = tr("status.downloading");
         set_status(state, &downloading);
         crate::accessibility::screen_reader_speak(&downloading);
+
+        if let Err(err) = refresh_catalog_if_needed(state) {
+            set_status(
+                state,
+                &i18n::tr_f(
+                    Language::Italian,
+                    "excluded_from_testing.bdciechi.error.download",
+                    &[("err", &err.to_string())],
+                ),
+            );
+            return None;
+        }
+
+        let catalog_index = match state
+            .catalog_rows
+            .iter()
+            .position(|row| row == &selected_row)
+        {
+            Some(idx) => idx,
+            None => {
+                set_status(
+                    state,
+                    &i18n::tr_f(
+                        Language::Italian,
+                        "excluded_from_testing.bdciechi.error.download",
+                        &[("err", "Opera non più disponibile nel catalogo aggiornato")],
+                    ),
+                );
+                return None;
+            }
+        };
 
         let work = match bdciechi::download_work(
             &state.username,
@@ -764,7 +939,8 @@ fn download_selected(hwnd: HWND) {
             }
         }
 
-        if let Err(err) = fs::write(&path, &work.text) {
+        let decoded_text = decode_book_text(&work.text);
+        if let Err(err) = fs::write(&path, decoded_text.as_bytes()) {
             set_status(
                 state,
                 &i18n::tr_f(
@@ -822,10 +998,53 @@ fn sample_selected(hwnd: HWND) {
             return;
         }
 
-        let catalog_index = state.visible_indices[sel_idx];
+        let selected_row = match state
+            .visible_indices
+            .get(sel_idx)
+            .and_then(|idx| state.catalog_rows.get(*idx))
+            .cloned()
+        {
+            Some(row) => row,
+            None => {
+                set_status(state, &tr("status.invalid_selection"));
+                return;
+            }
+        };
+
         let sample_loading = tr("status.sample_loading");
         set_status(state, &sample_loading);
         crate::accessibility::screen_reader_speak(&sample_loading);
+
+        if let Err(err) = refresh_catalog_if_needed(state) {
+            set_status(
+                state,
+                &i18n::tr_f(
+                    Language::Italian,
+                    "excluded_from_testing.bdciechi.error.sample",
+                    &[("err", &err.to_string())],
+                ),
+            );
+            return;
+        }
+
+        let catalog_index = match state
+            .catalog_rows
+            .iter()
+            .position(|row| row == &selected_row)
+        {
+            Some(idx) => idx,
+            None => {
+                set_status(
+                    state,
+                    &i18n::tr_f(
+                        Language::Italian,
+                        "excluded_from_testing.bdciechi.error.sample",
+                        &[("err", "Opera non più disponibile nel catalogo aggiornato")],
+                    ),
+                );
+                return;
+            }
+        };
 
         let work = match bdciechi::download_work(
             &state.username,
@@ -1659,7 +1878,9 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_search_text, row_matches_query, tokenize_search_terms};
+    use super::{
+        normalize_search_text, repair_utf8_mojibake, row_matches_query, tokenize_search_terms,
+    };
 
     #[test]
     fn bdciechi_search_normalizes_accents_in_query() {
@@ -1680,6 +1901,22 @@ mod tests {
         assert_eq!(
             normalize_search_text("autore titolo 123"),
             "autore titolo 123"
+        );
+    }
+
+    #[test]
+    fn repair_utf8_mojibake_fixes_common_cp1252_utf8_mixups() {
+        assert_eq!(
+            repair_utf8_mojibake("Lâ€™EMIRATO DEL POSSIBILE OpportunitÃ "),
+            "L’EMIRATO DEL POSSIBILE Opportunità"
+        );
+    }
+
+    #[test]
+    fn repair_utf8_mojibake_fixes_apostrophe_only_case() {
+        assert_eq!(
+            repair_utf8_mojibake("DUBAI\nLâ€™EMIRATO DEL POSSIBILE"),
+            "DUBAI\nL’EMIRATO DEL POSSIBILE"
         );
     }
 }

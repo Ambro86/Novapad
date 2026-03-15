@@ -493,6 +493,12 @@ fn ensure_cuda_runtime(cancel: &Arc<AtomicBool>) -> Result<PathBuf, String> {
     if !has_required_cuda_runtime(&cuda_dir) {
         return Err("CUDA runtime package missing required DLLs".to_string());
     }
+    if let Err(err) = fs::remove_file(&package_path) {
+        crate::log_debug(&format!(
+            "Transcription: failed to remove CUDA package {}: {err}",
+            package_path.display()
+        ));
+    }
     crate::log_debug(&format!(
         "Transcription: CUDA runtime ready at {}",
         cuda_dir.display()

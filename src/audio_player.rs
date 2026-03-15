@@ -387,6 +387,79 @@ fn ffmpeg_cache_key(path: &Path) -> String {
     hex::encode(hasher.finalize())
 }
 
+fn ffmpeg_cache_limit_bytes() -> u64 {
+    crate::settings::load_settings().podcast_cache_limit_mb as u64 * 1024 * 1024
+}
+
+fn enforce_ffmpeg_cache_limit(cache_dir: &Path, limit_bytes: u64, protected: Option<&Path>) {
+    if limit_bytes == 0 {
+        return;
+    }
+    let entries = match std::fs::read_dir(cache_dir) {
+        Ok(entries) => entries,
+        Err(err) => {
+            log_debug(&format!("FFmpeg cache: read_dir failed: {}", err));
+            return;
+        }
+    };
+    let mut files: Vec<(PathBuf, u64, u64)> = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let metadata = match entry.metadata() {
+            Ok(metadata) => metadata,
+            Err(err) => {
+                log_debug(&format!(
+                    "FFmpeg cache: metadata failed for {}: {}",
+                    path.display(),
+                    err
+                ));
+                continue;
+            }
+        };
+        if !metadata.is_file() {
+            continue;
+        }
+        let modified = metadata
+            .modified()
+            .ok()
+            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+            .map(|duration| duration.as_secs())
+            .unwrap_or(0);
+        files.push((path, metadata.len(), modified));
+    }
+
+    let mut total: u64 = files.iter().map(|(_, size, _)| *size).sum();
+    if total <= limit_bytes {
+        return;
+    }
+
+    let protected = protected.map(Path::to_path_buf);
+    files.sort_by_key(|entry| entry.2);
+    for (path, size, _) in files {
+        if total <= limit_bytes {
+            break;
+        }
+        if protected
+            .as_ref()
+            .is_some_and(|protected_path| protected_path == &path)
+        {
+            continue;
+        }
+        match std::fs::remove_file(&path) {
+            Ok(()) => {
+                total = total.saturating_sub(size);
+            }
+            Err(err) => {
+                log_debug(&format!(
+                    "FFmpeg cache: delete failed for {}: {}",
+                    path.display(),
+                    err
+                ));
+            }
+        }
+    }
+}
+
 fn write_wav_header<W: Write + Seek>(
     writer: &mut W,
     data_bytes: u64,
@@ -422,6 +495,7 @@ fn decode_ffmpeg_to_wav(path: &Path, stream_index: Option<i32>) -> Result<PathBu
     let cache_dir = settings_dir().join("ffmpeg_cache");
     std::fs::create_dir_all(&cache_dir)
         .map_err(|e| format!("FFmpeg cache dir create failed: {}", e))?;
+    let cache_limit_bytes = ffmpeg_cache_limit_bytes();
     // Include stream_index in cache key to separate different audio tracks
     let mut key = ffmpeg_cache_key(path);
     if let Some(idx) = stream_index {
@@ -430,6 +504,7 @@ fn decode_ffmpeg_to_wav(path: &Path, stream_index: Option<i32>) -> Result<PathBu
     let wav_path = cache_dir.join(format!("{}.wav", &key[..key.len().min(20)]));
     if wav_path.exists() {
         log_debug(&format!("FFmpeg: using cached WAV {}", wav_path.display()));
+        enforce_ffmpeg_cache_limit(&cache_dir, cache_limit_bytes, Some(&wav_path));
         return Ok(wav_path);
     }
 
@@ -492,6 +567,7 @@ fn decode_ffmpeg_to_wav(path: &Path, stream_index: Option<i32>) -> Result<PathBu
         .map_err(|e| format!("FFmpeg: into_inner failed: {}", e))?;
     write_wav_header(&mut file, data_bytes, channels, sample_rate)
         .map_err(|e| format!("FFmpeg: wav finalize failed: {}", e))?;
+    enforce_ffmpeg_cache_limit(&cache_dir, cache_limit_bytes, Some(&wav_path));
     Ok(wav_path)
 }
 

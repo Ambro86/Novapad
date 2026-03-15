@@ -1065,7 +1065,8 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
         if all_edge {
             const WS_RETRY_MAX: usize = 10;
             let mut next_index = 0usize;
-            for attempt in 1..=WS_RETRY_MAX {
+            let mut attempt = 1usize;
+            loop {
                 if cancel_downloader.load(Ordering::SeqCst) {
                     return;
                 }
@@ -1104,21 +1105,29 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                         if cancel_downloader.load(Ordering::SeqCst) {
                             return;
                         }
+                        let retry_forever = is_edge_connection_retry_error(&e);
                         crate::log_debug(&format!(
                             "Edge WS reuse failed (attempt {}/{}): {}",
-                            attempt, WS_RETRY_MAX, e
+                            attempt,
+                            if retry_forever {
+                                "inf".to_string()
+                            } else {
+                                WS_RETRY_MAX.to_string()
+                            },
+                            e
                         ));
-                        if attempt == WS_RETRY_MAX {
+                        if !retry_forever && attempt >= WS_RETRY_MAX {
                             if let Err(err) = audio_tx.send(Err(e)).await {
                                 crate::log_debug(&format!("Failed to send audio error: {:?}", err));
                             }
                             return;
                         }
-                        tokio::time::sleep(Duration::from_millis(500)).await;
+                        tokio::time::sleep(Duration::from_millis(edge_retry_delay_ms(&e, attempt)))
+                            .await;
+                        attempt = attempt.saturating_add(1);
                     }
                 }
             }
-            return;
         }
 
         // Mixed-engine path: synthesise chunks sequentially to avoid
@@ -1343,6 +1352,23 @@ pub fn play_edge_bytes_async(bytes: Vec<u8>, volume: i32) -> Arc<AtomicBool> {
     cancel
 }
 
+fn is_edge_connection_retry_error(err: &str) -> bool {
+    let lower = err.to_ascii_lowercase();
+    err.contains("os error 10054")
+        || lower.contains("connection reset")
+        || lower.contains("forcibly closed by the remote host")
+}
+
+fn edge_retry_delay_ms(err: &str, attempt: usize) -> u64 {
+    let lower = err.to_ascii_lowercase();
+    let base_ms = if is_edge_connection_retry_error(err) || lower.contains("timeout") {
+        250
+    } else {
+        400
+    };
+    ((attempt as u64) * (base_ms as u64)).min(2000)
+}
+
 pub async fn download_audio_chunk(
     text: &str,
     voice: &str,
@@ -1352,34 +1378,81 @@ pub async fn download_audio_chunk(
     tts_volume: i32,
     language: Language,
 ) -> Result<Vec<u8>, String> {
-    let max_retries = 40;
-    let mut last_error = String::new();
+    download_audio_chunk_with_cancel(DownloadAudioChunkRequest {
+        text,
+        voice,
+        request_id,
+        tts_rate,
+        tts_pitch,
+        tts_volume,
+        language,
+        cancel: None,
+    })
+    .await
+}
 
-    for attempt in 1..=max_retries {
-        match download_audio_chunk_attempt(text, voice, request_id, tts_rate, tts_pitch, tts_volume)
-            .await
+struct DownloadAudioChunkRequest<'a> {
+    text: &'a str,
+    voice: &'a str,
+    request_id: &'a str,
+    tts_rate: i32,
+    tts_pitch: i32,
+    tts_volume: i32,
+    language: Language,
+    cancel: Option<&'a AtomicBool>,
+}
+
+async fn download_audio_chunk_with_cancel(
+    request: DownloadAudioChunkRequest<'_>,
+) -> Result<Vec<u8>, String> {
+    let max_retries = 40;
+    let mut attempt = 1usize;
+
+    let last_error = loop {
+        if request
+            .cancel
+            .is_some_and(|flag| flag.load(Ordering::Relaxed))
+        {
+            return Err(cancelled_message(request.language));
+        }
+        match download_audio_chunk_attempt(
+            request.text,
+            request.voice,
+            request.request_id,
+            request.tts_rate,
+            request.tts_pitch,
+            request.tts_volume,
+        )
+        .await
         {
             Ok(data) => return Ok(data),
             Err(e) => {
-                last_error = e;
+                let retry_forever = is_edge_connection_retry_error(&e);
+                let max_label = if retry_forever {
+                    "inf".to_string()
+                } else {
+                    max_retries.to_string()
+                };
                 let msg = i18n::tr_f(
-                    language,
+                    request.language,
                     "tts.chunk_download_retry",
                     &[
                         ("attempt", &attempt.to_string()),
-                        ("max", &max_retries.to_string()),
-                        ("err", &last_error),
+                        ("max", &max_label),
+                        ("err", &e),
                     ],
                 );
                 log_debug(&msg);
-                if attempt < max_retries {
-                    tokio::time::sleep(Duration::from_millis(500 * attempt as u64)).await;
+                if !retry_forever && attempt >= max_retries {
+                    break e;
                 }
+                tokio::time::sleep(Duration::from_millis(edge_retry_delay_ms(&e, attempt))).await;
+                attempt = attempt.saturating_add(1);
             }
         }
-    }
+    };
     Err(i18n::tr_f(
-        language,
+        request.language,
         "tts.chunk_download_error",
         &[("err", &last_error)],
     ))
@@ -1933,53 +2006,55 @@ async fn download_edge_chunk_ws_with_retry(
     idx: usize,
     max_retries: usize,
 ) -> Result<Vec<u8>, String> {
-    let mut last_err = None;
-    for attempt in 1..=max_retries {
+    let mut attempt = 1usize;
+    let last_err = loop {
         if options.cancel.load(Ordering::Relaxed) {
-            return Err("Cancelled".to_string());
+            return Err(cancelled_message(options.language));
         }
         match download_edge_chunk_ws(chunk, options, idx).await {
             Ok(audio) => return Ok(audio),
             Err(err) => {
-                last_err = Some(err);
-                let err_str = last_err.as_deref().unwrap_or("unknown");
+                let err_str = err.as_str();
                 crate::log_debug(&format!(
                     "Edge WS: chunk download failed (attempt {}/{} chunk_index={}): {}",
-                    attempt, max_retries, idx, err_str
-                ));
-                if attempt < max_retries {
-                    let is_conn_reset = err_str.contains("os error 10054")
-                        || err_str.to_ascii_lowercase().contains("connection reset");
-                    let is_timeout = err_str.to_ascii_lowercase().contains("timeout");
-                    let base_ms = if is_conn_reset || is_timeout {
-                        250
+                    attempt,
+                    if is_edge_connection_retry_error(err_str) {
+                        "inf".to_string()
                     } else {
-                        400
-                    };
-                    let delay_ms = ((attempt as u64) * (base_ms as u64)).min(2000);
-                    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                        max_retries.to_string()
+                    },
+                    idx,
+                    err_str
+                ));
+                let retry_forever = is_edge_connection_retry_error(err_str);
+                if !retry_forever && attempt >= max_retries {
+                    break err;
                 }
+                tokio::time::sleep(Duration::from_millis(edge_retry_delay_ms(err_str, attempt)))
+                    .await;
+                attempt = attempt.saturating_add(1);
             }
         }
-    }
+    };
     if options.allow_http_fallback && !options.cancel.load(Ordering::Relaxed) {
         crate::log_debug(&format!(
             "Edge WS: falling back to HTTP chunk (chunk_index={})",
             idx
         ));
         let request_id = Uuid::new_v4().simple().to_string();
-        return download_audio_chunk(
-            &chunk.text_to_read,
-            options.voice,
-            &request_id,
-            options.rate,
-            options.pitch,
-            options.volume,
-            options.language,
-        )
+        return download_audio_chunk_with_cancel(DownloadAudioChunkRequest {
+            text: &chunk.text_to_read,
+            voice: options.voice,
+            request_id: &request_id,
+            tts_rate: options.rate,
+            tts_pitch: options.pitch,
+            tts_volume: options.volume,
+            language: options.language,
+            cancel: Some(options.cancel),
+        })
         .await;
     }
-    Err(last_err.unwrap_or_else(|| "Edge WS: chunk download failed".to_string()))
+    Err(last_err)
 }
 
 pub(crate) fn format_audiobook_part_filename(
@@ -6376,7 +6451,6 @@ pub(crate) fn run_tts_audiobook_part(
             .collect();
 
         const WS_RETRY_MAX: usize = 3;
-        let mut last_err = None;
         let mut next_index = 0usize;
 
         let file = std::fs::File::create(options.output).map_err(|err| err.to_string())?;
@@ -6393,7 +6467,8 @@ pub(crate) fn run_tts_audiobook_part(
             allow_http_fallback: true,
         };
 
-        for attempt in 1..=WS_RETRY_MAX {
+        let mut attempt = 1usize;
+        let last_err = loop {
             if options.cancel.load(Ordering::Relaxed) {
                 return Err(cancelled_message(options.language));
             }
@@ -6409,27 +6484,35 @@ pub(crate) fn run_tts_audiobook_part(
             .await;
 
             match res {
-                Ok(_) => {
-                    last_err = None;
-                    break;
-                }
+                Ok(_) => break None,
                 Err(err) => {
                     let completed = current_global_progress.saturating_sub(base_progress);
                     next_index = (next_index + completed).min(edge_chunks.len());
-                    last_err = Some(err);
+                    let err_str = err.as_str();
+                    let retry_forever = is_edge_connection_retry_error(err_str);
                     crate::log_debug(&format!(
                         "Edge WS export failed (attempt {}/{}): {}",
                         attempt,
-                        WS_RETRY_MAX,
-                        last_err.as_deref().unwrap_or("unknown")
+                        if retry_forever {
+                            "inf".to_string()
+                        } else {
+                            WS_RETRY_MAX.to_string()
+                        },
+                        err_str
                     ));
                     if next_index >= edge_chunks.len() {
-                        break;
+                        break Some(err);
                     }
-                    std::thread::sleep(std::time::Duration::from_millis(250));
+                    if !retry_forever && attempt >= WS_RETRY_MAX {
+                        break Some(err);
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(edge_retry_delay_ms(
+                        err_str, attempt,
+                    )));
+                    attempt = attempt.saturating_add(1);
                 }
             }
-        }
+        };
         if let Some(err) = last_err {
             return Err(err);
         }

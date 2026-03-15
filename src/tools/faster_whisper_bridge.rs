@@ -286,52 +286,91 @@ pub fn prewarm_shared_worker(model: BridgeModel, use_cuda_runtime: bool) {
     let cancel = Arc::new(AtomicBool::new(false));
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(1));
-        let slot = dictation_worker_slot();
-        let mut guard = match slot.lock() {
-            Ok(guard) => guard,
-            Err(_) => {
-                crate::log_debug("Dictation bridge worker prewarm: lock poisoned");
-                return;
-            }
-        };
-
         let worker_config = DictationWorkerConfig {
             model,
             use_cuda_runtime,
         };
-        let mut stale_worker = false;
-        if let Some(worker) = guard.as_mut() {
-            let wrong_config = worker.config != worker_config;
-            let exited = match worker.child.try_wait() {
-                Ok(Some(_)) => true,
-                Ok(None) => false,
-                Err(_) => true,
+        let slot = dictation_worker_slot();
+
+        let should_start = {
+            let mut guard = match slot.lock() {
+                Ok(guard) => guard,
+                Err(_) => {
+                    crate::log_debug("Dictation bridge worker prewarm: lock poisoned");
+                    return;
+                }
             };
-            stale_worker = wrong_config || exited;
+
+            let mut stale_worker = false;
+            if let Some(worker) = guard.as_mut() {
+                let wrong_config = worker.config != worker_config;
+                let exited = match worker.child.try_wait() {
+                    Ok(Some(_)) => true,
+                    Ok(None) => false,
+                    Err(_) => true,
+                };
+                stale_worker = wrong_config || exited;
+            }
+            if stale_worker
+                && let Some(mut worker) = guard.take()
+                && let Err(err) = worker.child.kill()
+            {
+                crate::log_debug(&format!(
+                    "Dictation bridge worker prewarm stale kill failed: {err}"
+                ));
+            }
+
+            guard.is_none()
+        };
+
+        if !should_start {
+            return;
         }
-        if stale_worker
-            && let Some(mut worker) = guard.take()
-            && let Err(err) = worker.child.kill()
-        {
-            crate::log_debug(&format!(
-                "Dictation bridge worker prewarm stale kill failed: {err}"
-            ));
-        }
-        if guard.is_none() {
-            let mut no_download_progress = None;
-            match start_dictation_bridge_worker(
-                model,
-                use_cuda_runtime,
-                &cancel,
-                &mut no_download_progress,
-            ) {
-                Ok(worker) => {
+
+        let mut no_download_progress = None;
+        match start_dictation_bridge_worker(
+            model,
+            use_cuda_runtime,
+            &cancel,
+            &mut no_download_progress,
+        ) {
+            Ok(mut worker) => {
+                let mut guard = match slot.lock() {
+                    Ok(guard) => guard,
+                    Err(_) => {
+                        crate::log_debug(
+                            "Dictation bridge worker prewarm: lock poisoned while storing worker",
+                        );
+                        close_dictation_worker(&mut worker, "prewarm_lock_poisoned");
+                        return;
+                    }
+                };
+
+                let replace_existing = match guard.as_mut() {
+                    Some(existing) => {
+                        let wrong_config = existing.config != worker_config;
+                        let exited = match existing.child.try_wait() {
+                            Ok(Some(_)) => true,
+                            Ok(None) => false,
+                            Err(_) => true,
+                        };
+                        wrong_config || exited
+                    }
+                    None => true,
+                };
+
+                if replace_existing {
+                    if let Some(mut existing) = guard.take() {
+                        close_dictation_worker(&mut existing, "prewarm_replace");
+                    }
                     *guard = Some(worker);
                     crate::log_debug("Dictation bridge worker prewarm completed");
+                } else {
+                    close_dictation_worker(&mut worker, "prewarm_unused");
                 }
-                Err(err) => {
-                    crate::log_debug(&format!("Dictation bridge worker prewarm failed: {err}"));
-                }
+            }
+            Err(err) => {
+                crate::log_debug(&format!("Dictation bridge worker prewarm failed: {err}"));
             }
         }
     });

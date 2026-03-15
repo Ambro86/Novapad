@@ -1067,7 +1067,7 @@
   "reader.no_title": "Без названия",
   "reader.external_link": "Внешняя ссылка:\r\n{url}",
   "options.lang.lt": "Литовский",
-  "playback.transcribe_current": "Транскрибировать текущее аудио",
+  "playback.transcribe_current": "Транскрибировать текущее аудио\tAlt+Shift+T",
   "whisper.model.choice_intro": "Выбор модели Whisper (первое использование): Small, Medium или Large.",
   "whisper.model.choice_advanced": "Расширенный выбор модели Whisper доступен в выпадающем списке.",
   "options.tab.ai_transcription": "ИИ и транскрипция",

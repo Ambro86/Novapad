@@ -1128,7 +1128,7 @@
   "reader.no_title": "Nessun titolo",
   "reader.external_link": "Link esterno:\n{url}",
   "options.lang.lt": "Lituano",
-  "playback.transcribe_current": "Trascrivi audio corrente",
+  "playback.transcribe_current": "Trascrivi audio corrente\tAlt+Shift+T",
   "whisper.model.choice_intro": "Scelta modello Whisper (primo utilizzo): Small, Medium o Large.",
   "whisper.model.choice_advanced": "Scelta modello Whisper avanzata disponibile nella casella elenco.",
   "options.tab.ai_transcription": "AI e trascrizione",

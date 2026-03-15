@@ -1078,7 +1078,7 @@
   "reader.no_title": "No Title",
   "reader.external_link": "External link:\n{url}",
   "options.lang.lt": "Lithuanian",
-  "playback.transcribe_current": "Transcribe current audio",
+  "playback.transcribe_current": "Transcribe current audio\tAlt+Shift+T",
   "whisper.model.choice_intro": "Whisper model selection (first use): Small, Medium, or Large.",
   "whisper.model.choice_advanced": "Advanced Whisper model selection is available in the combo box.",
   "options.tab.ai_transcription": "AI and transcription",

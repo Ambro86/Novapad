@@ -471,6 +471,7 @@ fn cuda_package_path() -> PathBuf {
         .join(CUDA_PACKAGE_FILE_NAME)
 }
 
+#[cfg(debug_assertions)]
 fn repo_dll_dir_candidates() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     if let Ok(exe_path) = std::env::current_exe()

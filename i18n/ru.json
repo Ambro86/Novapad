@@ -700,7 +700,7 @@
   "podcasts.no_audio_url": "Нет URL-адреса аудио для этого эпизода",
   "podcasts.search.no_results": "Нет результатов",
   "podcasts.search.label": "Поиск подкастов:",
-  "podcasts.search.provider.itunes": "iTunes",
+  "podcasts.search.provider.itunes": "iTunes + Spreaker",
   "podcasts.search.provider.podcastindex": "Podcast Index",
   "podcasts.download_filter": "Аудиофайлы\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Все файлы\\0*.*\\0\\0",
   "podcasts.download_started": "Загрузка начата",

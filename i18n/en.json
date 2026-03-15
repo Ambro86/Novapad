@@ -707,7 +707,7 @@
   "podcasts.no_audio_url": "No audio URL for this episode",
   "podcasts.search.no_results": "No results",
   "podcasts.search.label": "Search Podcasts:",
-  "podcasts.search.provider.itunes": "iTunes",
+  "podcasts.search.provider.itunes": "iTunes + Spreaker",
   "podcasts.search.provider.podcastindex": "Podcast Index",
   "podcasts.download_filter": "Audio files\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0All files\\0*.*\\0\\0",
   "podcasts.download_started": "Download started",

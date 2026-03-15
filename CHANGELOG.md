@@ -1,10 +1,11 @@
 # Changelog
 
-Version 0.6.8 – 2026-03-04
+Version 0.6.8 – 2026-03-15
 
 What's New
 • Added a new item to the Play menu that lets you transcribe any audio or video file with Whisper. A new “AI and Transcription” section is now available in Options, where you can choose the model, enable optional CUDA support for NVIDIA graphics cards, preserve the original language, and enable or disable timestamps.
 • Added offline voice dictation, using the same workflow as audio transcription. By default, press `Ctrl+Shift+Space` to start dictation and press the same shortcut again to stop it; the shortcut can be customized in Options. From the second activation onward, dictation is faster because the engine stays ready in memory; this preloading and reuse are automatically disabled on PCs with less than 4 GB of RAM.
+• Podcast search now uses `iTunes + Spreaker` by default, with duplicate filtering when the same podcast is found on both platforms.
 • Sonarpad is now also available on Mac with a subset of features. Project link: https://github.com/Ambro86/Sonarpad-Mac
 
 Improvements

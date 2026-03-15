@@ -707,7 +707,7 @@
   "podcasts.no_audio_url": "Немає аудіо-URL для цього епізоду",
   "podcasts.search.no_results": "Нічого не знайдено",
   "podcasts.search.label": "Пошук подкастів:",
-  "podcasts.search.provider.itunes": "iTunes",
+  "podcasts.search.provider.itunes": "iTunes + Spreaker",
   "podcasts.search.provider.podcastindex": "Podcast Index",
   "podcasts.download_filter": "Аудіофайли\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Всі файли\\0*.*\\0\\0",
   "podcasts.download_started": "Завантаження розпочато",

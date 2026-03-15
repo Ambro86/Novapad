@@ -707,7 +707,7 @@
   "podcasts.no_audio_url": "Šiam epizodui nėra garso URL",
   "podcasts.search.no_results": "Nėra rezultatų",
   "podcasts.search.label": "Ieškoti podcastų:",
-  "podcasts.search.provider.itunes": "iTunes",
+  "podcasts.search.provider.itunes": "iTunes + Spreaker",
   "podcasts.search.provider.podcastindex": "Podcast indeksas",
   "podcasts.download_filter": "Garso failai\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Visi failai\\0*.*\\0\\0",
   "podcasts.download_started": "Pradėtas atsisiuntimas",

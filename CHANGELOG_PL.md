@@ -1,10 +1,11 @@
 # Dziennik zmian
 
-Wersja 0.6.8 – 2026-03-04
+Wersja 0.6.8 – 2026-03-15
 
 Nowości
 • Dodano nową pozycję w menu Odtwarzanie, która umożliwia transkrypcję dowolnego pliku audio lub wideo za pomocą Whisper. W Opcjach dostępna jest nowa sekcja „AI i transkrypcja”, w której można wybrać model, włączyć opcjonalną obsługę CUDA dla kart graficznych NVIDIA, zachować oryginalny język oraz włączyć lub wyłączyć znaczniki czasu.
 • Dodano możliwość korzystania z dyktowania głosowego offline, działającego tak samo jak transkrypcja audio. Domyślnie naciśnij `Ctrl+Shift+Spacja`, aby rozpocząć dyktowanie, i naciśnij ten sam skrót ponownie, aby je zakończyć; skrót można dostosować w Opcjach. Od drugiego uruchomienia dyktowanie działa szybciej, ponieważ silnik pozostaje gotowy w pamięci; na komputerach z mniej niż 4 GB RAM to wstępne ładowanie i ponowne użycie są automatycznie wyłączane.
+• Wyszukiwanie podcastów domyślnie korzysta teraz z `iTunes + Spreaker`, z filtrowaniem duplikatów, gdy ten sam podcast jest dostępny na obu platformach.
 • Sonarpad jest teraz dostępny także na Macu, choć na razie z częściowym zestawem funkcji. Link do projektu: https://github.com/Ambro86/Sonarpad-Mac
 
 Ulepszenia

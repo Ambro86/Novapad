@@ -2776,11 +2776,11 @@ fn perform_search(hwnd: HWND, query: &str) {
         let mut results = Vec::new();
         match provider {
             SearchProvider::Itunes => {
+                let fetch_config = rss_fetch_config(parent);
                 let url = format!(
                     "https://itunes.apple.com/search?media=podcast&term={}&limit=20",
                     query
                 );
-                let fetch_config = rss_fetch_config(parent);
                 match rt.block_on(rss::fetch_url_bytes(&url, fetch_config)) {
                     Ok(bytes) => {
                         if let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes) {
@@ -2791,6 +2791,24 @@ fn perform_search(hwnd: HWND, query: &str) {
                         log_debug(&format!("itunes_search_failed: {}", err));
                     }
                 }
+
+                let spreaker_url = format!(
+                    "https://api.spreaker.com/v2/search?q={}&type=shows&limit=20",
+                    query
+                );
+                match rt.block_on(rss::fetch_url_bytes(&spreaker_url, fetch_config)) {
+                    Ok(bytes) => {
+                        if let Ok(parsed) = serde_json::from_slice::<SpreakerSearchResponse>(&bytes)
+                        {
+                            results.extend(spreaker_items_to_results(parsed.response.items));
+                        }
+                    }
+                    Err(err) => {
+                        log_debug(&format!("spreaker_search_failed: {}", err));
+                    }
+                }
+
+                dedup_podcast_search_results(&mut results);
             }
             SearchProvider::PodcastIndex => {
                 let Some((key, secret)) = podcastindex_auth else {
@@ -2905,6 +2923,43 @@ fn itunes_items_to_results(items: Vec<ItunesSearchItem>) -> Vec<PodcastSearchRes
         }
     }
     results
+}
+
+fn spreaker_items_to_results(items: Vec<SpreakerShowItem>) -> Vec<PodcastSearchResult> {
+    let mut results = Vec::new();
+    for item in items {
+        if item.title.trim().is_empty() {
+            continue;
+        }
+        results.push(PodcastSearchResult {
+            title: item.title,
+            artist: item.author_name,
+            feed_url: format!(
+                "https://www.spreaker.com/show/{}/episodes/feed",
+                item.show_id
+            ),
+        });
+    }
+    results
+}
+
+fn dedup_podcast_search_results(results: &mut Vec<PodcastSearchResult>) {
+    let mut seen_feed_urls = HashSet::new();
+    let mut seen_titles = HashSet::new();
+    results.retain(|result| {
+        let feed_key = normalize_podcast_key(&result.feed_url);
+        let title_key = format!(
+            "{}|{}",
+            result.title.trim().to_ascii_lowercase(),
+            result.artist.trim().to_ascii_lowercase()
+        );
+
+        if !feed_key.is_empty() && !seen_feed_urls.insert(feed_key) {
+            return false;
+        }
+
+        seen_titles.insert(title_key)
+    });
 }
 
 #[cfg(debug_assertions)]
@@ -4439,6 +4494,26 @@ struct ItunesSearchItem {
     primary_genre_id: Option<u32>,
     #[serde(rename = "genreIds")]
     genre_ids: Option<Vec<String>>,
+}
+
+#[derive(serde::Deserialize)]
+struct SpreakerSearchResponse {
+    response: SpreakerSearchPayload,
+}
+
+#[derive(serde::Deserialize)]
+struct SpreakerSearchPayload {
+    #[serde(default)]
+    items: Vec<SpreakerShowItem>,
+}
+
+#[derive(serde::Deserialize)]
+struct SpreakerShowItem {
+    show_id: u64,
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    author_name: String,
 }
 
 #[derive(serde::Deserialize)]

@@ -707,7 +707,7 @@
   "podcasts.no_audio_url": "Nema audio linka za ovu epizodu.",
   "podcasts.search.no_results": "Nema rezultata.",
   "podcasts.search.label": "Pretraži podkaste:",
-  "podcasts.search.provider.itunes": "iTunes",
+  "podcasts.search.provider.itunes": "iTunes + Spreaker",
   "podcasts.search.provider.podcastindex": "Podkast Indeks",
   "podcasts.download_filter": "Audio datoteke\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Sve datoteke\\0*.*\\0\\0",
   "podcasts.download_started": "Preuzimanje je započeto.",

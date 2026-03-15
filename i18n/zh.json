@@ -678,7 +678,7 @@
   "podcasts.no_audio_url": "本集无音频链接",
   "podcasts.search.no_results": "没有结果",
   "podcasts.search.label": "搜索播客：",
-  "podcasts.search.provider.itunes": "iTunes",
+  "podcasts.search.provider.itunes": "iTunes + Spreaker",
   "podcasts.search.provider.podcastindex": "播客索引",
   "podcasts.download_filter": "音频文件\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0所有文件\\0*.*\\0\\0",
   "podcasts.download_started": "下载开始",

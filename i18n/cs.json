@@ -708,7 +708,7 @@
   "podcasts.no_audio_url": "Pro tuto epizodu není k dispozici žádná URL zvuku",
   "podcasts.search.no_results": "Žádné výsledky",
   "podcasts.search.label": "Hledat podcasty:",
-  "podcasts.search.provider.itunes": "iTunes",
+  "podcasts.search.provider.itunes": "iTunes + Spreaker",
   "podcasts.search.provider.podcastindex": "Podcast Index",
   "podcasts.download_filter": "Zvukové soubory\\0*.mp3;*.m4a;*.aac;*.ogg;*.opus;*.wav;*.flac\\0Všechny soubory\\0*.*\\0\\0",
   "podcasts.download_started": "Stahování zahájeno",

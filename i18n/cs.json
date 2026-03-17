@@ -1056,9 +1056,9 @@
   "stream_audio.quality.high": "Vysoká kvalita",
   "stream_audio.quality.low": "Nízká kvalita",
   "stream_audio.quality.medium": "Střední kvalita",
-  "stream_audio.load_more_videos": "Load more videos",
-  "stream_audio.previous_results": "Back to previous results",
-  "stream_audio.views_suffix": "views",
+  "stream_audio.load_more_videos": "Načíst další videa",
+  "stream_audio.previous_results": "Zpět na předchozí výsledky",
+  "stream_audio.views_suffix": "zhlédnutí",
   "stream_audio.quality_label": "Kvalita:",
   "options.split.by_parts": "Na části",
   "options.label.audio_split_parts_count": "Počet částí:",
@@ -1106,5 +1106,6 @@
   "options.lang.ru": "Ruština",
   "options.spellcheck.lang.ru": "Ruština (Rusko)"
 }
+
 
 

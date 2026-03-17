@@ -1056,9 +1056,9 @@
   "stream_audio.quality.high": "Visok kvalitet",
   "stream_audio.quality.low": "Nizak kvalitet",
   "stream_audio.quality.medium": "Srednji kvalitet",
-  "stream_audio.load_more_videos": "Load more videos",
-  "stream_audio.previous_results": "Back to previous results",
-  "stream_audio.views_suffix": "views",
+  "stream_audio.load_more_videos": "Učitaj još video zapisa",
+  "stream_audio.previous_results": "Povratak na prethodne rezultate",
+  "stream_audio.views_suffix": "pregledi",
   "stream_audio.quality_label": "Kvalitet:",
   "options.split.by_parts": "Po delovima",
   "options.label.audio_split_parts_count": "Broj delova:",
@@ -1106,5 +1106,6 @@
   "options.lang.ru": "Ruski",
   "options.spellcheck.lang.ru": "Ruski (Rusija)"
 }
+
 
 

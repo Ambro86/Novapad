@@ -1056,9 +1056,9 @@
   "stream_audio.quality.high": "Aukšta kokybė",
   "stream_audio.quality.low": "Žema kokybė",
   "stream_audio.quality.medium": "Vidutinė kokybė",
-  "stream_audio.load_more_videos": "Load more videos",
-  "stream_audio.previous_results": "Back to previous results",
-  "stream_audio.views_suffix": "views",
+  "stream_audio.load_more_videos": "Įkelti daugiau vaizdo įrašų",
+  "stream_audio.previous_results": "Grįžti prie ankstesnių rezultatų",
+  "stream_audio.views_suffix": "peržiūros",
   "stream_audio.quality_label": "Kokybė:",
   "options.split.by_parts": "Dalimis",
   "options.label.audio_split_parts_count": "Dalių skaičius:",
@@ -1106,5 +1106,6 @@
   "options.lang.ru": "Rusų",
   "options.spellcheck.lang.ru": "Rusų (Rusija)"
 }
+
 
 

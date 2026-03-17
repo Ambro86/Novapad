@@ -1056,9 +1056,9 @@
   "stream_audio.quality.high": "Hög kvalitet",
   "stream_audio.quality.low": "Låg kvalitet",
   "stream_audio.quality.medium": "Medelhög kvalitet",
-  "stream_audio.load_more_videos": "Load more videos",
-  "stream_audio.previous_results": "Back to previous results",
-  "stream_audio.views_suffix": "views",
+  "stream_audio.load_more_videos": "Ladda fler videor",
+  "stream_audio.previous_results": "Tillbaka till tidigare resultat",
+  "stream_audio.views_suffix": "visningar",
   "stream_audio.quality_label": "Kvalitet:",
   "options.split.by_parts": "Efter delar",
   "options.label.audio_split_parts_count": "Antal delar:",
@@ -1106,5 +1106,6 @@
   "options.lang.ru": "Ryska",
   "options.spellcheck.lang.ru": "Ryska (Ryssland)"
 }
+
 
 

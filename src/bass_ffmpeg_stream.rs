@@ -23,6 +23,8 @@ struct StreamState {
     data_ready: Condvar,
     /// True when FFmpeg has finished decoding
     eof: AtomicBool,
+    /// Avoid repeated EOF callback logs from the audio thread
+    eof_callback_logged: AtomicBool,
     /// True when stream should stop
     stop: AtomicBool,
     /// Sample rate
@@ -60,8 +62,8 @@ impl FfmpegBassStream {
         }
 
         log_debug(&format!(
-            "FFmpeg stream: rate={} channels={}",
-            sample_rate, channels
+            "FFmpeg stream: rate={} channels={} total_duration={:?}",
+            sample_rate, channels, total_duration_secs
         ));
 
         // Create shared state
@@ -71,6 +73,7 @@ impl FfmpegBassStream {
             )),
             data_ready: Condvar::new(),
             eof: AtomicBool::new(false),
+            eof_callback_logged: AtomicBool::new(false),
             stop: AtomicBool::new(false),
             sample_rate,
             channels,
@@ -189,6 +192,12 @@ unsafe extern "C" fn stream_callback(
         }
 
         if written == 0 && state.eof.load(Ordering::SeqCst) {
+            if !state.eof_callback_logged.swap(true, Ordering::SeqCst) {
+                log_debug(&format!(
+                    "FFmpeg stream callback: returning EOF with empty buffer (rate={} channels={} total_duration={:?})",
+                    state.sample_rate, state.channels, state.total_duration_secs
+                ));
+            }
             BASS_STREAMPROC_END
         } else {
             length // Return requested length (we filled with silence if needed)
@@ -233,8 +242,15 @@ fn decode_loop(mut source: FfmpegSource, state: Arc<StreamState>) {
     }
 
     state.eof.store(true, Ordering::SeqCst);
+    let decoded_secs =
+        sample_count as f64 / f64::from(state.sample_rate) / f64::from(state.channels.max(1));
+    let buffered_samples = state.buffer.lock().unwrap_or_else(|e| e.into_inner()).len();
     log_debug(&format!(
-        "FFmpeg stream: decode complete ({} samples)",
-        sample_count
+        "FFmpeg stream: decode complete (samples={} decoded_secs={:.3} buffered_samples={} stop={} total_duration={:?})",
+        sample_count,
+        decoded_secs,
+        buffered_samples,
+        state.stop.load(Ordering::SeqCst),
+        state.total_duration_secs
     ));
 }

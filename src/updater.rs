@@ -378,7 +378,11 @@ fn select_sha256_asset<'a>(assets: &'a [ReleaseAsset], exe_name: &str) -> Option
 }
 
 fn normalize_version(tag: &str) -> String {
-    tag.trim().trim_start_matches('v').to_string()
+    let trimmed = tag.trim().trim_start_matches('v');
+    match parse_version(trimmed) {
+        Some(parsed) => format_version(parsed),
+        None => trimmed.to_string(),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -419,7 +423,26 @@ fn parse_beta_suffix(suffix: &str) -> Option<u32> {
     if numeric.is_empty() {
         return Some(1);
     }
-    numeric.parse::<u32>().ok().or(Some(1))
+    let digits: String = numeric
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit())
+        .collect();
+    if digits.is_empty() {
+        return Some(1);
+    }
+    digits.parse::<u32>().ok().or(Some(1))
+}
+
+fn format_version(version: ParsedVersion) -> String {
+    match version.prerelease_beta {
+        Some(beta) if beta > 0 => {
+            format!(
+                "{}.{}.{}-beta{}",
+                version.major, version.minor, version.patch, beta
+            )
+        }
+        _ => format!("{}.{}.{}", version.major, version.minor, version.patch),
+    }
 }
 
 fn compare_versions(a: ParsedVersion, b: ParsedVersion) -> std::cmp::Ordering {
@@ -2033,6 +2056,25 @@ fn show_update_message(
         });
     log_debug(&format!("Updater: Received response: {}", response));
     windows::Win32::UI::WindowsAndMessaging::MESSAGEBOX_RESULT(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_newer_version, normalize_version, parse_version};
+
+    #[test]
+    fn normalizes_graphic_beta_suffix() {
+        assert_eq!(normalize_version("0.6.8-beta2.graphic 59"), "0.6.8-beta2");
+        assert_eq!(normalize_version("v0.6.8-beta3"), "0.6.8-beta3");
+    }
+
+    #[test]
+    fn compares_graphic_beta_suffix_correctly() {
+        let parsed = parse_version("0.6.8-beta2.graphic 59").expect("version should parse");
+        assert_eq!(parsed.prerelease_beta, Some(2));
+        assert!(is_newer_version("0.6.8-beta3", "0.6.8-beta2.graphic 59"));
+        assert!(!is_newer_version("0.6.8-beta2", "0.6.8-beta2.graphic 59"));
+    }
 }
 
 struct UpdateProgressGuard {

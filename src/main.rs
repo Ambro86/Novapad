@@ -75,8 +75,9 @@ use chrono::Local;
 use serde::{Deserialize, Serialize};
 
 use windows::Win32::Foundation::{
-    BOOL, ERROR_INVALID_PARAMETER, ERROR_INVALID_WINDOW_HANDLE, GetLastError, HANDLE, HINSTANCE,
-    HWND, LPARAM, LRESULT, POINT, RECT, SetLastError, WIN32_ERROR, WPARAM,
+    BOOL, ERROR_INVALID_PARAMETER, ERROR_INVALID_WINDOW_HANDLE, ERROR_MENU_ITEM_NOT_FOUND,
+    GetLastError, HANDLE, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, SetLastError, WIN32_ERROR,
+    WPARAM,
 };
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
 use windows::Win32::Graphics::Gdi::{
@@ -134,17 +135,17 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL, HCURSOR, HICON, HMENU,
     IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsDialogMessageW, IsIconic, IsWindow, KillTimer,
     LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO,
-    MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED,
-    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW,
-    OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
-    SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow,
-    SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON,
-    TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP,
-    WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT,
-    WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
-    WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER,
-    WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
-    WS_TABSTOP, WS_VISIBLE,
+    MENU_ITEM_FLAGS, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
+    MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW,
+    ModifyMenuW, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
+    RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL,
+    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
+    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
+    WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
+    WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP,
+    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
+    WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
+    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -909,6 +910,22 @@ fn kill_timer_best_effort(hwnd: HWND, timer_id: usize, context: &str) {
     }
 }
 
+fn delete_menu_best_effort(menu: HMENU, position: u32, flags: MENU_ITEM_FLAGS, context: &str) {
+    unsafe {
+        SetLastError(WIN32_ERROR(0));
+        if let Err(err) = DeleteMenu(menu, position, flags) {
+            let last_error = GetLastError();
+            if last_error == WIN32_ERROR(0) || last_error == ERROR_MENU_ITEM_NOT_FOUND {
+                return;
+            }
+            log_debug(&format!(
+                "{} failed: {:?} (win32={})",
+                context, err, last_error.0
+            ));
+        }
+    }
+}
+
 fn clean_menu_label(label: &str) -> String {
     let main = label.split('\t').next().unwrap_or(label);
     let mut cleaned = String::with_capacity(main.len());
@@ -1498,23 +1515,11 @@ fn download_podcast_episode_cache_with_resume(
                     "podcast_episode_save_attempt_failed attempt={} url={} partial_bytes={} err={}",
                     attempt, url, resume_from, err
                 ));
-                if attempt < 5 {
-                    if resume_from == 0 {
-                        last_reported_pct = 0;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(500u64 * attempt as u64));
-                    continue;
+                if resume_from == 0 {
+                    last_reported_pct = 0;
                 }
-                if let Err(remove_err) = std::fs::remove_file(&partial_file_path)
-                    && remove_err.kind() != std::io::ErrorKind::NotFound
-                {
-                    log_debug(&format!(
-                        "Failed to remove partial podcast save file {}: {}",
-                        partial_file_path.display(),
-                        remove_err
-                    ));
-                }
-                return Err(err);
+                std::thread::sleep(std::time::Duration::from_millis(500u64 * attempt as u64));
+                continue;
             }
         }
     }
@@ -2050,10 +2055,18 @@ fn handle_chapter_navigation(hwnd: HWND, direction: i32) {
         announce_chapters_unavailable(language);
         return;
     }
-    let current_idx = current_pos_ms
-        .and_then(|pos| crate::podcast::chapters::current_chapter_index(pos, &chapters))
-        .or(last_idx);
-    if direction < 0 && matches!(current_idx, Some(0)) {
+    let current_idx = match current_pos_ms {
+        Some(pos)
+            if chapters
+                .first()
+                .is_some_and(|chapter| pos < chapter.start_ms) =>
+        {
+            None
+        }
+        Some(pos) => crate::podcast::chapters::current_chapter_index(pos, &chapters).or(last_idx),
+        None => last_idx,
+    };
+    if direction < 0 && current_idx.is_none_or(|idx| idx == 0) {
         {
             match seek_audiobook_to(hwnd, 0) {
                 Ok(()) => {
@@ -3249,6 +3262,7 @@ pub(crate) struct AppState {
     audio_playlist: Vec<PathBuf>,
     audio_playlist_index: Option<usize>,
     audio_ffmpeg_retry_for: Option<PathBuf>,
+    audio_unexpected_stop_retry_for: Option<PathBuf>,
     transcription_cancel: Option<Arc<AtomicBool>>,
     transcription_in_progress: bool,
     dictation_recorder: Option<podcast_recorder::RecorderHandle>,
@@ -4647,6 +4661,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     audio_playlist: Vec::new(),
                     audio_playlist_index: None,
                     audio_ffmpeg_retry_for: None,
+                    audio_unexpected_stop_retry_for: None,
                     transcription_cancel: None,
                     transcription_in_progress: false,
                     dictation_recorder: None,
@@ -10859,33 +10874,36 @@ fn switch_audio_playlist_relative(hwnd: HWND, delta: i32) -> bool {
 }
 
 fn handle_audio_playlist_timer(hwnd: HWND) {
-    let (is_paused, should_advance, current_seconds, elapsed_since_start) = {
+    let (is_paused, should_advance, current_seconds, elapsed_since_start, total_seconds) = {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
             if player.is_paused {
-                return Some((true, false, 0_u64, std::time::Duration::from_secs(0)));
+                return Some((true, false, 0_u64, std::time::Duration::from_secs(0), None));
             }
             let current = audio_player::audiobook_position_secs(player)
                 .max(0.0)
                 .floor() as u64;
-            let near_end_player = player
-                .duration_secs()
-                .map(|d| current.saturating_add(1) >= d.max(0.0).floor() as u64)
+            let total_player = player.duration_secs().map(|d| d.max(0.0).floor() as u64);
+            let total_file = audio_player::audiobook_duration_secs(&player.path);
+            let near_end_player = total_player
+                .map(|duration| current.saturating_add(1) >= duration)
                 .unwrap_or(false);
-            let near_end_file = audio_player::audiobook_duration_secs(&player.path)
+            let near_end_file = total_file
                 .map(|duration| current.saturating_add(1) >= duration)
                 .unwrap_or(false);
             // Treat as ended if either live player duration or file duration confirms near-end.
             let should_advance = near_end_player || near_end_file;
+            let total_seconds = total_file.or(total_player);
             Some((
                 false,
                 should_advance,
                 current,
                 player.start_instant.elapsed(),
+                total_seconds,
             ))
         })
         .flatten()
-        .unwrap_or((false, false, 0_u64, std::time::Duration::from_secs(0)))
+        .unwrap_or((false, false, 0_u64, std::time::Duration::from_secs(0), None))
     };
     if is_paused {
         return;
@@ -10923,6 +10941,16 @@ fn handle_audio_playlist_timer(hwnd: HWND) {
             .unwrap_or(false)
         };
         if is_stream_cache {
+            let stopped_far_from_end = total_seconds
+                .map(|total| current_seconds.saturating_add(5) < total)
+                .unwrap_or(current_seconds >= 15);
+            if elapsed_since_start.as_secs() >= 5
+                && current_seconds > 0
+                && stopped_far_from_end
+                && audio_player::retry_current_after_unexpected_stop(hwnd)
+            {
+                return;
+            }
             log_debug("Audio player: stream cache output stopped, skipping mid-file auto-restart");
         } else {
             let restart = {
@@ -11496,9 +11524,12 @@ fn refresh_window_open_documents_menu(hwnd: HWND, window_menu: HMENU) {
     }
     for idx in 0..WINDOW_DOC_MENU_MAX {
         let cmd_id = (WINDOW_DOC_MENU_BASE + idx) as u32;
-        unsafe {
-            crate::log_if_err!(DeleteMenu(window_menu, cmd_id, MF_BYCOMMAND));
-        }
+        delete_menu_best_effort(
+            window_menu,
+            cmd_id,
+            MF_BYCOMMAND,
+            &format!("DeleteMenu(window open docs, cmd_id={cmd_id})"),
+        );
     }
 
     let docs = {

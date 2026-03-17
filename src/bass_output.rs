@@ -41,6 +41,10 @@ fn bass_channel_play_safe(api: &BassApi, handle: Hstream, restart: i32) -> i32 {
     unsafe { (api.channel_play)(handle, restart) }
 }
 
+fn bass_start_safe(api: &BassApi) -> i32 {
+    unsafe { (api.start)() }
+}
+
 fn bass_channel_pause_safe(api: &BassApi, handle: Hstream) -> i32 {
     unsafe { (api.channel_pause)(handle) }
 }
@@ -84,6 +88,36 @@ fn init_bass_once() -> Result<(), String> {
             Ok(())
         })
         .clone()
+}
+
+fn play_channel(api: &BassApi, handle: Hstream, restart: i32, context: &str) -> Result<(), String> {
+    const BASS_ERROR_START: i32 = 9;
+
+    let play_ok = bass_channel_play_safe(api, handle, restart);
+    if play_ok != 0 {
+        return Ok(());
+    }
+
+    let err = bass_error(api);
+    log_debug(&format!("BASS: {} failed (error {})", context, err));
+    if err != BASS_ERROR_START {
+        return Err(format!("{context} failed (error {err})"));
+    }
+
+    let start_ok = bass_start_safe(api);
+    if start_ok == 0 {
+        log_bass_error(api, "BASS_Start");
+        return Err(format!("{context} failed (error {err})"));
+    }
+
+    let retry_ok = bass_channel_play_safe(api, handle, restart);
+    if retry_ok == 0 {
+        log_bass_error(api, &format!("{context} retry"));
+        return Err(format!("{context} failed after BASS_Start retry"));
+    }
+
+    log_debug(&format!("BASS: {} recovered after BASS_Start", context));
+    Ok(())
 }
 
 fn load_plugins_once(api: &BassApi) -> Result<Vec<Hplugin>, String> {
@@ -230,19 +264,12 @@ impl BassOutput {
             }
         }
 
-        if !paused {
-            let play_ok = bass_channel_play_safe(api, handle, 0);
-            if play_ok == 0 {
-                log_bass_error(api, "BASS_ChannelPlay");
-                let free_ok = bass_stream_free_safe(api, handle);
-                if free_ok == 0 {
-                    log_bass_error(api, "BASS_StreamFree (play-fail)");
-                }
-                return Err(format!(
-                    "BASS_ChannelPlay failed (error {})",
-                    bass_error(api)
-                ));
+        if !paused && let Err(err) = play_channel(api, handle, 0, "BASS_ChannelPlay") {
+            let free_ok = bass_stream_free_safe(api, handle);
+            if free_ok == 0 {
+                log_bass_error(api, "BASS_StreamFree (play-fail)");
             }
+            return Err(err);
         }
 
         Ok(Arc::new(Self {
@@ -321,19 +348,12 @@ impl BassOutput {
             log_bass_error(api, "BASS_ChannelSetAttribute volume (ffmpeg)");
         }
 
-        if !paused {
-            let play_ok = bass_channel_play_safe(api, handle, 0);
-            if play_ok == 0 {
-                log_bass_error(api, "BASS_ChannelPlay (ffmpeg)");
-                let free_ok = bass_stream_free_safe(api, handle);
-                if free_ok == 0 {
-                    log_bass_error(api, "BASS_StreamFree (ffmpeg play-fail)");
-                }
-                return Err(format!(
-                    "BASS_ChannelPlay (ffmpeg) failed (error {})",
-                    bass_error(api)
-                ));
+        if !paused && let Err(err) = play_channel(api, handle, 0, "BASS_ChannelPlay (ffmpeg)") {
+            let free_ok = bass_stream_free_safe(api, handle);
+            if free_ok == 0 {
+                log_bass_error(api, "BASS_StreamFree (ffmpeg play-fail)");
             }
+            return Err(err);
         }
 
         log_debug("BASS: FFmpeg streaming started");
@@ -347,12 +367,7 @@ impl BassOutput {
 
     pub fn play(&self) -> bool {
         let handle = *self.handle.lock().unwrap_or_else(|e| e.into_inner());
-        let ok = bass_channel_play_safe(self.api, handle, 0);
-        if ok == 0 {
-            log_bass_error(self.api, "BASS_ChannelPlay");
-            return false;
-        }
-        true
+        play_channel(self.api, handle, 0, "BASS_ChannelPlay").is_ok()
     }
 
     pub fn pause(&self) -> bool {

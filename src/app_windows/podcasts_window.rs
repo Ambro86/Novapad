@@ -2133,7 +2133,7 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
         log_debug(&format!("Podcast thread: starting download for {}", url));
         let mut last_reported_pct = 0u32;
         let mut attempt: u32 = 0;
-        let downloaded_len = loop {
+        let downloaded_len: Result<u64, String> = loop {
             attempt += 1;
             let resume_from = std::fs::metadata(&partial_file_path)
                 .map(|meta| meta.len())
@@ -2190,29 +2190,24 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
                         "podcasts_download_attempt_failed attempt={} url={} partial_bytes={} err={}",
                         attempt, url, resume_from, err
                     ));
-                    if attempt < 5 {
-                        if resume_from == 0 {
-                            last_reported_pct = 0;
-                            unsafe {
-                                if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy)
-                                    .as_bool()
-                                {
-                                    PostMessageW(
-                                        hwnd_copy,
-                                        WM_PODCAST_DOWNLOAD_PROGRESS,
-                                        WPARAM(0),
-                                        LPARAM(0),
-                                    )
-                                    .ok();
-                                }
+                    if resume_from == 0 {
+                        last_reported_pct = 0;
+                        unsafe {
+                            if windows::Win32::UI::WindowsAndMessaging::IsWindow(hwnd_copy)
+                                .as_bool()
+                            {
+                                PostMessageW(
+                                    hwnd_copy,
+                                    WM_PODCAST_DOWNLOAD_PROGRESS,
+                                    WPARAM(0),
+                                    LPARAM(0),
+                                )
+                                .ok();
                             }
                         }
-                        std::thread::sleep(std::time::Duration::from_millis(
-                            500u64 * attempt as u64,
-                        ));
-                        continue;
                     }
-                    break Err(err);
+                    std::thread::sleep(std::time::Duration::from_millis(500u64 * attempt as u64));
+                    continue;
                 }
             }
         };

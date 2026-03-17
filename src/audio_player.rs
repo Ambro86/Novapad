@@ -62,14 +62,23 @@ pub struct AudiobookPlayer {
 
 impl AudiobookPlayer {
     fn play(&self) -> bool {
-        self.output.play()
+        let resumed = self.output.play();
+        if resumed {
+            crate::tts_engine::prevent_sleep(true);
+        }
+        resumed
     }
 
     fn pause(&self) -> bool {
-        self.output.pause()
+        let paused = self.output.pause();
+        if paused {
+            crate::tts_engine::prevent_sleep(false);
+        }
+        paused
     }
 
     fn stop(&self) {
+        crate::tts_engine::prevent_sleep(false);
         self.output.stop();
     }
 
@@ -902,6 +911,9 @@ fn start_audiobook_at_with_options(
         };
 
         log_debug("Audio player: Playback started");
+        if !effective_paused {
+            crate::tts_engine::prevent_sleep(true);
+        }
 
         let session_id = {
             with_state(hwnd_main, |state| {
@@ -963,6 +975,7 @@ pub fn start_audiobook_playback(hwnd: HWND, path: &Path) {
         ));
         let path_buf = path.to_path_buf();
         with_state(hwnd, |state| {
+            state.audio_unexpected_stop_retry_for = None;
             if let Some(idx) = state.audio_playlist.iter().position(|p| p == &path_buf) {
                 state.audio_playlist_index = Some(idx);
             } else {
@@ -970,15 +983,21 @@ pub fn start_audiobook_playback(hwnd: HWND, path: &Path) {
                 state.audio_playlist_index = Some(state.audio_playlist.len().saturating_sub(1));
             }
         });
+        let had_pending_chapters =
+            with_state(hwnd, |state| state.pending_podcast_chapters_key.is_some()).unwrap_or(false);
         if path_buf.is_file() {
-            let chapter_key = crate::local_media_chapters_key(&path_buf);
-            crate::set_pending_podcast_chapters_key(hwnd, Some(chapter_key.clone()));
-            crate::prefetch_podcast_chapters_from_file(hwnd, chapter_key, path_buf.clone());
+            if !had_pending_chapters {
+                let chapter_key = crate::local_media_chapters_key(&path_buf);
+                crate::set_pending_podcast_chapters_key(hwnd, Some(chapter_key.clone()));
+                crate::prefetch_podcast_chapters_from_file(hwnd, chapter_key, path_buf.clone());
+            }
         } else {
             crate::set_pending_podcast_chapters_key(hwnd, None);
         }
         crate::reset_active_podcast_chapters_for_playback(hwnd);
-        crate::activate_pending_podcast_chapters(hwnd);
+        if !had_pending_chapters || !path_buf.is_file() {
+            crate::activate_pending_podcast_chapters(hwnd);
+        }
 
         // List available audio tracks and store them in state
         let audio_tracks = match crate::ffmpeg_source::list_audio_streams(path) {
@@ -1473,6 +1492,74 @@ pub fn retry_current_with_ffmpeg_stream(hwnd: HWND) -> bool {
     }
 }
 
+pub fn retry_current_after_unexpected_stop(hwnd: HWND) -> bool {
+    {
+        let restart = with_state(hwnd, |state| {
+            let player = state.active_audiobook.take()?;
+            let path = player.path.clone();
+            if state
+                .audio_unexpected_stop_retry_for
+                .as_ref()
+                .is_some_and(|p| p == &path)
+            {
+                state.active_audiobook = Some(player);
+                return None;
+            }
+            state.audio_unexpected_stop_retry_for = Some(path.clone());
+            let current = audiobook_position_secs(&player).max(0.0).floor() as u64;
+            let audio_track = state.selected_audio_track;
+            stop_shared_subtitle_speech(
+                &player.subtitle_speech_cancel,
+                &player.subtitle_speech_command,
+                "unexpected_stop_retry",
+            );
+            player.subtitle_cancel.store(true, Ordering::Relaxed);
+            player.stop();
+            Some((
+                path,
+                current,
+                player.speed,
+                player.pitch,
+                player.is_paused,
+                player.volume,
+                player.muted,
+                player.prev_volume,
+                audio_track,
+            ))
+        })
+        .flatten();
+
+        let Some((path, current, speed, pitch, paused, volume, muted, prev_volume, audio_track)) =
+            restart
+        else {
+            return false;
+        };
+
+        log_debug(&format!(
+            "Audio player: retrying after unexpected stop for {} at {}s",
+            path.display(),
+            current
+        ));
+        start_audiobook_at_with_options(
+            hwnd,
+            path,
+            current,
+            AudiobookPlaybackOptions {
+                speed,
+                pitch,
+                paused,
+                volume,
+                muted,
+                prev_volume,
+                mix_export: false,
+                audio_track,
+                force_ffmpeg_stream: false,
+            },
+        );
+        true
+    }
+}
+
 pub fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
     {
         crate::log_debug(&format!(
@@ -1481,6 +1568,7 @@ pub fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
             seconds
         ));
         let (speed, pitch, volume, muted, prev_volume) = with_state(hwnd, |state| {
+            state.audio_unexpected_stop_retry_for = None;
             if let Some(player) = &state.active_audiobook {
                 (
                     player.speed,

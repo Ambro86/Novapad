@@ -241,7 +241,7 @@ pub fn prompt_user(
     title: &str,
     body: &str,
     default_val: &str,
-    _language: Language,
+    language: Language,
 ) -> Option<String> {
     unsafe {
         let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
@@ -265,6 +265,7 @@ pub fn prompt_user(
             body: body.to_string(),
             value: default_val.to_string(),
             confirmed: false,
+            language,
         };
 
         let hwnd = CreateWindowExW(
@@ -311,6 +312,7 @@ struct SimplePromptData {
     body: String,
     value: String,
     confirmed: bool,
+    language: Language,
 }
 
 unsafe extern "system" fn simple_prompt_wndproc(
@@ -345,10 +347,13 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 crate::get_stock_object_safe(windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT).0,
             );
 
-            // Get language from parent or default
-            let parent = crate::get_parent_safe(hwnd);
-            let language =
-                { with_state(parent, |state| state.settings.language) }.unwrap_or_default();
+            let language = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
+                .try_into()
+                .ok()
+                .and_then(|ptr: usize| {
+                    crate::with_raw_mut_ptr_safe(ptr as *mut SimplePromptData, |data| data.language)
+                })
+                .unwrap_or_default();
 
             let _label = unsafe {
                 CreateWindowExW(

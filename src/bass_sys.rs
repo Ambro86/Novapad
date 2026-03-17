@@ -38,6 +38,7 @@ type BassInit = unsafe extern "C" fn(
     win: *mut c_void,
     clsid: *const c_void,
 ) -> Bool;
+type BassStart = unsafe extern "C" fn() -> Bool;
 type BassErrorGetCode = unsafe extern "C" fn() -> i32;
 type BassPluginLoad = unsafe extern "C" fn(file: *const c_void, flags: Dword) -> Hplugin;
 type BassStreamCreateFile = unsafe extern "C" fn(
@@ -73,6 +74,7 @@ type BassFxTempoCreate = unsafe extern "C" fn(handle: Dword, flags: Dword) -> Hs
 pub struct BassApi {
     _lib: Library,
     pub init: BassInit,
+    pub start: BassStart,
     pub error_get_code: BassErrorGetCode,
     pub plugin_load: BassPluginLoad,
     pub stream_create_file: BassStreamCreateFile,
@@ -116,6 +118,7 @@ fn load_bass_api(path: &Path) -> Result<BassApi, String> {
         .map_err(|e| format!("BASS: failed to load {}: {}", path.display(), e))?;
     Ok(BassApi {
         init: load_symbol(&lib, b"BASS_Init\0")?,
+        start: load_symbol(&lib, b"BASS_Start\0")?,
         error_get_code: load_symbol(&lib, b"BASS_ErrorGetCode\0")?,
         plugin_load: load_symbol(&lib, b"BASS_PluginLoad\0")?,
         stream_create_file: load_symbol(&lib, b"BASS_StreamCreateFile\0")?,

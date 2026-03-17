@@ -12805,8 +12805,12 @@ fn search_for_interpreter(hwnd: HWND) {
         return;
     }
 
-    if let Some(selected) = interpreter_select_window::select_interpreter(hwnd, paths, language)
-        && let Some(edit) = with_options_state(hwnd, |state| state.edit_interpreter_path)
+    if let Some(selected) = interpreter_select_window::select_interpreter(
+        hwnd,
+        paths,
+        language,
+        i18n::tr(language, "options.interpreter_search.title"),
+    ) && let Some(edit) = with_options_state(hwnd, |state| state.edit_interpreter_path)
     {
         crate::log_if_err!(crate::set_window_text_w_safe(
             edit,

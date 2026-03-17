@@ -1056,6 +1056,9 @@
   "stream_audio.quality.high": "Haute qualité",
   "stream_audio.quality.low": "Basse qualité",
   "stream_audio.quality.medium": "Qualité moyenne",
+  "stream_audio.load_more_videos": "Charger plus de vidéos",
+  "stream_audio.previous_results": "Retour aux résultats précédents",
+  "stream_audio.views_suffix": "vues",
   "stream_audio.quality_label": "Qualité :",
   "options.split.by_parts": "Par nombre de parties",
   "options.label.audio_split_parts_count": "Nombre de parties :",
@@ -1103,3 +1106,5 @@
   "options.lang.ru": "Russe",
   "options.spellcheck.lang.ru": "Russe (Russie)"
 }
+
+

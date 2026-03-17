@@ -35,7 +35,12 @@ struct InterpreterSelectState {
     result: Arc<Mutex<Option<String>>>,
 }
 
-pub fn select_interpreter(parent: HWND, items: Vec<String>, language: Language) -> Option<String> {
+pub fn select_interpreter(
+    parent: HWND,
+    items: Vec<String>,
+    language: Language,
+    title: String,
+) -> Option<String> {
     if items.is_empty() {
         return None;
     }
@@ -61,7 +66,7 @@ pub fn select_interpreter(parent: HWND, items: Vec<String>, language: Language) 
         language,
         result: result.clone(),
     });
-    let title = to_wide(&i18n::tr(language, "options.interpreter_search.title"));
+    let title = to_wide(&title);
 
     let hwnd = unsafe {
         CreateWindowExW(

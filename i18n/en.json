@@ -1064,6 +1064,9 @@
   "stream_audio.quality.high": "High Quality",
   "stream_audio.quality.low": "Low Quality",
   "stream_audio.quality.medium": "Medium Quality",
+  "stream_audio.load_more_videos": "Load more videos",
+  "stream_audio.previous_results": "Back to previous results",
+  "stream_audio.views_suffix": "views",
   "stream_audio.quality_label": "Quality:",
   "options.split.by_parts": "By parts",
   "options.label.audio_split_parts_count": "Number of parts:",
@@ -1103,3 +1106,5 @@
   "options.lang.ru": "Russian",
   "options.spellcheck.lang.ru": "Russian (Russia)"
 }
+
+

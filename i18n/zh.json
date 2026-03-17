@@ -1012,6 +1012,9 @@
   "stream_audio.quality.high": "高品质",
   "stream_audio.quality.low": "低质量",
   "stream_audio.quality.medium": "中等质量",
+  "stream_audio.load_more_videos": "加载更多视频",
+  "stream_audio.previous_results": "返回之前的结果",
+  "stream_audio.views_suffix": "观看次数",
   "stream_audio.quality_label": "质量：",
   "options.split.by_parts": "按部件",
   "options.label.audio_split_parts_count": "零件数量：",
@@ -1103,3 +1106,5 @@
   "options.lang.ru": "俄语",
   "options.spellcheck.lang.ru": "俄语（俄罗斯）"
 }
+
+

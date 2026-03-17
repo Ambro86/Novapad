@@ -179,6 +179,25 @@ fn ytdlp_command(path: &Path) -> Command {
     cmd
 }
 
+fn youtube_ui_language_code(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "it",
+        Language::English => "en",
+        Language::Spanish => "es",
+        Language::Portuguese => "pt",
+        Language::Swedish => "sv",
+        Language::Vietnamese => "vi",
+        Language::Czech => "cs",
+        Language::Polish => "pl",
+        Language::French => "fr",
+        Language::Serbian => "sr",
+        Language::Ukrainian => "uk",
+        Language::Lithuanian => "lt",
+        Language::Russian => "ru",
+        Language::Chinese => "zh",
+    }
+}
+
 fn ytdlp_debug_enabled() -> bool {
     std::env::var("SONARPAD_YTDLP_DEBUG")
         .map(|v| {
@@ -1448,6 +1467,355 @@ fn normalize_youtube_input_for_download(input: &str) -> Option<String> {
     }
 }
 
+fn normalize_youtube_collection_url(input: &str) -> Option<String> {
+    let normalized = normalize_youtube_input_for_download(input)?;
+    let Ok(mut url) = Url::parse(&normalized) else {
+        return Some(normalized);
+    };
+    let Some(host) = url.host_str() else {
+        return Some(normalized);
+    };
+    if !(host.eq_ignore_ascii_case("youtube.com") || host.ends_with(".youtube.com")) {
+        return Some(normalized);
+    }
+    let path = url.path().trim_end_matches('/').to_string();
+    let segments: Vec<&str> = path
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect();
+    let should_force_videos = match segments.as_slice() {
+        ["channel", _] | ["user", _] | ["c", _] => true,
+        [segment] => segment.starts_with('@'),
+        _ => false,
+    };
+    if should_force_videos && !path.ends_with("/videos") {
+        url.set_path(&format!("{path}/videos"));
+    }
+    Some(url.to_string())
+}
+
+fn is_youtube_collection_url(input: &str) -> bool {
+    let Some(normalized) = normalize_youtube_collection_url(input) else {
+        return false;
+    };
+    let Ok(url) = Url::parse(&normalized) else {
+        return false;
+    };
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    if !(host.eq_ignore_ascii_case("youtube.com") || host.ends_with(".youtube.com")) {
+        return false;
+    }
+    let path = url.path().trim_end_matches('/');
+    path.starts_with("/channel/")
+        || path.starts_with("/user/")
+        || path.starts_with("/c/")
+        || path.starts_with("/@")
+        || path == "/playlist"
+}
+
+#[derive(Clone)]
+struct StreamCollectionEntry {
+    label: String,
+    url: String,
+}
+
+const STREAM_SELECTION_PAGE_SIZE: usize = 20;
+const STREAM_SELECTION_LOAD_MORE_KEY: &str = "stream_audio.load_more_videos";
+const STREAM_SELECTION_PREVIOUS_KEY: &str = "stream_audio.previous_results";
+
+fn collect_stream_collection_entries(
+    entries: &[serde_json::Value],
+    language: Language,
+) -> Vec<StreamCollectionEntry> {
+    let mut out = Vec::new();
+    for entry in entries.iter() {
+        let video_url = entry
+            .get("webpage_url")
+            .and_then(|value| value.as_str())
+            .map(|value| value.to_string())
+            .or_else(|| {
+                entry
+                    .get("url")
+                    .and_then(|value| value.as_str())
+                    .map(|value| {
+                        if value.starts_with("http://") || value.starts_with("https://") {
+                            value.to_string()
+                        } else {
+                            format!("https://www.youtube.com/watch?v={value}")
+                        }
+                    })
+            });
+        let Some(video_url) = video_url else {
+            continue;
+        };
+        out.push(StreamCollectionEntry {
+            label: format_stream_entry_label(entry, language),
+            url: video_url,
+        });
+    }
+    out
+}
+
+fn probe_youtube_collection_entries(
+    ytdlp_path: &Path,
+    url: &str,
+    language: Language,
+    page: usize,
+) -> Result<(Vec<StreamCollectionEntry>, bool), String> {
+    let start = page * STREAM_SELECTION_PAGE_SIZE + 1;
+    let end = start + STREAM_SELECTION_PAGE_SIZE;
+    let target_url = normalize_youtube_collection_url(url).unwrap_or_else(|| url.to_string());
+    let output = ytdlp_command(ytdlp_path)
+        .arg("--flat-playlist")
+        .arg("--dump-single-json")
+        .arg("--playlist-start")
+        .arg(start.to_string())
+        .arg("--playlist-end")
+        .arg(end.to_string())
+        .arg("--no-warnings")
+        .arg("--skip-download")
+        .arg("--extractor-args")
+        .arg(format!(
+            "youtube:lang={}",
+            youtube_ui_language_code(language)
+        ))
+        .arg("--")
+        .arg(&target_url)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            "yt-dlp collection probe failed".to_string()
+        } else {
+            stderr
+        });
+    }
+
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
+    let Some(entries) = json.get("entries").and_then(|value| value.as_array()) else {
+        return Ok((Vec::new(), false));
+    };
+
+    let mut out = collect_stream_collection_entries(entries, language);
+    let has_more = out.len() > STREAM_SELECTION_PAGE_SIZE;
+    if has_more {
+        out.truncate(STREAM_SELECTION_PAGE_SIZE);
+    }
+    Ok((out, has_more))
+}
+
+fn probe_youtube_search_entries(
+    ytdlp_path: &Path,
+    query: &str,
+    language: Language,
+    page: usize,
+) -> Result<(Vec<StreamCollectionEntry>, bool), String> {
+    let limit = (page + 1) * STREAM_SELECTION_PAGE_SIZE + 1;
+    let output = ytdlp_command(ytdlp_path)
+        .arg("--flat-playlist")
+        .arg("--dump-single-json")
+        .arg("--playlist-end")
+        .arg(limit.to_string())
+        .arg("--no-warnings")
+        .arg("--skip-download")
+        .arg("--extractor-args")
+        .arg(format!(
+            "youtube:lang={}",
+            youtube_ui_language_code(language)
+        ))
+        .arg("--")
+        .arg(format!("ytsearch{limit}:{query}"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            "yt-dlp search probe failed".to_string()
+        } else {
+            stderr
+        });
+    }
+
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
+    let Some(entries) = json.get("entries").and_then(|value| value.as_array()) else {
+        return Ok((Vec::new(), false));
+    };
+
+    let skip = page * STREAM_SELECTION_PAGE_SIZE;
+    let has_more = entries.len() > skip + STREAM_SELECTION_PAGE_SIZE;
+    let page_entries: Vec<serde_json::Value> = entries
+        .iter()
+        .skip(skip)
+        .take(STREAM_SELECTION_PAGE_SIZE)
+        .cloned()
+        .collect();
+    Ok((
+        collect_stream_collection_entries(&page_entries, language),
+        has_more,
+    ))
+}
+
+fn choose_stream_collection_entry_page(
+    parent: HWND,
+    language: Language,
+    entries: &[StreamCollectionEntry],
+    has_previous: bool,
+    has_more: bool,
+) -> Option<String> {
+    let mut labels =
+        Vec::with_capacity(entries.len() + usize::from(has_previous) + usize::from(has_more));
+    if has_previous {
+        labels.push(i18n::tr(language, STREAM_SELECTION_PREVIOUS_KEY));
+    }
+    labels.extend(entries.iter().map(|entry| entry.label.clone()));
+    if has_more {
+        labels.push(i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY));
+    }
+    crate::app_windows::interpreter_select_window::select_interpreter(
+        parent,
+        labels,
+        language,
+        i18n::tr(language, "stream_audio.prompt_title"),
+    )
+}
+
+fn choose_youtube_collection_entry(
+    parent: HWND,
+    language: Language,
+    ytdlp_path: &Path,
+    url: &str,
+) -> Result<Option<String>, String> {
+    if !is_youtube_collection_url(url) {
+        return Ok(Some(url.to_string()));
+    }
+
+    let mut page = 0usize;
+    loop {
+        let progress = open_progress_dialog(
+            parent,
+            language,
+            "stream_audio.progress_title",
+            "podcasts.loading",
+            false,
+        );
+        let ytdlp = ytdlp_path.to_path_buf();
+        let url_owned = url.to_string();
+        let worker = std::thread::spawn(move || {
+            probe_youtube_collection_entries(&ytdlp, &url_owned, language, page)
+        });
+        while !worker.is_finished() {
+            ignore_bool(pump_messages_detect_stream_cancel(parent, progress));
+            std::thread::sleep(std::time::Duration::from_millis(30));
+        }
+        close_progress_dialog(progress);
+        let (entries, has_more) = match worker.join() {
+            Ok(result) => result?,
+            Err(_) => return Err("yt-dlp collection probe worker failed".to_string()),
+        };
+        if entries.is_empty() {
+            return if page == 0 {
+                Ok(Some(url.to_string()))
+            } else {
+                Ok(None)
+            };
+        }
+
+        let Some(selected) =
+            choose_stream_collection_entry_page(parent, language, &entries, page > 0, has_more)
+        else {
+            return Ok(None);
+        };
+        if selected == i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY) {
+            page += 1;
+            continue;
+        }
+        if selected == i18n::tr(language, STREAM_SELECTION_PREVIOUS_KEY) {
+            page = page.saturating_sub(1);
+            continue;
+        }
+        return Ok(entries
+            .into_iter()
+            .find(|entry| entry.label == selected)
+            .map(|entry| entry.url));
+    }
+}
+
+fn choose_youtube_search_entry(
+    parent: HWND,
+    language: Language,
+    ytdlp_path: &Path,
+    query: &str,
+) -> Result<Option<String>, String> {
+    let mut page = 0usize;
+    loop {
+        let progress = open_progress_dialog(
+            parent,
+            language,
+            "stream_audio.progress_title",
+            "podcasts.loading",
+            false,
+        );
+        let ytdlp = ytdlp_path.to_path_buf();
+        let query_owned = query.to_string();
+        let worker = std::thread::spawn(move || {
+            probe_youtube_search_entries(&ytdlp, &query_owned, language, page)
+        });
+        while !worker.is_finished() {
+            ignore_bool(pump_messages_detect_stream_cancel(parent, progress));
+            std::thread::sleep(std::time::Duration::from_millis(30));
+        }
+        close_progress_dialog(progress);
+        let (entries, has_more) = match worker.join() {
+            Ok(result) => result?,
+            Err(_) => return Err("yt-dlp search probe worker failed".to_string()),
+        };
+        if entries.is_empty() {
+            return if page == 0 {
+                Err("No matching YouTube videos found".to_string())
+            } else {
+                Ok(None)
+            };
+        }
+
+        let Some(selected) =
+            choose_stream_collection_entry_page(parent, language, &entries, page > 0, has_more)
+        else {
+            return Ok(None);
+        };
+        if selected == i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY) {
+            page += 1;
+            continue;
+        }
+        if selected == i18n::tr(language, STREAM_SELECTION_PREVIOUS_KEY) {
+            page = page.saturating_sub(1);
+            continue;
+        }
+        return Ok(entries
+            .into_iter()
+            .find(|entry| entry.label == selected)
+            .map(|entry| entry.url));
+    }
+}
+fn resolve_stream_input_url(
+    parent: HWND,
+    language: Language,
+    ytdlp_path: &Path,
+    input: &str,
+) -> Result<Option<String>, String> {
+    if looks_like_valid_stream_url(input) {
+        return choose_youtube_collection_entry(parent, language, ytdlp_path, input);
+    }
+    choose_youtube_search_entry(parent, language, ytdlp_path, input)
+}
 fn looks_like_valid_stream_url(input: &str) -> bool {
     let Some(normalized) = normalize_youtube_input_for_download(input) else {
         return false;
@@ -2365,6 +2733,87 @@ fn plain_label(text: &str) -> String {
     text.replace('&', "")
 }
 
+fn format_stream_entry_upload_date(entry: &serde_json::Value) -> Option<String> {
+    let raw = entry.get("upload_date")?.as_str()?.trim();
+    if raw.len() == 8 && raw.chars().all(|ch| ch.is_ascii_digit()) {
+        return Some(format!("{}-{}-{}", &raw[0..4], &raw[4..6], &raw[6..8]));
+    }
+    if raw.is_empty() {
+        None
+    } else {
+        Some(raw.to_string())
+    }
+}
+
+fn format_stream_entry_view_count(entry: &serde_json::Value, language: Language) -> Option<String> {
+    let count = entry.get("view_count")?.as_u64()?;
+    let digits = count.to_string();
+    let mut formatted = String::with_capacity(digits.len() + digits.len() / 3);
+    for (idx, ch) in digits.chars().rev().enumerate() {
+        if idx != 0 && idx % 3 == 0 {
+            formatted.push('.');
+        }
+        formatted.push(ch);
+    }
+    let formatted: String = formatted.chars().rev().collect();
+    Some(format!(
+        "{} {}",
+        formatted,
+        i18n::tr(language, "stream_audio.views_suffix")
+    ))
+}
+
+fn format_stream_entry_channel(entry: &serde_json::Value) -> Option<String> {
+    entry
+        .get("channel")
+        .and_then(|value| value.as_str())
+        .or_else(|| entry.get("uploader").and_then(|value| value.as_str()))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(plain_label)
+}
+
+fn format_stream_entry_duration(entry: &serde_json::Value) -> Option<String> {
+    if let Some(text) = entry
+        .get("duration_string")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        return Some(text.to_string());
+    }
+    let seconds = entry.get("duration")?.as_u64()?;
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let secs = seconds % 60;
+    if hours > 0 {
+        Some(format!("{hours}:{minutes:02}:{secs:02}"))
+    } else {
+        Some(format!("{minutes}:{secs:02}"))
+    }
+}
+fn format_stream_entry_label(entry: &serde_json::Value, language: Language) -> String {
+    let title = entry
+        .get("title")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("Untitled");
+    let mut parts = vec![plain_label(title)];
+    if let Some(channel) = format_stream_entry_channel(entry) {
+        parts.push(channel);
+    }
+    if let Some(duration) = format_stream_entry_duration(entry) {
+        parts.push(duration);
+    }
+    if let Some(date) = format_stream_entry_upload_date(entry) {
+        parts.push(date);
+    }
+    if let Some(view_count) = format_stream_entry_view_count(entry, language) {
+        parts.push(view_count);
+    }
+    parts.join(" - ")
+}
 fn probe_stream_media_title(ytdlp_path: &Path, url: &str) -> Option<String> {
     let output = ytdlp_command(ytdlp_path)
         .arg("--no-playlist")
@@ -2847,12 +3296,8 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     if saved.is_none() {
         crate::log_debug("Failed to persist stream output format preference");
     }
-    let url: String = dialog_data
-        .url
-        .chars()
-        .filter(|ch| !ch.is_whitespace())
-        .collect();
-    if url.is_empty() {
+    let input = dialog_data.url.trim().to_string();
+    if input.is_empty() {
         show_error(
             parent,
             language,
@@ -2860,13 +3305,45 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         );
         return;
     }
-    if !looks_like_valid_stream_url(&url) {
-        show_error(
-            parent,
-            language,
-            &i18n::tr(language, "stream_audio.invalid_url"),
-        );
-        return;
+
+    let labels_data = labels(language);
+    let ytdlp_debug = ytdlp_debug_enabled();
+    if ytdlp_debug {
+        crate::log_debug("yt-dlp debug mode enabled for streaming (SONARPAD_YTDLP_DEBUG=1)");
+    }
+
+    let needs_ytdlp_selection =
+        !looks_like_valid_stream_url(&input) || is_youtube_collection_url(&input);
+    let mut url = input.clone();
+    let mut ytdlp_path = None;
+    if needs_ytdlp_selection {
+        let path = match ensure_ytdlp_available(parent, language, &labels_data) {
+            Ok(Some(path)) => path,
+            Ok(None) => {
+                post_focus_editor(parent);
+                return;
+            }
+            Err(err) => {
+                let message =
+                    i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
+                show_error(parent, language, &message);
+                return;
+            }
+        };
+        url = match resolve_stream_input_url(parent, language, &path, &input) {
+            Ok(Some(selected_url)) => selected_url,
+            Ok(None) => {
+                post_focus_editor(parent);
+                return;
+            }
+            Err(err) => {
+                let message =
+                    i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
+                show_error(parent, language, &message);
+                return;
+            }
+        };
+        ytdlp_path = Some(path);
     }
 
     if dialog_data.direct_play {
@@ -2884,22 +3361,21 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         return;
     }
 
-    let labels_data = labels(language);
-    let ytdlp_debug = ytdlp_debug_enabled();
-    if ytdlp_debug {
-        crate::log_debug("yt-dlp debug mode enabled for streaming (SONARPAD_YTDLP_DEBUG=1)");
-    }
-    let ytdlp_path = match ensure_ytdlp_available(parent, language, &labels_data) {
-        Ok(Some(path)) => path,
-        Ok(None) => {
-            post_focus_editor(parent);
-            return;
-        }
-        Err(err) => {
-            let message = i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
-            show_error(parent, language, &message);
-            return;
-        }
+    let ytdlp_path = match ytdlp_path {
+        Some(path) => path,
+        None => match ensure_ytdlp_available(parent, language, &labels_data) {
+            Ok(Some(path)) => path,
+            Ok(None) => {
+                post_focus_editor(parent);
+                return;
+            }
+            Err(err) => {
+                let message =
+                    i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
+                show_error(parent, language, &message);
+                return;
+            }
+        },
     };
     let stream_title = probe_stream_media_title(&ytdlp_path, &url);
 

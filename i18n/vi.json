@@ -1056,6 +1056,9 @@
   "stream_audio.quality.high": "Chất lượng cao",
   "stream_audio.quality.low": "Chất lượng thấp",
   "stream_audio.quality.medium": "Chất lượng trung bình",
+  "stream_audio.load_more_videos": "Load more videos",
+  "stream_audio.previous_results": "Back to previous results",
+  "stream_audio.views_suffix": "views",
   "stream_audio.quality_label": "Chất lượng:",
   "options.split.by_parts": "Theo phần",
   "options.label.audio_split_parts_count": "Số lượng phần:",
@@ -1103,3 +1106,5 @@
   "options.lang.ru": "Tiếng Nga",
   "options.spellcheck.lang.ru": "Tiếng Nga (Nga)"
 }
+
+

@@ -1056,6 +1056,9 @@
   "stream_audio.quality.high": "Висока якість",
   "stream_audio.quality.low": "Низька якість",
   "stream_audio.quality.medium": "Середня якість",
+  "stream_audio.load_more_videos": "Завантажити більше відео",
+  "stream_audio.previous_results": "Повернутися до попередніх результатів",
+  "stream_audio.views_suffix": "перегляди",
   "stream_audio.quality_label": "Якість:",
   "options.split.by_parts": "На частини",
   "options.label.audio_split_parts_count": "Кількість частин:",
@@ -1103,3 +1106,5 @@
   "options.lang.ru": "Російська",
   "options.spellcheck.lang.ru": "Російська (Росія)"
 }
+
+

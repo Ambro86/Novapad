@@ -47,11 +47,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MB_ICONWARNING, MB_OK, MSG, MessageBoxW,
     MoveWindow, PostMessageW, RegisterClassW, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN,
     SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS,
-    SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
-    WM_SETFONT, WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOSIZE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW,
+    ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFONT, WM_VSCROLL, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -7787,7 +7788,8 @@ fn initialize_options_dialog(hwnd: HWND) {
             (3600, "1 h"),
             (7200, "2 h"),
         ];
-        let mut selected_idx = 0;
+        let mut selected_idx = None;
+        let mut default_idx = None;
         for (secs, label) in skip_options.iter() {
             let idx = SendMessageW(
                 combo_audio_skip,
@@ -7802,14 +7804,16 @@ fn initialize_options_dialog(hwnd: HWND) {
                 WPARAM(idx),
                 LPARAM(*secs as isize),
             );
-            if *secs == 60 || *secs == settings.audiobook_skip_seconds {
-                selected_idx = idx;
+            if *secs == settings.audiobook_skip_seconds {
+                selected_idx = Some(idx);
+            } else if *secs == 60 {
+                default_idx = Some(idx);
             }
         }
         SendMessageW(
             combo_audio_skip,
             CB_SETCURSEL,
-            WPARAM(selected_idx),
+            WPARAM(selected_idx.or(default_idx).unwrap_or(0)),
             LPARAM(0),
         );
         if with_options_state(hwnd, |state| {
@@ -10968,6 +10972,97 @@ fn update_audio_split_visibility(hwnd: HWND) {
         ShowWindow(label_audio_split_start_number, show_time);
         ShowWindow(combo_audio_split_start_number, show_time);
         EnableWindow(combo_audio_split_start_number, selected_time);
+    }
+    update_audio_split_tab_order(hwnd, selected_text, selected_time, selected_parts);
+}
+
+fn update_audio_split_tab_order(
+    hwnd: HWND,
+    selected_text: bool,
+    selected_time: bool,
+    selected_parts: bool,
+) {
+    let Some((
+        combo_audio_split,
+        label_audio_split_minutes,
+        combo_audio_split_minutes,
+        label_audio_split_parts_count,
+        edit_audio_split_parts_count,
+        label_audio_split_start_number,
+        combo_audio_split_start_number,
+        label_audiobook_part_naming,
+        combo_audiobook_part_naming,
+        label_audio_split_text,
+        edit_audio_split_text,
+        checkbox_audio_split_requires_newline,
+    )) = with_options_state(hwnd, |state| {
+        (
+            state.combo_audio_split,
+            state.label_audio_split_minutes,
+            state.combo_audio_split_minutes,
+            state.label_audio_split_parts_count,
+            state.edit_audio_split_parts_count,
+            state.label_audio_split_start_number,
+            state.combo_audio_split_start_number,
+            state.label_audiobook_part_naming,
+            state.combo_audiobook_part_naming,
+            state.label_audio_split_text,
+            state.edit_audio_split_text,
+            state.checkbox_audio_split_requires_newline,
+        )
+    })
+    else {
+        return;
+    };
+
+    let order: &[HWND] = if selected_text {
+        &[
+            label_audio_split_text,
+            edit_audio_split_text,
+            checkbox_audio_split_requires_newline,
+            label_audiobook_part_naming,
+            combo_audiobook_part_naming,
+        ]
+    } else if selected_time {
+        &[
+            label_audio_split_minutes,
+            combo_audio_split_minutes,
+            label_audio_split_start_number,
+            combo_audio_split_start_number,
+            label_audiobook_part_naming,
+            combo_audiobook_part_naming,
+        ]
+    } else if selected_parts {
+        &[
+            label_audio_split_parts_count,
+            edit_audio_split_parts_count,
+            label_audiobook_part_naming,
+            combo_audiobook_part_naming,
+        ]
+    } else {
+        &[label_audiobook_part_naming, combo_audiobook_part_naming]
+    };
+
+    let mut insert_after = combo_audio_split;
+    for control in order {
+        if let Err(e) = unsafe {
+            SetWindowPos(
+                *control,
+                insert_after,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            )
+        } {
+            crate::log_debug(&format!(
+                "Failed to update audio split tab order for {:?}: {e}",
+                control
+            ));
+            return;
+        }
+        insert_after = *control;
     }
 }
 

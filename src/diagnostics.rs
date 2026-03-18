@@ -26,7 +26,7 @@ fn sanitize_content(content: &str) -> String {
 
 /// Genera il contenuto di version.txt
 fn generate_version_info() -> String {
-    let version = env!("CARGO_PKG_VERSION");
+    let version = crate::app_display_version();
 
     #[cfg(feature = "standalone")]
     let mode = "standalone";

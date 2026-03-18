@@ -1,4 +1,10 @@
 fn main() {
+    let release_tag = std::env::var("SONARPAD_RELEASE_TAG")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| format!("v{}", env!("CARGO_PKG_VERSION")));
+    println!("cargo:rustc-env=SONARPAD_RELEASE_TAG={release_tag}");
+
     let root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let lib_dir = std::path::Path::new(&root).join("lib64");
     let dll_dir = std::path::Path::new(&root).join("dll");

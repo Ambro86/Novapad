@@ -25,6 +25,6 @@ fn about_title(language: Language) -> String {
 }
 
 fn about_message(language: Language) -> String {
-    let version = env!("CARGO_PKG_VERSION");
+    let version = crate::app_display_version();
     i18n::tr_f(language, "about.message", &[("version", version)])
 }

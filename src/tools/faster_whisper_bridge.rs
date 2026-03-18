@@ -22,12 +22,12 @@ const DICTATION_WORKER_IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const DICTATION_WORKER_STARTUP_TIMEOUT: Duration = Duration::from_secs(60);
 const MIN_SHARED_WORKER_RAM_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const BRIDGE_DOWNLOAD_URLS: [&str; 2] = [
-    "https://github.com/Ambro86/Sonarpad/releases/download/v0.6.7/faster_whisper_bridge.exe",
-    "https://github.com/Ambro86/Sonarpad/releases/download/0.6.7/faster_whisper_bridge.exe",
+    "https://github.com/Ambro86/Sonarpad-Tools/releases/download/0.7/faster_whisper_bridge.exe",
+    "https://github.com/Ambro86/Sonarpad-Tools/releases/download/v0.7/faster_whisper_bridge.exe",
 ];
 const CUDA_PACKAGE_URLS: [&str; 2] = [
-    "https://github.com/Ambro86/Sonarpad/releases/download/v0.6.7/whisper-cuda-runtime-win64-cu12.zip",
-    "https://github.com/Ambro86/Sonarpad/releases/download/0.6.7/whisper-cuda-runtime-win64-cu12.zip",
+    "https://github.com/Ambro86/Sonarpad-Tools/releases/download/0.7/whisper-cuda-runtime-win64-cu12.zip",
+    "https://github.com/Ambro86/Sonarpad-Tools/releases/download/v0.7/whisper-cuda-runtime-win64-cu12.zip",
 ];
 const CUDA_REQUIRED_DLLS: [&str; 3] = ["cublas64_12.dll", "cudart64_12.dll", "cudnn64_9.dll"];
 

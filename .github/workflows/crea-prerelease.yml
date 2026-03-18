@@ -36,6 +36,7 @@ jobs:
         script: |
           const version = process.env.APP_VERSION;
           const prefix = `v${version}-beta`;
+          const forcedBeta = 4;
           let page = 1;
           const releases = [];
           while (true) {
@@ -50,21 +51,15 @@ jobs:
             page += 1;
           }
 
-          let maxBeta = 0;
           const existingPrereleaseTags = [];
           for (const rel of releases) {
             if (rel.prerelease) {
               existingPrereleaseTags.push(rel.tag_name);
             }
             if (!rel.tag_name.startsWith(prefix)) continue;
-            const suffix = rel.tag_name.slice(prefix.length);
-            const parsed = Number.parseInt(suffix, 10);
-            if (Number.isFinite(parsed) && parsed > maxBeta) {
-              maxBeta = parsed;
-            }
           }
 
-          const nextBeta = maxBeta + 1;
+          const nextBeta = forcedBeta;
           const nextTag = `${prefix}${nextBeta}`;
           const nextTitle = `Sonarpad v${version} beta${nextBeta}`;
 

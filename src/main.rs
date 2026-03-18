@@ -164,6 +164,14 @@ use crate::app_windows::find_in_files_window::{
 use crate::podcast::chapters::Chapter;
 use crate::tools::faster_whisper_bridge::BridgeModel;
 
+pub(crate) fn app_release_tag() -> &'static str {
+    option_env!("SONARPAD_RELEASE_TAG").unwrap_or(concat!("v", env!("CARGO_PKG_VERSION")))
+}
+
+pub(crate) fn app_display_version() -> &'static str {
+    app_release_tag()
+}
+
 const WM_PDF_LOADED: u32 = WM_APP + 1;
 const WM_TTS_VOICES_LOADED: u32 = WM_APP + 2;
 pub(crate) const WM_DOCUMENT_LOADED: u32 = WM_APP + 9;
@@ -3112,8 +3120,6 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
             state.update_progress_window.0 == 0
                 && state.transcription_progress_window.0 == 0
                 && state.bdciechi_window.0 == 0
-                && state.podcast_window.0 == 0
-                && state.podcast_save_window.0 == 0
                 && state.replace_progress_window.0 == 0
                 && !audiobook_progress_in_foreground
                 && !is_reader_mode
@@ -3373,7 +3379,7 @@ fn main() -> windows::core::Result<()> {
         std::process::exit(0);
     }
     if args.iter().any(|arg| arg == "--version") {
-        println!("Sonarpad {}", env!("CARGO_PKG_VERSION"));
+        println!("Sonarpad {}", app_display_version());
         std::process::exit(0);
     }
     let show_update_completed = args.iter().any(|arg| arg == "--after-update-completed");
@@ -3408,7 +3414,7 @@ fn main() -> windows::core::Result<()> {
 }
 
 fn print_cli_help() {
-    println!("Sonarpad {}", env!("CARGO_PKG_VERSION"));
+    println!("Sonarpad {}", app_display_version());
     println!("Usage:");
     println!("  sonarpad.exe [OPTIONS] [FILES...]");
     println!();

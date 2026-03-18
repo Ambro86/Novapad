@@ -58,6 +58,16 @@ fn app_beta_updates_enabled(hwnd: HWND) -> bool {
     with_state(hwnd, |state| state.settings.check_beta_updates_on_startup).unwrap_or(false)
 }
 
+fn embedded_release_tag() -> Option<&'static str> {
+    let tag = option_env!("SONARPAD_RELEASE_TAG")?;
+    let trimmed = tag.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    }
+}
+
 fn app_installed_release_tag(hwnd: HWND) -> Option<String> {
     with_state(hwnd, |state| state.settings.installed_release_tag.clone()).and_then(|tag| {
         let trimmed = tag.trim();
@@ -101,6 +111,12 @@ fn current_version_for_update_check(
     include_beta_updates: bool,
     package_version: &str,
 ) -> String {
+    if let Some(tag) = embedded_release_tag() {
+        let normalized = normalize_version(tag);
+        if parse_version(&normalized).is_some() {
+            return normalized;
+        }
+    }
     if let Some(tag) = app_installed_release_tag(hwnd) {
         let normalized = normalize_version(&tag);
         if parse_version(&normalized).is_some() {

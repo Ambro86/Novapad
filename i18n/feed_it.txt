@@ -30,4 +30,5 @@ Formiche | https://www.formiche.net/feed/
 Linkiesta | https://www.linkiesta.it/feed/
 Il Foglio | https://www.ilfoglio.it/rss.xml
 Il Giornale | https://www.ilgiornale.it/rss.xml
+Il Riformista | https://www.ilriformista.it/feed/
 Quotidiano.net | https://www.quotidiano.net/rss

@@ -49,6 +49,7 @@ const IDC_STATUS: usize = 9950;
 const IDC_SAMPLE_BTN: usize = 9951;
 const IDC_SAMPLE_EDIT: usize = 9952;
 const IDC_SAMPLE_CLOSE_BTN: usize = 9953;
+const IDC_LOGOUT_BTN: usize = 9954;
 const WM_BDC_LOGIN_DONE: u32 = WM_APP + 240;
 const BDCIECHI_CREDENTIAL_MAX_AGE_SECS: i64 = 30 * 24 * 60 * 60;
 
@@ -71,9 +72,11 @@ struct BdState {
     search: HWND,
     search_btn: HWND,
     latest_btn: HWND,
+    results_label: HWND,
     results_combo: HWND,
     download_btn: HWND,
     sample_btn: HWND,
+    logout_btn: HWND,
     sample_edit: HWND,
     sample_close_btn: HWND,
     close_btn: HWND,
@@ -160,8 +163,7 @@ fn enable_logged_controls(state: &BdState, enabled: bool) {
         EnableWindow(state.search_btn, enabled);
         EnableWindow(state.latest_btn, enabled);
         EnableWindow(state.results_combo, enabled);
-        EnableWindow(state.download_btn, enabled);
-        EnableWindow(state.sample_btn, enabled);
+        EnableWindow(state.logout_btn, enabled);
     }
 }
 
@@ -174,6 +176,28 @@ fn set_login_controls_visible(state: &BdState, visible: bool) {
         state.pass,
         state.login,
     ] {
+        crate::show_window_safe(control, cmd);
+        crate::enable_window_safe(control, visible);
+    }
+}
+
+fn set_logout_button_visible(state: &BdState, visible: bool) {
+    let cmd = if visible { SW_SHOW } else { SW_HIDE };
+    crate::show_window_safe(state.logout_btn, cmd);
+    crate::enable_window_safe(state.logout_btn, visible);
+}
+
+fn set_result_action_buttons_visible(state: &BdState, visible: bool) {
+    let cmd = if visible { SW_SHOW } else { SW_HIDE };
+    for control in [state.download_btn, state.sample_btn] {
+        crate::show_window_safe(control, cmd);
+        crate::enable_window_safe(control, visible);
+    }
+}
+
+fn set_results_visible(state: &BdState, visible: bool) {
+    let cmd = if visible { SW_SHOW } else { SW_HIDE };
+    for control in [state.results_label, state.results_combo] {
         crate::show_window_safe(control, cmd);
         crate::enable_window_safe(control, visible);
     }
@@ -607,10 +631,15 @@ fn show_results(state: &mut BdState, indices: Vec<usize>) {
     }
 
     if !state.visible_indices.is_empty() {
+        set_results_visible(state, true);
+        set_result_action_buttons_visible(state, true);
         crate::send_message_w_safe(state.results_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
         unsafe {
             SetFocus(state.results_combo);
         }
+    } else {
+        set_results_visible(state, false);
+        set_result_action_buttons_visible(state, false);
     }
 }
 
@@ -694,7 +723,10 @@ fn apply_authenticated_state(state: &mut BdState) {
     state.visible_indices.clear();
     state.authenticated = true;
     enable_logged_controls(state, true);
+    set_results_visible(state, false);
+    set_result_action_buttons_visible(state, false);
     set_login_controls_visible(state, false);
+    set_logout_button_visible(state, true);
     set_status(
         state,
         &i18n::tr_f(
@@ -703,6 +735,44 @@ fn apply_authenticated_state(state: &mut BdState) {
             &[("count", &state.catalog_rows.len().to_string())],
         ),
     );
+}
+
+fn apply_logged_out_state(state: &mut BdState) {
+    state.authenticated = false;
+    state.username.clear();
+    state.password.clear();
+    state.nprov.clear();
+    state.remember_credentials = false;
+    state.visible_indices.clear();
+    show_results(state, Vec::new());
+    set_sample_text(state, "");
+    set_sample_visible(state, false);
+    enable_logged_controls(state, false);
+    set_result_action_buttons_visible(state, false);
+    set_logout_button_visible(state, false);
+    set_login_controls_visible(state, true);
+    crate::log_if_err!(crate::set_window_text_w_safe(state.user, PCWSTR::null()));
+    crate::log_if_err!(crate::set_window_text_w_safe(state.pass, PCWSTR::null()));
+    crate::log_if_err!(crate::set_window_text_w_safe(state.search, PCWSTR::null()));
+    sync_bdc_session(state.parent, "", "", "", &[], false);
+    persist_bdc_credentials(state.parent, false, "", "", 0);
+    set_status(state, &tr("status.login_prompt"));
+}
+
+fn do_logout(hwnd: HWND) {
+    let ask = crate::message_box_w_safe(
+        hwnd,
+        PCWSTR(to_wide(&tr("ask_logout")).as_ptr()),
+        PCWSTR(to_wide(&tr("title")).as_ptr()),
+        MESSAGEBOX_STYLE(MB_YESNO.0 | MB_ICONQUESTION.0),
+    );
+    if ask != IDYES {
+        return;
+    }
+    with_window_state(hwnd, |state| {
+        apply_logged_out_state(state);
+        crate::set_focus_safe(state.user);
+    });
 }
 
 fn do_search(hwnd: HWND) {
@@ -1115,6 +1185,9 @@ pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessagi
                 } else if target == state.results_combo || target == state.download_btn {
                     download_selected(hwnd);
                     handled = true;
+                } else if target == state.logout_btn {
+                    do_logout(hwnd);
+                    handled = true;
                 } else if target == state.sample_edit || target == state.sample_close_btn {
                     close_sample_and_focus_search(state);
                     handled = true;
@@ -1273,9 +1346,11 @@ pub fn open(parent: HWND) {
             search: HWND(0),
             search_btn: HWND(0),
             latest_btn: HWND(0),
+            results_label: HWND(0),
             results_combo: HWND(0),
             download_btn: HWND(0),
             sample_btn: HWND(0),
+            logout_btn: HWND(0),
             sample_edit: HWND(0),
             sample_close_btn: HWND(0),
             close_btn: HWND(0),
@@ -1480,7 +1555,7 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     None,
                 );
 
-                CreateWindowExW(
+                let results_label = CreateWindowExW(
                     Default::default(),
                     w!("STATIC"),
                     PCWSTR(to_wide(&tr("label.results")).as_ptr()),
@@ -1534,6 +1609,20 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     26,
                     hwnd,
                     HMENU(IDC_SAMPLE_BTN as isize),
+                    hinstance,
+                    None,
+                );
+                let logout_btn = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&tr("button.logout")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    372,
+                    128,
+                    130,
+                    26,
+                    hwnd,
+                    HMENU(IDC_LOGOUT_BTN as isize),
                     hinstance,
                     None,
                 );
@@ -1607,9 +1696,11 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 (*init_ptr).search = search;
                 (*init_ptr).search_btn = search_btn;
                 (*init_ptr).latest_btn = latest_btn;
+                (*init_ptr).results_label = results_label;
                 (*init_ptr).results_combo = results_combo;
                 (*init_ptr).download_btn = download_btn;
                 (*init_ptr).sample_btn = sample_btn;
+                (*init_ptr).logout_btn = logout_btn;
                 (*init_ptr).sample_edit = sample_edit;
                 (*init_ptr).sample_close_btn = sample_close_btn;
                 (*init_ptr).close_btn = close_btn;
@@ -1624,12 +1715,15 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&(*init_ptr).password).as_ptr())
                 ));
 
+                set_results_visible(&*init_ptr, false);
                 set_sample_visible(&*init_ptr, false);
+                set_result_action_buttons_visible(&*init_ptr, false);
                 if (*init_ptr).authenticated {
                     apply_authenticated_state(&mut *init_ptr);
                     SetFocus(search);
                 } else {
                     enable_logged_controls(&*init_ptr, false);
+                    set_logout_button_visible(&*init_ptr, false);
                     set_login_controls_visible(&*init_ptr, true);
                     if !(*init_ptr).catalog_rows.is_empty() {
                         set_status(&*init_ptr, &tr("status.cached_catalog_loaded"));
@@ -1674,6 +1768,8 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             do_latest(hwnd);
                         } else if focus == state.results_combo || focus == state.download_btn {
                             download_selected(hwnd);
+                        } else if focus == state.logout_btn {
+                            do_logout(hwnd);
                         } else if focus == state.sample_edit || focus == state.sample_close_btn {
                             close_sample_and_focus_search(state);
                         } else if focus == state.close_btn {
@@ -1742,6 +1838,10 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     }
                     IDC_SAMPLE_BTN => {
                         sample_selected(hwnd);
+                        LRESULT(0)
+                    }
+                    IDC_LOGOUT_BTN => {
+                        do_logout(hwnd);
                         LRESULT(0)
                     }
                     IDC_SAMPLE_CLOSE_BTN => {

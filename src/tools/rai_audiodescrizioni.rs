@@ -9,6 +9,11 @@ const RAI_AUDIODESCRIZIONI_LIST_URL_B64_B: &str = "GFYERk8WCAYaFgcbQg8BSgcK";
 const RAI_AUDIODESCRIZIONI_LIST_URL_B64_C: &str = "Bk42SQMqSwYIFQg2RA8qEB9A";
 const RAI_AUDIODESCRIZIONI_LIST_URL_B64_D: &str = "AgAKRgASAQ1AExQNRA5aCAAc";
 const RAI_AUDIODESCRIZIONI_LIST_URL_B64_E: &str = "Bk8DXg4b";
+const RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64_A: &str = "GhUdXRJPS0YLQ1JcVw0dVAAM";
+const RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64_B: &str = "GFYERk8WCAYaFgcbQg8BSgcK";
+const RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64_C: &str = "Bk42SQMqSwYIFQg2RA8qEB9A";
+const RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64_D: &str = "AgAKRgASAQ1AExQNRA5aBwgb";
+const RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64_E: &str = "Ew0GShQQOwUGARVHRxIaCg==";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct CatalogItem {
@@ -61,6 +66,12 @@ pub(crate) struct Catalog {
     pub(crate) items: Vec<CatalogItem>,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct CatalogGroup {
+    pub(crate) title: String,
+    pub(crate) items: Vec<CatalogItem>,
+}
+
 #[derive(Debug, Deserialize)]
 struct ExternalItem {
     title: String,
@@ -73,8 +84,26 @@ struct ExternalItem {
     url: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct ExternalCatalogueGroup {
+    title: String,
+    #[serde(default)]
+    data: Vec<ExternalCatalogueItem>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExternalCatalogueItem {
+    title: String,
+    #[serde(default)]
+    url: String,
+}
+
 pub(crate) fn load_catalog() -> Result<Catalog, String> {
     fetch_catalog()
+}
+
+pub(crate) fn load_grouped_catalog() -> Result<Vec<CatalogGroup>, String> {
+    fetch_grouped_catalog()
 }
 
 pub(crate) fn resolve_audio_url(audio_url: &str) -> Result<String, String> {
@@ -131,6 +160,54 @@ fn fetch_catalog() -> Result<Catalog, String> {
     })
 }
 
+fn fetch_grouped_catalog() -> Result<Vec<CatalogGroup>, String> {
+    let source_url =
+        decode_obfuscated_url(&obfuscated_catalogue_url_b64(), &obfuscated_list_url_key())?;
+    let raw = fetch_text_blocking(&source_url)?;
+    let groups: Vec<ExternalCatalogueGroup> = serde_json::from_str(&raw)
+        .map_err(|err| format!("Catalogo Rai completo non valido: {err}"))?;
+    let mut parsed_groups = Vec::new();
+
+    for group in groups {
+        let title = group.title.trim().to_string();
+        if title.is_empty() {
+            continue;
+        }
+        let set_id = slugify(&title);
+        let mut items = Vec::new();
+        for (item_index, item) in group.data.into_iter().enumerate() {
+            let item_title = item.title.trim().to_string();
+            let audio_url = item.url.trim().to_string();
+            if item_title.is_empty() || audio_url.is_empty() {
+                continue;
+            }
+            items.push(CatalogItem {
+                set_id: set_id.clone(),
+                set_name: title.clone(),
+                item_id: format!("{set_id}|{}|{audio_url}", slugify(&item_title)),
+                title: item_title,
+                date: String::new(),
+                iso_date: None,
+                description: String::new(),
+                url: String::new(),
+                image: String::new(),
+                image_timestamp: None,
+                audio_url,
+                gen_date: None,
+                source_order: item_index as i64,
+                first_seen_at: None,
+                last_seen_at: None,
+            });
+        }
+
+        if !items.is_empty() {
+            parsed_groups.push(CatalogGroup { title, items });
+        }
+    }
+
+    Ok(parsed_groups)
+}
+
 fn fetch_text_blocking(url: &str) -> Result<String, String> {
     let bytes = crate::curl_client::CurlClient::fetch_url_impersonated(url)
         .map_err(|err| format!("Impossibile scaricare il catalogo Rai: {err}"))?;
@@ -178,6 +255,17 @@ fn obfuscated_list_url_b64() -> String {
         RAI_AUDIODESCRIZIONI_LIST_URL_B64_C,
         RAI_AUDIODESCRIZIONI_LIST_URL_B64_D,
         RAI_AUDIODESCRIZIONI_LIST_URL_B64_E,
+    ]
+    .concat()
+}
+
+fn obfuscated_catalogue_url_b64() -> String {
+    [
+        RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64_A,
+        RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64_B,
+        RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64_C,
+        RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64_D,
+        RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64_E,
     ]
     .concat()
 }

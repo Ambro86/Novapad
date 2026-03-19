@@ -3,9 +3,12 @@ use std::collections::HashSet;
 use windows::Win32::Foundation::HWND;
 
 use crate::app_windows::interpreter_select_window;
+use crate::app_windows::interpreter_select_window::{
+    GroupedSelectGroup, GroupedSelectItem, InterpreterSelectionResult,
+};
 use crate::settings::Language;
-use crate::tools::rai_audiodescrizioni::{self, CatalogItem};
-use crate::{show_error, with_state};
+use crate::tools::rai_audiodescrizioni::{self, CatalogGroup, CatalogItem};
+use crate::{RaiAudioOrigin, show_error, with_state};
 
 pub fn open(parent: HWND) {
     let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
@@ -33,27 +36,101 @@ pub fn open(parent: HWND) {
 
     crate::screen_reader_speak("Caricamento audiodescrizioni Rai");
     let (display_items, labels) = build_display_items(&catalog.items);
-    let Some(selected_label) = interpreter_select_window::select_interpreter(
+    let selection = interpreter_select_window::select_interpreter_with_secondary_action(
         parent,
         labels,
         language,
         "Rai audiodescrizioni".to_string(),
+        "Mostra tutte le audiodescrizioni".to_string(),
+    );
+
+    match selection {
+        Some(InterpreterSelectionResult::Item(selected_label)) => {
+            let Some((_, selected_item)) = display_items
+                .into_iter()
+                .find(|(label, _)| label == &selected_label)
+            else {
+                show_error(
+                    parent,
+                    language,
+                    "Impossibile aprire l'audiodescrizione selezionata.",
+                );
+                return;
+            };
+            open_item(parent, language, &selected_item, RaiAudioOrigin::Recenti);
+        }
+        Some(InterpreterSelectionResult::SecondaryAction) => {
+            open_grouped(parent);
+        }
+        None => {}
+    }
+}
+
+pub fn open_grouped(parent: HWND) {
+    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+    if language != Language::Italian {
+        return;
+    }
+    let initial_item_id =
+        with_state(parent, |state| state.last_rai_grouped_item_id.clone()).unwrap_or(None);
+    open_grouped_catalog(parent, language, initial_item_id);
+}
+
+fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Option<String>) {
+    crate::screen_reader_speak("Caricamento catalogo completo audiodescrizioni Rai");
+    let groups = match rai_audiodescrizioni::load_grouped_catalog() {
+        Ok(groups) => groups,
+        Err(err) => {
+            show_error(parent, language, &err);
+            return;
+        }
+    };
+
+    if groups.is_empty() {
+        show_error(
+            parent,
+            language,
+            "Nessuna audiodescrizione Rai disponibile nel catalogo completo.",
+        );
+        return;
+    }
+
+    let grouped_items = build_grouped_items(&groups);
+    let Some(selected_value) = interpreter_select_window::select_grouped_interpreter(
+        parent,
+        grouped_items,
+        language,
+        "Tutte le audiodescrizioni Rai".to_string(),
+        initial_item_id,
     ) else {
         return;
     };
 
-    let Some((_, selected_item)) = display_items
-        .into_iter()
-        .find(|(label, _)| label == &selected_label)
-    else {
-        show_error(
-            parent,
-            language,
-            "Impossibile aprire l'audiodescrizione selezionata.",
-        );
-        return;
-    };
+    for group in groups {
+        for item in group.items {
+            if item.item_id == selected_value {
+                with_state(parent, |state| {
+                    state.last_rai_grouped_item_id = Some(item.item_id.clone());
+                });
+                open_item(parent, language, &item, RaiAudioOrigin::Tutte);
+                return;
+            }
+        }
+    }
 
+    show_error(
+        parent,
+        language,
+        "Impossibile aprire l'audiodescrizione selezionata.",
+    );
+}
+
+fn open_item(
+    parent: HWND,
+    language: Language,
+    selected_item: &CatalogItem,
+    rai_origin: RaiAudioOrigin,
+) {
     let resolved_url = match rai_audiodescrizioni::resolve_audio_url(&selected_item.audio_url) {
         Ok(url) => url,
         Err(err) => {
@@ -64,7 +141,30 @@ pub fn open(parent: HWND) {
 
     let title = selected_item.title.trim().to_string();
     let title = if title.is_empty() { None } else { Some(title) };
-    crate::play_named_remote_audio_from_url(parent, resolved_url, title, Some("audio/mpeg"));
+    crate::play_named_remote_audio_from_url_with_rai_origin(
+        parent,
+        resolved_url,
+        title,
+        Some("audio/mpeg"),
+        rai_origin,
+    );
+}
+
+fn build_grouped_items(groups: &[CatalogGroup]) -> Vec<GroupedSelectGroup> {
+    groups
+        .iter()
+        .map(|group| GroupedSelectGroup {
+            label: group.title.clone(),
+            items: group
+                .items
+                .iter()
+                .map(|item| GroupedSelectItem {
+                    label: item.title.clone(),
+                    value: item.item_id.clone(),
+                })
+                .collect(),
+        })
+        .collect()
 }
 
 fn build_display_items(items: &[CatalogItem]) -> (Vec<(String, CatalogItem)>, Vec<String>) {

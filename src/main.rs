@@ -769,6 +769,15 @@ struct PodcastEpisodePlayReady {
     title: Option<String>,
     cache_path: PathBuf,
     prefer_title_for_document: bool,
+    rai_origin: RaiAudioOrigin,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum RaiAudioOrigin {
+    #[default]
+    None,
+    Recenti,
+    Tutte,
 }
 
 struct PodcastEpisodePlayFailed {
@@ -1294,7 +1303,7 @@ pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
             state.active_podcast_episode_url = None;
             state.active_podcast_episode_title = None;
             state.active_podcast_episode_cache = None;
-            state.active_podcast_episode_from_rai = false;
+            state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
         })
         .is_none()
         {
@@ -1327,7 +1336,7 @@ pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
                 state.active_podcast_episode_url = None;
                 state.active_podcast_episode_title = None;
                 state.active_podcast_episode_cache = None;
-                state.active_podcast_episode_from_rai = false;
+                state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
             });
             kill_timer_best_effort(
                 hwnd,
@@ -1563,13 +1572,14 @@ fn podcast_cache_path_for_url(url: &str, mime: Option<&str>) -> PathBuf {
         .join(format!("podcast_{}.{}", &hash[..16], ext))
 }
 
-pub(crate) fn play_named_remote_audio_from_url(
+pub(crate) fn play_named_remote_audio_from_url_with_rai_origin(
     hwnd: HWND,
     url: String,
     title: Option<String>,
     mime: Option<&str>,
+    rai_origin: RaiAudioOrigin,
 ) {
-    play_podcast_episode_from_url_internal(hwnd, url, title, mime, true);
+    play_podcast_episode_from_url_internal(hwnd, url, title, mime, true, rai_origin);
 }
 
 fn play_podcast_episode_from_url_internal(
@@ -1578,6 +1588,7 @@ fn play_podcast_episode_from_url_internal(
     title: Option<String>,
     mime: Option<&str>,
     prefer_title_for_document: bool,
+    rai_origin: RaiAudioOrigin,
 ) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let cache_path = podcast_cache_path_for_url(&url, mime);
@@ -1601,6 +1612,7 @@ fn play_podcast_episode_from_url_internal(
                     title,
                     cache_path,
                     prefer_title_for_document,
+                    rai_origin,
                 },
             ),
             Err(error) => {
@@ -3407,7 +3419,8 @@ pub(crate) struct AppState {
     active_podcast_episode_url: Option<String>,
     active_podcast_episode_title: Option<String>,
     active_podcast_episode_cache: Option<PathBuf>,
-    active_podcast_episode_from_rai: bool,
+    active_podcast_episode_from_rai: RaiAudioOrigin,
+    last_rai_grouped_item_id: Option<String>,
     podcast_chapters_cache: HashMap<String, Option<Vec<Chapter>>>,
     pending_podcast_chapters_key: Option<String>,
     active_podcast_chapters_key: Option<String>,
@@ -4065,8 +4078,10 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                                 // close_current_document() already stops audiobook playback
                                 // for audiobook tabs, so avoid duplicate stop work here.
                                 editor_manager::close_current_document(hwnd);
-                                if from_rai {
+                                if from_rai == RaiAudioOrigin::Recenti {
                                     app_windows::rai_audiodescrizioni_window::open(hwnd);
+                                } else if from_rai == RaiAudioOrigin::Tutte {
+                                    app_windows::rai_audiodescrizioni_window::open_grouped(hwnd);
                                 } else if podcasts_window.0 != 0 {
                                     SetForegroundWindow(podcasts_window);
                                     app_windows::podcasts_window::focus_library(podcasts_window);
@@ -4810,7 +4825,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_podcast_episode_url: None,
                     active_podcast_episode_title: None,
                     active_podcast_episode_cache: None,
-                    active_podcast_episode_from_rai: false,
+                    active_podcast_episode_from_rai: RaiAudioOrigin::None,
+                    last_rai_grouped_item_id: None,
                     podcast_chapters_cache: HashMap::new(),
                     pending_podcast_chapters_key: None,
                     active_podcast_chapters_key: None,
@@ -5191,7 +5207,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     editor_manager::set_current_document_title(hwnd, title);
                 }
                 if with_state(hwnd, |state| {
-                    state.active_podcast_episode_from_rai = payload.prefer_title_for_document;
+                    state.active_podcast_episode_from_rai = payload.rai_origin;
                 })
                 .is_none()
                 {

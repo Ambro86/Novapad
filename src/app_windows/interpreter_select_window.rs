@@ -2,7 +2,10 @@ use std::sync::{Arc, Mutex};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::UI::Controls::WC_BUTTON;
-use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    EnableWindow, SetFocus, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_NEXT, VK_PRIOR, VK_RETURN,
+    VK_UP,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     DispatchMessageW, GWLP_USERDATA, HMENU, HWND_TOPMOST, IDC_ARROW, IsDialogMessageW,
@@ -147,6 +150,16 @@ fn select_interpreter_internal(
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
                 crate::log_if_err!(PostMessageW(hwnd, WM_COMMAND, WPARAM(ID_OK), LPARAM(0)));
+                continue;
+            }
+            let focused = crate::get_focus_safe();
+            let list_has_navigation_key = with_interpreter_state(hwnd, |state| {
+                focused == state.list && is_list_navigation_key(msg.wParam.0 as u32)
+            })
+            .unwrap_or(false);
+            if list_has_navigation_key {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
                 continue;
             }
             if IsDialogMessageW(hwnd, &msg).as_bool() {
@@ -351,4 +364,13 @@ where
 {
     let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut InterpreterSelectState;
     crate::with_raw_mut_ptr_safe(ptr, f)
+}
+
+fn is_list_navigation_key(key: u32) -> bool {
+    key == VK_UP.0 as u32
+        || key == VK_DOWN.0 as u32
+        || key == VK_PRIOR.0 as u32
+        || key == VK_NEXT.0 as u32
+        || key == VK_HOME.0 as u32
+        || key == VK_END.0 as u32
 }

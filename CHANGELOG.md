@@ -10,6 +10,7 @@ What's New
 
 Improvements
 • "Play streaming audio..." can now also search YouTube from any text query, or accept a YouTube channel link and show its results.
+• Improved focus handling during "Play streaming audio...", so the progress window stays more stable during download and conversion.
 • Added voice profiles in Options > Voice: profiles can be added, renamed, and deleted.
 • Expanded the playback rewind interval options in Options > Audio with additional values from 1 second up to 2 hours.
 • Added Russian translation thanks to Dmitriy.

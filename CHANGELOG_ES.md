@@ -10,6 +10,7 @@ Novedades
 
 Mejoras
 • "Reproducir audio en streaming..." ahora también permite buscar en YouTube escribiendo cualquier texto o pegar el enlace de un canal de YouTube para mostrar sus resultados.
+• Mejorado el enfoque durante "Reproducir audio en streaming...", para que la ventana de progreso se mantenga más estable durante la descarga y la conversión.
 • Añadida la gestión de perfiles de voz en Opciones > Voz: se pueden añadir, renombrar y eliminar perfiles.
 • Ampliadas en Opciones > Audio las opciones del intervalo de rebobinado durante la reproducción, con nuevos valores desde 1 segundo hasta 2 horas.
 • Añadida la traducción rusa gracias a Dmitriy.

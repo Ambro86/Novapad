@@ -1,4 +1,4 @@
-use crate::accessibility::{ES_CENTER, ES_READONLY, handle_accessibility, to_wide};
+use crate::accessibility::{handle_accessibility, to_wide};
 use crate::i18n;
 use crate::settings::Language;
 use crate::with_state;
@@ -28,6 +28,7 @@ const SAVE_ID_CANCEL: usize = 12002;
 const SAVE_PROGRESS_TIMER_ID: usize = 1;
 const SAVE_PROGRESS_TICK_MS: u32 = 250;
 const SAVE_PROGRESS_MAX_FAKE: usize = 95;
+const STATIC_CENTER_STYLE: u32 = 0x0000_0001;
 
 pub struct SaveDialogLabels {
     pub title: String,
@@ -50,10 +51,12 @@ struct SaveState {
     cancel_button: HWND,
     cancel_requested: bool,
     language: Language,
+    status_text: String,
     current_pct: usize,
     has_real_progress: bool,
     labels: SaveDialogLabels,
     show_cancel: bool,
+    suppress_parent_restore: bool,
 }
 
 fn save_labels(language: Language) -> SaveDialogLabels {
@@ -96,16 +99,38 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
 }
 
 pub fn focus_cancel_button(hwnd: HWND) {
+    crate::log_debug(&format!(
+        "podcast_save_window focus_cancel_button: hwnd={:?}",
+        hwnd
+    ));
     if with_save_state(hwnd, |state| {
         if state.cancel_button.0 != 0 {
+            crate::log_debug(&format!(
+                "podcast_save_window focusing cancel button: dialog={:?} cancel={:?}",
+                hwnd, state.cancel_button
+            ));
             crate::set_focus_safe(state.cancel_button);
         } else {
-            crate::set_focus_safe(state.label);
+            crate::log_debug(&format!(
+                "podcast_save_window focusing dialog fallback: dialog={:?} label={:?}",
+                hwnd, state.label
+            ));
+            crate::set_focus_safe(hwnd);
         }
     })
     .is_none()
     {
         crate::log_debug("Failed to access save state for focus");
+    }
+}
+
+pub fn suppress_parent_restore_on_close(hwnd: HWND) {
+    if with_save_state(hwnd, |state| {
+        state.suppress_parent_restore = true;
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to set suppress_parent_restore on save window");
     }
 }
 
@@ -295,9 +320,9 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             let label = unsafe {
                 CreateWindowExW(
                     Default::default(),
-                    w!("EDIT"),
+                    w!("STATIC"),
                     PCWSTR(to_wide(&label_text).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_CENTER | ES_READONLY),
+                    WS_CHILD | WS_VISIBLE | WINDOW_STYLE(STATIC_CENTER_STYLE),
                     20,
                     20,
                     260,
@@ -376,14 +401,24 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 cancel_button,
                 cancel_requested: false,
                 language,
+                status_text: labels.in_progress.clone(),
                 current_pct: 0,
                 has_real_progress: false,
                 labels,
                 show_cancel,
+                suppress_parent_restore: false,
             };
             unsafe {
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(Box::new(state)) as isize);
-                SetFocus(label);
+                crate::log_debug(&format!(
+                    "podcast_save_window WM_CREATE: hwnd={:?} parent={:?} label={:?} progress={:?} cancel_button={:?} show_cancel={}",
+                    hwnd, parent, label, progress, cancel_button, show_cancel
+                ));
+                if cancel_button.0 != 0 {
+                    SetFocus(cancel_button);
+                } else {
+                    SetFocus(hwnd);
+                }
             }
             if unsafe { SetTimer(hwnd, SAVE_PROGRESS_TIMER_ID, SAVE_PROGRESS_TICK_MS, None) } == 0 {
                 crate::log_debug("Failed to set SAVE_PROGRESS_TIMER");
@@ -391,8 +426,15 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             LRESULT(0)
         }
         WM_SETFOCUS => {
+            crate::log_debug(&format!("podcast_save_window WM_SETFOCUS: hwnd={:?}", hwnd));
             if with_save_state(hwnd, |state| {
-                crate::set_focus_safe(state.label);
+                if state.cancel_button.0 != 0 {
+                    crate::log_debug(&format!(
+                        "podcast_save_window WM_SETFOCUS focusing cancel: hwnd={:?} cancel={:?}",
+                        hwnd, state.cancel_button
+                    ));
+                    crate::set_focus_safe(state.cancel_button);
+                }
             })
             .is_none()
             {
@@ -414,9 +456,8 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 return LRESULT(0);
             }
             if wparam.0 as u32 == VK_TAB.0 as u32
-                && let Some((label, cancel, show_cancel)) = with_save_state(hwnd, |state| {
-                    (state.label, state.cancel_button, state.show_cancel)
-                })
+                && let Some((cancel, show_cancel)) =
+                    with_save_state(hwnd, |state| (state.cancel_button, state.show_cancel))
                 && show_cancel
                 && cancel.0 != 0
             {
@@ -428,7 +469,6 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                     return LRESULT(0);
                 }
                 if shift_down && focus == cancel {
-                    crate::set_focus_safe(label);
                     return LRESULT(0);
                 }
             }
@@ -449,6 +489,10 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
         }
         WM_PODCAST_SAVE_PROGRESS => {
             let pct = wparam.0.min(100);
+            crate::log_debug(&format!(
+                "podcast_save_window progress message: hwnd={:?} pct={}",
+                hwnd, pct
+            ));
             if with_save_state(hwnd, |state| {
                 crate::send_message_w_safe(state.progress, PBM_SETPOS, WPARAM(pct), LPARAM(0));
                 state.has_real_progress = true;
@@ -492,15 +536,30 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            let parent = with_save_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+            let (parent, show_cancel, suppress_parent_restore) = with_save_state(hwnd, |state| {
+                (
+                    state.parent,
+                    state.show_cancel,
+                    state.suppress_parent_restore,
+                )
+            })
+            .unwrap_or((HWND(0), false, false));
+            crate::log_debug(&format!(
+                "podcast_save_window WM_NCDESTROY: hwnd={:?} parent={:?} show_cancel={} suppress_parent_restore={}",
+                hwnd, parent, show_cancel, suppress_parent_restore
+            ));
             if let Err(e) = crate::kill_timer_safe(hwnd, SAVE_PROGRESS_TIMER_ID) {
                 crate::log_debug(&format!("Failed to kill SAVE_PROGRESS_TIMER: {}", e));
             }
             if parent.0 != 0 {
-                crate::enable_window_safe(parent, true);
-                // Keep focus within Sonarpad when progress dialogs close (e.g. streaming
-                // download -> conversion handoff), avoiding transient desktop focus.
-                crate::set_foreground_window_safe(parent);
+                if !suppress_parent_restore {
+                    crate::enable_window_safe(parent, true);
+                }
+                // For transient probe/progress dialogs without cancel, avoid briefly
+                // bouncing focus back to the editor before the next modal opens.
+                if show_cancel && !suppress_parent_restore {
+                    crate::set_foreground_window_safe(parent);
+                }
                 if let Err(_e) = crate::post_message_w_safe(
                     parent,
                     WM_PODCAST_SAVE_CLOSED,
@@ -526,11 +585,22 @@ fn with_save_state<T>(hwnd: HWND, f: impl FnOnce(&mut SaveState) -> T) -> Option
 }
 
 fn update_progress_label(state: &SaveState) {
-    let text = format!("{} {}%", state.labels.in_progress, state.current_pct);
+    let text = format!("{} {}%", state.status_text, state.current_pct);
     unsafe {
         if let Err(e) = SetWindowTextW(state.label, PCWSTR(to_wide(&text).as_ptr())) {
             crate::log_debug(&format!("Failed to set label text: {}", e));
         }
+    }
+}
+
+pub fn set_status_text(hwnd: HWND, text: &str) {
+    if with_save_state(hwnd, |state| {
+        state.status_text = text.to_string();
+        update_progress_label(state);
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access save state");
     }
 }
 

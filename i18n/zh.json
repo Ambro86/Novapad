@@ -952,6 +952,7 @@
   "stream_audio.invalid_format": "格式无效：{input}。允许格式：mp3、m4a、opus、wav、flac、mp4。",
   "stream_audio.invalid_url": "无效的URL。",
   "stream_audio.no_output": "未生成可播放的输出文件。",
+  "stream_audio.no_matching_videos": "未找到匹配的YouTube视频",
   "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",

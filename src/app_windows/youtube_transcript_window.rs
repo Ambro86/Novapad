@@ -22,13 +22,13 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
     CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT,
     CreateWindowExW, DefWindowProcW, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE,
-    ES_READONLY, FindWindowExW, GWLP_USERDATA, GetForegroundWindow, GetWindowLongPtrW, HMENU,
+    ES_READONLY, GWLP_USERDATA, GetForegroundWindow, GetWindowLongPtrW, HMENU, HWND_TOPMOST,
     IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO,
-    MSG, PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TranslateMessage,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
-    WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    MSG, PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SWP_NOMOVE,
+    SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
+    SetWindowTextW, ShowWindow, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -869,7 +869,7 @@ fn start_load_languages(hwnd: HWND) -> bool {
             }
 
             // Fallback to yt-dlp
-            let ytdlp_path = match ensure_ytdlp_available(hwnd, language, &labels_data) {
+            let ytdlp_path = match ensure_ytdlp_available(hwnd, language, &labels_data, None) {
                 Ok(Some(path)) => path,
                 Ok(None) => {
                     return LoadResult {
@@ -1194,7 +1194,7 @@ fn start_load_transcript_text(
                 Some(&download_url),
             );
             if matches!(fetch_result, Err(ImportError::YtdlpUnavailable)) {
-                let ytdlp_path = match ensure_ytdlp_available(hwnd, language, &labels_data) {
+                let ytdlp_path = match ensure_ytdlp_available(hwnd, language, &labels_data, None) {
                     Ok(Some(path)) => path,
                     Ok(None) => {
                         return TextLoadResult {
@@ -1680,7 +1680,7 @@ fn choose_stream_collection_entry_page(
     if has_more {
         labels.push(i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY));
     }
-    crate::app_windows::interpreter_select_window::select_interpreter(
+    crate::app_windows::interpreter_select_window::select_interpreter_without_parent_restore_on_accept(
         parent,
         labels,
         language,
@@ -1693,34 +1693,56 @@ fn choose_youtube_collection_entry(
     language: Language,
     ytdlp_path: &Path,
     url: &str,
+    initial_progress: Option<HWND>,
 ) -> Result<Option<String>, String> {
     if !is_youtube_collection_url(url) {
         return Ok(Some(url.to_string()));
     }
 
     let mut page = 0usize;
+    let mut shared_progress = initial_progress;
     loop {
-        let progress = open_progress_dialog(
-            parent,
-            language,
-            "stream_audio.progress_title",
-            "podcasts.loading",
-            false,
-        );
+        let progress = if let Some(existing) = shared_progress.take() {
+            report_progress_status(existing, &i18n::tr(language, "podcasts.loading"));
+            keep_stream_progress_focus(existing);
+            existing
+        } else {
+            open_progress_dialog(
+                parent,
+                language,
+                "stream_audio.progress_title",
+                "podcasts.loading",
+                false,
+            )
+        };
         let ytdlp = ytdlp_path.to_path_buf();
         let url_owned = url.to_string();
         let worker = std::thread::spawn(move || {
             probe_youtube_collection_entries(&ytdlp, &url_owned, language, page)
         });
+        let mut last_focus_keepalive = std::time::Instant::now();
         while !worker.is_finished() {
             ignore_bool(pump_messages_detect_stream_cancel(parent, progress));
+            if last_focus_keepalive.elapsed() > std::time::Duration::from_millis(300) {
+                keep_stream_progress_focus(progress);
+                last_focus_keepalive = std::time::Instant::now();
+            }
             std::thread::sleep(std::time::Duration::from_millis(30));
         }
-        close_progress_dialog(progress);
         let (entries, has_more) = match worker.join() {
             Ok(result) => result?,
             Err(_) => return Err("yt-dlp collection probe worker failed".to_string()),
         };
+        crate::log_debug(&format!(
+            "stream transition [collection_probe.completed]: page={} entries={} has_more={}",
+            page,
+            entries.len(),
+            has_more
+        ));
+        if !entries.is_empty() {
+            crate::app_windows::podcast_save_window::suppress_parent_restore_on_close(progress);
+        }
+        close_progress_dialog(progress);
         if entries.is_empty() {
             return if page == 0 {
                 Ok(Some(url.to_string()))
@@ -1754,33 +1776,55 @@ fn choose_youtube_search_entry(
     language: Language,
     ytdlp_path: &Path,
     query: &str,
+    initial_progress: Option<HWND>,
 ) -> Result<Option<String>, String> {
     let mut page = 0usize;
+    let mut shared_progress = initial_progress;
     loop {
-        let progress = open_progress_dialog(
-            parent,
-            language,
-            "stream_audio.progress_title",
-            "podcasts.loading",
-            false,
-        );
+        let progress = if let Some(existing) = shared_progress.take() {
+            report_progress_status(existing, &i18n::tr(language, "podcasts.loading"));
+            keep_stream_progress_focus(existing);
+            existing
+        } else {
+            open_progress_dialog(
+                parent,
+                language,
+                "stream_audio.progress_title",
+                "podcasts.loading",
+                false,
+            )
+        };
         let ytdlp = ytdlp_path.to_path_buf();
         let query_owned = query.to_string();
         let worker = std::thread::spawn(move || {
             probe_youtube_search_entries(&ytdlp, &query_owned, language, page)
         });
+        let mut last_focus_keepalive = std::time::Instant::now();
         while !worker.is_finished() {
             ignore_bool(pump_messages_detect_stream_cancel(parent, progress));
+            if last_focus_keepalive.elapsed() > std::time::Duration::from_millis(300) {
+                keep_stream_progress_focus(progress);
+                last_focus_keepalive = std::time::Instant::now();
+            }
             std::thread::sleep(std::time::Duration::from_millis(30));
         }
-        close_progress_dialog(progress);
         let (entries, has_more) = match worker.join() {
             Ok(result) => result?,
             Err(_) => return Err("yt-dlp search probe worker failed".to_string()),
         };
+        crate::log_debug(&format!(
+            "stream transition [search_probe.completed]: page={} entries={} has_more={}",
+            page,
+            entries.len(),
+            has_more
+        ));
+        if !entries.is_empty() {
+            crate::app_windows::podcast_save_window::suppress_parent_restore_on_close(progress);
+        }
+        close_progress_dialog(progress);
         if entries.is_empty() {
             return if page == 0 {
-                Err("No matching YouTube videos found".to_string())
+                Err(i18n::tr(language, "stream_audio.no_matching_videos"))
             } else {
                 Ok(None)
             };
@@ -1810,11 +1854,18 @@ fn resolve_stream_input_url(
     language: Language,
     ytdlp_path: &Path,
     input: &str,
+    initial_progress: Option<HWND>,
 ) -> Result<Option<String>, String> {
     if looks_like_valid_stream_url(input) {
-        return choose_youtube_collection_entry(parent, language, ytdlp_path, input);
+        return choose_youtube_collection_entry(
+            parent,
+            language,
+            ytdlp_path,
+            input,
+            initial_progress,
+        );
     }
-    choose_youtube_search_entry(parent, language, ytdlp_path, input)
+    choose_youtube_search_entry(parent, language, ytdlp_path, input, initial_progress)
 }
 fn looks_like_valid_stream_url(input: &str) -> bool {
     let Some(normalized) = normalize_youtube_input_for_download(input) else {
@@ -1837,7 +1888,7 @@ fn looks_like_valid_stream_url(input: &str) -> bool {
         || (host_lc.starts_with('[') && host_lc.ends_with(']'))
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum StreamOutputFormat {
     Auto,
     Mp3,
@@ -1849,7 +1900,7 @@ enum StreamOutputFormat {
     Mp4,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum StreamQualitySelection {
     Original,
     BitrateKbps(u32),
@@ -2404,7 +2455,14 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             WM_DESTROY => {
                 if with_stream_dialog_state(hwnd, |state| {
                     EnableWindow(state.parent, true);
-                    SetForegroundWindow(state.parent);
+                    let accepted = state
+                        .result
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .is_some();
+                    if !accepted {
+                        SetForegroundWindow(state.parent);
+                    }
                 })
                 .is_none()
                 {
@@ -2474,8 +2532,8 @@ fn show_stream_dialog(
     }
     unsafe {
         EnableWindow(parent, false);
-        SetForegroundWindow(hwnd);
     }
+    pin_stream_modal_window(hwnd);
 
     let mut msg = MSG::default();
     loop {
@@ -2495,11 +2553,18 @@ fn show_stream_dialog(
         }
     }
     crate::watchdog::exit_modal_dialog();
+    let result_value = result.lock().unwrap_or_else(|e| e.into_inner()).clone();
     unsafe {
-        EnableWindow(parent, true);
-        SetForegroundWindow(parent);
+        if result_value.is_none() {
+            EnableWindow(parent, true);
+            SetForegroundWindow(parent);
+        } else {
+            crate::log_debug(
+                "stream track selection accepted: keeping parent disabled to avoid focus bounce",
+            );
+        }
     }
-    result.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    result_value
 }
 
 fn open_progress_dialog(
@@ -2515,7 +2580,78 @@ fn open_progress_dialog(
         cancel: i18n::tr(language, "podcast.save.cancel"),
         cancel_confirm: i18n::tr(language, "podcast.cancel_confirm"),
     };
-    crate::app_windows::podcast_save_window::open_with_labels(parent, language, labels, show_cancel)
+    let dialog = crate::app_windows::podcast_save_window::open_with_labels(
+        parent,
+        language,
+        labels,
+        show_cancel,
+    );
+    crate::log_debug(&format!(
+        "stream progress dialog opened: parent={:?} dialog={:?} title_key={} status_key={} show_cancel={}",
+        parent, dialog, title_key, status_key, show_cancel
+    ));
+    if dialog.0 != 0 {
+        pin_stream_modal_window(dialog);
+        crate::app_windows::podcast_save_window::focus_cancel_button(dialog);
+        keep_stream_progress_focus(dialog);
+        std::thread::sleep(std::time::Duration::from_millis(15));
+        pin_stream_modal_window(dialog);
+        keep_stream_progress_focus(dialog);
+        log_stream_focus_snapshot("open_progress_dialog.after_focus", dialog);
+    }
+    dialog
+}
+
+fn restore_stream_parent_focus(hwnd: HWND) {
+    if hwnd.0 == 0 {
+        return;
+    }
+    crate::set_foreground_window_safe(hwnd);
+}
+
+fn log_stream_transition(tag: &str, parent: HWND) {
+    crate::log_debug(&format!(
+        "stream transition [{}]: parent={}",
+        tag,
+        describe_window_handle(parent)
+    ));
+    log_stream_focus_snapshot(tag, parent);
+}
+
+fn reclaim_stream_modal_parent_foreground(parent: HWND, tag: &str) {
+    if parent.0 == 0 {
+        return;
+    }
+    crate::log_debug(&format!(
+        "stream parent foreground reclaim [{}]: before={}",
+        tag,
+        describe_window_handle(crate::get_foreground_window_safe())
+    ));
+    crate::bring_window_to_foreground(parent);
+    log_stream_transition(tag, parent);
+}
+
+fn pin_stream_modal_window(hwnd: HWND) {
+    if hwnd.0 == 0 {
+        return;
+    }
+    unsafe {
+        if let Err(err) = SetWindowPos(
+            hwnd,
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+        ) {
+            crate::log_debug(&format!(
+                "Failed to pin stream modal window {:?} as topmost: {}",
+                hwnd, err
+            ));
+        }
+    }
+    crate::set_foreground_window_safe(hwnd);
 }
 
 fn close_progress_dialog(dialog: HWND) {
@@ -2534,6 +2670,10 @@ fn report_progress(dialog: HWND, pct: u32) {
     if dialog.0 == 0 {
         return;
     }
+    crate::log_debug(&format!(
+        "stream progress update: dialog={:?} pct={}",
+        dialog, pct
+    ));
     crate::send_message_w_safe(
         dialog,
         crate::app_windows::podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
@@ -2546,17 +2686,11 @@ fn report_progress_status(dialog: HWND, text: &str) {
     if dialog.0 == 0 {
         return;
     }
-    unsafe {
-        let label = FindWindowExW(dialog, HWND(0), w!("EDIT"), PCWSTR::null());
-        if label.0 != 0
-            && let Err(e) = SetWindowTextW(label, PCWSTR(to_wide(text).as_ptr()))
-        {
-            crate::log_debug(&format!(
-                "Failed to set streaming progress status text: {}",
-                e
-            ));
-        }
-    }
+    crate::log_debug(&format!(
+        "stream progress status: dialog={:?} text={}",
+        dialog, text
+    ));
+    crate::app_windows::podcast_save_window::set_status_text(dialog, text);
 }
 
 fn pump_messages_detect_stream_cancel(parent: HWND, dialog: HWND) -> bool {
@@ -2588,20 +2722,83 @@ fn keep_stream_progress_focus(dialog: HWND) {
         let fg = GetForegroundWindow();
         let dialog_is_foreground = fg == dialog || (fg.0 != 0 && IsChild(dialog, fg).as_bool());
         if !dialog_is_foreground {
+            crate::log_debug(&format!(
+                "stream focus keepalive: restoring foreground dialog={:?} current_fg={}",
+                dialog,
+                describe_window_handle(fg)
+            ));
             SetForegroundWindow(dialog);
         }
         let focus = GetFocus();
         let dialog_has_focus =
             focus == dialog || (focus.0 != 0 && IsChild(dialog, focus).as_bool());
         if !dialog_has_focus {
-            let label = FindWindowExW(dialog, HWND(0), w!("EDIT"), PCWSTR::null());
-            if label.0 != 0 {
-                SetFocus(label);
-            } else {
-                SetFocus(dialog);
-            }
+            crate::log_debug(&format!(
+                "stream focus keepalive: restoring keyboard focus dialog={:?} current_focus={}",
+                dialog,
+                describe_window_handle(focus)
+            ));
+            crate::app_windows::podcast_save_window::focus_cancel_button(dialog);
+            log_stream_focus_snapshot("keep_stream_progress_focus.after_restore", dialog);
         }
     }
+}
+
+fn get_window_text_for_log(hwnd: HWND, max_len: usize) -> String {
+    if hwnd.0 == 0 {
+        return String::new();
+    }
+    let len = crate::get_window_text_length_w_safe(hwnd);
+    if len <= 0 {
+        return String::new();
+    }
+    let mut buf = vec![0u16; len as usize + 1];
+    let read = crate::get_window_text_w_safe(hwnd, &mut buf);
+    if read <= 0 {
+        return String::new();
+    }
+    let mut text = String::from_utf16_lossy(&buf[..read as usize]);
+    if text.chars().count() > max_len {
+        text = text.chars().take(max_len).collect();
+        text.push_str("...");
+    }
+    text
+}
+
+fn get_window_class_for_log(hwnd: HWND) -> String {
+    if hwnd.0 == 0 {
+        return String::new();
+    }
+    let mut class_buf = [0u16; 128];
+    let len = crate::get_class_name_w_safe(hwnd, &mut class_buf);
+    if len <= 0 {
+        return String::new();
+    }
+    String::from_utf16_lossy(&class_buf[..len as usize])
+}
+
+fn describe_window_handle(hwnd: HWND) -> String {
+    if hwnd.0 == 0 {
+        return "HWND(0)".to_string();
+    }
+    format!(
+        "HWND({}) class='{}' text='{}'",
+        hwnd.0,
+        get_window_class_for_log(hwnd),
+        get_window_text_for_log(hwnd, 120)
+    )
+}
+
+fn log_stream_focus_snapshot(tag: &str, dialog: HWND) {
+    let fg = crate::get_foreground_window_safe();
+    let focus = crate::get_focus_safe();
+    crate::log_debug(&format!(
+        "stream focus snapshot [{}]: dialog={} foreground={} focus={}",
+        tag,
+        describe_window_handle(dialog),
+        describe_window_handle(fg),
+        describe_window_handle(focus)
+    ));
 }
 
 fn parse_ytdlp_progress_pct(line: &str) -> Option<u32> {
@@ -2832,12 +3029,38 @@ fn probe_stream_media_title(ytdlp_path: &Path, url: &str) -> Option<String> {
     }
     let raw = String::from_utf8_lossy(&output.stdout);
     let first_non_empty = raw.lines().map(str::trim).find(|line| !line.is_empty())?;
-    let sanitized = crate::sanitize_filename(first_non_empty);
+    let repaired = repair_stream_title_mojibake(first_non_empty);
+    let sanitized = crate::sanitize_filename(&repaired);
     if sanitized.is_empty() {
         None
     } else {
         Some(sanitized)
     }
+}
+
+fn repair_stream_title_mojibake(text: &str) -> String {
+    let repaired = text
+        .replace("â€™", "’")
+        .replace("â€˜", "‘")
+        .replace("â€œ", "“")
+        .replace("â€", "”")
+        .replace("â€“", "–")
+        .replace("â€”", "—")
+        .replace("â€¦", "…")
+        .replace("Â ", " ")
+        .replace("Ã ", "à")
+        .replace("Ã¨", "è")
+        .replace("Ã©", "é")
+        .replace("Ã¬", "ì")
+        .replace("Ã²", "ò")
+        .replace("Ã¹", "ù")
+        .replace("Ã€", "À")
+        .replace("Ãˆ", "È")
+        .replace("Ã‰", "É")
+        .replace("ÃŒ", "Ì")
+        .replace("Ã’", "Ò")
+        .replace("Ã™", "Ù");
+    repaired.replace('\u{FFFD}', "Ó")
 }
 
 fn unique_stream_named_path(dir: &Path, title: &str, ext: &str) -> PathBuf {
@@ -2968,11 +3191,20 @@ fn probe_stream_audio_tracks_responsive(
         }
         std::thread::sleep(std::time::Duration::from_millis(30));
     }
-    close_progress_dialog(progress);
-    match worker.join() {
+    let result = match worker.join() {
         Ok(result) => result,
         Err(_) => Err("yt-dlp track probe worker failed".to_string()),
+    };
+    crate::log_debug(&format!(
+        "stream transition [track_probe.completed]: ok={} track_count={}",
+        result.is_ok(),
+        result.as_ref().map(|tracks| tracks.len()).unwrap_or(0)
+    ));
+    if result.is_ok() {
+        crate::app_windows::podcast_save_window::suppress_parent_restore_on_close(progress);
     }
+    close_progress_dialog(progress);
+    result
 }
 
 unsafe extern "system" fn stream_track_dialog_wndproc(
@@ -3173,7 +3405,14 @@ fn stream_track_dialog_wndproc_inner(
             WM_DESTROY => {
                 if with_stream_track_dialog_state(hwnd, |state| {
                     EnableWindow(state.parent, true);
-                    SetForegroundWindow(state.parent);
+                    let accepted = state
+                        .result
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .is_some();
+                    if !accepted {
+                        SetForegroundWindow(state.parent);
+                    }
                 })
                 .is_none()
                 {
@@ -3242,8 +3481,8 @@ fn choose_stream_audio_track(
     }
     unsafe {
         EnableWindow(parent, false);
-        SetForegroundWindow(hwnd);
     }
+    pin_stream_modal_window(hwnd);
     let mut msg = MSG::default();
     loop {
         if !crate::is_window_handle_valid(hwnd) {
@@ -3261,14 +3500,18 @@ fn choose_stream_audio_track(
             DispatchMessageW(&msg);
         }
     }
+    let result_value = result.lock().unwrap_or_else(|e| e.into_inner()).clone();
     unsafe {
         EnableWindow(parent, true);
-        SetForegroundWindow(parent);
+        if result_value.is_none() {
+            SetForegroundWindow(parent);
+        }
     }
-    result.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    result_value
 }
 
 pub fn play_streaming_audio_from_url(parent: HWND) {
+    log_stream_transition("play_streaming_audio.start", parent);
     let (language, default_format) = {
         with_state(parent, |state| {
             (
@@ -3317,7 +3560,19 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     let mut url = input.clone();
     let mut ytdlp_path = None;
     if needs_ytdlp_selection {
-        let path = match ensure_ytdlp_available(parent, language, &labels_data) {
+        let bootstrap_progress = open_progress_dialog(
+            parent,
+            language,
+            "stream_audio.progress_title",
+            "podcasts.loading",
+            false,
+        );
+        let path = match ensure_ytdlp_available(
+            parent,
+            language,
+            &labels_data,
+            Some(bootstrap_progress),
+        ) {
             Ok(Some(path)) => path,
             Ok(None) => {
                 post_focus_editor(parent);
@@ -3330,7 +3585,13 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 return;
             }
         };
-        url = match resolve_stream_input_url(parent, language, &path, &input) {
+        url = match resolve_stream_input_url(
+            parent,
+            language,
+            &path,
+            &input,
+            Some(bootstrap_progress),
+        ) {
             Ok(Some(selected_url)) => selected_url,
             Ok(None) => {
                 post_focus_editor(parent);
@@ -3363,7 +3624,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
 
     let ytdlp_path = match ytdlp_path {
         Some(path) => path,
-        None => match ensure_ytdlp_available(parent, language, &labels_data) {
+        None => match ensure_ytdlp_available(parent, language, &labels_data, None) {
             Ok(Some(path)) => path,
             Ok(None) => {
                 post_focus_editor(parent);
@@ -3377,8 +3638,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             }
         },
     };
-    let stream_title = probe_stream_media_title(&ytdlp_path, &url);
-
     let selected_audio_format =
         match probe_stream_audio_tracks_responsive(parent, language, &ytdlp_path, &url) {
             Ok(tracks) if tracks.len() > 1 => {
@@ -3397,6 +3656,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             }
         };
 
+    reclaim_stream_modal_parent_foreground(parent, "play_streaming_audio.before_final_progress");
     let cache_dir = settings_dir().join("podcast cache");
     if let Err(err) = std::fs::create_dir_all(&cache_dir) {
         let message = i18n::tr_f(
@@ -3420,6 +3680,11 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         "stream_audio.progress_downloading",
         true,
     );
+    keep_stream_progress_focus(progress);
+    std::thread::sleep(std::time::Duration::from_millis(15));
+    keep_stream_progress_focus(progress);
+    log_stream_focus_snapshot("play_streaming_audio.progress_opened", progress);
+    let stream_title = probe_stream_media_title(&ytdlp_path, &url);
 
     let mut cmd = ytdlp_command(&ytdlp_path);
     cmd.arg("--no-playlist")
@@ -3514,6 +3779,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             return;
         }
     };
+    keep_stream_progress_focus(progress);
 
     let stderr_pipe = match child.stderr.take() {
         Some(stderr) => stderr,
@@ -3578,11 +3844,23 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     let mut last_progress_at = std::time::Instant::now();
     let mut reached_100_at: Option<std::time::Instant> = None;
     let mut last_focus_keepalive = std::time::Instant::now();
+    crate::log_debug(&format!(
+        "stream download loop start: progress_dialog={:?} url={} cache_prefix={} allow_early_finalize={}",
+        progress, url, prefix, allow_early_finalize
+    ));
     let _status = loop {
         match child.try_wait() {
-            Ok(Some(status)) => break Some(status),
+            Ok(Some(status)) => {
+                crate::log_debug(&format!(
+                    "stream download loop exit: success={} code={:?}",
+                    status.success(),
+                    status.code()
+                ));
+                break Some(status);
+            }
             Ok(None) => {
                 if pump_messages_detect_stream_cancel(parent, progress) {
+                    crate::log_debug("stream download loop: cancel detected while downloading");
                     close_progress_dialog(progress);
                     if let Err(err) = child.kill() {
                         crate::log_debug(&format!(
@@ -3594,12 +3872,21 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 }
                 let pct = progress_shared.load(Ordering::Relaxed);
                 if pct > last_pct {
+                    crate::log_debug(&format!(
+                        "stream download raw progress: previous={} new_raw={} ui_target_before={} ui_pct={}",
+                        last_pct, pct, ui_target_pct, ui_pct
+                    ));
                     last_pct = pct;
                     last_progress_at = std::time::Instant::now();
                     // Keep room for post-download finalization so 100% appears right before playback.
                     ui_target_pct = pct.min(95);
+                    crate::log_debug(&format!(
+                        "stream download target progress adjusted: raw={} ui_target_after={}",
+                        pct, ui_target_pct
+                    ));
                     if last_pct >= 100 && reached_100_at.is_none() {
                         reached_100_at = Some(std::time::Instant::now());
+                        crate::log_debug("stream download raw progress reached 100%");
                     }
                 }
                 if ui_pct < ui_target_pct {
@@ -3621,6 +3908,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     crate::log_debug(
                         "Stream download reached 100% with output present: finalizing early",
                     );
+                    log_stream_focus_snapshot("stream_download.finalize_early", progress);
                     if let Err(err) = child.kill() {
                         crate::log_debug(&format!(
                             "Failed to kill finalized yt-dlp process: {}",
@@ -3631,6 +3919,10 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 }
                 let activity = activity_shared.load(Ordering::Relaxed);
                 if activity != last_activity {
+                    crate::log_debug(&format!(
+                        "stream download activity heartbeat: previous={} current={}",
+                        last_activity, activity
+                    ));
                     last_activity = activity;
                     last_progress_at = std::time::Instant::now();
                 }
@@ -3639,6 +3931,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 {
                     stalled = true;
                     crate::log_debug("Stream download stalled: terminating yt-dlp process");
+                    log_stream_focus_snapshot("stream_download.stalled", progress);
                     if let Err(err) = child.kill() {
                         crate::log_debug(&format!(
                             "Failed to kill stalled yt-dlp process: {}",
@@ -3650,6 +3943,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 std::thread::sleep(std::time::Duration::from_millis(30));
             }
             Err(err) => {
+                crate::log_debug(&format!("stream download loop wait error: {}", err));
                 close_progress_dialog(progress);
                 show_error(
                     parent,
@@ -3685,6 +3979,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     }
 
     report_progress_status(progress, &i18n::tr(language, "podcasts.loading"));
+    log_stream_focus_snapshot("stream_download.after_download_before_finalize", progress);
     let primary_path = find_latest_downloaded_stream_file(&cache_dir, &prefix);
     let downloaded_path = if primary_path.is_some() {
         primary_path
@@ -3910,52 +4205,86 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             )
         );
         if same_extension && !must_reencode_mp3 {
+            crate::log_debug(&format!(
+                "stream conversion skipped: downloaded_path={} target_ext={} same_extension={} must_reencode_mp3={}",
+                downloaded_path.to_string_lossy(),
+                target_ext,
+                same_extension,
+                must_reencode_mp3
+            ));
             close_progress_dialog(progress);
             downloaded_path.clone()
         } else {
             let converted_path = downloaded_path.with_extension(target_ext);
-            let converting_progress = open_progress_dialog(
-                parent,
-                language,
-                "stream_audio.progress_title",
-                "stream_audio.progress_converting",
-                false,
+            let convert_cancel = Arc::new(AtomicBool::new(false));
+            crate::log_debug(&format!(
+                "stream conversion start: input={} output={} target_ext={} quality={:?} format={:?}",
+                downloaded_path.to_string_lossy(),
+                converted_path.to_string_lossy(),
+                target_ext,
+                dialog_data.quality,
+                dialog_data.format
+            ));
+            report_progress_status(
+                progress,
+                &i18n::tr(language, "stream_audio.progress_converting"),
             );
-            keep_stream_progress_focus(converting_progress);
-            report_progress(progress, 100);
-            close_progress_dialog(progress);
+            report_progress(progress, 0);
+            log_stream_focus_snapshot("stream_conversion.started", progress);
             let mut last_pump = std::time::Instant::now();
-            let mut last_focus_keepalive = std::time::Instant::now();
-            let mut progress_cb = |pct| {
-                report_progress(converting_progress, pct);
+            let mut last_reported_pct = 0u32;
+            let convert_cancel_for_cb = Arc::clone(&convert_cancel);
+            let mut progress_cb = |pct: u32| {
+                let normalized = (pct / 100).min(100);
+                crate::log_debug(&format!(
+                    "stream conversion progress callback: raw_pct={} normalized_pct={} last_reported_pct={}",
+                    pct, normalized, last_reported_pct
+                ));
+                if normalized > last_reported_pct {
+                    last_reported_pct = normalized;
+                    report_progress(progress, normalized);
+                }
                 // Keep window responsive during in-process conversion on slower machines.
                 if last_pump.elapsed() >= std::time::Duration::from_millis(50) {
-                    ignore_bool(pump_messages_detect_stream_cancel(
-                        parent,
-                        converting_progress,
+                    let cancelled = pump_messages_detect_stream_cancel(parent, progress);
+                    crate::log_debug(&format!(
+                        "stream conversion ui pump: cancelled={} elapsed_ms={}",
+                        cancelled,
+                        last_pump.elapsed().as_millis()
                     ));
+                    log_stream_focus_snapshot("stream_conversion.ui_pump", progress);
+                    if cancelled {
+                        convert_cancel_for_cb.store(true, Ordering::Relaxed);
+                    }
                     last_pump = std::time::Instant::now();
-                }
-                if last_focus_keepalive.elapsed() >= std::time::Duration::from_millis(300) {
-                    keep_stream_progress_focus(converting_progress);
-                    last_focus_keepalive = std::time::Instant::now();
                 }
             };
             let convert_result = crate::ffmpeg_export::convert_audio_file(
                 &downloaded_path,
                 &converted_path,
                 &convert_settings,
-                None,
+                Some(Arc::clone(&convert_cancel)),
                 Some(&mut progress_cb),
             );
-            report_progress(converting_progress, 100);
-            close_progress_dialog(converting_progress);
+            crate::log_debug(&format!(
+                "stream conversion result: success={} output_exists={} output={}",
+                convert_result.is_ok(),
+                converted_path.exists(),
+                converted_path.to_string_lossy()
+            ));
+            report_progress(progress, 100);
+            close_progress_dialog(progress);
             match convert_result {
                 Ok(()) => {
                     crate::log_if_err!(std::fs::remove_file(&downloaded_path));
                     converted_path
                 }
                 Err(err) => {
+                    if convert_cancel.load(Ordering::Relaxed) || err == "Conversion canceled." {
+                        crate::log_debug("stream conversion cancelled by user");
+                        crate::log_if_err!(std::fs::remove_file(&converted_path));
+                        return;
+                    }
                     show_error(
                         parent,
                         language,
@@ -4014,25 +4343,44 @@ fn ensure_ytdlp_available(
     hwnd: HWND,
     language: Language,
     labels: &Labels,
+    initial_progress: Option<HWND>,
 ) -> Result<Option<PathBuf>, String> {
+    restore_stream_parent_focus(hwnd);
     let local_path = settings_dir().join(YTDLP_EXE_NAME);
     if local_path.exists() {
+        let progress = initial_progress;
+        if let Some(progress) = progress {
+            report_progress_status(progress, &i18n::tr(language, "podcasts.loading"));
+            keep_stream_progress_focus(progress);
+        }
         check_ytdlp_update(hwnd, language, labels, &local_path);
+        if let Some(progress) = progress {
+            keep_stream_progress_focus(progress);
+        }
+        restore_stream_parent_focus(hwnd);
         return Ok(Some(local_path));
     }
     if let Some(path_in_system) = find_ytdlp_in_path() {
+        let progress = initial_progress;
+        if let Some(progress) = progress {
+            report_progress_status(progress, &i18n::tr(language, "podcasts.loading"));
+            keep_stream_progress_focus(progress);
+        }
         crate::log_debug(&format!(
             "{} {}",
             labels.ytdlp_found_in_path,
             path_in_system.display()
         ));
-        return Ok(Some(check_ytdlp_path_update(
-            hwnd,
-            language,
-            labels,
-            &path_in_system,
-            &local_path,
-        )));
+        let selected_path =
+            check_ytdlp_path_update(hwnd, language, labels, &path_in_system, &local_path);
+        if let Some(progress) = progress {
+            keep_stream_progress_focus(progress);
+        }
+        restore_stream_parent_focus(hwnd);
+        return Ok(Some(selected_path));
+    }
+    if let Some(progress) = initial_progress {
+        close_progress_dialog(progress);
     }
     let title = to_wide(&confirm_title(language));
     let message = to_wide(&labels.ytdlp_prompt_download);
@@ -4042,6 +4390,7 @@ fn ensure_ytdlp_available(
         PCWSTR(title.as_ptr()),
         MB_YESNO | MB_ICONQUESTION,
     );
+    restore_stream_parent_focus(hwnd);
     if response != IDYES {
         return Ok(None);
     }
@@ -4055,6 +4404,7 @@ fn ensure_ytdlp_available(
     let download_result =
         download_ytdlp_with_progress(&local_path, |pct| report_progress(progress, pct));
     close_progress_dialog(progress);
+    restore_stream_parent_focus(hwnd);
     match download_result {
         Ok(()) => Ok(Some(local_path)),
         Err(err) => Err(err),
@@ -4079,6 +4429,7 @@ fn check_ytdlp_path_update(
     path_in_system: &Path,
     local_path: &Path,
 ) -> PathBuf {
+    restore_stream_parent_focus(hwnd);
     if YTDLP_UPDATE_CHECKED.swap(true, Ordering::SeqCst) {
         return path_in_system.to_path_buf();
     }
@@ -4117,6 +4468,7 @@ fn check_ytdlp_path_update(
         PCWSTR(title.as_ptr()),
         MB_YESNO | MB_ICONQUESTION,
     );
+    restore_stream_parent_focus(hwnd);
     if response != IDYES {
         return path_in_system.to_path_buf();
     }
@@ -4130,6 +4482,7 @@ fn check_ytdlp_path_update(
     );
     let result = download_ytdlp_with_progress(local_path, |pct| report_progress(progress, pct));
     close_progress_dialog(progress);
+    restore_stream_parent_focus(hwnd);
     if let Err(err) = result {
         crate::log_debug(&format!(
             "yt-dlp local download from PATH prompt failed: {}",
@@ -4142,6 +4495,7 @@ fn check_ytdlp_path_update(
 }
 
 fn check_ytdlp_update(hwnd: HWND, language: Language, labels: &Labels, path: &Path) {
+    restore_stream_parent_focus(hwnd);
     if YTDLP_UPDATE_CHECKED.swap(true, Ordering::SeqCst) {
         return;
     }
@@ -4176,6 +4530,7 @@ fn check_ytdlp_update(hwnd: HWND, language: Language, labels: &Labels, path: &Pa
         PCWSTR(title.as_ptr()),
         MB_YESNO | MB_ICONQUESTION,
     );
+    restore_stream_parent_focus(hwnd);
     if response != IDYES {
         return;
     }
@@ -4188,6 +4543,7 @@ fn check_ytdlp_update(hwnd: HWND, language: Language, labels: &Labels, path: &Pa
     );
     let result = download_ytdlp_with_progress(path, |pct| report_progress(progress, pct));
     close_progress_dialog(progress);
+    restore_stream_parent_focus(hwnd);
     if let Err(err) = result {
         crate::log_debug(&format!("yt-dlp update failed: {}", err));
         show_error(hwnd, language, &labels.ytdlp_update_failed);

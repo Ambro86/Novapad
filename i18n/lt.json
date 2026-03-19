@@ -996,6 +996,7 @@
   "stream_audio.invalid_format": "Neteisingas formatas: {input}. Leidžiami formatai: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "Neteisingas URL adresas.",
   "stream_audio.no_output": "Nebuvo sukurtas atkuriamas išvesties failas.",
+  "stream_audio.no_matching_videos": "Nerasta atitinkančių „YouTube“ vaizdo įrašų",
   "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",

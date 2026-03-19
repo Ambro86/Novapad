@@ -988,6 +988,7 @@
   "stream_audio.invalid_format": "Formato no válido: {input}. Permitidos: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "URL no válida.",
   "stream_audio.no_output": "No se generó ningún archivo reproducible.",
+  "stream_audio.no_matching_videos": "No se encontraron videos de YouTube coincidentes",
   "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",

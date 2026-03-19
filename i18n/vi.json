@@ -996,6 +996,7 @@
   "stream_audio.invalid_format": "Định dạng không hợp lệ: {input}. Cho phép: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "URL không hợp lệ.",
   "stream_audio.no_output": "Không tạo được tệp đầu ra có thể phát.",
+  "stream_audio.no_matching_videos": "Không tìm thấy video YouTube phù hợp",
   "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",

@@ -996,6 +996,7 @@
   "stream_audio.invalid_format": "Недійсний формат: {input}. Допустимі значення: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "Недійсний URL.",
   "stream_audio.no_output": "Не створено жодного файлу для відтворення.",
+  "stream_audio.no_matching_videos": "Не знайдено відповідних відео YouTube",
   "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",

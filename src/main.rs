@@ -227,7 +227,7 @@ const WINDOW_DOC_MENU_BASE: usize = 11_000;
 const WINDOW_DOC_MENU_MAX: usize = 200;
 const WINDOW_DOC_MENU_SEPARATOR_ID: usize = 10_999;
 
-fn bring_window_to_foreground(hwnd: HWND) {
+pub(crate) fn bring_window_to_foreground(hwnd: HWND) {
     unsafe {
         let foreground = GetForegroundWindow();
         let current_thread = GetCurrentThreadId();

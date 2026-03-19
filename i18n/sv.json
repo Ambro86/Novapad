@@ -996,6 +996,7 @@
   "stream_audio.invalid_format": "Ogiltigt format: {input}. Tillåtna: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "Ogiltig URL.",
   "stream_audio.no_output": "Ingen uppspelningsbar utdatafil skapades.",
+  "stream_audio.no_matching_videos": "Inga matchande YouTube-videor hittades",
   "whisper.status.starting": "Starting transcription...",
   "whisper.status.downloading_model": "Downloading Whisper model if needed...",
   "whisper.status.preparing_audio": "Preparing audio for transcription...",

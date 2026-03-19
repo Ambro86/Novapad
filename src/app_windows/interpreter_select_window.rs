@@ -5,11 +5,12 @@ use windows::Win32::UI::Controls::WC_BUTTON;
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
-    DispatchMessageW, GWLP_USERDATA, HMENU, IDC_ARROW, IsDialogMessageW, LB_ADDSTRING,
-    LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MSG,
-    PostMessageW, SendMessageW, SetForegroundWindow, TranslateMessage, WINDOW_STYLE, WM_CLOSE,
-    WM_COMMAND, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    DispatchMessageW, GWLP_USERDATA, HMENU, HWND_TOPMOST, IDC_ARROW, IsDialogMessageW,
+    LB_ADDSTRING, LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW,
+    MSG, PostMessageW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
+    SetWindowPos, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -40,6 +41,26 @@ pub fn select_interpreter(
     items: Vec<String>,
     language: Language,
     title: String,
+) -> Option<String> {
+    select_interpreter_internal(parent, items, language, title, false, false)
+}
+
+pub fn select_interpreter_without_parent_restore_on_accept(
+    parent: HWND,
+    items: Vec<String>,
+    language: Language,
+    title: String,
+) -> Option<String> {
+    select_interpreter_internal(parent, items, language, title, true, false)
+}
+
+fn select_interpreter_internal(
+    parent: HWND,
+    items: Vec<String>,
+    language: Language,
+    title: String,
+    suppress_parent_restore_on_accept: bool,
+    pin_topmost: bool,
 ) -> Option<String> {
     if items.is_empty() {
         return None;
@@ -92,6 +113,22 @@ pub fn select_interpreter(
     unsafe {
         EnableWindow(parent, false);
         SetForegroundWindow(hwnd);
+        if pin_topmost
+            && let Err(err) = SetWindowPos(
+                hwnd,
+                HWND_TOPMOST,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+            )
+        {
+            crate::log_debug(&format!(
+                "Failed to pin interpreter selection window {:?} as topmost: {}",
+                hwnd, err
+            ));
+        }
     }
 
     let mut msg = MSG::default();
@@ -120,13 +157,17 @@ pub fn select_interpreter(
         }
     }
 
+    let result_value = result.lock().unwrap_or_else(|e| e.into_inner()).clone();
     unsafe {
-        EnableWindow(parent, true);
-        SetForegroundWindow(parent);
+        if !(suppress_parent_restore_on_accept && result_value.is_some()) {
+            EnableWindow(parent, true);
+        }
+        if result_value.is_none() {
+            SetForegroundWindow(parent);
+        }
     }
 
-    let guard = result.lock().unwrap_or_else(|e| e.into_inner());
-    guard.clone()
+    result_value
 }
 
 unsafe extern "system" fn interpreter_select_wndproc(

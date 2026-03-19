@@ -985,6 +985,7 @@
   "stream_audio.invalid_format": "Неверный формат: {input}. Разрешены: mp3, m4a, opus, wav, flac, mp4.",
   "stream_audio.invalid_url": "Неверный URL.",
   "stream_audio.no_output": "Не был сгенерирован воспроизводимый выходной файл.",
+  "stream_audio.no_matching_videos": "Не найдено подходящих видео на YouTube",
   "whisper.status.starting": "Начало транскрипции...",
   "whisper.status.downloading_model": "Загрузка модели Whisper при необходимости...",
   "whisper.status.preparing_audio": "Подготовка аудио для транскрипции...",

@@ -10,6 +10,7 @@ Có gì mới
 
 Cải tiến
 • "Phat am thanh tu streaming..." gio cung cho phep tim kiem tren YouTube bang bat ky chuoi van ban nao, hoac dan lien ket cua mot kenh YouTube de hien thi cac ket qua cua kenh do.
+• Đã cải thiện focus khi dùng "Phat am thanh tu streaming...", để cửa sổ tiến trình ổn định hơn trong lúc tải xuống và chuyển đổi.
 • Đã thêm quản lý hồ sơ giọng nói trong Tùy chọn > Giọng nói: có thể thêm, đổi tên và xóa hồ sơ.
 • Đã mở rộng trong Tùy chọn > Âm thanh các lựa chọn cho khoảng tua lùi khi phát, với các giá trị mới từ 1 giây đến 2 giờ.
 • Đã thêm bản dịch tiếng Nga nhờ Dmitriy.

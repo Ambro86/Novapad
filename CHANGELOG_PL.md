@@ -9,6 +9,7 @@ Nowości
 • Sonarpad jest teraz dostępny także na Macu, choć na razie z częściowym zestawem funkcji. Link do projektu: https://github.com/Ambro86/Sonarpad-Mac
 
 Ulepszenia
+• Funkcja „Odtwórz dźwięk ze streamingu...” pozwala teraz także wyszukiwać w YouTube po dowolnym tekście albo wkleić link do kanału YouTube, aby wyświetlić jego wyniki.
 • Dodano zarządzanie profilami głosu w Opcje > Głos: profile można dodawać, zmieniać nazwę i usuwać.
 • Rozszerzono w Opcje > Audio wybór interwału przewijania wstecz podczas odtwarzania o nowe wartości od 1 sekundy do 2 godzin.
 • Dodano tłumaczenie rosyjskie dzięki Dmitriyowi.
@@ -43,7 +44,6 @@ Ulepszenia
 • Zaktualizowano przewodniki we wszystkich językach i zasoby lokalizacyjne całej aplikacji, w tym teksty darowizn oraz tłumaczenia instalatora NSIS (nowe ciągi dla chińskiego uproszczonego i litewskiego oraz uzupełnione tłumaczenie ukraińskie setupu).
 • Dodano globalną obsługę proxy sieciowego (HTTP/HTTPS oraz SOCKS5/SOCKS5H) dla funkcji online, z walidacją przy zapisie opcji: nieprawidłowe proxy jest sygnalizowane i usuwane automatycznie.
 • Dodano nową funkcję w menu Narzędzia: „Odtwórz dźwięk ze streamingu...”, która pozwala wkleić adres URL (YouTube lub bezpośredni link do mediów), wybrać format wyjściowy oraz profil jakości/bitrate (w tym oryginalną jakość/bitrate dla MP3 i MP4) i odtworzyć materiał w odtwarzaczu Sonarpad.
-• Funkcja „Odtwórz dźwięk ze streamingu...” pozwala teraz także wyszukiwać w YouTube po dowolnym tekście albo wkleić link do kanału YouTube, aby wyświetlić jego wyniki.
 • Dodano obsługę systemowego klawisza multimedialnego Play/Pause (słuchawki/klawiatura): teraz steruje zarówno odtwarzaniem multimediów, jak i pauzą/wznowieniem czytania tekstu (z priorytetem odtwarzacza multimediów, gdy oba są aktywne).
 • Dodano nową pozycję w Plik > Ostatnie pliki: „Wyczyść ostatnie pliki”, aby szybko wyczyścić listę ostatnio używanych dokumentów.
 • Rozszerzono opcje bitrate w konwersji audio i ustawieniach nagrywania podcastu: dodano niższe wartości (64/96 kbps) oraz zwiększono MP3 do 320 kbps, z ujednoliconą walidacją i obsługą enkodera.

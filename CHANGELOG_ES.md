@@ -9,6 +9,7 @@ Novedades
 • Sonarpad ya está disponible también en Mac, aunque con un conjunto de funciones parcial. Enlace del proyecto: https://github.com/Ambro86/Sonarpad-Mac
 
 Mejoras
+• "Reproducir audio en streaming..." ahora también permite buscar en YouTube escribiendo cualquier texto o pegar el enlace de un canal de YouTube para mostrar sus resultados.
 • Añadida la gestión de perfiles de voz en Opciones > Voz: se pueden añadir, renombrar y eliminar perfiles.
 • Ampliadas en Opciones > Audio las opciones del intervalo de rebobinado durante la reproducción, con nuevos valores desde 1 segundo hasta 2 horas.
 • Añadida la traducción rusa gracias a Dmitriy.
@@ -43,7 +44,6 @@ Mejoras
 • Guías actualizadas para todos los idiomas y recursos de localización actualizados en toda la app, incluidas donaciones y traducciones del instalador NSIS (nuevas cadenas de instalación en chino simplificado y lituano, además de completar la traducción ucraniana del setup).
 • Añadido soporte global de proxy de red (HTTP/HTTPS y SOCKS5/SOCKS5H) para funciones en línea, con validación al guardar Opciones: los proxies no válidos se avisan y se eliminan automáticamente.
 • Añadida una nueva función en Herramientas: "Reproducir audio en streaming...", que permite pegar una URL (YouTube o enlace multimedia directo), elegir el formato de salida y el perfil de calidad/bitrate (incluida calidad/bitrate original para MP3 y MP4) y reproducirla en el reproductor de Sonarpad.
-• "Reproducir audio en streaming..." ahora también permite buscar en YouTube escribiendo cualquier texto o pegar el enlace de un canal de YouTube para mostrar sus resultados.
 • Añadido soporte para la tecla multimedia de sistema Reproducir/Pausar (auriculares/teclado): ahora controla tanto la reproducción multimedia como la pausa/reanudación de la lectura de texto (con prioridad para el reproductor multimedia cuando ambos están activos).
 • Añadida en Archivo > Archivos recientes la nueva opción "Limpiar archivos recientes" para vaciar rápidamente la lista de documentos recientes.
 • Ampliadas las opciones de bitrate en la conversión de audio y en la grabación de podcast: añadidos valores más bajos (64/96 kbps) y ampliado MP3 hasta 320 kbps, con validación y manejo del codificador alineados.

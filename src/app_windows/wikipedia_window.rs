@@ -1,4 +1,4 @@
-use crate::accessibility::{handle_accessibility, to_wide, to_wide_normalized};
+use crate::accessibility::{handle_accessibility, normalize_to_crlf, to_wide, to_wide_normalized};
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
 use crate::settings::Language;
@@ -10,7 +10,9 @@ use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL};
-use windows::Win32::UI::Controls::{EM_SCROLLCARET, EM_SETSEL, WC_LISTBOXW, WC_STATIC};
+use windows::Win32::UI::Controls::{
+    EM_LIMITTEXT, EM_SCROLLCARET, EM_SETSEL, WC_LISTBOXW, WC_STATIC,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
@@ -820,11 +822,16 @@ fn apply_import_text(parent: HWND, text: &str) -> bool {
     let Some(hwnd_edit) = get_active_edit(parent) else {
         return false;
     };
+    // Large Wikipedia extracts can exceed the default Win32 edit text limit.
+    unsafe {
+        SendMessageW(hwnd_edit, EM_LIMITTEXT, WPARAM(0x7FFF_FFFEusize), LPARAM(0));
+    }
+    let cleaned = normalize_to_crlf(text);
     let existing = get_edit_text(hwnd_edit);
     let combined = if existing.is_empty() {
-        text.to_string()
+        cleaned
     } else {
-        format!("{text}\n\n{existing}")
+        format!("{cleaned}\r\n\r\n{existing}")
     };
     let wide = to_wide_normalized(&combined);
     unsafe {

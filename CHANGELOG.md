@@ -9,6 +9,7 @@ What's New
 • Sonarpad is now also available on Mac with a subset of features. Project link: https://github.com/Ambro86/Sonarpad-Mac
 
 Improvements
+• "Play streaming audio..." can now also search YouTube from any text query, or accept a YouTube channel link and show its results.
 • Added voice profiles in Options > Voice: profiles can be added, renamed, and deleted.
 • Expanded the playback rewind interval options in Options > Audio with additional values from 1 second up to 2 hours.
 • Added Russian translation thanks to Dmitriy.
@@ -43,7 +44,6 @@ Improvements
 • Updated guides for all languages and refreshed localization resources across the app, including donations texts and NSIS setup translations (new Simplified Chinese and Lithuanian installer strings, plus completed Ukrainian setup translation).
 • Added global network proxy support (HTTP/HTTPS and SOCKS5/SOCKS5H) for online features, with proxy validation on Options save: invalid proxies are warned and automatically removed.
 • Added a new Tools action: "Play streaming audio...", allowing users to paste a URL (YouTube or direct media link), choose output format and quality/bitrate profile (including original quality/bitrate for MP3 and MP4), and play it directly in Sonarpad’s audio player.
-• "Play streaming audio..." can now also search YouTube from any text query, or accept a YouTube channel link and show its results.
 • Added support for the system media Play/Pause key (headsets/keyboards): it now controls both media playback and text reading pause/resume (with media playback priority when both are active).
 • Added a new File > Recent Files entry: "Clear recent files" to quickly wipe the recent documents list.
 • Expanded audio bitrate options in Convert Audio and podcast recording settings: added lower values (64/96 kbps) and extended MP3 up to 320 kbps, with aligned validation and encoder handling.

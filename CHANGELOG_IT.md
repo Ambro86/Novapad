@@ -9,12 +9,11 @@ Novità
 • Sonarpad è disponibile anche su Mac, anche se con un set di funzioni parziale. Link al progetto: https://github.com/Ambro86/Sonarpad-Mac
 
 Miglioramenti
+• "Riproduci audio da streaming..." ora permette anche di cercare su YouTube scrivendo una qualunque stringa di testo oppure di incollare il link di un canale YouTube per visualizzarne i risultati.
 • Ora il programma riesce a gestire Sostituisci tutto in modo massivo su file grandi con un gran numero di sostituzioni.
 • Aggiunto il pieno supporto della biblioteca BdCiechi, accessibile da Strumenti o con la scorciatoia Alt+Shift+B. E' possibile cercare, scaricare libri, leggere le ultime novità, scaricare un testo di assaggio. Quando verrà salvato un file è possibile aprirlo direttamente in Sonarpad e leggerlo con le voci di alta qualità presenti nel programma.
 • Diversi miglioramenti alla biblioteca BdCiechi grazie alla collaborazione con Giuliano Artico: login e password possono essere memorizzati in Sonarpad per 30 giorni, dopo i quali è necessario effettuare nuovamente l'accesso; se invece l'utente sceglie di non memorizzare i dati, finché Sonarpad resta aperto questi vengono riutilizzati senza doverli digitare di nuovo. La ricerca delle opere è stata normalizzata correggendo gli accenti non immessi, quindi ad esempio cercando `giosue` viene trovata anche `Giosuè`. Corretto inoltre un problema per cui, alla riapertura di BdCiechi, la finestra non si riattivava correttamente. Il catalogo della BdCiechi viene ora scaricato solo al primo utilizzo e aggiornato successivamente solo quando necessario.
 • Migliorata la finestra RSS con un'anteprima articolo integrata, così il testo può essere consultato direttamente lì e raggiunto rapidamente con Tab prima di aprire l'articolo completo nell'editor.
-
-Miglioramenti
 • Aggiunta in Opzioni > Voce la gestione dei profili voce: è possibile aggiungere, rinominare ed eliminare un profilo.
 • Ampliate in Opzioni > Audio le scelte per l'intervallo di riavvolgimento durante la riproduzione, con nuovi valori da 1 secondo fino a 2 ore.
 • Aggiunta la traduzione russa grazie a Dmitriy.
@@ -47,7 +46,6 @@ Miglioramenti
 • Aggiornate le guide per tutte le lingue e aggiornate le risorse di localizzazione dell'app, incluse testo donazioni e traduzioni setup NSIS (nuove stringhe installer in cinese semplificato e lituano, più completamento della traduzione ucraina del setup).
 • Aggiunto il supporto proxy di rete globale (HTTP/HTTPS e SOCKS5/SOCKS5H) per le funzioni online, con validazione al salvataggio Opzioni: i proxy non validi vengono segnalati e rimossi automaticamente.
 • Aggiunta una nuova funzione in Strumenti: "Riproduci audio da streaming...", che permette di inserire un URL (YouTube o link media diretto), scegliere il formato di output e il profilo qualità/bitrate (inclusa qualità/bitrate originale per MP3 e MP4) e avviare la riproduzione nell’audio player di Sonarpad.
-• "Riproduci audio da streaming..." ora permette anche di cercare su YouTube scrivendo una qualunque stringa di testo oppure di incollare il link di un canale YouTube per visualizzarne i risultati.
 • Aggiunto il supporto al tasto multimediale Play/Pausa di sistema (cuffie/tastiera): ora controlla sia la riproduzione media sia la pausa/ripresa della lettura testo (con priorità al player media quando entrambi sono attivi).
 • Aggiunta nel menu File > File recenti la nuova voce "Svuota file recenti" per cancellare rapidamente l’elenco dei documenti recenti.
 • Ampliate le opzioni di bitrate nella conversione audio e nella registrazione podcast: aggiunti valori più bassi (64/96 kbps) ed esteso MP3 fino a 320 kbps, con validazione e gestione encoder allineate.

@@ -7,6 +7,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
+use encoding_rs::WINDOWS_1252;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::Threading::CREATE_NO_WINDOW;
@@ -3027,7 +3028,13 @@ fn probe_stream_media_title(ytdlp_path: &Path, url: &str) -> Option<String> {
     if !output.status.success() {
         return None;
     }
-    let raw = String::from_utf8_lossy(&output.stdout);
+    let raw = match String::from_utf8(output.stdout.clone()) {
+        Ok(text) => text,
+        Err(_) => {
+            let (decoded, _, _) = WINDOWS_1252.decode(&output.stdout);
+            decoded.into_owned()
+        }
+    };
     let first_non_empty = raw.lines().map(str::trim).find(|line| !line.is_empty())?;
     let repaired = repair_stream_title_mojibake(first_non_empty);
     let sanitized = crate::sanitize_filename(&repaired);
@@ -3060,7 +3067,7 @@ fn repair_stream_title_mojibake(text: &str) -> String {
         .replace("ÃŒ", "Ì")
         .replace("Ã’", "Ò")
         .replace("Ã™", "Ù");
-    repaired.replace('\u{FFFD}', "Ó")
+    repaired.replace('\u{FFFD}', "")
 }
 
 fn unique_stream_named_path(dir: &Path, title: &str, ext: &str) -> PathBuf {

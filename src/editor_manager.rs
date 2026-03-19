@@ -4269,10 +4269,14 @@ pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
         let mut was_empty = false;
         let mut update_title = false;
         let mut was_audiobook = false;
+        let mut removed_path: Option<PathBuf> = None;
+        let mut removed_from_rss = false;
 
         if with_state(hwnd, |state| {
             was_current = state.current == index;
             let doc = state.docs.remove(index);
+            removed_path = doc.path.clone();
+            removed_from_rss = doc.from_rss;
             closing_hwnd_edit = doc.hwnd_edit;
             state.large_text_editors.remove(&closing_hwnd_edit.0);
             was_audiobook = matches!(doc.format, FileFormat::Audiobook);
@@ -4313,6 +4317,50 @@ pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
         if was_audiobook {
             crate::audio_player::stop_audiobook_playback(hwnd);
             crate::clear_active_podcast_chapters(hwnd);
+            if removed_from_rss {
+                let removed_path_for_cleanup = removed_path.clone();
+                if with_state(hwnd, |state| {
+                    if let Some(path) = removed_path_for_cleanup.as_ref() {
+                        if let Some(pos) = state.audio_playlist.iter().position(|p| p == path) {
+                            state.audio_playlist.remove(pos);
+                            state.audio_playlist_index = match state.audio_playlist_index {
+                                Some(current) if current == pos => None,
+                                Some(current) if current > pos => Some(current - 1),
+                                other => other,
+                            };
+                        }
+                        if state
+                            .audio_ffmpeg_retry_for
+                            .as_ref()
+                            .is_some_and(|retry| retry == path)
+                        {
+                            state.audio_ffmpeg_retry_for = None;
+                        }
+                        if state
+                            .audio_unexpected_stop_retry_for
+                            .as_ref()
+                            .is_some_and(|retry| retry == path)
+                        {
+                            state.audio_unexpected_stop_retry_for = None;
+                        }
+                        if state
+                            .last_stopped_audiobook
+                            .as_ref()
+                            .is_some_and(|stopped| stopped == path)
+                        {
+                            state.last_stopped_audiobook = None;
+                        }
+                    }
+                    state.selected_audio_track = None;
+                    state.pending_podcast_chapters_key = None;
+                })
+                .is_none()
+                {
+                    crate::log_debug(
+                        "Failed to clear streaming playback state after closing document",
+                    );
+                }
+            }
         }
 
         if was_empty {

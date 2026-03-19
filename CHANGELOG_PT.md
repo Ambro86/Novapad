@@ -19,6 +19,7 @@ Melhorias
 • A fonte RSS "Favoritos" pode ser eliminada e é recriada automaticamente quando um novo artigo é adicionado aos favoritos.
 • Adicionados atalhos de teclado RSS para mover as fontes para cima/para baixo: `Ctrl+Shift+Seta para cima` e `Ctrl+Shift+Seta para baixo`.
 • Melhorada a janela RSS com uma pré-visualização integrada do artigo, permitindo consultar o texto diretamente ali e alcançá-lo rapidamente com Tab antes de abrir o artigo completo no editor.
+• Adicionada no RSS uma entrada explícita «Carregar mais notícias» no fim das fontes quando existem mais itens disponíveis; ao premir Enter é carregado o bloco seguinte e o foco passa para o primeiro artigo novo.
 Correções
 • Corrigido um erro em que a lista de ficheiros abertos era mostrada no menu Ajuda em vez do menu Janela.
 • Corrigido um caso limite no streaming em que a reprodução podia iniciar, mas a janela “Transferência de streaming” permanecia aberta quando o ficheiro descarregado já correspondia ao formato de destino.

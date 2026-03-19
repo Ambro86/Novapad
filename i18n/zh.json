@@ -1075,6 +1075,7 @@
   "voice.lang.ps": "普什图语",
   "voice.lang.su": "巽他语",
   "playback.transcribe_current": "Transcribe current audio\tAlt+Shift+T",
+  "rss.load_more_news": "加载更多新闻",
   "whisper.model.choice_intro": "Whisper model selection (first use).`n`nYes: Balanced (default, recommended).`n- Model: ggml-base-q5_1 (~60 MB)`n- Suggested: at least 8 GB RAM`n`nNo: choose Fast or High quality.`nCancel: abort transcription.",
   "whisper.model.choice_advanced": "Choose Whisper model.`n`nYes: Fast`n- Model: ggml-tiny-q5_1 (~31 MB)`n- Suggested: about 1-2 GB RAM`n`nNo: High quality`n- Model: ggml-small-q5_1 (~190 MB)`n- Suggested: at least 16 GB RAM and a stronger CPU`n`nCancel: abort transcription.",
   "whisper.model.dialog_title": "Whisper model",

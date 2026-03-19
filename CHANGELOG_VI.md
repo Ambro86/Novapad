@@ -19,6 +19,7 @@ Cải tiến
 • Nguồn RSS "Yêu thích" có thể bị xóa và sẽ được tạo lại tự động khi thêm bài viết mới vào mục yêu thích.
 • Đã thêm phím tắt RSS để di chuyển nguồn lên/xuống: `Ctrl+Shift+Mũi tên lên` và `Ctrl+Shift+Mũi tên xuống`.
 • Đã cải thiện cửa sổ RSS với phần xem trước bài viết tích hợp, giúp có thể xem ngay nội dung tại đó và chuyển nhanh tới bằng phím Tab trước khi mở toàn bộ bài viết trong trình soạn thảo.
+• Đã thêm trong RSS một mục rõ ràng “Tải thêm tin tức” ở cuối nguồn khi còn bài khác; nhấn Enter sẽ tải khối tiếp theo và đưa focus tới bài viết mới đầu tiên.
 Sửa lỗi
 • Đã sửa lỗi khiến danh sách tệp đang mở hiển thị trong menu Trợ giúp thay vì menu Cửa sổ.
 • Đã sửa một trường hợp biên khi phát trực tuyến: phát âm thanh có thể bắt đầu nhưng cửa sổ “Đang tải streaming” vẫn mở khi tệp đã tải xuống đã đúng định dạng đích.

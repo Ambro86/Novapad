@@ -598,6 +598,13 @@ fn show_selected_properties(hwnd: HWND) {
                 ));
             }
         }
+        Some(NodeData::LoadMore) => {
+            lines.push(format!(
+                "{}: {}",
+                i18n::tr(language, "properties.type"),
+                rss_load_more_label(language)
+            ));
+        }
         Some(NodeData::Item(item)) => {
             let status_value = if item_unread.unwrap_or(true) {
                 i18n::tr(language, "properties.unread")
@@ -1092,7 +1099,7 @@ fn load_favorites_source_items(
     });
 
     let (initial_count, _next_count) = rss_page_sizes(parent);
-    load_more_items(hwnd, hitem, initial_count);
+    let (_inserted, _first_inserted) = load_more_items(hwnd, hitem, initial_count);
 }
 fn source_removed_keys_for_tree_item(
     hwnd: HWND,
@@ -1310,6 +1317,10 @@ fn rss_page_sizes(parent: HWND) -> (usize, usize) {
     }
 }
 
+fn rss_load_more_label(language: crate::settings::Language) -> String {
+    i18n::tr(language, "rss.load_more_news")
+}
+
 fn ensure_rss_http(parent: HWND) {
     let config = {
         with_state(parent, |s| rss::config_from_settings(&s.settings))
@@ -1324,6 +1335,82 @@ fn rss_fetch_config(parent: HWND) -> rss::RssFetchConfig {
     {
         with_state(parent, |s| rss::fetch_config_from_settings(&s.settings))
             .unwrap_or_else(rss::RssFetchConfig::default)
+    }
+}
+
+fn delete_load_more_nodes(hwnd: HWND, source_hitem: windows::Win32::UI::Controls::HTREEITEM) {
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 || source_hitem.0 == 0 {
+        return;
+    }
+    let mut child = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CHILD as usize),
+            LPARAM(source_hitem.0),
+        )
+        .0,
+    );
+    while child.0 != 0 {
+        let next = windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
+                LPARAM(child.0),
+            )
+            .0,
+        );
+        let is_load_more = with_rss_state(hwnd, |s| {
+            matches!(s.node_data.get(&child.0), Some(NodeData::LoadMore))
+        })
+        .unwrap_or(false);
+        if is_load_more {
+            with_rss_state(hwnd, |s| {
+                s.node_data.remove(&child.0);
+            });
+            crate::send_message_w_safe(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+        }
+        child = next;
+    }
+}
+
+fn append_load_more_node(
+    hwnd: HWND,
+    source_hitem: windows::Win32::UI::Controls::HTREEITEM,
+    language: crate::settings::Language,
+) {
+    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 || source_hitem.0 == 0 {
+        return;
+    }
+    let text = to_wide(&rss_load_more_label(language));
+    let mut tvis = TVINSERTSTRUCTW {
+        hParent: source_hitem,
+        hInsertAfter: TVI_LAST,
+        Anonymous: TVINSERTSTRUCTW_0 {
+            item: TVITEMW {
+                mask: TVIF_TEXT | TVIF_PARAM,
+                pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                lParam: LPARAM(0),
+                ..Default::default()
+            },
+        },
+    };
+    let hchild = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_INSERTITEMW,
+            WPARAM(0),
+            LPARAM(&mut tvis as *mut _ as isize),
+        )
+        .0,
+    );
+    if hchild.0 != 0 {
+        with_rss_state(hwnd, |s| {
+            s.node_data.insert(hchild.0, NodeData::LoadMore);
+        });
     }
 }
 
@@ -1784,6 +1871,7 @@ enum RssLastRemoved {
 enum NodeData {
     Source(usize), // Index in settings
     Item(RssItem),
+    LoadMore,
 }
 
 struct SourceItemsState {
@@ -2077,7 +2165,7 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
             with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
                 Some(NodeData::Source(idx)) => (true, Some(*idx), None),
                 Some(NodeData::Item(item)) => (false, None, Some(item.clone())),
-                None => (false, None, None),
+                Some(NodeData::LoadMore) | None => (false, None, None),
             })
             .unwrap_or((false, None, None));
         if !is_source && article_item.is_none() {
@@ -4431,7 +4519,8 @@ fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                         if loaded_before >= total_before {
                             let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                             let (_initial_count, next_count) = rss_page_sizes(parent);
-                            load_more_items(hwnd, hitem, next_count);
+                            let (_inserted, _first_inserted) =
+                                load_more_items(hwnd, hitem, next_count);
                         }
                         log_debug(&format!(
                             "rss_ui_batch end source={} appended={}",
@@ -4495,7 +4584,7 @@ fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                         "rss_ui_batch start source={} append_count={} loaded_before=0 total_before=0",
                         hitem.0, initial_count
                     ));
-                    let inserted = load_more_items(hwnd, hitem, initial_count);
+                    let (inserted, _) = load_more_items(hwnd, hitem, initial_count);
                     log_debug(&format!(
                         "rss_ui_batch end source={} appended={}",
                         hitem.0, inserted
@@ -4592,76 +4681,17 @@ fn handle_selection_changed(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTR
         return;
     }
     with_rss_state(hwnd, |s| s.last_selected = hitem.0);
-    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
-    if hwnd_tree.0 == 0 {
-        return;
-    }
-    let parent = windows::Win32::UI::Controls::HTREEITEM(
-        crate::send_message_w_safe(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(windows::Win32::UI::Controls::TVGN_PARENT as usize),
-            LPARAM(hitem.0),
-        )
-        .0,
-    );
-    if parent.0 == 0 {
-        return;
-    }
-    let has_more = with_rss_state(hwnd, |s| {
-        s.source_items
-            .get(&parent.0)
-            .map(|state| state.loaded < state.items.len())
-            .unwrap_or(false)
-    })
-    .unwrap_or(false);
-    if !has_more {
-        return;
-    }
-    let child = windows::Win32::UI::Controls::HTREEITEM(
-        crate::send_message_w_safe(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_CHILD as usize),
-            LPARAM(parent.0),
-        )
-        .0,
-    );
-    if child.0 == 0 {
-        return;
-    }
-    let mut last = child;
-    loop {
-        let next = windows::Win32::UI::Controls::HTREEITEM(
-            crate::send_message_w_safe(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
-                LPARAM(last.0),
-            )
-            .0,
-        );
-        if next.0 == 0 {
-            break;
-        }
-        last = next;
-    }
-    if hitem == last {
-        let parent_hwnd = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-        let (_initial_count, next_count) = rss_page_sizes(parent_hwnd);
-        load_more_items(hwnd, parent, next_count);
-    }
 }
 
 fn load_more_items(
     hwnd: HWND,
     hitem: windows::Win32::UI::Controls::HTREEITEM,
     batch: usize,
-) -> usize {
+) -> (usize, windows::Win32::UI::Controls::HTREEITEM) {
     // UI: "Load more titles" can call this to append the next page locally.
     let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     if hwnd_tree.0 == 0 {
-        return 0;
+        return (0, windows::Win32::UI::Controls::HTREEITEM(0));
     }
     let (language, announce_unread, unread_label_position, rss_date_mode, rss_time_mode) =
         with_rss_state(hwnd, |s| {
@@ -4693,15 +4723,27 @@ fn load_more_items(
         ));
 
     crate::send_message_w_safe(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
-    let (inserted, loaded_after, total_after) = with_rss_state(hwnd, |s| {
+    delete_load_more_nodes(hwnd, hitem);
+    let (inserted, loaded_after, total_after, first_inserted) = with_rss_state(hwnd, |s| {
         let Some(state) = s.source_items.get_mut(&hitem.0) else {
-            return (0usize, 0usize, 0usize);
+            return (
+                0usize,
+                0usize,
+                0usize,
+                windows::Win32::UI::Controls::HTREEITEM(0),
+            );
         };
         if state.loaded >= state.items.len() {
-            return (0usize, state.loaded, state.items.len());
+            return (
+                0usize,
+                state.loaded,
+                state.items.len(),
+                windows::Win32::UI::Controls::HTREEITEM(0),
+            );
         }
         let mut inserted = 0usize;
         let mut idx = state.loaded;
+        let mut first_inserted = windows::Win32::UI::Controls::HTREEITEM(0);
         let day_counts = build_day_counts(&state.items);
         while idx < state.items.len() && inserted < batch {
             let item = &state.items[idx];
@@ -4746,12 +4788,23 @@ fn load_more_items(
                 LPARAM(&mut tvis as *mut _ as isize),
             );
             s.node_data.insert(hchild.0, NodeData::Item(item.clone()));
+            if inserted == 0 && hchild.0 != 0 {
+                first_inserted = windows::Win32::UI::Controls::HTREEITEM(hchild.0);
+            }
             inserted += 1;
         }
         state.loaded = idx;
-        (inserted, state.loaded, state.items.len())
+        (inserted, state.loaded, state.items.len(), first_inserted)
     })
-    .unwrap_or((0usize, 0usize, 0usize));
+    .unwrap_or((
+        0usize,
+        0usize,
+        0usize,
+        windows::Win32::UI::Controls::HTREEITEM(0),
+    ));
+    if loaded_after < total_after {
+        append_load_more_node(hwnd, hitem, language);
+    }
     crate::send_message_w_safe(hwnd_tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
     if inserted > 0 {
         log_debug(&format!(
@@ -4759,7 +4812,7 @@ fn load_more_items(
             hitem.0, inserted, loaded_after, total_after
         ));
     }
-    inserted
+    (inserted, first_inserted)
 }
 
 fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
@@ -4775,6 +4828,40 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
         .0,
     );
     if hitem.0 == 0 {
+        return;
+    }
+
+    let load_more_parent = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::LoadMore) => Some(windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
+                s.hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_PARENT as usize),
+                LPARAM(hitem.0),
+            )
+            .0,
+        )),
+        _ => None,
+    })
+    .flatten();
+    if let Some(parent) = load_more_parent {
+        let parent_hwnd = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+        let (_initial_count, next_count) = rss_page_sizes(parent_hwnd);
+        let (inserted, first_inserted) = load_more_items(hwnd, parent, next_count);
+        if inserted > 0 && first_inserted.0 != 0 {
+            crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_SELECTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(first_inserted.0),
+            );
+            crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_ENSUREVISIBLE,
+                WPARAM(0),
+                LPARAM(first_inserted.0),
+            );
+        }
         return;
     }
 
@@ -5855,6 +5942,33 @@ fn rebuild_source_children_from_state(
                     if rss_item_key(entry) == select_key {
                         selected_hitem = hchild;
                     }
+                }
+            }
+            if state.loaded < state.items.len() {
+                let text = to_wide(&rss_load_more_label(language));
+                let mut tvis = TVINSERTSTRUCTW {
+                    hParent: source_hitem,
+                    hInsertAfter: TVI_LAST,
+                    Anonymous: TVINSERTSTRUCTW_0 {
+                        item: TVITEMW {
+                            mask: TVIF_TEXT | TVIF_PARAM,
+                            pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                            lParam: LPARAM(0),
+                            ..Default::default()
+                        },
+                    },
+                };
+                let hchild = windows::Win32::UI::Controls::HTREEITEM(
+                    crate::send_message_w_safe(
+                        hwnd_tree,
+                        TVM_INSERTITEMW,
+                        WPARAM(0),
+                        LPARAM(&mut tvis as *mut _ as isize),
+                    )
+                    .0,
+                );
+                if hchild.0 != 0 {
+                    s.node_data.insert(hchild.0, NodeData::LoadMore);
                 }
             }
         }

@@ -1072,6 +1072,7 @@
   "reader.external_link": "Внешняя ссылка:\r\n{url}",
   "options.lang.lt": "Литовский",
   "playback.transcribe_current": "Транскрибировать текущее аудио\tAlt+Shift+T",
+  "rss.load_more_news": "Загрузить больше новостей",
   "whisper.model.choice_intro": "Выбор модели Whisper (первое использование): Small, Medium или Large.",
   "whisper.model.choice_advanced": "Расширенный выбор модели Whisper доступен в выпадающем списке.",
   "options.tab.ai_transcription": "ИИ и транскрипция",

@@ -3353,6 +3353,35 @@ pub fn mark_current_document_from_rss(hwnd: HWND, from_rss: bool) {
     }
 }
 
+pub fn set_current_document_title(hwnd: HWND, title: &str) {
+    let new_title = title.trim();
+    if new_title.is_empty() {
+        return;
+    }
+
+    let updated = with_state(hwnd, |state| {
+        let index = state.current;
+        if index >= state.docs.len() {
+            return false;
+        }
+        state.docs[index].title = new_title.to_string();
+        update_tab_title(
+            state.hwnd_tab,
+            index,
+            &state.docs[index].title,
+            state.docs[index].dirty,
+        );
+        true
+    })
+    .unwrap_or(false);
+
+    if updated {
+        update_window_title(hwnd);
+    } else {
+        crate::log_debug("Failed to set current document title");
+    }
+}
+
 pub fn current_document_is_from_rss(hwnd: HWND) -> bool {
     {
         with_state(hwnd, |state| {

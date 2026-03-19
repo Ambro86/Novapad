@@ -17,6 +17,7 @@ pub mod podcast_save_window;
 pub mod podcast_window;
 pub mod podcasts_window;
 pub mod prompt_window;
+pub mod rai_audiodescrizioni_window;
 pub mod rss_window;
 pub mod whisper_model_window;
 pub mod wikipedia_window;

@@ -139,6 +139,7 @@ pub const IDM_TOOLS_WIKIPEDIA_IMPORT: usize = 5008;
 pub const IDM_TOOLS_STREAM_AUDIO: usize = 5009;
 pub const IDM_TOOLS_BDCIECHI: usize = 5010;
 pub const IDM_TOOLS_TOGGLE_DICTATION: usize = 5011;
+pub const IDM_TOOLS_RAI_AUDIODESCRIZIONI: usize = 5012;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -164,6 +165,7 @@ pub struct MenuLabels {
     pub menu_import_youtube: String,
     pub menu_stream_audio: String,
     pub menu_bdciechi: String,
+    pub menu_rai_audiodescrizioni: String,
     pub menu_prompt: String,
     pub menu_rss: String,
     pub menu_podcasts: String,
@@ -271,6 +273,11 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_stream_audio: i18n::tr(language, "menu.stream_audio"),
         menu_bdciechi: if language == Language::Italian {
             i18n::tr(language, "excluded_from_testing.bdciechi.menu_label")
+        } else {
+            String::new()
+        },
+        menu_rai_audiodescrizioni: if language == Language::Italian {
+            "Rai audiodescrizioni".to_string()
         } else {
             String::new()
         },
@@ -1285,6 +1292,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             &labels.menu_stream_audio,
         );
         if language == Language::Italian {
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_RAI_AUDIODESCRIZIONI,
+                &labels.menu_rai_audiodescrizioni,
+            );
             append_menu_string(
                 tools_menu,
                 MF_STRING,

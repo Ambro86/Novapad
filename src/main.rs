@@ -197,6 +197,8 @@ const WM_PODCAST_EPISODE_SAVE_RESULT: u32 = WM_APP + 33;
 const WM_WHISPER_TRANSCRIPTION_DONE: u32 = WM_APP + 34;
 const WM_WHISPER_TRANSCRIPTION_PROGRESS: u32 = WM_APP + 35;
 const WM_DICTATION_DONE: u32 = WM_APP + 36;
+const WM_PODCAST_EPISODE_PLAY_READY: u32 = WM_APP + 37;
+const WM_PODCAST_EPISODE_PLAY_FAILED: u32 = WM_APP + 38;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
@@ -762,6 +764,18 @@ struct PodcastEpisodeSaveResult {
     error: Option<String>,
 }
 
+struct PodcastEpisodePlayReady {
+    url: String,
+    title: Option<String>,
+    cache_path: PathBuf,
+    prefer_title_for_document: bool,
+}
+
+struct PodcastEpisodePlayFailed {
+    language: Language,
+    error: String,
+}
+
 struct PodcastChaptersReady {
     key: String,
     chapters: Option<Vec<Chapter>>,
@@ -1280,6 +1294,7 @@ pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
             state.active_podcast_episode_url = None;
             state.active_podcast_episode_title = None;
             state.active_podcast_episode_cache = None;
+            state.active_podcast_episode_from_rai = false;
         })
         .is_none()
         {
@@ -1312,6 +1327,7 @@ pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
                 state.active_podcast_episode_url = None;
                 state.active_podcast_episode_title = None;
                 state.active_podcast_episode_cache = None;
+                state.active_podcast_episode_from_rai = false;
             });
             kill_timer_best_effort(
                 hwnd,
@@ -1459,8 +1475,139 @@ fn post_podcast_episode_save_result(hwnd: HWND, payload: PodcastEpisodeSaveResul
     }
 }
 
+fn post_podcast_episode_play_ready(hwnd: HWND, payload: PodcastEpisodePlayReady) {
+    let ptr = Box::into_raw(Box::new(payload));
+    unsafe {
+        if let Err(err) = PostMessageW(
+            hwnd,
+            WM_PODCAST_EPISODE_PLAY_READY,
+            WPARAM(0),
+            LPARAM(ptr as isize),
+        ) {
+            log_debug(&format!(
+                "Failed to post WM_PODCAST_EPISODE_PLAY_READY: {}",
+                err
+            ));
+            let _drop_payload = Box::from_raw(ptr);
+        }
+    }
+}
+
+fn post_podcast_episode_play_failed(hwnd: HWND, payload: PodcastEpisodePlayFailed) {
+    let ptr = Box::into_raw(Box::new(payload));
+    unsafe {
+        if let Err(err) = PostMessageW(
+            hwnd,
+            WM_PODCAST_EPISODE_PLAY_FAILED,
+            WPARAM(0),
+            LPARAM(ptr as isize),
+        ) {
+            log_debug(&format!(
+                "Failed to post WM_PODCAST_EPISODE_PLAY_FAILED: {}",
+                err
+            ));
+            let _drop_payload = Box::from_raw(ptr);
+        }
+    }
+}
+
 fn podcast_partial_cache_path(file_path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.part", file_path.to_string_lossy()))
+}
+
+fn podcast_cache_path_for_url(url: &str, mime: Option<&str>) -> PathBuf {
+    use sha2::Digest;
+
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(url.as_bytes());
+    let hash = hex::encode(hasher.finalize());
+
+    let mut ext = match mime.map(|m| m.to_ascii_lowercase()) {
+        Some(m) if m.contains("mpeg") || m.contains("mp3") => "mp3",
+        Some(m) if m.contains("mp4") || m.contains("m4a") || m.contains("aac") => "m4a",
+        Some(m) if m.contains("ogg") || m.contains("vorbis") => "ogg",
+        Some(m) if m.contains("opus") => "opus",
+        Some(m) if m.contains("wav") => "wav",
+        Some(m) if m.contains("flac") => "flac",
+        _ => "",
+    };
+
+    let url_ext_owned;
+    if ext.is_empty() {
+        let url_ext = url
+            .split('?')
+            .next()
+            .unwrap_or(url)
+            .split('/')
+            .next_back()
+            .unwrap_or("")
+            .split('.')
+            .next_back()
+            .unwrap_or("mp3")
+            .to_ascii_lowercase();
+
+        if url_ext == "mp4" {
+            ext = "m4a";
+        } else {
+            url_ext_owned = url_ext;
+            ext = &url_ext_owned;
+        }
+    }
+
+    if ext.len() > 5 || ext.is_empty() {
+        ext = "mp3";
+    }
+
+    settings::settings_dir()
+        .join("podcast cache")
+        .join(format!("podcast_{}.{}", &hash[..16], ext))
+}
+
+pub(crate) fn play_named_remote_audio_from_url(
+    hwnd: HWND,
+    url: String,
+    title: Option<String>,
+    mime: Option<&str>,
+) {
+    play_podcast_episode_from_url_internal(hwnd, url, title, mime, true);
+}
+
+fn play_podcast_episode_from_url_internal(
+    hwnd: HWND,
+    url: String,
+    title: Option<String>,
+    mime: Option<&str>,
+    prefer_title_for_document: bool,
+) {
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let cache_path = podcast_cache_path_for_url(&url, mime);
+    screen_reader_speak(&i18n::tr(language, "podcasts.loading"));
+    std::thread::spawn(move || {
+        let cache_ok = cache_path
+            .metadata()
+            .map(|meta| meta.is_file() && meta.len() > 0)
+            .unwrap_or(false);
+        let result = if cache_ok {
+            Ok(())
+        } else {
+            download_podcast_episode_cache_with_resume(&url, &cache_path, language)
+        };
+
+        match result {
+            Ok(()) => post_podcast_episode_play_ready(
+                hwnd,
+                PodcastEpisodePlayReady {
+                    url,
+                    title,
+                    cache_path,
+                    prefer_title_for_document,
+                },
+            ),
+            Err(error) => {
+                post_podcast_episode_play_failed(hwnd, PodcastEpisodePlayFailed { language, error })
+            }
+        }
+    });
 }
 
 fn download_podcast_episode_cache_with_resume(
@@ -3260,6 +3407,7 @@ pub(crate) struct AppState {
     active_podcast_episode_url: Option<String>,
     active_podcast_episode_title: Option<String>,
     active_podcast_episode_cache: Option<PathBuf>,
+    active_podcast_episode_from_rai: bool,
     podcast_chapters_cache: HashMap<String, Option<Vec<Chapter>>>,
     pending_podcast_chapters_key: Option<String>,
     active_podcast_chapters_key: Option<String>,
@@ -3912,11 +4060,14 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                             }
                             let is_stop = matches!(command, PlayerCommand::Stop);
                             let podcasts_window = state.podcasts_window;
+                            let from_rai = state.active_podcast_episode_from_rai;
                             if is_stop {
                                 // close_current_document() already stops audiobook playback
                                 // for audiobook tabs, so avoid duplicate stop work here.
                                 editor_manager::close_current_document(hwnd);
-                                if podcasts_window.0 != 0 {
+                                if from_rai {
+                                    app_windows::rai_audiodescrizioni_window::open(hwnd);
+                                } else if podcasts_window.0 != 0 {
                                     SetForegroundWindow(podcasts_window);
                                     app_windows::podcasts_window::focus_library(podcasts_window);
                                 }
@@ -4659,6 +4810,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_podcast_episode_url: None,
                     active_podcast_episode_title: None,
                     active_podcast_episode_cache: None,
+                    active_podcast_episode_from_rai: false,
                     podcast_chapters_cache: HashMap::new(),
                     pending_podcast_chapters_key: None,
                     active_podcast_chapters_key: None,
@@ -5024,6 +5176,45 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         ));
                     }
                 }
+                LRESULT(0)
+            }
+            WM_PODCAST_EPISODE_PLAY_READY => {
+                let ptr = lparam.0 as *mut PodcastEpisodePlayReady;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let payload = Box::from_raw(ptr);
+                editor_manager::open_document(hwnd, &payload.cache_path);
+                if payload.prefer_title_for_document
+                    && let Some(title) = payload.title.as_deref()
+                {
+                    editor_manager::set_current_document_title(hwnd, title);
+                }
+                if with_state(hwnd, |state| {
+                    state.active_podcast_episode_from_rai = payload.prefer_title_for_document;
+                })
+                .is_none()
+                {
+                    log_debug("Failed to set active podcast Rai origin flag");
+                }
+                editor_manager::mark_current_document_from_rss(hwnd, true);
+                set_active_podcast_episode_info(
+                    hwnd,
+                    Some(payload.url),
+                    payload.title,
+                    Some(payload.cache_path),
+                );
+                menu::update_playback_menu(hwnd, true);
+                activate_pending_podcast_chapters(hwnd);
+                LRESULT(0)
+            }
+            WM_PODCAST_EPISODE_PLAY_FAILED => {
+                let ptr = lparam.0 as *mut PodcastEpisodePlayFailed;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let payload = Box::from_raw(ptr);
+                show_error(hwnd, payload.language, &payload.error);
                 LRESULT(0)
             }
             WM_WHISPER_TRANSCRIPTION_DONE => {
@@ -6363,6 +6554,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_TOOLS_BDCIECHI => {
                         log_debug("Menu: bdCiechi");
                         app_windows::bdciechi_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_RAI_AUDIODESCRIZIONI => {
+                        log_debug("Menu: Rai audiodescrizioni");
+                        app_windows::rai_audiodescrizioni_window::open(hwnd);
                         LRESULT(0)
                     }
                     IDM_HELP_GUIDE => {

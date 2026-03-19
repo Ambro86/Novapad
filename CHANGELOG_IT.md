@@ -27,6 +27,9 @@ Correzioni
 • Corretto un caso limite nello streaming in cui la riproduzione poteva partire ma la finestra “Download streaming” restava aperta quando il file scaricato era già nel formato di destinazione.
 • Corretto il comportamento di conversione nello streaming MP3: quando lo stream è già MP3 e l’utente sceglie un bitrate MP3 esplicito (ad esempio 128 kbps), Sonarpad ora ricodifica al bitrate selezionato invece di saltare la conversione.
 • Corretta la scorciatoia `Alt+Shift+L`: ora apre correttamente la lista capitoli durante la riproduzione.
+• Corretta la scorciatoia `Alt+Shift+T`: ora avvia correttamente “Trascrivi audio corrente” invece di aprire il menu Strumenti.
+• Se è già in corso la riproduzione di un audio, quando si avvia la trascrizione Sonarpad mette automaticamente quell’audio in pausa prima di iniziare.
+• Corretto un problema per cui, importando un articolo da Wikipedia, l’importazione poteva riuscire ma il testo dell’articolo non veniva mostrato sullo schermo.
 • Aggiunto il supporto ai capitoli podcast embedded nei file multimediali locali (es. metadati capitoli MP3): quando feed/URL non forniscono capitoli, Sonarpad li legge dal file scaricato in background, così la riproduzione parte subito e i capitoli vengono applicati appena disponibili.
 • Corretta la lettura dei capitoli per gli episodi podcast scaricati e aperti come normali file multimediali locali: i capitoli embedded sono ora disponibili anche in questo caso, non solo avviando la riproduzione dalla finestra Podcast.
 • Corretta la finalizzazione degli audiolibri MP3 con SAPI4 e SAPI5: il file finale viene ora finalizzato correttamente, evitando file incompleti o fragili dopo esportazioni lunghe.

@@ -712,6 +712,7 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
             ".section--content-news .title-quote-text p",
             ".story__text p, .story__text h2, .story__text li",
             "#article-body .story__text",
+            ".post-content > h2, .post-content > h3, .post-content > p, .post-content > li",
             ".entry-content p",
             ".wp-block-post-content p",
             ".ifq-post__content p",

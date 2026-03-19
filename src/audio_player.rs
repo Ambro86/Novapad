@@ -1216,6 +1216,27 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
     }
 }
 
+pub fn pause_audiobook_if_playing(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| {
+        let player = state.active_audiobook.as_mut()?;
+        if player.is_paused || player.output.is_stopped() {
+            return Some(false);
+        }
+        crate::log_debug("Audio player: pausing playback for whisper transcription");
+        let paused = player.pause();
+        if !paused || player.output.is_stopped() {
+            crate::log_debug("Audio player: pause for whisper transcription failed");
+            return Some(false);
+        }
+        let pos = audiobook_position_secs(player);
+        player.is_paused = true;
+        player.accumulated_seconds = pos.floor() as u64;
+        Some(true)
+    })
+    .flatten()
+    .unwrap_or(false)
+}
+
 pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
     enum SeekAction {
         Direct,

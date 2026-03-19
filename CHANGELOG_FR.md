@@ -24,6 +24,9 @@ Correctifs
 • Correction d’un cas limite de streaming où la lecture pouvait démarrer mais la fenêtre « Téléchargement du flux » restait ouverte lorsque le fichier téléchargé correspondait déjà au format cible.
 • Correction du comportement de conversion en streaming MP3 : lorsque le flux est déjà en MP3 et que l’utilisateur choisit un bitrate MP3 explicite (par exemple 128 kbps), Sonarpad réencode désormais au bitrate sélectionné au lieu d’ignorer la conversion.
 • Correction du raccourci `Alt+Shift+L` : il ouvre désormais correctement la liste des chapitres pendant la lecture.
+• Correction du raccourci `Alt+Shift+T` : il lance désormais correctement « Transcrire l’audio en cours » au lieu d’ouvrir le menu Outils.
+• Si un audio est déjà en cours de lecture, Sonarpad le met désormais automatiquement en pause avant de démarrer la transcription.
+• Correction d’un problème où l’import d’un article depuis Wikipédia pouvait réussir sans afficher le texte de l’article à l’écran.
 • Ajout de la prise en charge des chapitres de podcast intégrés dans les fichiers multimédias locaux (par ex. métadonnées de chapitres MP3) : lorsque le flux/URL ne fournit pas de chapitres, Sonarpad les charge désormais depuis le fichier téléchargé en arrière-plan, ce qui permet de démarrer la lecture immédiatement puis d’appliquer les chapitres dès qu’ils sont disponibles.
 • Correction du chargement des chapitres pour les épisodes de podcast téléchargés et ouverts comme de simples fichiers multimédias locaux : les chapitres intégrés sont désormais disponibles aussi dans ce cas, et pas seulement quand la lecture démarre depuis la fenêtre Podcasts.
 • Correction de la finalisation des livres audio MP3 avec SAPI4 et SAPI5 : le fichier final est désormais finalisé correctement, ce qui évite les fichiers incomplets ou fragiles après de longues exportations.

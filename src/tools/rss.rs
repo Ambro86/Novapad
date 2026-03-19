@@ -1562,6 +1562,29 @@ mod tests {
     }
 
     #[test]
+    fn reader_extract_from_ilriformista_fixture_keeps_full_body() {
+        let html = std::fs::read_to_string("tests/fixtures/articles/084.html")
+            .expect("failed to read il riformista article fixture");
+        let article = reader::reader_mode_extract(&html, crate::settings::Language::Italian)
+            .unwrap_or_else(|| panic!("reader_mode_extract failed on il riformista fixture"));
+
+        assert!(
+            article
+                .title
+                .contains("Bizzarro ma influente, la storia di Peter Thiel"),
+            "unexpected il riformista title: {}",
+            article.title
+        );
+        assert!(
+            article
+                .content
+                .contains("La sua preparazione filosofica è impeccabile."),
+            "extracted il riformista content is missing later body paragraphs: {}",
+            article.content
+        );
+    }
+
+    #[test]
     fn extract_google_news_article_id_parses_rss_articles_path() {
         let id = extract_google_news_article_id(
             "https://news.google.com/rss/articles/CBMiQGh0dHBzOi8vZXhhbXBsZS5jb20v?oc=5",

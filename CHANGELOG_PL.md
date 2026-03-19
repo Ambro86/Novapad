@@ -24,6 +24,9 @@ Poprawki
 • Naprawiono przypadek brzegowy streamingu, w którym odtwarzanie mogło się rozpocząć, ale okno „Pobieranie streamingu” pozostawało otwarte, gdy pobrany plik już pasował do formatu docelowego.
 • Naprawiono zachowanie konwersji dla streamingu MP3: gdy strumień jest już w MP3 i użytkownik wybierze jawny bitrate MP3 (np. 128 kbps), Sonarpad teraz ponownie koduje do wybranego bitrate zamiast pomijać konwersję.
 • Naprawiono skrót `Alt+Shift+L`: teraz poprawnie otwiera listę rozdziałów podczas odtwarzania.
+• Naprawiono skrót `Alt+Shift+T`: teraz poprawnie uruchamia „Transkrybuj bieżące audio” zamiast otwierać menu Narzędzia.
+• Jeśli dźwięk jest już odtwarzany, Sonarpad przy uruchamianiu transkrypcji automatycznie wstrzymuje to odtwarzanie przed rozpoczęciem pracy.
+• Naprawiono problem, przez który po zaimportowaniu artykułu z Wikipedii import mógł się udać, ale tekst artykułu nie był widoczny na ekranie.
 • Dodano obsługę osadzonych rozdziałów podcastów z lokalnych plików multimedialnych (np. metadanych rozdziałów MP3): gdy feed/URL nie udostępnia rozdziałów, Sonarpad ładuje je teraz w tle z pobranego pliku, dzięki czemu odtwarzanie startuje od razu, a rozdziały są stosowane, gdy tylko będą gotowe.
 • Naprawiono wczytywanie rozdziałów dla pobranych odcinków podcastów otwieranych jako zwykłe lokalne pliki multimedialne: osadzone rozdziały są teraz dostępne także w tym przypadku, a nie tylko po uruchomieniu odtwarzania z okna Podcasty.
 • Naprawiono finalizację audiobooków MP3 w SAPI4 i SAPI5: plik końcowy jest teraz poprawnie finalizowany, co zapobiega niepełnym lub niestabilnym plikom po długich eksportach.

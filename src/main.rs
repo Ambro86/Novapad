@@ -2362,6 +2362,8 @@ fn start_whisper_transcription(hwnd: HWND) {
         return;
     }
 
+    crate::audio_player::pause_audiobook_if_playing(hwnd);
+
     let cancel_flag = Arc::new(AtomicBool::new(false));
     with_state(hwnd, |state| {
         if let Some(prev) = state.transcription_cancel.take() {
@@ -9975,6 +9977,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     }
     if key == 'S' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_STREAM_AUDIO);
+        return true;
+    }
+    if key == 'T' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_PLAYBACK_TRANSCRIBE_CURRENT);
         return true;
     }
     if key == 'L' as u16 && !ctrl_down && shift_down && alt_down {

@@ -24,6 +24,9 @@ Sửa lỗi
 • Đã sửa một trường hợp biên khi phát trực tuyến: phát âm thanh có thể bắt đầu nhưng cửa sổ “Đang tải streaming” vẫn mở khi tệp đã tải xuống đã đúng định dạng đích.
 • Đã sửa hành vi chuyển đổi với streaming MP3: khi luồng đã là MP3 và người dùng chọn bitrate MP3 cụ thể (ví dụ 128 kbps), Sonarpad giờ sẽ mã hóa lại theo bitrate đã chọn thay vì bỏ qua bước chuyển đổi.
 • Đã sửa phím tắt `Alt+Shift+L`: giờ đây phím này mở đúng danh sách chương trong khi phát.
+• Đã sửa phím tắt `Alt+Shift+T`: giờ đây phím này khởi động đúng chức năng “Chép lời âm thanh hiện tại” thay vì mở menu Công cụ.
+• Nếu đang có âm thanh được phát, khi bắt đầu chép lời Sonarpad giờ sẽ tự động tạm dừng âm thanh đó trước khi bắt đầu.
+• Đã sửa lỗi khiến khi nhập một bài viết từ Wikipedia, quá trình nhập có thể thành công nhưng phần văn bản bài viết lại không hiển thị trên màn hình.
 • Đã bổ sung hỗ trợ chương podcast nhúng trong tệp media cục bộ (ví dụ metadata chương của MP3): khi feed/URL không cung cấp chương, Sonarpad sẽ nạp chương từ tệp đã tải ở chế độ nền, giúp phát bắt đầu ngay và áp dụng chương ngay khi sẵn sàng.
 • Đã sửa việc nạp chương cho các tập podcast đã tải xuống rồi mở như tệp media cục bộ thông thường: các chương nhúng giờ cũng khả dụng trong trường hợp này, không chỉ khi bắt đầu phát từ cửa sổ Podcast.
 • Đã sửa bước hoàn tất cuối cùng của sách nói MP3 với SAPI4 và SAPI5: tệp đầu ra cuối cùng giờ được hoàn tất đúng cách, tránh các tệp không đầy đủ hoặc kém ổn định sau các lần xuất dài.

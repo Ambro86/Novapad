@@ -61,6 +61,7 @@ struct InterpreterSelectInit {
     mode: InterpreterDialogInitMode,
     language: Language,
     secondary_action_label: Option<String>,
+    initial_list_value: Option<String>,
     initial_tree_value: Option<String>,
     result: Arc<Mutex<Option<InterpreterSelectionResult>>>,
 }
@@ -68,8 +69,11 @@ struct InterpreterSelectInit {
 #[derive(Default)]
 struct InterpreterSelectOptions {
     suppress_parent_restore_on_accept: bool,
+    suppress_parent_restore_on_secondary: bool,
+    suppress_parent_restore_on_cancel: bool,
     pin_topmost: bool,
     secondary_action_label: Option<String>,
+    initial_list_value: Option<String>,
     initial_tree_value: Option<String>,
 }
 
@@ -123,12 +127,13 @@ pub fn select_interpreter_without_parent_restore_on_accept(
     }
 }
 
-pub fn select_interpreter_with_secondary_action(
+pub fn select_interpreter_with_secondary_action_and_initial_without_parent_restore(
     parent: HWND,
     items: Vec<String>,
     language: Language,
     title: String,
     secondary_action_label: String,
+    initial_value: Option<String>,
 ) -> Option<InterpreterSelectionResult> {
     select_interpreter_internal(
         parent,
@@ -137,12 +142,15 @@ pub fn select_interpreter_with_secondary_action(
         title,
         InterpreterSelectOptions {
             secondary_action_label: Some(secondary_action_label),
+            initial_list_value: initial_value,
+            suppress_parent_restore_on_accept: true,
+            suppress_parent_restore_on_secondary: true,
             ..Default::default()
         },
     )
 }
 
-pub fn select_grouped_interpreter(
+pub fn select_grouped_interpreter_without_parent_restore_on_accept(
     parent: HWND,
     groups: Vec<GroupedSelectGroup>,
     language: Language,
@@ -155,6 +163,9 @@ pub fn select_grouped_interpreter(
         language,
         title,
         InterpreterSelectOptions {
+            suppress_parent_restore_on_accept: true,
+            suppress_parent_restore_on_cancel: true,
+            pin_topmost: true,
             initial_tree_value: initial_value,
             ..Default::default()
         },
@@ -197,6 +208,7 @@ fn select_interpreter_internal(
         mode,
         language,
         secondary_action_label: options.secondary_action_label,
+        initial_list_value: options.initial_list_value,
         initial_tree_value: options.initial_tree_value,
         result: result.clone(),
     });
@@ -287,8 +299,15 @@ fn select_interpreter_internal(
     }
 
     let result_value = result.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let suppress_parent_restore = match &result_value {
+        Some(InterpreterSelectionResult::Item(_)) => options.suppress_parent_restore_on_accept,
+        Some(InterpreterSelectionResult::SecondaryAction) => {
+            options.suppress_parent_restore_on_secondary
+        }
+        None => options.suppress_parent_restore_on_cancel,
+    };
     unsafe {
-        if !(options.suppress_parent_restore_on_accept && result_value.is_some()) {
+        if !suppress_parent_restore {
             EnableWindow(parent, true);
         }
         if result_value.is_none() {
@@ -354,7 +373,11 @@ fn interpreter_select_wndproc_inner(
                         )
                     };
 
-                    for item in items {
+                    let mut initial_index = 0usize;
+                    for (index, item) in items.into_iter().enumerate() {
+                        if init.initial_list_value.as_deref() == Some(item.as_str()) {
+                            initial_index = index;
+                        }
                         crate::send_message_w_safe(
                             list,
                             LB_ADDSTRING,
@@ -363,7 +386,7 @@ fn interpreter_select_wndproc_inner(
                         );
                     }
                     unsafe {
-                        SendMessageW(list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+                        SendMessageW(list, LB_SETCURSEL, WPARAM(initial_index), LPARAM(0));
                         SetFocus(list);
                     }
                     (ControlKind::List(list), Vec::new())

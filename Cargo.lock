@@ -4165,6 +4165,7 @@ dependencies = [
  "epub",
  "fancy-regex",
  "feed-rs",
+ "flate2",
  "futures-util",
  "hex",
  "hound",

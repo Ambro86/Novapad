@@ -106,6 +106,7 @@ const OPTIONS_ID_PODCAST_CACHE_LIMIT: usize = 6030;
 const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
 const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
 const OPTIONS_ID_PODCASTINDEX_SIGNUP: usize = 6037;
+const OPTIONS_ID_RAI_LUCE_CODE: usize = 6120;
 const OPTIONS_ID_WHISPER_MODEL: usize = 6111;
 const OPTIONS_ID_WHISPER_CUDA: usize = 6112;
 const OPTIONS_ID_WHISPER_KEEP_ORIGINAL_LANGUAGE: usize = 6113;
@@ -678,6 +679,8 @@ struct OptionsDialogState {
     edit_podcastindex_key: HWND,
     label_podcastindex_secret: HWND,
     edit_podcastindex_secret: HWND,
+    label_rai_luce_code: HWND,
+    edit_rai_luce_code: HWND,
     label_whisper_model: HWND,
     combo_whisper_model: HWND,
     checkbox_whisper_cuda: HWND,
@@ -915,6 +918,7 @@ struct OptionsLabels {
     label_podcast_time_display: String,
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
+    label_rai_luce_code: String,
     label_whisper_model: String,
     label_whisper_cuda: String,
     label_whisper_keep_original_language: String,
@@ -1195,6 +1199,14 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_podcast_time_display: i18n::tr(language, "options.label.podcast_time_display"),
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
+        label_rai_luce_code: {
+            let value = i18n::tr(language, "options.label.rai_luce_code");
+            if value == "options.label.rai_luce_code" {
+                "Codice Sonarpad per funzioni aggiuntive".to_string()
+            } else {
+                value
+            }
+        },
         label_whisper_model: i18n::tr(language, "options.label.whisper_model"),
         label_whisper_cuda: i18n::tr(language, "options.label.whisper_cuda"),
         label_whisper_keep_original_language: i18n::tr(
@@ -4534,6 +4546,39 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 34;
 
+                let label_rai_luce_code = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_rai_luce_code).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_rai_luce_code = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
+                    170,
+                    y - 2,
+                    300,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_RAI_LUCE_CODE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
                 let checkbox_tts_manual = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -5383,6 +5428,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_podcastindex_key,
                     label_podcastindex_secret,
                     edit_podcastindex_secret,
+                    label_rai_luce_code,
+                    edit_rai_luce_code,
                     label_whisper_model,
                     combo_whisper_model,
                     checkbox_whisper_cuda,
@@ -5575,6 +5622,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_podcastindex_key,
                     label_podcastindex_secret,
                     edit_podcastindex_secret,
+                    label_rai_luce_code,
+                    edit_rai_luce_code,
                     label_whisper_model,
                     combo_whisper_model,
                     checkbox_whisper_cuda,
@@ -6194,6 +6243,8 @@ fn initialize_options_dialog(hwnd: HWND) {
             edit_podcastindex_key,
             _label_podcastindex_secret,
             edit_podcastindex_secret,
+            _label_rai_luce_code,
+            edit_rai_luce_code,
             _label_whisper_model,
             combo_whisper_model,
             _label_dictation_microphone,
@@ -6327,6 +6378,8 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.edit_podcastindex_key,
                 state.label_podcastindex_secret,
                 state.edit_podcastindex_secret,
+                state.label_rai_luce_code,
+                state.edit_rai_luce_code,
                 state.label_whisper_model,
                 state.combo_whisper_model,
                 state.label_dictation_microphone,
@@ -8065,6 +8118,12 @@ fn initialize_options_dialog(hwnd: HWND) {
         {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
+        if let Err(_e) = SetWindowTextW(
+            edit_rai_luce_code,
+            PCWSTR(to_wide(&settings.rai_luce_code).as_ptr()),
+        ) {
+            crate::log_debug(&format!("Error: {:?}", _e));
+        }
         let whisper_index = match settings.whisper_model_profile.as_str() {
             "medium_q5_0" => 1usize,
             "large_v3_turbo_q5_0" => 2usize,
@@ -9651,6 +9710,7 @@ fn apply_options_dialog(hwnd: HWND) {
             combo_podcast_time_display,
             edit_podcastindex_key,
             edit_podcastindex_secret,
+            edit_rai_luce_code,
             combo_whisper_model,
             checkbox_tts_manual,
             checkbox_multilingual,
@@ -9743,6 +9803,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.combo_podcast_time_display,
                 state.edit_podcastindex_key,
                 state.edit_podcastindex_secret,
+                state.edit_rai_luce_code,
                 state.combo_whisper_model,
                 state.checkbox_tts_manual,
                 state.checkbox_multilingual,
@@ -10712,6 +10773,13 @@ fn apply_options_dialog(hwnd: HWND) {
                 settings.podcast_index_api_secret =
                     crate::settings::encrypt_podcast_index_secret(trimmed);
             }
+        }
+        let rai_luce_code_len = GetWindowTextLengthW(edit_rai_luce_code);
+        if rai_luce_code_len >= 0 {
+            let mut buf = vec![0u16; (rai_luce_code_len + 1) as usize];
+            let read = GetWindowTextW(edit_rai_luce_code, &mut buf);
+            let text = String::from_utf16_lossy(&buf[..read as usize]);
+            settings.rai_luce_code = text.trim().to_string();
         }
         let whisper_sel = SendMessageW(combo_whisper_model, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
         settings.whisper_model_profile = match whisper_sel {
@@ -12025,6 +12093,19 @@ fn layout_rss_podcast_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32
         state.button_podcastindex_signup,
         y,
     );
+    let show_rai_luce_code = with_state(state.parent, |app| app.settings.language)
+        .unwrap_or_default()
+        == Language::Italian;
+    if show_rai_luce_code {
+        y = layout_label_control(
+            "label_rai_luce_code",
+            state.label_rai_luce_code,
+            "edit_rai_luce_code",
+            state.edit_rai_luce_code,
+            y,
+            OPTIONS_EDIT_HEIGHT,
+        );
+    }
     y + scroll_offset
 }
 
@@ -12302,6 +12383,9 @@ fn set_active_tab(hwnd: HWND, index: i32) {
         let show_rss_podcast = index == OPTIONS_TAB_RSS_PODCAST;
         let show_ai_transcription = index == OPTIONS_TAB_AI_TRANSCRIPTION;
         let show_shortcuts = index == OPTIONS_TAB_SHORTCUTS;
+        let show_rai_luce_code = show_rss_podcast
+            && with_state(state.parent, |app| app.settings.language).unwrap_or_default()
+                == Language::Italian;
 
         for control in [
             state.label_language,
@@ -12490,6 +12574,9 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.button_podcastindex_signup,
         ] {
             crate::show_window_safe(control, if show_rss_podcast { SW_SHOW } else { SW_HIDE });
+        }
+        for control in [state.label_rai_luce_code, state.edit_rai_luce_code] {
+            crate::show_window_safe(control, if show_rai_luce_code { SW_SHOW } else { SW_HIDE });
         }
 
         for control in [

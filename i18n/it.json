@@ -266,6 +266,7 @@
   "options.label.podcast_cache_limit": "Limite cache podcast (MB):",
   "options.label.podcastindex_key": "Podcast Index API key:",
   "options.label.podcastindex_secret": "Podcast Index API secret:",
+  "options.label.rai_luce_code": "Codice Sonarpad per funzioni aggiuntive:",
   "options.button.podcastindex_signup": "Ottieni API key e API secret (free)",
   "podcasts.podcastindex.missing_title": "Podcast Index",
   "podcasts.podcastindex.missing_body": "Mancano API key e API secret! Vuoi generarli ora gratuitamente?",

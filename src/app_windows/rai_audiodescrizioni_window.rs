@@ -1,6 +1,20 @@
 use std::collections::HashSet;
+use std::time::{Duration, Instant};
 
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH};
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Input::KeyboardAndMouse::{SetFocus, VK_ESCAPE, VK_RETURN};
+use windows::Win32::UI::WindowsAndMessaging::{
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
+    ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
+    IDC_ARROW, IDYES, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MSG,
+    MessageBoxW, RegisterClassW, SetForegroundWindow, SetWindowLongPtrW, WINDOW_STYLE, WM_CLOSE,
+    WM_COMMAND, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE,
+};
+use windows::core::PCWSTR;
 
 use crate::app_windows::interpreter_select_window;
 use crate::app_windows::interpreter_select_window::{
@@ -10,16 +24,44 @@ use crate::settings::Language;
 use crate::tools::rai_audiodescrizioni::{self, CatalogGroup, CatalogItem};
 use crate::{RaiAudioOrigin, show_error, with_state};
 
+const AUTHOR_EMAIL: &str = "ambro86@gmail.com";
+const MISSING_KEY_MESSAGE: &str = "Per utilizzare questa funzione devi fare richiesta all'autore del programma. Questo è necessario per garantire che le informazioni contenute non vengano utilizzate in modo dannoso. L'autore, Ambrogio Riili, condivide il programma e tutte le sue funzioni in modo gratuito. Vuoi inviare una mail all'autore adesso?";
+const MISSING_KEY_TITLE: &str = "Codice Rai";
+const REQUEST_SUBJECT: &str = "Richiesta codice Sonarpad";
+const REQUEST_FORM_CLASS: &str = "SonarpadRaiCodeRequest";
+const REQUEST_ID_NAME: usize = 8201;
+const REQUEST_ID_SURNAME: usize = 8202;
+const REQUEST_ID_EMAIL: usize = 8203;
+const REQUEST_ID_OK: usize = 8204;
+const REQUEST_ID_CANCEL: usize = 8205;
+
+struct RequestCodeState {
+    parent: HWND,
+    name_edit: HWND,
+    surname_edit: HWND,
+    email_edit: HWND,
+    result: Option<(String, String, String)>,
+    opened_at: Instant,
+}
+
 pub fn open(parent: HWND) {
     let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
     if language != Language::Italian {
         return;
     }
+    let initial_item_id =
+        with_state(parent, |state| state.last_rai_recent_item_id.clone()).unwrap_or(None);
+    open_recent_catalog(parent, language, initial_item_id);
+}
 
+fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option<String>) {
     crate::screen_reader_speak("Caricamento audiodescrizioni Rai");
     let catalog = match rai_audiodescrizioni::load_catalog() {
         Ok(catalog) => catalog,
         Err(err) => {
+            if handle_missing_luce_key(parent, language, &err) {
+                return;
+            }
             show_error(parent, language, &err);
             return;
         }
@@ -36,13 +78,21 @@ pub fn open(parent: HWND) {
 
     crate::screen_reader_speak("Caricamento audiodescrizioni Rai");
     let (display_items, labels) = build_display_items(&catalog.items);
-    let selection = interpreter_select_window::select_interpreter_with_secondary_action(
-        parent,
-        labels,
-        language,
-        "Rai audiodescrizioni".to_string(),
-        "Mostra tutte le audiodescrizioni".to_string(),
-    );
+    let initial_label = initial_item_id.as_deref().and_then(|item_id| {
+        display_items
+            .iter()
+            .find(|(_, item)| item.item_id == item_id)
+            .map(|(label, _)| label.clone())
+    });
+    let selection =
+        interpreter_select_window::select_interpreter_with_secondary_action_and_initial_without_parent_restore(
+            parent,
+            labels,
+            language,
+            "Rai audiodescrizioni".to_string(),
+            "Mostra tutte le audiodescrizioni".to_string(),
+            initial_label,
+        );
 
     match selection {
         Some(InterpreterSelectionResult::Item(selected_label)) => {
@@ -57,9 +107,14 @@ pub fn open(parent: HWND) {
                 );
                 return;
             };
+            with_state(parent, |state| {
+                state.last_rai_recent_item_id = Some(selected_item.item_id.clone());
+            });
+            crate::set_foreground_window_safe(parent);
             open_item(parent, language, &selected_item, RaiAudioOrigin::Recenti);
         }
         Some(InterpreterSelectionResult::SecondaryAction) => {
+            crate::set_foreground_window_safe(parent);
             open_grouped(parent);
         }
         None => {}
@@ -81,6 +136,9 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
     let groups = match rai_audiodescrizioni::load_grouped_catalog() {
         Ok(groups) => groups,
         Err(err) => {
+            if handle_missing_luce_key(parent, language, &err) {
+                return;
+            }
             show_error(parent, language, &err);
             return;
         }
@@ -96,13 +154,20 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
     }
 
     let grouped_items = build_grouped_items(&groups);
-    let Some(selected_value) = interpreter_select_window::select_grouped_interpreter(
-        parent,
-        grouped_items,
-        language,
-        "Tutte le audiodescrizioni Rai".to_string(),
-        initial_item_id,
-    ) else {
+    let Some(selected_value) =
+        interpreter_select_window::select_grouped_interpreter_without_parent_restore_on_accept(
+            parent,
+            grouped_items,
+            language,
+            "Tutte le audiodescrizioni Rai".to_string(),
+            initial_item_id,
+        )
+    else {
+        let recent_item_id =
+            with_state(parent, |state| state.last_rai_recent_item_id.clone()).unwrap_or(None);
+        crate::set_foreground_window_safe(parent);
+        crate::set_focus_safe(parent);
+        open_recent_catalog(parent, language, recent_item_id);
         return;
     };
 
@@ -112,6 +177,7 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
                 with_state(parent, |state| {
                     state.last_rai_grouped_item_id = Some(item.item_id.clone());
                 });
+                crate::set_foreground_window_safe(parent);
                 open_item(parent, language, &item, RaiAudioOrigin::Tutte);
                 return;
             }
@@ -239,4 +305,355 @@ fn ensure_unique_label(
         }
         index += 1;
     }
+}
+
+fn handle_missing_luce_key(parent: HWND, language: Language, err: &str) -> bool {
+    if !rai_audiodescrizioni::is_luce_key_missing_error(err) {
+        return false;
+    }
+
+    let ask = unsafe {
+        MessageBoxW(
+            parent,
+            PCWSTR(crate::to_wide(MISSING_KEY_MESSAGE).as_ptr()),
+            PCWSTR(crate::to_wide(MISSING_KEY_TITLE).as_ptr()),
+            MB_YESNO | MB_ICONQUESTION,
+        )
+    };
+    if ask != IDYES {
+        return true;
+    }
+
+    let Some((nome, cognome, mail)) = request_code_contact(parent) else {
+        return true;
+    };
+
+    let nome = nome.trim();
+    let cognome = cognome.trim();
+    let mail = mail.trim();
+    if nome.is_empty() || cognome.is_empty() || mail.is_empty() {
+        return true;
+    }
+
+    let body = format!("Richiesta da {nome} {cognome}\r\nEmail: {mail}");
+    let uri = format!(
+        "mailto:{AUTHOR_EMAIL}?subject={}&body={}",
+        mailto_encode_component(REQUEST_SUBJECT),
+        mailto_encode_component(&body)
+    );
+    if let Err(open_err) = crate::audio_utils::open_url_in_browser(&uri) {
+        show_error(parent, language, &open_err);
+    }
+    true
+}
+
+fn mailto_encode_component(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char)
+            }
+            b' ' => encoded.push_str("%20"),
+            b'\r' => encoded.push_str("%0D"),
+            b'\n' => encoded.push_str("%0A"),
+            _ => {
+                encoded.push('%');
+                encoded.push_str(&format!("{byte:02X}"));
+            }
+        }
+    }
+    encoded
+}
+
+fn request_code_contact(parent: HWND) -> Option<(String, String, String)> {
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = crate::to_wide(REQUEST_FORM_CLASS);
+        let wc = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+            ),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(request_code_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+
+        let state = Box::new(RequestCodeState {
+            parent,
+            name_edit: HWND(0),
+            surname_edit: HWND(0),
+            email_edit: HWND(0),
+            result: None,
+            opened_at: Instant::now(),
+        });
+        let state_ptr = Box::into_raw(state);
+        let hwnd = CreateWindowExW(
+            WS_EX_DLGMODALFRAME | WS_EX_CONTROLPARENT,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(crate::to_wide("Richiesta codice Sonarpad").as_ptr()),
+            WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            420,
+            240,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(state_ptr as *const _),
+        );
+        if hwnd.0 == 0 {
+            let _unused_box = Box::from_raw(state_ptr);
+            return None;
+        }
+
+        crate::enable_window_safe(parent, false);
+        SetForegroundWindow(hwnd);
+        let mut msg = MSG::default();
+        while IsWindow(hwnd).as_bool() {
+            if windows::Win32::UI::WindowsAndMessaging::GetMessageW(&mut msg, HWND(0), 0, 0).0 == 0
+            {
+                break;
+            }
+            if !IsDialogMessageW(hwnd, &msg).as_bool() {
+                windows::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
+                windows::Win32::UI::WindowsAndMessaging::DispatchMessageW(&msg);
+            }
+        }
+
+        crate::enable_window_safe(parent, true);
+        crate::set_foreground_window_safe(parent);
+        let state = Box::from_raw(state_ptr);
+        state.result
+    }
+}
+
+unsafe extern "system" fn request_code_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_CREATE => {
+            let cs = lparam.0 as *const CREATESTRUCTW;
+            let state_ptr = unsafe { (*cs).lpCreateParams as *mut RequestCodeState };
+            unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, state_ptr as isize) };
+            create_request_code_controls(hwnd);
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let id = wparam.0 & 0xffff;
+            match id {
+                REQUEST_ID_OK => {
+                    if let Some(state) = request_code_state_mut(hwnd) {
+                        let name = read_edit_text(state.name_edit);
+                        let surname = read_edit_text(state.surname_edit);
+                        let email = read_edit_text(state.email_edit);
+                        if !name.trim().is_empty()
+                            && !surname.trim().is_empty()
+                            && !email.trim().is_empty()
+                        {
+                            state.result = Some((name, surname, email));
+                        }
+                    }
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                    LRESULT(0)
+                }
+                REQUEST_ID_CANCEL => {
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                    LRESULT(0)
+                }
+                _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+            }
+        }
+        WM_KEYDOWN => match wparam.0 as u16 {
+            key if key == VK_RETURN.0 => {
+                if request_code_state_mut(hwnd)
+                    .is_some_and(|state| state.opened_at.elapsed() < Duration::from_millis(300))
+                {
+                    return LRESULT(0);
+                }
+                unsafe {
+                    windows::Win32::UI::WindowsAndMessaging::SendMessageW(
+                        hwnd,
+                        WM_COMMAND,
+                        WPARAM(REQUEST_ID_OK),
+                        LPARAM(0),
+                    );
+                }
+                LRESULT(0)
+            }
+            key if key == VK_ESCAPE.0 => {
+                unsafe {
+                    windows::Win32::UI::WindowsAndMessaging::SendMessageW(
+                        hwnd,
+                        WM_COMMAND,
+                        WPARAM(REQUEST_ID_CANCEL),
+                        LPARAM(0),
+                    );
+                }
+                LRESULT(0)
+            }
+            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+        },
+        WM_CLOSE => {
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
+            LRESULT(0)
+        }
+        WM_NCDESTROY => {
+            if let Some(state) = request_code_state_mut(hwnd) {
+                crate::enable_window_safe(state.parent, true);
+            }
+            LRESULT(0)
+        }
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+    }
+}
+
+fn create_request_code_controls(hwnd: HWND) {
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        CreateWindowExW(
+            Default::default(),
+            windows::core::w!("STATIC"),
+            PCWSTR(crate::to_wide("Inserisci nome").as_ptr()),
+            WS_CHILD | WS_VISIBLE,
+            12,
+            16,
+            180,
+            18,
+            hwnd,
+            HMENU(0),
+            hinstance,
+            None,
+        );
+        let name_edit = CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            windows::core::w!("EDIT"),
+            PCWSTR::null(),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+            12,
+            34,
+            380,
+            24,
+            hwnd,
+            HMENU(REQUEST_ID_NAME as isize),
+            hinstance,
+            None,
+        );
+        CreateWindowExW(
+            Default::default(),
+            windows::core::w!("STATIC"),
+            PCWSTR(crate::to_wide("Inserisci cognome").as_ptr()),
+            WS_CHILD | WS_VISIBLE,
+            12,
+            68,
+            180,
+            18,
+            hwnd,
+            HMENU(0),
+            hinstance,
+            None,
+        );
+        let surname_edit = CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            windows::core::w!("EDIT"),
+            PCWSTR::null(),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+            12,
+            86,
+            380,
+            24,
+            hwnd,
+            HMENU(REQUEST_ID_SURNAME as isize),
+            hinstance,
+            None,
+        );
+        CreateWindowExW(
+            Default::default(),
+            windows::core::w!("STATIC"),
+            PCWSTR(crate::to_wide("Inserisci mail").as_ptr()),
+            WS_CHILD | WS_VISIBLE,
+            12,
+            120,
+            180,
+            18,
+            hwnd,
+            HMENU(0),
+            hinstance,
+            None,
+        );
+        let email_edit = CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            windows::core::w!("EDIT"),
+            PCWSTR::null(),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+            12,
+            138,
+            380,
+            24,
+            hwnd,
+            HMENU(REQUEST_ID_EMAIL as isize),
+            hinstance,
+            None,
+        );
+        CreateWindowExW(
+            Default::default(),
+            windows::core::w!("BUTTON"),
+            PCWSTR(crate::to_wide("OK").as_ptr()),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+            206,
+            178,
+            90,
+            26,
+            hwnd,
+            HMENU(REQUEST_ID_OK as isize),
+            hinstance,
+            None,
+        );
+        CreateWindowExW(
+            Default::default(),
+            windows::core::w!("BUTTON"),
+            PCWSTR(crate::to_wide("Annulla").as_ptr()),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            302,
+            178,
+            90,
+            26,
+            hwnd,
+            HMENU(REQUEST_ID_CANCEL as isize),
+            hinstance,
+            None,
+        );
+
+        if let Some(state) = request_code_state_mut(hwnd) {
+            state.name_edit = name_edit;
+            state.surname_edit = surname_edit;
+            state.email_edit = email_edit;
+        }
+        SetFocus(name_edit);
+    }
+}
+
+fn request_code_state_mut(hwnd: HWND) -> Option<&'static mut RequestCodeState> {
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RequestCodeState };
+    if ptr.is_null() {
+        None
+    } else {
+        Some(unsafe { &mut *ptr })
+    }
+}
+
+fn read_edit_text(hwnd: HWND) -> String {
+    let len = unsafe { GetWindowTextLengthW(hwnd) };
+    if len <= 0 {
+        return String::new();
+    }
+    let mut buf = vec![0u16; len as usize + 1];
+    let written = unsafe { GetWindowTextW(hwnd, &mut buf) };
+    String::from_utf16_lossy(&buf[..written as usize])
 }

@@ -634,6 +634,8 @@ pub struct AppSettings {
     pub podcast_index_api_key: String,
     pub podcast_index_api_secret: String,
     #[serde(default)]
+    pub rai_luce_code: String,
+    #[serde(default)]
     pub podcast_search_provider: PodcastSearchProvider,
     #[serde(default)]
     pub gemini_api_key: String,
@@ -977,6 +979,7 @@ impl Default for AppSettings {
             show_media_save_confirmation: true,
             podcast_index_api_key: String::new(),
             podcast_index_api_secret: String::new(),
+            rai_luce_code: String::new(),
             podcast_search_provider: PodcastSearchProvider::Itunes,
             gemini_api_key: String::new(),
             youtube_include_timestamps: true,
@@ -1621,6 +1624,15 @@ pub fn load_settings() -> AppSettings {
                 }
             }
         }
+        if !settings.rai_luce_code.trim().is_empty() {
+            match decrypt_rai_luce_code(&settings.rai_luce_code) {
+                Some(code) => settings.rai_luce_code = code,
+                None => {
+                    crate::log_debug("Failed to decrypt stored Rai Luce code; clearing saved code");
+                    settings.rai_luce_code.clear();
+                }
+            }
+        }
         let normalized = normalize_settings(settings);
         save_settings(normalized.clone());
         return normalized;
@@ -1663,6 +1675,7 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.network_proxy_password = settings.network_proxy_password.trim().to_string();
     settings.bdciechi_username = settings.bdciechi_username.trim().to_string();
     settings.bdciechi_password = settings.bdciechi_password.trim().to_string();
+    settings.rai_luce_code = settings.rai_luce_code.trim().to_string();
     if !settings.remember_bdciechi_credentials {
         settings.bdciechi_username.clear();
         settings.bdciechi_password.clear();
@@ -1960,6 +1973,34 @@ pub fn decrypt_bdciechi_password(password: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
+pub fn encrypt_rai_luce_code(code: &str) -> String {
+    if code.trim().is_empty() {
+        return String::new();
+    }
+    dpapi_protect(code.as_bytes())
+        .map(hex::encode)
+        .unwrap_or_default()
+}
+
+pub fn decrypt_rai_luce_code(code: &str) -> Option<String> {
+    if code.trim().is_empty() {
+        return None;
+    }
+    let decoded = match hex::decode(code) {
+        Ok(decoded) => decoded,
+        Err(_) => return Some(code.to_string()),
+    };
+    let bytes = dpapi_unprotect(&decoded)?;
+    String::from_utf8(bytes).ok()
+}
+
+pub fn load_saved_rai_luce_code() -> Option<String> {
+    let path = get_settings_path();
+    let data = std::fs::read_to_string(path).ok()?;
+    let settings = serde_json::from_str::<AppSettings>(&data).ok()?;
+    decrypt_rai_luce_code(&settings.rai_luce_code)
+}
+
 pub fn save_settings(settings: AppSettings) {
     apply_network_proxy_settings(&settings);
     let mut persisted = settings;
@@ -1970,6 +2011,7 @@ pub fn save_settings(settings: AppSettings) {
         persisted.bdciechi_password.clear();
         persisted.bdciechi_last_successful_login_unix = 0;
     }
+    persisted.rai_luce_code = encrypt_rai_luce_code(&persisted.rai_luce_code);
     let path = get_settings_path();
     if let Some(parent) = path.parent()
         && let Err(e) = std::fs::create_dir_all(parent)

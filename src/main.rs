@@ -1582,6 +1582,34 @@ pub(crate) fn play_named_remote_audio_from_url_with_rai_origin(
     play_podcast_episode_from_url_internal(hwnd, url, title, mime, true, rai_origin);
 }
 
+fn open_podcast_play_progress_window(hwnd: HWND, language: Language) {
+    let labels = app_windows::podcast_save_window::SaveDialogLabels {
+        title: i18n::tr(language, "podcast.save.title"),
+        in_progress: i18n::tr(language, "podcasts.loading"),
+        cancel: i18n::tr(language, "podcast.save.cancel"),
+        cancel_confirm: i18n::tr(language, "podcast.cancel_confirm"),
+    };
+    let dialog = app_windows::podcast_save_window::open_with_labels(hwnd, language, labels, false);
+    with_state(hwnd, |state| {
+        state.podcast_save_window = dialog;
+    });
+}
+
+fn close_podcast_play_progress_window(hwnd: HWND) {
+    let dialog = with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
+    if dialog.0 != 0 {
+        crate::send_message_w_safe(
+            dialog,
+            app_windows::podcast_save_window::WM_PODCAST_SAVE_DONE,
+            WPARAM(0),
+            LPARAM(0),
+        );
+    }
+    with_state(hwnd, |state| {
+        state.podcast_save_window = HWND(0);
+    });
+}
+
 fn play_podcast_episode_from_url_internal(
     hwnd: HWND,
     url: String,
@@ -1593,6 +1621,7 @@ fn play_podcast_episode_from_url_internal(
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let cache_path = podcast_cache_path_for_url(&url, mime);
     screen_reader_speak(&i18n::tr(language, "podcasts.loading"));
+    open_podcast_play_progress_window(hwnd, language);
     std::thread::spawn(move || {
         let cache_ok = cache_path
             .metadata()
@@ -3420,6 +3449,7 @@ pub(crate) struct AppState {
     active_podcast_episode_title: Option<String>,
     active_podcast_episode_cache: Option<PathBuf>,
     active_podcast_episode_from_rai: RaiAudioOrigin,
+    last_rai_recent_item_id: Option<String>,
     last_rai_grouped_item_id: Option<String>,
     podcast_chapters_cache: HashMap<String, Option<Vec<Chapter>>>,
     pending_podcast_chapters_key: Option<String>,
@@ -4826,6 +4856,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_podcast_episode_title: None,
                     active_podcast_episode_cache: None,
                     active_podcast_episode_from_rai: RaiAudioOrigin::None,
+                    last_rai_recent_item_id: None,
                     last_rai_grouped_item_id: None,
                     podcast_chapters_cache: HashMap::new(),
                     pending_podcast_chapters_key: None,
@@ -5200,6 +5231,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     return LRESULT(0);
                 }
                 let payload = Box::from_raw(ptr);
+                close_podcast_play_progress_window(hwnd);
                 editor_manager::open_document(hwnd, &payload.cache_path);
                 if payload.prefer_title_for_document
                     && let Some(title) = payload.title.as_deref()
@@ -5230,6 +5262,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     return LRESULT(0);
                 }
                 let payload = Box::from_raw(ptr);
+                close_podcast_play_progress_window(hwnd);
                 show_error(hwnd, payload.language, &payload.error);
                 LRESULT(0)
             }
@@ -5407,6 +5440,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
             app_windows::podcast_save_window::WM_PODCAST_SAVE_CLOSED => {
                 let closed_hwnd = HWND(lparam.0);
                 with_state(hwnd, |state| {
+                    if state.podcast_save_window == closed_hwnd {
+                        state.podcast_save_window = HWND(0);
+                    }
                     if state.update_progress_window == closed_hwnd {
                         state.update_progress_window = HWND(0);
                     }

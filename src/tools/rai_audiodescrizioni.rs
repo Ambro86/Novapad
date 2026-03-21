@@ -1,19 +1,15 @@
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
-use std::io::Read;
-use std::path::PathBuf;
-
 use base64::Engine;
 use chrono::{TimeZone, Utc};
 use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::io::Read;
 
 const RAI_AUDIODESCRIZIONI_URL_KEY_A: &[u8] = b"rai-";
 const RAI_AUDIODESCRIZIONI_URL_KEY_B: &[u8] = b"audio";
 const RAI_AUDIODESCRIZIONI_LIST_URL_B64: &str = "GhUdXRJPS0YdExZHSggBDBwNBxIMXwIaCh0KHBVHTg4YSygCEBMGFVdaNwYBExMZTAVYMAYAHhJGXwQTF0YHFwANXk4YBQABXQYMQwQHBR0KFk4FWAIQSQUGARVHSA8WSgMcHQ8=";
 const RAI_AUDIODESCRIZIONI_CATALOGUE_URL_B64: &str = "GhUdXRJPS0YdExZHSggBDBwNBxIMXwIaCh0KHBVHTg4YSygCEBMGFVdaNwYBExMZTAVYMAYAHhJGXwQTF0YHFwANXk4YBQABXQYMQwQHBR0KFk4FWAIQSQoOBgAFQgYAAUcKHAJHRxIaCg==";
-const LUCE_PAYLOAD_KEY_ENV: &str = "LUCE_ENCRYPTION_KEY";
-const LUCE_KEY_FILE_NAME: &str = "luce.key";
 const LUCE_PAYLOAD_STATIC_KEY_PARTS: &[&[u8]] = &[b"sonar", b"pad-", b"SonarSecure-"];
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -288,23 +284,6 @@ fn xor_with_luce_key(
 }
 
 fn resolve_luce_secret_key() -> Result<String, String> {
-    if let Ok(secret_key) = std::env::var(LUCE_PAYLOAD_KEY_ENV) {
-        let trimmed = secret_key.trim();
-        if !trimmed.is_empty() {
-            return Ok(trimmed.to_string());
-        }
-    }
-
-    for path in luce_key_candidate_paths() {
-        let Ok(contents) = std::fs::read_to_string(&path) else {
-            continue;
-        };
-        let trimmed = contents.trim();
-        if !trimmed.is_empty() {
-            return Ok(trimmed.to_string());
-        }
-    }
-
     if let Some(secret_key) = crate::settings::load_saved_rai_luce_code() {
         let trimmed = secret_key.trim();
         if !trimmed.is_empty() {
@@ -312,22 +291,7 @@ fn resolve_luce_secret_key() -> Result<String, String> {
         }
     }
 
-    Err(format!(
-        "Chiave Luce mancante: imposta {LUCE_PAYLOAD_KEY_ENV}, crea {LUCE_KEY_FILE_NAME} accanto all'eseguibile o nella cartella Sonarpad, oppure inserisci il codice nelle impostazioni RSS/Podcast."
-    ))
-}
-
-fn luce_key_candidate_paths() -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-
-    if let Ok(exe_path) = std::env::current_exe()
-        && let Some(parent) = exe_path.parent()
-    {
-        paths.push(parent.join(LUCE_KEY_FILE_NAME));
-    }
-
-    paths.push(crate::settings::settings_dir().join(LUCE_KEY_FILE_NAME));
-    paths
+    Err("Chiave Luce mancante: inserisci il codice nelle impostazioni RSS/Podcast.".to_string())
 }
 
 fn slugify(input: &str) -> String {

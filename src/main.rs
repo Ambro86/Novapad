@@ -3782,14 +3782,10 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
 
         // Avvia watchdog per rilevare freeze
         let watchdog = watchdog::start_watchdog(watchdog::WatchdogConfig::default());
-        let mut heartbeat_counter = 0u32;
 
         while GetMessageW(&mut msg, HWND(0), 0, 0).into() {
-            // Heartbeat ogni ~100 messaggi per non impattare performance
-            heartbeat_counter = heartbeat_counter.wrapping_add(1);
-            if heartbeat_counter.is_multiple_of(100) {
-                watchdog.heartbeat();
-            }
+            // Keep the watchdog aligned with UI message-loop activity.
+            watchdog.heartbeat();
             // Priority 1: Global navigation keys (Ctrl+Tab)
             if msg.message == WM_KEYDOWN
                 && msg.wParam.0 as u32 == VK_TAB.0 as u32

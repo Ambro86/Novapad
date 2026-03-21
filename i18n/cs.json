@@ -207,6 +207,7 @@
   "options.label.spellcheck": "Kontrola pravopisu",
   "options.label.spellcheck_language": "Jazyk kontroly pravopisu:",
   "options.label.dictionary_translation": "Jazyk překladu slovníku:",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "Jazyk Wikipedie:",
   "options.label.wrap_width": "Šířka zalomení (znaky):",
   "options.label.quote_prefix": "Prefix citace (Citovat řádky (Q)):",

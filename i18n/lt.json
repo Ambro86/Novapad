@@ -207,6 +207,7 @@
   "options.label.spellcheck": "Rašybos patikrinimas",
   "options.label.spellcheck_language": "Rašybos tikrinimo kalba:",
   "options.label.dictionary_translation": "Žodyno vertimo kalba:",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "Vikipedijos kalba:",
   "options.label.wrap_width": "Apvyniojimo plotis (simboliai):",
   "options.label.quote_prefix": "Cituojamo teksto priešdėlis (cituojamos eilutės):",

@@ -203,6 +203,7 @@
   "options.label.spellcheck": "Corrector ortográfico",
   "options.label.spellcheck_language": "Idioma del corrector:",
   "options.label.dictionary_translation": "Idioma de traducción del diccionario:",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "Idioma de Wikipedia:",
   "options.label.wrap_width": "Ancho de línea (caracteres):",
   "options.label.quote_prefix": "Prefijo de cita (Comentar líneas (Q)):",

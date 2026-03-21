@@ -207,6 +207,7 @@
   "options.label.spellcheck": "Перевірка правопису",
   "options.label.spellcheck_language": "Мова перевірки правопису:",
   "options.label.dictionary_translation": "Мова перекладу словника:",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "Мова Вікіпедії:",
   "options.label.wrap_width": "Ширина рядка (симв.):",
   "options.label.quote_prefix": "Префікс цитати (Цитування рядків):",

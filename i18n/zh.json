@@ -183,6 +183,7 @@
   "options.label.spellcheck": "拼写检查",
   "options.label.spellcheck_language": "拼写检查语言：",
   "options.label.dictionary_translation": "词典翻译语言：",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "维基百科语言：",
   "options.label.wrap_width": "换行宽度（字符）：",
   "options.label.quote_prefix": "引用前缀（引用行）：",

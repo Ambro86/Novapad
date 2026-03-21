@@ -207,6 +207,7 @@
   "options.label.spellcheck": "Sprawdzanie pisowni",
   "options.label.spellcheck_language": "Język sprawdzania pisowni:",
   "options.label.dictionary_translation": "Język tłumaczenia słownika:",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "Język Wikipedii:",
   "options.label.wrap_width": "Szerokość zawijania (znaki):",
   "options.label.quote_prefix": "Prefiks cytatu (Cytuj linie):",

@@ -207,6 +207,7 @@
   "options.label.spellcheck": "Provera pravopisa",
   "options.label.spellcheck_language": "Jezik za proveru pravopisa:",
   "options.label.dictionary_translation": "Jezik za prevod rečnika:",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "Jezik za Vikipediju:",
   "options.label.wrap_width": "Širina prelamanja (u znakovima):",
   "options.label.quote_prefix": "Prefiks za citiranje:",

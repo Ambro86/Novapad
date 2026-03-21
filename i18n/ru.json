@@ -206,6 +206,7 @@
   "options.label.spellcheck": "Проверка орфографии",
   "options.label.spellcheck_language": "Язык проверки орфографии:",
   "options.label.dictionary_translation": "Язык перевода в словаре:",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "Язык Википедии:",
   "options.label.wrap_width": "Ширина переноса (символов):",
   "options.label.quote_prefix": "Префикс цитаты (Цитировать строки):",

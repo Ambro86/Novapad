@@ -207,6 +207,7 @@
   "options.label.spellcheck": "Correcteur orthographique",
   "options.label.spellcheck_language": "Langue du correcteur :",
   "options.label.dictionary_translation": "Langue de traduction du dictionnaire :",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "Langue de Wikipédia :",
   "options.label.wrap_width": "Largeur de ligne (caractères) :",
   "options.label.quote_prefix": "Préfixe de citation (Citer les lignes) :",

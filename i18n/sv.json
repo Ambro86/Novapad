@@ -205,6 +205,7 @@
   "options.label.spellcheck": "Stavningskontroll",
   "options.label.spellcheck_language": "Språk för stavningskontroll:",
   "options.label.dictionary_translation": "Översättningsspråk för ordlista:",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "Wikipedia-språk:",
   "options.label.wrap_width": "Radbrytningsbredd (tecken):",
   "options.label.quote_prefix": "Citatprefix (Citera rader):",

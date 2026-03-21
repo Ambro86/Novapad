@@ -204,6 +204,7 @@
   "options.label.spellcheck": "Kiểm tra chính tả",
   "options.label.spellcheck_language": "Ngôn ngữ kiểm tra chính tả:",
   "options.label.dictionary_translation": "Ngôn ngữ dịch của từ điển:",
+  "options.label.rai_luce_code": "Sonarpad code for additional features:",
   "options.label.wikipedia_language": "Ngôn ngữ Wikipedia:",
   "options.label.wrap_width": "Độ rộng ngắt dòng (ký tự):",
   "options.label.quote_prefix": "Tiền tố trích dẫn (Trích dẫn các dòng):",

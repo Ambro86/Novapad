@@ -8,18 +8,19 @@ use tokio::sync::mpsc;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Controls::{WC_BUTTON, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC};
+use windows::Win32::UI::Controls::{BST_CHECKED, WC_BUTTON, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC};
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_GETITEMDATA, CB_RESETCONTENT,
-    CB_SETCURSEL, CB_SETITEMDATA, CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW,
-    ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IDCANCEL, IDOK,
-    LB_ADDSTRING, LB_GETCOUNT, LB_GETCURSEL, LB_GETITEMDATA, LB_RESETCONTENT, LB_SETCURSEL,
-    LB_SETITEMDATA, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY, LoadCursorW, MSG, PostMessageW,
-    RegisterClassW, SW_HIDE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW,
-    ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
+    CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL, CB_SETITEMDATA, CBS_DROPDOWNLIST, CREATESTRUCTW,
+    CreateWindowExW, DefWindowProcW, ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, HMENU,
+    IDC_ARROW, IDCANCEL, IDOK, LB_ADDSTRING, LB_GETCOUNT, LB_GETCURSEL, LB_GETITEMDATA,
+    LB_RESETCONTENT, LB_SETCURSEL, LB_SETITEMDATA, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY,
+    LoadCursorW, MSG, PostMessageW, RegisterClassW, SW_HIDE, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -40,6 +41,7 @@ const DICT_ENTRY_ID_USE_VOICE: usize = 9205;
 const DICT_ENTRY_ID_ENGINE: usize = 9206;
 const DICT_ENTRY_ID_VOICE: usize = 9207;
 const DICT_ENTRY_ID_PREVIEW: usize = 9208;
+const DICT_ENTRY_ID_MATCH_CASE: usize = 9209;
 const DICT_FOCUS_LIST_MSG: u32 = WM_APP + 9;
 
 struct DictionaryWindowState {
@@ -54,6 +56,7 @@ struct DictionaryEntryState {
     owner: HWND,
     edit_original: HWND,
     edit_replacement: HWND,
+    checkbox_match_case: HWND,
     ok_button: HWND,
     index: Option<usize>,
     checkbox_use_voice: HWND,
@@ -74,6 +77,7 @@ struct DictionaryLabels {
     entry_title_edit: String,
     entry_original: String,
     entry_replacement: String,
+    entry_match_case: String,
     entry_ok: String,
     entry_cancel: String,
     entry_use_voice: String,
@@ -97,6 +101,7 @@ fn dictionary_labels(language: Language) -> DictionaryLabels {
         entry_title_edit: i18n::tr(language, "dictionary.entry_title_edit"),
         entry_original: i18n::tr(language, "dictionary.entry_original"),
         entry_replacement: i18n::tr(language, "dictionary.entry_replacement"),
+        entry_match_case: i18n::tr(language, "find.match_case"),
         entry_ok: i18n::tr(language, "dictionary.entry_ok"),
         entry_cancel: i18n::tr(language, "dictionary.entry_cancel"),
         entry_use_voice: i18n::tr(language, "dictionary.entry_use_voice"),
@@ -530,6 +535,7 @@ fn open_entry_dialog(owner: HWND, index: Option<usize>) {
         owner,
         edit_original: HWND(0),
         edit_replacement: HWND(0),
+        checkbox_match_case: HWND(0),
         ok_button: HWND(0),
         index,
         checkbox_use_voice: HWND(0),
@@ -661,6 +667,20 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     HINSTANCE(0),
                     None,
                 );
+                let checkbox_match_case = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.entry_match_case).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    10,
+                    118,
+                    380,
+                    20,
+                    hwnd,
+                    HMENU(DICT_ENTRY_ID_MATCH_CASE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
 
                 // Voice controls
                 let checkbox_use_voice = CreateWindowExW(
@@ -669,7 +689,7 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     PCWSTR(to_wide(&labels.entry_use_voice).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
                     10,
-                    120,
+                    150,
                     380,
                     20,
                     hwnd,
@@ -684,7 +704,7 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     PCWSTR(to_wide(&labels.entry_engine).as_ptr()),
                     WS_CHILD,
                     10,
-                    150,
+                    180,
                     120,
                     20,
                     hwnd,
@@ -698,7 +718,7 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     PCWSTR::null(),
                     WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     140,
-                    148,
+                    178,
                     250,
                     120,
                     hwnd,
@@ -713,7 +733,7 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     PCWSTR(to_wide(&labels.entry_voice).as_ptr()),
                     WS_CHILD,
                     10,
-                    185,
+                    215,
                     120,
                     20,
                     hwnd,
@@ -727,7 +747,7 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     PCWSTR::null(),
                     WS_CHILD | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     140,
-                    183,
+                    213,
                     250,
                     200,
                     hwnd,
@@ -742,7 +762,7 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     PCWSTR(to_wide(&labels.entry_preview).as_ptr()),
                     WS_CHILD | WS_TABSTOP,
                     140,
-                    218,
+                    248,
                     250,
                     26,
                     hwnd,
@@ -778,7 +798,7 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     PCWSTR(to_wide(&labels.entry_ok).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     200,
-                    290,
+                    320,
                     90,
                     28,
                     hwnd,
@@ -792,7 +812,7 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     PCWSTR(to_wide(&labels.entry_cancel).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     300,
-                    290,
+                    320,
                     90,
                     28,
                     hwnd,
@@ -806,6 +826,7 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     edit_original,
                     label_replacement,
                     edit_replacement,
+                    checkbox_match_case,
                     checkbox_use_voice,
                     label_engine,
                     combo_engine,
@@ -837,13 +858,30 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     ) {
                         crate::log_debug(&format!("Failed to set edit_replacement text: {:?}", _e));
                     }
+                    SendMessageW(
+                        checkbox_match_case,
+                        BM_SETCHECK,
+                        WPARAM(if entry.match_case {
+                            BST_CHECKED.0 as usize
+                        } else {
+                            0
+                        }),
+                        LPARAM(0),
+                    );
                     None
                 } else {
+                    SendMessageW(
+                        checkbox_match_case,
+                        BM_SETCHECK,
+                        WPARAM(BST_CHECKED.0 as usize),
+                        LPARAM(0),
+                    );
                     None
                 };
 
                 state.edit_original = edit_original;
                 state.edit_replacement = edit_replacement;
+                state.checkbox_match_case = checkbox_match_case;
                 state.ok_button = ok_button;
                 state.checkbox_use_voice = checkbox_use_voice;
                 state.label_engine = label_engine;
@@ -945,13 +983,14 @@ where
 }
 
 fn apply_entry_dialog(hwnd: HWND) {
-    let (parent, owner, edit_original, edit_replacement, index) =
+    let (parent, owner, edit_original, edit_replacement, checkbox_match_case, index) =
         match with_entry_state(hwnd, |s| {
             (
                 s.parent,
                 s.owner,
                 s.edit_original,
                 s.edit_replacement,
+                s.checkbox_match_case,
                 s.index,
             )
         }) {
@@ -961,6 +1000,10 @@ fn apply_entry_dialog(hwnd: HWND) {
 
     let original = get_window_text(edit_original);
     let replacement = get_window_text(edit_replacement);
+    let match_case = unsafe {
+        SendMessageW(checkbox_match_case, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+            == BST_CHECKED.0
+    };
     if original.trim().is_empty() {
         return;
     }
@@ -975,6 +1018,7 @@ fn apply_entry_dialog(hwnd: HWND) {
             let entry = DictionaryEntry {
                 original,
                 replacement,
+                match_case,
                 use_custom_voice: use_voice,
                 custom_voice_engine: custom_engine,
                 custom_voice,

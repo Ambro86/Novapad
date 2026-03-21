@@ -277,7 +277,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
             String::new()
         },
         menu_rai_audiodescrizioni: if language == Language::Italian {
-            "Rai audiodescrizioni".to_string()
+            "Rai audiodescrizioni...\tAlt+Shift+A".to_string()
         } else {
             String::new()
         },

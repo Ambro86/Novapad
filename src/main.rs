@@ -144,8 +144,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
     WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP,
     WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
-    WM_SETREDRAW, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
-    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD,
+    WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -6651,6 +6651,25 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
             }
+            WM_SYSCHAR => {
+                let ctrl_down =
+                    (crate::get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+                let shift_down =
+                    (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                let alt_down =
+                    (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+                let sys_char = wparam.0 as u32;
+                if !ctrl_down
+                    && shift_down
+                    && alt_down
+                    && (sys_char == u32::from(b'a') || sys_char == u32::from(b'A'))
+                {
+                    dispatch_shortcut_command(hwnd, IDM_TOOLS_RAI_AUDIODESCRIZIONI);
+                    LRESULT(0)
+                } else {
+                    DefWindowProcW(hwnd, msg, wparam, lparam)
+                }
+            }
             WM_CLOSE => {
                 try_close_app(hwnd);
                 LRESULT(0)
@@ -10235,6 +10254,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         dispatch_shortcut_command(hwnd, IDM_PLAYBACK_CHAPTER_LIST);
         return true;
     }
+    if key == 'A' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_RAI_AUDIODESCRIZIONI);
+        return true;
+    }
     if shortcut_matches_message(shortcuts.read_pause_resume, msg) {
         dispatch_shortcut_command(hwnd, IDM_FILE_READ_PAUSE);
         return true;
@@ -10472,6 +10495,11 @@ fn create_accelerators() -> HACCEL {
                 fVirt: virt_alt_shift,
                 key: 'D' as u16,
                 cmd: IDM_TOOLS_DICTIONARY_LOOKUP as u16,
+            },
+            ACCEL {
+                fVirt: virt_alt_shift,
+                key: 'A' as u16,
+                cmd: IDM_TOOLS_RAI_AUDIODESCRIZIONI as u16,
             },
             ACCEL {
                 fVirt: virt,

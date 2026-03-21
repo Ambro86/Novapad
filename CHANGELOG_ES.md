@@ -20,6 +20,7 @@ Mejoras
 • Añadidos atajos de teclado RSS para mover las fuentes arriba/abajo: `Ctrl+Shift+Flecha arriba` y `Ctrl+Shift+Flecha abajo`.
 • Mejorada la ventana RSS con una vista previa integrada del artículo, para consultar el texto directamente allí y alcanzarlo rápidamente con Tab antes de abrir el artículo completo en el editor.
 • Añadida en RSS una entrada explícita «Cargar más noticias» al final de las fuentes cuando hay más elementos disponibles; al pulsar Intro se carga el siguiente bloque y el foco se mueve al primer artículo nuevo.
+• En el diccionario de voz, al añadir o editar una sustitución, ahora hay una casilla «Distinguir mayúsculas y minúsculas» para decidir si cada sustitución debe respetar o ignorar el uso de mayúsculas.
 Correcciones
 • Corregido un error por el que la lista de archivos abiertos se mostraba en el menú Ayuda en lugar del menú Ventana.
 • Corregido un caso límite de streaming en el que la reproducción podía iniciarse pero la ventana “Descargando streaming” quedaba abierta cuando el archivo descargado ya coincidía con el formato de destino.

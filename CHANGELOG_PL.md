@@ -20,6 +20,7 @@ Ulepszenia
 • Dodano skróty klawiaturowe RSS do przenoszenia źródeł w górę/w dół: `Ctrl+Shift+Strzałka w górę` i `Ctrl+Shift+Strzałka w dół`.
 • Ulepszono okno RSS, dodając zintegrowany podgląd artykułu, dzięki czemu tekst można przeglądać bezpośrednio tam i szybko przejść do niego klawiszem Tab przed otwarciem pełnego artykułu w edytorze.
 • Dodano w RSS wyraźną pozycję „Załaduj więcej wiadomości” na końcu źródła, gdy dostępne są kolejne elementy; naciśnięcie Enter wczytuje następny blok i przenosi fokus na pierwszy nowy artykuł.
+• W słowniku głosowym podczas dodawania lub edycji podmiany dostępne jest teraz pole „Uwzględniaj wielkość liter”, które pozwala zdecydować, czy dana podmiana ma rozróżniać wielkie i małe litery.
 Poprawki
 • Naprawiono błąd, przez który lista otwartych plików była wyświetlana w menu Pomoc zamiast w menu Okno.
 • Naprawiono przypadek brzegowy streamingu, w którym odtwarzanie mogło się rozpocząć, ale okno „Pobieranie streamingu” pozostawało otwarte, gdy pobrany plik już pasował do formatu docelowego.

@@ -18,6 +18,7 @@ Miglioramenti
 • Aggiunta negli RSS una voce esplicita “Carica altre notizie” in fondo alle fonti quando sono disponibili altri elementi; premendo Invio viene caricato il blocco successivo e il focus si sposta sulla prima notizia nuova.
 • Aggiunto il supporto per le audiodescrizioni Rai. Si possono visualizzare le audiodescrizioni più recenti e tutte le audiodescrizioni ordinate per categoria. Per accedere al servizio è necessario richiedere un codice all'autore. In maniera automatizzata il programma proporrà l'invio della mail. In caso di problemi è sufficiente inviarla ad ambro86@gmail.com con oggetto `Richiesta codice Sonarpad`, con nel corpo della mail il proprio nome e cognome. Tutto questo è necessario per evitare abusi del servizio.
 • Aggiunta in Opzioni > Voce la gestione dei profili voce: è possibile aggiungere, rinominare ed eliminare un profilo.
+• Nel dizionario vocale, quando si aggiunge o modifica una sostituzione, è ora disponibile la casella “Distingui maiuscole e minuscole”, che permette di scegliere se applicare la sostituzione rispettando o ignorando il maiuscolo/minuscolo.
 • Ampliate in Opzioni > Audio le scelte per l'intervallo di riavvolgimento durante la riproduzione, con nuovi valori da 1 secondo fino a 2 ore.
 • Aggiunta la traduzione russa grazie a Dmitriy.
 • Aggiunta in Opzioni > Audio una nuova scelta per il formato nome delle parti audiolibro: `Titolo + numero`, `Solo numero` oppure `Numero + titolo`.

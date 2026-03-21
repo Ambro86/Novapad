@@ -47,6 +47,8 @@ pub struct FavoriteVoice {
 pub struct DictionaryEntry {
     pub original: String,
     pub replacement: String,
+    #[serde(default = "default_true")]
+    pub match_case: bool,
     #[serde(default)]
     pub use_custom_voice: bool,
     #[serde(default)]

@@ -3239,9 +3239,47 @@ fn apply_dictionary(text: &str, dictionary: &[DictionaryEntry]) -> String {
         if entry.original.is_empty() {
             continue;
         }
-        out = out.replace(&entry.original, &entry.replacement);
+        out = if entry.match_case {
+            out.replace(&entry.original, &entry.replacement)
+        } else {
+            replace_case_insensitive(&out, &entry.original, &entry.replacement)
+        };
     }
     out
+}
+
+fn replace_case_insensitive(text: &str, needle: &str, replacement: &str) -> String {
+    if needle.is_empty() {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut cursor = 0;
+    while cursor < text.len() {
+        if let Some(match_len) = match_len_case_insensitive(text, cursor, needle) {
+            out.push_str(replacement);
+            cursor += match_len;
+            continue;
+        }
+        let Some(ch) = text[cursor..].chars().next() else {
+            break;
+        };
+        out.push(ch);
+        cursor += ch.len_utf8();
+    }
+    out
+}
+
+fn match_len_case_insensitive(text: &str, start: usize, needle: &str) -> Option<usize> {
+    let mut consumed = 0;
+    let mut text_chars = text[start..].chars();
+    for needle_ch in needle.chars() {
+        let text_ch = text_chars.next()?;
+        if text_ch.to_lowercase().to_string() != needle_ch.to_lowercase().to_string() {
+            return None;
+        }
+        consumed += text_ch.len_utf8();
+    }
+    Some(consumed)
 }
 
 pub(crate) fn prepare_tts_text(
@@ -5445,6 +5483,8 @@ fn merge_and_finalize_sapi4_mp3(
 
 #[cfg(test)]
 mod tests {
+    use crate::settings::DictionaryEntry;
+
     use super::{
         TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, find_edge_split_idx,
         is_edge_text_usable, normalize_for_tts, parse_edge_binary_audio_payload,
@@ -5452,6 +5492,40 @@ mod tests {
         sanitize_edge_text, split_into_tts_chunks, split_long_sentence_edge_with_limit,
         split_text_for_engine, split_voice_tag_spans, strip_dashed_lines,
     };
+
+    #[test]
+    fn prepare_tts_text_keeps_dictionary_entries_case_sensitive_by_default() {
+        let dictionary = vec![DictionaryEntry {
+            original: "ciao".to_string(),
+            replacement: "salve".to_string(),
+            match_case: true,
+            use_custom_voice: false,
+            custom_voice_engine: None,
+            custom_voice: None,
+        }];
+
+        assert_eq!(
+            prepare_tts_text("Ciao ciao", false, &dictionary),
+            "Ciao salve"
+        );
+    }
+
+    #[test]
+    fn prepare_tts_text_supports_case_insensitive_dictionary_entries() {
+        let dictionary = vec![DictionaryEntry {
+            original: "ciao".to_string(),
+            replacement: "salve".to_string(),
+            match_case: false,
+            use_custom_voice: false,
+            custom_voice_engine: None,
+            custom_voice: None,
+        }];
+
+        assert_eq!(
+            prepare_tts_text("Ciao cIAO ciao", false, &dictionary),
+            "salve salve salve"
+        );
+    }
 
     #[test]
     fn parse_sapi4_part_index_prefers_named_prefix() {

@@ -20,6 +20,7 @@ Améliorations
 • Ajout de raccourcis clavier RSS pour déplacer les sources vers le haut/le bas : `Ctrl+Shift+Flèche haut` et `Ctrl+Shift+Flèche bas`.
 • Amélioration de la fenêtre RSS avec un aperçu d'article intégré, afin de consulter directement le texte dans la fenêtre et d'y accéder rapidement avec Tab avant d'ouvrir l'article complet dans l'éditeur.
 • Ajout dans RSS d’une entrée explicite « Charger plus d’actualités » à la fin des sources lorsque d’autres éléments sont disponibles ; en appuyant sur Entrée, le bloc suivant est chargé et le focus se déplace vers le premier nouvel article.
+• Dans le dictionnaire vocal, lors de l’ajout ou de la modification d’un remplacement, une case « Respecter la casse » permet désormais de choisir si chaque substitution doit respecter ou ignorer les majuscules/minuscules.
 Correctifs
 • Correction d’un bug où la liste des fichiers ouverts s’affichait dans le menu Aide au lieu du menu Fenêtre.
 • Correction d’un cas limite de streaming où la lecture pouvait démarrer mais la fenêtre « Téléchargement du flux » restait ouverte lorsque le fichier téléchargé correspondait déjà au format cible.

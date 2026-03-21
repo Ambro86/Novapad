@@ -638,6 +638,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub rai_luce_code: String,
     #[serde(default)]
+    pub podcast_directory_country: String,
+    #[serde(default)]
     pub podcast_search_provider: PodcastSearchProvider,
     #[serde(default)]
     pub gemini_api_key: String,
@@ -982,6 +984,7 @@ impl Default for AppSettings {
             podcast_index_api_key: String::new(),
             podcast_index_api_secret: String::new(),
             rai_luce_code: String::new(),
+            podcast_directory_country: String::new(),
             podcast_search_provider: PodcastSearchProvider::Itunes,
             gemini_api_key: String::new(),
             youtube_include_timestamps: true,
@@ -1678,6 +1681,10 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.bdciechi_username = settings.bdciechi_username.trim().to_string();
     settings.bdciechi_password = settings.bdciechi_password.trim().to_string();
     settings.rai_luce_code = settings.rai_luce_code.trim().to_string();
+    settings.podcast_directory_country = settings
+        .podcast_directory_country
+        .trim()
+        .to_ascii_lowercase();
     if !settings.remember_bdciechi_credentials {
         settings.bdciechi_username.clear();
         settings.bdciechi_password.clear();

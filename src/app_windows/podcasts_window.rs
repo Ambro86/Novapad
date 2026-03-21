@@ -78,6 +78,30 @@ const ADD_CANCEL_ID: usize = 12203;
 
 const WM_PODCAST_FETCH_COMPLETE: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 310;
 const WM_PODCAST_SEARCH_COMPLETE: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 311;
+
+const PODCAST_DIRECTORY_COUNTRIES: &[(&str, &str)] = &[
+    ("au", "Australia"),
+    ("ca", "Canada"),
+    ("cn", "China"),
+    ("cz", "Czechia"),
+    ("fr", "France"),
+    ("de", "Germany"),
+    ("in", "India"),
+    ("ie", "Ireland"),
+    ("it", "Italy"),
+    ("jp", "Japan"),
+    ("lt", "Lithuania"),
+    ("nz", "New Zealand"),
+    ("pl", "Poland"),
+    ("pt", "Portugal"),
+    ("rs", "Serbia"),
+    ("es", "Spain"),
+    ("se", "Sweden"),
+    ("ua", "Ukraine"),
+    ("gb", "United Kingdom"),
+    ("us", "United States"),
+    ("vn", "Vietnam"),
+];
 const WM_PODCAST_PLAY_READY: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 312;
 const WM_PODCAST_PLAY_FAILED: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 313;
 const WM_PODCAST_DOWNLOAD_PROGRESS: u32 = windows::Win32::UI::WindowsAndMessaging::WM_USER + 314;
@@ -2772,9 +2796,10 @@ fn perform_search(hwnd: HWND, query: &str) {
         match provider {
             SearchProvider::Itunes => {
                 let fetch_config = rss_fetch_config(parent);
+                let country = apple_country_for_parent(parent);
                 let url = format!(
-                    "https://itunes.apple.com/search?media=podcast&term={}&limit=20",
-                    query
+                    "https://itunes.apple.com/search?media=podcast&entity=podcast&term={}&country={}&limit=20",
+                    query, country
                 );
                 match rt.block_on(rss::fetch_url_bytes(&url, fetch_config)) {
                     Ok(bytes) => {
@@ -3121,10 +3146,11 @@ async fn load_by_category(
     match source {
         Source::Apple => {
             let mut status = None;
-            let country = apple_country_for_language(language);
+            let settings = settings::load_settings();
+            let country = apple_country_from_settings(&settings);
             let results = match mode {
                 Mode::Top => {
-                    let url = apple_top_podcasts_by_genre(category.id, country, APPLE_LIMIT);
+                    let url = apple_top_podcasts_by_genre(category.id, &country, APPLE_LIMIT);
                     let ids = match rss::fetch_url_bytes(&url, fetch_config).await {
                         Ok(bytes) => parse_apple_top_ids(&bytes),
                         Err(err) => {
@@ -3132,7 +3158,7 @@ async fn load_by_category(
                             Vec::new()
                         }
                     };
-                    let lookup_url = apple_lookup_by_ids(&ids, country);
+                    let lookup_url = apple_lookup_by_ids(&ids, &country);
                     if let Some(lookup_url) = lookup_url
                         && let Ok(bytes) = rss::fetch_url_bytes(&lookup_url, fetch_config).await
                         && let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes)
@@ -3178,9 +3204,9 @@ async fn load_by_category(
                 return Ok((results, status));
             }
             let url = if matches!(mode, Mode::SearchInCategory) {
-                apple_search_in_category(search_term, category.id, country, APPLE_LIMIT)
+                apple_search_in_category(search_term, category.id, &country, APPLE_LIMIT)
             } else {
-                apple_search_by_category(category.id, country, APPLE_LIMIT)
+                apple_search_by_category(category.id, &country, APPLE_LIMIT)
             };
             let bytes = rss::fetch_url_bytes(&url, fetch_config)
                 .await
@@ -8264,23 +8290,42 @@ fn percent_encode(input: &str) -> String {
 
 const APPLE_LIMIT: u32 = 50;
 
-fn apple_country_for_language(language: Language) -> &'static str {
-    match language {
-        Language::Italian => "it",
-        Language::Ukrainian
-        | Language::Lithuanian
-        | Language::Russian
-        | Language::Chinese
-        | Language::English => "us",
-        Language::Spanish => "es",
-        Language::Portuguese => "pt",
-        Language::Swedish => "se",
-        Language::Vietnamese => "vn",
-        Language::Czech => "cz",
-        Language::Polish => "pl",
-        Language::French => "fr",
-        Language::Serbian => "rs",
+pub(crate) fn podcast_directory_country_options() -> &'static [(&'static str, &'static str)] {
+    PODCAST_DIRECTORY_COUNTRIES
+}
+
+fn system_podcast_country() -> String {
+    let mut buffer = [0u16; 85];
+    let len = crate::get_user_default_locale_name_safe(&mut buffer);
+    if len > 1 {
+        let locale = String::from_utf16_lossy(&buffer[..len.saturating_sub(1) as usize]);
+        for segment in locale.split(['-', '_']).rev() {
+            let trimmed = segment.trim();
+            if trimmed.len() == 2 && trimmed.chars().all(|ch| ch.is_ascii_alphabetic()) {
+                return trimmed.to_ascii_lowercase();
+            }
+        }
     }
+    "us".to_string()
+}
+
+fn normalize_podcast_country_code(country: &str) -> Option<&'static str> {
+    let normalized = country.trim().to_ascii_lowercase();
+    PODCAST_DIRECTORY_COUNTRIES
+        .iter()
+        .find_map(|(code, _)| (*code == normalized).then_some(*code))
+}
+
+fn apple_country_from_settings(settings: &settings::AppSettings) -> String {
+    if let Some(country) = normalize_podcast_country_code(&settings.podcast_directory_country) {
+        return country.to_string();
+    }
+    system_podcast_country()
+}
+
+fn apple_country_for_parent(parent: HWND) -> String {
+    let settings = with_state(parent, |state| state.settings.clone()).unwrap_or_default();
+    apple_country_from_settings(&settings)
 }
 
 fn podcastindex_language_code(language: Language) -> &'static str {

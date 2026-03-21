@@ -1,5 +1,6 @@
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::app_windows::interpreter_select_window;
+use crate::app_windows::podcasts_window;
 use crate::editor_manager::{
     apply_indent_settings_to_all_edits, apply_word_wrap_to_all_edits, insert_voice_tag_at_caret,
     update_window_title,
@@ -107,6 +108,7 @@ const OPTIONS_ID_PODCASTINDEX_KEY: usize = 6035;
 const OPTIONS_ID_PODCASTINDEX_SECRET: usize = 6036;
 const OPTIONS_ID_PODCASTINDEX_SIGNUP: usize = 6037;
 const OPTIONS_ID_RAI_LUCE_CODE: usize = 6120;
+const OPTIONS_ID_PODCAST_DIRECTORY_COUNTRY: usize = 6122;
 const OPTIONS_ID_WHISPER_MODEL: usize = 6111;
 const OPTIONS_ID_WHISPER_CUDA: usize = 6112;
 const OPTIONS_ID_WHISPER_KEEP_ORIGINAL_LANGUAGE: usize = 6113;
@@ -234,6 +236,16 @@ fn proxy_is_valid(proxy_url: &str, username: &str, password: &str) -> Result<(),
         Ok(())
     } else {
         Err(format!("HTTP {}", response.status()))
+    }
+}
+
+fn podcast_country_label(language: Language, code: &str, fallback: &str) -> String {
+    let key = format!("options.podcast_country.{}", code);
+    let value = i18n::tr(language, &key);
+    if value == key {
+        fallback.to_string()
+    } else {
+        value
     }
 }
 
@@ -675,6 +687,8 @@ struct OptionsDialogState {
     combo_podcast_date_display: HWND,
     label_podcast_time_display: HWND,
     combo_podcast_time_display: HWND,
+    label_podcast_directory_country: HWND,
+    combo_podcast_directory_country: HWND,
     label_podcastindex_key: HWND,
     edit_podcastindex_key: HWND,
     label_podcastindex_secret: HWND,
@@ -916,6 +930,8 @@ struct OptionsLabels {
     label_rss_time_display: String,
     label_podcast_date_display: String,
     label_podcast_time_display: String,
+    label_podcast_directory_country: String,
+    option_automatic: String,
     label_podcastindex_key: String,
     label_podcastindex_secret: String,
     label_rai_luce_code: String,
@@ -1197,6 +1213,22 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_rss_time_display: i18n::tr(language, "options.label.rss_time_display"),
         label_podcast_date_display: i18n::tr(language, "options.label.podcast_date_display"),
         label_podcast_time_display: i18n::tr(language, "options.label.podcast_time_display"),
+        label_podcast_directory_country: {
+            let value = i18n::tr(language, "options.label.podcast_directory_country");
+            if value == "options.label.podcast_directory_country" {
+                "Podcast directory country".to_string()
+            } else {
+                value
+            }
+        },
+        option_automatic: {
+            let value = i18n::tr(language, "options.choice.automatic");
+            if value == "options.choice.automatic" {
+                "Automatic".to_string()
+            } else {
+                value
+            }
+        },
         label_podcastindex_key: i18n::tr(language, "options.label.podcastindex_key"),
         label_podcastindex_secret: i18n::tr(language, "options.label.podcastindex_secret"),
         label_rai_luce_code: {
@@ -4309,6 +4341,36 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 30;
 
+                let label_podcast_directory_country = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_podcast_directory_country).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_podcast_directory_country = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    220,
+                    hwnd,
+                    HMENU(OPTIONS_ID_PODCAST_DIRECTORY_COUNTRY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
                 let label_podcastindex_key = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
@@ -5424,6 +5486,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     combo_podcast_date_display,
                     label_podcast_time_display,
                     combo_podcast_time_display,
+                    label_podcast_directory_country,
+                    combo_podcast_directory_country,
                     label_podcastindex_key,
                     edit_podcastindex_key,
                     label_podcastindex_secret,
@@ -5618,6 +5682,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     combo_podcast_date_display,
                     label_podcast_time_display,
                     combo_podcast_time_display,
+                    label_podcast_directory_country,
+                    combo_podcast_directory_country,
                     label_podcastindex_key,
                     edit_podcastindex_key,
                     label_podcastindex_secret,
@@ -6239,6 +6305,8 @@ fn initialize_options_dialog(hwnd: HWND) {
             combo_podcast_date_display,
             _label_podcast_time_display,
             combo_podcast_time_display,
+            _label_podcast_directory_country,
+            combo_podcast_directory_country,
             _label_podcastindex_key,
             edit_podcastindex_key,
             _label_podcastindex_secret,
@@ -6374,6 +6442,8 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.combo_podcast_date_display,
                 state.label_podcast_time_display,
                 state.combo_podcast_time_display,
+                state.label_podcast_directory_country,
+                state.combo_podcast_directory_country,
                 state.label_podcastindex_key,
                 state.edit_podcastindex_key,
                 state.label_podcastindex_secret,
@@ -7737,6 +7807,39 @@ fn initialize_options_dialog(hwnd: HWND) {
             combo_podcast_time_display,
             CB_SETCURSEL,
             WPARAM(podcast_time_idx),
+            LPARAM(0),
+        );
+
+        SendMessageW(
+            combo_podcast_directory_country,
+            CB_RESETCONTENT,
+            WPARAM(0),
+            LPARAM(0),
+        );
+        SendMessageW(
+            combo_podcast_directory_country,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.option_automatic).as_ptr() as isize),
+        );
+        for (code, fallback) in podcasts_window::podcast_directory_country_options() {
+            let label = podcast_country_label(settings.language, code, fallback);
+            SendMessageW(
+                combo_podcast_directory_country,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            );
+        }
+        let podcast_country_idx = podcasts_window::podcast_directory_country_options()
+            .iter()
+            .position(|(code, _)| *code == settings.podcast_directory_country)
+            .map(|idx| idx + 1)
+            .unwrap_or(0);
+        SendMessageW(
+            combo_podcast_directory_country,
+            CB_SETCURSEL,
+            WPARAM(podcast_country_idx),
             LPARAM(0),
         );
 
@@ -9708,6 +9811,7 @@ fn apply_options_dialog(hwnd: HWND) {
             combo_rss_time_display,
             combo_podcast_date_display,
             combo_podcast_time_display,
+            combo_podcast_directory_country,
             edit_podcastindex_key,
             edit_podcastindex_secret,
             edit_rai_luce_code,
@@ -9801,6 +9905,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.combo_rss_time_display,
                 state.combo_podcast_date_display,
                 state.combo_podcast_time_display,
+                state.combo_podcast_directory_country,
                 state.edit_podcastindex_key,
                 state.edit_podcastindex_secret,
                 state.edit_rai_luce_code,
@@ -10361,6 +10466,21 @@ fn apply_options_dialog(hwnd: HWND) {
             1 => ListTimeDisplayMode::Never,
             2 => ListTimeDisplayMode::OnlyIfMultipleSameDay,
             _ => ListTimeDisplayMode::Always,
+        };
+        let podcast_country_sel = SendMessageW(
+            combo_podcast_directory_country,
+            CB_GETCURSEL,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0;
+        settings.podcast_directory_country = if podcast_country_sel <= 0 {
+            String::new()
+        } else {
+            podcasts_window::podcast_directory_country_options()
+                .get((podcast_country_sel - 1) as usize)
+                .map(|(code, _)| (*code).to_string())
+                .unwrap_or_default()
         };
 
         let prompt_sel = SendMessageW(combo_prompt_program, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
@@ -12063,6 +12183,14 @@ fn layout_rss_podcast_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32
         y,
         OPTIONS_COMBO_HEIGHT,
     );
+    y = layout_label_control(
+        "label_podcast_directory_country",
+        state.label_podcast_directory_country,
+        "combo_podcast_directory_country",
+        state.combo_podcast_directory_country,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
     y += OPTIONS_SECTION_GAP;
     y = layout_label_control(
         "label_podcast_cache_limit",
@@ -12567,6 +12695,8 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_podcast_date_display,
             state.label_podcast_time_display,
             state.combo_podcast_time_display,
+            state.label_podcast_directory_country,
+            state.combo_podcast_directory_country,
             state.label_podcastindex_key,
             state.edit_podcastindex_key,
             state.label_podcastindex_secret,

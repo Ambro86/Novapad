@@ -1,11 +1,12 @@
 # Changelog
 
-Versão 0.6.8 – 2026-03-15
+Versão 0.6.8 – 2026-03-21
 
 Novidades
 • Adicionado um novo item no menu Reproduzir que permite transcrever qualquer ficheiro de áudio ou vídeo com o Whisper. Nas Opções existe uma nova secção chamada «IA e Transcrição», onde é possível escolher o modelo, ativar o suporte opcional a CUDA para placas gráficas NVIDIA, manter o idioma original e ativar ou desativar as marcas temporais.
 • Adicionada a possibilidade de usar ditado por voz offline, com o mesmo funcionamento da transcrição de áudio. Por predefinição, prima `Ctrl+Shift+Espaço` para iniciar o ditado e prima o mesmo atalho novamente para o terminar; o atalho pode ser personalizado nas Opções. A partir da segunda ativação, o ditado fica mais rápido porque o motor permanece pronto na memória; em PCs com menos de 4 GB de RAM, este pré-carregamento e reutilização são desativados automaticamente.
 • A pesquisa de podcasts passa agora a usar `iTunes + Spreaker` por predefinição, com filtragem de resultados duplicados quando o mesmo podcast está presente em ambas as plataformas.
+• Melhorada a pesquisa e navegação de podcasts Apple: a pesquisa de podcasts, a navegação por categorias e os top podcasts por categoria passam agora a usar o país selecionado para o diretório de podcasts. Em Opções > RSS / Podcast, pode deixar em `Automático` para usar o país do sistema ou escolher manualmente outro país.
 • O Sonarpad está agora disponível também no Mac, embora com um conjunto de funcionalidades parcial. Ligação do projeto: https://github.com/Ambro86/Sonarpad-Mac
 
 Melhorias

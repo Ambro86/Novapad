@@ -8,6 +8,7 @@ use std::os::windows::prelude::*;
 use std::path::PathBuf;
 #[cfg(not(feature = "standalone"))]
 use std::path::{Component, Prefix};
+use std::sync::{OnceLock, RwLock};
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, HANDLE, HLOCAL, LocalFree};
 use windows::Win32::Security::Cryptography::{
     CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData, CryptUnprotectData,
@@ -29,6 +30,8 @@ pub const DRIVE_REMOVABLE: u32 = 2;
 pub const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 pub const VOICE_LIST_URL: &str =
     "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list";
+
+static RAI_LUCE_CODE_CACHE: OnceLock<RwLock<Option<String>>> = OnceLock::new();
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct VoiceInfo {
@@ -1639,11 +1642,13 @@ pub fn load_settings() -> AppSettings {
             }
         }
         let normalized = normalize_settings(settings);
+        update_cached_rai_luce_code(&normalized.rai_luce_code);
         save_settings(normalized.clone());
         return normalized;
     }
 
     let normalized = normalize_settings(default_settings);
+    update_cached_rai_luce_code(&normalized.rai_luce_code);
     save_settings(normalized.clone());
     normalized
 }
@@ -2003,15 +2008,39 @@ pub fn decrypt_rai_luce_code(code: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
+fn cached_rai_luce_code() -> Option<String> {
+    let cache = RAI_LUCE_CODE_CACHE.get_or_init(|| RwLock::new(None));
+    cache.read().ok().and_then(|value| value.clone())
+}
+
+fn update_cached_rai_luce_code(code: &str) {
+    let trimmed = code.trim();
+    let cache = RAI_LUCE_CODE_CACHE.get_or_init(|| RwLock::new(None));
+    if let Ok(mut value) = cache.write() {
+        *value = if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        };
+    }
+}
+
 pub fn load_saved_rai_luce_code() -> Option<String> {
+    if let Some(code) = cached_rai_luce_code() {
+        return Some(code);
+    }
+
     let path = get_settings_path();
     let data = std::fs::read_to_string(path).ok()?;
     let settings = serde_json::from_str::<AppSettings>(&data).ok()?;
-    decrypt_rai_luce_code(&settings.rai_luce_code)
+    let code = decrypt_rai_luce_code(&settings.rai_luce_code)?;
+    update_cached_rai_luce_code(&code);
+    Some(code)
 }
 
 pub fn save_settings(settings: AppSettings) {
     apply_network_proxy_settings(&settings);
+    update_cached_rai_luce_code(&settings.rai_luce_code);
     let mut persisted = settings;
     if persisted.remember_bdciechi_credentials {
         persisted.bdciechi_password = encrypt_bdciechi_password(&persisted.bdciechi_password);

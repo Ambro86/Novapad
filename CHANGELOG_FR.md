@@ -10,7 +10,7 @@ Nouveautés
 • Sonarpad est désormais disponible aussi sur Mac, même avec un ensemble de fonctions partiel. Lien du projet : https://github.com/Ambro86/Sonarpad-Mac
 
 Améliorations
-• « Lire l'audio en streaming... » permet désormais aussi d'effectuer une recherche YouTube à partir de n'importe quel texte, ou de coller le lien d'une chaîne YouTube pour afficher ses résultats.
+• « Lire l'audio en streaming... » permet désormais aussi d'effectuer une recherche YouTube à partir de n'importe quel texte, ou de coller le lien d'une chaîne ou d'une playlist YouTube pour afficher ses résultats.
 • Amélioration du focus pendant « Lire l'audio en streaming... », afin que la fenêtre de progression reste plus stable pendant le téléchargement et la conversion.
 • Ajout de deux nouvelles actions de lecture dans le menu Voix : `Phrase précédente` et `Phrase suivante`, avec des raccourcis configurables pour se déplacer pendant la lecture du texte.
 • Le raccourci par défaut de `Exécuter le fichier avec l’interpréteur` est maintenant `Ctrl+Shift+F5`, afin que `Shift+F5` puisse être utilisé par défaut pour `Phrase précédente`.

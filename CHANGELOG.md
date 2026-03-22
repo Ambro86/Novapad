@@ -10,7 +10,7 @@ What's New
 • Sonarpad is now also available on Mac with a subset of features. Project link: https://github.com/Ambro86/Sonarpad-Mac
 
 Improvements
-• "Play streaming audio..." can now also search YouTube from any text query, or accept a YouTube channel link and show its results.
+• "Play streaming audio..." can now also search YouTube from any text query, or accept a YouTube channel or playlist link and show its results.
 • Improved focus handling during "Play streaming audio...", so the progress window stays more stable during download and conversion.
 • Added two new reading navigation actions in the Voice menu: `Previous sentence` and `Next sentence`, with configurable shortcuts to jump during text reading.
 • The default shortcut for `Execute file with interpreter` is now `Ctrl+Shift+F5`, so `Shift+F5` can be used by default for `Previous sentence`.

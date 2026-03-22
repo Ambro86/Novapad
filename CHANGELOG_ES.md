@@ -10,7 +10,7 @@ Novedades
 • Sonarpad ya está disponible también en Mac, aunque con un conjunto de funciones parcial. Enlace del proyecto: https://github.com/Ambro86/Sonarpad-Mac
 
 Mejoras
-• "Reproducir audio en streaming..." ahora también permite buscar en YouTube escribiendo cualquier texto o pegar el enlace de un canal de YouTube para mostrar sus resultados.
+• "Reproducir audio en streaming..." ahora también permite buscar en YouTube escribiendo cualquier texto o pegar el enlace de un canal o una lista de reproducción de YouTube para mostrar sus resultados.
 • Mejorado el enfoque durante "Reproducir audio en streaming...", para que la ventana de progreso se mantenga más estable durante la descarga y la conversión.
 • Añadidas dos nuevas acciones de lectura en el menú Voz: `Frase anterior` y `Siguiente frase`, con atajos configurables para saltar durante la lectura del texto.
 • El atajo predeterminado de `Ejecutar archivo con intérprete` ahora es `Ctrl+Shift+F5`, para que `Shift+F5` pueda usarse por defecto para `Frase anterior`.

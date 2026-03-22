@@ -1340,7 +1340,7 @@ where
     }
 }
 
-fn get_text_range(hwnd_edit: HWND, range: CHARRANGE) -> String {
+pub(crate) fn get_text_range(hwnd_edit: HWND, range: CHARRANGE) -> String {
     let len = (range.cpMax - range.cpMin).max(0) as usize;
     if len == 0 {
         return String::new();

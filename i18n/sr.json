@@ -82,6 +82,8 @@
   "file.close_others": "Zatvori &druge datoteke\tCtrl+Shift+W",
   "file.recent": "Nedavne &datoteke",
   "file.read_start": "Pokreni &čitanje\tF5",
+  "file.read_previous_sentence": "Prethodna rečenica",
+  "file.read_next_sentence": "Sledeća rečenica",
   "file.execute": "Pokreni &datoteku interpreterom\tShift+F5",
   "file.read_pause": "Pauziraj/Nastavi čitanje\tF4",
   "file.read_stop": "&Zaustavi čitanje\tF6",

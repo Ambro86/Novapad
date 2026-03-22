@@ -61,11 +61,14 @@ Manage Bookmarks: View, jump to, or delete saved bookmarks. When opening a file 
 
 Voice and audio:
 Reading: F5 Start Reading, F4 Pause/Resume, F6 Stop Reading.
+Previous sentence: Shift+F5 jumps to the previous sentence during reading.
+Next sentence: Ctrl+F5 jumps to the next sentence during reading.
 Favorites during reading: F9 previous favorite voice, F10 next favorite voice.
 Record Audiobook: Create an MP3 file from the current text (Ctrl+R).
 Batch Audiobooks: Convert a list of files into audiobooks (Ctrl+Shift+B).
 Record Podcast: Record a podcast from microphone and/or system audio (Ctrl+Shift+R).
 Convert Audio: Convert audio/video files to other audio formats (Ctrl+Shift+A).
+Execute file: runs the current file with the configured interpreter (Ctrl+Shift+F5).
 
 Tools:
 Batch Audiobooks: Opens a window to convert a list of files (or entire folders) into audiobooks.

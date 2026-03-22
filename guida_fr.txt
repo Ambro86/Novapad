@@ -68,11 +68,14 @@ Menu Signets :
 Menu Voix et audio :
 
  Lecture : F5 Démarrer la lecture, F4 Pause/Reprise, F6 Arrêter la lecture.
+ Phrase précédente : Shift+F5 passe à la phrase précédente pendant la lecture.
+ Phrase suivante : Ctrl+F5 passe à la phrase suivante pendant la lecture.
  Favoris pendant la lecture : F9 voix favorite précédente, F10 voix favorite suivante.
  Enregistrer un audiolivre : Crée un fichier MP3 ou WAV à partir du texte actuel (Ctrl+R).
  Livres audio en lot : Convertit une liste de fichiers en livres audio (Ctrl+Maj+B).
  Enregistrer un podcast : Enregistre un podcast à partir du microphone et/ou de l'audio système (Ctrl+Maj+R).
  Convertir l'audio : Convertit des fichiers audio/vidéo vers d'autres formats audio (Ctrl+Maj+A).
+ Exécuter le fichier : exécute le fichier courant avec l’interpréteur configuré (Ctrl+Maj+F5).
 
 Menu Outils :
 

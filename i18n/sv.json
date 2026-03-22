@@ -80,6 +80,8 @@
   "file.close_others": "Stäng and&ra filer\tCtrl+Shift+W",
   "file.recent": "Senaste &filer",
   "file.read_start": "Starta &läsning\tF5",
+  "file.read_previous_sentence": "Föregående mening",
+  "file.read_next_sentence": "Nästa mening",
   "file.execute": "Kör &fil med tolk\tShift+F5",
   "file.read_pause": "Pausa/Återuppta läsning\tF4",
   "file.read_stop": "S&toppa läsning\tF6",

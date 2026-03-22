@@ -67,11 +67,14 @@ Zakładki:
 Głos i audio:
 
  Czytanie: F5 Rozpocznij czytanie, F4 Pauza/Wznów, F6 Zatrzymaj czytanie.
+ Poprzednie zdanie: Shift+F5 przechodzi do poprzedniego zdania podczas czytania.
+ Następne zdanie: Ctrl+F5 przechodzi do następnego zdania podczas czytania.
  Ulubione podczas czytania: F9 poprzedni ulubiony głos, F10 następny ulubiony głos.
  Nagraj audiobook: Utwórz plik MP3 z bieżącego tekstu (Ctrl+R).
  Audiobooki wsadowe: Konwertuj listę plików na audiobooki (Ctrl+Shift+B).
  Nagraj podcast: Nagraj podcast z mikrofonu i/lub dźwięku systemowego (Ctrl+Shift+R).
  Konwertuj audio: Konwertuj pliki audio/wideo do innych formatów audio (Ctrl+Shift+A).
+ Wykonaj plik w interpreterze: uruchamia bieżący plik w skonfigurowanym interpreterze (Ctrl+Shift+F5).
 
 Narzędzia:
 

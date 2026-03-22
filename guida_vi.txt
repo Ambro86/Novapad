@@ -70,11 +70,14 @@ Khi mở một tệp có dấu trang, con trỏ hoặc vị trí phát sẽ tự
 
 Giọng nói và âm thanh:
 Đọc: F5 Bắt đầu đọc, F4 Tạm dừng/Tiếp tục, F6 Dừng đọc.
+Câu trước: Shift+F5 chuyển đến câu trước trong khi đọc.
+Câu tiếp theo: Ctrl+F5 chuyển đến câu tiếp theo trong khi đọc.
 Yêu thích khi đang đọc: F9 giọng đọc yêu thích trước đó, F10 giọng đọc yêu thích tiếp theo.
 Ghi âm sách nói: Tạo một tệp MP3 từ văn bản hiện tại (Ctrl+R).
 Sách nói hàng loạt: Chuyển đổi danh sách tệp thành sách nói (Ctrl+Shift+B).
 Ghi âm podcast: Ghi âm một podcast từ micro và/hoặc âm thanh hệ thống (Ctrl+Shift+R).
 Chuyển đổi âm thanh: Chuyển đổi tệp âm thanh/video sang định dạng âm thanh khác (Ctrl+Shift+A).
+Chạy tệp bằng trình thông dịch: chạy tệp hiện tại bằng trình thông dịch đã cấu hình (Ctrl+Shift+F5).
 
 Công cụ: 
 Sách nói hàng loạt: mở một cửa sổ để chuyển đổi một danh sách các tệp (hoặc toàn bộ thư mục) thành sách nói.

@@ -62,11 +62,14 @@ Upravljaj obeleživačima: Pregled, skok na obeleživač ili brisanje sačuvanih
 
 Glas i audio:
 Čitanje: F5 pokreće čitanje, F4 pauzira ili nastavlja, F6 zaustavlja čitanje. 
+Prethodna rečenica: Shift+F5 prelazi na prethodnu rečenicu tokom čitanja.
+Sledeća rečenica: Ctrl+F5 prelazi na sledeću rečenicu tokom čitanja.
 Omiljeni glasovi tokom čitanja: F9 prethodni omiljeni glas, F10 sledeći omiljeni glas. 
 Snimi audio‑knjigu: Kreira MP3 datoteku iz trenutnog teksta (Ctrl+R). 
 Grupno pretvaranje u audio‑knjige: Pretvara listu datoteka u audio‑knjige (Ctrl+Shift+B).
 Snimi podkast: Snima podkast sa mikrofona i/ili sistemskog zvuka (Ctrl+Shift+R).
 Konvertuj audio: Konvertuje audio/video datoteke u druge audio formate (Ctrl+Shift+A).
+Pokreni datoteku interpreterom: pokreće trenutnu datoteku pomoću podešenog interpretera (Ctrl+Shift+F5).
 
 Alati: 
 Grupno pretvaranje u audio-knjige: Otvara prozor za pretvaranje liste datoteka ili fascikli u audio‑knjige. 

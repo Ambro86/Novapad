@@ -253,6 +253,8 @@ fn podcast_country_label(language: Language, code: &str, fallback: &str) -> Stri
 enum ShortcutAction {
     ReadPauseResume,
     ReadStart,
+    ReadPreviousSentence,
+    ReadNextSentence,
     ReadStop,
     ExecuteFile,
     Audiobook,
@@ -277,9 +279,11 @@ enum ShortcutAction {
 }
 
 impl ShortcutAction {
-    const ALL: [ShortcutAction; 23] = [
+    const ALL: [ShortcutAction; 25] = [
         ShortcutAction::ReadPauseResume,
         ShortcutAction::ReadStart,
+        ShortcutAction::ReadPreviousSentence,
+        ShortcutAction::ReadNextSentence,
         ShortcutAction::ReadStop,
         ShortcutAction::ExecuteFile,
         ShortcutAction::Audiobook,
@@ -306,6 +310,12 @@ impl ShortcutAction {
 
 fn shortcut_action_label(language: Language, action: ShortcutAction) -> String {
     match action {
+        ShortcutAction::ReadPreviousSentence => {
+            shortcut_action_tr_or(language, "file.read_previous_sentence", "Previous sentence")
+        }
+        ShortcutAction::ReadNextSentence => {
+            shortcut_action_tr_or(language, "file.read_next_sentence", "Next sentence")
+        }
         ShortcutAction::ChapterPrev => i18n::tr(language, "playback.chapter_prev"),
         ShortcutAction::ChapterNext => i18n::tr(language, "playback.chapter_next"),
         _ => i18n::tr(language, shortcut_action_i18n_key(action)),
@@ -316,6 +326,8 @@ fn shortcut_action_i18n_key(action: ShortcutAction) -> &'static str {
     match action {
         ShortcutAction::ReadPauseResume => "options.shortcuts.action.read_pause_resume",
         ShortcutAction::ReadStart => "options.shortcuts.action.read_start",
+        ShortcutAction::ReadPreviousSentence => "file.read_previous_sentence",
+        ShortcutAction::ReadNextSentence => "file.read_next_sentence",
         ShortcutAction::ReadStop => "options.shortcuts.action.read_stop",
         ShortcutAction::ExecuteFile => "options.shortcuts.action.execute_file",
         ShortcutAction::Audiobook => "options.shortcuts.action.audiobook",
@@ -371,6 +383,8 @@ fn shortcut_binding_for_action(
     match action {
         ShortcutAction::ReadPauseResume => settings.read_pause_resume,
         ShortcutAction::ReadStart => settings.read_start,
+        ShortcutAction::ReadPreviousSentence => settings.read_previous_sentence,
+        ShortcutAction::ReadNextSentence => settings.read_next_sentence,
         ShortcutAction::ReadStop => settings.read_stop,
         ShortcutAction::ExecuteFile => settings.execute_file,
         ShortcutAction::Audiobook => settings.audiobook,
@@ -403,6 +417,8 @@ fn set_shortcut_binding_for_action(
     match action {
         ShortcutAction::ReadPauseResume => settings.read_pause_resume = binding,
         ShortcutAction::ReadStart => settings.read_start = binding,
+        ShortcutAction::ReadPreviousSentence => settings.read_previous_sentence = binding,
+        ShortcutAction::ReadNextSentence => settings.read_next_sentence = binding,
         ShortcutAction::ReadStop => settings.read_stop = binding,
         ShortcutAction::ExecuteFile => settings.execute_file = binding,
         ShortcutAction::Audiobook => settings.audiobook = binding,
@@ -424,6 +440,15 @@ fn set_shortcut_binding_for_action(
         ShortcutAction::MediaNext => settings.media_next = binding,
         ShortcutAction::ChapterPrev => settings.chapter_prev = binding,
         ShortcutAction::ChapterNext => settings.chapter_next = binding,
+    }
+}
+
+fn shortcut_action_tr_or(language: Language, key: &str, fallback: &str) -> String {
+    let translated = i18n::tr(language, key);
+    if translated == key {
+        fallback.to_string()
+    } else {
+        translated
     }
 }
 

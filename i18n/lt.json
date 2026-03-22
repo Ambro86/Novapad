@@ -82,6 +82,8 @@
   "file.close_others": "Uždaryti kitus failus Ctrl+Shift+W",
   "file.recent": "Naujausi failai",
   "file.read_start": "Pradėti skaityti F5",
+  "file.read_previous_sentence": "Ankstesnis sakinys",
+  "file.read_next_sentence": "Kitas sakinys",
   "file.execute": "Vykdyti ir failą su interpretatoriumi Shift+F5",
   "file.read_pause": "Pauzė/Tęsti ir skaityti F4",
   "file.read_stop": "S&top Skaityti F6",

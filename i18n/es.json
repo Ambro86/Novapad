@@ -79,6 +79,8 @@
   "file.close_others": "Cerrar todos los archivos excepto éste\tCtrl+Shift+W",
   "file.recent": "Archivos &recientes",
   "file.read_start": "Iniciar &lectura\tF5",
+  "file.read_previous_sentence": "Frase anterior",
+  "file.read_next_sentence": "Siguiente frase",
   "file.read_pause": "Pausar/Reanudar lectura\tF4",
   "file.read_stop": "Detener le&ctura\tF6",
   "file.audiobook": "Grabar au&diolibro...\tCtrl+R",

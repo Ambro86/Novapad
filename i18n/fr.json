@@ -82,6 +82,8 @@
   "file.close_others": "Fermer les au&tres fichiers\tCtrl+Shift+W",
   "file.recent": "Fichiers &récents",
   "file.read_start": "Démarrer la &lecture\tF5",
+  "file.read_previous_sentence": "Phrase précédente",
+  "file.read_next_sentence": "Phrase suivante",
   "file.execute": "Exécuter le &fichier avec l’interpréteur\tShift+F5",
   "file.read_pause": "Pause/Reprendre la lecture\tF4",
   "file.read_stop": "A&rrêter la lecture\tF6",

@@ -1,8 +1,10 @@
 use crate::accessibility::to_wide;
 use crate::tools::rss::{RssItem, RssSource};
+use chrono::Local;
 use serde::{Deserialize, Serialize};
 #[cfg(not(feature = "standalone"))]
 use std::ffi::OsStr;
+use std::io::Write;
 #[cfg(not(feature = "standalone"))]
 use std::os::windows::prelude::*;
 use std::path::PathBuf;
@@ -385,6 +387,8 @@ impl ShortcutBinding {
 pub struct ShortcutSettings {
     pub read_pause_resume: ShortcutBinding,
     pub read_start: ShortcutBinding,
+    pub read_previous_sentence: ShortcutBinding,
+    pub read_next_sentence: ShortcutBinding,
     pub read_stop: ShortcutBinding,
     pub execute_file: ShortcutBinding,
     pub audiobook: ShortcutBinding,
@@ -413,8 +417,10 @@ impl Default for ShortcutSettings {
         Self {
             read_pause_resume: ShortcutBinding::new(false, false, false, VK_F4.0),
             read_start: ShortcutBinding::new(false, false, false, VK_F5.0),
+            read_previous_sentence: ShortcutBinding::new(false, true, false, VK_F5.0),
+            read_next_sentence: ShortcutBinding::new(true, false, false, VK_F5.0),
             read_stop: ShortcutBinding::new(false, false, false, VK_F6.0),
-            execute_file: ShortcutBinding::new(false, true, false, VK_F5.0),
+            execute_file: ShortcutBinding::new(true, true, false, VK_F5.0),
             audiobook: ShortcutBinding::new(true, false, false, 'R' as u16),
             batch_audiobooks: ShortcutBinding::new(true, true, false, 'B' as u16),
             record_podcast: ShortcutBinding::new(true, true, false, 'R' as u16),
@@ -1375,6 +1381,44 @@ fn get_settings_path() -> PathBuf {
     resolve_settings_dir().join("settings.json")
 }
 
+fn rai_luce_trace_path() -> PathBuf {
+    resolve_settings_dir().join("rai_luce_trace.txt")
+}
+
+fn rai_luce_backup_path() -> PathBuf {
+    resolve_settings_dir().join("rai_luce_last_good.txt")
+}
+
+fn log_rai_luce_event(message: &str) {
+    let dir = resolve_settings_dir();
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        crate::log_debug(&format!(
+            "Failed to create settings directory for Rai Luce trace: {}",
+            e
+        ));
+        return;
+    }
+    let line = format!(
+        "[{}] {}\r\n",
+        Local::now().format("%Y-%m-%d %H:%M:%S"),
+        message
+    );
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(rai_luce_trace_path())
+    {
+        Ok(mut file) => {
+            if let Err(e) = file.write_all(line.as_bytes()) {
+                crate::log_debug(&format!("Failed to write Rai Luce trace: {}", e));
+            }
+        }
+        Err(e) => {
+            crate::log_debug(&format!("Failed to open Rai Luce trace file: {}", e));
+        }
+    }
+}
+
 fn system_language() -> Language {
     let mut buffer = [0u16; 85];
     let len = crate::get_user_default_locale_name_safe(&mut buffer);
@@ -1615,40 +1659,96 @@ pub fn load_settings() -> AppSettings {
     };
 
     let path = get_settings_path();
-    if path.exists()
-        && let Ok(data) = std::fs::read_to_string(&path)
-        && let Ok(mut settings) = serde_json::from_str::<AppSettings>(&data)
-    {
-        if settings.remember_bdciechi_credentials && !settings.bdciechi_password.trim().is_empty() {
-            match decrypt_bdciechi_password(&settings.bdciechi_password) {
-                Some(password) => settings.bdciechi_password = password,
-                None => {
-                    crate::log_debug(
-                        "Failed to decrypt stored BDCiechi password; clearing saved credentials",
-                    );
-                    settings.bdciechi_username.clear();
-                    settings.bdciechi_password.clear();
-                    settings.bdciechi_last_successful_login_unix = 0;
+    if path.exists() {
+        match std::fs::read_to_string(&path) {
+            Ok(data) => match serde_json::from_str::<AppSettings>(&data) {
+                Ok(mut settings) => {
+                    log_rai_luce_event(&format!(
+                        "load_settings parsed settings.json raw_len={}",
+                        settings.rai_luce_code.len()
+                    ));
+                    if settings.remember_bdciechi_credentials
+                        && !settings.bdciechi_password.trim().is_empty()
+                    {
+                        match decrypt_bdciechi_password(&settings.bdciechi_password) {
+                            Some(password) => settings.bdciechi_password = password,
+                            None => {
+                                crate::log_debug(
+                                    "Failed to decrypt stored BDCiechi password; clearing saved credentials",
+                                );
+                                settings.bdciechi_username.clear();
+                                settings.bdciechi_password.clear();
+                                settings.bdciechi_last_successful_login_unix = 0;
+                            }
+                        }
+                    }
+                    if !settings.rai_luce_code.trim().is_empty() {
+                        match decrypt_rai_luce_code(&settings.rai_luce_code) {
+                            Some(code) => {
+                                log_rai_luce_event(&format!(
+                                    "load_settings decrypted Rai Luce code len={}",
+                                    code.len()
+                                ));
+                                settings.rai_luce_code = code;
+                            }
+                            None => {
+                                crate::log_debug(
+                                    "Failed to decrypt stored Rai Luce code; clearing saved code",
+                                );
+                                log_rai_luce_event(
+                                    "load_settings failed to decrypt Rai Luce code; clearing in-memory value",
+                                );
+                                settings.rai_luce_code.clear();
+                            }
+                        }
+                    } else {
+                        log_rai_luce_event(
+                            "load_settings found empty Rai Luce code in settings.json",
+                        );
+                    }
+                    let normalized = normalize_settings(settings);
+                    update_cached_rai_luce_code(&normalized.rai_luce_code);
+                    save_settings(normalized.clone());
+                    return normalized;
                 }
+                Err(e) => {
+                    log_rai_luce_event(&format!(
+                        "load_settings failed to parse settings.json err={}",
+                        e
+                    ));
+                    crate::log_debug(&format!(
+                        "Failed to parse settings from {}: {}",
+                        path.display(),
+                        e
+                    ));
+                }
+            },
+            Err(e) => {
+                log_rai_luce_event(&format!(
+                    "load_settings failed to read settings.json err={}",
+                    e
+                ));
+                crate::log_debug(&format!(
+                    "Failed to read settings from {}: {}",
+                    path.display(),
+                    e
+                ));
             }
         }
-        if !settings.rai_luce_code.trim().is_empty() {
-            match decrypt_rai_luce_code(&settings.rai_luce_code) {
-                Some(code) => settings.rai_luce_code = code,
-                None => {
-                    crate::log_debug("Failed to decrypt stored Rai Luce code; clearing saved code");
-                    settings.rai_luce_code.clear();
-                }
-            }
-        }
-        let normalized = normalize_settings(settings);
+
+        let normalized = normalize_settings(default_settings);
         update_cached_rai_luce_code(&normalized.rai_luce_code);
-        save_settings(normalized.clone());
+        log_rai_luce_event(
+            "load_settings returning normalized defaults because existing file was unreadable",
+        );
         return normalized;
     }
 
     let normalized = normalize_settings(default_settings);
     update_cached_rai_luce_code(&normalized.rai_luce_code);
+    log_rai_luce_event(
+        "load_settings creating default settings because settings.json does not exist",
+    );
     save_settings(normalized.clone());
     normalized
 }
@@ -1686,6 +1786,7 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.bdciechi_username = settings.bdciechi_username.trim().to_string();
     settings.bdciechi_password = settings.bdciechi_password.trim().to_string();
     settings.rai_luce_code = settings.rai_luce_code.trim().to_string();
+    normalize_shortcut_settings(&mut settings.shortcuts);
     settings.podcast_directory_country = settings
         .podcast_directory_country
         .trim()
@@ -1893,6 +1994,17 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings
 }
 
+fn normalize_shortcut_settings(shortcuts: &mut ShortcutSettings) {
+    let legacy_execute_file = ShortcutBinding::new(false, true, false, VK_F5.0);
+    let default_previous_sentence = ShortcutSettings::default().read_previous_sentence;
+    let default_execute_file = ShortcutSettings::default().execute_file;
+    if shortcuts.execute_file == legacy_execute_file
+        && shortcuts.read_previous_sentence == default_previous_sentence
+    {
+        shortcuts.execute_file = default_execute_file;
+    }
+}
+
 fn dpapi_protect(data: &[u8]) -> Option<Vec<u8>> {
     unsafe {
         let in_blob = CRYPT_INTEGER_BLOB {
@@ -2025,23 +2137,103 @@ fn update_cached_rai_luce_code(code: &str) {
     }
 }
 
+fn load_saved_rai_luce_code_from_path(path: &std::path::Path) -> Option<String> {
+    let data = std::fs::read_to_string(path).ok()?;
+    let raw = data.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    decrypt_rai_luce_code(raw)
+}
+
+fn load_saved_rai_luce_code_from_settings_file() -> Option<String> {
+    let path = get_settings_path();
+    let data = std::fs::read_to_string(&path).ok()?;
+    let settings = serde_json::from_str::<AppSettings>(&data).ok()?;
+    decrypt_rai_luce_code(&settings.rai_luce_code)
+}
+
+fn persist_rai_luce_backup_from_encrypted(encrypted_code: &str) {
+    let path = rai_luce_backup_path();
+    if encrypted_code.trim().is_empty() {
+        return;
+    }
+    if let Err(e) = std::fs::write(&path, encrypted_code) {
+        crate::log_debug(&format!(
+            "Failed to save Rai Luce backup to {}: {}",
+            path.display(),
+            e
+        ));
+        log_rai_luce_event(&format!(
+            "backup_write_failed path={} err={}",
+            path.display(),
+            e
+        ));
+    } else {
+        log_rai_luce_event(&format!(
+            "backup_saved path={} len={}",
+            path.display(),
+            encrypted_code.len()
+        ));
+    }
+}
+
 pub fn load_saved_rai_luce_code() -> Option<String> {
     if let Some(code) = cached_rai_luce_code() {
+        log_rai_luce_event(&format!(
+            "load_saved_rai_luce_code source=cache len={}",
+            code.len()
+        ));
         return Some(code);
     }
 
-    let path = get_settings_path();
-    let data = std::fs::read_to_string(path).ok()?;
-    let settings = serde_json::from_str::<AppSettings>(&data).ok()?;
-    let code = decrypt_rai_luce_code(&settings.rai_luce_code)?;
-    update_cached_rai_luce_code(&code);
-    Some(code)
+    if let Some(code) = load_saved_rai_luce_code_from_settings_file() {
+        log_rai_luce_event(&format!(
+            "load_saved_rai_luce_code source=settings_json len={}",
+            code.len()
+        ));
+        update_cached_rai_luce_code(&code);
+        return Some(code);
+    }
+
+    if let Some(code) = load_saved_rai_luce_code_from_path(&rai_luce_backup_path()) {
+        log_rai_luce_event(&format!(
+            "load_saved_rai_luce_code source=backup len={}",
+            code.len()
+        ));
+        update_cached_rai_luce_code(&code);
+        return Some(code);
+    }
+
+    log_rai_luce_event("load_saved_rai_luce_code source=none");
+    None
 }
 
 pub fn save_settings(settings: AppSettings) {
     apply_network_proxy_settings(&settings);
-    update_cached_rai_luce_code(&settings.rai_luce_code);
     let mut persisted = settings;
+    if persisted.rai_luce_code.trim().is_empty() {
+        if let Some(restored) = cached_rai_luce_code()
+            .or_else(load_saved_rai_luce_code_from_settings_file)
+            .or_else(|| load_saved_rai_luce_code_from_path(&rai_luce_backup_path()))
+        {
+            log_rai_luce_event(&format!(
+                "save_settings preserved existing Rai Luce code len={}",
+                restored.len()
+            ));
+            persisted.rai_luce_code = restored;
+        } else {
+            log_rai_luce_event(
+                "save_settings incoming Rai Luce code is empty and nothing to preserve",
+            );
+        }
+    } else {
+        log_rai_luce_event(&format!(
+            "save_settings incoming Rai Luce code len={}",
+            persisted.rai_luce_code.len()
+        ));
+    }
+    update_cached_rai_luce_code(&persisted.rai_luce_code);
     if persisted.remember_bdciechi_credentials {
         persisted.bdciechi_password = encrypt_bdciechi_password(&persisted.bdciechi_password);
     } else {
@@ -2050,6 +2242,9 @@ pub fn save_settings(settings: AppSettings) {
         persisted.bdciechi_last_successful_login_unix = 0;
     }
     persisted.rai_luce_code = encrypt_rai_luce_code(&persisted.rai_luce_code);
+    if !persisted.rai_luce_code.trim().is_empty() {
+        persist_rai_luce_backup_from_encrypted(&persisted.rai_luce_code);
+    }
     let path = get_settings_path();
     if let Some(parent) = path.parent()
         && let Err(e) = std::fs::create_dir_all(parent)
@@ -2058,7 +2253,25 @@ pub fn save_settings(settings: AppSettings) {
     }
     match serde_json::to_string_pretty(&persisted) {
         Ok(json) => {
-            if let Err(e) = std::fs::write(&path, json) {
+            let tmp_path = path.with_extension("json.tmp");
+            let save_result = (|| -> std::io::Result<()> {
+                let mut file = std::fs::File::create(&tmp_path)?;
+                file.write_all(json.as_bytes())?;
+                file.sync_all()?;
+                match std::fs::rename(&tmp_path, &path) {
+                    Ok(()) => Ok(()),
+                    Err(rename_err) => {
+                        if path.exists() {
+                            std::fs::remove_file(&path)?;
+                            std::fs::rename(&tmp_path, &path)
+                        } else {
+                            Err(rename_err)
+                        }
+                    }
+                }
+            })();
+            if let Err(e) = save_result {
+                let _cleanup_result = std::fs::remove_file(&tmp_path);
                 crate::log_debug(&format!(
                     "Failed to save settings to {}: {}",
                     path.display(),

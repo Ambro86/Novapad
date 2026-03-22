@@ -12,6 +12,8 @@ Có gì mới
 Cải tiến
 • "Phat am thanh tu streaming..." gio cung cho phep tim kiem tren YouTube bang bat ky chuoi van ban nao, hoac dan lien ket cua mot kenh YouTube de hien thi cac ket qua cua kenh do.
 • Đã cải thiện focus khi dùng "Phat am thanh tu streaming...", để cửa sổ tiến trình ổn định hơn trong lúc tải xuống và chuyển đổi.
+• Đã thêm hai thao tác đọc mới trong menu Giọng nói: `Câu trước` và `Câu tiếp theo`, với phím tắt có thể cấu hình để nhảy trong khi đọc văn bản.
+• Phím tắt mặc định của `Chạy tệp bằng trình thông dịch` giờ là `Ctrl+Shift+F5`, để `Shift+F5` có thể được dùng mặc định cho `Câu trước`.
 • Đã thêm quản lý hồ sơ giọng nói trong Tùy chọn > Giọng nói: có thể thêm, đổi tên và xóa hồ sơ.
 • Đã mở rộng trong Tùy chọn > Âm thanh các lựa chọn cho khoảng tua lùi khi phát, với các giá trị mới từ 1 giây đến 2 giờ.
 • Đã thêm bản dịch tiếng Nga nhờ Dmitriy.

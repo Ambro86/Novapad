@@ -82,6 +82,8 @@
   "file.close_others": "Close Ot&her Files\tCtrl+Shift+W",
   "file.recent": "Recent &Files",
   "file.read_start": "Start &Reading\tF5",
+  "file.read_previous_sentence": "Previous sentence",
+  "file.read_next_sentence": "Next sentence",
   "file.execute": "Execute &File with Interpreter\tShift+F5",
   "file.read_pause": "Pause/Resume &Reading\tF4",
   "file.read_stop": "S&top Reading\tF6",

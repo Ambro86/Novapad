@@ -68,11 +68,14 @@ Menu Záložky:
 Menu Hlas a zvuk:
 
  Čtení: F5 Spustit čtení, F4 Pozastavit/Pokračovat, F6 Zastavit čtení.
+ Předchozí věta: Shift+F5 přejde během čtení na předchozí větu.
+ Další věta: Ctrl+F5 přejde během čtení na další větu.
  Oblíbené během čtení: F9 předchozí oblíbený hlas, F10 další oblíbený hlas.
  Nahrát audioknihu: Vytvoří soubor MP3 nebo WAV z aktuálního textu (Ctrl+R).
  Dávkové audioknihy: Převede seznam souborů na audioknihy (Ctrl+Shift+B).
  Nahrát podcast: Nahraje podcast z mikrofonu a/nebo systémového zvuku (Ctrl+Shift+R).
  Převést audio: Převede audio/video soubory do jiných audio formátů (Ctrl+Shift+A).
+ Spustit soubor interpretem: spustí aktuální soubor nakonfigurovaným interpretem (Ctrl+Shift+F5).
 
 Menu Nástroje:
 

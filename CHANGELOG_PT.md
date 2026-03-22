@@ -12,6 +12,8 @@ Novidades
 Melhorias
 • "Reproduzir áudio por streaming..." agora também permite pesquisar no YouTube escrevendo qualquer texto ou colar a ligação de um canal do YouTube para mostrar os respetivos resultados.
 • Melhorado o foco durante "Reproduzir áudio por streaming...", para que a janela de progresso permaneça mais estável durante a descarga e a conversão.
+• Adicionadas duas novas ações de leitura no menu Voz: `Frase anterior` e `Próxima frase`, com atalhos configuráveis para saltar durante a leitura do texto.
+• O atalho predefinido de `Executar ficheiro com interpretador` é agora `Ctrl+Shift+F5`, para que `Shift+F5` possa ser usado por predefinição para `Frase anterior`.
 • Adicionada a gestão de perfis de voz em Opções > Voz: é possível adicionar, renomear e eliminar perfis.
 • Alargadas em Opções > Áudio as opções do intervalo de retrocesso durante a reprodução, com novos valores de 1 segundo até 2 horas.
 • Adicionada a tradução russa graças a Dmitriy.

@@ -82,6 +82,8 @@
   "file.close_others": "Zavřít os&tatní soubory\tCtrl+Shift+W",
   "file.recent": "Nedávné &soubory",
   "file.read_start": "Spustit č&tení\tF5",
+  "file.read_previous_sentence": "Předchozí věta",
+  "file.read_next_sentence": "Další věta",
   "file.execute": "Spustit &soubor interpretem\tShift+F5",
   "file.read_pause": "Pozastavit/Pokračovat ve čtení\tF4",
   "file.read_stop": "Zas&tavit čtení\tF6",

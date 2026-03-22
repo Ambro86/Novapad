@@ -21,6 +21,8 @@ pub const IDM_FILE_EXIT: usize = 1007;
 pub const IDM_FILE_READ_START: usize = 1008;
 pub const IDM_FILE_READ_PAUSE: usize = 1009;
 pub const IDM_FILE_READ_STOP: usize = 1010;
+pub const IDM_FILE_READ_PREVIOUS_SENTENCE: usize = 1017;
+pub const IDM_FILE_READ_NEXT_SENTENCE: usize = 1018;
 pub const IDM_FILE_EXECUTE: usize = 1015;
 pub const IDM_FILE_AUDIOBOOK: usize = 1011;
 pub const IDM_FILE_PODCAST: usize = 1012;
@@ -198,6 +200,8 @@ pub struct MenuLabels {
     pub file_close: String,
     pub file_recent: String,
     file_read_start: String,
+    file_read_previous_sentence: String,
+    file_read_next_sentence: String,
     file_execute: String,
     file_read_pause: String,
     pub file_read_stop: String,
@@ -313,6 +317,12 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         file_close: i18n::tr(language, "file.close"),
         file_recent: i18n::tr(language, "file.recent"),
         file_read_start: i18n::tr(language, "file.read_start"),
+        file_read_previous_sentence: tr_or(
+            language,
+            "file.read_previous_sentence",
+            "Previous sentence",
+        ),
+        file_read_next_sentence: tr_or(language, "file.read_next_sentence", "Next sentence"),
         file_execute: i18n::tr(language, "file.execute"),
         file_read_pause: i18n::tr(language, "file.read_pause"),
         file_read_stop: i18n::tr(language, "file.read_stop"),
@@ -371,6 +381,15 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         help_about: i18n::tr(language, "help.about"),
         recent_empty: i18n::tr(language, "recent.empty"),
         recent_clear: i18n::tr(language, "recent.clear"),
+    }
+}
+
+fn tr_or(language: Language, key: &str, fallback: &str) -> String {
+    let translated = i18n::tr(language, key);
+    if translated == key {
+        fallback.to_string()
+    } else {
+        translated
     }
 }
 
@@ -796,6 +815,14 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
             .unwrap_or_else(ShortcutSettings::default);
         labels.file_read_start = label_with_shortcut(&labels.file_read_start, shortcuts.read_start);
+        labels.file_read_previous_sentence = label_with_shortcut(
+            &labels.file_read_previous_sentence,
+            shortcuts.read_previous_sentence,
+        );
+        labels.file_read_next_sentence = label_with_shortcut(
+            &labels.file_read_next_sentence,
+            shortcuts.read_next_sentence,
+        );
         labels.file_read_pause =
             label_with_shortcut(&labels.file_read_pause, shortcuts.read_pause_resume);
         labels.file_read_stop = label_with_shortcut(&labels.file_read_stop, shortcuts.read_stop);
@@ -1203,6 +1230,18 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             MF_STRING,
             IDM_FILE_READ_START,
             &labels.file_read_start,
+        );
+        append_menu_string(
+            voice_audio_menu,
+            MF_STRING,
+            IDM_FILE_READ_PREVIOUS_SENTENCE,
+            &labels.file_read_previous_sentence,
+        );
+        append_menu_string(
+            voice_audio_menu,
+            MF_STRING,
+            IDM_FILE_READ_NEXT_SENTENCE,
+            &labels.file_read_next_sentence,
         );
         append_menu_string(
             voice_audio_menu,

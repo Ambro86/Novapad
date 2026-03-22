@@ -61,11 +61,14 @@ Klavišų kombinacijos: skaitymo metu galima paspausti klavišus F9 ir F10, kad 
 
 Balsas ir garso įrašai:
 Skaitymas: F5 Pradėti skaityti, F4 Pauzė/Tęsti, F6 Sustabdyti skaitymą.
+Ankstesnis sakinys: Shift+F5 pereina prie ankstesnio sakinio skaitymo metu.
+Kitas sakinys: Ctrl+F5 pereina prie kito sakinio skaitymo metu.
 Mėgstamiausi skaitant: F9 ankstesnis mėgstamiausias balsas, F10 kitas mėgstamiausias balsas.
 Įrašyti garso knygą: Sukurti MP3 failą iš esamo teksto (Ctrl+R).
 Garso knygų partijos: konvertuokite failų sąrašą į garso knygas (Ctrl+Shift+B).
 Įrašyti podcastą: įrašykite podcastą iš mikrofono ir (arba) sistemos garso (Ctrl+Shift+R).
 Konvertuoti garso įrašą: Konvertuoti garso/vaizdo įrašų failus į kitus garso formatus (Ctrl+Shift+A).
+Vykdyti failą: paleidžia dabartinį failą su sukonfigūruotu interpretatoriumi (Ctrl+Shift+F5).
 
 Įrankiai:
 Batch Audiobooks: atidaro langą, kuriame galima konvertuoti failų sąrašą (arba visą aplanką) į garso knygas.

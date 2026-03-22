@@ -80,6 +80,8 @@
   "file.close_others": "Đóng các tệp &khác\tCtrl+Shift+W",
   "file.recent": "Tệp gần đâ&y",
   "file.read_start": "Bắt đầu &đọc\tF5",
+  "file.read_previous_sentence": "Câu trước",
+  "file.read_next_sentence": "Câu tiếp theo",
   "file.read_pause": "Tạm dừng/Tiếp tục đọc\tF4",
   "file.read_stop": "&Dừng đọc\tF6",
   "file.audiobook": "Ghi âm &sách nói...\tCtrl+R",

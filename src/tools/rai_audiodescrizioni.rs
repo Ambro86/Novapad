@@ -4,7 +4,8 @@ use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::io::Read;
+use std::io::{Read, Write};
+use std::path::PathBuf;
 
 const RAI_AUDIODESCRIZIONI_URL_KEY_A: &[u8] = b"rai-";
 const RAI_AUDIODESCRIZIONI_URL_KEY_B: &[u8] = b"audio";
@@ -108,6 +109,32 @@ pub(crate) fn load_catalog() -> Result<Catalog, String> {
 
 pub(crate) fn load_grouped_catalog() -> Result<Vec<CatalogGroup>, String> {
     fetch_grouped_catalog()
+}
+
+pub(crate) fn grouped_catalog_dump_path() -> PathBuf {
+    crate::settings::settings_dir().join("rai_grouped_catalog_dump.txt")
+}
+
+pub(crate) fn write_grouped_catalog_dump(groups: &[CatalogGroup]) -> Result<PathBuf, String> {
+    let path = grouped_catalog_dump_path();
+    let mut file = std::fs::File::create(&path)
+        .map_err(|err| format!("Impossibile creare dump catalogo Rai: {err}"))?;
+    writeln!(
+        file,
+        "Dump catalogo completo audiodescrizioni Rai - {}",
+        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+    )
+    .map_err(|err| format!("Impossibile scrivere dump catalogo Rai: {err}"))?;
+    for group in groups {
+        writeln!(file).map_err(|err| format!("Impossibile scrivere dump catalogo Rai: {err}"))?;
+        writeln!(file, "[{}]", group.title)
+            .map_err(|err| format!("Impossibile scrivere dump catalogo Rai: {err}"))?;
+        for (index, item) in group.items.iter().enumerate() {
+            writeln!(file, "{}. {}", index + 1, item.title.trim())
+                .map_err(|err| format!("Impossibile scrivere dump catalogo Rai: {err}"))?;
+        }
+    }
+    Ok(path)
 }
 
 pub(crate) fn is_luce_key_missing_error(err: &str) -> bool {
@@ -364,16 +391,22 @@ fn normalize_grouped_catalog(groups: Vec<CatalogGroup>) -> Vec<CatalogGroup> {
         .into_iter()
         .map(|(title, mut items)| {
             items.sort_by(|left, right| {
-                compare_natural_labels(&left.title, &right.title)
-                    .then_with(|| left.source_order.cmp(&right.source_order))
+                compare_natural_labels(
+                    &normalize_sort_key(&left.title),
+                    &normalize_sort_key(&right.title),
+                )
+                .then_with(|| compare_natural_labels(&left.title, &right.title))
+                .then_with(|| left.source_order.cmp(&right.source_order))
             });
             items.dedup_by(|left, right| dedupe_key(&left.title) == dedupe_key(&right.title));
             CatalogGroup { title, items }
         })
         .collect::<Vec<_>>();
 
-    normalized_groups
-        .sort_by(|left, right| sortable_label(&left.title).cmp(&sortable_label(&right.title)));
+    normalized_groups.sort_by(|left, right| {
+        compare_natural_labels(&left.title, &right.title)
+            .then_with(|| sortable_label(&left.title).cmp(&sortable_label(&right.title)))
+    });
     normalized_groups
 }
 
@@ -395,6 +428,10 @@ fn sortable_label(input: &str) -> String {
     input.trim().to_lowercase()
 }
 
+fn normalize_sort_key(input: &str) -> String {
+    input.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 fn normalize_item_title(input: &str) -> String {
     let trimmed = input.trim();
     let lower = trimmed.to_lowercase();
@@ -407,7 +444,7 @@ fn normalize_item_title(input: &str) -> String {
 }
 
 fn dedupe_key(input: &str) -> String {
-    sortable_label(&normalize_item_title(input))
+    sortable_label(&normalize_sort_key(&normalize_item_title(input)))
 }
 
 fn compare_natural_labels(left: &str, right: &str) -> Ordering {
@@ -455,4 +492,99 @@ fn compare_natural_labels(left: &str, right: &str) -> Ordering {
     }
 
     left_chars.len().cmp(&right_chars.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CatalogGroup, CatalogItem, normalize_grouped_catalog};
+
+    fn item(title: &str, source_order: i64) -> CatalogItem {
+        CatalogItem {
+            set_id: String::new(),
+            set_name: String::new(),
+            item_id: format!("item-{source_order}"),
+            title: title.to_string(),
+            date: String::new(),
+            iso_date: None,
+            description: String::new(),
+            url: String::new(),
+            image: String::new(),
+            image_timestamp: None,
+            audio_url: String::new(),
+            gen_date: None,
+            source_order,
+            first_seen_at: None,
+            last_seen_at: None,
+        }
+    }
+
+    #[test]
+    fn grouped_catalog_sorts_series_titles_naturally() {
+        let groups = vec![
+            CatalogGroup {
+                title: "Un Medico in Famiglia 10".to_string(),
+                items: vec![item("Un medico in famiglia 10 - Puntata 1", 0)],
+            },
+            CatalogGroup {
+                title: "Un medico in famiglia 6".to_string(),
+                items: vec![item("Un medico in famiglia 6 - Puntata 1", 1)],
+            },
+            CatalogGroup {
+                title: "Un medico in famiglia 5".to_string(),
+                items: vec![item("Un medico in famiglia 5 - Puntata 1", 2)],
+            },
+        ];
+
+        let normalized = normalize_grouped_catalog(groups);
+        let titles = normalized
+            .iter()
+            .map(|group| group.title.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            titles,
+            vec![
+                "Un medico in famiglia 5",
+                "Un medico in famiglia 6",
+                "Un Medico in Famiglia 10",
+            ]
+        );
+    }
+
+    #[test]
+    fn grouped_catalog_sorts_items_with_double_spaces_naturally() {
+        let groups = vec![CatalogGroup {
+            title: "Questo nostro amore".to_string(),
+            items: vec![
+                item("Questo nostro amore - Puntata  4", 0),
+                item("Questo nostro amore - Puntata 1", 1),
+                item("Questo nostro amore - Puntata 2", 2),
+            ],
+        }];
+
+        let normalized = normalize_grouped_catalog(groups);
+        let titles = normalized[0]
+            .items
+            .iter()
+            .map(|item| item.title.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            titles,
+            vec![
+                "Questo nostro amore - Puntata 1",
+                "Questo nostro amore - Puntata 2",
+                "Questo nostro amore - Puntata  4",
+            ]
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn debug_dump_current_grouped_catalog_to_file() {
+        let groups = super::load_grouped_catalog().expect("expected Rai grouped catalog");
+        let path =
+            super::write_grouped_catalog_dump(&groups).expect("expected Rai grouped catalog dump");
+        println!("{}", path.display());
+    }
 }

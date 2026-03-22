@@ -12,6 +12,8 @@ Nowości
 Ulepszenia
 • Funkcja „Odtwórz dźwięk ze streamingu...” pozwala teraz także wyszukiwać w YouTube po dowolnym tekście albo wkleić link do kanału YouTube, aby wyświetlić jego wyniki.
 • Poprawiono fokus podczas „Odtwórz dźwięk ze streamingu...”, dzięki czemu okno postępu pozostaje stabilniejsze podczas pobierania i konwersji.
+• Dodano dwie nowe akcje czytania w menu Głos: `Poprzednie zdanie` i `Następne zdanie`, z konfigurowalnymi skrótami do przeskakiwania podczas czytania tekstu.
+• Domyślny skrót dla `Wykonaj plik w interpreterze` to teraz `Ctrl+Shift+F5`, dzięki czemu `Shift+F5` może być domyślnie używany dla `Poprzednie zdanie`.
 • Dodano zarządzanie profilami głosu w Opcje > Głos: profile można dodawać, zmieniać nazwę i usuwać.
 • Rozszerzono w Opcje > Audio wybór interwału przewijania wstecz podczas odtwarzania o nowe wartości od 1 sekundy do 2 godzin.
 • Dodano tłumaczenie rosyjskie dzięki Dmitriyowi.

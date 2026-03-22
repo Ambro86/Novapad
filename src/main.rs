@@ -142,10 +142,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
     TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
     WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
-    WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_INITMENUPOPUP,
-    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
-    WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD,
-    WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_GETTEXTLENGTH,
+    WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
+    WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW,
+    WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP,
+    WS_VISIBLE,
 };
 use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
 
@@ -3437,6 +3438,7 @@ pub(crate) struct AppState {
     tts_session: Option<TtsSession>,
     tts_next_session_id: u64,
     tts_last_offset: i32,
+    tts_pending_start_pos: Option<i32>,
     edge_voices: Vec<VoiceInfo>,
     sapi_voices: Vec<VoiceInfo>,
 
@@ -4840,6 +4842,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     tts_session: None,
                     tts_next_session_id: 1,
                     tts_last_offset: 0,
+                    tts_pending_start_pos: None,
                     edge_voices: Vec::new(),
                     sapi_voices: Vec::new(),
 
@@ -5576,6 +5579,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     {
                         state.tts_session = None;
                         state.tts_last_offset = 0;
+                        state.tts_pending_start_pos = None;
                         prevent_sleep(false);
                     }
                 });
@@ -5596,6 +5600,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                             ));
                         }
                         state.tts_last_offset = safe_offset;
+                        state.tts_pending_start_pos = None;
                         if state.settings.move_cursor_during_reading
                             && let Some(doc) = state.docs.get(state.current)
                         {
@@ -5630,6 +5635,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     {
                         state.tts_session = None;
                         state.tts_last_offset = 0;
+                        state.tts_pending_start_pos = None;
                         prevent_sleep(false);
                         should_show = true;
                     }
@@ -6025,7 +6031,31 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     }
                     IDM_FILE_READ_START => {
                         log_debug("Menu: Start reading");
-                        tts_engine::start_tts_from_caret(hwnd);
+                        let mut restart = None;
+                        with_state(hwnd, |state| {
+                            state.tts_pending_start_pos = None;
+                            if let Some(doc) = state.docs.get(state.current)
+                                && !matches!(doc.format, FileFormat::Audiobook)
+                            {
+                                restart = Some(doc.hwnd_edit);
+                            }
+                        });
+                        if let Some(hwnd_edit) = restart {
+                            tts_engine::stop_tts_playback(hwnd);
+                            restart_tts_from_position(hwnd, hwnd_edit, 0);
+                        } else {
+                            tts_engine::start_tts_from_caret(hwnd);
+                        }
+                        LRESULT(0)
+                    }
+                    IDM_FILE_READ_PREVIOUS_SENTENCE => {
+                        log_debug("Menu: Read previous sentence");
+                        jump_tts_sentence(hwnd, SentenceNavigationDirection::Previous);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_READ_NEXT_SENTENCE => {
+                        log_debug("Menu: Read next sentence");
+                        jump_tts_sentence(hwnd, SentenceNavigationDirection::Next);
                         LRESULT(0)
                     }
                     IDM_FILE_EXECUTE => {
@@ -8548,35 +8578,214 @@ unsafe extern "system" fn voice_combo_subclass_proc(
 }
 
 pub(crate) fn restart_tts_from_current_offset(hwnd: HWND) {
-    unsafe {
-        let mut restart = None;
-        with_state(hwnd, |state| {
-            if let Some(session) = &state.tts_session
-                && let Some(doc) = state.docs.get(state.current)
-            {
-                if matches!(doc.format, FileFormat::Audiobook) {
-                    return;
-                }
-                let pos = (session.initial_caret_pos + state.tts_last_offset).max(0);
-                restart = Some((doc.hwnd_edit, pos));
+    let mut restart = None;
+    with_state(hwnd, |state| {
+        if let Some(session) = &state.tts_session
+            && let Some(doc) = state.docs.get(state.current)
+        {
+            if matches!(doc.format, FileFormat::Audiobook) {
+                return;
             }
-        });
-        let Some((hwnd_edit, pos)) = restart else {
+            let pos = (session.initial_caret_pos + state.tts_last_offset).max(0);
+            restart = Some((doc.hwnd_edit, pos));
+        }
+    });
+    let Some((hwnd_edit, pos)) = restart else {
+        return;
+    };
+    tts_engine::stop_tts_playback(hwnd);
+    let pos = adjust_tts_restart_pos(hwnd_edit, pos);
+    restart_tts_from_position(hwnd, hwnd_edit, pos);
+}
+
+#[derive(Clone, Copy, Debug)]
+enum SentenceNavigationDirection {
+    Previous,
+    Next,
+}
+
+fn jump_tts_sentence(hwnd: HWND, direction: SentenceNavigationDirection) {
+    let mut navigation = None;
+    with_state(hwnd, |state| {
+        let Some(doc) = state.docs.get(state.current) else {
             return;
         };
-        tts_engine::stop_tts_playback(hwnd);
-        let pos = adjust_tts_restart_pos(hwnd_edit, pos);
-        let mut cr = CHARRANGE {
-            cpMin: pos,
-            cpMax: pos,
+        if matches!(doc.format, FileFormat::Audiobook) {
+            return;
+        }
+        let current_pos = if let Some(pending) = state.tts_pending_start_pos {
+            pending.max(0)
+        } else if let Some(session) = &state.tts_session {
+            (session.initial_caret_pos + state.tts_last_offset).max(0)
+        } else {
+            spellcheck_caret_char_index(doc.hwnd_edit).unwrap_or(0)
         };
+        navigation = Some((doc.hwnd_edit, current_pos));
+    });
+    let Some((hwnd_edit, current_pos)) = navigation else {
+        return;
+    };
+    let text = editor_text_for_offsets(hwnd_edit);
+    let Some(target_pos) = sentence_navigation_target(&text, current_pos, direction) else {
+        log_debug(&format!(
+            "TTS sentence jump: no target direction={:?} current_pos={}",
+            direction, current_pos
+        ));
+        return;
+    };
+    let current_preview =
+        sentence_preview_at_pos(&text, current_pos).unwrap_or_else(|| "(none)".to_string());
+    let target_preview =
+        sentence_preview_at_pos(&text, target_pos).unwrap_or_else(|| "(none)".to_string());
+    tts_engine::stop_tts_playback(hwnd);
+    with_state(hwnd, |state| {
+        state.tts_pending_start_pos = Some(target_pos);
+    });
+    log_debug(&format!(
+        "TTS sentence jump: direction={:?} current_pos={} target_pos={} current_preview=\"{}\" target_preview=\"{}\"",
+        direction, current_pos, target_pos, current_preview, target_preview
+    ));
+    restart_tts_from_position(hwnd, hwnd_edit, target_pos);
+}
+
+fn sentence_navigation_target(
+    text: &str,
+    current_pos: i32,
+    direction: SentenceNavigationDirection,
+) -> Option<i32> {
+    const SENTENCE_NAVIGATION_TOLERANCE_UTF16: i32 = 4;
+
+    let starts = sentence_start_offsets_utf16(text);
+    if starts.is_empty() {
+        return None;
+    }
+    let current = current_pos.max(0);
+    match direction {
+        SentenceNavigationDirection::Previous => {
+            let effective_current = current.saturating_sub(SENTENCE_NAVIGATION_TOLERANCE_UTF16);
+            let previous_index = starts.partition_point(|start| *start < effective_current);
+            if previous_index == 0 {
+                None
+            } else {
+                starts.get(previous_index - 1).copied()
+            }
+        }
+        SentenceNavigationDirection::Next => {
+            let effective_current = current.saturating_add(SENTENCE_NAVIGATION_TOLERANCE_UTF16);
+            let current_index = starts.partition_point(|start| *start <= effective_current);
+            starts.get(current_index).copied()
+        }
+    }
+}
+
+fn sentence_start_offsets_utf16(text: &str) -> Vec<i32> {
+    let mut starts = Vec::new();
+    let mut offset = 0usize;
+    let mut start_of_sentence = true;
+    let chars: Vec<char> = text.chars().collect();
+    for (index, ch) in chars.iter().copied().enumerate() {
+        let start = offset;
+        if start_of_sentence && !ch.is_whitespace() {
+            starts.push(start as i32);
+            start_of_sentence = false;
+        }
+        offset += ch.len_utf16();
+        let prev = index.checked_sub(1).and_then(|i| chars.get(i)).copied();
+        let next = chars.get(index + 1).copied();
+        if is_sentence_terminator(ch, prev, next) {
+            start_of_sentence = true;
+        }
+    }
+    starts
+}
+
+fn is_sentence_terminator(ch: char, prev: Option<char>, next: Option<char>) -> bool {
+    match ch {
+        '!' | '?' => true,
+        '.' => {
+            if prev.is_some_and(|c| c.is_ascii_digit()) && next.is_some_and(|c| c.is_ascii_digit())
+            {
+                return false;
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+fn sentence_preview_at_pos(text: &str, pos: i32) -> Option<String> {
+    let starts = sentence_start_offsets_utf16(text);
+    if starts.is_empty() {
+        return None;
+    }
+    let position = pos.max(0);
+    let effective_position = position.saturating_add(4);
+    let index = starts.partition_point(|start| *start <= effective_position);
+    let sentence_index = index.saturating_sub(1);
+    let start = *starts.get(sentence_index)? as usize;
+    let end = starts
+        .get(sentence_index + 1)
+        .copied()
+        .unwrap_or(text.encode_utf16().count() as i32)
+        .max(0) as usize;
+    let snippet = utf16_slice_to_string(text, start, end)
+        .trim()
+        .replace('\n', " ");
+    if snippet.is_empty() {
+        None
+    } else {
+        Some(snippet.chars().take(120).collect())
+    }
+}
+
+fn utf16_slice_to_string(text: &str, start_utf16: usize, end_utf16: usize) -> String {
+    let mut utf16_index = 0usize;
+    let mut out = String::new();
+    for ch in text.chars() {
+        let ch_len = ch.len_utf16();
+        let ch_start = utf16_index;
+        let ch_end = utf16_index + ch_len;
+        if ch_end <= start_utf16 {
+            utf16_index = ch_end;
+            continue;
+        }
+        if ch_start >= end_utf16 {
+            break;
+        }
+        out.push(ch);
+        utf16_index = ch_end;
+    }
+    out
+}
+
+fn restart_tts_from_position(hwnd: HWND, hwnd_edit: HWND, pos: i32) {
+    let mut original_selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+    let mut cr = CHARRANGE {
+        cpMin: pos,
+        cpMax: pos,
+    };
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut original_selection as *mut _ as isize),
+        );
         SendMessageW(
             hwnd_edit,
             EM_EXSETSEL,
             WPARAM(0),
             LPARAM(&mut cr as *mut _ as isize),
         );
-        tts_engine::start_tts_from_caret(hwnd);
+    }
+    tts_engine::start_tts_from_caret(hwnd);
+    unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut original_selection as *mut _ as isize),
+        );
     }
 }
 
@@ -8584,7 +8793,7 @@ fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {
     if pos <= 0 {
         return 0;
     }
-    let text = editor_manager::get_edit_text(hwnd_edit);
+    let text = editor_text_for_offsets(hwnd_edit);
     if text.is_empty() {
         return pos;
     }
@@ -8639,6 +8848,21 @@ fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {
         return items[idx].0 as i32;
     }
     pos
+}
+
+fn editor_text_for_offsets(hwnd_edit: HWND) -> String {
+    let total_len =
+        unsafe { SendMessageW(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 } as i32;
+    if total_len <= 0 {
+        return String::new();
+    }
+    editor_manager::get_text_range(
+        hwnd_edit,
+        CHARRANGE {
+            cpMin: 0,
+            cpMax: total_len,
+        },
+    )
 }
 
 fn spellcheck_caret_char_index(hwnd_edit: HWND) -> Option<i32> {
@@ -10262,6 +10486,14 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         dispatch_shortcut_command(hwnd, IDM_FILE_READ_START);
         return true;
     }
+    if shortcut_matches_message(shortcuts.read_previous_sentence, msg) {
+        dispatch_shortcut_command(hwnd, IDM_FILE_READ_PREVIOUS_SENTENCE);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.read_next_sentence, msg) {
+        dispatch_shortcut_command(hwnd, IDM_FILE_READ_NEXT_SENTENCE);
+        return true;
+    }
     if shortcut_matches_message(shortcuts.read_stop, msg) {
         dispatch_shortcut_command(hwnd, IDM_FILE_READ_STOP);
         return true;
@@ -11005,7 +11237,9 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{audio_bookmark_position_and_snippet, clamp_tts_chunk_offset};
+    use super::{
+        audio_bookmark_position_and_snippet, clamp_tts_chunk_offset, sentence_start_offsets_utf16,
+    };
 
     #[test]
     fn audio_bookmark_position_rounds_down_and_formats() {
@@ -11039,6 +11273,12 @@ mod tests {
     fn tts_chunk_offset_clamps_negative_input() {
         assert_eq!(clamp_tts_chunk_offset(0, -7), 0);
         assert_eq!(clamp_tts_chunk_offset(25, -1), 25);
+    }
+
+    #[test]
+    fn sentence_navigation_does_not_split_on_thousands_separators() {
+        let text = "Sono chiamati alle urne 51.424.729 cittadini, tra cui 5.477.619 residenti all’estero. Si vota.";
+        assert_eq!(sentence_start_offsets_utf16(text), vec![0, 86]);
     }
 }
 

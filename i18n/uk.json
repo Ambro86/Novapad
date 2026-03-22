@@ -82,6 +82,8 @@
   "file.close_others": "Закрити &інші файли\tCtrl+Shift+W",
   "file.recent": "О&станні файли",
   "file.read_start": "Почати &читання\tF5",
+  "file.read_previous_sentence": "Попереднє речення",
+  "file.read_next_sentence": "Наступне речення",
   "file.execute": "Виконати файл за допомогою &інтерпретатора\tShift+F5",
   "file.read_pause": "&Призупинити/продовжити читання\tF4",
   "file.read_stop": "З&упинити читання\tF6",

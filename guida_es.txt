@@ -72,11 +72,14 @@ Gestionar marcadores: Ver, saltar o eliminar marcadores guardados. Al abrir un a
  
 Voz y audio:
 Lectura: F5 Iniciar lectura, F4 Pausar/Reanudar, F6 Detener lectura.
+Frase anterior: Shift+F5 salta a la frase anterior durante la lectura.
+Siguiente frase: Ctrl+F5 salta a la frase siguiente durante la lectura.
 Favoritos durante la lectura: F9 voz favorita anterior, F10 voz favorita siguiente.
 Grabar audiolibro: Crear un archivo MP3 a partir del texto actual (Ctrl+R).
 Audiolibros por lotes: Convertir una lista de archivos en audiolibros (Ctrl+Shift+B).
 Grabar podcast: Grabar un podcast desde el micrófono y/o el audio del sistema (Ctrl+Shift+R).
 Convertir audio: Convertir archivos de audio/video a otros formatos de audio (Ctrl+Shift+A).
+Ejecutar archivo: ejecuta el archivo actual con el intérprete configurado (Ctrl+Shift+F5).
 
 Herramientas:
 Audiolibros en lote: Abrir la ventana para convertir una lista de archivos (o carpetas completas) en audiolibros.

@@ -75,6 +75,8 @@
   "file.close_others": "关闭其他文件 Ctrl+Shift+W",
   "file.recent": "近期文件",
   "file.read_start": "开始阅读 F5",
+  "file.read_previous_sentence": "上一句",
+  "file.read_next_sentence": "下一句",
   "file.read_pause": "暂停/继续阅读 F4",
   "file.read_stop": "停止阅读 F6",
   "file.audiobook": "录制有声书... Ctrl+R",

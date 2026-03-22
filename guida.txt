@@ -62,11 +62,14 @@ Gestisci segnalibri: visualizza, salta o elimina i segnalibri salvati. All'apert
 
 Voce e audio:
 Lettura: F5 avvia la lettura, F4 pausa/riprendi, F6 ferma la lettura.
+Frase precedente: Shift+F5 salta alla frase precedente durante la lettura.
+Frase successiva: Ctrl+F5 salta alla frase successiva durante la lettura.
 Preferiti durante la lettura: F9 voce preferita precedente, F10 voce preferita successiva.
 Registra audiolibro: crea un file MP3 dal testo corrente (Ctrl+R).
 Registra in batch: converte una lista di file in audiolibri (Ctrl+Shift+B).
 Crea podcast: crea un podcast da microfono e/o audio di sistema (Ctrl+Shift+R).
 Converti audio: converte file audio/video in altri formati audio (Ctrl+Shift+A).
+Esegui file: esegue il file corrente con l'interprete configurato (Ctrl+Shift+F5).
 
 Strumenti:
 Audiolibri in sequenza: apre la finestra per convertire una lista di file (o intere cartelle) in audiolibri.

@@ -62,11 +62,14 @@ Hantera bokmärken: visa, hoppa till eller ta bort sparade bokmärken. När en f
 
 Röst och ljud:
 Läsning: F5 startar läsning, F4 pausa/återuppta, F6 stoppa läsning.
+Föregående mening: Shift+F5 går till föregående mening under läsning.
+Nästa mening: Ctrl+F5 går till nästa mening under läsning.
 Favoriter under läsning: F9 föregående favoritröst, F10 nästa favoritröst.
 Spela in ljudbok: skapar en MP3-fil från den aktuella texten (Ctrl+R).
 Batch-ljudböcker: konverterar en lista med filer till ljudböcker (Ctrl+Shift+B).
 Skapa podd: skapar en podd från mikrofon och/eller systemljud (Ctrl+Shift+R).
 Konvertera ljud: konverterar ljud-/videofiler till andra ljudformat (Ctrl+Shift+A).
+Kör fil med tolk: kör den aktuella filen med den konfigurerade tolken (Ctrl+Shift+F5).
 
 Verktyg:
 Satsvis ljudböcker: öppnar fönstret för att konvertera en lista med filer (eller hela mappar) till ljudböcker.

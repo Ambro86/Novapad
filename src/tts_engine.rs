@@ -658,6 +658,7 @@ pub fn stop_tts_playback(hwnd: HWND) {
                 }
             }
             state.tts_session = None;
+            state.tts_pending_start_pos = None;
         })
     }
     .is_none()
@@ -3909,11 +3910,22 @@ async fn download_edge_chunk_ws_strict_small_lt(
 fn split_sentences(text: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let mut start = 0usize;
-    let mut iter = text.char_indices().peekable();
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
 
-    while let Some((idx, ch)) = iter.next() {
+    for (index, (idx, ch)) in chars.iter().copied().enumerate() {
         if matches!(ch, '.' | '!' | '?' | ';' | ':') {
-            let next_is_space = iter.peek().map(|(_, c)| c.is_whitespace()).unwrap_or(true);
+            let prev = index
+                .checked_sub(1)
+                .and_then(|i| chars.get(i))
+                .map(|(_, c)| *c);
+            let next = chars.get(index + 1).map(|(_, c)| *c);
+            let next_is_space = next.map(|c| c.is_whitespace()).unwrap_or(true);
+            let is_numeric_separator = matches!(ch, '.' | ':')
+                && prev.is_some_and(|c| c.is_ascii_digit())
+                && next.is_some_and(|c| c.is_ascii_digit());
+            if is_numeric_separator {
+                continue;
+            }
             if next_is_space {
                 let end = idx + ch.len_utf8();
                 if end > start {
@@ -5490,7 +5502,7 @@ mod tests {
         is_edge_text_usable, normalize_for_tts, parse_edge_binary_audio_payload,
         parse_sapi4_part_index, parse_voice_tag_override, prepare_tts_text, preview_for_log,
         sanitize_edge_text, split_into_tts_chunks, split_long_sentence_edge_with_limit,
-        split_text_for_engine, split_voice_tag_spans, strip_dashed_lines,
+        split_sentences, split_text_for_engine, split_voice_tag_spans, strip_dashed_lines,
     };
 
     #[test]
@@ -5691,6 +5703,18 @@ mod tests {
         );
         assert!(!chunks.is_empty());
         assert!(chunks.iter().all(|c| c.text_to_read.trim() != "."));
+    }
+
+    #[test]
+    fn split_sentences_keeps_number_groups_intact() {
+        let text = "Sono chiamati alle urne 51.424.729 cittadini, tra cui 5.477.619 residenti all’estero. Si vota alle 12:30.";
+        assert_eq!(
+            split_sentences(text),
+            vec![
+                "Sono chiamati alle urne 51.424.729 cittadini, tra cui 5.477.619 residenti all’estero.",
+                " Si vota alle 12:30."
+            ]
+        );
     }
 
     #[test]

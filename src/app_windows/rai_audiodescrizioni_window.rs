@@ -153,6 +153,17 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
         return;
     }
 
+    match rai_audiodescrizioni::write_grouped_catalog_dump(&groups) {
+        Ok(path) => crate::log_debug(&format!(
+            "Rai grouped catalog dump written to {}",
+            path.display()
+        )),
+        Err(err) => crate::log_debug(&format!(
+            "Failed to write Rai grouped catalog dump: {}",
+            err
+        )),
+    }
+
     let grouped_items = build_grouped_items(&groups);
     let Some(selected_value) =
         interpreter_select_window::select_grouped_interpreter_without_parent_restore_on_accept(
@@ -311,6 +322,7 @@ fn handle_missing_luce_key(parent: HWND, language: Language, err: &str) -> bool 
     if !rai_audiodescrizioni::is_luce_key_missing_error(err) {
         return false;
     }
+    crate::log_debug(&format!("Rai Luce missing key handler invoked: {}", err));
 
     let ask = unsafe {
         MessageBoxW(
@@ -335,7 +347,10 @@ fn handle_missing_luce_key(parent: HWND, language: Language, err: &str) -> bool 
         return true;
     }
 
-    let body = format!("Richiesta da {nome} {cognome}\r\nEmail: {mail}");
+    let body = format!(
+        "Richiesta da: {nome} {cognome}\r\nEmail: {mail}\r\nSistema operativo: Windows\r\nLingua: {}",
+        app_language_label(language)
+    );
     let uri = format!(
         "mailto:{AUTHOR_EMAIL}?subject={}&body={}",
         mailto_encode_component(REQUEST_SUBJECT),
@@ -345,6 +360,25 @@ fn handle_missing_luce_key(parent: HWND, language: Language, err: &str) -> bool 
         show_error(parent, language, &open_err);
     }
     true
+}
+
+fn app_language_label(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "Italiano",
+        Language::English => "English",
+        Language::Spanish => "Español",
+        Language::Portuguese => "Português",
+        Language::Swedish => "Svenska",
+        Language::Vietnamese => "Tiếng Việt",
+        Language::Czech => "Čeština",
+        Language::Polish => "Polski",
+        Language::French => "Français",
+        Language::Serbian => "Srpski",
+        Language::Ukrainian => "Українська",
+        Language::Lithuanian => "Lietuvių",
+        Language::Russian => "Русский",
+        Language::Chinese => "中文",
+    }
 }
 
 fn mailto_encode_component(value: &str) -> String {

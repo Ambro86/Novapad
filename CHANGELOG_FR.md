@@ -1,6 +1,6 @@
 # Journal des modifications
 
-Version 0.6.8 – 2026-03-21
+Version 0.6.8 – 2026-03-22
 
 Nouveautés
 • Ajout d’un nouvel élément dans le menu Lecture permettant de transcrire n’importe quel fichier audio ou vidéo avec Whisper. Une nouvelle section « IA et transcription » est désormais disponible dans Options, où vous pouvez choisir le modèle, activer la prise en charge optionnelle de CUDA pour les cartes graphiques NVIDIA, conserver la langue d’origine et activer ou désactiver les horodatages.

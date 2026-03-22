@@ -1,6 +1,6 @@
 # Dziennik zmian
 
-Wersja 0.6.8 – 2026-03-21
+Wersja 0.6.8 – 2026-03-22
 
 Nowości
 • Dodano nową pozycję w menu Odtwarzanie, która umożliwia transkrypcję dowolnego pliku audio lub wideo za pomocą Whisper. W Opcjach dostępna jest nowa sekcja „AI i transkrypcja”, w której można wybrać model, włączyć opcjonalną obsługę CUDA dla kart graficznych NVIDIA, zachować oryginalny język oraz włączyć lub wyłączyć znaczniki czasu.

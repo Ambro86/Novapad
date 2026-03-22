@@ -1,6 +1,6 @@
 # Changelog
 
-Versione 0.6.8 – 2026-03-21
+Versione 0.6.8 – 2026-03-22
 
 Novità
 • Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.

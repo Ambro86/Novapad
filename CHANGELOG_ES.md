@@ -1,6 +1,6 @@
 # Changelog
 
-Versión 0.6.8 – 2026-03-21
+Versión 0.6.8 – 2026-03-22
 
 Novedades
 • Añadido un nuevo elemento en el menú Reproducir que permite transcribir cualquier archivo de audio o vídeo con Whisper. En Opciones hay una nueva sección llamada «IA y transcripción», donde se puede elegir el modelo, habilitar la compatibilidad opcional con CUDA para tarjetas gráficas NVIDIA, mantener el idioma original y activar o desactivar las marcas de tiempo.

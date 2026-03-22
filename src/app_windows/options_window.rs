@@ -10924,7 +10924,11 @@ fn apply_options_dialog(hwnd: HWND) {
             let mut buf = vec![0u16; (rai_luce_code_len + 1) as usize];
             let read = GetWindowTextW(edit_rai_luce_code, &mut buf);
             let text = String::from_utf16_lossy(&buf[..read as usize]);
-            settings.rai_luce_code = text.trim().to_string();
+            let trimmed = text.trim().to_string();
+            if trimmed.is_empty() {
+                crate::settings::request_explicit_rai_luce_clear();
+            }
+            settings.rai_luce_code = trimmed;
         }
         let whisper_sel = SendMessageW(combo_whisper_model, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
         settings.whisper_model_profile = match whisper_sel {

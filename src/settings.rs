@@ -10,6 +10,7 @@ use std::os::windows::prelude::*;
 use std::path::PathBuf;
 #[cfg(not(feature = "standalone"))]
 use std::path::{Component, Prefix};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{OnceLock, RwLock};
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, HANDLE, HLOCAL, LocalFree};
 use windows::Win32::Security::Cryptography::{
@@ -34,6 +35,7 @@ pub const VOICE_LIST_URL: &str =
     "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list";
 
 static RAI_LUCE_CODE_CACHE: OnceLock<RwLock<Option<String>>> = OnceLock::new();
+static RAI_LUCE_EXPLICIT_CLEAR_PENDING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct VoiceInfo {
@@ -2178,6 +2180,33 @@ fn persist_rai_luce_backup_from_encrypted(encrypted_code: &str) {
     }
 }
 
+fn delete_rai_luce_backup() {
+    let path = rai_luce_backup_path();
+    match std::fs::remove_file(&path) {
+        Ok(()) => {
+            log_rai_luce_event(&format!("backup_deleted path={}", path.display()));
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => {
+            crate::log_debug(&format!(
+                "Failed to delete Rai Luce backup {}: {}",
+                path.display(),
+                err
+            ));
+            log_rai_luce_event(&format!(
+                "backup_delete_failed path={} err={}",
+                path.display(),
+                err
+            ));
+        }
+    }
+}
+
+pub fn request_explicit_rai_luce_clear() {
+    RAI_LUCE_EXPLICIT_CLEAR_PENDING.store(true, Ordering::SeqCst);
+    log_rai_luce_event("explicit Rai Luce clear requested");
+}
+
 pub fn load_saved_rai_luce_code() -> Option<String> {
     if let Some(code) = cached_rai_luce_code() {
         log_rai_luce_event(&format!(
@@ -2212,8 +2241,13 @@ pub fn load_saved_rai_luce_code() -> Option<String> {
 pub fn save_settings(settings: AppSettings) {
     apply_network_proxy_settings(&settings);
     let mut persisted = settings;
+    let explicit_clear_requested = RAI_LUCE_EXPLICIT_CLEAR_PENDING.swap(false, Ordering::SeqCst);
     if persisted.rai_luce_code.trim().is_empty() {
-        if let Some(restored) = cached_rai_luce_code()
+        if explicit_clear_requested {
+            log_rai_luce_event("save_settings honoring explicit Rai Luce clear request");
+            update_cached_rai_luce_code("");
+            delete_rai_luce_backup();
+        } else if let Some(restored) = cached_rai_luce_code()
             .or_else(load_saved_rai_luce_code_from_settings_file)
             .or_else(|| load_saved_rai_luce_code_from_path(&rai_luce_backup_path()))
         {
@@ -2244,6 +2278,8 @@ pub fn save_settings(settings: AppSettings) {
     persisted.rai_luce_code = encrypt_rai_luce_code(&persisted.rai_luce_code);
     if !persisted.rai_luce_code.trim().is_empty() {
         persist_rai_luce_backup_from_encrypted(&persisted.rai_luce_code);
+    } else if explicit_clear_requested {
+        delete_rai_luce_backup();
     }
     let path = get_settings_path();
     if let Some(parent) = path.parent()

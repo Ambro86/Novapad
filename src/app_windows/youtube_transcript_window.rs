@@ -80,6 +80,7 @@ const STREAM_DOWNLOAD_STALL_SECS: u64 = 180;
 const STREAM_POST_100_GRACE_SECS: u64 = 25;
 const STREAM_RETRY_TIMEOUT_SECS: u64 = 120;
 static YTDLP_UPDATE_CHECKED: AtomicBool = AtomicBool::new(false);
+static PENDING_STREAM_REOPEN_INPUT: Mutex<Option<String>> = Mutex::new(None);
 
 // YouTube InnerTube API constants
 const INNERTUBE_API_URL: &str = "https://www.youtube.com/youtubei/v1/player";
@@ -1522,9 +1523,40 @@ struct StreamCollectionEntry {
     url: String,
 }
 
+struct ResolvedStreamSelection {
+    url: String,
+    collection_url: Option<String>,
+}
+
 const STREAM_SELECTION_PAGE_SIZE: usize = 20;
 const STREAM_SELECTION_LOAD_MORE_KEY: &str = "stream_audio.load_more_videos";
 const STREAM_SELECTION_PREVIOUS_KEY: &str = "stream_audio.previous_results";
+
+fn stream_entry_url(entry: &serde_json::Value) -> Option<String> {
+    entry
+        .get("webpage_url")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string())
+        .or_else(|| {
+            entry
+                .get("url")
+                .and_then(|value| value.as_str())
+                .map(|value| {
+                    if value.starts_with("http://") || value.starts_with("https://") {
+                        value.to_string()
+                    } else if value.starts_with('@')
+                        || value.starts_with("channel/")
+                        || value.starts_with("user/")
+                        || value.starts_with("c/")
+                        || value.starts_with("playlist")
+                    {
+                        format!("https://www.youtube.com/{value}")
+                    } else {
+                        format!("https://www.youtube.com/watch?v={value}")
+                    }
+                })
+        })
+}
 
 fn collect_stream_collection_entries(
     entries: &[serde_json::Value],
@@ -1532,23 +1564,7 @@ fn collect_stream_collection_entries(
 ) -> Vec<StreamCollectionEntry> {
     let mut out = Vec::new();
     for entry in entries.iter() {
-        let video_url = entry
-            .get("webpage_url")
-            .and_then(|value| value.as_str())
-            .map(|value| value.to_string())
-            .or_else(|| {
-                entry
-                    .get("url")
-                    .and_then(|value| value.as_str())
-                    .map(|value| {
-                        if value.starts_with("http://") || value.starts_with("https://") {
-                            value.to_string()
-                        } else {
-                            format!("https://www.youtube.com/watch?v={value}")
-                        }
-                    })
-            });
-        let Some(video_url) = video_url else {
+        let Some(video_url) = stream_entry_url(entry) else {
             continue;
         };
         out.push(StreamCollectionEntry {
@@ -1618,6 +1634,8 @@ fn probe_youtube_search_entries(
     page: usize,
 ) -> Result<(Vec<StreamCollectionEntry>, bool), String> {
     let limit = (page + 1) * STREAM_SELECTION_PAGE_SIZE + 1;
+    let encoded_query: String = url::form_urlencoded::byte_serialize(query.as_bytes()).collect();
+    let search_url = format!("https://www.youtube.com/results?search_query={encoded_query}");
     let output = ytdlp_command(ytdlp_path)
         .arg("--flat-playlist")
         .arg("--dump-single-json")
@@ -1631,7 +1649,7 @@ fn probe_youtube_search_entries(
             youtube_ui_language_code(language)
         ))
         .arg("--")
-        .arg(format!("ytsearch{limit}:{query}"))
+        .arg(&search_url)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .output()
@@ -1659,10 +1677,9 @@ fn probe_youtube_search_entries(
         .take(STREAM_SELECTION_PAGE_SIZE)
         .cloned()
         .collect();
-    Ok((
-        collect_stream_collection_entries(&page_entries, language),
-        has_more,
-    ))
+    let mut collected = collect_stream_collection_entries(&page_entries, language);
+    collected.sort_by_key(|entry| !is_youtube_collection_url(&entry.url));
+    Ok((collected, has_more))
 }
 
 fn choose_stream_collection_entry_page(
@@ -1695,9 +1712,12 @@ fn choose_youtube_collection_entry(
     ytdlp_path: &Path,
     url: &str,
     initial_progress: Option<HWND>,
-) -> Result<Option<String>, String> {
+) -> Result<Option<ResolvedStreamSelection>, String> {
     if !is_youtube_collection_url(url) {
-        return Ok(Some(url.to_string()));
+        return Ok(Some(ResolvedStreamSelection {
+            url: url.to_string(),
+            collection_url: None,
+        }));
     }
 
     let mut page = 0usize;
@@ -1745,8 +1765,12 @@ fn choose_youtube_collection_entry(
         }
         close_progress_dialog(progress);
         if entries.is_empty() {
+            crate::log_debug(&format!(
+                "stream transition [collection_probe.empty]: page={} url={}",
+                page, url
+            ));
             return if page == 0 {
-                Ok(Some(url.to_string()))
+                Err(i18n::tr(language, "stream_audio.no_matching_videos"))
             } else {
                 Ok(None)
             };
@@ -1765,10 +1789,30 @@ fn choose_youtube_collection_entry(
             page = page.saturating_sub(1);
             continue;
         }
-        return Ok(entries
+        let selected_url = entries
             .into_iter()
             .find(|entry| entry.label == selected)
-            .map(|entry| entry.url));
+            .map(|entry| entry.url);
+        if let Some(selected_url) = selected_url {
+            if is_youtube_collection_url(&selected_url) {
+                crate::log_debug(&format!(
+                    "stream transition [collection_probe.selected_collection]: url={}",
+                    selected_url
+                ));
+                return choose_youtube_collection_entry(
+                    parent,
+                    language,
+                    ytdlp_path,
+                    &selected_url,
+                    None,
+                );
+            }
+            return Ok(Some(ResolvedStreamSelection {
+                url: selected_url,
+                collection_url: Some(url.to_string()),
+            }));
+        }
+        return Ok(None);
     }
 }
 
@@ -1778,7 +1822,7 @@ fn choose_youtube_search_entry(
     ytdlp_path: &Path,
     query: &str,
     initial_progress: Option<HWND>,
-) -> Result<Option<String>, String> {
+) -> Result<Option<ResolvedStreamSelection>, String> {
     let mut page = 0usize;
     let mut shared_progress = initial_progress;
     loop {
@@ -1844,10 +1888,30 @@ fn choose_youtube_search_entry(
             page = page.saturating_sub(1);
             continue;
         }
-        return Ok(entries
+        let selected_url = entries
             .into_iter()
             .find(|entry| entry.label == selected)
-            .map(|entry| entry.url));
+            .map(|entry| entry.url);
+        if let Some(selected_url) = selected_url {
+            if is_youtube_collection_url(&selected_url) {
+                crate::log_debug(&format!(
+                    "stream transition [search_probe.selected_collection]: url={}",
+                    selected_url
+                ));
+                return choose_youtube_collection_entry(
+                    parent,
+                    language,
+                    ytdlp_path,
+                    &selected_url,
+                    None,
+                );
+            }
+            return Ok(Some(ResolvedStreamSelection {
+                url: selected_url,
+                collection_url: None,
+            }));
+        }
+        return Ok(None);
     }
 }
 fn resolve_stream_input_url(
@@ -1856,7 +1920,7 @@ fn resolve_stream_input_url(
     ytdlp_path: &Path,
     input: &str,
     initial_progress: Option<HWND>,
-) -> Result<Option<String>, String> {
+) -> Result<Option<ResolvedStreamSelection>, String> {
     if looks_like_valid_stream_url(input) {
         return choose_youtube_collection_entry(
             parent,
@@ -1867,6 +1931,21 @@ fn resolve_stream_input_url(
         );
     }
     choose_youtube_search_entry(parent, language, ytdlp_path, input, initial_progress)
+}
+
+fn is_members_only_stream_error(err: &str) -> bool {
+    let err_lc = err.to_ascii_lowercase();
+    err_lc.contains("members-only")
+        || err_lc.contains("members only")
+        || err_lc.contains("join this channel to get access to members-only content")
+}
+
+fn members_only_stream_message(language: Language) -> String {
+    format!(
+        "{} {}",
+        i18n::tr(language, "stream_audio.members_only_video"),
+        i18n::tr(language, "stream_audio.choose_another_video")
+    )
 }
 fn looks_like_valid_stream_url(input: &str) -> bool {
     let Some(normalized) = normalize_youtube_input_for_download(input) else {
@@ -2488,6 +2567,18 @@ fn show_stream_dialog(
     language: Language,
     default_format: StreamOutputFormat,
 ) -> Option<StreamDialogResult> {
+    if let Some(input) = take_pending_stream_reopen_input() {
+        crate::log_debug(&format!(
+            "stream transition [reopen_stream_selection]: input={}",
+            input
+        ));
+        return Some(StreamDialogResult {
+            url: input,
+            format: default_format,
+            quality: StreamQualitySelection::Original,
+            direct_play: false,
+        });
+    }
     let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(STREAM_DIALOG_CLASS_NAME);
     let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
@@ -2566,6 +2657,25 @@ fn show_stream_dialog(
         }
     }
     result_value
+}
+
+fn set_pending_stream_reopen_input(input: Option<String>) {
+    let mut pending = PENDING_STREAM_REOPEN_INPUT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    *pending = input;
+}
+
+fn take_pending_stream_reopen_input() -> Option<String> {
+    let mut pending = PENDING_STREAM_REOPEN_INPUT
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    pending.take()
+}
+
+pub(crate) fn reopen_stream_selection(parent: HWND, input: String) {
+    set_pending_stream_reopen_input(Some(input));
+    play_streaming_audio_from_url(parent);
 }
 
 fn open_progress_dialog(
@@ -2956,8 +3066,8 @@ fn format_stream_entry_view_count(entry: &serde_json::Value, language: Language)
     let formatted: String = formatted.chars().rev().collect();
     Some(format!(
         "{} {}",
-        formatted,
-        i18n::tr(language, "stream_audio.views_suffix")
+        i18n::tr(language, "stream_audio.views_label"),
+        formatted
     ))
 }
 
@@ -2980,7 +3090,11 @@ fn format_stream_entry_duration(entry: &serde_json::Value) -> Option<String> {
     {
         return Some(text.to_string());
     }
-    let seconds = entry.get("duration")?.as_u64()?;
+    let seconds = entry.get("duration").and_then(|value| {
+        value
+            .as_u64()
+            .or_else(|| value.as_f64().map(|v| v.round() as u64))
+    })?;
     let hours = seconds / 3600;
     let minutes = (seconds % 3600) / 60;
     let secs = seconds % 60;
@@ -2998,11 +3112,19 @@ fn format_stream_entry_label(entry: &serde_json::Value, language: Language) -> S
         .filter(|value| !value.is_empty())
         .unwrap_or("Untitled");
     let mut parts = vec![plain_label(title)];
-    if let Some(channel) = format_stream_entry_channel(entry) {
-        parts.push(channel);
-    }
     if let Some(duration) = format_stream_entry_duration(entry) {
-        parts.push(duration);
+        parts.push(format!(
+            "{} {}",
+            i18n::tr(language, "stream_audio.duration_label"),
+            duration
+        ));
+    }
+    if let Some(channel) = format_stream_entry_channel(entry) {
+        parts.push(format!(
+            "{} {}",
+            i18n::tr(language, "stream_audio.channel_label"),
+            channel
+        ));
     }
     if let Some(date) = format_stream_entry_upload_date(entry) {
         parts.push(date);
@@ -3564,7 +3686,13 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
 
     let needs_ytdlp_selection =
         !looks_like_valid_stream_url(&input) || is_youtube_collection_url(&input);
+    if needs_ytdlp_selection {
+        crate::set_active_youtube_return_input(parent, Some(input.clone()));
+    } else {
+        crate::set_active_youtube_return_input(parent, None);
+    }
     let mut url = input.clone();
+    let mut collection_url: Option<String> = None;
     let mut ytdlp_path = None;
     if needs_ytdlp_selection {
         let bootstrap_progress = open_progress_dialog(
@@ -3592,14 +3720,14 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 return;
             }
         };
-        url = match resolve_stream_input_url(
+        let resolved = match resolve_stream_input_url(
             parent,
             language,
             &path,
             &input,
             Some(bootstrap_progress),
         ) {
-            Ok(Some(selected_url)) => selected_url,
+            Ok(Some(selection)) => selection,
             Ok(None) => {
                 post_focus_editor(parent);
                 return;
@@ -3611,6 +3739,8 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 return;
             }
         };
+        url = resolved.url;
+        collection_url = resolved.collection_url;
         ytdlp_path = Some(path);
     }
 
@@ -3625,6 +3755,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             .map(|s| s.to_string())
             .or_else(|| Some(url.clone()));
         crate::set_active_podcast_episode_info(parent, Some(url), episode_title, Some(stream_path));
+        crate::set_active_youtube_return_input(parent, Some(input.clone()));
         crate::menu::update_playback_menu(parent, true);
         return;
     }
@@ -3645,138 +3776,61 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             }
         },
     };
-    let selected_audio_format =
-        match probe_stream_audio_tracks_responsive(parent, language, &ytdlp_path, &url) {
-            Ok(tracks) if tracks.len() > 1 => {
-                match choose_stream_audio_track(parent, language, tracks) {
-                    Some(chosen) => chosen,
-                    None => {
-                        post_focus_editor(parent);
-                        return;
+    'select_video: loop {
+        let selected_audio_format =
+            match probe_stream_audio_tracks_responsive(parent, language, &ytdlp_path, &url) {
+                Ok(tracks) if tracks.len() > 1 => {
+                    match choose_stream_audio_track(parent, language, tracks) {
+                        Some(chosen) => chosen,
+                        None => {
+                            post_focus_editor(parent);
+                            return;
+                        }
                     }
                 }
-            }
-            Ok(_) => None,
-            Err(err) => {
-                crate::log_debug(&format!("Stream audio track probe failed: {}", err));
-                None
-            }
-        };
+                Ok(_) => None,
+                Err(err) => {
+                    crate::log_debug(&format!("Stream audio track probe failed: {}", err));
+                    if is_members_only_stream_error(&err)
+                        && let Some(source_collection_url) = collection_url.as_deref()
+                    {
+                        show_error(parent, language, &members_only_stream_message(language));
+                        let next_selection = match choose_youtube_collection_entry(
+                            parent,
+                            language,
+                            &ytdlp_path,
+                            source_collection_url,
+                            None,
+                        ) {
+                            Ok(Some(selection)) => selection,
+                            Ok(None) => {
+                                post_focus_editor(parent);
+                                return;
+                            }
+                            Err(next_err) => {
+                                let message = i18n::tr_f(
+                                    language,
+                                    "stream_audio.download_failed",
+                                    &[("err", &next_err)],
+                                );
+                                show_error(parent, language, &message);
+                                return;
+                            }
+                        };
+                        url = next_selection.url;
+                        collection_url = next_selection.collection_url;
+                        continue 'select_video;
+                    }
+                    None
+                }
+            };
 
-    reclaim_stream_modal_parent_foreground(parent, "play_streaming_audio.before_final_progress");
-    let cache_dir = settings_dir().join("podcast cache");
-    if let Err(err) = std::fs::create_dir_all(&cache_dir) {
-        let message = i18n::tr_f(
-            language,
-            "stream_audio.download_failed",
-            &[("err", &err.to_string())],
+        reclaim_stream_modal_parent_foreground(
+            parent,
+            "play_streaming_audio.before_final_progress",
         );
-        show_error(parent, language, &message);
-        return;
-    }
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    let prefix = format!("stream_{}_{}", std::process::id(), stamp);
-    let output_template = cache_dir.join(format!("{prefix}.%(ext)s"));
-    let progress = open_progress_dialog(
-        parent,
-        language,
-        "stream_audio.progress_title",
-        "stream_audio.progress_downloading",
-        true,
-    );
-    keep_stream_progress_focus(progress);
-    std::thread::sleep(std::time::Duration::from_millis(15));
-    keep_stream_progress_focus(progress);
-    log_stream_focus_snapshot("play_streaming_audio.progress_opened", progress);
-    let stream_title = probe_stream_media_title(&ytdlp_path, &url);
-
-    let mut cmd = ytdlp_command(&ytdlp_path);
-    cmd.arg("--no-playlist")
-        .arg("--socket-timeout")
-        .arg(YTDLP_SOCKET_TIMEOUT_SECS)
-        .arg("--no-warnings")
-        .arg("--newline")
-        .arg("--verbose");
-
-    if let Some(format_id) = selected_audio_format.as_ref() {
-        match dialog_data.format {
-            StreamOutputFormat::Mp4 => {
-                cmd.arg("-f").arg(format!(
-                    "bestvideo[ext=mp4]+{id}/bestvideo+{id}/best[ext=mp4]/best",
-                    id = format_id
-                ));
-            }
-            StreamOutputFormat::Auto => {
-                cmd.arg("-f").arg(format!(
-                    "bestvideo[ext=webm]+{id}/bestvideo+{id}/best",
-                    id = format_id
-                ));
-            }
-            _ => {
-                cmd.arg("-f").arg(format_id);
-            }
-        }
-    } else {
-        match dialog_data.format {
-            StreamOutputFormat::Mp4 => {
-                let mp4_profile = match dialog_data.quality {
-                    StreamQualitySelection::Mp4High => {
-                        "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best"
-                    }
-                    StreamQualitySelection::Mp4Medium => {
-                        "best[ext=mp4][height<=720]/best[height<=720]/best"
-                    }
-                    StreamQualitySelection::Mp4Low => {
-                        "best[ext=mp4][height<=480]/best[height<=480]/worst"
-                    }
-                    _ => "best[ext=mp4]/best",
-                };
-                cmd.arg("-f").arg(mp4_profile);
-            }
-            StreamOutputFormat::Auto => {
-                cmd.arg("-f")
-                    .arg("bestvideo[ext=webm]+bestaudio[ext=webm]/bestvideo+bestaudio/best");
-            }
-            _ => {
-                cmd.arg("-f").arg("bestaudio/best");
-            }
-        }
-    }
-    cmd.arg("-o")
-        .arg(output_template.to_string_lossy().to_string())
-        .arg("--")
-        .arg(&url)
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped());
-    if ytdlp_debug {
-        let format_for_log = selected_audio_format.as_deref().map_or_else(
-            || match dialog_data.format {
-                StreamOutputFormat::Auto => i18n::tr(language, "stream_audio.format.auto"),
-                StreamOutputFormat::Mp3 => "mp3".to_string(),
-                StreamOutputFormat::M4a => "m4a".to_string(),
-                StreamOutputFormat::Opus => "opus".to_string(),
-                StreamOutputFormat::Ogg => "ogg".to_string(),
-                StreamOutputFormat::Wav => "wav".to_string(),
-                StreamOutputFormat::Flac => "flac".to_string(),
-                StreamOutputFormat::Mp4 => "mp4".to_string(),
-            },
-            |f| f.to_string(),
-        );
-        crate::log_debug(&format!(
-            "yt-dlp stream start: url={} output_template={} format={}",
-            url,
-            output_template.to_string_lossy(),
-            format_for_log
-        ));
-    }
-
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        Err(err) => {
-            close_progress_dialog(progress);
+        let cache_dir = settings_dir().join("podcast cache");
+        if let Err(err) = std::fs::create_dir_all(&cache_dir) {
             let message = i18n::tr_f(
                 language,
                 "stream_audio.download_failed",
@@ -3785,172 +3839,123 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             show_error(parent, language, &message);
             return;
         }
-    };
-    keep_stream_progress_focus(progress);
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let prefix = format!("stream_{}_{}", std::process::id(), stamp);
+        let output_template = cache_dir.join(format!("{prefix}.%(ext)s"));
+        let progress = open_progress_dialog(
+            parent,
+            language,
+            "stream_audio.progress_title",
+            "stream_audio.progress_downloading",
+            true,
+        );
+        keep_stream_progress_focus(progress);
+        std::thread::sleep(std::time::Duration::from_millis(15));
+        keep_stream_progress_focus(progress);
+        log_stream_focus_snapshot("play_streaming_audio.progress_opened", progress);
+        let stream_title = probe_stream_media_title(&ytdlp_path, &url);
 
-    let stderr_pipe = match child.stderr.take() {
-        Some(stderr) => stderr,
-        None => {
-            close_progress_dialog(progress);
-            show_error(
-                parent,
-                language,
-                &i18n::tr_f(
+        let mut cmd = ytdlp_command(&ytdlp_path);
+        cmd.arg("--no-playlist")
+            .arg("--socket-timeout")
+            .arg(YTDLP_SOCKET_TIMEOUT_SECS)
+            .arg("--no-warnings")
+            .arg("--newline")
+            .arg("--verbose");
+
+        if let Some(format_id) = selected_audio_format.as_ref() {
+            match dialog_data.format {
+                StreamOutputFormat::Mp4 => {
+                    cmd.arg("-f").arg(format!(
+                        "bestvideo[ext=mp4]+{id}/bestvideo+{id}/best[ext=mp4]/best",
+                        id = format_id
+                    ));
+                }
+                StreamOutputFormat::Auto => {
+                    cmd.arg("-f").arg(format!(
+                        "bestvideo[ext=webm]+{id}/bestvideo+{id}/best",
+                        id = format_id
+                    ));
+                }
+                _ => {
+                    cmd.arg("-f").arg(format_id);
+                }
+            }
+        } else {
+            match dialog_data.format {
+                StreamOutputFormat::Mp4 => {
+                    let mp4_profile = match dialog_data.quality {
+                        StreamQualitySelection::Mp4High => {
+                            "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best"
+                        }
+                        StreamQualitySelection::Mp4Medium => {
+                            "best[ext=mp4][height<=720]/best[height<=720]/best"
+                        }
+                        StreamQualitySelection::Mp4Low => {
+                            "best[ext=mp4][height<=480]/best[height<=480]/worst"
+                        }
+                        _ => "best[ext=mp4]/best",
+                    };
+                    cmd.arg("-f").arg(mp4_profile);
+                }
+                StreamOutputFormat::Auto => {
+                    cmd.arg("-f")
+                        .arg("bestvideo[ext=webm]+bestaudio[ext=webm]/bestvideo+bestaudio/best");
+                }
+                _ => {
+                    cmd.arg("-f").arg("bestaudio/best");
+                }
+            }
+        }
+        cmd.arg("-o")
+            .arg(output_template.to_string_lossy().to_string())
+            .arg("--")
+            .arg(&url)
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped());
+        if ytdlp_debug {
+            let format_for_log = selected_audio_format.as_deref().map_or_else(
+                || match dialog_data.format {
+                    StreamOutputFormat::Auto => i18n::tr(language, "stream_audio.format.auto"),
+                    StreamOutputFormat::Mp3 => "mp3".to_string(),
+                    StreamOutputFormat::M4a => "m4a".to_string(),
+                    StreamOutputFormat::Opus => "opus".to_string(),
+                    StreamOutputFormat::Ogg => "ogg".to_string(),
+                    StreamOutputFormat::Wav => "wav".to_string(),
+                    StreamOutputFormat::Flac => "flac".to_string(),
+                    StreamOutputFormat::Mp4 => "mp4".to_string(),
+                },
+                |f| f.to_string(),
+            );
+            crate::log_debug(&format!(
+                "yt-dlp stream start: url={} output_template={} format={}",
+                url,
+                output_template.to_string_lossy(),
+                format_for_log
+            ));
+        }
+
+        let mut child = match cmd.spawn() {
+            Ok(c) => c,
+            Err(err) => {
+                close_progress_dialog(progress);
+                let message = i18n::tr_f(
                     language,
                     "stream_audio.download_failed",
-                    &[("err", "yt-dlp stderr unavailable")],
-                ),
-            );
-            return;
-        }
-    };
+                    &[("err", &err.to_string())],
+                );
+                show_error(parent, language, &message);
+                return;
+            }
+        };
+        keep_stream_progress_focus(progress);
 
-    let progress_shared = Arc::new(AtomicU32::new(0));
-    let activity_shared = Arc::new(AtomicU32::new(0));
-    let stderr_shared = Arc::new(Mutex::new(String::new()));
-    let progress_reader = Arc::clone(&progress_shared);
-    let activity_reader = Arc::clone(&activity_shared);
-    let stderr_reader = Arc::clone(&stderr_shared);
-    let reader_thread = std::thread::spawn(move || {
-        for line_result in BufReader::new(stderr_pipe).lines() {
-            let line = match line_result {
-                Ok(line) => line,
-                Err(err) => {
-                    crate::log_debug(&format!("yt-dlp stderr read failed: {}", err));
-                    continue;
-                }
-            };
-            if let Ok(mut captured) = stderr_reader.lock()
-                && captured.len() < 16_384
-            {
-                if !captured.is_empty() {
-                    captured.push('\n');
-                }
-                captured.push_str(&line);
-            }
-            if ytdlp_debug {
-                crate::log_debug(&format!("yt-dlp stderr: {}", line));
-            }
-            activity_reader.fetch_add(1, Ordering::Relaxed);
-            if let Some(pct) = parse_ytdlp_progress_pct(&line) {
-                progress_reader.fetch_max(pct, Ordering::Relaxed);
-            }
-        }
-    });
-
-    let allow_early_finalize = !matches!(
-        dialog_data.format,
-        StreamOutputFormat::Auto | StreamOutputFormat::Mp4
-    );
-
-    let mut last_pct = 0u32;
-    let mut ui_pct = 0u32;
-    let mut ui_target_pct = 0u32;
-    let mut last_activity = 0u32;
-    let mut stalled = false;
-    let mut last_progress_at = std::time::Instant::now();
-    let mut reached_100_at: Option<std::time::Instant> = None;
-    let mut last_focus_keepalive = std::time::Instant::now();
-    crate::log_debug(&format!(
-        "stream download loop start: progress_dialog={:?} url={} cache_prefix={} allow_early_finalize={}",
-        progress, url, prefix, allow_early_finalize
-    ));
-    let _status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                crate::log_debug(&format!(
-                    "stream download loop exit: success={} code={:?}",
-                    status.success(),
-                    status.code()
-                ));
-                break Some(status);
-            }
-            Ok(None) => {
-                if pump_messages_detect_stream_cancel(parent, progress) {
-                    crate::log_debug("stream download loop: cancel detected while downloading");
-                    close_progress_dialog(progress);
-                    if let Err(err) = child.kill() {
-                        crate::log_debug(&format!(
-                            "Failed to kill cancelled yt-dlp process: {}",
-                            err
-                        ));
-                    }
-                    return;
-                }
-                let pct = progress_shared.load(Ordering::Relaxed);
-                if pct > last_pct {
-                    crate::log_debug(&format!(
-                        "stream download raw progress: previous={} new_raw={} ui_target_before={} ui_pct={}",
-                        last_pct, pct, ui_target_pct, ui_pct
-                    ));
-                    last_pct = pct;
-                    last_progress_at = std::time::Instant::now();
-                    // Keep room for post-download finalization so 100% appears right before playback.
-                    ui_target_pct = pct.min(95);
-                    crate::log_debug(&format!(
-                        "stream download target progress adjusted: raw={} ui_target_after={}",
-                        pct, ui_target_pct
-                    ));
-                    if last_pct >= 100 && reached_100_at.is_none() {
-                        reached_100_at = Some(std::time::Instant::now());
-                        crate::log_debug("stream download raw progress reached 100%");
-                    }
-                }
-                if ui_pct < ui_target_pct {
-                    ui_pct = (ui_pct + 1).min(ui_target_pct);
-                    report_progress(progress, ui_pct);
-                }
-                if last_focus_keepalive.elapsed() > std::time::Duration::from_millis(300) {
-                    keep_stream_progress_focus(progress);
-                    last_focus_keepalive = std::time::Instant::now();
-                }
-                if allow_early_finalize
-                    && reached_100_at
-                        .map(|t| {
-                            t.elapsed() > std::time::Duration::from_secs(STREAM_POST_100_GRACE_SECS)
-                        })
-                        .unwrap_or(false)
-                    && find_latest_downloaded_stream_file(&cache_dir, &prefix).is_some()
-                {
-                    crate::log_debug(
-                        "Stream download reached 100% with output present: finalizing early",
-                    );
-                    log_stream_focus_snapshot("stream_download.finalize_early", progress);
-                    if let Err(err) = child.kill() {
-                        crate::log_debug(&format!(
-                            "Failed to kill finalized yt-dlp process: {}",
-                            err
-                        ));
-                    }
-                    break None;
-                }
-                let activity = activity_shared.load(Ordering::Relaxed);
-                if activity != last_activity {
-                    crate::log_debug(&format!(
-                        "stream download activity heartbeat: previous={} current={}",
-                        last_activity, activity
-                    ));
-                    last_activity = activity;
-                    last_progress_at = std::time::Instant::now();
-                }
-                if last_progress_at.elapsed()
-                    > std::time::Duration::from_secs(STREAM_DOWNLOAD_STALL_SECS)
-                {
-                    stalled = true;
-                    crate::log_debug("Stream download stalled: terminating yt-dlp process");
-                    log_stream_focus_snapshot("stream_download.stalled", progress);
-                    if let Err(err) = child.kill() {
-                        crate::log_debug(&format!(
-                            "Failed to kill stalled yt-dlp process: {}",
-                            err
-                        ));
-                    }
-                    break None;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(30));
-            }
-            Err(err) => {
-                crate::log_debug(&format!("stream download loop wait error: {}", err));
+        let stderr_pipe = match child.stderr.take() {
+            Some(stderr) => stderr,
+            None => {
                 close_progress_dialog(progress);
                 show_error(
                     parent,
@@ -3958,392 +3963,565 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     &i18n::tr_f(
                         language,
                         "stream_audio.download_failed",
-                        &[("err", &err.to_string())],
+                        &[("err", "yt-dlp stderr unavailable")],
                     ),
                 );
                 return;
             }
-        }
-    };
-    if _status.is_some() {
-        if let Err(err) = reader_thread.join() {
-            crate::log_debug(&format!("yt-dlp stderr thread join failed: {:?}", err));
-        }
-    } else {
-        // Avoid UI hangs when yt-dlp is terminated early (finalization/stall paths).
-        // The stderr reader thread will exit on its own once pipes are closed.
-        crate::log_debug("Skipping yt-dlp stderr thread join after early termination");
-    }
-    let stderr_capture = stderr_shared
-        .lock()
-        .map(|s| s.clone())
-        .unwrap_or_else(|_| String::new());
-    if ytdlp_debug && !stderr_capture.trim().is_empty() {
-        crate::log_debug(&format!(
-            "yt-dlp combined stderr: {}",
-            truncate_debug_text(stderr_capture.trim(), 5000)
-        ));
-    }
-
-    report_progress_status(progress, &i18n::tr(language, "podcasts.loading"));
-    log_stream_focus_snapshot("stream_download.after_download_before_finalize", progress);
-    let primary_path = find_latest_downloaded_stream_file(&cache_dir, &prefix);
-    let downloaded_path = if primary_path.is_some() {
-        primary_path
-    } else {
-        let err = if stderr_capture.trim().is_empty() {
-            "yt-dlp failed".to_string()
-        } else {
-            stderr_capture.trim().to_string()
         };
-        let err_lc = err.to_ascii_lowercase();
-        let should_retry = stalled
-            || err_lc.contains("downloaded file is empty")
-            || err_lc.contains("http error 404")
-            || err_lc.contains("unable to download video data")
-            || err_lc.contains("requested format is not available");
-        if ytdlp_debug {
-            crate::log_debug(&format!(
-                "yt-dlp primary output missing: stalled={} should_retry={} err={}",
-                stalled,
-                should_retry,
-                truncate_debug_text(&err, 1000)
-            ));
-            log_stream_cache_snapshot(&cache_dir, &prefix, "primary-missing");
-        }
-        if should_retry {
-            crate::log_debug("Stream download failed/stalled: retrying with fallback profiles");
-            report_progress(progress, 95);
-            let retry_profiles: [(&str, Option<&str>); 2] = [
-                ("audio-autoip", Some("bestaudio/best")),
-                ("auto-autoip", None),
-            ];
-            let mut retry_path: Option<PathBuf> = None;
-            let mut retry_error = String::new();
-            'retry_rounds: for round in 0..2 {
-                for (idx, (profile_name, profile)) in retry_profiles.iter().enumerate() {
-                    let retry_prefix = format!("{prefix}_retry{}_{}", round + 1, idx + 1);
-                    let retry_template = cache_dir.join(format!("{retry_prefix}.%(ext)s"));
-                    let mut retry = ytdlp_command(&ytdlp_path);
-                    retry
-                        .arg("--no-playlist")
-                        .arg("--socket-timeout")
-                        .arg(YTDLP_SOCKET_TIMEOUT_SECS)
-                        .arg("--no-warnings")
-                        .arg("--verbose")
-                        .arg("--extractor-retries")
-                        .arg("3")
-                        .arg("--fragment-retries")
-                        .arg("3");
-                    if let Some(profile) = profile {
-                        retry.arg("-f").arg(profile);
+
+        let progress_shared = Arc::new(AtomicU32::new(0));
+        let activity_shared = Arc::new(AtomicU32::new(0));
+        let stderr_shared = Arc::new(Mutex::new(String::new()));
+        let progress_reader = Arc::clone(&progress_shared);
+        let activity_reader = Arc::clone(&activity_shared);
+        let stderr_reader = Arc::clone(&stderr_shared);
+        let reader_thread = std::thread::spawn(move || {
+            for line_result in BufReader::new(stderr_pipe).lines() {
+                let line = match line_result {
+                    Ok(line) => line,
+                    Err(err) => {
+                        crate::log_debug(&format!("yt-dlp stderr read failed: {}", err));
+                        continue;
                     }
-                    retry
-                        .arg("-o")
-                        .arg(retry_template.to_string_lossy().to_string())
-                        .arg("--")
-                        .arg(&url)
-                        .stdout(Stdio::null())
-                        .stderr(Stdio::null());
-                    if ytdlp_debug {
+                };
+                if let Ok(mut captured) = stderr_reader.lock()
+                    && captured.len() < 16_384
+                {
+                    if !captured.is_empty() {
+                        captured.push('\n');
+                    }
+                    captured.push_str(&line);
+                }
+                if ytdlp_debug {
+                    crate::log_debug(&format!("yt-dlp stderr: {}", line));
+                }
+                activity_reader.fetch_add(1, Ordering::Relaxed);
+                if let Some(pct) = parse_ytdlp_progress_pct(&line) {
+                    progress_reader.fetch_max(pct, Ordering::Relaxed);
+                }
+            }
+        });
+
+        let allow_early_finalize = !matches!(
+            dialog_data.format,
+            StreamOutputFormat::Auto | StreamOutputFormat::Mp4
+        );
+
+        let mut last_pct = 0u32;
+        let mut ui_pct = 0u32;
+        let mut ui_target_pct = 0u32;
+        let mut last_activity = 0u32;
+        let mut stalled = false;
+        let mut last_progress_at = std::time::Instant::now();
+        let mut reached_100_at: Option<std::time::Instant> = None;
+        let mut last_focus_keepalive = std::time::Instant::now();
+        crate::log_debug(&format!(
+            "stream download loop start: progress_dialog={:?} url={} cache_prefix={} allow_early_finalize={}",
+            progress, url, prefix, allow_early_finalize
+        ));
+        let _status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    crate::log_debug(&format!(
+                        "stream download loop exit: success={} code={:?}",
+                        status.success(),
+                        status.code()
+                    ));
+                    break Some(status);
+                }
+                Ok(None) => {
+                    if pump_messages_detect_stream_cancel(parent, progress) {
+                        crate::log_debug("stream download loop: cancel detected while downloading");
+                        close_progress_dialog(progress);
+                        if let Err(err) = child.kill() {
+                            crate::log_debug(&format!(
+                                "Failed to kill cancelled yt-dlp process: {}",
+                                err
+                            ));
+                        }
+                        return;
+                    }
+                    let pct = progress_shared.load(Ordering::Relaxed);
+                    if pct > last_pct {
                         crate::log_debug(&format!(
-                            "yt-dlp retry start: round={} profile={} format={:?} output_template={}",
-                            round + 1,
-                            profile_name,
-                            profile,
-                            retry_template.to_string_lossy()
+                            "stream download raw progress: previous={} new_raw={} ui_target_before={} ui_pct={}",
+                            last_pct, pct, ui_target_pct, ui_pct
                         ));
+                        last_pct = pct;
+                        last_progress_at = std::time::Instant::now();
+                        // Keep room for post-download finalization so 100% appears right before playback.
+                        ui_target_pct = pct.min(95);
+                        crate::log_debug(&format!(
+                            "stream download target progress adjusted: raw={} ui_target_after={}",
+                            pct, ui_target_pct
+                        ));
+                        if last_pct >= 100 && reached_100_at.is_none() {
+                            reached_100_at = Some(std::time::Instant::now());
+                            crate::log_debug("stream download raw progress reached 100%");
+                        }
                     }
-                    match retry.spawn() {
-                        Ok(mut retry_child) => {
-                            let retry_start = std::time::Instant::now();
-                            let mut status_opt = None;
-                            loop {
-                                match retry_child.try_wait() {
-                                    Ok(Some(status)) => {
-                                        status_opt = Some(status);
-                                        break;
-                                    }
-                                    Ok(None) => {
-                                        if pump_messages_detect_stream_cancel(parent, progress) {
-                                            close_progress_dialog(progress);
-                                            let _unused = retry_child.kill();
-                                            return;
+                    if ui_pct < ui_target_pct {
+                        ui_pct = (ui_pct + 1).min(ui_target_pct);
+                        report_progress(progress, ui_pct);
+                    }
+                    if last_focus_keepalive.elapsed() > std::time::Duration::from_millis(300) {
+                        keep_stream_progress_focus(progress);
+                        last_focus_keepalive = std::time::Instant::now();
+                    }
+                    if allow_early_finalize
+                        && reached_100_at
+                            .map(|t| {
+                                t.elapsed()
+                                    > std::time::Duration::from_secs(STREAM_POST_100_GRACE_SECS)
+                            })
+                            .unwrap_or(false)
+                        && find_latest_downloaded_stream_file(&cache_dir, &prefix).is_some()
+                    {
+                        crate::log_debug(
+                            "Stream download reached 100% with output present: finalizing early",
+                        );
+                        log_stream_focus_snapshot("stream_download.finalize_early", progress);
+                        if let Err(err) = child.kill() {
+                            crate::log_debug(&format!(
+                                "Failed to kill finalized yt-dlp process: {}",
+                                err
+                            ));
+                        }
+                        break None;
+                    }
+                    let activity = activity_shared.load(Ordering::Relaxed);
+                    if activity != last_activity {
+                        crate::log_debug(&format!(
+                            "stream download activity heartbeat: previous={} current={}",
+                            last_activity, activity
+                        ));
+                        last_activity = activity;
+                        last_progress_at = std::time::Instant::now();
+                    }
+                    if last_progress_at.elapsed()
+                        > std::time::Duration::from_secs(STREAM_DOWNLOAD_STALL_SECS)
+                    {
+                        stalled = true;
+                        crate::log_debug("Stream download stalled: terminating yt-dlp process");
+                        log_stream_focus_snapshot("stream_download.stalled", progress);
+                        if let Err(err) = child.kill() {
+                            crate::log_debug(&format!(
+                                "Failed to kill stalled yt-dlp process: {}",
+                                err
+                            ));
+                        }
+                        break None;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(30));
+                }
+                Err(err) => {
+                    crate::log_debug(&format!("stream download loop wait error: {}", err));
+                    close_progress_dialog(progress);
+                    show_error(
+                        parent,
+                        language,
+                        &i18n::tr_f(
+                            language,
+                            "stream_audio.download_failed",
+                            &[("err", &err.to_string())],
+                        ),
+                    );
+                    return;
+                }
+            }
+        };
+        if _status.is_some() {
+            if let Err(err) = reader_thread.join() {
+                crate::log_debug(&format!("yt-dlp stderr thread join failed: {:?}", err));
+            }
+        } else {
+            // Avoid UI hangs when yt-dlp is terminated early (finalization/stall paths).
+            // The stderr reader thread will exit on its own once pipes are closed.
+            crate::log_debug("Skipping yt-dlp stderr thread join after early termination");
+        }
+        let stderr_capture = stderr_shared
+            .lock()
+            .map(|s| s.clone())
+            .unwrap_or_else(|_| String::new());
+        if ytdlp_debug && !stderr_capture.trim().is_empty() {
+            crate::log_debug(&format!(
+                "yt-dlp combined stderr: {}",
+                truncate_debug_text(stderr_capture.trim(), 5000)
+            ));
+        }
+
+        report_progress_status(progress, &i18n::tr(language, "podcasts.loading"));
+        log_stream_focus_snapshot("stream_download.after_download_before_finalize", progress);
+        let primary_path = find_latest_downloaded_stream_file(&cache_dir, &prefix);
+        let downloaded_path = if primary_path.is_some() {
+            primary_path
+        } else {
+            let err = if stderr_capture.trim().is_empty() {
+                "yt-dlp failed".to_string()
+            } else {
+                stderr_capture.trim().to_string()
+            };
+            let err_lc = err.to_ascii_lowercase();
+            let should_retry = stalled
+                || err_lc.contains("downloaded file is empty")
+                || err_lc.contains("http error 404")
+                || err_lc.contains("unable to download video data")
+                || err_lc.contains("requested format is not available");
+            if ytdlp_debug {
+                crate::log_debug(&format!(
+                    "yt-dlp primary output missing: stalled={} should_retry={} err={}",
+                    stalled,
+                    should_retry,
+                    truncate_debug_text(&err, 1000)
+                ));
+                log_stream_cache_snapshot(&cache_dir, &prefix, "primary-missing");
+            }
+            if should_retry {
+                crate::log_debug("Stream download failed/stalled: retrying with fallback profiles");
+                report_progress(progress, 95);
+                let retry_profiles: [(&str, Option<&str>); 2] = [
+                    ("audio-autoip", Some("bestaudio/best")),
+                    ("auto-autoip", None),
+                ];
+                let mut retry_path: Option<PathBuf> = None;
+                let mut retry_error = String::new();
+                'retry_rounds: for round in 0..2 {
+                    for (idx, (profile_name, profile)) in retry_profiles.iter().enumerate() {
+                        let retry_prefix = format!("{prefix}_retry{}_{}", round + 1, idx + 1);
+                        let retry_template = cache_dir.join(format!("{retry_prefix}.%(ext)s"));
+                        let mut retry = ytdlp_command(&ytdlp_path);
+                        retry
+                            .arg("--no-playlist")
+                            .arg("--socket-timeout")
+                            .arg(YTDLP_SOCKET_TIMEOUT_SECS)
+                            .arg("--no-warnings")
+                            .arg("--verbose")
+                            .arg("--extractor-retries")
+                            .arg("3")
+                            .arg("--fragment-retries")
+                            .arg("3");
+                        if let Some(profile) = profile {
+                            retry.arg("-f").arg(profile);
+                        }
+                        retry
+                            .arg("-o")
+                            .arg(retry_template.to_string_lossy().to_string())
+                            .arg("--")
+                            .arg(&url)
+                            .stdout(Stdio::null())
+                            .stderr(Stdio::null());
+                        if ytdlp_debug {
+                            crate::log_debug(&format!(
+                                "yt-dlp retry start: round={} profile={} format={:?} output_template={}",
+                                round + 1,
+                                profile_name,
+                                profile,
+                                retry_template.to_string_lossy()
+                            ));
+                        }
+                        match retry.spawn() {
+                            Ok(mut retry_child) => {
+                                let retry_start = std::time::Instant::now();
+                                let mut status_opt = None;
+                                loop {
+                                    match retry_child.try_wait() {
+                                        Ok(Some(status)) => {
+                                            status_opt = Some(status);
+                                            break;
                                         }
-                                        if last_focus_keepalive.elapsed()
-                                            > std::time::Duration::from_millis(300)
-                                        {
-                                            keep_stream_progress_focus(progress);
-                                            last_focus_keepalive = std::time::Instant::now();
+                                        Ok(None) => {
+                                            if pump_messages_detect_stream_cancel(parent, progress)
+                                            {
+                                                close_progress_dialog(progress);
+                                                let _unused = retry_child.kill();
+                                                return;
+                                            }
+                                            if last_focus_keepalive.elapsed()
+                                                > std::time::Duration::from_millis(300)
+                                            {
+                                                keep_stream_progress_focus(progress);
+                                                last_focus_keepalive = std::time::Instant::now();
+                                            }
+                                            if retry_start.elapsed()
+                                                > std::time::Duration::from_secs(
+                                                    STREAM_RETRY_TIMEOUT_SECS,
+                                                )
+                                            {
+                                                let _unused = retry_child.kill();
+                                                retry_error = format!(
+                                                    "yt-dlp retry timeout (round={}, profile={}) after {}s",
+                                                    round + 1,
+                                                    profile_name,
+                                                    STREAM_RETRY_TIMEOUT_SECS
+                                                );
+                                                crate::log_debug(&retry_error);
+                                                break;
+                                            }
+                                            std::thread::sleep(std::time::Duration::from_millis(
+                                                30,
+                                            ));
                                         }
-                                        if retry_start.elapsed()
-                                            > std::time::Duration::from_secs(
-                                                STREAM_RETRY_TIMEOUT_SECS,
-                                            )
-                                        {
-                                            let _unused = retry_child.kill();
+                                        Err(e) => {
                                             retry_error = format!(
-                                                "yt-dlp retry timeout (round={}, profile={}) after {}s",
+                                                "yt-dlp retry wait error (round={}, profile={}): {}",
                                                 round + 1,
                                                 profile_name,
-                                                STREAM_RETRY_TIMEOUT_SECS
+                                                e
                                             );
                                             crate::log_debug(&retry_error);
                                             break;
                                         }
-                                        std::thread::sleep(std::time::Duration::from_millis(30));
-                                    }
-                                    Err(e) => {
-                                        retry_error = format!(
-                                            "yt-dlp retry wait error (round={}, profile={}): {}",
-                                            round + 1,
-                                            profile_name,
-                                            e
-                                        );
-                                        crate::log_debug(&retry_error);
-                                        break;
                                     }
                                 }
-                            }
-                            let status = status_opt;
-                            if ytdlp_debug {
-                                crate::log_debug(&format!(
-                                    "yt-dlp retry status: round={} profile={} format={:?} success={} code={:?}",
-                                    round + 1,
-                                    profile_name,
-                                    profile,
-                                    status.map(|s| s.success()).unwrap_or(false),
-                                    status.and_then(|s| s.code())
-                                ));
-                            }
-                            if let Some(found) =
-                                find_latest_downloaded_stream_file(&cache_dir, &retry_prefix)
-                            {
+                                let status = status_opt;
                                 if ytdlp_debug {
-                                    log_stream_cache_snapshot(
-                                        &cache_dir,
-                                        &retry_prefix,
-                                        "retry-found",
-                                    );
+                                    crate::log_debug(&format!(
+                                        "yt-dlp retry status: round={} profile={} format={:?} success={} code={:?}",
+                                        round + 1,
+                                        profile_name,
+                                        profile,
+                                        status.map(|s| s.success()).unwrap_or(false),
+                                        status.and_then(|s| s.code())
+                                    ));
                                 }
-                                retry_path = Some(found);
-                                break 'retry_rounds;
+                                if let Some(found) =
+                                    find_latest_downloaded_stream_file(&cache_dir, &retry_prefix)
+                                {
+                                    if ytdlp_debug {
+                                        log_stream_cache_snapshot(
+                                            &cache_dir,
+                                            &retry_prefix,
+                                            "retry-found",
+                                        );
+                                    }
+                                    retry_path = Some(found);
+                                    break 'retry_rounds;
+                                }
+                                if let Some(status) = status
+                                    && !status.success()
+                                {
+                                    retry_error = format!(
+                                        "yt-dlp retry failed (round={}, profile={}) exit_code={:?}",
+                                        round + 1,
+                                        profile_name,
+                                        status.code()
+                                    );
+                                    crate::log_debug(&retry_error);
+                                }
                             }
-                            if let Some(status) = status
-                                && !status.success()
-                            {
-                                retry_error = format!(
-                                    "yt-dlp retry failed (round={}, profile={}) exit_code={:?}",
-                                    round + 1,
-                                    profile_name,
-                                    status.code()
-                                );
-                                crate::log_debug(&retry_error);
-                            }
-                        }
-                        Err(e) => {
-                            crate::log_debug(&format!(
-                                "yt-dlp retry spawn/output error (round={}, profile={}): {}",
-                                round + 1,
-                                profile_name,
-                                e
-                            ));
-                            if ytdlp_debug {
+                            Err(e) => {
                                 crate::log_debug(&format!(
                                     "yt-dlp retry spawn/output error (round={}, profile={}): {}",
                                     round + 1,
                                     profile_name,
                                     e
                                 ));
+                                if ytdlp_debug {
+                                    crate::log_debug(&format!(
+                                        "yt-dlp retry spawn/output error (round={}, profile={}): {}",
+                                        round + 1,
+                                        profile_name,
+                                        e
+                                    ));
+                                }
+                                retry_error = e.to_string();
                             }
-                            retry_error = e.to_string();
                         }
                     }
                 }
-            }
-            if retry_path.is_none() {
-                if ytdlp_debug {
-                    log_stream_cache_snapshot(&cache_dir, &prefix, "retry-missing");
+                if retry_path.is_none() {
+                    if ytdlp_debug {
+                        log_stream_cache_snapshot(&cache_dir, &prefix, "retry-missing");
+                    }
+                    let msg = if retry_error.trim().is_empty() {
+                        err
+                    } else {
+                        retry_error
+                    };
+                    let message =
+                        i18n::tr_f(language, "stream_audio.download_failed", &[("err", &msg)]);
+                    close_progress_dialog(progress);
+                    show_error(parent, language, &message);
+                    return;
                 }
-                let msg = if retry_error.trim().is_empty() {
-                    err
-                } else {
-                    retry_error
-                };
+                retry_path
+            } else {
                 let message =
-                    i18n::tr_f(language, "stream_audio.download_failed", &[("err", &msg)]);
+                    i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
                 close_progress_dialog(progress);
                 show_error(parent, language, &message);
                 return;
             }
-            retry_path
-        } else {
-            let message = i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
-            close_progress_dialog(progress);
-            show_error(parent, language, &message);
-            return;
-        }
-    };
+        };
 
-    let Some(downloaded_path) = downloaded_path else {
-        close_progress_dialog(progress);
-        show_error(
-            parent,
-            language,
-            &i18n::tr(language, "stream_audio.no_output"),
-        );
-        return;
-    };
-    let final_path = if let Some(convert_settings) = dialog_data
-        .format
-        .as_audio_convert_settings(dialog_data.quality)
-    {
-        let target_ext = dialog_data.format.extension().unwrap_or("mp3");
-        let same_extension = downloaded_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.eq_ignore_ascii_case(target_ext))
-            .unwrap_or(false);
-        let must_reencode_mp3 = matches!(
-            (dialog_data.format, dialog_data.quality),
-            (
-                StreamOutputFormat::Mp3,
-                StreamQualitySelection::BitrateKbps(_)
-            )
-        );
-        if same_extension && !must_reencode_mp3 {
-            crate::log_debug(&format!(
-                "stream conversion skipped: downloaded_path={} target_ext={} same_extension={} must_reencode_mp3={}",
-                downloaded_path.to_string_lossy(),
-                target_ext,
-                same_extension,
-                must_reencode_mp3
-            ));
+        let Some(downloaded_path) = downloaded_path else {
             close_progress_dialog(progress);
-            downloaded_path.clone()
-        } else {
-            let converted_path = downloaded_path.with_extension(target_ext);
-            let convert_cancel = Arc::new(AtomicBool::new(false));
-            crate::log_debug(&format!(
-                "stream conversion start: input={} output={} target_ext={} quality={:?} format={:?}",
-                downloaded_path.to_string_lossy(),
-                converted_path.to_string_lossy(),
-                target_ext,
-                dialog_data.quality,
-                dialog_data.format
-            ));
-            report_progress_status(
-                progress,
-                &i18n::tr(language, "stream_audio.progress_converting"),
+            show_error(
+                parent,
+                language,
+                &i18n::tr(language, "stream_audio.no_output"),
             );
-            report_progress(progress, 0);
-            log_stream_focus_snapshot("stream_conversion.started", progress);
-            let mut last_pump = std::time::Instant::now();
-            let mut last_reported_pct = 0u32;
-            let convert_cancel_for_cb = Arc::clone(&convert_cancel);
-            let mut progress_cb = |pct: u32| {
-                let normalized = (pct / 100).min(100);
+            return;
+        };
+        let final_path = if let Some(convert_settings) = dialog_data
+            .format
+            .as_audio_convert_settings(dialog_data.quality)
+        {
+            let target_ext = dialog_data.format.extension().unwrap_or("mp3");
+            let same_extension = downloaded_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.eq_ignore_ascii_case(target_ext))
+                .unwrap_or(false);
+            let must_reencode_mp3 = matches!(
+                (dialog_data.format, dialog_data.quality),
+                (
+                    StreamOutputFormat::Mp3,
+                    StreamQualitySelection::BitrateKbps(_)
+                )
+            );
+            if same_extension && !must_reencode_mp3 {
                 crate::log_debug(&format!(
-                    "stream conversion progress callback: raw_pct={} normalized_pct={} last_reported_pct={}",
-                    pct, normalized, last_reported_pct
+                    "stream conversion skipped: downloaded_path={} target_ext={} same_extension={} must_reencode_mp3={}",
+                    downloaded_path.to_string_lossy(),
+                    target_ext,
+                    same_extension,
+                    must_reencode_mp3
                 ));
-                if normalized > last_reported_pct {
-                    last_reported_pct = normalized;
-                    report_progress(progress, normalized);
-                }
-                // Keep window responsive during in-process conversion on slower machines.
-                if last_pump.elapsed() >= std::time::Duration::from_millis(50) {
-                    let cancelled = pump_messages_detect_stream_cancel(parent, progress);
+                close_progress_dialog(progress);
+                downloaded_path.clone()
+            } else {
+                let converted_path = downloaded_path.with_extension(target_ext);
+                let convert_cancel = Arc::new(AtomicBool::new(false));
+                crate::log_debug(&format!(
+                    "stream conversion start: input={} output={} target_ext={} quality={:?} format={:?}",
+                    downloaded_path.to_string_lossy(),
+                    converted_path.to_string_lossy(),
+                    target_ext,
+                    dialog_data.quality,
+                    dialog_data.format
+                ));
+                report_progress_status(
+                    progress,
+                    &i18n::tr(language, "stream_audio.progress_converting"),
+                );
+                report_progress(progress, 0);
+                log_stream_focus_snapshot("stream_conversion.started", progress);
+                let mut last_pump = std::time::Instant::now();
+                let mut last_reported_pct = 0u32;
+                let convert_cancel_for_cb = Arc::clone(&convert_cancel);
+                let mut progress_cb = |pct: u32| {
+                    let normalized = (pct / 100).min(100);
                     crate::log_debug(&format!(
-                        "stream conversion ui pump: cancelled={} elapsed_ms={}",
-                        cancelled,
-                        last_pump.elapsed().as_millis()
+                        "stream conversion progress callback: raw_pct={} normalized_pct={} last_reported_pct={}",
+                        pct, normalized, last_reported_pct
                     ));
-                    log_stream_focus_snapshot("stream_conversion.ui_pump", progress);
-                    if cancelled {
-                        convert_cancel_for_cb.store(true, Ordering::Relaxed);
+                    if normalized > last_reported_pct {
+                        last_reported_pct = normalized;
+                        report_progress(progress, normalized);
                     }
-                    last_pump = std::time::Instant::now();
-                }
-            };
-            let convert_result = crate::ffmpeg_export::convert_audio_file(
-                &downloaded_path,
-                &converted_path,
-                &convert_settings,
-                Some(Arc::clone(&convert_cancel)),
-                Some(&mut progress_cb),
-            );
-            crate::log_debug(&format!(
-                "stream conversion result: success={} output_exists={} output={}",
-                convert_result.is_ok(),
-                converted_path.exists(),
-                converted_path.to_string_lossy()
-            ));
-            report_progress(progress, 100);
-            close_progress_dialog(progress);
-            match convert_result {
-                Ok(()) => {
-                    crate::log_if_err!(std::fs::remove_file(&downloaded_path));
-                    converted_path
-                }
-                Err(err) => {
-                    if convert_cancel.load(Ordering::Relaxed) || err == "Conversion canceled." {
-                        crate::log_debug("stream conversion cancelled by user");
-                        crate::log_if_err!(std::fs::remove_file(&converted_path));
+                    // Keep window responsive during in-process conversion on slower machines.
+                    if last_pump.elapsed() >= std::time::Duration::from_millis(50) {
+                        let cancelled = pump_messages_detect_stream_cancel(parent, progress);
+                        crate::log_debug(&format!(
+                            "stream conversion ui pump: cancelled={} elapsed_ms={}",
+                            cancelled,
+                            last_pump.elapsed().as_millis()
+                        ));
+                        log_stream_focus_snapshot("stream_conversion.ui_pump", progress);
+                        if cancelled {
+                            convert_cancel_for_cb.store(true, Ordering::Relaxed);
+                        }
+                        last_pump = std::time::Instant::now();
+                    }
+                };
+                let convert_result = crate::ffmpeg_export::convert_audio_file(
+                    &downloaded_path,
+                    &converted_path,
+                    &convert_settings,
+                    Some(Arc::clone(&convert_cancel)),
+                    Some(&mut progress_cb),
+                );
+                crate::log_debug(&format!(
+                    "stream conversion result: success={} output_exists={} output={}",
+                    convert_result.is_ok(),
+                    converted_path.exists(),
+                    converted_path.to_string_lossy()
+                ));
+                report_progress(progress, 100);
+                close_progress_dialog(progress);
+                match convert_result {
+                    Ok(()) => {
+                        crate::log_if_err!(std::fs::remove_file(&downloaded_path));
+                        converted_path
+                    }
+                    Err(err) => {
+                        if convert_cancel.load(Ordering::Relaxed) || err == "Conversion canceled." {
+                            crate::log_debug("stream conversion cancelled by user");
+                            crate::log_if_err!(std::fs::remove_file(&converted_path));
+                            return;
+                        }
+                        show_error(
+                            parent,
+                            language,
+                            &i18n::tr_f(language, "stream_audio.convert_failed", &[("err", &err)]),
+                        );
                         return;
                     }
-                    show_error(
-                        parent,
-                        language,
-                        &i18n::tr_f(language, "stream_audio.convert_failed", &[("err", &err)]),
-                    );
-                    return;
                 }
             }
-        }
-    } else {
-        report_progress(progress, 100);
-        close_progress_dialog(progress);
-        downloaded_path
-    };
+        } else {
+            report_progress(progress, 100);
+            close_progress_dialog(progress);
+            downloaded_path
+        };
 
-    let playback_path = if let Some(title) = stream_title.as_ref() {
-        let ext = final_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .filter(|e| !e.trim().is_empty())
-            .unwrap_or("mp3");
-        let target = unique_stream_named_path(&cache_dir, title, ext);
-        if target != final_path {
-            match std::fs::rename(&final_path, &target) {
-                Ok(()) => target,
-                Err(err) => {
-                    crate::log_debug(&format!(
-                        "Stream title rename failed ({} -> {}): {}",
-                        final_path.to_string_lossy(),
-                        target.to_string_lossy(),
-                        err
-                    ));
-                    final_path.clone()
+        let playback_path = if let Some(title) = stream_title.as_ref() {
+            let ext = final_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .filter(|e| !e.trim().is_empty())
+                .unwrap_or("mp3");
+            let target = unique_stream_named_path(&cache_dir, title, ext);
+            if target != final_path {
+                match std::fs::rename(&final_path, &target) {
+                    Ok(()) => target,
+                    Err(err) => {
+                        crate::log_debug(&format!(
+                            "Stream title rename failed ({} -> {}): {}",
+                            final_path.to_string_lossy(),
+                            target.to_string_lossy(),
+                            err
+                        ));
+                        final_path.clone()
+                    }
                 }
+            } else {
+                final_path.clone()
             }
         } else {
             final_path.clone()
-        }
-    } else {
-        final_path.clone()
-    };
+        };
 
-    crate::queue_audio_files_and_play(parent, vec![playback_path.clone()]);
-    crate::editor_manager::mark_current_document_from_rss(parent, true);
-    let episode_title = stream_title.or_else(|| {
-        playback_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .map(|s| s.to_string())
-    });
-    crate::set_active_podcast_episode_info(parent, Some(url), episode_title, Some(playback_path));
-    crate::menu::update_playback_menu(parent, true);
+        crate::queue_audio_files_and_play(parent, vec![playback_path.clone()]);
+        crate::editor_manager::mark_current_document_from_rss(parent, true);
+        let episode_title = stream_title.or_else(|| {
+            playback_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+        });
+        crate::set_active_podcast_episode_info(
+            parent,
+            Some(url),
+            episode_title,
+            Some(playback_path),
+        );
+        crate::set_active_youtube_return_input(parent, Some(input.clone()));
+        crate::menu::update_playback_menu(parent, true);
+        return;
+    }
 }
 
 fn ensure_ytdlp_available(

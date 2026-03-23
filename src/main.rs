@@ -781,6 +781,11 @@ pub(crate) enum RaiAudioOrigin {
     Tutte,
 }
 
+#[derive(Clone, Debug, Default)]
+pub(crate) struct YouTubeReturnContext {
+    pub input: Option<String>,
+}
+
 struct PodcastEpisodePlayFailed {
     language: Language,
     error: String,
@@ -1305,6 +1310,7 @@ pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
             state.active_podcast_episode_title = None;
             state.active_podcast_episode_cache = None;
             state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
+            state.active_youtube_return_context = YouTubeReturnContext::default();
         })
         .is_none()
         {
@@ -1338,6 +1344,7 @@ pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
                 state.active_podcast_episode_title = None;
                 state.active_podcast_episode_cache = None;
                 state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
+                state.active_youtube_return_context = YouTubeReturnContext::default();
             });
             kill_timer_best_effort(
                 hwnd,
@@ -1449,6 +1456,16 @@ pub(crate) fn set_active_podcast_episode_info(
                 }
             }
         }
+    }
+}
+
+pub(crate) fn set_active_youtube_return_input(hwnd: HWND, input: Option<String>) {
+    if with_state(hwnd, |state| {
+        state.active_youtube_return_context.input = input;
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to set active YouTube return context");
     }
 }
 
@@ -3451,6 +3468,7 @@ pub(crate) struct AppState {
     active_podcast_episode_title: Option<String>,
     active_podcast_episode_cache: Option<PathBuf>,
     active_podcast_episode_from_rai: RaiAudioOrigin,
+    active_youtube_return_context: YouTubeReturnContext,
     last_rai_recent_item_id: Option<String>,
     last_rai_grouped_item_id: Option<String>,
     podcast_chapters_cache: HashMap<String, Option<Vec<Chapter>>>,
@@ -4102,6 +4120,8 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                             let is_stop = matches!(command, PlayerCommand::Stop);
                             let podcasts_window = state.podcasts_window;
                             let from_rai = state.active_podcast_episode_from_rai;
+                            let youtube_return_input =
+                                state.active_youtube_return_context.input.clone();
                             if is_stop {
                                 // close_current_document() already stops audiobook playback
                                 // for audiobook tabs, so avoid duplicate stop work here.
@@ -4110,6 +4130,10 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                                     app_windows::rai_audiodescrizioni_window::open(hwnd);
                                 } else if from_rai == RaiAudioOrigin::Tutte {
                                     app_windows::rai_audiodescrizioni_window::open_grouped(hwnd);
+                                } else if let Some(input) = youtube_return_input {
+                                    app_windows::youtube_transcript_window::reopen_stream_selection(
+                                        hwnd, input,
+                                    );
                                 } else if podcasts_window.0 != 0 {
                                     SetForegroundWindow(podcasts_window);
                                     app_windows::podcasts_window::focus_library(podcasts_window);
@@ -4855,6 +4879,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_podcast_episode_title: None,
                     active_podcast_episode_cache: None,
                     active_podcast_episode_from_rai: RaiAudioOrigin::None,
+                    active_youtube_return_context: YouTubeReturnContext::default(),
                     last_rai_recent_item_id: None,
                     last_rai_grouped_item_id: None,
                     podcast_chapters_cache: HashMap::new(),

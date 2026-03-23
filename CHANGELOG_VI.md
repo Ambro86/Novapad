@@ -10,7 +10,9 @@ Có gì mới
 • Sonarpad hiện cũng đã có bản cho Mac, dù hiện chỉ hỗ trợ một phần chức năng. Liên kết dự án: https://github.com/Ambro86/Sonarpad-Mac
 
 Cải tiến
+• Đã thêm hơn 50 quốc gia có thể chọn cho thư mục podcast, giúp người dùng chọn được nhiều danh mục quốc gia hơn.
 • "Phat am thanh tu streaming..." gio cung cho phep tim kiem tren YouTube bang bat ky chuoi van ban nao, hoac dan lien ket cua mot kenh hoac playlist YouTube de hien thi cac ket qua cua no.
+• Đã cải thiện cách hiển thị kết quả trong "Phat am thanh tu streaming...": các mục YouTube giờ bao gồm tiêu đề, thời lượng, kênh và lượt xem theo định dạng rõ ràng hơn.
 • Đã cải thiện focus khi dùng "Phat am thanh tu streaming...", để cửa sổ tiến trình ổn định hơn trong lúc tải xuống và chuyển đổi.
 • Đã thêm hai thao tác đọc mới trong menu Giọng nói: `Câu trước` và `Câu tiếp theo`, với phím tắt có thể cấu hình để nhảy trong khi đọc văn bản.
 • Phím tắt mặc định của `Chạy tệp bằng trình thông dịch` giờ là `Ctrl+Shift+F5`, để `Shift+F5` có thể được dùng mặc định cho `Câu trước`.
@@ -25,6 +27,7 @@ Cải tiến
 • Đã thêm trong RSS một mục rõ ràng “Tải thêm tin tức” ở cuối nguồn khi còn bài khác; nhấn Enter sẽ tải khối tiếp theo và đưa focus tới bài viết mới đầu tiên.
 • Trong từ điển giọng nói, khi thêm hoặc sửa một mục thay thế, giờ có thêm ô «Phân biệt chữ hoa/thường» để quyết định mỗi phép thay thế có phân biệt hay bỏ qua chữ hoa chữ thường.
 Sửa lỗi
+• Đã sửa lỗi trong "Phat am thanh tu streaming..." khiến chương trình có thể trông như bị treo khi nhập chuỗi tìm kiếm và chọn một kênh YouTube từ kết quả, thay vì mở danh sách video của kênh đó.
 • Đã sửa lỗi khiến danh sách tệp đang mở hiển thị trong menu Trợ giúp thay vì menu Cửa sổ.
 • Đã sửa một trường hợp biên khi phát trực tuyến: phát âm thanh có thể bắt đầu nhưng cửa sổ “Đang tải streaming” vẫn mở khi tệp đã tải xuống đã đúng định dạng đích.
 • Đã sửa hành vi chuyển đổi với streaming MP3: khi luồng đã là MP3 và người dùng chọn bitrate MP3 cụ thể (ví dụ 128 kbps), Sonarpad giờ sẽ mã hóa lại theo bitrate đã chọn thay vì bỏ qua bước chuyển đổi.

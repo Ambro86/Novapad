@@ -10,7 +10,9 @@ What's New
 • Sonarpad is now also available on Mac with a subset of features. Project link: https://github.com/Ambro86/Sonarpad-Mac
 
 Improvements
+• Added more than 50 selectable countries for the podcast directory, so users can choose from a much wider range of national catalogs.
 • "Play streaming audio..." can now also search YouTube from any text query, or accept a YouTube channel or playlist link and show its results.
+• Improved how results are shown in "Play streaming audio...": YouTube entries now include title, duration, channel, and view count in a clearer format.
 • Improved focus handling during "Play streaming audio...", so the progress window stays more stable during download and conversion.
 • Added two new reading navigation actions in the Voice menu: `Previous sentence` and `Next sentence`, with configurable shortcuts to jump during text reading.
 • The default shortcut for `Execute file with interpreter` is now `Ctrl+Shift+F5`, so `Shift+F5` can be used by default for `Previous sentence`.
@@ -25,6 +27,7 @@ Improvements
 • Added an explicit RSS entry “Load more news” at the end of feeds when more items are available; pressing Enter loads the next batch and moves focus to the first newly loaded article.
 • In the voice dictionary, when adding or editing a replacement, there is now a “Match Case” checkbox so each substitution can either respect or ignore letter casing.
 Bug fixes
+• Fixed a bug where, in "Play streaming audio...", typing a search string and selecting a YouTube channel from the results could make the program appear stuck instead of opening that channel’s videos.
 • Fixed a bug where the list of open files was shown in the Help menu instead of the Window menu.
 • Fixed a streaming edge case where playback could start but the “Downloading stream” dialog stayed open when the downloaded file already matched the target format.
 • Fixed MP3 streaming conversion behavior: when the stream is already MP3 and the user selects an explicit MP3 bitrate (for example 128 kbps), Sonarpad now re-encodes to the selected bitrate instead of skipping conversion.

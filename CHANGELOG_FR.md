@@ -10,7 +10,9 @@ Nouveautés
 • Sonarpad est désormais disponible aussi sur Mac, même avec un ensemble de fonctions partiel. Lien du projet : https://github.com/Ambro86/Sonarpad-Mac
 
 Améliorations
+• Plus de 50 pays sélectionnables ont été ajoutés pour le répertoire de podcasts, afin de pouvoir choisir parmi un éventail bien plus large de catalogues nationaux.
 • « Lire l'audio en streaming... » permet désormais aussi d'effectuer une recherche YouTube à partir de n'importe quel texte, ou de coller le lien d'une chaîne ou d'une playlist YouTube pour afficher ses résultats.
+• L’affichage des résultats dans « Lire l'audio en streaming... » a été amélioré : les entrées YouTube incluent maintenant le titre, la durée, la chaîne et le nombre de vues dans un format plus clair.
 • Amélioration du focus pendant « Lire l'audio en streaming... », afin que la fenêtre de progression reste plus stable pendant le téléchargement et la conversion.
 • Ajout de deux nouvelles actions de lecture dans le menu Voix : `Phrase précédente` et `Phrase suivante`, avec des raccourcis configurables pour se déplacer pendant la lecture du texte.
 • Le raccourci par défaut de `Exécuter le fichier avec l’interpréteur` est maintenant `Ctrl+Shift+F5`, afin que `Shift+F5` puisse être utilisé par défaut pour `Phrase précédente`.
@@ -25,6 +27,7 @@ Améliorations
 • Ajout dans RSS d’une entrée explicite « Charger plus d’actualités » à la fin des sources lorsque d’autres éléments sont disponibles ; en appuyant sur Entrée, le bloc suivant est chargé et le focus se déplace vers le premier nouvel article.
 • Dans le dictionnaire vocal, lors de l’ajout ou de la modification d’un remplacement, une case « Respecter la casse » permet désormais de choisir si chaque substitution doit respecter ou ignorer les majuscules/minuscules.
 Correctifs
+• Correction d’un problème où, dans « Lire l'audio en streaming... », après avoir saisi une recherche textuelle et sélectionné une chaîne YouTube dans les résultats, le programme pouvait sembler bloqué au lieu d’ouvrir les vidéos de la chaîne.
 • Correction d’un bug où la liste des fichiers ouverts s’affichait dans le menu Aide au lieu du menu Fenêtre.
 • Correction d’un cas limite de streaming où la lecture pouvait démarrer mais la fenêtre « Téléchargement du flux » restait ouverte lorsque le fichier téléchargé correspondait déjà au format cible.
 • Correction du comportement de conversion en streaming MP3 : lorsque le flux est déjà en MP3 et que l’utilisateur choisit un bitrate MP3 explicite (par exemple 128 kbps), Sonarpad réencode désormais au bitrate sélectionné au lieu d’ignorer la conversion.

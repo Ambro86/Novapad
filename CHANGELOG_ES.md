@@ -10,7 +10,9 @@ Novedades
 • Sonarpad ya está disponible también en Mac, aunque con un conjunto de funciones parcial. Enlace del proyecto: https://github.com/Ambro86/Sonarpad-Mac
 
 Mejoras
+• Se añadieron más de 50 países seleccionables para el directorio de podcasts, de modo que ahora se puede elegir entre muchos más catálogos nacionales.
 • "Reproducir audio en streaming..." ahora también permite buscar en YouTube escribiendo cualquier texto o pegar el enlace de un canal o una lista de reproducción de YouTube para mostrar sus resultados.
+• Se mejoró la visualización de los resultados en "Reproducir audio en streaming...": las entradas de YouTube ahora incluyen título, duración, canal y visualizaciones en un formato más claro.
 • Mejorado el enfoque durante "Reproducir audio en streaming...", para que la ventana de progreso se mantenga más estable durante la descarga y la conversión.
 • Añadidas dos nuevas acciones de lectura en el menú Voz: `Frase anterior` y `Siguiente frase`, con atajos configurables para saltar durante la lectura del texto.
 • El atajo predeterminado de `Ejecutar archivo con intérprete` ahora es `Ctrl+Shift+F5`, para que `Shift+F5` pueda usarse por defecto para `Frase anterior`.
@@ -25,6 +27,7 @@ Mejoras
 • Añadida en RSS una entrada explícita «Cargar más noticias» al final de las fuentes cuando hay más elementos disponibles; al pulsar Intro se carga el siguiente bloque y el foco se mueve al primer artículo nuevo.
 • En el diccionario de voz, al añadir o editar una sustitución, ahora hay una casilla «Distinguir mayúsculas y minúsculas» para decidir si cada sustitución debe respetar o ignorar el uso de mayúsculas.
 Correcciones
+• Corregido un problema por el que, en "Reproducir audio en streaming...", al escribir un texto de búsqueda y seleccionar un canal de YouTube en los resultados, el programa podía parecer bloqueado en lugar de abrir los vídeos del canal.
 • Corregido un error por el que la lista de archivos abiertos se mostraba en el menú Ayuda en lugar del menú Ventana.
 • Corregido un caso límite de streaming en el que la reproducción podía iniciarse pero la ventana “Descargando streaming” quedaba abierta cuando el archivo descargado ya coincidía con el formato de destino.
 • Corregido el comportamiento de conversión en streaming MP3: cuando el stream ya es MP3 y el usuario elige un bitrate MP3 explícito (por ejemplo 128 kbps), Sonarpad ahora recodifica al bitrate seleccionado en lugar de omitir la conversión.

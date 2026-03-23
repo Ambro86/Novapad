@@ -10,7 +10,9 @@ Nowości
 • Sonarpad jest teraz dostępny także na Macu, choć na razie z częściowym zestawem funkcji. Link do projektu: https://github.com/Ambro86/Sonarpad-Mac
 
 Ulepszenia
+• Dodano ponad 50 wybieralnych krajów dla katalogu podcastów, dzięki czemu można teraz wybierać spośród znacznie większej liczby katalogów narodowych.
 • Funkcja „Odtwórz dźwięk ze streamingu...” pozwala teraz także wyszukiwać w YouTube po dowolnym tekście albo wkleić link do kanału lub playlisty YouTube, aby wyświetlić ich wyniki.
+• Ulepszono sposób wyświetlania wyników w „Odtwórz dźwięk ze streamingu...”: wpisy YouTube zawierają teraz tytuł, czas trwania, kanał i liczbę wyświetleń w czytelniejszym formacie.
 • Poprawiono fokus podczas „Odtwórz dźwięk ze streamingu...”, dzięki czemu okno postępu pozostaje stabilniejsze podczas pobierania i konwersji.
 • Dodano dwie nowe akcje czytania w menu Głos: `Poprzednie zdanie` i `Następne zdanie`, z konfigurowalnymi skrótami do przeskakiwania podczas czytania tekstu.
 • Domyślny skrót dla `Wykonaj plik w interpreterze` to teraz `Ctrl+Shift+F5`, dzięki czemu `Shift+F5` może być domyślnie używany dla `Poprzednie zdanie`.
@@ -25,6 +27,7 @@ Ulepszenia
 • Dodano w RSS wyraźną pozycję „Załaduj więcej wiadomości” na końcu źródła, gdy dostępne są kolejne elementy; naciśnięcie Enter wczytuje następny blok i przenosi fokus na pierwszy nowy artykuł.
 • W słowniku głosowym podczas dodawania lub edycji podmiany dostępne jest teraz pole „Uwzględniaj wielkość liter”, które pozwala zdecydować, czy dana podmiana ma rozróżniać wielkie i małe litery.
 Poprawki
+• Naprawiono problem, przez który w „Odtwórz dźwięk ze streamingu...” po wpisaniu wyszukiwanej frazy i wybraniu kanału YouTube z wyników program mógł sprawiać wrażenie zawieszonego zamiast otworzyć filmy z tego kanału.
 • Naprawiono błąd, przez który lista otwartych plików była wyświetlana w menu Pomoc zamiast w menu Okno.
 • Naprawiono przypadek brzegowy streamingu, w którym odtwarzanie mogło się rozpocząć, ale okno „Pobieranie streamingu” pozostawało otwarte, gdy pobrany plik już pasował do formatu docelowego.
 • Naprawiono zachowanie konwersji dla streamingu MP3: gdy strumień jest już w MP3 i użytkownik wybierze jawny bitrate MP3 (np. 128 kbps), Sonarpad teraz ponownie koduje do wybranego bitrate zamiast pomijać konwersję.

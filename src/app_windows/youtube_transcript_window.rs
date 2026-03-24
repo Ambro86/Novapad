@@ -2104,12 +2104,24 @@ fn is_members_only_stream_error(err: &str) -> bool {
         || err_lc.contains("join this channel to get access to members-only content")
 }
 
+fn is_drm_not_supported_stream_error(err: &str) -> bool {
+    let err_lc = err.to_ascii_lowercase();
+    err_lc.contains("known to use drm protection")
+        || err_lc.contains("uses drm protection")
+        || err_lc.contains("not be supported")
+        || err_lc.contains("[drm]")
+}
+
 fn members_only_stream_message(language: Language) -> String {
     format!(
         "{} {}",
         i18n::tr(language, "stream_audio.members_only_video"),
         i18n::tr(language, "stream_audio.choose_another_video")
     )
+}
+
+fn drm_not_supported_stream_message(language: Language) -> String {
+    i18n::tr(language, "stream_audio.drm_not_supported")
 }
 fn looks_like_valid_stream_url(input: &str) -> bool {
     let Some(normalized) = normalize_youtube_input_for_download(input) else {
@@ -4720,6 +4732,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             } else {
                 stderr_capture.trim().to_string()
             };
+            if is_drm_not_supported_stream_error(&err) {
+                close_progress_dialog(progress);
+                show_error(
+                    parent,
+                    language,
+                    &drm_not_supported_stream_message(language),
+                );
+                return;
+            }
             let err_lc = err.to_ascii_lowercase();
             let should_retry = stalled
                 || err_lc.contains("downloaded file is empty")

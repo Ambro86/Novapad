@@ -8,8 +8,8 @@ use windows::Win32::UI::Controls::{
     TVM_SELECTITEM, TVS_HASBUTTONS, TVS_HASLINES, TVS_LINESATROOT, TVS_SHOWSELALWAYS, WC_BUTTON,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, SetFocus, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_NEXT, VK_PRIOR,
-    VK_RETURN, VK_RIGHT, VK_UP,
+    EnableWindow, SetFocus, VK_APPS, VK_DOWN, VK_END, VK_ESCAPE, VK_F10, VK_HOME, VK_LEFT, VK_NEXT,
+    VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW,
@@ -126,13 +126,14 @@ pub fn select_interpreter(
     }
 }
 
-pub fn select_interpreter_with_secondary_action_and_initial_without_parent_restore(
+pub fn select_interpreter_with_secondary_action_and_context_action_and_initial_without_parent_restore(
     parent: HWND,
     items: Vec<String>,
     language: Language,
     title: String,
     secondary_action_label: String,
     initial_value: Option<String>,
+    context_action: InterpreterContextAction,
 ) -> Option<InterpreterSelectionResult> {
     select_interpreter_internal(
         parent,
@@ -142,6 +143,9 @@ pub fn select_interpreter_with_secondary_action_and_initial_without_parent_resto
         InterpreterSelectOptions {
             secondary_action_label: Some(secondary_action_label),
             initial_list_value: initial_value,
+            context_action_label: Some(context_action.label),
+            context_action_enabled: Some(context_action.enabled),
+            context_action_handler: Some(context_action.handler),
             suppress_parent_restore_on_accept: true,
             suppress_parent_restore_on_secondary: true,
             ..Default::default()
@@ -177,12 +181,13 @@ pub fn select_interpreter_with_context_action_without_parent_restore_on_accept(
     }
 }
 
-pub fn select_grouped_interpreter_without_parent_restore_on_accept(
+pub fn select_grouped_interpreter_with_context_action_without_parent_restore_on_accept(
     parent: HWND,
     groups: Vec<GroupedSelectGroup>,
     language: Language,
     title: String,
     initial_value: Option<String>,
+    context_action: InterpreterContextAction,
 ) -> Option<String> {
     match select_interpreter_internal(
         parent,
@@ -194,6 +199,9 @@ pub fn select_grouped_interpreter_without_parent_restore_on_accept(
             suppress_parent_restore_on_cancel: true,
             pin_topmost: true,
             initial_tree_value: initial_value,
+            context_action_label: Some(context_action.label),
+            context_action_enabled: Some(context_action.enabled),
+            context_action_handler: Some(context_action.handler),
             ..Default::default()
         },
     ) {
@@ -296,6 +304,7 @@ fn select_interpreter_internal(
             break;
         }
         unsafe {
+            let focused = crate::get_focus_safe();
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
                 crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
                 continue;
@@ -304,7 +313,27 @@ fn select_interpreter_internal(
                 crate::log_if_err!(PostMessageW(hwnd, WM_COMMAND, WPARAM(ID_OK), LPARAM(0)));
                 continue;
             }
-            let focused = crate::get_focus_safe();
+            if msg.message == WM_KEYDOWN
+                && (msg.wParam.0 as u32 == VK_APPS.0 as u32
+                    || (msg.wParam.0 as u32 == VK_F10.0 as u32
+                        && crate::get_key_state_safe(VK_SHIFT.0 as i32) < 0))
+            {
+                let should_open_context_menu =
+                    with_interpreter_state(hwnd, |state| match state.control {
+                        ControlKind::List(list) => focused == list,
+                        ControlKind::Tree(tree) => focused == tree,
+                    })
+                    .unwrap_or(false);
+                if should_open_context_menu {
+                    crate::log_if_err!(PostMessageW(
+                        hwnd,
+                        WM_CONTEXTMENU,
+                        WPARAM(focused.0 as usize),
+                        LPARAM(-1),
+                    ));
+                    continue;
+                }
+            }
             let control_has_navigation_key =
                 with_interpreter_state(hwnd, |state| match state.control {
                     ControlKind::List(list) => {
@@ -590,20 +619,31 @@ fn interpreter_select_wndproc_inner(
         WM_CONTEXTMENU => {
             let target = HWND(wparam.0 as isize);
             let handled = with_interpreter_state(hwnd, |state| {
-                let ControlKind::List(list) = state.control else {
-                    return false;
-                };
-                if target.0 != 0 && target != list && target != hwnd {
-                    return false;
-                }
                 let Some(label) = state.context_action_label.clone() else {
                     return false;
                 };
                 let Some(handler) = state.context_action_handler.clone() else {
                     return false;
                 };
-                let Some(value) = selected_list_value(list) else {
-                    return false;
+                let value = match state.control {
+                    ControlKind::List(list) => {
+                        if target.0 != 0 && target != list && target != hwnd {
+                            return false;
+                        }
+                        let Some(value) = selected_list_value(list) else {
+                            return false;
+                        };
+                        value
+                    }
+                    ControlKind::Tree(tree) => {
+                        if target.0 != 0 && target != tree && target != hwnd {
+                            return false;
+                        }
+                        let Some(value) = selected_tree_value(tree, &state.tree_values) else {
+                            return false;
+                        };
+                        value
+                    }
                 };
                 if let Some(enabled) = state.context_action_enabled.as_ref()
                     && !enabled(&value)
@@ -817,6 +857,40 @@ fn selected_list_value(list: HWND) -> Option<String> {
         LPARAM(buf.as_mut_ptr() as isize),
     );
     Some(String::from_utf16_lossy(&buf[..len as usize]))
+}
+
+fn selected_tree_value(tree: HWND, tree_values: &[String]) -> Option<String> {
+    let caret = HTREEITEM(
+        crate::send_message_w_safe(
+            tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    if caret.0 == 0 {
+        return None;
+    }
+    let mut item = TVITEMW {
+        mask: TVIF_PARAM,
+        hItem: caret,
+        ..Default::default()
+    };
+    if crate::send_message_w_safe(
+        tree,
+        TVM_GETITEMW,
+        WPARAM(0),
+        LPARAM(&mut item as *mut _ as isize),
+    )
+    .0 == 0
+    {
+        return None;
+    }
+    if item.lParam.0 < 0 {
+        return None;
+    }
+    tree_values.get(item.lParam.0 as usize).cloned()
 }
 
 fn insert_tree_item(tree: HWND, parent: HTREEITEM, label: &str, value_index: isize) -> HTREEITEM {

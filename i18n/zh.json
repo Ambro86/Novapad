@@ -1233,6 +1233,7 @@
   "stream_audio.duration_label": "时长",
   "stream_audio.channel_label": "频道",
   "stream_audio.views_label": "观看次数",
+  "stream_audio.drm_not_supported": "此流媒体源使用 DRM 保护，暂不支持。",
   "stream_audio.favorites_label": "收藏",
   "stream_audio.add_to_favorites": "添加到收藏",
   "stream_audio.subscribers_label": "订阅者"

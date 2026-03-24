@@ -1233,6 +1233,7 @@
   "stream_audio.duration_label": "Trajanje",
   "stream_audio.channel_label": "Kanal",
   "stream_audio.views_label": "Pregledi",
+  "stream_audio.drm_not_supported": "Ovaj izvor striminga koristi DRM zaštitu i nije podržan.",
   "stream_audio.favorites_label": "Omiljeni",
   "stream_audio.add_to_favorites": "Dodaj u omiljene",
   "stream_audio.subscribers_label": "Pretplatnici"

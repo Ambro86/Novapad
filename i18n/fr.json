@@ -1233,6 +1233,7 @@
   "stream_audio.duration_label": "Durée",
   "stream_audio.channel_label": "Chaîne",
   "stream_audio.views_label": "Vues",
+  "stream_audio.drm_not_supported": "Cette source de streaming utilise une protection DRM et n'est pas prise en charge.",
   "stream_audio.favorites_label": "Favoris",
   "stream_audio.add_to_favorites": "Ajouter aux favoris",
   "stream_audio.subscribers_label": "Abonnés"

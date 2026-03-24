@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
@@ -18,7 +19,7 @@ use windows::core::PCWSTR;
 
 use crate::app_windows::interpreter_select_window;
 use crate::app_windows::interpreter_select_window::{
-    GroupedSelectGroup, GroupedSelectItem, InterpreterSelectionResult,
+    GroupedSelectGroup, GroupedSelectItem, InterpreterContextAction, InterpreterSelectionResult,
 };
 use crate::settings::Language;
 use crate::tools::rai_audiodescrizioni::{self, CatalogGroup, CatalogItem};
@@ -84,15 +85,34 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
             .find(|(_, item)| item.item_id == item_id)
             .map(|(label, _)| label.clone())
     });
-    let selection =
-        interpreter_select_window::select_interpreter_with_secondary_action_and_initial_without_parent_restore(
-            parent,
-            labels,
-            language,
-            "Rai audiodescrizioni".to_string(),
-            "Mostra tutte le audiodescrizioni".to_string(),
-            initial_label,
-        );
+    let display_items_for_enabled = display_items.clone();
+    let display_items_for_handler = display_items.clone();
+    let selection = interpreter_select_window::select_interpreter_with_secondary_action_and_context_action_and_initial_without_parent_restore(
+        parent,
+        labels,
+        language,
+        "Rai audiodescrizioni".to_string(),
+        "Mostra tutte le audiodescrizioni".to_string(),
+        initial_label,
+        InterpreterContextAction {
+            label: tr_or(language, "rai_audiodescrizioni.copy_audio_url", "Copia URL audio"),
+            enabled: Arc::new(move |selected_label: &str| {
+                display_items_for_enabled
+                    .iter()
+                    .find(|(label, _)| label == selected_label)
+                    .map(|(_, item)| !item.audio_url.trim().is_empty())
+                    .unwrap_or(false)
+            }),
+            handler: Arc::new(move |selected_label: String| {
+                if let Some((_, item)) = display_items_for_handler
+                    .iter()
+                    .find(|(label, _)| label == &selected_label)
+                {
+                    copy_text_to_clipboard(parent, &item.audio_url);
+                }
+            }),
+        },
+    );
 
     match selection {
         Some(InterpreterSelectionResult::Item(selected_label)) => {
@@ -165,14 +185,34 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
     }
 
     let grouped_items = build_grouped_items(&groups);
-    let Some(selected_value) =
-        interpreter_select_window::select_grouped_interpreter_without_parent_restore_on_accept(
-            parent,
-            grouped_items,
-            language,
-            "Tutte le audiodescrizioni Rai".to_string(),
-            initial_item_id,
-        )
+    let item_by_id: std::collections::HashMap<String, CatalogItem> = groups
+        .iter()
+        .flat_map(|group| group.items.iter().cloned())
+        .map(|item| (item.item_id.clone(), item))
+        .collect();
+    let item_by_id_for_enabled = item_by_id.clone();
+    let item_by_id_for_handler = item_by_id.clone();
+    let Some(selected_value) = interpreter_select_window::select_grouped_interpreter_with_context_action_without_parent_restore_on_accept(
+        parent,
+        grouped_items,
+        language,
+        "Tutte le audiodescrizioni Rai".to_string(),
+        initial_item_id,
+        InterpreterContextAction {
+            label: tr_or(language, "rai_audiodescrizioni.copy_audio_url", "Copia URL audio"),
+            enabled: Arc::new(move |selected_value: &str| {
+                item_by_id_for_enabled
+                    .get(selected_value)
+                    .map(|item| !item.audio_url.trim().is_empty())
+                    .unwrap_or(false)
+            }),
+            handler: Arc::new(move |selected_value: String| {
+                if let Some(item) = item_by_id_for_handler.get(&selected_value) {
+                    copy_text_to_clipboard(parent, &item.audio_url);
+                }
+            }),
+        },
+    )
     else {
         let recent_item_id =
             with_state(parent, |state| state.last_rai_recent_item_id.clone()).unwrap_or(None);
@@ -200,6 +240,59 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
         language,
         "Impossibile aprire l'audiodescrizione selezionata.",
     );
+}
+
+fn tr_or(language: Language, key: &str, fallback: &str) -> String {
+    let translated = crate::i18n::tr(language, key);
+    if translated == key {
+        fallback.to_string()
+    } else {
+        translated
+    }
+}
+
+fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::Memory::GMEM_MOVEABLE;
+
+    const CF_UNICODETEXT: u32 = 13;
+
+    let content = crate::to_wide(text);
+    if content.is_empty() {
+        return;
+    }
+    if crate::open_clipboard_safe(hwnd).is_err() {
+        return;
+    }
+    if let Err(err) = crate::empty_clipboard_safe() {
+        crate::log_debug(&format!("EmptyClipboard failed: {}", err));
+    }
+    let size = content.len() * std::mem::size_of::<u16>();
+    let handle = match crate::global_alloc_safe(GMEM_MOVEABLE, size) {
+        Ok(handle) => handle,
+        Err(err) => {
+            crate::log_debug(&format!("GlobalAlloc failed: {}", err));
+            crate::log_if_err!(crate::close_clipboard_safe());
+            return;
+        }
+    };
+    if handle.0.is_null() {
+        crate::log_if_err!(crate::close_clipboard_safe());
+        return;
+    }
+    let ptr = crate::global_lock_as_safe(handle) as *mut u16;
+    if ptr.is_null() {
+        crate::log_if_err!(crate::close_clipboard_safe());
+        return;
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(content.as_ptr(), ptr, content.len());
+    }
+    crate::log_if_err!(crate::global_unlock_safe(handle));
+    if let Err(err) = crate::set_clipboard_data_safe(CF_UNICODETEXT, HANDLE(handle.0 as isize)) {
+        crate::log_debug(&format!("SetClipboardData failed: {}", err));
+    }
+    crate::log_if_err!(crate::close_clipboard_safe());
 }
 
 fn open_item(

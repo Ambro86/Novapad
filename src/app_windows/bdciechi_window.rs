@@ -283,6 +283,36 @@ fn sanitize_filename(name: &str) -> String {
     }
 }
 
+fn strip_known_extension<'a>(name: &'a str, extension: &str) -> &'a str {
+    let suffix = format!(".{extension}");
+    if name.len() > suffix.len() && name.ends_with(&suffix) {
+        &name[..name.len() - suffix.len()]
+    } else {
+        name
+    }
+}
+
+fn format_bdc_catalog_filename_base(name: &str) -> String {
+    let mut formatted = String::with_capacity(name.len());
+    let mut chars = name.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '_' {
+            let prev_is_space = formatted.ends_with(' ');
+            let next_is_space = chars.peek().copied() == Some(' ');
+            if !prev_is_space {
+                formatted.push(' ');
+            }
+            formatted.push('-');
+            if !next_is_space {
+                formatted.push(' ');
+            }
+        } else {
+            formatted.push(ch);
+        }
+    }
+    formatted.trim().to_string()
+}
+
 fn decode_book_text(bytes: &[u8]) -> String {
     let decoded = if let Ok(text) = std::str::from_utf8(bytes) {
         text.to_string()
@@ -390,7 +420,33 @@ fn row_matches_query(row: &str, query_terms: &[String]) -> bool {
     query_terms.iter().all(|term| normalized_row.contains(term))
 }
 
-fn suggested_name_from_info(info: &str, index: usize) -> String {
+fn suggested_name_from_info(info: &str, row: &str, index: usize) -> String {
+    let extension = info
+        .split(';')
+        .nth(3)
+        .and_then(|path_field| {
+            let trimmed = path_field.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                trimmed
+                    .rsplit('\\')
+                    .next()
+                    .and_then(|name| Path::new(name.trim()).extension())
+                    .and_then(|ext| ext.to_str())
+                    .filter(|ext| !ext.trim().is_empty())
+                    .map(|ext| ext.trim().to_string())
+            }
+        })
+        .unwrap_or_else(|| "txt".to_string());
+
+    let row_name = format_bdc_catalog_filename_base(&sanitize_filename(
+        strip_known_extension(row.trim(), &extension).trim(),
+    ));
+    if !row_name.is_empty() && row_name != "opera.txt" {
+        return format!("{row_name}.{extension}");
+    }
+
     if let Some(path_field) = info.split(';').nth(3) {
         let trimmed = path_field.trim();
         if !trimmed.is_empty()
@@ -988,7 +1044,7 @@ fn download_selected(hwnd: HWND) {
             }
         };
 
-        let suggested = suggested_name_from_info(&work.info, catalog_index);
+        let suggested = suggested_name_from_info(&work.info, &selected_row, catalog_index);
         let Some(path) = save_as_dialog(state.parent, &docs_dir, &suggested) else {
             set_status(state, &tr("status.save_cancelled"));
             return None;
@@ -1136,7 +1192,7 @@ fn sample_selected(hwnd: HWND) {
             }
         };
 
-        let file_name = suggested_name_from_info(&work.info, catalog_index);
+        let file_name = suggested_name_from_info(&work.info, &selected_row, catalog_index);
         let decoded = decode_book_text(&work.text);
         let sample: String = decoded.chars().take(8_000).collect();
         let composed = format!(
@@ -1979,7 +2035,8 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_search_text, repair_utf8_mojibake, row_matches_query, tokenize_search_terms,
+        format_bdc_catalog_filename_base, normalize_search_text, repair_utf8_mojibake,
+        row_matches_query, strip_known_extension, suggested_name_from_info, tokenize_search_terms,
     };
 
     #[test]
@@ -2017,6 +2074,38 @@ mod tests {
         assert_eq!(
             repair_utf8_mojibake("DUBAI\nLâ€™EMIRATO DEL POSSIBILE"),
             "DUBAI\nL’EMIRATO DEL POSSIBILE"
+        );
+    }
+
+    #[test]
+    fn suggested_name_from_info_prefers_catalog_row_with_original_extension() {
+        assert_eq!(
+            suggested_name_from_info(
+                "x;y;z;C:\\\\books\\\\Titolo opera.txt",
+                "Autore Nome - Titolo opera",
+                12
+            ),
+            "Autore Nome - Titolo opera.txt"
+        );
+    }
+
+    #[test]
+    fn strip_known_extension_removes_duplicate_suffix_only_once() {
+        assert_eq!(
+            strip_known_extension("Titolo opera.txt", "txt"),
+            "Titolo opera"
+        );
+        assert_eq!(
+            strip_known_extension("Titolo opera.rtf", "txt"),
+            "Titolo opera.rtf"
+        );
+    }
+
+    #[test]
+    fn format_bdc_catalog_filename_base_replaces_underscores_with_spaced_dash() {
+        assert_eq!(
+            format_bdc_catalog_filename_base("Carducci Giosue_ Conversazioni Critiche"),
+            "Carducci Giosue - Conversazioni Critiche"
         );
     }
 }

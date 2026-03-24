@@ -13,6 +13,7 @@ Melhorias
 • Foram adicionados mais de 50 países selecionáveis para o diretório de podcasts, permitindo escolher entre muitos mais catálogos nacionais.
 • "Reproduzir áudio por streaming..." agora também permite pesquisar no YouTube escrevendo qualquer texto ou colar a ligação de um canal ou de uma playlist do YouTube para mostrar os respetivos resultados.
 • A apresentação dos resultados em "Reproduzir áudio por streaming..." foi melhorada: as entradas do YouTube agora incluem título, duração, canal e visualizações num formato mais claro.
+• Foram adicionados favoritos do YouTube para canais e playlists em "Reproduzir áudio por streaming...": podem ser adicionados a partir dos resultados através do menu contextual, abertos diretamente a partir da lista Favoritos acessível com Tab logo após o campo de URL/pesquisa do YouTube e removidos mais tarde dessa mesma lista também pelo menu contextual. Nos resultados de pesquisa do YouTube, o menu contextual está disponível apenas para canais e playlists.
 • Melhorado o foco durante "Reproduzir áudio por streaming...", para que a janela de progresso permaneça mais estável durante a descarga e a conversão.
 • Adicionadas duas novas ações de leitura no menu Voz: `Frase anterior` e `Próxima frase`, com atalhos configuráveis para saltar durante a leitura do texto.
 • O atalho predefinido de `Executar ficheiro com interpretador` é agora `Ctrl+Shift+F5`, para que `Shift+F5` possa ser usado por predefinição para `Frase anterior`.

@@ -1233,5 +1233,7 @@
   "stream_audio.duration_label": "Czas trwania",
   "stream_audio.channel_label": "Kanał",
   "stream_audio.views_label": "Wyświetlenia",
+  "stream_audio.favorites_label": "Ulubione",
+  "stream_audio.add_to_favorites": "Dodaj do ulubionych",
   "stream_audio.subscribers_label": "Subskrybenci"
 }

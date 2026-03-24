@@ -13,6 +13,7 @@ Ulepszenia
 • Dodano ponad 50 wybieralnych krajów dla katalogu podcastów, dzięki czemu można teraz wybierać spośród znacznie większej liczby katalogów narodowych.
 • Funkcja „Odtwórz dźwięk ze streamingu...” pozwala teraz także wyszukiwać w YouTube po dowolnym tekście albo wkleić link do kanału lub playlisty YouTube, aby wyświetlić ich wyniki.
 • Ulepszono sposób wyświetlania wyników w „Odtwórz dźwięk ze streamingu...”: wpisy YouTube zawierają teraz tytuł, czas trwania, kanał i liczbę wyświetleń w czytelniejszym formacie.
+• Dodano ulubione YouTube dla kanałów i playlist w „Odtwórz dźwięk ze streamingu...”: można je dodawać z wyników za pomocą menu kontekstowego, otwierać bezpośrednio z listy Ulubione dostępnej po naciśnięciu Tab zaraz za polem adresu URL/zapytania YouTube oraz usuwać później z tej samej listy również przez menu kontekstowe. W wynikach wyszukiwania YouTube menu kontekstowe jest dostępne tylko dla kanałów i playlist.
 • Poprawiono fokus podczas „Odtwórz dźwięk ze streamingu...”, dzięki czemu okno postępu pozostaje stabilniejsze podczas pobierania i konwersji.
 • Dodano dwie nowe akcje czytania w menu Głos: `Poprzednie zdanie` i `Następne zdanie`, z konfigurowalnymi skrótami do przeskakiwania podczas czytania tekstu.
 • Domyślny skrót dla `Wykonaj plik w interpreterze` to teraz `Ctrl+Shift+F5`, dzięki czemu `Shift+F5` może być domyślnie używany dla `Poprzednie zdanie`.

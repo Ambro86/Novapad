@@ -1233,5 +1233,7 @@
   "stream_audio.duration_label": "Trukmė",
   "stream_audio.channel_label": "Kanalas",
   "stream_audio.views_label": "Peržiūros",
+  "stream_audio.favorites_label": "Mėgstamiausi",
+  "stream_audio.add_to_favorites": "Pridėti prie mėgstamiausių",
   "stream_audio.subscribers_label": "Prenumeratoriai"
 }

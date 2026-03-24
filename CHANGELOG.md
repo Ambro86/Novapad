@@ -13,6 +13,7 @@ Improvements
 • Added more than 50 selectable countries for the podcast directory, so users can choose from a much wider range of national catalogs.
 • "Play streaming audio..." can now also search YouTube from any text query, or accept a YouTube channel or playlist link and show its results.
 • Improved how results are shown in "Play streaming audio...": YouTube entries now include title, duration, channel, and view count in a clearer format.
+• Added YouTube favorites for channels and playlists in "Play streaming audio...": they can be added from the results with the context menu, opened directly from the Favorites list reached with Tab right after the YouTube URL/query field, and removed later from that same list using the context menu. In YouTube search results, the context menu is available only for channels and playlists.
 • Improved focus handling during "Play streaming audio...", so the progress window stays more stable during download and conversion.
 • Added two new reading navigation actions in the Voice menu: `Previous sentence` and `Next sentence`, with configurable shortcuts to jump during text reading.
 • The default shortcut for `Execute file with interpreter` is now `Ctrl+Shift+F5`, so `Shift+F5` can be used by default for `Previous sentence`.

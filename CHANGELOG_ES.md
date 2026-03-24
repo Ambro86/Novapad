@@ -13,6 +13,7 @@ Mejoras
 • Se añadieron más de 50 países seleccionables para el directorio de podcasts, de modo que ahora se puede elegir entre muchos más catálogos nacionales.
 • "Reproducir audio en streaming..." ahora también permite buscar en YouTube escribiendo cualquier texto o pegar el enlace de un canal o una lista de reproducción de YouTube para mostrar sus resultados.
 • Se mejoró la visualización de los resultados en "Reproducir audio en streaming...": las entradas de YouTube ahora incluyen título, duración, canal y visualizaciones en un formato más claro.
+• Se añadieron favoritos de YouTube para canales y listas de reproducción en "Reproducir audio en streaming...": pueden añadirse desde los resultados mediante el menú contextual, abrirse directamente desde la lista Favoritos accesible con Tab justo después del campo URL/consulta de YouTube y eliminarse más tarde desde esa misma lista también con el menú contextual. En los resultados de búsqueda de YouTube, el menú contextual solo está disponible para canales y listas de reproducción.
 • Mejorado el enfoque durante "Reproducir audio en streaming...", para que la ventana de progreso se mantenga más estable durante la descarga y la conversión.
 • Añadidas dos nuevas acciones de lectura en el menú Voz: `Frase anterior` y `Siguiente frase`, con atajos configurables para saltar durante la lectura del texto.
 • El atajo predeterminado de `Ejecutar archivo con intérprete` ahora es `Ctrl+Shift+F5`, para que `Shift+F5` pueda usarse por defecto para `Frase anterior`.

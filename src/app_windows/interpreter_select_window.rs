@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::UI::Controls::{
     HTREEITEM, TVE_EXPAND, TVGN_CARET, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW, TVINSERTSTRUCTW_0,
@@ -12,13 +12,15 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VK_RETURN, VK_RIGHT, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
-    DispatchMessageW, GWLP_USERDATA, HMENU, HWND_TOPMOST, IDC_ARROW, IsDialogMessageW,
-    LB_ADDSTRING, LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW,
-    MSG, PostMessageW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
-    SetWindowPos, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    AppendMenuW, BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW,
+    DefWindowProcW, DestroyMenu, DispatchMessageW, GWLP_USERDATA, GetCursorPos, HMENU,
+    HWND_TOPMOST, IDC_ARROW, IsDialogMessageW, LB_ADDSTRING, LB_GETCURSEL, LB_GETTEXT,
+    LB_GETTEXTLEN, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MF_STRING, MSG, PostMessageW, SWP_NOMOVE,
+    SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowPos, TPM_NONOTIFY,
+    TPM_RETURNCMD, TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION,
+    WS_CHILD, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -32,6 +34,9 @@ const ID_LIST: usize = 9201;
 const ID_OK: usize = 9202;
 const ID_CANCEL: usize = 9203;
 const ID_SECONDARY: usize = 9204;
+
+type ContextActionEnabled = Arc<dyn Fn(&str) -> bool + Send + Sync>;
+type ContextActionHandler = Arc<dyn Fn(String) + Send + Sync>;
 
 #[derive(Clone)]
 pub(crate) struct GroupedSelectItem {
@@ -61,8 +66,11 @@ struct InterpreterSelectInit {
     mode: InterpreterDialogInitMode,
     language: Language,
     secondary_action_label: Option<String>,
+    context_action_label: Option<String>,
     initial_list_value: Option<String>,
     initial_tree_value: Option<String>,
+    context_action_enabled: Option<ContextActionEnabled>,
+    context_action_handler: Option<ContextActionHandler>,
     result: Arc<Mutex<Option<InterpreterSelectionResult>>>,
 }
 
@@ -73,8 +81,11 @@ struct InterpreterSelectOptions {
     suppress_parent_restore_on_cancel: bool,
     pin_topmost: bool,
     secondary_action_label: Option<String>,
+    context_action_label: Option<String>,
     initial_list_value: Option<String>,
     initial_tree_value: Option<String>,
+    context_action_enabled: Option<ContextActionEnabled>,
+    context_action_handler: Option<ContextActionHandler>,
 }
 
 enum ControlKind {
@@ -85,7 +96,16 @@ enum ControlKind {
 struct InterpreterSelectState {
     control: ControlKind,
     tree_values: Vec<String>,
+    context_action_label: Option<String>,
+    context_action_enabled: Option<ContextActionEnabled>,
+    context_action_handler: Option<ContextActionHandler>,
     result: Arc<Mutex<Option<InterpreterSelectionResult>>>,
+}
+
+pub struct InterpreterContextAction {
+    pub label: String,
+    pub enabled: ContextActionEnabled,
+    pub handler: ContextActionHandler,
 }
 
 pub fn select_interpreter(
@@ -100,27 +120,6 @@ pub fn select_interpreter(
         language,
         title,
         InterpreterSelectOptions::default(),
-    ) {
-        Some(InterpreterSelectionResult::Item(value)) => Some(value),
-        _ => None,
-    }
-}
-
-pub fn select_interpreter_without_parent_restore_on_accept(
-    parent: HWND,
-    items: Vec<String>,
-    language: Language,
-    title: String,
-) -> Option<String> {
-    match select_interpreter_internal(
-        parent,
-        InterpreterDialogInitMode::List(items),
-        language,
-        title,
-        InterpreterSelectOptions {
-            suppress_parent_restore_on_accept: true,
-            ..Default::default()
-        },
     ) {
         Some(InterpreterSelectionResult::Item(value)) => Some(value),
         _ => None,
@@ -148,6 +147,34 @@ pub fn select_interpreter_with_secondary_action_and_initial_without_parent_resto
             ..Default::default()
         },
     )
+}
+
+pub fn select_interpreter_with_context_action_without_parent_restore_on_accept(
+    parent: HWND,
+    items: Vec<String>,
+    language: Language,
+    title: String,
+    initial_value: Option<String>,
+    context_action: InterpreterContextAction,
+) -> Option<String> {
+    match select_interpreter_internal(
+        parent,
+        InterpreterDialogInitMode::List(items),
+        language,
+        title,
+        InterpreterSelectOptions {
+            context_action_label: Some(context_action.label),
+            initial_list_value: initial_value,
+            context_action_enabled: Some(context_action.enabled),
+            context_action_handler: Some(context_action.handler),
+            suppress_parent_restore_on_accept: true,
+            suppress_parent_restore_on_cancel: true,
+            ..Default::default()
+        },
+    ) {
+        Some(InterpreterSelectionResult::Item(value)) => Some(value),
+        _ => None,
+    }
 }
 
 pub fn select_grouped_interpreter_without_parent_restore_on_accept(
@@ -208,8 +235,11 @@ fn select_interpreter_internal(
         mode,
         language,
         secondary_action_label: options.secondary_action_label,
+        context_action_label: options.context_action_label,
         initial_list_value: options.initial_list_value,
         initial_tree_value: options.initial_tree_value,
+        context_action_enabled: options.context_action_enabled,
+        context_action_handler: options.context_action_handler,
         result: result.clone(),
     });
     let title = to_wide(&title);
@@ -549,10 +579,98 @@ fn interpreter_select_wndproc_inner(
             let state = Box::new(InterpreterSelectState {
                 control,
                 tree_values,
+                context_action_label: init.context_action_label,
+                context_action_enabled: init.context_action_enabled,
+                context_action_handler: init.context_action_handler,
                 result: init.result.clone(),
             });
             crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
             LRESULT(0)
+        }
+        WM_CONTEXTMENU => {
+            let target = HWND(wparam.0 as isize);
+            let handled = with_interpreter_state(hwnd, |state| {
+                let ControlKind::List(list) = state.control else {
+                    return false;
+                };
+                if target.0 != 0 && target != list && target != hwnd {
+                    return false;
+                }
+                let Some(label) = state.context_action_label.clone() else {
+                    return false;
+                };
+                let Some(handler) = state.context_action_handler.clone() else {
+                    return false;
+                };
+                let Some(value) = selected_list_value(list) else {
+                    return false;
+                };
+                if let Some(enabled) = state.context_action_enabled.as_ref()
+                    && !enabled(&value)
+                {
+                    return false;
+                }
+                let menu = match unsafe { CreatePopupMenu() } {
+                    Ok(menu) => menu,
+                    Err(err) => {
+                        crate::log_debug(&format!(
+                            "Failed to create interpreter selection context menu: {}",
+                            err
+                        ));
+                        return false;
+                    }
+                };
+                let label_w = to_wide(&label);
+                if let Err(err) =
+                    unsafe { AppendMenuW(menu, MF_STRING, 1, PCWSTR(label_w.as_ptr())) }
+                {
+                    crate::log_debug(&format!(
+                        "Failed to append interpreter selection context menu item: {}",
+                        err
+                    ));
+                    crate::log_if_err!(unsafe { DestroyMenu(menu) });
+                    return false;
+                }
+                let point = if lparam.0 == -1 {
+                    let mut pt = POINT::default();
+                    if let Err(err) = unsafe { GetCursorPos(&mut pt) } {
+                        crate::log_debug(&format!(
+                            "Failed to query cursor position for interpreter selection context menu: {}",
+                            err
+                        ));
+                        crate::log_if_err!(unsafe { DestroyMenu(menu) });
+                        return false;
+                    }
+                    pt
+                } else {
+                    POINT {
+                        x: (lparam.0 as u32 & 0xFFFF) as i16 as i32,
+                        y: ((lparam.0 as u32 >> 16) & 0xFFFF) as i16 as i32,
+                    }
+                };
+                let command = unsafe {
+                    TrackPopupMenu(
+                        menu,
+                        TPM_RETURNCMD | TPM_NONOTIFY,
+                        point.x,
+                        point.y,
+                        0,
+                        hwnd,
+                        None,
+                    )
+                };
+                crate::log_if_err!(unsafe { DestroyMenu(menu) });
+                if command.0 != 1 {
+                    return true;
+                }
+                handler(value);
+                true
+            })
+            .unwrap_or(false);
+            if handled {
+                return LRESULT(0);
+            }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_COMMAND => {
             let id = wparam.0;
@@ -680,6 +798,25 @@ fn interpreter_select_wndproc_inner(
         }
         _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
     }
+}
+
+fn selected_list_value(list: HWND) -> Option<String> {
+    let sel = crate::send_message_w_safe(list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if sel < 0 {
+        return None;
+    }
+    let len = crate::send_message_w_safe(list, LB_GETTEXTLEN, WPARAM(sel as usize), LPARAM(0)).0;
+    if len < 0 {
+        return None;
+    }
+    let mut buf = vec![0u16; (len + 1) as usize];
+    crate::send_message_w_safe(
+        list,
+        LB_GETTEXT,
+        WPARAM(sel as usize),
+        LPARAM(buf.as_mut_ptr() as isize),
+    );
+    Some(String::from_utf16_lossy(&buf[..len as usize]))
 }
 
 fn insert_tree_item(tree: HWND, parent: HTREEITEM, label: &str, value_index: isize) -> HTREEITEM {

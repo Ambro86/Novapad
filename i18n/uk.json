@@ -1233,5 +1233,7 @@
   "stream_audio.duration_label": "Тривалість",
   "stream_audio.channel_label": "Канал",
   "stream_audio.views_label": "Перегляди",
+  "stream_audio.favorites_label": "Улюблені",
+  "stream_audio.add_to_favorites": "Додати до улюблених",
   "stream_audio.subscribers_label": "Підписники"
 }

@@ -13,6 +13,7 @@ Miglioramenti
 • Aggiunte più di 50 nazioni selezionabili per la directory dei podcast, così è possibile scegliere tra molti più cataloghi nazionali.
 • "Riproduci audio da streaming..." ora permette anche di cercare su YouTube scrivendo una qualunque stringa di testo oppure di incollare il link di un canale o di una playlist YouTube per visualizzarne i risultati.
 • Migliorata la visualizzazione dei risultati in "Riproduci audio da streaming...": le voci YouTube ora includono titolo, durata, canale e visualizzazioni in un formato più chiaro.
+• Aggiunta in "Riproduci audio da streaming..." la possibilità di salvare canali e playlist YouTube nei preferiti: si possono aggiungere dai risultati tramite menu contestuale, aprire direttamente dalla lista Preferiti raggiungibile con Tab subito dopo il campo URL/query YouTube e rimuovere sempre dalla stessa lista tramite menu contestuale. Nei risultati della ricerca YouTube il menu contestuale è disponibile solo per canali e playlist.
 • Migliorato il focus durante "Riproduci audio da streaming...", così la finestra di avanzamento resta più stabile durante il download e la conversione.
 • Aggiunte nel menu Voce due nuove azioni per la lettura: `Frase precedente` e `Frase successiva`, con scorciatoie personalizzabili per saltare durante la lettura del testo.
 • La scorciatoia predefinita di `Esegui file con interprete` è ora `Ctrl+Shift+F5`, così `Shift+F5` può essere usata di default per `Frase precedente`.

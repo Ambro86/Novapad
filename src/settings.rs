@@ -50,6 +50,14 @@ pub struct FavoriteVoice {
     pub short_name: String,
 }
 
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct StreamFavorite {
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub url: String,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct DictionaryEntry {
     pub original: String,
@@ -658,6 +666,8 @@ pub struct AppSettings {
     #[serde(default = "default_stream_audio_output_format")]
     pub stream_audio_default_format: String,
     #[serde(default)]
+    pub stream_favorites: Vec<StreamFavorite>,
+    #[serde(default)]
     pub whisper_model_profile: String,
     #[serde(default)]
     pub whisper_cuda_enabled: bool,
@@ -1000,6 +1010,7 @@ impl Default for AppSettings {
             gemini_api_key: String::new(),
             youtube_include_timestamps: true,
             stream_audio_default_format: default_stream_audio_output_format(),
+            stream_favorites: Vec::new(),
             whisper_model_profile: String::new(),
             whisper_cuda_enabled: false,
             whisper_keep_original_language: false,
@@ -1960,6 +1971,24 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
             settings.stream_audio_default_format = default_stream_audio_output_format();
         }
     }
+    for favorite in &mut settings.stream_favorites {
+        favorite.label = favorite.label.trim().to_string();
+        favorite.url = favorite.url.trim().to_string();
+    }
+    settings
+        .stream_favorites
+        .retain(|favorite| !favorite.url.is_empty());
+    let mut deduped_stream_favorites = Vec::with_capacity(settings.stream_favorites.len());
+    for favorite in settings.stream_favorites.drain(..) {
+        if deduped_stream_favorites
+            .iter()
+            .any(|existing: &StreamFavorite| existing.url.eq_ignore_ascii_case(&favorite.url))
+        {
+            continue;
+        }
+        deduped_stream_favorites.push(favorite);
+    }
+    settings.stream_favorites = deduped_stream_favorites;
     settings.whisper_model_profile = settings.whisper_model_profile.trim().to_ascii_lowercase();
     if matches!(
         settings.whisper_model_profile.as_str(),

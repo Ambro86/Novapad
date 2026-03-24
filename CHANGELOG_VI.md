@@ -13,6 +13,7 @@ Cải tiến
 • Đã thêm hơn 50 quốc gia có thể chọn cho thư mục podcast, giúp người dùng chọn được nhiều danh mục quốc gia hơn.
 • "Phat am thanh tu streaming..." gio cung cho phep tim kiem tren YouTube bang bat ky chuoi van ban nao, hoac dan lien ket cua mot kenh hoac playlist YouTube de hien thi cac ket qua cua no.
 • Đã cải thiện cách hiển thị kết quả trong "Phat am thanh tu streaming...": các mục YouTube giờ bao gồm tiêu đề, thời lượng, kênh và lượt xem theo định dạng rõ ràng hơn.
+• Đã thêm mục yêu thích YouTube cho kênh và danh sách phát trong "Phat am thanh tu streaming...": có thể thêm từ kết quả bằng menu ngữ cảnh, mở trực tiếp từ danh sách Yêu thích truy cập bằng Tab ngay sau trường URL/truy vấn YouTube và xóa sau đó cũng từ chính danh sách đó bằng menu ngữ cảnh. Trong kết quả tìm kiếm YouTube, menu ngữ cảnh chỉ khả dụng cho kênh và danh sách phát.
 • Đã cải thiện focus khi dùng "Phat am thanh tu streaming...", để cửa sổ tiến trình ổn định hơn trong lúc tải xuống và chuyển đổi.
 • Đã thêm hai thao tác đọc mới trong menu Giọng nói: `Câu trước` và `Câu tiếp theo`, với phím tắt có thể cấu hình để nhảy trong khi đọc văn bản.
 • Phím tắt mặc định của `Chạy tệp bằng trình thông dịch` giờ là `Ctrl+Shift+F5`, để `Shift+F5` có thể được dùng mặc định cho `Câu trước`.

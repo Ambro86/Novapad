@@ -1233,5 +1233,7 @@
   "stream_audio.duration_label": "Thời lượng",
   "stream_audio.channel_label": "Kênh",
   "stream_audio.views_label": "Lượt xem",
+  "stream_audio.favorites_label": "Yêu thích",
+  "stream_audio.add_to_favorites": "Thêm vào yêu thích",
   "stream_audio.subscribers_label": "Người đăng ký"
 }

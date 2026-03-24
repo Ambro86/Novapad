@@ -1233,5 +1233,7 @@
   "stream_audio.duration_label": "Délka",
   "stream_audio.channel_label": "Kanál",
   "stream_audio.views_label": "Zhlédnutí",
+  "stream_audio.favorites_label": "Oblíbené",
+  "stream_audio.add_to_favorites": "Přidat do oblíbených",
   "stream_audio.subscribers_label": "Odběratelé"
 }

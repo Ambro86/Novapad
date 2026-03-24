@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use encoding_rs::WINDOWS_1252;
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
@@ -20,23 +20,25 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
-    CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT,
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE,
-    ES_READONLY, GWLP_USERDATA, GetForegroundWindow, GetWindowLongPtrW, HMENU, HWND_TOPMOST,
-    IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO,
-    MSG, PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SWP_NOMOVE,
-    SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
-    SetWindowTextW, ShowWindow, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING,
+    CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW,
+    CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DispatchMessageW,
+    EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE, ES_READONLY, GWLP_USERDATA, GetCursorPos,
+    GetForegroundWindow, GetWindowLongPtrW, HMENU, HWND_TOPMOST, IDC_ARROW, IDYES, IsChild,
+    IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MF_STRING, MSG, PM_REMOVE,
+    PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
+    SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu, TranslateMessage,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
 use crate::accessibility::{EM_REPLACESEL, screen_reader_speak, to_wide, to_wide_normalized};
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
-use crate::settings::{Language, confirm_title, save_settings, settings_dir};
+use crate::settings::{Language, StreamFavorite, confirm_title, save_settings, settings_dir};
 use crate::with_state;
 use crate::{WM_FOCUS_EDITOR, get_active_edit, show_error};
 use url::Url;
@@ -53,10 +55,11 @@ const STREAM_ID_FORMAT: usize = 9312;
 const STREAM_ID_OK: usize = 9313;
 const STREAM_ID_CANCEL: usize = 9314;
 const STREAM_ID_DIRECT_PLAY: usize = 9315;
+const STREAM_ID_FAVORITES: usize = 9316;
 
 #[inline]
 fn ignore_bool(_value: bool) {}
-const STREAM_ID_QUALITY: usize = 9316;
+const STREAM_ID_QUALITY: usize = 9317;
 const STREAM_TRACK_ID_COMBO: usize = 9321;
 const STREAM_TRACK_ID_OK: usize = 9322;
 const STREAM_TRACK_ID_CANCEL: usize = 9323;
@@ -1359,6 +1362,89 @@ fn read_edit_text(hwnd: HWND) -> String {
     String::from_utf16_lossy(&buf[..len as usize])
 }
 
+fn tr_or(language: Language, key: &str, fallback: &str) -> String {
+    let translated = i18n::tr(language, key);
+    if translated == key {
+        fallback.to_string()
+    } else {
+        translated
+    }
+}
+
+fn load_stream_favorites(parent: HWND) -> Vec<StreamFavorite> {
+    with_state(parent, |state| state.settings.stream_favorites.clone()).unwrap_or_default()
+}
+
+fn refill_stream_favorites_combo(state: &StreamDialogState, selection: Option<usize>) {
+    unsafe {
+        SendMessageW(state.favorites_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        for favorite in &state.favorites {
+            let display = if favorite.label.trim().is_empty() {
+                favorite.url.clone()
+            } else {
+                favorite.label.clone()
+            };
+            let wide = to_wide(&display);
+            SendMessageW(
+                state.favorites_combo,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(wide.as_ptr() as isize),
+            );
+        }
+        if !state.favorites.is_empty() {
+            let max_index = state.favorites.len() - 1;
+            let selected = selection.unwrap_or(0).min(max_index);
+            SendMessageW(
+                state.favorites_combo,
+                CB_SETCURSEL,
+                WPARAM(selected),
+                LPARAM(0),
+            );
+        }
+    }
+}
+
+fn add_stream_favorite(parent: HWND, label: String, url: String) {
+    let normalized_url = normalize_youtube_collection_url(&url).unwrap_or(url);
+    if !is_youtube_collection_url(&normalized_url) {
+        return;
+    }
+    let favorite = StreamFavorite {
+        label: label.trim().to_string(),
+        url: normalized_url,
+    };
+    if favorite.url.is_empty() {
+        return;
+    }
+    if with_state(parent, |state| {
+        state
+            .settings
+            .stream_favorites
+            .retain(|existing| !existing.url.eq_ignore_ascii_case(&favorite.url));
+        state.settings.stream_favorites.insert(0, favorite);
+        save_settings(state.settings.clone());
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to save stream favorite");
+    }
+}
+
+fn remove_stream_favorite(parent: HWND, url: &str) {
+    if with_state(parent, |state| {
+        state
+            .settings
+            .stream_favorites
+            .retain(|favorite| !favorite.url.eq_ignore_ascii_case(url));
+        save_settings(state.settings.clone());
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to remove stream favorite");
+    }
+}
+
 fn extract_video_id(input: &str) -> Option<String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
@@ -1719,11 +1805,43 @@ fn choose_stream_collection_entry_page(
     if has_more {
         labels.push(i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY));
     }
-    crate::app_windows::interpreter_select_window::select_interpreter_without_parent_restore_on_accept(
+    let favorite_candidates = Arc::new(entries.to_vec());
+    let context_action_enabled = {
+        let favorite_candidates = Arc::clone(&favorite_candidates);
+        Arc::new(move |selected: &str| {
+            favorite_candidates
+                .iter()
+                .find(|entry| entry.label == selected)
+                .map(|entry| is_youtube_collection_url(&entry.url))
+                .unwrap_or(false)
+        })
+    };
+    let context_action_handler = {
+        let favorite_candidates = Arc::clone(&favorite_candidates);
+        Arc::new(move |selected: String| {
+            if let Some(entry) = favorite_candidates
+                .iter()
+                .find(|entry| entry.label == selected && is_youtube_collection_url(&entry.url))
+            {
+                add_stream_favorite(parent, entry.label.clone(), entry.url.clone());
+            }
+        })
+    };
+    crate::app_windows::interpreter_select_window::select_interpreter_with_context_action_without_parent_restore_on_accept(
         parent,
         labels,
         language,
         i18n::tr(language, "stream_audio.prompt_title"),
+        None,
+        crate::app_windows::interpreter_select_window::InterpreterContextAction {
+            label: tr_or(
+                language,
+                "stream_audio.add_to_favorites",
+                "Add to favorites",
+            ),
+            enabled: context_action_enabled,
+            handler: context_action_handler,
+        },
     )
 }
 
@@ -2058,6 +2176,8 @@ struct StreamDialogState {
     parent: HWND,
     language: Language,
     url_edit: HWND,
+    favorites_combo: HWND,
+    favorites: Vec<StreamFavorite>,
     format_combo: HWND,
     quality_combo: HWND,
     direct_play_check: HWND,
@@ -2332,13 +2452,48 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     HINSTANCE(0),
                     None,
                 );
+                let favorites_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(
+                        to_wide(&tr_or(
+                            init.language,
+                            "stream_audio.favorites_label",
+                            "Favorites:",
+                        ))
+                        .as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    50,
+                    90,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let favorites_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    110,
+                    48,
+                    330,
+                    180,
+                    hwnd,
+                    HMENU(STREAM_ID_FAVORITES as isize),
+                    HINSTANCE(0),
+                    None,
+                );
                 let direct_play_check = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
                     PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.direct_play")).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
                     110,
-                    50,
+                    82,
                     330,
                     22,
                     hwnd,
@@ -2352,7 +2507,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.format_label")).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    84,
+                    116,
                     90,
                     20,
                     hwnd,
@@ -2366,7 +2521,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     110,
-                    82,
+                    114,
                     210,
                     180,
                     hwnd,
@@ -2382,7 +2537,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     ),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    116,
+                    148,
                     90,
                     20,
                     hwnd,
@@ -2396,7 +2551,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     110,
-                    114,
+                    146,
                     210,
                     180,
                     hwnd,
@@ -2410,7 +2565,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     350,
-                    146,
+                    178,
                     90,
                     28,
                     hwnd,
@@ -2424,7 +2579,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     350,
-                    178,
+                    210,
                     90,
                     28,
                     hwnd,
@@ -2436,6 +2591,8 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 for control in [
                     url_label,
                     url_edit,
+                    favorites_label,
+                    favorites_combo,
                     format_label,
                     format_combo,
                     quality_label,
@@ -2464,11 +2621,14 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     .position(|(_, format)| *format == init.default_format)
                     .unwrap_or(0);
                 SendMessageW(format_combo, CB_SETCURSEL, WPARAM(default_idx), LPARAM(0));
+                let favorites = load_stream_favorites(init.parent);
 
                 let state = Box::new(StreamDialogState {
                     parent: init.parent,
                     language: init.language,
                     url_edit,
+                    favorites_combo,
+                    favorites,
                     format_combo,
                     quality_combo,
                     direct_play_check,
@@ -2476,9 +2636,90 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     result: init.result.clone(),
                 });
                 refill_stream_quality_combo(&state, false);
+                refill_stream_favorites_combo(&state, Some(0));
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
                 SetFocus(url_edit);
                 LRESULT(0)
+            }
+            WM_CONTEXTMENU => {
+                let target = HWND(wparam.0 as isize);
+                let handled = with_stream_dialog_state(hwnd, |state| {
+                    if target.0 != 0 && target != state.favorites_combo && target != hwnd {
+                        return false;
+                    }
+                    let selected =
+                        SendMessageW(state.favorites_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                    if selected < 0 || selected as usize >= state.favorites.len() {
+                        return false;
+                    }
+                    let menu = match CreatePopupMenu() {
+                        Ok(menu) => menu,
+                        Err(err) => {
+                            crate::log_debug(&format!(
+                                "Failed to create stream favorites context menu: {}",
+                                err
+                            ));
+                            return false;
+                        }
+                    };
+                    let label =
+                        to_wide(&i18n::tr(state.language, "voice_panel.remove_favorite"));
+                    if let Err(err) = AppendMenuW(menu, MF_STRING, 1, PCWSTR(label.as_ptr())) {
+                        crate::log_debug(&format!(
+                            "Failed to append stream favorites context menu item: {}",
+                            err
+                        ));
+                        crate::log_if_err!(DestroyMenu(menu));
+                        return false;
+                    }
+                    let point = if lparam.0 == -1 {
+                        let mut pt = POINT::default();
+                        if let Err(err) = GetCursorPos(&mut pt) {
+                            crate::log_debug(&format!(
+                                "Failed to query cursor position for stream favorites context menu: {}",
+                                err
+                            ));
+                            crate::log_if_err!(DestroyMenu(menu));
+                            return false;
+                        }
+                        pt
+                    } else {
+                        POINT {
+                            x: (lparam.0 as u32 & 0xFFFF) as i16 as i32,
+                            y: ((lparam.0 as u32 >> 16) & 0xFFFF) as i16 as i32,
+                        }
+                    };
+                    let command = TrackPopupMenu(
+                        menu,
+                        TPM_RETURNCMD | TPM_NONOTIFY,
+                        point.x,
+                        point.y,
+                        0,
+                        hwnd,
+                        None,
+                    );
+                    crate::log_if_err!(DestroyMenu(menu));
+                    if command.0 != 1 {
+                        return true;
+                    }
+                    let removed_url = state.favorites[selected as usize].url.clone();
+                    state.favorites.remove(selected as usize);
+                    remove_stream_favorite(state.parent, &removed_url);
+                    let next_selection = if state.favorites.is_empty() {
+                        None
+                    } else if selected as usize >= state.favorites.len() {
+                        Some(state.favorites.len() - 1)
+                    } else {
+                        Some(selected as usize)
+                    };
+                    refill_stream_favorites_combo(state, next_selection);
+                    true
+                })
+                .unwrap_or(false);
+                if handled {
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_COMMAND => {
                 let cmd_id = wparam.0 & 0xffff;
@@ -2499,7 +2740,21 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                         if !screen_reader_speak(&msg) {
                             crate::log_debug("Screen reader speak failed");
                         }
-                        let url = read_edit_text(state.url_edit);
+                        let mut url = read_edit_text(state.url_edit);
+                        if url.trim().is_empty() {
+                            let favorite_idx = SendMessageW(
+                                state.favorites_combo,
+                                CB_GETCURSEL,
+                                WPARAM(0),
+                                LPARAM(0),
+                            )
+                            .0;
+                            if favorite_idx >= 0
+                                && let Some(favorite) = state.favorites.get(favorite_idx as usize)
+                            {
+                                url = favorite.url.clone();
+                            }
+                        }
                         let format_idx =
                             SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
                         let format = StreamOutputFormat::combo_items(state.language)
@@ -2561,7 +2816,10 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 if wparam.0 as u32 == VK_RETURN.0 as u32 {
                     let ok =
                         with_stream_dialog_state(hwnd, |state| state.ok_button).unwrap_or(HWND(0));
-                    if GetFocus() == ok {
+                    let favorites_combo =
+                        with_stream_dialog_state(hwnd, |state| state.favorites_combo)
+                            .unwrap_or(HWND(0));
+                    if GetFocus() == ok || GetFocus() == favorites_combo {
                         crate::log_if_err!(PostMessageW(
                             hwnd,
                             WM_COMMAND,
@@ -2659,7 +2917,7 @@ fn show_stream_dialog(
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             470,
-            268,
+            300,
             parent,
             HMENU(0),
             hinstance,

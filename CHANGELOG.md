@@ -1,6 +1,6 @@
 # Changelog
 
-Version 0.6.8 – 2026-03-22
+Version 0.6.8 – 2026-03-24
 
 What's New
 • Added a new item to the Play menu that lets you transcribe any audio or video file with Whisper. A new “AI and Transcription” section is now available in Options, where you can choose the model, enable optional CUDA support for NVIDIA graphics cards, preserve the original language, and enable or disable timestamps.

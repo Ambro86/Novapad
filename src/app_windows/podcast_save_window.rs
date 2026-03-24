@@ -134,6 +134,19 @@ pub fn suppress_parent_restore_on_close(hwnd: HWND) {
     }
 }
 
+pub fn disable_fake_progress(hwnd: HWND) {
+    if with_save_state(hwnd, |state| {
+        state.has_real_progress = true;
+        state.current_pct = 0;
+        crate::send_message_w_safe(state.progress, PBM_SETPOS, WPARAM(0), LPARAM(0));
+        update_progress_label(state);
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to disable fake progress on save window");
+    }
+}
+
 pub fn open(parent: HWND) -> HWND {
     unsafe {
         let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);

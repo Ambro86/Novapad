@@ -1,6 +1,6 @@
 use std::cmp::Ordering as CmpOrdering;
 use std::collections::HashSet;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -79,6 +79,7 @@ const YTDLP_DOWNLOAD_URL: &str =
 const YTDLP_LATEST_API_URL: &str = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
 const YTDLP_USER_AGENT: &str = "Sonarpad/yt-dlp";
 const YTDLP_SOCKET_TIMEOUT_SECS: &str = "10";
+const YTDLP_PROGRESS_TEMPLATE_PREFIX: &str = "SONARPAD_PROGRESS";
 const STREAM_DOWNLOAD_STALL_SECS: u64 = 180;
 const STREAM_POST_100_GRACE_SECS: u64 = 25;
 const STREAM_RETRY_TIMEOUT_SECS: u64 = 120;
@@ -1920,6 +1921,7 @@ fn choose_youtube_collection_entry(
         let Some(selected) =
             choose_stream_collection_entry_page(parent, language, &entries, page > 0, has_more)
         else {
+            restore_stream_parent_after_selection_cancel(parent);
             return Ok(None);
         };
         if selected == i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY) {
@@ -2035,6 +2037,7 @@ fn choose_youtube_search_entry(
         let Some(selected) =
             choose_stream_collection_entry_page(parent, language, &entries, page > 0, has_more)
         else {
+            restore_stream_parent_after_selection_cancel(parent);
             return Ok(None);
         };
         if selected == i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY) {
@@ -3023,6 +3026,7 @@ fn open_progress_dialog(
         parent, dialog, title_key, status_key, show_cancel
     ));
     if dialog.0 != 0 {
+        crate::app_windows::podcast_save_window::disable_fake_progress(dialog);
         pin_stream_modal_window(dialog);
         crate::app_windows::podcast_save_window::focus_cancel_button(dialog);
         keep_stream_progress_focus(dialog);
@@ -3039,6 +3043,16 @@ fn restore_stream_parent_focus(hwnd: HWND) {
         return;
     }
     crate::set_foreground_window_safe(hwnd);
+}
+
+fn restore_stream_parent_after_selection_cancel(hwnd: HWND) {
+    if hwnd.0 == 0 {
+        return;
+    }
+    unsafe {
+        EnableWindow(hwnd, true);
+    }
+    restore_stream_parent_focus(hwnd);
 }
 
 fn log_stream_transition(tag: &str, parent: HWND) {
@@ -3234,6 +3248,20 @@ fn log_stream_focus_snapshot(tag: &str, dialog: HWND) {
 }
 
 fn parse_ytdlp_progress_pct(line: &str) -> Option<u32> {
+    if let Some(pct) = parse_ytdlp_progress_template_pct(line) {
+        return Some(pct);
+    }
+    let lower = line.to_ascii_lowercase();
+    let has_download_progress_prefix = lower.contains("[download]");
+    let has_named_progress_fields = lower.contains("downloaded_bytes")
+        || lower.contains("total_bytes")
+        || lower.contains("total_bytes_estimate");
+    if !has_download_progress_prefix && !has_named_progress_fields {
+        return None;
+    }
+    if let Some(pct) = parse_ytdlp_progress_bytes_pct(line) {
+        return Some(pct);
+    }
     let marker = line.find('%')?;
     let before = &line[..marker];
     let mut start = before.len();
@@ -3249,6 +3277,125 @@ fn parse_ytdlp_progress_pct(line: &str) -> Option<u32> {
     }
     let value = before[start..].trim().parse::<f32>().ok()?;
     Some(value.clamp(0.0, 100.0).round() as u32)
+}
+
+fn parse_ytdlp_progress_template_pct(line: &str) -> Option<u32> {
+    let marker = format!("{YTDLP_PROGRESS_TEMPLATE_PREFIX}:");
+    let start = line.find(&marker)? + marker.len();
+    let mut parts = line[start..].split(':');
+    let downloaded = parts
+        .next()?
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .filter(|v| *v > 0)?;
+    let total = parts
+        .next()
+        .and_then(|part| part.trim().parse::<u64>().ok())
+        .filter(|v| *v > 0)
+        .or_else(|| {
+            parts
+                .next()
+                .and_then(|part| part.trim().parse::<u64>().ok())
+                .filter(|v| *v > 0)
+        })?;
+    Some(
+        ((downloaded as f64 / total as f64) * 100.0)
+            .clamp(0.0, 100.0)
+            .round() as u32,
+    )
+}
+
+fn parse_ytdlp_progress_bytes_pct(line: &str) -> Option<u32> {
+    let downloaded = parse_ytdlp_named_u64(line, "downloaded_bytes")
+        .or_else(|| parse_ytdlp_named_u64(line, "downloaded"))
+        .filter(|value| *value > 0)?;
+    let total = parse_ytdlp_named_u64(line, "total_bytes")
+        .or_else(|| parse_ytdlp_named_u64(line, "total_bytes_estimate"))
+        .or_else(|| parse_ytdlp_named_u64(line, "total"))
+        .filter(|value| *value > 0)?;
+    Some(
+        ((downloaded as f64 / total as f64) * 100.0)
+            .clamp(0.0, 100.0)
+            .round() as u32,
+    )
+}
+
+fn ytdlp_download_progress_template() -> String {
+    format!(
+        "download:{prefix}:%(progress.downloaded_bytes)s:%(progress.total_bytes)s:%(progress.total_bytes_estimate)s",
+        prefix = YTDLP_PROGRESS_TEMPLATE_PREFIX
+    )
+}
+
+fn handle_ytdlp_progress_line(
+    line: String,
+    ytdlp_debug: bool,
+    output_label: &str,
+    stderr_capture: &Arc<Mutex<String>>,
+    progress: &Arc<AtomicU32>,
+    activity: &Arc<AtomicU32>,
+) {
+    if let Ok(mut captured) = stderr_capture.lock()
+        && captured.len() < 16_384
+    {
+        if !captured.is_empty() {
+            captured.push('\n');
+        }
+        captured.push_str(&line);
+    }
+    if ytdlp_debug {
+        crate::log_debug(&format!("yt-dlp {}: {}", output_label, line));
+    }
+    activity.fetch_add(1, Ordering::Relaxed);
+    if let Some(pct) = parse_ytdlp_progress_pct(&line) {
+        progress.fetch_max(pct, Ordering::Relaxed);
+    }
+}
+
+fn spawn_ytdlp_output_reader<R: Read + Send + 'static>(
+    pipe: R,
+    ytdlp_debug: bool,
+    output_label: &'static str,
+    stderr_capture: Arc<Mutex<String>>,
+    progress: Arc<AtomicU32>,
+    activity: Arc<AtomicU32>,
+) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        for line_result in BufReader::new(pipe).lines() {
+            let line = match line_result {
+                Ok(line) => line,
+                Err(err) => {
+                    crate::log_debug(&format!("yt-dlp {} read failed: {}", output_label, err));
+                    continue;
+                }
+            };
+            handle_ytdlp_progress_line(
+                line,
+                ytdlp_debug,
+                output_label,
+                &stderr_capture,
+                &progress,
+                &activity,
+            );
+        }
+    })
+}
+
+fn parse_ytdlp_named_u64(line: &str, key: &str) -> Option<u64> {
+    for separator in ['=', ':'] {
+        let marker = format!("{key}{separator}");
+        let start = line.find(&marker)? + marker.len();
+        let digits: String = line[start..]
+            .chars()
+            .skip_while(|ch| ch.is_whitespace())
+            .take_while(|ch| ch.is_ascii_digit())
+            .collect();
+        if let Ok(value) = digits.parse::<u64>() {
+            return Some(value);
+        }
+    }
+    None
 }
 
 fn truncate_debug_text(text: &str, max_chars: usize) -> String {
@@ -4262,6 +4409,8 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             .arg(YTDLP_SOCKET_TIMEOUT_SECS)
             .arg("--no-warnings")
             .arg("--newline")
+            .arg("--progress-template")
+            .arg(ytdlp_download_progress_template())
             .arg("--verbose");
 
         if let Some(format_id) = selected_audio_format.as_ref() {
@@ -4312,7 +4461,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             .arg(output_template.to_string_lossy().to_string())
             .arg("--")
             .arg(&url)
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         if ytdlp_debug {
             let format_for_log = selected_audio_format.as_deref().map_or_else(
@@ -4367,39 +4516,42 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 return;
             }
         };
+        let stdout_pipe = match child.stdout.take() {
+            Some(stdout) => stdout,
+            None => {
+                close_progress_dialog(progress);
+                show_error(
+                    parent,
+                    language,
+                    &i18n::tr_f(
+                        language,
+                        "stream_audio.download_failed",
+                        &[("err", "yt-dlp stdout unavailable")],
+                    ),
+                );
+                return;
+            }
+        };
 
         let progress_shared = Arc::new(AtomicU32::new(0));
         let activity_shared = Arc::new(AtomicU32::new(0));
         let stderr_shared = Arc::new(Mutex::new(String::new()));
-        let progress_reader = Arc::clone(&progress_shared);
-        let activity_reader = Arc::clone(&activity_shared);
-        let stderr_reader = Arc::clone(&stderr_shared);
-        let reader_thread = std::thread::spawn(move || {
-            for line_result in BufReader::new(stderr_pipe).lines() {
-                let line = match line_result {
-                    Ok(line) => line,
-                    Err(err) => {
-                        crate::log_debug(&format!("yt-dlp stderr read failed: {}", err));
-                        continue;
-                    }
-                };
-                if let Ok(mut captured) = stderr_reader.lock()
-                    && captured.len() < 16_384
-                {
-                    if !captured.is_empty() {
-                        captured.push('\n');
-                    }
-                    captured.push_str(&line);
-                }
-                if ytdlp_debug {
-                    crate::log_debug(&format!("yt-dlp stderr: {}", line));
-                }
-                activity_reader.fetch_add(1, Ordering::Relaxed);
-                if let Some(pct) = parse_ytdlp_progress_pct(&line) {
-                    progress_reader.fetch_max(pct, Ordering::Relaxed);
-                }
-            }
-        });
+        let stderr_thread = spawn_ytdlp_output_reader(
+            stderr_pipe,
+            ytdlp_debug,
+            "stderr",
+            Arc::clone(&stderr_shared),
+            Arc::clone(&progress_shared),
+            Arc::clone(&activity_shared),
+        );
+        let stdout_thread = spawn_ytdlp_output_reader(
+            stdout_pipe,
+            ytdlp_debug,
+            "stdout",
+            Arc::clone(&stderr_shared),
+            Arc::clone(&progress_shared),
+            Arc::clone(&activity_shared),
+        );
 
         let allow_early_finalize = !matches!(
             dialog_data.format,
@@ -4448,8 +4600,9 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                         ));
                         last_pct = pct;
                         last_progress_at = std::time::Instant::now();
-                        // Keep room for post-download finalization so 100% appears right before playback.
-                        ui_target_pct = pct.min(95);
+                        // Leave only the final 1% for the "file is really ready" handoff,
+                        // so download progress can stay much closer to yt-dlp's real value.
+                        ui_target_pct = pct.min(99);
                         crate::log_debug(&format!(
                             "stream download target progress adjusted: raw={} ui_target_after={}",
                             pct, ui_target_pct
@@ -4460,7 +4613,11 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                         }
                     }
                     if ui_pct < ui_target_pct {
-                        ui_pct = (ui_pct + 1).min(ui_target_pct);
+                        ui_pct = ui_target_pct;
+                        crate::log_debug(&format!(
+                            "stream download ui progress apply: ui_pct={} raw_pct={}",
+                            ui_pct, last_pct
+                        ));
                         report_progress(progress, ui_pct);
                     }
                     if last_focus_keepalive.elapsed() > std::time::Duration::from_millis(300) {
@@ -4491,7 +4648,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     let activity = activity_shared.load(Ordering::Relaxed);
                     if activity != last_activity {
                         crate::log_debug(&format!(
-                            "stream download activity heartbeat: previous={} current={}",
+                            "stream download activity tick: previous_tick={} current_tick={}",
                             last_activity, activity
                         ));
                         last_activity = activity;
@@ -4530,13 +4687,16 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             }
         };
         if _status.is_some() {
-            if let Err(err) = reader_thread.join() {
+            if let Err(err) = stderr_thread.join() {
                 crate::log_debug(&format!("yt-dlp stderr thread join failed: {:?}", err));
+            }
+            if let Err(err) = stdout_thread.join() {
+                crate::log_debug(&format!("yt-dlp stdout thread join failed: {:?}", err));
             }
         } else {
             // Avoid UI hangs when yt-dlp is terminated early (finalization/stall paths).
-            // The stderr reader thread will exit on its own once pipes are closed.
-            crate::log_debug("Skipping yt-dlp stderr thread join after early termination");
+            // The output reader threads will exit on their own once pipes are closed.
+            crate::log_debug("Skipping yt-dlp output thread join after early termination");
         }
         let stderr_capture = stderr_shared
             .lock()
@@ -4594,6 +4754,8 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                             .arg("--socket-timeout")
                             .arg(YTDLP_SOCKET_TIMEOUT_SECS)
                             .arg("--no-warnings")
+                            .arg("--progress-template")
+                            .arg(ytdlp_download_progress_template())
                             .arg("--verbose")
                             .arg("--extractor-retries")
                             .arg("3")
@@ -4804,6 +4966,12 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     progress,
                     &i18n::tr(language, "stream_audio.progress_converting"),
                 );
+                crate::log_debug(&format!(
+                    "stream phase transition [download_to_conversion]: last_download_ui_pct={} input={} output={}",
+                    ui_pct,
+                    downloaded_path.to_string_lossy(),
+                    converted_path.to_string_lossy()
+                ));
                 report_progress(progress, 0);
                 log_stream_focus_snapshot("stream_conversion.started", progress);
                 let mut last_pump = std::time::Instant::now();

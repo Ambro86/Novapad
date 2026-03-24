@@ -1232,5 +1232,6 @@
   "options.spellcheck.lang.ru": "俄语（俄罗斯）",
   "stream_audio.duration_label": "时长",
   "stream_audio.channel_label": "频道",
-  "stream_audio.views_label": "观看次数"
+  "stream_audio.views_label": "观看次数",
+  "stream_audio.subscribers_label": "订阅者"
 }

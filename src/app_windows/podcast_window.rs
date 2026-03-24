@@ -1195,9 +1195,6 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     {
                         crate::log_debug("Failed to access podcast state");
                     }
-                    if state.start_button.0 != 0 {
-                        SetFocus(state.start_button);
-                    }
                 })
                 .is_none()
                 {
@@ -1223,6 +1220,9 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 }
                 let result = Box::from_raw(lparam.0 as *mut PodcastSaveResult);
                 if with_podcast_state(hwnd, |state| {
+                    if result.success && state.saving_dialog.0 != 0 {
+                        podcast_save_window::set_status_text(state.saving_dialog, &result.message);
+                    }
                     let title = if result.success {
                         i18n::tr(state.language, "podcast.done_title")
                     } else {
@@ -1241,7 +1241,6 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         PCWSTR(title_w.as_ptr()),
                         flags,
                     );
-                    SetFocus(state.start_button);
                 })
                 .is_none()
                 {
@@ -1943,18 +1942,6 @@ fn stop_recording_action(state: &mut PodcastState, hwnd: HWND) {
                     message: i18n::tr(language, "podcast.saved"),
                 });
             }
-            if dialog.0 != 0 {
-                unsafe {
-                    if let Err(_e) = PostMessageW(
-                        dialog,
-                        podcast_save_window::WM_PODCAST_SAVE_DONE,
-                        WPARAM(0),
-                        LPARAM(0),
-                    ) {
-                        crate::log_debug(&format!("Error: {:?}", _e));
-                    }
-                }
-            }
             if let Some(payload) = notify {
                 unsafe {
                     if let Err(e) = PostMessageW(
@@ -1966,6 +1953,18 @@ fn stop_recording_action(state: &mut PodcastState, hwnd: HWND) {
                         crate::log_debug(&format!("Failed to post WM_PODCAST_SAVE_RESULT: {}", e));
                     }
                 };
+            }
+            if dialog.0 != 0 {
+                unsafe {
+                    if let Err(_e) = PostMessageW(
+                        dialog,
+                        podcast_save_window::WM_PODCAST_SAVE_DONE,
+                        WPARAM(0),
+                        LPARAM(0),
+                    ) {
+                        crate::log_debug(&format!("Error: {:?}", _e));
+                    }
+                }
             }
         });
     }

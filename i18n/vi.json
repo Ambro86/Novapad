@@ -1232,5 +1232,6 @@
   "options.spellcheck.lang.ru": "Tiếng Nga (Nga)",
   "stream_audio.duration_label": "Thời lượng",
   "stream_audio.channel_label": "Kênh",
-  "stream_audio.views_label": "Lượt xem"
+  "stream_audio.views_label": "Lượt xem",
+  "stream_audio.subscribers_label": "Người đăng ký"
 }

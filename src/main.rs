@@ -784,6 +784,7 @@ pub(crate) enum RaiAudioOrigin {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct YouTubeReturnContext {
     pub input: Option<String>,
+    pub collection_page: Option<usize>,
 }
 
 struct PodcastEpisodePlayFailed {
@@ -1459,9 +1460,19 @@ pub(crate) fn set_active_podcast_episode_info(
     }
 }
 
-pub(crate) fn set_active_youtube_return_input(hwnd: HWND, input: Option<String>) {
+pub(crate) fn set_active_youtube_return_context(
+    hwnd: HWND,
+    input: Option<String>,
+    collection_page: Option<usize>,
+) {
+    crate::log_debug(&format!(
+        "set_active_youtube_return_context: input={} page={:?}",
+        input.as_deref().unwrap_or(""),
+        collection_page
+    ));
     if with_state(hwnd, |state| {
         state.active_youtube_return_context.input = input;
+        state.active_youtube_return_context.collection_page = collection_page;
     })
     .is_none()
     {
@@ -4120,8 +4131,8 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                             let is_stop = matches!(command, PlayerCommand::Stop);
                             let podcasts_window = state.podcasts_window;
                             let from_rai = state.active_podcast_episode_from_rai;
-                            let youtube_return_input =
-                                state.active_youtube_return_context.input.clone();
+                            let youtube_return_context =
+                                state.active_youtube_return_context.clone();
                             if is_stop {
                                 // close_current_document() already stops audiobook playback
                                 // for audiobook tabs, so avoid duplicate stop work here.
@@ -4130,9 +4141,10 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                                     app_windows::rai_audiodescrizioni_window::open(hwnd);
                                 } else if from_rai == RaiAudioOrigin::Tutte {
                                     app_windows::rai_audiodescrizioni_window::open_grouped(hwnd);
-                                } else if let Some(input) = youtube_return_input {
+                                } else if youtube_return_context.input.is_some() {
                                     app_windows::youtube_transcript_window::reopen_stream_selection(
-                                        hwnd, input,
+                                        hwnd,
+                                        youtube_return_context,
                                     );
                                 } else if podcasts_window.0 != 0 {
                                     SetForegroundWindow(podcasts_window);

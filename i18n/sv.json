@@ -1232,5 +1232,6 @@
   "options.spellcheck.lang.ru": "Ryska (Ryssland)",
   "stream_audio.duration_label": "Längd",
   "stream_audio.channel_label": "Kanal",
-  "stream_audio.views_label": "Visningar"
+  "stream_audio.views_label": "Visningar",
+  "stream_audio.subscribers_label": "Prenumeranter"
 }

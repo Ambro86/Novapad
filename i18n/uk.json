@@ -1232,5 +1232,6 @@
   "options.spellcheck.lang.ru": "Російська (Росія)",
   "stream_audio.duration_label": "Тривалість",
   "stream_audio.channel_label": "Канал",
-  "stream_audio.views_label": "Перегляди"
+  "stream_audio.views_label": "Перегляди",
+  "stream_audio.subscribers_label": "Підписники"
 }

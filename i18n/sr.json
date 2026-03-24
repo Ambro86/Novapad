@@ -1232,5 +1232,6 @@
   "options.spellcheck.lang.ru": "Ruski (Rusija)",
   "stream_audio.duration_label": "Trajanje",
   "stream_audio.channel_label": "Kanal",
-  "stream_audio.views_label": "Pregledi"
+  "stream_audio.views_label": "Pregledi",
+  "stream_audio.subscribers_label": "Pretplatnici"
 }

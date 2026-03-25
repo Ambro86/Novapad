@@ -28,6 +28,8 @@ Improvements
 • Added an explicit RSS entry “Load more news” at the end of feeds when more items are available; pressing Enter loads the next batch and moves focus to the first newly loaded article.
 • In the voice dictionary, when adding or editing a replacement, there is now a “Match Case” checkbox so each substitution can either respect or ignore letter casing.
 Bug fixes
+• Fixed OPML export for podcasts and RSS so the exported files are now accepted by iTunes.
+• Added localized confirmation messages for correct OPML import and export of RSS feeds and podcasts.
 • Fixed a bug where, in "Play streaming audio...", typing a search string and selecting a YouTube channel from the results could make the program appear stuck instead of opening that channel’s videos.
 • Fixed a bug where the list of open files was shown in the Help menu instead of the Window menu.
 • Fixed a streaming edge case where playback could start but the “Downloading stream” dialog stayed open when the downloaded file already matched the target format.

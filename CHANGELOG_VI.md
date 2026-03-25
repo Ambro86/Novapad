@@ -28,6 +28,8 @@ Cải tiến
 • Đã thêm trong RSS một mục rõ ràng “Tải thêm tin tức” ở cuối nguồn khi còn bài khác; nhấn Enter sẽ tải khối tiếp theo và đưa focus tới bài viết mới đầu tiên.
 • Trong từ điển giọng nói, khi thêm hoặc sửa một mục thay thế, giờ có thêm ô «Phân biệt chữ hoa/thường» để quyết định mỗi phép thay thế có phân biệt hay bỏ qua chữ hoa chữ thường.
 Sửa lỗi
+• Đã sửa xuất OPML cho podcast và RSS, vì vậy các tệp xuất ra giờ đã được iTunes chấp nhận.
+• Đã thêm thông báo xác nhận được bản địa hóa cho việc nhập và xuất OPML podcast và nguồn RSS đúng cách.
 • Đã sửa lỗi trong "Phat am thanh tu streaming..." khiến chương trình có thể trông như bị treo khi nhập chuỗi tìm kiếm và chọn một kênh YouTube từ kết quả, thay vì mở danh sách video của kênh đó.
 • Đã sửa lỗi khiến danh sách tệp đang mở hiển thị trong menu Trợ giúp thay vì menu Cửa sổ.
 • Đã sửa một trường hợp biên khi phát trực tuyến: phát âm thanh có thể bắt đầu nhưng cửa sổ “Đang tải streaming” vẫn mở khi tệp đã tải xuống đã đúng định dạng đích.

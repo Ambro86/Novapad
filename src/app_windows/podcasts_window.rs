@@ -383,16 +383,35 @@ fn parse_single_path(buffer: &[u16]) -> Option<PathBuf> {
     Some(PathBuf::from(String::from_utf16_lossy(&buffer[..end])))
 }
 
+fn ensure_opml_extension(path: PathBuf) -> PathBuf {
+    if path.extension().is_some() {
+        path
+    } else {
+        path.with_extension("opml")
+    }
+}
+
 fn open_opml_file_dialog(hwnd: HWND, language: Language, for_import: bool) -> Option<PathBuf> {
     let raw_filter = i18n::tr(language, "rss.import_filter");
     let filter = to_wide(&raw_filter.replace("\\0", "\0"));
     let mut buffer = vec![0u16; 4096];
+    let default_name = if for_import {
+        None
+    } else {
+        Some(to_wide("Sonarpad Podcast.opml"))
+    };
+    if let Some(name) = &default_name {
+        let copy_len = name.len().min(buffer.len().saturating_sub(1));
+        buffer[..copy_len].copy_from_slice(&name[..copy_len]);
+    }
+    let default_ext = to_wide("opml");
     let mut ofn = OPENFILENAMEW {
         lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
         hwndOwner: hwnd,
         lpstrFilter: PCWSTR(filter.as_ptr()),
         lpstrFile: PWSTR(buffer.as_mut_ptr()),
         nMaxFile: buffer.len() as u32,
+        lpstrDefExt: PCWSTR(default_ext.as_ptr()),
         Flags: OFN_EXPLORER
             | OFN_HIDEREADONLY
             | OFN_PATHMUSTEXIST
@@ -411,7 +430,12 @@ fn open_opml_file_dialog(hwnd: HWND, language: Language, for_import: bool) -> Op
     if !success {
         return None;
     }
-    parse_single_path(&buffer)
+    let path = parse_single_path(&buffer)?;
+    if for_import {
+        Some(path)
+    } else {
+        Some(ensure_opml_extension(path))
+    }
 }
 
 fn normalize_podcast_key(url: &str) -> String {
@@ -752,7 +776,7 @@ fn export_podcast_sources_to_file(hwnd: HWND, path: &Path) -> Result<usize, Stri
         };
         writeln!(
             file,
-            "  <outline text=\"{}\" title=\"{}\" xmlUrl=\"{}\" />",
+            "  <outline text=\"{}\" title=\"{}\" type=\"rss\" xmlUrl=\"{}\" />",
             escape_opml_attr(&title),
             escape_opml_attr(&title),
             escape_opml_attr(&src.url)
@@ -769,6 +793,23 @@ fn handle_import_opml(hwnd: HWND) {
         if let Some(count) = import_podcast_sources_from_file(hwnd, &path) {
             if count > 0 {
                 announce_status(&i18n::tr(language, "podcasts.imported"));
+                let title = i18n::tr(language, "podcasts.window.title");
+                let count_text = count.to_string();
+                let path_text = path.display().to_string();
+                let message = i18n::tr_f(
+                    language,
+                    "podcasts.import_success",
+                    &[("count", &count_text), ("path", &path_text)],
+                );
+                unsafe {
+                    MessageBoxW(
+                        hwnd,
+                        PCWSTR(to_wide(&message).as_ptr()),
+                        PCWSTR(to_wide(&title).as_ptr()),
+                        MB_OK | MB_ICONINFORMATION,
+                    );
+                }
+                focus_library(hwnd);
             }
         } else {
             let title = i18n::tr(language, "podcasts.window.title");
@@ -792,6 +833,23 @@ fn handle_export_opml(hwnd: HWND) {
             Ok(count) => {
                 if count > 0 {
                     announce_status(&i18n::tr(language, "podcasts.exported"));
+                    let title = i18n::tr(language, "podcasts.window.title");
+                    let count_text = count.to_string();
+                    let path_text = path.display().to_string();
+                    let message = i18n::tr_f(
+                        language,
+                        "podcasts.export_success",
+                        &[("count", &count_text), ("path", &path_text)],
+                    );
+                    unsafe {
+                        MessageBoxW(
+                            hwnd,
+                            PCWSTR(to_wide(&message).as_ptr()),
+                            PCWSTR(to_wide(&title).as_ptr()),
+                            MB_OK | MB_ICONINFORMATION,
+                        );
+                    }
+                    focus_library(hwnd);
                 }
             }
             Err(err) => {
@@ -11118,4 +11176,49 @@ fn add_podcastindex_auth_headers(
         .header("X-Auth-Date", auth_date)
         .header("X-Auth-Key", api_key)
         .header("Authorization", hash)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ensure_opml_extension, parse_opml_sources};
+    use std::path::PathBuf;
+
+    #[test]
+    fn parse_opml_sources_accepts_type_rss_outline() {
+        let text = r#"<?xml version="1.0" encoding="UTF-8"?>
+<opml version="1.0">
+<head>
+<title>Podcasts</title>
+</head>
+<body>
+  <outline text="Example Podcast" title="Example Podcast" type="rss" xmlUrl="https://example.com/feed.xml" />
+</body>
+</opml>"#;
+
+        let sources = parse_opml_sources(text);
+
+        assert_eq!(
+            sources,
+            vec![(
+                "Example Podcast".to_string(),
+                "https://example.com/feed.xml".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn ensure_opml_extension_adds_missing_extension() {
+        assert_eq!(
+            ensure_opml_extension(PathBuf::from("Sonarpad Podcast")),
+            PathBuf::from("Sonarpad Podcast.opml")
+        );
+    }
+
+    #[test]
+    fn ensure_opml_extension_keeps_existing_extension() {
+        assert_eq!(
+            ensure_opml_extension(PathBuf::from("Sonarpad Podcast.opml")),
+            PathBuf::from("Sonarpad Podcast.opml")
+        );
+    }
 }

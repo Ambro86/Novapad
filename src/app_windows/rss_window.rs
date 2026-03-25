@@ -138,8 +138,10 @@ fn normalize_article_text(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        decode_basic_html_entities, format_google_news_source_title, normalize_rss_url_key,
+        decode_basic_html_entities, ensure_opml_extension, format_google_news_source_title,
+        normalize_rss_url_key,
     };
+    use std::path::PathBuf;
 
     #[test]
     fn normalize_rss_url_key_keeps_query_parameters() {
@@ -170,6 +172,22 @@ mod tests {
         let text = "cos&igrave; si &egrave; visto, &laquo;ok&raquo;";
         let decoded = decode_basic_html_entities(text);
         assert_eq!(decoded, "così si è visto, «ok»");
+    }
+
+    #[test]
+    fn ensure_opml_extension_adds_missing_extension() {
+        assert_eq!(
+            ensure_opml_extension(PathBuf::from("Sonarpad Rss")),
+            PathBuf::from("Sonarpad Rss.opml")
+        );
+    }
+
+    #[test]
+    fn ensure_opml_extension_keeps_existing_extension() {
+        assert_eq!(
+            ensure_opml_extension(PathBuf::from("Sonarpad Rss.opml")),
+            PathBuf::from("Sonarpad Rss.opml")
+        );
     }
 }
 
@@ -759,6 +777,14 @@ fn parse_single_path(buffer: &[u16]) -> Option<PathBuf> {
     Some(PathBuf::from(String::from_utf16_lossy(&buffer[..end])))
 }
 
+fn ensure_opml_extension(path: PathBuf) -> PathBuf {
+    if path.extension().is_some() {
+        path
+    } else {
+        path.with_extension("opml")
+    }
+}
+
 fn parse_opml_sources(text: &str) -> Vec<(String, String)> {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
@@ -823,19 +849,24 @@ fn open_export_opml_dialog(hwnd: HWND, language: crate::settings::Language) -> O
     let filter_raw = i18n::tr(language, "rss.import_filter");
     let filter = to_wide(&filter_raw.replace("\\0", "\0"));
     let mut buffer = vec![0u16; 4096];
+    let default_name = to_wide("Sonarpad Rss.opml");
+    let copy_len = default_name.len().min(buffer.len().saturating_sub(1));
+    buffer[..copy_len].copy_from_slice(&default_name[..copy_len]);
+    let default_ext = to_wide("opml");
     let mut ofn = OPENFILENAMEW {
         lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
         hwndOwner: hwnd,
         lpstrFilter: PCWSTR(filter.as_ptr()),
         lpstrFile: PWSTR(buffer.as_mut_ptr()),
         nMaxFile: buffer.len() as u32,
+        lpstrDefExt: PCWSTR(default_ext.as_ptr()),
         Flags: OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY,
         ..Default::default()
     };
     if !crate::get_save_file_name_w_safe(&mut ofn).as_bool() {
         return None;
     }
-    parse_single_path(&buffer)
+    parse_single_path(&buffer).map(ensure_opml_extension)
 }
 
 fn escape_opml_attr(value: &str) -> String {
@@ -883,7 +914,7 @@ fn export_sources_to_opml_file(hwnd: HWND, path: &Path) -> Result<usize, String>
     Ok(sources.len())
 }
 
-fn import_sources_from_file(hwnd: HWND, path: &Path) {
+fn import_sources_from_file(hwnd: HWND, path: &Path) -> usize {
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
         Err(err) => {
@@ -892,7 +923,7 @@ fn import_sources_from_file(hwnd: HWND, path: &Path) {
                 path.to_string_lossy(),
                 err
             ));
-            return;
+            return 0;
         }
     };
     let text = String::from_utf8_lossy(&bytes);
@@ -909,7 +940,7 @@ fn import_sources_from_file(hwnd: HWND, path: &Path) {
     };
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
-        return;
+        return 0;
     }
     let mut added = 0;
     if with_state(parent, |state| {
@@ -955,6 +986,7 @@ fn import_sources_from_file(hwnd: HWND, path: &Path) {
         ));
         reload_tree(hwnd);
     }
+    added
 }
 
 fn is_valid_article_url(url: &str) -> bool {
@@ -2569,7 +2601,24 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         })
                         .unwrap_or_default();
                         if let Some(path) = open_import_txt_dialog(hwnd, language) {
-                            import_sources_from_file(hwnd, &path);
+                            let count = import_sources_from_file(hwnd, &path);
+                            if count > 0 {
+                                let title = i18n::tr(language, "rss.window.title");
+                                let count_text = count.to_string();
+                                let path_text = path.display().to_string();
+                                let message = i18n::tr_f(
+                                    language,
+                                    "rss.import_success",
+                                    &[("count", &count_text), ("path", &path_text)],
+                                );
+                                MessageBoxW(
+                                    hwnd,
+                                    PCWSTR(to_wide(&message).as_ptr()),
+                                    PCWSTR(to_wide(&title).as_ptr()),
+                                    MB_OK | MB_ICONINFORMATION,
+                                );
+                                focus_library(hwnd);
+                            }
                         }
                         LRESULT(0)
                     }
@@ -2587,6 +2636,20 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                 Ok(count) => {
                                     if count > 0 {
                                         announce_rss_status(&i18n::tr(language, "rss.exported"));
+                                        let title = i18n::tr(language, "rss.window.title");
+                                        let count_text = count.to_string();
+                                        let path_text = path.display().to_string();
+                                        let message = i18n::tr_f(
+                                            language,
+                                            "rss.export_success",
+                                            &[("count", &count_text), ("path", &path_text)],
+                                        );
+                                        MessageBoxW(
+                                            hwnd,
+                                            PCWSTR(to_wide(&message).as_ptr()),
+                                            PCWSTR(to_wide(&title).as_ptr()),
+                                            MB_OK | MB_ICONINFORMATION,
+                                        );
                                     }
                                 }
                                 Err(err) => {
@@ -2635,7 +2698,24 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             })
                             .unwrap_or_default();
                             if let Some(path) = open_import_txt_dialog(hwnd, language) {
-                                import_sources_from_file(hwnd, &path);
+                                let count = import_sources_from_file(hwnd, &path);
+                                if count > 0 {
+                                    let title = i18n::tr(language, "rss.window.title");
+                                    let count_text = count.to_string();
+                                    let path_text = path.display().to_string();
+                                    let message = i18n::tr_f(
+                                        language,
+                                        "rss.import_success",
+                                        &[("count", &count_text), ("path", &path_text)],
+                                    );
+                                    MessageBoxW(
+                                        hwnd,
+                                        PCWSTR(to_wide(&message).as_ptr()),
+                                        PCWSTR(to_wide(&title).as_ptr()),
+                                        MB_OK | MB_ICONINFORMATION,
+                                    );
+                                    focus_library(hwnd);
+                                }
                             }
                             return LRESULT(0);
                         }
@@ -2658,6 +2738,20 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                                 language,
                                                 "rss.exported",
                                             ));
+                                            let title = i18n::tr(language, "rss.window.title");
+                                            let count_text = count.to_string();
+                                            let path_text = path.display().to_string();
+                                            let message = i18n::tr_f(
+                                                language,
+                                                "rss.export_success",
+                                                &[("count", &count_text), ("path", &path_text)],
+                                            );
+                                            MessageBoxW(
+                                                hwnd,
+                                                PCWSTR(to_wide(&message).as_ptr()),
+                                                PCWSTR(to_wide(&title).as_ptr()),
+                                                MB_OK | MB_ICONINFORMATION,
+                                            );
                                         }
                                     }
                                     Err(err) => {

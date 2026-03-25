@@ -28,6 +28,8 @@ Mejoras
 • Añadida en RSS una entrada explícita «Cargar más noticias» al final de las fuentes cuando hay más elementos disponibles; al pulsar Intro se carga el siguiente bloque y el foco se mueve al primer artículo nuevo.
 • En el diccionario de voz, al añadir o editar una sustitución, ahora hay una casilla «Distinguir mayúsculas y minúsculas» para decidir si cada sustitución debe respetar o ignorar el uso de mayúsculas.
 Correcciones
+• Corregida la exportación OPML de podcasts y RSS, que ahora genera archivos aceptados por iTunes.
+• Añadidos mensajes de confirmación localizados para la correcta importación y exportación OPML de fuentes RSS y podcasts.
 • Corregido un problema por el que, en "Reproducir audio en streaming...", al escribir un texto de búsqueda y seleccionar un canal de YouTube en los resultados, el programa podía parecer bloqueado en lugar de abrir los vídeos del canal.
 • Corregido un error por el que la lista de archivos abiertos se mostraba en el menú Ayuda en lugar del menú Ventana.
 • Corregido un caso límite de streaming en el que la reproducción podía iniciarse pero la ventana “Descargando streaming” quedaba abierta cuando el archivo descargado ya coincidía con el formato de destino.

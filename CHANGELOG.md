@@ -28,6 +28,9 @@ Improvements
 • Added an explicit RSS entry “Load more news” at the end of feeds when more items are available; pressing Enter loads the next batch and moves focus to the first newly loaded article.
 • In the voice dictionary, when adding or editing a replacement, there is now a “Match Case” checkbox so each substitution can either respect or ignore letter casing.
 Bug fixes
+• Fixed Wikipedia import so quote blocks present in pages are now imported correctly.
+• Improved the web page parser for WordPress pages where list items and some section headings could be omitted.
+• "Go to line" now pre-fills the field with the current line.
 • Fixed OPML export for podcasts and RSS so the exported files are now accepted by iTunes.
 • Added localized confirmation messages for correct OPML import and export of RSS feeds and podcasts.
 • Fixed a bug where, in "Play streaming audio...", typing a search string and selecting a YouTube channel from the results could make the program appear stuck instead of opening that channel’s videos.

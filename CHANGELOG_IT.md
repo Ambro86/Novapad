@@ -32,6 +32,9 @@ Miglioramenti
 • Introdotta la fonte RSS "Preferiti": può essere eliminata e viene ricreata automaticamente alla prossima aggiunta di un articolo ai preferiti.
 • Aggiunte le scorciatoie da tastiera RSS per spostare le fonti in alto/in basso: `Ctrl+Shift+Freccia su` e `Ctrl+Shift+Freccia giù`.
 Correzioni
+• Corretta l'importazione da Wikipedia, che in alcune pagine non riportava correttamente le citazioni presenti nel testo.
+• Migliorato il parser delle pagine web: in alcune pagine WordPress non venivano inclusi gli elementi delle liste e alcuni titoli di sezione.
+• Ora, usando "Vai alla riga", il campo viene precompilato con la riga attuale.
 • Corretta l'esportazione OPML di podcast e RSS, che ora genera file accettati da iTunes.
 • Aggiunti messaggi di conferma localizzati per la corretta importazione ed esportazione OPML di feed RSS e podcast.
 • Corretto un problema per cui, in "Riproduci audio da streaming...", scrivendo una stringa di ricerca e selezionando un canale YouTube dai risultati il programma poteva sembrare bloccato invece di aprire i video del canale.

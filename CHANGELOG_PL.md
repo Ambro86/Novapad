@@ -28,6 +28,9 @@ Ulepszenia
 • Dodano w RSS wyraźną pozycję „Załaduj więcej wiadomości” na końcu źródła, gdy dostępne są kolejne elementy; naciśnięcie Enter wczytuje następny blok i przenosi fokus na pierwszy nowy artykuł.
 • W słowniku głosowym podczas dodawania lub edycji podmiany dostępne jest teraz pole „Uwzględniaj wielkość liter”, które pozwala zdecydować, czy dana podmiana ma rozróżniać wielkie i małe litery.
 Poprawki
+• Poprawiono import z Wikipedii, który na niektórych stronach nie importował poprawnie cytatów obecnych w tekście.
+• Ulepszono parser stron internetowych: na niektórych stronach WordPress nie były uwzględniane elementy list oraz niektóre nagłówki sekcji.
+• Teraz przy użyciu „Przejdź do wiersza” pole jest wstępnie wypełniane bieżącym numerem wiersza.
 • Poprawiono eksport OPML podcastów i RSS, dzięki czemu eksportowane pliki są teraz akceptowane przez iTunes.
 • Dodano lokalizowane komunikaty potwierdzenia poprawnego importu i eksportu OPML źródeł RSS oraz podcastów.
 • Naprawiono problem, przez który w „Odtwórz dźwięk ze streamingu...” po wpisaniu wyszukiwanej frazy i wybraniu kanału YouTube z wyników program mógł sprawiać wrażenie zawieszonego zamiast otworzyć filmy z tego kanału.

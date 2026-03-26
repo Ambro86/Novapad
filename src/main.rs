@@ -6201,8 +6201,21 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                                 .unwrap_or_default();
                             let title = i18n::tr(language, "goto_line.prompt_title");
                             let body = i18n::tr(language, "goto_line.prompt_body");
+                            let current_line = (SendMessageW(
+                                hwnd_edit,
+                                EM_LINEFROMCHAR,
+                                WPARAM(usize::MAX),
+                                LPARAM(0),
+                            )
+                            .0 as usize)
+                                + 1;
+                            let current_line_str = current_line.to_string();
                             if let Some(res) = app_windows::prompt_window::prompt_user(
-                                hwnd, &title, &body, "", language,
+                                hwnd,
+                                &title,
+                                &body,
+                                &current_line_str,
+                                language,
                             ) && let Ok(line) = res.trim().parse::<usize>()
                                 && line > 0
                             {

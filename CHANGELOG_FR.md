@@ -28,6 +28,9 @@ Améliorations
 • Ajout dans RSS d’une entrée explicite « Charger plus d’actualités » à la fin des sources lorsque d’autres éléments sont disponibles ; en appuyant sur Entrée, le bloc suivant est chargé et le focus se déplace vers le premier nouvel article.
 • Dans le dictionnaire vocal, lors de l’ajout ou de la modification d’un remplacement, une case « Respecter la casse » permet désormais de choisir si chaque substitution doit respecter ou ignorer les majuscules/minuscules.
 Correctifs
+• Correction de l’importation depuis Wikipédia, qui sur certaines pages n’importait pas correctement les citations présentes dans le texte.
+• Amélioration de l’analyseur de pages web : sur certaines pages WordPress, les éléments de liste et certains titres de section n’étaient pas inclus.
+• Désormais, lorsque l’on utilise « Aller à la ligne », le champ est prérempli avec la ligne actuelle.
 • Correction de l’export OPML des podcasts et des flux RSS : les fichiers générés sont désormais acceptés par iTunes.
 • Ajout de messages de confirmation localisés pour l’importation et l’exportation OPML corrects des flux RSS et des podcasts.
 • Correction d’un problème où, dans « Lire l'audio en streaming... », après avoir saisi une recherche textuelle et sélectionné une chaîne YouTube dans les résultats, le programme pouvait sembler bloqué au lieu d’ouvrir les vidéos de la chaîne.

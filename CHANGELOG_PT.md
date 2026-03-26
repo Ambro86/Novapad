@@ -28,6 +28,9 @@ Melhorias
 • Adicionada no RSS uma entrada explícita «Carregar mais notícias» no fim das fontes quando existem mais itens disponíveis; ao premir Enter é carregado o bloco seguinte e o foco passa para o primeiro artigo novo.
 • No dicionário de voz, ao adicionar ou editar uma substituição, existe agora uma caixa «Distinguir maiúsculas e minúsculas» para decidir se cada substituição deve respeitar ou ignorar a capitalização.
 Correções
+• Corrigida a importação a partir da Wikipédia, que em algumas páginas não importava corretamente as citações presentes no texto.
+• Melhorado o parser de páginas web: em algumas páginas WordPress não eram incluídos os itens de listas nem alguns títulos de secção.
+• Agora, ao usar «Ir para a linha», o campo é pré-preenchido com a linha atual.
 • Corrigida a exportação OPML de podcasts e feeds RSS, que agora gera ficheiros aceites pelo iTunes.
 • Adicionadas mensagens de confirmação localizadas para a correta importação e exportação OPML de fontes RSS e podcasts.
 • Foi corrigido um problema em que, em "Reproduzir áudio por streaming...", ao digitar um texto de pesquisa e selecionar um canal do YouTube nos resultados, o programa podia parecer bloqueado em vez de abrir os vídeos desse canal.

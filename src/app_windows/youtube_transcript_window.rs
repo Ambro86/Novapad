@@ -4291,6 +4291,8 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             collection_page,
         );
     }
+    let should_reopen_selection =
+        needs_ytdlp_selection || collection_url.is_some() || collection_page.is_some();
 
     if dialog_data.direct_play {
         let stream_path = PathBuf::from(&url);
@@ -4303,8 +4305,12 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             .map(|s| s.to_string())
             .or_else(|| Some(url.clone()));
         crate::set_active_podcast_episode_info(parent, Some(url), episode_title, Some(stream_path));
-        let return_input = collection_url.clone().unwrap_or_else(|| input.clone());
-        crate::set_active_youtube_return_context(parent, Some(return_input), collection_page);
+        if should_reopen_selection {
+            let return_input = collection_url.clone().unwrap_or_else(|| input.clone());
+            crate::set_active_youtube_return_context(parent, Some(return_input), collection_page);
+        } else {
+            crate::set_active_youtube_return_context(parent, None, None);
+        }
         crate::menu::update_playback_menu(parent, true);
         return;
     }
@@ -5110,12 +5116,16 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             episode_title,
             Some(playback_path),
         );
-        update_youtube_return_context_from_selection(
-            parent,
-            &input,
-            collection_url.as_deref(),
-            collection_page,
-        );
+        if should_reopen_selection {
+            update_youtube_return_context_from_selection(
+                parent,
+                &input,
+                collection_url.as_deref(),
+                collection_page,
+            );
+        } else {
+            crate::set_active_youtube_return_context(parent, None, None);
+        }
         crate::menu::update_playback_menu(parent, true);
         return;
     }

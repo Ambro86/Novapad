@@ -4422,8 +4422,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             .arg("--no-warnings")
             .arg("--newline")
             .arg("--progress-template")
-            .arg(ytdlp_download_progress_template())
-            .arg("--verbose");
+            .arg(ytdlp_download_progress_template());
 
         if let Some(format_id) = selected_audio_format.as_ref() {
             match dialog_data.format {
@@ -4461,8 +4460,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     cmd.arg("-f").arg(mp4_profile);
                 }
                 StreamOutputFormat::Auto => {
-                    cmd.arg("-f")
-                        .arg("bestvideo[ext=webm]+bestaudio[ext=webm]/bestvideo+bestaudio/best");
+                    cmd.arg("-f").arg("bestaudio/best");
+                }
+                StreamOutputFormat::Mp3
+                    if matches!(dialog_data.quality, StreamQualitySelection::Original) =>
+                {
+                    cmd.arg("-f").arg("bestaudio[ext=mp3]/bestaudio/best");
+                }
+                StreamOutputFormat::M4a => {
+                    cmd.arg("-f").arg("m4a/bestaudio[ext=m4a]/bestaudio/best");
                 }
                 _ => {
                     cmd.arg("-f").arg("bestaudio/best");
@@ -4777,7 +4783,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                             .arg("--no-warnings")
                             .arg("--progress-template")
                             .arg(ytdlp_download_progress_template())
-                            .arg("--verbose")
                             .arg("--extractor-retries")
                             .arg("3")
                             .arg("--fragment-retries")

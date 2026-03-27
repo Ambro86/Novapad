@@ -36,9 +36,13 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{PCWSTR, w};
 
 use crate::accessibility::{EM_REPLACESEL, screen_reader_speak, to_wide, to_wide_normalized};
+use crate::app_windows::prompt_window;
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
-use crate::settings::{Language, StreamFavorite, confirm_title, save_settings, settings_dir};
+use crate::settings::{
+    Language, StreamFavorite, clear_ytdlp_site_credentials, confirm_title,
+    get_ytdlp_site_credentials, save_settings, set_ytdlp_site_credentials, settings_dir,
+};
 use crate::with_state;
 use crate::{WM_FOCUS_EDITOR, get_active_edit, show_error};
 use url::Url;
@@ -2123,6 +2127,111 @@ fn members_only_stream_message(language: Language) -> String {
 fn drm_not_supported_stream_message(language: Language) -> String {
     i18n::tr(language, "stream_audio.drm_not_supported")
 }
+
+fn is_login_required_stream_error(err: &str) -> bool {
+    let err_lc = err.to_ascii_lowercase();
+    err_lc.contains("use --username and --password") || err_lc.contains("login required")
+}
+
+fn stream_auth_site_key(url: &str) -> Option<String> {
+    Url::parse(url)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(|host| host.to_ascii_lowercase()))
+}
+
+fn load_saved_stream_site_credentials(
+    parent: HWND,
+    site_key: &str,
+) -> Option<YtdlpAuthCredentials> {
+    with_state(parent, |state| {
+        get_ytdlp_site_credentials(&state.settings, site_key)
+            .map(|(username, password)| YtdlpAuthCredentials { username, password })
+    })
+    .flatten()
+}
+
+fn save_stream_site_credentials(parent: HWND, site_key: &str, credentials: &YtdlpAuthCredentials) {
+    let Some(settings_snapshot) = with_state(parent, |state| {
+        if !set_ytdlp_site_credentials(
+            &mut state.settings,
+            site_key,
+            &credentials.username,
+            &credentials.password,
+        ) {
+            return None;
+        }
+        Some(state.settings.clone())
+    })
+    .flatten() else {
+        return;
+    };
+    save_settings(settings_snapshot);
+}
+
+fn clear_stream_site_credentials(parent: HWND, site_key: &str) {
+    let Some(settings_snapshot) = with_state(parent, |state| {
+        if !clear_ytdlp_site_credentials(&mut state.settings, site_key) {
+            return None;
+        }
+        Some(state.settings.clone())
+    })
+    .flatten() else {
+        return;
+    };
+    save_settings(settings_snapshot);
+}
+
+struct PromptedYtdlpCredentials {
+    credentials: YtdlpAuthCredentials,
+    save_credentials: bool,
+}
+
+fn prompt_ytdlp_credentials(
+    parent: HWND,
+    language: Language,
+    username_default: &str,
+    save_credentials_default: bool,
+    saved_credentials_failed: bool,
+) -> Option<PromptedYtdlpCredentials> {
+    let title = tr_or(
+        language,
+        "stream_audio.auth_required_title",
+        "Authentication required",
+    );
+    let (body_key, body_fallback) = if saved_credentials_failed {
+        (
+            "stream_audio.saved_credentials_failed",
+            "Saved credentials did not work. Enter the credentials for this site again:",
+        )
+    } else {
+        (
+            "stream_audio.auth_prompt",
+            "Enter the credentials required by this site:",
+        )
+    };
+    let body = tr_or(language, body_key, body_fallback);
+    let result = prompt_window::prompt_credentials(
+        parent,
+        &title,
+        &body,
+        username_default,
+        save_credentials_default,
+        language,
+    )?;
+    let username = result.username.trim().to_string();
+    if username.is_empty() {
+        return None;
+    }
+    let password = result.password.trim().to_string();
+    if password.is_empty() {
+        return None;
+    }
+    Some(PromptedYtdlpCredentials {
+        credentials: YtdlpAuthCredentials { username, password },
+        save_credentials: result.save_credentials,
+    })
+}
+
 fn looks_like_valid_stream_url(input: &str) -> bool {
     let Some(normalized) = normalize_youtube_input_for_download(input) else {
         return false;
@@ -2178,6 +2287,33 @@ struct StreamDialogResult {
 struct StreamAudioTrack {
     format_id: String,
     label: String,
+}
+
+#[derive(Clone)]
+struct YtdlpAuthCredentials {
+    username: String,
+    password: String,
+}
+
+struct YtdlpDownloadAttempt {
+    primary_path: Option<PathBuf>,
+    stderr_capture: String,
+    stalled: bool,
+}
+
+struct YtdlpDownloadRequest<'a> {
+    parent: HWND,
+    progress: HWND,
+    language: Language,
+    ytdlp_path: &'a Path,
+    url: &'a str,
+    cache_dir: &'a Path,
+    prefix: &'a str,
+    output_template: &'a Path,
+    dialog_data: &'a StreamDialogResult,
+    selected_audio_format: Option<&'a str>,
+    ytdlp_debug: bool,
+    credentials: Option<&'a YtdlpAuthCredentials>,
 }
 
 struct StreamDialogInit {
@@ -3340,6 +3476,89 @@ fn ytdlp_download_progress_template() -> String {
     )
 }
 
+fn configure_ytdlp_stream_download_command(
+    cmd: &mut Command,
+    url: &str,
+    output_template: &Path,
+    dialog_data: &StreamDialogResult,
+    selected_audio_format: Option<&str>,
+    credentials: Option<&YtdlpAuthCredentials>,
+) {
+    cmd.arg("--no-playlist")
+        .arg("--socket-timeout")
+        .arg(YTDLP_SOCKET_TIMEOUT_SECS)
+        .arg("--no-warnings")
+        .arg("--newline")
+        .arg("--progress-template")
+        .arg(ytdlp_download_progress_template());
+
+    if let Some(credentials) = credentials {
+        cmd.arg("--username")
+            .arg(&credentials.username)
+            .arg("--password")
+            .arg(&credentials.password);
+    }
+
+    if let Some(format_id) = selected_audio_format {
+        match dialog_data.format {
+            StreamOutputFormat::Mp4 => {
+                cmd.arg("-f").arg(format!(
+                    "bestvideo[ext=mp4]+{id}/bestvideo+{id}/best[ext=mp4]/best",
+                    id = format_id
+                ));
+            }
+            StreamOutputFormat::Auto => {
+                cmd.arg("-f").arg(format!(
+                    "bestvideo[ext=webm]+{id}/bestvideo+{id}/best",
+                    id = format_id
+                ));
+            }
+            _ => {
+                cmd.arg("-f").arg(format_id);
+            }
+        }
+    } else {
+        match dialog_data.format {
+            StreamOutputFormat::Mp4 => {
+                let mp4_profile = match dialog_data.quality {
+                    StreamQualitySelection::Mp4High => {
+                        "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best"
+                    }
+                    StreamQualitySelection::Mp4Medium => {
+                        "best[ext=mp4][height<=720]/best[height<=720]/best"
+                    }
+                    StreamQualitySelection::Mp4Low => {
+                        "best[ext=mp4][height<=480]/best[height<=480]/worst"
+                    }
+                    _ => "best[ext=mp4]/best",
+                };
+                cmd.arg("-f").arg(mp4_profile);
+            }
+            StreamOutputFormat::Auto => {
+                cmd.arg("-f").arg("bestaudio/best");
+            }
+            StreamOutputFormat::Mp3
+                if matches!(dialog_data.quality, StreamQualitySelection::Original) =>
+            {
+                cmd.arg("-f").arg("bestaudio[ext=mp3]/bestaudio/best");
+            }
+            StreamOutputFormat::M4a => {
+                cmd.arg("-f").arg("m4a/bestaudio[ext=m4a]/bestaudio/best");
+            }
+            _ => {
+                cmd.arg("-f").arg("bestaudio/best");
+            }
+        }
+    }
+
+    cmd.arg("-o")
+        .arg(output_template.to_string_lossy().to_string())
+        .arg("--")
+        .arg(url)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+}
+
 fn handle_ytdlp_progress_line(
     line: String,
     ytdlp_debug: bool,
@@ -3391,6 +3610,193 @@ fn spawn_ytdlp_output_reader<R: Read + Send + 'static>(
                 &activity,
             );
         }
+    })
+}
+
+fn run_ytdlp_stream_download_attempt(
+    req: YtdlpDownloadRequest<'_>,
+) -> Result<YtdlpDownloadAttempt, String> {
+    let mut cmd = ytdlp_command(req.ytdlp_path);
+    configure_ytdlp_stream_download_command(
+        &mut cmd,
+        req.url,
+        req.output_template,
+        req.dialog_data,
+        req.selected_audio_format,
+        req.credentials,
+    );
+    if req.ytdlp_debug {
+        let format_for_log = req.selected_audio_format.map_or_else(
+            || match req.dialog_data.format {
+                StreamOutputFormat::Auto => i18n::tr(req.language, "stream_audio.format.auto"),
+                StreamOutputFormat::Mp3 => "mp3".to_string(),
+                StreamOutputFormat::M4a => "m4a".to_string(),
+                StreamOutputFormat::Opus => "opus".to_string(),
+                StreamOutputFormat::Ogg => "ogg".to_string(),
+                StreamOutputFormat::Wav => "wav".to_string(),
+                StreamOutputFormat::Flac => "flac".to_string(),
+                StreamOutputFormat::Mp4 => "mp4".to_string(),
+            },
+            |f| f.to_string(),
+        );
+        crate::log_debug(&format!(
+            "yt-dlp stream start: url={} output_template={} format={} auth={}",
+            req.url,
+            req.output_template.to_string_lossy(),
+            format_for_log,
+            req.credentials.is_some()
+        ));
+    }
+    let mut child = cmd.spawn().map_err(|err| {
+        i18n::tr_f(
+            req.language,
+            "stream_audio.download_failed",
+            &[("err", &err.to_string())],
+        )
+    })?;
+    keep_stream_progress_focus(req.progress);
+
+    let stderr_pipe = child.stderr.take().ok_or_else(|| {
+        i18n::tr_f(
+            req.language,
+            "stream_audio.download_failed",
+            &[("err", "yt-dlp stderr unavailable")],
+        )
+    })?;
+    let stdout_pipe = child.stdout.take().ok_or_else(|| {
+        i18n::tr_f(
+            req.language,
+            "stream_audio.download_failed",
+            &[("err", "yt-dlp stdout unavailable")],
+        )
+    })?;
+
+    let progress_shared = Arc::new(AtomicU32::new(0));
+    let activity_shared = Arc::new(AtomicU32::new(0));
+    let stderr_shared = Arc::new(Mutex::new(String::new()));
+    let stderr_thread = spawn_ytdlp_output_reader(
+        stderr_pipe,
+        req.ytdlp_debug,
+        "stderr",
+        Arc::clone(&stderr_shared),
+        Arc::clone(&progress_shared),
+        Arc::clone(&activity_shared),
+    );
+    let stdout_thread = spawn_ytdlp_output_reader(
+        stdout_pipe,
+        req.ytdlp_debug,
+        "stdout",
+        Arc::clone(&stderr_shared),
+        Arc::clone(&progress_shared),
+        Arc::clone(&activity_shared),
+    );
+
+    let allow_early_finalize = !matches!(
+        req.dialog_data.format,
+        StreamOutputFormat::Auto | StreamOutputFormat::Mp4
+    );
+    let mut last_pct = 0u32;
+    let mut ui_pct = 0u32;
+    let mut ui_target_pct = 0u32;
+    let mut last_activity = 0u32;
+    let mut stalled = false;
+    let mut last_progress_at = std::time::Instant::now();
+    let mut reached_100_at: Option<std::time::Instant> = None;
+    let mut last_focus_keepalive = std::time::Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) => {
+                if pump_messages_detect_stream_cancel(req.parent, req.progress) {
+                    close_progress_dialog(req.progress);
+                    if let Err(err) = child.kill() {
+                        crate::log_debug(&format!(
+                            "Failed to kill cancelled yt-dlp process: {}",
+                            err
+                        ));
+                    }
+                    return Err(String::new());
+                }
+                let pct = progress_shared.load(Ordering::Relaxed);
+                if pct > last_pct {
+                    last_pct = pct;
+                    last_progress_at = std::time::Instant::now();
+                    ui_target_pct = pct.min(99);
+                    if last_pct >= 100 && reached_100_at.is_none() {
+                        reached_100_at = Some(std::time::Instant::now());
+                    }
+                }
+                if ui_pct < ui_target_pct {
+                    ui_pct = ui_target_pct;
+                    report_progress(req.progress, ui_pct);
+                }
+                if last_focus_keepalive.elapsed() > std::time::Duration::from_millis(300) {
+                    keep_stream_progress_focus(req.progress);
+                    last_focus_keepalive = std::time::Instant::now();
+                }
+                if allow_early_finalize
+                    && reached_100_at
+                        .map(|t| {
+                            t.elapsed() > std::time::Duration::from_secs(STREAM_POST_100_GRACE_SECS)
+                        })
+                        .unwrap_or(false)
+                    && find_latest_downloaded_stream_file(req.cache_dir, req.prefix).is_some()
+                {
+                    if let Err(err) = child.kill() {
+                        crate::log_debug(&format!(
+                            "Failed to kill finalized yt-dlp process: {}",
+                            err
+                        ));
+                    }
+                    break None;
+                }
+                let activity = activity_shared.load(Ordering::Relaxed);
+                if activity != last_activity {
+                    last_activity = activity;
+                    last_progress_at = std::time::Instant::now();
+                }
+                if last_progress_at.elapsed()
+                    > std::time::Duration::from_secs(STREAM_DOWNLOAD_STALL_SECS)
+                {
+                    stalled = true;
+                    if let Err(err) = child.kill() {
+                        crate::log_debug(&format!(
+                            "Failed to kill stalled yt-dlp process: {}",
+                            err
+                        ));
+                    }
+                    break None;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(30));
+            }
+            Err(err) => {
+                return Err(i18n::tr_f(
+                    req.language,
+                    "stream_audio.download_failed",
+                    &[("err", &err.to_string())],
+                ));
+            }
+        }
+    };
+
+    if status.is_some() {
+        if let Err(err) = stderr_thread.join() {
+            crate::log_debug(&format!("yt-dlp stderr thread join failed: {:?}", err));
+        }
+        if let Err(err) = stdout_thread.join() {
+            crate::log_debug(&format!("yt-dlp stdout thread join failed: {:?}", err));
+        }
+    }
+
+    let stderr_capture = stderr_shared
+        .lock()
+        .map(|s| s.clone())
+        .unwrap_or_else(|_| String::new());
+
+    Ok(YtdlpDownloadAttempt {
+        primary_path: find_latest_downloaded_stream_file(req.cache_dir, req.prefix),
+        stderr_capture,
+        stalled,
     })
 }
 
@@ -4421,311 +4827,116 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         log_stream_focus_snapshot("play_streaming_audio.progress_opened", progress);
         let stream_title = probe_stream_media_title(&ytdlp_path, &url);
 
-        let mut cmd = ytdlp_command(&ytdlp_path);
-        cmd.arg("--no-playlist")
-            .arg("--socket-timeout")
-            .arg(YTDLP_SOCKET_TIMEOUT_SECS)
-            .arg("--no-warnings")
-            .arg("--newline")
-            .arg("--progress-template")
-            .arg(ytdlp_download_progress_template());
-
-        if let Some(format_id) = selected_audio_format.as_ref() {
-            match dialog_data.format {
-                StreamOutputFormat::Mp4 => {
-                    cmd.arg("-f").arg(format!(
-                        "bestvideo[ext=mp4]+{id}/bestvideo+{id}/best[ext=mp4]/best",
-                        id = format_id
-                    ));
+        let mut progress = progress;
+        let site_key = stream_auth_site_key(&url);
+        let saved_credentials = site_key
+            .as_deref()
+            .and_then(|site| load_saved_stream_site_credentials(parent, site));
+        let mut credentials_to_persist: Option<(String, YtdlpAuthCredentials)> = None;
+        let mut attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
+            parent,
+            progress,
+            language,
+            ytdlp_path: &ytdlp_path,
+            url: &url,
+            cache_dir: &cache_dir,
+            prefix: &prefix,
+            output_template: &output_template,
+            dialog_data: &dialog_data,
+            selected_audio_format: selected_audio_format.as_deref(),
+            ytdlp_debug,
+            credentials: saved_credentials.as_ref(),
+        }) {
+            Ok(attempt) => attempt,
+            Err(message) => {
+                if !message.is_empty() {
+                    close_progress_dialog(progress);
+                    show_error(parent, language, &message);
                 }
-                StreamOutputFormat::Auto => {
-                    cmd.arg("-f").arg(format!(
-                        "bestvideo[ext=webm]+{id}/bestvideo+{id}/best",
-                        id = format_id
-                    ));
-                }
-                _ => {
-                    cmd.arg("-f").arg(format_id);
-                }
+                return;
             }
-        } else {
-            match dialog_data.format {
-                StreamOutputFormat::Mp4 => {
-                    let mp4_profile = match dialog_data.quality {
-                        StreamQualitySelection::Mp4High => {
-                            "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best"
-                        }
-                        StreamQualitySelection::Mp4Medium => {
-                            "best[ext=mp4][height<=720]/best[height<=720]/best"
-                        }
-                        StreamQualitySelection::Mp4Low => {
-                            "best[ext=mp4][height<=480]/best[height<=480]/worst"
-                        }
-                        _ => "best[ext=mp4]/best",
-                    };
-                    cmd.arg("-f").arg(mp4_profile);
-                }
-                StreamOutputFormat::Auto => {
-                    cmd.arg("-f").arg("bestaudio/best");
-                }
-                StreamOutputFormat::Mp3
-                    if matches!(dialog_data.quality, StreamQualitySelection::Original) =>
+        };
+        let mut primary_path = attempt.primary_path.take();
+        let mut stderr_capture = attempt.stderr_capture;
+        let mut stalled = attempt.stalled;
+        if primary_path.is_none() {
+            let err = if stderr_capture.trim().is_empty() {
+                "yt-dlp failed".to_string()
+            } else {
+                stderr_capture.trim().to_string()
+            };
+            if is_login_required_stream_error(&err) {
+                let saved_credentials_failed = saved_credentials.is_some();
+                let saved_username = saved_credentials
+                    .as_ref()
+                    .map(|credentials| credentials.username.clone())
+                    .unwrap_or_default();
+                if let Some(site) = site_key.as_deref()
+                    && saved_credentials_failed
                 {
-                    cmd.arg("-f").arg("bestaudio[ext=mp3]/bestaudio/best");
+                    clear_stream_site_credentials(parent, site);
                 }
-                StreamOutputFormat::M4a => {
-                    cmd.arg("-f").arg("m4a/bestaudio[ext=m4a]/bestaudio/best");
-                }
-                _ => {
-                    cmd.arg("-f").arg("bestaudio/best");
-                }
-            }
-        }
-        cmd.arg("-o")
-            .arg(output_template.to_string_lossy().to_string())
-            .arg("--")
-            .arg(&url)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        if ytdlp_debug {
-            let format_for_log = selected_audio_format.as_deref().map_or_else(
-                || match dialog_data.format {
-                    StreamOutputFormat::Auto => i18n::tr(language, "stream_audio.format.auto"),
-                    StreamOutputFormat::Mp3 => "mp3".to_string(),
-                    StreamOutputFormat::M4a => "m4a".to_string(),
-                    StreamOutputFormat::Opus => "opus".to_string(),
-                    StreamOutputFormat::Ogg => "ogg".to_string(),
-                    StreamOutputFormat::Wav => "wav".to_string(),
-                    StreamOutputFormat::Flac => "flac".to_string(),
-                    StreamOutputFormat::Mp4 => "mp4".to_string(),
-                },
-                |f| f.to_string(),
-            );
-            crate::log_debug(&format!(
-                "yt-dlp stream start: url={} output_template={} format={}",
-                url,
-                output_template.to_string_lossy(),
-                format_for_log
-            ));
-        }
-
-        let mut child = match cmd.spawn() {
-            Ok(c) => c,
-            Err(err) => {
                 close_progress_dialog(progress);
-                let message = i18n::tr_f(
-                    language,
-                    "stream_audio.download_failed",
-                    &[("err", &err.to_string())],
-                );
-                show_error(parent, language, &message);
-                return;
-            }
-        };
-        keep_stream_progress_focus(progress);
-
-        let stderr_pipe = match child.stderr.take() {
-            Some(stderr) => stderr,
-            None => {
-                close_progress_dialog(progress);
-                show_error(
+                let Some(prompted) = prompt_ytdlp_credentials(
                     parent,
                     language,
-                    &i18n::tr_f(
-                        language,
-                        "stream_audio.download_failed",
-                        &[("err", "yt-dlp stderr unavailable")],
-                    ),
-                );
-                return;
-            }
-        };
-        let stdout_pipe = match child.stdout.take() {
-            Some(stdout) => stdout,
-            None => {
-                close_progress_dialog(progress);
-                show_error(
+                    &saved_username,
+                    site_key.is_some(),
+                    saved_credentials_failed,
+                ) else {
+                    post_focus_editor(parent);
+                    return;
+                };
+                if let Some(site) = site_key.as_ref() {
+                    if prompted.save_credentials {
+                        credentials_to_persist = Some((site.clone(), prompted.credentials.clone()));
+                    } else {
+                        clear_stream_site_credentials(parent, site);
+                    }
+                }
+                let auth_prefix = format!("{prefix}_auth");
+                let auth_output_template = cache_dir.join(format!("{auth_prefix}.%(ext)s"));
+                progress = open_progress_dialog(
                     parent,
                     language,
-                    &i18n::tr_f(
-                        language,
-                        "stream_audio.download_failed",
-                        &[("err", "yt-dlp stdout unavailable")],
-                    ),
+                    "stream_audio.progress_title",
+                    "stream_audio.progress_downloading",
+                    true,
                 );
-                return;
-            }
-        };
-
-        let progress_shared = Arc::new(AtomicU32::new(0));
-        let activity_shared = Arc::new(AtomicU32::new(0));
-        let stderr_shared = Arc::new(Mutex::new(String::new()));
-        let stderr_thread = spawn_ytdlp_output_reader(
-            stderr_pipe,
-            ytdlp_debug,
-            "stderr",
-            Arc::clone(&stderr_shared),
-            Arc::clone(&progress_shared),
-            Arc::clone(&activity_shared),
-        );
-        let stdout_thread = spawn_ytdlp_output_reader(
-            stdout_pipe,
-            ytdlp_debug,
-            "stdout",
-            Arc::clone(&stderr_shared),
-            Arc::clone(&progress_shared),
-            Arc::clone(&activity_shared),
-        );
-
-        let allow_early_finalize = !matches!(
-            dialog_data.format,
-            StreamOutputFormat::Auto | StreamOutputFormat::Mp4
-        );
-
-        let mut last_pct = 0u32;
-        let mut ui_pct = 0u32;
-        let mut ui_target_pct = 0u32;
-        let mut last_activity = 0u32;
-        let mut stalled = false;
-        let mut last_progress_at = std::time::Instant::now();
-        let mut reached_100_at: Option<std::time::Instant> = None;
-        let mut last_focus_keepalive = std::time::Instant::now();
-        crate::log_debug(&format!(
-            "stream download loop start: progress_dialog={:?} url={} cache_prefix={} allow_early_finalize={}",
-            progress, url, prefix, allow_early_finalize
-        ));
-        let _status = loop {
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    crate::log_debug(&format!(
-                        "stream download loop exit: success={} code={:?}",
-                        status.success(),
-                        status.code()
-                    ));
-                    break Some(status);
-                }
-                Ok(None) => {
-                    if pump_messages_detect_stream_cancel(parent, progress) {
-                        crate::log_debug("stream download loop: cancel detected while downloading");
-                        close_progress_dialog(progress);
-                        if let Err(err) = child.kill() {
-                            crate::log_debug(&format!(
-                                "Failed to kill cancelled yt-dlp process: {}",
-                                err
-                            ));
+                keep_stream_progress_focus(progress);
+                attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
+                    parent,
+                    progress,
+                    language,
+                    ytdlp_path: &ytdlp_path,
+                    url: &url,
+                    cache_dir: &cache_dir,
+                    prefix: &auth_prefix,
+                    output_template: &auth_output_template,
+                    dialog_data: &dialog_data,
+                    selected_audio_format: selected_audio_format.as_deref(),
+                    ytdlp_debug,
+                    credentials: Some(&prompted.credentials),
+                }) {
+                    Ok(attempt) => attempt,
+                    Err(message) => {
+                        if !message.is_empty() {
+                            close_progress_dialog(progress);
+                            show_error(parent, language, &message);
                         }
                         return;
                     }
-                    let pct = progress_shared.load(Ordering::Relaxed);
-                    if pct > last_pct {
-                        crate::log_debug(&format!(
-                            "stream download raw progress: previous={} new_raw={} ui_target_before={} ui_pct={}",
-                            last_pct, pct, ui_target_pct, ui_pct
-                        ));
-                        last_pct = pct;
-                        last_progress_at = std::time::Instant::now();
-                        // Leave only the final 1% for the "file is really ready" handoff,
-                        // so download progress can stay much closer to yt-dlp's real value.
-                        ui_target_pct = pct.min(99);
-                        crate::log_debug(&format!(
-                            "stream download target progress adjusted: raw={} ui_target_after={}",
-                            pct, ui_target_pct
-                        ));
-                        if last_pct >= 100 && reached_100_at.is_none() {
-                            reached_100_at = Some(std::time::Instant::now());
-                            crate::log_debug("stream download raw progress reached 100%");
-                        }
-                    }
-                    if ui_pct < ui_target_pct {
-                        ui_pct = ui_target_pct;
-                        crate::log_debug(&format!(
-                            "stream download ui progress apply: ui_pct={} raw_pct={}",
-                            ui_pct, last_pct
-                        ));
-                        report_progress(progress, ui_pct);
-                    }
-                    if last_focus_keepalive.elapsed() > std::time::Duration::from_millis(300) {
-                        keep_stream_progress_focus(progress);
-                        last_focus_keepalive = std::time::Instant::now();
-                    }
-                    if allow_early_finalize
-                        && reached_100_at
-                            .map(|t| {
-                                t.elapsed()
-                                    > std::time::Duration::from_secs(STREAM_POST_100_GRACE_SECS)
-                            })
-                            .unwrap_or(false)
-                        && find_latest_downloaded_stream_file(&cache_dir, &prefix).is_some()
-                    {
-                        crate::log_debug(
-                            "Stream download reached 100% with output present: finalizing early",
-                        );
-                        log_stream_focus_snapshot("stream_download.finalize_early", progress);
-                        if let Err(err) = child.kill() {
-                            crate::log_debug(&format!(
-                                "Failed to kill finalized yt-dlp process: {}",
-                                err
-                            ));
-                        }
-                        break None;
-                    }
-                    let activity = activity_shared.load(Ordering::Relaxed);
-                    if activity != last_activity {
-                        crate::log_debug(&format!(
-                            "stream download activity tick: previous_tick={} current_tick={}",
-                            last_activity, activity
-                        ));
-                        last_activity = activity;
-                        last_progress_at = std::time::Instant::now();
-                    }
-                    if last_progress_at.elapsed()
-                        > std::time::Duration::from_secs(STREAM_DOWNLOAD_STALL_SECS)
-                    {
-                        stalled = true;
-                        crate::log_debug("Stream download stalled: terminating yt-dlp process");
-                        log_stream_focus_snapshot("stream_download.stalled", progress);
-                        if let Err(err) = child.kill() {
-                            crate::log_debug(&format!(
-                                "Failed to kill stalled yt-dlp process: {}",
-                                err
-                            ));
-                        }
-                        break None;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(30));
-                }
-                Err(err) => {
-                    crate::log_debug(&format!("stream download loop wait error: {}", err));
-                    close_progress_dialog(progress);
-                    show_error(
-                        parent,
-                        language,
-                        &i18n::tr_f(
-                            language,
-                            "stream_audio.download_failed",
-                            &[("err", &err.to_string())],
-                        ),
-                    );
-                    return;
-                }
+                };
+                primary_path = attempt.primary_path.take();
+                stderr_capture = attempt.stderr_capture;
+                stalled = attempt.stalled;
             }
-        };
-        if _status.is_some() {
-            if let Err(err) = stderr_thread.join() {
-                crate::log_debug(&format!("yt-dlp stderr thread join failed: {:?}", err));
-            }
-            if let Err(err) = stdout_thread.join() {
-                crate::log_debug(&format!("yt-dlp stdout thread join failed: {:?}", err));
-            }
-        } else {
-            // Avoid UI hangs when yt-dlp is terminated early (finalization/stall paths).
-            // The output reader threads will exit on their own once pipes are closed.
-            crate::log_debug("Skipping yt-dlp output thread join after early termination");
         }
-        let stderr_capture = stderr_shared
-            .lock()
-            .map(|s| s.clone())
-            .unwrap_or_else(|_| String::new());
+        if primary_path.is_some()
+            && let Some((site, credentials)) = credentials_to_persist.take()
+        {
+            save_stream_site_credentials(parent, &site, &credentials);
+        }
         if ytdlp_debug && !stderr_capture.trim().is_empty() {
             crate::log_debug(&format!(
                 "yt-dlp combined stderr: {}",
@@ -4735,7 +4946,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
 
         report_progress_status(progress, &i18n::tr(language, "podcasts.loading"));
         log_stream_focus_snapshot("stream_download.after_download_before_finalize", progress);
-        let primary_path = find_latest_downloaded_stream_file(&cache_dir, &prefix);
         let downloaded_path = if primary_path.is_some() {
             primary_path
         } else {
@@ -4815,6 +5025,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                         match retry.spawn() {
                             Ok(mut retry_child) => {
                                 let retry_start = std::time::Instant::now();
+                                let mut retry_focus_keepalive = std::time::Instant::now();
                                 let mut status_opt = None;
                                 loop {
                                     match retry_child.try_wait() {
@@ -4829,11 +5040,11 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                                                 let _unused = retry_child.kill();
                                                 return;
                                             }
-                                            if last_focus_keepalive.elapsed()
+                                            if retry_focus_keepalive.elapsed()
                                                 > std::time::Duration::from_millis(300)
                                             {
                                                 keep_stream_progress_focus(progress);
-                                                last_focus_keepalive = std::time::Instant::now();
+                                                retry_focus_keepalive = std::time::Instant::now();
                                             }
                                             if retry_start.elapsed()
                                                 > std::time::Duration::from_secs(
@@ -4998,12 +5209,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     progress,
                     &i18n::tr(language, "stream_audio.progress_converting"),
                 );
-                crate::log_debug(&format!(
-                    "stream phase transition [download_to_conversion]: last_download_ui_pct={} input={} output={}",
-                    ui_pct,
-                    downloaded_path.to_string_lossy(),
-                    converted_path.to_string_lossy()
-                ));
                 report_progress(progress, 0);
                 log_stream_focus_snapshot("stream_conversion.started", progress);
                 let mut last_pump = std::time::Instant::now();

@@ -1240,5 +1240,9 @@
   "stream_audio.drm_not_supported": "Этот источник потокового вещания использует защиту DRM и не поддерживается.",
   "stream_audio.favorites_label": "Избранное",
   "stream_audio.add_to_favorites": "Добавить в избранное",
-  "stream_audio.subscribers_label": "Подписчики"
+  "stream_audio.subscribers_label": "Подписчики",
+  "stream_audio.auth_username": "Имя пользователя:",
+  "stream_audio.auth_password": "Пароль:",
+  "stream_audio.save_credentials": "Сохранить учетные данные для этого сайта",
+  "stream_audio.saved_credentials_failed": "Сохранённые учетные данные не сработали. Введите их снова:"
 }

@@ -1240,5 +1240,9 @@
   "stream_audio.drm_not_supported": "This streaming source uses DRM protection and is not supported.",
   "stream_audio.favorites_label": "Favorites",
   "stream_audio.add_to_favorites": "Add to favorites",
-  "stream_audio.subscribers_label": "Subscribers"
+  "stream_audio.subscribers_label": "Subscribers",
+  "stream_audio.auth_username": "Username:",
+  "stream_audio.auth_password": "Password:",
+  "stream_audio.save_credentials": "Save credentials for this site",
+  "stream_audio.saved_credentials_failed": "Saved credentials did not work. Enter the credentials for this site again:"
 }

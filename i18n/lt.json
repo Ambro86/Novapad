@@ -1240,5 +1240,9 @@
   "stream_audio.drm_not_supported": "Šis srautinio perdavimo šaltinis naudoja DRM apsaugą ir nėra palaikomas.",
   "stream_audio.favorites_label": "Mėgstamiausi",
   "stream_audio.add_to_favorites": "Pridėti prie mėgstamiausių",
-  "stream_audio.subscribers_label": "Prenumeratoriai"
+  "stream_audio.subscribers_label": "Prenumeratoriai",
+  "stream_audio.auth_username": "Naudotojo vardas:",
+  "stream_audio.auth_password": "Slaptažodis:",
+  "stream_audio.save_credentials": "Išsaugoti šios svetainės prisijungimo duomenis",
+  "stream_audio.saved_credentials_failed": "Išsaugoti prisijungimo duomenys neveikia. Įveskite juos dar kartą:"
 }

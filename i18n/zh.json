@@ -1240,5 +1240,9 @@
   "stream_audio.drm_not_supported": "此流媒体源使用 DRM 保护，暂不支持。",
   "stream_audio.favorites_label": "收藏",
   "stream_audio.add_to_favorites": "添加到收藏",
-  "stream_audio.subscribers_label": "订阅者"
+  "stream_audio.subscribers_label": "订阅者",
+  "stream_audio.auth_username": "用户名：",
+  "stream_audio.auth_password": "密码：",
+  "stream_audio.save_credentials": "保存此网站的登录凭据",
+  "stream_audio.saved_credentials_failed": "已保存的登录凭据无效，请重新输入："
 }

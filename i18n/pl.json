@@ -1240,5 +1240,9 @@
   "stream_audio.drm_not_supported": "To źródło strumieniowe używa ochrony DRM i nie jest obsługiwane.",
   "stream_audio.favorites_label": "Ulubione",
   "stream_audio.add_to_favorites": "Dodaj do ulubionych",
-  "stream_audio.subscribers_label": "Subskrybenci"
+  "stream_audio.subscribers_label": "Subskrybenci",
+  "stream_audio.auth_username": "Nazwa użytkownika:",
+  "stream_audio.auth_password": "Hasło:",
+  "stream_audio.save_credentials": "Zapisz dane logowania dla tej strony",
+  "stream_audio.saved_credentials_failed": "Zapisane dane logowania nie zadziałały. Wprowadź je ponownie:"
 }

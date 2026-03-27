@@ -1240,5 +1240,9 @@
   "stream_audio.drm_not_supported": "Ovaj izvor striminga koristi DRM zaštitu i nije podržan.",
   "stream_audio.favorites_label": "Omiljeni",
   "stream_audio.add_to_favorites": "Dodaj u omiljene",
-  "stream_audio.subscribers_label": "Pretplatnici"
+  "stream_audio.subscribers_label": "Pretplatnici",
+  "stream_audio.auth_username": "Korisničko ime:",
+  "stream_audio.auth_password": "Lozinka:",
+  "stream_audio.save_credentials": "Sačuvaj kredencijale za ovaj sajt",
+  "stream_audio.saved_credentials_failed": "Sačuvani podaci za prijavu ne rade. Unesite ih ponovo:"
 }

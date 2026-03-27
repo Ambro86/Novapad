@@ -1240,5 +1240,9 @@
   "stream_audio.drm_not_supported": "Nguồn phát trực tuyến này sử dụng bảo vệ DRM và không được hỗ trợ.",
   "stream_audio.favorites_label": "Yêu thích",
   "stream_audio.add_to_favorites": "Thêm vào yêu thích",
-  "stream_audio.subscribers_label": "Người đăng ký"
+  "stream_audio.subscribers_label": "Người đăng ký",
+  "stream_audio.auth_username": "Tên người dùng:",
+  "stream_audio.auth_password": "Mật khẩu:",
+  "stream_audio.save_credentials": "Lưu thông tin đăng nhập cho trang web này",
+  "stream_audio.saved_credentials_failed": "Thông tin đăng nhập đã lưu không hoạt động. Vui lòng nhập lại:"
 }

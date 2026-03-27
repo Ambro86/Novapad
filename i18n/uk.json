@@ -1240,5 +1240,9 @@
   "stream_audio.drm_not_supported": "Це джерело потокового відтворення використовує захист DRM і не підтримується.",
   "stream_audio.favorites_label": "Улюблені",
   "stream_audio.add_to_favorites": "Додати до улюблених",
-  "stream_audio.subscribers_label": "Підписники"
+  "stream_audio.subscribers_label": "Підписники",
+  "stream_audio.auth_username": "Ім’я користувача:",
+  "stream_audio.auth_password": "Пароль:",
+  "stream_audio.save_credentials": "Зберегти облікові дані для цього сайту",
+  "stream_audio.saved_credentials_failed": "Збережені облікові дані не спрацювали. Введіть їх ще раз:"
 }

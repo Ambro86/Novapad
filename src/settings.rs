@@ -2,6 +2,7 @@ use crate::accessibility::to_wide;
 use crate::tools::rss::{RssItem, RssSource};
 use chrono::Local;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 #[cfg(not(feature = "standalone"))]
 use std::ffi::OsStr;
 use std::io::Write;
@@ -56,6 +57,12 @@ pub struct StreamFavorite {
     pub label: String,
     #[serde(default)]
     pub url: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct SavedYtdlpSiteCredentials {
+    username: String,
+    password: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -719,6 +726,8 @@ pub struct AppSettings {
     pub bdciechi_password: String,
     #[serde(default)]
     pub bdciechi_last_successful_login_unix: i64,
+    #[serde(default)]
+    pub ytdlp_site_credentials: HashMap<String, String>,
     pub prompt_auto_scroll: bool,
     pub prompt_strip_ansi: bool,
     pub prompt_beep_on_idle: bool,
@@ -1044,6 +1053,7 @@ impl Default for AppSettings {
             bdciechi_username: String::new(),
             bdciechi_password: String::new(),
             bdciechi_last_successful_login_unix: 0,
+            ytdlp_site_credentials: HashMap::new(),
             prompt_auto_scroll: true,
             prompt_strip_ansi: true,
             prompt_beep_on_idle: true,
@@ -1695,6 +1705,27 @@ pub fn load_settings() -> AppSettings {
                             }
                         }
                     }
+                    if !settings.ytdlp_site_credentials.is_empty() {
+                        let mut decrypted_credentials = HashMap::new();
+                        for (site, value) in std::mem::take(&mut settings.ytdlp_site_credentials) {
+                            match decrypt_ytdlp_site_credentials_entry(&value) {
+                                Some(credentials) => {
+                                    if let Some(serialized) =
+                                        serialize_ytdlp_site_credentials(&credentials)
+                                    {
+                                        decrypted_credentials.insert(site, serialized);
+                                    }
+                                }
+                                None => {
+                                    crate::log_debug(&format!(
+                                        "Failed to decrypt stored yt-dlp credentials for site {}; clearing saved credentials",
+                                        site
+                                    ));
+                                }
+                            }
+                        }
+                        settings.ytdlp_site_credentials = decrypted_credentials;
+                    }
                     if !settings.rai_luce_code.trim().is_empty() {
                         match decrypt_rai_luce_code(&settings.rai_luce_code) {
                             Some(code) => {
@@ -1798,6 +1829,21 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.network_proxy_password = settings.network_proxy_password.trim().to_string();
     settings.bdciechi_username = settings.bdciechi_username.trim().to_string();
     settings.bdciechi_password = settings.bdciechi_password.trim().to_string();
+    settings.ytdlp_site_credentials = settings
+        .ytdlp_site_credentials
+        .into_iter()
+        .filter_map(|(site, value)| {
+            let site = normalize_ytdlp_site_key(&site)?;
+            let mut credentials = deserialize_ytdlp_site_credentials(&value)?;
+            credentials.username = credentials.username.trim().to_string();
+            credentials.password = credentials.password.trim().to_string();
+            if credentials.username.is_empty() || credentials.password.is_empty() {
+                return None;
+            }
+            let serialized = serialize_ytdlp_site_credentials(&credentials)?;
+            Some((site, serialized))
+        })
+        .collect();
     settings.rai_luce_code = settings.rai_luce_code.trim().to_string();
     normalize_shortcut_settings(&mut settings.shortcuts);
     settings.podcast_directory_country = settings
@@ -2130,6 +2176,81 @@ pub fn decrypt_bdciechi_password(password: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
+fn serialize_ytdlp_site_credentials(credentials: &SavedYtdlpSiteCredentials) -> Option<String> {
+    serde_json::to_string(credentials).ok()
+}
+
+fn deserialize_ytdlp_site_credentials(value: &str) -> Option<SavedYtdlpSiteCredentials> {
+    serde_json::from_str(value).ok()
+}
+
+fn encrypt_ytdlp_site_credentials_entry(credentials: &SavedYtdlpSiteCredentials) -> String {
+    let Some(serialized) = serialize_ytdlp_site_credentials(credentials) else {
+        return String::new();
+    };
+    dpapi_protect(serialized.as_bytes())
+        .map(hex::encode)
+        .unwrap_or_default()
+}
+
+fn decrypt_ytdlp_site_credentials_entry(value: &str) -> Option<SavedYtdlpSiteCredentials> {
+    if value.trim().is_empty() {
+        return None;
+    }
+    let serialized = match hex::decode(value) {
+        Ok(decoded) => {
+            let bytes = dpapi_unprotect(&decoded)?;
+            String::from_utf8(bytes).ok()?
+        }
+        Err(_) => value.to_string(),
+    };
+    deserialize_ytdlp_site_credentials(&serialized)
+}
+
+pub fn normalize_ytdlp_site_key(site: &str) -> Option<String> {
+    let site = site.trim().to_ascii_lowercase();
+    if site.is_empty() { None } else { Some(site) }
+}
+
+pub fn get_ytdlp_site_credentials(settings: &AppSettings, site: &str) -> Option<(String, String)> {
+    let site = normalize_ytdlp_site_key(site)?;
+    let value = settings.ytdlp_site_credentials.get(&site)?;
+    let credentials = deserialize_ytdlp_site_credentials(value)?;
+    Some((credentials.username, credentials.password))
+}
+
+pub fn set_ytdlp_site_credentials(
+    settings: &mut AppSettings,
+    site: &str,
+    username: &str,
+    password: &str,
+) -> bool {
+    let Some(site) = normalize_ytdlp_site_key(site) else {
+        return false;
+    };
+    let username = username.trim();
+    let password = password.trim();
+    if username.is_empty() || password.is_empty() {
+        return false;
+    }
+    let credentials = SavedYtdlpSiteCredentials {
+        username: username.to_string(),
+        password: password.to_string(),
+    };
+    let Some(serialized) = serialize_ytdlp_site_credentials(&credentials) else {
+        return false;
+    };
+    settings.ytdlp_site_credentials.insert(site, serialized);
+    true
+}
+
+pub fn clear_ytdlp_site_credentials(settings: &mut AppSettings, site: &str) -> bool {
+    let Some(site) = normalize_ytdlp_site_key(site) else {
+        return false;
+    };
+    settings.ytdlp_site_credentials.remove(&site).is_some()
+}
+
 pub fn encrypt_rai_luce_code(code: &str) -> String {
     if code.trim().is_empty() {
         return String::new();
@@ -2304,6 +2425,29 @@ pub fn save_settings(settings: AppSettings) {
         persisted.bdciechi_password.clear();
         persisted.bdciechi_last_successful_login_unix = 0;
     }
+    persisted.ytdlp_site_credentials = persisted
+        .ytdlp_site_credentials
+        .into_iter()
+        .filter_map(|(site, value)| {
+            let site = normalize_ytdlp_site_key(&site)?;
+            let mut credentials = deserialize_ytdlp_site_credentials(&value)?;
+            credentials.username = credentials.username.trim().to_string();
+            credentials.password = credentials.password.trim().to_string();
+            if credentials.username.is_empty() || credentials.password.is_empty() {
+                return None;
+            }
+            let encrypted = encrypt_ytdlp_site_credentials_entry(&credentials);
+            if encrypted.is_empty() {
+                crate::log_debug(&format!(
+                    "Failed to encrypt yt-dlp credentials for site {}; clearing saved credentials",
+                    site
+                ));
+                None
+            } else {
+                Some((site, encrypted))
+            }
+        })
+        .collect();
     persisted.rai_luce_code = encrypt_rai_luce_code(&persisted.rai_luce_code);
     if !persisted.rai_luce_code.trim().is_empty() {
         persist_rai_luce_backup_from_encrypted(&persisted.rai_luce_code);

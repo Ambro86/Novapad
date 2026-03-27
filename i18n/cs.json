@@ -1240,5 +1240,9 @@
   "stream_audio.drm_not_supported": "Tento streamovací zdroj používá ochranu DRM a není podporován.",
   "stream_audio.favorites_label": "Oblíbené",
   "stream_audio.add_to_favorites": "Přidat do oblíbených",
-  "stream_audio.subscribers_label": "Odběratelé"
+  "stream_audio.subscribers_label": "Odběratelé",
+  "stream_audio.auth_username": "Uživatelské jméno:",
+  "stream_audio.auth_password": "Heslo:",
+  "stream_audio.save_credentials": "Uložit přihlašovací údaje pro tento web",
+  "stream_audio.saved_credentials_failed": "Uložené přihlašovací údaje nefungují. Zadejte je prosím znovu:"
 }

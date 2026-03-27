@@ -1,4 +1,4 @@
-use crate::accessibility::{handle_accessibility, to_wide};
+use crate::accessibility::{handle_accessibility, screen_reader_speak, to_wide};
 use crate::app_windows::interpreter_select_window;
 use crate::app_windows::podcasts_window;
 use crate::editor_manager::{
@@ -10,8 +10,8 @@ use crate::settings::{
     ListTimeDisplayMode, ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode,
     RssDeleteConfirmMode, RssPodcastUnreadLabelPosition, ShortcutBinding, ShortcutSettings,
     SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo, VoiceProfile,
-    format_shortcut, save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
-    voice_profile_from_settings_fields,
+    confirm_title, format_shortcut, save_settings_with_default_copy, sync_context_menu,
+    sync_start_menu_shortcuts, voice_profile_from_settings_fields,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
 use reqwest::blocking::Client;
@@ -45,15 +45,15 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
     DefWindowProcW, ES_AUTOHSCROLL, ES_PASSWORD, ES_READONLY, GWLP_USERDATA, GetClassNameW,
     GetClientRect, GetParent, GetScrollInfo, GetWindowLongPtrW, GetWindowTextLengthW,
-    GetWindowTextW, HMENU, IDC_ARROW, LoadCursorW, MB_ICONWARNING, MB_OK, MSG, MessageBoxW,
-    MoveWindow, PostMessageW, RegisterClassW, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN,
-    SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS,
-    SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW, SW_SHOWNORMAL, SWP_NOACTIVATE, SWP_NOMOVE,
-    SWP_NOSIZE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW,
-    ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_SETFONT, WM_VSCROLL, WNDCLASSW,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
-    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    GetWindowTextW, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONQUESTION, MB_ICONWARNING, MB_OK,
+    MB_YESNO, MSG, MessageBoxW, MoveWindow, PostMessageW, RegisterClassW, SB_BOTTOM, SB_LINEDOWN,
+    SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT,
+    SCROLLINFO, SIF_PAGE, SIF_POS, SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW, SW_SHOWNORMAL,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowPos, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
+    WM_SETFONT, WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -1959,23 +1959,35 @@ fn rename_selected_voice_profile(hwnd: HWND) {
 }
 
 fn add_voice_profile(hwnd: HWND) {
-    let updated = with_options_state(hwnd, |state| {
+    let added_profile_name = with_options_state(hwnd, |state| {
         let profile = VoiceProfile {
             name: next_voice_profile_name(&state.voice_profiles),
             ..Default::default()
         };
+        state.active_voice_profile_name = profile.name.clone();
         state.voice_profiles.push(profile);
+        state.active_voice_profile_name.clone()
     });
-    if updated.is_none() {
+    let Some(added_profile_name) = added_profile_name else {
         crate::log_debug("Failed to access options state when adding profile");
         return;
-    }
+    };
     refresh_voice_profile_combo(hwnd);
     update_voice_profile_delete_button_visibility(hwnd);
+    if let Some(combo_voice_profile) = with_options_state(hwnd, |state| state.combo_voice_profile) {
+        crate::set_focus_safe(combo_voice_profile);
+    }
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let message = i18n::tr_f(
+        language,
+        "options.voice_profile_added",
+        &[("name", &added_profile_name)],
+    );
+    screen_reader_speak(&message);
 }
 
 fn delete_selected_voice_profile(hwnd: HWND) {
-    let updated = with_options_state(hwnd, |state| {
+    let Some((selected_name, language)) = with_options_state(hwnd, |state| {
         let sel = unsafe {
             SendMessageW(
                 state.combo_voice_profile,
@@ -1986,27 +1998,73 @@ fn delete_selected_voice_profile(hwnd: HWND) {
             .0
         };
         if sel < 0 {
-            return;
+            return None;
         }
         let idx = sel as usize;
         if idx >= state.voice_profiles.len() {
-            return;
+            return None;
         }
         if state.voice_profiles[idx]
             .name
             .eq_ignore_ascii_case(DEFAULT_VOICE_PROFILE_NAME)
         {
-            return;
+            return None;
         }
-        state.voice_profiles.remove(idx);
-        state.active_voice_profile_name = DEFAULT_VOICE_PROFILE_NAME.to_string();
-    });
-    if updated.is_none() {
+        Some(state.voice_profiles[idx].name.clone())
+    })
+    .flatten()
+    .map(|selected_name| {
+        (
+            selected_name,
+            with_state(hwnd, |state| state.settings.language).unwrap_or_default(),
+        )
+    }) else {
         crate::log_debug("Failed to access options state when deleting profile");
         return;
+    };
+    let title = to_wide(&confirm_title(language));
+    let message = to_wide(&i18n::tr_f(
+        language,
+        "options.voice_profile_remove_confirm",
+        &[("name", &selected_name)],
+    ));
+    let confirmed = unsafe {
+        MessageBoxW(
+            hwnd,
+            PCWSTR(message.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_YESNO | MB_ICONQUESTION,
+        )
+    };
+    if confirmed != IDYES {
+        return;
     }
+    let removed_profile_name = with_options_state(hwnd, |state| {
+        let idx = state
+            .voice_profiles
+            .iter()
+            .position(|profile| profile.name.eq_ignore_ascii_case(&selected_name))?;
+        let removed_name = state.voice_profiles[idx].name.clone();
+        state.voice_profiles.remove(idx);
+        state.active_voice_profile_name = DEFAULT_VOICE_PROFILE_NAME.to_string();
+        Some(removed_name)
+    })
+    .flatten();
+    let Some(removed_profile_name) = removed_profile_name else {
+        crate::log_debug("Failed to remove selected voice profile");
+        return;
+    };
     refresh_voice_profile_combo(hwnd);
     update_voice_profile_delete_button_visibility(hwnd);
+    if let Some(combo_voice_profile) = with_options_state(hwnd, |state| state.combo_voice_profile) {
+        crate::set_focus_safe(combo_voice_profile);
+    }
+    let message = i18n::tr_f(
+        language,
+        "options.voice_profile_removed",
+        &[("name", &removed_profile_name)],
+    );
+    screen_reader_speak(&message);
 }
 pub fn open(parent: HWND) {
     unsafe {

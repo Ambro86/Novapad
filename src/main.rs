@@ -1747,6 +1747,17 @@ fn download_podcast_episode_cache_with_resume(
                         err
                     )
                 })?;
+                if let Some(cache_dir) = cache_path.parent() {
+                    let cache_limit_bytes = crate::settings::load_settings().podcast_cache_limit_mb
+                        as u64
+                        * 1024
+                        * 1024;
+                    crate::app_windows::podcasts_window::enforce_podcast_cache_limit(
+                        cache_dir,
+                        cache_limit_bytes,
+                        Some(cache_path),
+                    );
+                }
                 return Ok(());
             }
             Err(err) => {

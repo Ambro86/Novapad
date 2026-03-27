@@ -29,6 +29,7 @@ Improvements
 • Added an explicit RSS entry “Load more news” at the end of feeds when more items are available; pressing Enter loads the next batch and moves focus to the first newly loaded article.
 • In the voice dictionary, when adding or editing a replacement, there is now a “Match Case” checkbox so each substitution can either respect or ignore letter casing.
 Bug fixes
+• "Play streaming audio..." now respects the podcast cache limit already set in Options, and the same limit now also applies to audio descriptions playback.
 • Fixed Wikipedia import so quote blocks present in pages are now imported correctly.
 • Improved the web page parser for WordPress pages where list items and some section headings could be omitted.
 • "Go to line" now pre-fills the field with the current line.

@@ -29,6 +29,7 @@ Ulepszenia
 • Dodano w RSS wyraźną pozycję „Załaduj więcej wiadomości” na końcu źródła, gdy dostępne są kolejne elementy; naciśnięcie Enter wczytuje następny blok i przenosi fokus na pierwszy nowy artykuł.
 • W słowniku głosowym podczas dodawania lub edycji podmiany dostępne jest teraz pole „Uwzględniaj wielkość liter”, które pozwala zdecydować, czy dana podmiana ma rozróżniać wielkie i małe litery.
 Poprawki
+• Funkcja „Odtwórz dźwięk ze streamingu...” uwzględnia teraz limit pamięci podręcznej podcastów ustawiony już w Opcjach, a ten sam limit obowiązuje także przy odtwarzaniu audiodeskrypcji.
 • Poprawiono import z Wikipedii, który na niektórych stronach nie importował poprawnie cytatów obecnych w tekście.
 • Ulepszono parser stron internetowych: na niektórych stronach WordPress nie były uwzględniane elementy list oraz niektóre nagłówki sekcji.
 • Teraz przy użyciu „Przejdź do wiersza” pole jest wstępnie wypełniane bieżącym numerem wiersza.

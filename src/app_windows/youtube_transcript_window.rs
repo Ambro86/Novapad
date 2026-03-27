@@ -5338,6 +5338,16 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             final_path.clone()
         };
 
+        let cache_limit_bytes = with_state(parent, |state| {
+            state.settings.podcast_cache_limit_mb as u64 * 1024 * 1024
+        })
+        .unwrap_or(500 * 1024 * 1024);
+        crate::app_windows::podcasts_window::enforce_podcast_cache_limit(
+            &cache_dir,
+            cache_limit_bytes,
+            Some(&playback_path),
+        );
+
         crate::queue_audio_files_and_play(parent, vec![playback_path.clone()]);
         crate::editor_manager::mark_current_document_from_rss(parent, true);
         let episode_title = stream_title.or_else(|| {

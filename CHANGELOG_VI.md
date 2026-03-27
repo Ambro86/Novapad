@@ -29,6 +29,7 @@ Cải tiến
 • Đã thêm trong RSS một mục rõ ràng “Tải thêm tin tức” ở cuối nguồn khi còn bài khác; nhấn Enter sẽ tải khối tiếp theo và đưa focus tới bài viết mới đầu tiên.
 • Trong từ điển giọng nói, khi thêm hoặc sửa một mục thay thế, giờ có thêm ô «Phân biệt chữ hoa/thường» để quyết định mỗi phép thay thế có phân biệt hay bỏ qua chữ hoa chữ thường.
 Sửa lỗi
+• "Phat am thanh tu streaming..." giờ tôn trọng giới hạn bộ nhớ đệm podcast đã đặt trong Tùy chọn, và giới hạn này cũng được áp dụng cho việc phát audio description.
 • Đã sửa chức năng nhập từ Wikipedia: trên một số trang, các đoạn trích dẫn trong bài không được nhập đúng.
 • Đã cải thiện bộ phân tích trang web: trên một số trang WordPress, các mục danh sách và một số tiêu đề phần không được đưa vào.
 • Khi dùng “Đi đến dòng”, ô nhập giờ sẽ được điền sẵn bằng dòng hiện tại.

@@ -2605,7 +2605,11 @@ fn system_time_secs(time: SystemTime) -> u64 {
         .as_secs()
 }
 
-fn enforce_podcast_cache_limit(cache_dir: &Path, limit_bytes: u64, protected: Option<&Path>) {
+pub(crate) fn enforce_podcast_cache_limit(
+    cache_dir: &Path,
+    limit_bytes: u64,
+    protected: Option<&Path>,
+) {
     if limit_bytes == 0 {
         return;
     }

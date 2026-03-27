@@ -29,6 +29,7 @@ Mejoras
 • Añadida en RSS una entrada explícita «Cargar más noticias» al final de las fuentes cuando hay más elementos disponibles; al pulsar Intro se carga el siguiente bloque y el foco se mueve al primer artículo nuevo.
 • En el diccionario de voz, al añadir o editar una sustitución, ahora hay una casilla «Distinguir mayúsculas y minúsculas» para decidir si cada sustitución debe respetar o ignorar el uso de mayúsculas.
 Correcciones
+• "Reproducir audio en streaming..." ahora respeta el límite de caché de podcasts ya configurado en Opciones, y ese mismo límite también se aplica a la reproducción de audiodescripciones.
 • Corregida la importación desde Wikipedia, que en algunas páginas no importaba correctamente las citas presentes en el texto.
 • Mejorado el parser de páginas web: en algunas páginas WordPress no se incluían los elementos de listas ni algunos títulos de sección.
 • Ahora, al usar «Ir a la línea», el campo se rellena automáticamente con la línea actual.

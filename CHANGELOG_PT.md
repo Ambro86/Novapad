@@ -29,6 +29,7 @@ Melhorias
 • Adicionada no RSS uma entrada explícita «Carregar mais notícias» no fim das fontes quando existem mais itens disponíveis; ao premir Enter é carregado o bloco seguinte e o foco passa para o primeiro artigo novo.
 • No dicionário de voz, ao adicionar ou editar uma substituição, existe agora uma caixa «Distinguir maiúsculas e minúsculas» para decidir se cada substituição deve respeitar ou ignorar a capitalização.
 Correções
+• "Reproduzir áudio por streaming..." passa agora a respeitar o limite de cache de podcasts já definido nas Opções, e esse mesmo limite também se aplica à reprodução de audiodescrições.
 • Corrigida a importação a partir da Wikipédia, que em algumas páginas não importava corretamente as citações presentes no texto.
 • Melhorado o parser de páginas web: em algumas páginas WordPress não eram incluídos os itens de listas nem alguns títulos de secção.
 • Agora, ao usar «Ir para a linha», o campo é pré-preenchido com a linha atual.

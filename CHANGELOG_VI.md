@@ -14,6 +14,7 @@ Cải tiến
 • "Phat am thanh tu streaming..." gio cung cho phep tim kiem tren YouTube bang bat ky chuoi van ban nao, hoac dan lien ket cua mot kenh hoac playlist YouTube de hien thi cac ket qua cua no.
 • Đã cải thiện cách hiển thị kết quả trong "Phat am thanh tu streaming...": các mục YouTube giờ bao gồm tiêu đề, thời lượng, kênh và lượt xem theo định dạng rõ ràng hơn.
 • Đã thêm mục yêu thích YouTube cho kênh và danh sách phát trong "Phat am thanh tu streaming...": có thể thêm từ kết quả bằng menu ngữ cảnh, mở trực tiếp từ danh sách Yêu thích truy cập bằng Tab ngay sau trường URL/truy vấn YouTube và xóa sau đó cũng từ chính danh sách đó bằng menu ngữ cảnh. Trong kết quả tìm kiếm YouTube, menu ngữ cảnh chỉ khả dụng cho kênh và danh sách phát.
+• "Phat am thanh tu streaming..." giờ có thể yêu cầu thông tin đăng nhập khi một trang cần đăng nhập. Người dùng có thể nhập, lưu cho trang đó và quản lý các thông tin đã lưu sau này trong Tùy chọn > Âm thanh.
 • Đã cải thiện focus khi dùng "Phat am thanh tu streaming...", để cửa sổ tiến trình ổn định hơn trong lúc tải xuống và chuyển đổi.
 • Đã thêm hai thao tác đọc mới trong menu Giọng nói: `Câu trước` và `Câu tiếp theo`, với phím tắt có thể cấu hình để nhảy trong khi đọc văn bản.
 • Phím tắt mặc định của `Chạy tệp bằng trình thông dịch` giờ là `Ctrl+Shift+F5`, để `Shift+F5` có thể được dùng mặc định cho `Câu trước`.
@@ -32,6 +33,7 @@ Sửa lỗi
 • Đã cải thiện bộ phân tích trang web: trên một số trang WordPress, các mục danh sách và một số tiêu đề phần không được đưa vào.
 • Khi dùng “Đi đến dòng”, ô nhập giờ sẽ được điền sẵn bằng dòng hiện tại.
 • Đã sửa xuất OPML cho podcast và RSS, vì vậy các tệp xuất ra giờ đã được iTunes chấp nhận.
+• Đã sửa phần chép lời tệp phương tiện: giờ khi đóng tài liệu được tạo bằng Alt+F4, Sonarpad sẽ hỏi có muốn lưu hay không và đề xuất đúng tên tệp dựa trên tên tệp đã được chép lời thay vì dòng đầu tiên của văn bản.
 • Đã thêm thông báo xác nhận được bản địa hóa cho việc nhập và xuất OPML podcast và nguồn RSS đúng cách.
 • Đã sửa lỗi trong "Phat am thanh tu streaming..." khiến chương trình có thể trông như bị treo khi nhập chuỗi tìm kiếm và chọn một kênh YouTube từ kết quả, thay vì mở danh sách video của kênh đó.
 • Đã sửa lỗi khiến danh sách tệp đang mở hiển thị trong menu Trợ giúp thay vì menu Cửa sổ.

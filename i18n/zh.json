@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "订阅者",
   "stream_audio.auth_username": "用户名：",
   "stream_audio.auth_password": "密码：",
-  "stream_audio.save_credentials": "保存此网站的登录凭据",
-  "stream_audio.saved_credentials_failed": "已保存的登录凭据无效，请重新输入："
+  "stream_audio.save_credentials": "保存此网站的登录凭据（在 选项 > 音频 中管理）",
+  "stream_audio.saved_credentials_failed": "已保存的登录凭据无效，请重新输入：",
+  "options.manage_site_credentials": "管理网站凭据",
+  "site_credentials.title": "已保存的网站凭据",
+  "site_credentials.sites_label": "已保存的网站：",
+  "site_credentials.remove": "移除",
+  "site_credentials.remove_all": "全部移除",
+  "site_credentials.close": "关闭",
+  "site_credentials.empty": "没有已保存的网站凭据。",
+  "site_credentials.remove_confirm": "是否移除 {site} 的已保存凭据？",
+  "site_credentials.remove_all_confirm": "是否移除所有已保存的凭据？",
+  "site_credentials.removed": "已移除已保存的凭据。",
+  "site_credentials.removed_all": "已移除所有已保存的凭据。"
 }

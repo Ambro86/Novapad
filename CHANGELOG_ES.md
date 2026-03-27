@@ -14,6 +14,7 @@ Mejoras
 • "Reproducir audio en streaming..." ahora también permite buscar en YouTube escribiendo cualquier texto o pegar el enlace de un canal o una lista de reproducción de YouTube para mostrar sus resultados.
 • Se mejoró la visualización de los resultados en "Reproducir audio en streaming...": las entradas de YouTube ahora incluyen título, duración, canal y visualizaciones en un formato más claro.
 • Se añadieron favoritos de YouTube para canales y listas de reproducción en "Reproducir audio en streaming...": pueden añadirse desde los resultados mediante el menú contextual, abrirse directamente desde la lista Favoritos accesible con Tab justo después del campo URL/consulta de YouTube y eliminarse más tarde desde esa misma lista también con el menú contextual. En los resultados de búsqueda de YouTube, el menú contextual solo está disponible para canales y listas de reproducción.
+• "Reproducir audio en streaming..." ahora puede pedir credenciales cuando un sitio requiere iniciar sesión. El usuario puede introducirlas, guardarlas para ese sitio y gestionar después las credenciales guardadas en Opciones > Audio.
 • Mejorado el enfoque durante "Reproducir audio en streaming...", para que la ventana de progreso se mantenga más estable durante la descarga y la conversión.
 • Añadidas dos nuevas acciones de lectura en el menú Voz: `Frase anterior` y `Siguiente frase`, con atajos configurables para saltar durante la lectura del texto.
 • El atajo predeterminado de `Ejecutar archivo con intérprete` ahora es `Ctrl+Shift+F5`, para que `Shift+F5` pueda usarse por defecto para `Frase anterior`.
@@ -32,6 +33,7 @@ Correcciones
 • Mejorado el parser de páginas web: en algunas páginas WordPress no se incluían los elementos de listas ni algunos títulos de sección.
 • Ahora, al usar «Ir a la línea», el campo se rellena automáticamente con la línea actual.
 • Corregida la exportación OPML de podcasts y RSS, que ahora genera archivos aceptados por iTunes.
+• Corregida la transcripción de archivos multimedia: ahora, al cerrar con Alt+F4 el documento generado, Sonarpad pregunta si se quiere guardar el archivo y propone el nombre correcto basándose en el nombre del archivo transcrito, en lugar de la primera línea del texto.
 • Añadidos mensajes de confirmación localizados para la correcta importación y exportación OPML de fuentes RSS y podcasts.
 • Corregido un problema por el que, en "Reproducir audio en streaming...", al escribir un texto de búsqueda y seleccionar un canal de YouTube en los resultados, el programa podía parecer bloqueado en lugar de abrir los vídeos del canal.
 • Corregido un error por el que la lista de archivos abiertos se mostraba en el menú Ayuda en lugar del menú Ventana.

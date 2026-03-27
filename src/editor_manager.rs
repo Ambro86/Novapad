@@ -1144,6 +1144,7 @@ pub struct Document {
     pub current_save_text_encoding: Option<TextEncoding>,
     pub from_rss: bool,
     pub is_temporary: bool,
+    pub prefer_title_for_save_suggestion: bool,
 }
 
 #[derive(Clone)]
@@ -1167,6 +1168,7 @@ impl Default for Document {
             current_save_text_encoding: None,
             from_rss: false,
             is_temporary: false,
+            prefer_title_for_save_suggestion: false,
         }
     }
 }
@@ -3048,6 +3050,7 @@ pub fn new_document(hwnd: HWND) {
                 current_save_text_encoding: None,
                 from_rss: false,
                 is_temporary: false,
+                prefer_title_for_save_suggestion: false,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -3088,6 +3091,7 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
                 current_save_text_encoding: None,
                 from_rss: false,
                 is_temporary: false,
+                prefer_title_for_save_suggestion: false,
             };
             SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
             ShowWindow(hwnd_edit, SW_HIDE);
@@ -3423,6 +3427,7 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
                 current_save_text_encoding: None,
                 from_rss: true,
                 is_temporary: true,
+                prefer_title_for_save_suggestion: false,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
@@ -4039,6 +4044,8 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
             }
             let language = state.settings.language;
             let text = get_edit_text(state.docs[index].hwnd_edit);
+            let prefer_title_for_save_suggestion =
+                state.docs[index].prefer_title_for_save_suggestion;
             let is_lossy_doc = matches!(
                 state.docs[index].format,
                 FileFormat::Docx
@@ -4065,7 +4072,11 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                     }
                 })
                 .or_else(|| {
-                    crate::suggested_filename_from_text(&text).filter(|name| !name.is_empty())
+                    if prefer_title_for_save_suggestion {
+                        None
+                    } else {
+                        crate::suggested_filename_from_text(&text).filter(|name| !name.is_empty())
+                    }
                 })
                 .unwrap_or_else(|| state.docs[index].title.clone());
             if is_lossy_doc {

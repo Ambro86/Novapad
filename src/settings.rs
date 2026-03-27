@@ -2251,6 +2251,25 @@ pub fn clear_ytdlp_site_credentials(settings: &mut AppSettings, site: &str) -> b
     settings.ytdlp_site_credentials.remove(&site).is_some()
 }
 
+pub fn list_ytdlp_site_credentials(settings: &AppSettings) -> Vec<String> {
+    let mut sites = settings
+        .ytdlp_site_credentials
+        .keys()
+        .filter_map(|site| normalize_ytdlp_site_key(site))
+        .collect::<Vec<_>>();
+    sites.sort_unstable();
+    sites.dedup();
+    sites
+}
+
+pub fn clear_all_ytdlp_site_credentials(settings: &mut AppSettings) -> bool {
+    if settings.ytdlp_site_credentials.is_empty() {
+        return false;
+    }
+    settings.ytdlp_site_credentials.clear();
+    true
+}
+
 pub fn encrypt_rai_luce_code(code: &str) -> String {
     if code.trim().is_empty() {
         return String::new();

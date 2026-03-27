@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Prenumeratoriai",
   "stream_audio.auth_username": "Naudotojo vardas:",
   "stream_audio.auth_password": "Slaptažodis:",
-  "stream_audio.save_credentials": "Išsaugoti šios svetainės prisijungimo duomenis",
-  "stream_audio.saved_credentials_failed": "Išsaugoti prisijungimo duomenys neveikia. Įveskite juos dar kartą:"
+  "stream_audio.save_credentials": "Išsaugoti šios svetainės prisijungimo duomenis (tvarkyti skiltyje Parinktys > Garsas)",
+  "stream_audio.saved_credentials_failed": "Išsaugoti prisijungimo duomenys neveikia. Įveskite juos dar kartą:",
+  "options.manage_site_credentials": "Tvarkyti svetainių prisijungimo duomenis",
+  "site_credentials.title": "Išsaugoti svetainių prisijungimo duomenys",
+  "site_credentials.sites_label": "Išsaugotos svetainės:",
+  "site_credentials.remove": "Pašalinti",
+  "site_credentials.remove_all": "Pašalinti viską",
+  "site_credentials.close": "Uždaryti",
+  "site_credentials.empty": "Nėra išsaugotų prisijungimo duomenų.",
+  "site_credentials.remove_confirm": "Pašalinti išsaugotus prisijungimo duomenis svetainei {site}?",
+  "site_credentials.remove_all_confirm": "Pašalinti visus išsaugotus prisijungimo duomenis?",
+  "site_credentials.removed": "Išsaugoti prisijungimo duomenys pašalinti.",
+  "site_credentials.removed_all": "Visi išsaugoti prisijungimo duomenys pašalinti."
 }

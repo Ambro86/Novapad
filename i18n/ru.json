@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Подписчики",
   "stream_audio.auth_username": "Имя пользователя:",
   "stream_audio.auth_password": "Пароль:",
-  "stream_audio.save_credentials": "Сохранить учетные данные для этого сайта",
-  "stream_audio.saved_credentials_failed": "Сохранённые учетные данные не сработали. Введите их снова:"
+  "stream_audio.save_credentials": "Сохранить учетные данные для этого сайта (управление в Параметры > Аудио)",
+  "stream_audio.saved_credentials_failed": "Сохранённые учетные данные не сработали. Введите их снова:",
+  "options.manage_site_credentials": "Управление учетными данными сайтов",
+  "site_credentials.title": "Сохранённые учетные данные сайтов",
+  "site_credentials.sites_label": "Сохранённые сайты:",
+  "site_credentials.remove": "Удалить",
+  "site_credentials.remove_all": "Удалить все",
+  "site_credentials.close": "Закрыть",
+  "site_credentials.empty": "Нет сохранённых учетных данных.",
+  "site_credentials.remove_confirm": "Удалить сохранённые учетные данные для {site}?",
+  "site_credentials.remove_all_confirm": "Удалить все сохранённые учетные данные?",
+  "site_credentials.removed": "Сохранённые учетные данные удалены.",
+  "site_credentials.removed_all": "Все сохранённые учетные данные удалены."
 }

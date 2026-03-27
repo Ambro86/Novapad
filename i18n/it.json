@@ -1295,6 +1295,17 @@
   "stream_audio.subscribers_label": "Iscritti",
   "stream_audio.auth_username": "Nome utente:",
   "stream_audio.auth_password": "Password:",
-  "stream_audio.save_credentials": "Salva le credenziali per questo sito",
-  "stream_audio.saved_credentials_failed": "Le credenziali salvate non hanno funzionato. Inserisci di nuovo le credenziali per questo sito:"
+  "stream_audio.save_credentials": "Salva le credenziali per questo sito (gestiscile in Opzioni > Audio)",
+  "stream_audio.saved_credentials_failed": "Le credenziali salvate non hanno funzionato. Inserisci di nuovo le credenziali per questo sito:",
+  "options.manage_site_credentials": "Gestisci le credenziali dei siti",
+  "site_credentials.title": "Credenziali dei siti salvate",
+  "site_credentials.sites_label": "Siti salvati:",
+  "site_credentials.remove": "Rimuovi",
+  "site_credentials.remove_all": "Rimuovi tutto",
+  "site_credentials.close": "Chiudi",
+  "site_credentials.empty": "Nessuna credenziale salvata.",
+  "site_credentials.remove_confirm": "Rimuovere le credenziali salvate per {site}?",
+  "site_credentials.remove_all_confirm": "Rimuovere tutte le credenziali salvate?",
+  "site_credentials.removed": "Credenziali salvate rimosse.",
+  "site_credentials.removed_all": "Tutte le credenziali salvate sono state rimosse."
 }

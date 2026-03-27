@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Pretplatnici",
   "stream_audio.auth_username": "Korisničko ime:",
   "stream_audio.auth_password": "Lozinka:",
-  "stream_audio.save_credentials": "Sačuvaj kredencijale za ovaj sajt",
-  "stream_audio.saved_credentials_failed": "Sačuvani podaci za prijavu ne rade. Unesite ih ponovo:"
+  "stream_audio.save_credentials": "Sačuvaj kredencijale za ovaj sajt (upravljanje u Opcije > Audio)",
+  "stream_audio.saved_credentials_failed": "Sačuvani podaci za prijavu ne rade. Unesite ih ponovo:",
+  "options.manage_site_credentials": "Upravljaj podacima za prijavu na sajtove",
+  "site_credentials.title": "Sačuvani podaci za prijavu",
+  "site_credentials.sites_label": "Sačuvani sajtovi:",
+  "site_credentials.remove": "Ukloni",
+  "site_credentials.remove_all": "Ukloni sve",
+  "site_credentials.close": "Zatvori",
+  "site_credentials.empty": "Nema sačuvanih podataka za prijavu.",
+  "site_credentials.remove_confirm": "Ukloniti sačuvane podatke za prijavu za {site}?",
+  "site_credentials.remove_all_confirm": "Ukloniti sve sačuvane podatke za prijavu?",
+  "site_credentials.removed": "Sačuvani podaci za prijavu su uklonjeni.",
+  "site_credentials.removed_all": "Svi sačuvani podaci za prijavu su uklonjeni."
 }

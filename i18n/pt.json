@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Inscritos",
   "stream_audio.auth_username": "Nome de utilizador:",
   "stream_audio.auth_password": "Palavra-passe:",
-  "stream_audio.save_credentials": "Guardar credenciais para este site",
-  "stream_audio.saved_credentials_failed": "As credenciais guardadas não funcionaram. Introduza-as novamente:"
+  "stream_audio.save_credentials": "Guardar credenciais para este site (geri-las em Opções > Áudio)",
+  "stream_audio.saved_credentials_failed": "As credenciais guardadas não funcionaram. Introduza-as novamente:",
+  "options.manage_site_credentials": "Gerir credenciais dos sites",
+  "site_credentials.title": "Credenciais guardadas",
+  "site_credentials.sites_label": "Sites guardados:",
+  "site_credentials.remove": "Remover",
+  "site_credentials.remove_all": "Remover tudo",
+  "site_credentials.close": "Fechar",
+  "site_credentials.empty": "Nenhuma credencial guardada.",
+  "site_credentials.remove_confirm": "Remover as credenciais guardadas para {site}?",
+  "site_credentials.remove_all_confirm": "Remover todas as credenciais guardadas?",
+  "site_credentials.removed": "Credenciais guardadas removidas.",
+  "site_credentials.removed_all": "Todas as credenciais guardadas foram removidas."
 }

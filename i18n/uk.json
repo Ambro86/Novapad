@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Підписники",
   "stream_audio.auth_username": "Ім’я користувача:",
   "stream_audio.auth_password": "Пароль:",
-  "stream_audio.save_credentials": "Зберегти облікові дані для цього сайту",
-  "stream_audio.saved_credentials_failed": "Збережені облікові дані не спрацювали. Введіть їх ще раз:"
+  "stream_audio.save_credentials": "Зберегти облікові дані для цього сайту (керування в Параметри > Аудіо)",
+  "stream_audio.saved_credentials_failed": "Збережені облікові дані не спрацювали. Введіть їх ще раз:",
+  "options.manage_site_credentials": "Керування обліковими даними сайтів",
+  "site_credentials.title": "Збережені облікові дані сайтів",
+  "site_credentials.sites_label": "Збережені сайти:",
+  "site_credentials.remove": "Видалити",
+  "site_credentials.remove_all": "Видалити все",
+  "site_credentials.close": "Закрити",
+  "site_credentials.empty": "Немає збережених облікових даних.",
+  "site_credentials.remove_confirm": "Видалити збережені облікові дані для {site}?",
+  "site_credentials.remove_all_confirm": "Видалити всі збережені облікові дані?",
+  "site_credentials.removed": "Збережені облікові дані видалено.",
+  "site_credentials.removed_all": "Усі збережені облікові дані видалено."
 }

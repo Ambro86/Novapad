@@ -14,6 +14,7 @@ Improvements
 • "Play streaming audio..." can now also search YouTube from any text query, or accept a YouTube channel or playlist link and show its results.
 • Improved how results are shown in "Play streaming audio...": YouTube entries now include title, duration, channel, and view count in a clearer format.
 • Added YouTube favorites for channels and playlists in "Play streaming audio...": they can be added from the results with the context menu, opened directly from the Favorites list reached with Tab right after the YouTube URL/query field, and removed later from that same list using the context menu. In YouTube search results, the context menu is available only for channels and playlists.
+• "Play streaming audio..." can now request credentials when a streaming site requires login. Users can enter them, save them for the site, and manage saved credentials later in Options > Audio.
 • Improved focus handling during "Play streaming audio...", so the progress window stays more stable during download and conversion.
 • Added two new reading navigation actions in the Voice menu: `Previous sentence` and `Next sentence`, with configurable shortcuts to jump during text reading.
 • The default shortcut for `Execute file with interpreter` is now `Ctrl+Shift+F5`, so `Shift+F5` can be used by default for `Previous sentence`.
@@ -37,6 +38,7 @@ Bug fixes
 • Fixed a bug where the list of open files was shown in the Help menu instead of the Window menu.
 • Fixed a streaming edge case where playback could start but the “Downloading stream” dialog stayed open when the downloaded file already matched the target format.
 • Fixed MP3 streaming conversion behavior: when the stream is already MP3 and the user selects an explicit MP3 bitrate (for example 128 kbps), Sonarpad now re-encodes to the selected bitrate instead of skipping conversion.
+• Fixed media transcription documents so closing them now asks whether to save, and the suggested file name correctly reuses the transcribed media file name instead of the first line of the text.
 • Fixed the `Alt+Shift+L` shortcut: it now correctly opens the chapter list during playback.
 • Fixed the `Alt+Shift+T` shortcut: it now correctly starts “Transcribe current audio” instead of opening the Tools menu.
 • Fixed playback stop handling in the Play menu: pressing `.` now behaves like Stop and only stops the current track, instead of also exiting the player/episode.

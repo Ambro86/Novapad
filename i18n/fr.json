@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Abonnés",
   "stream_audio.auth_username": "Nom d'utilisateur :",
   "stream_audio.auth_password": "Mot de passe :",
-  "stream_audio.save_credentials": "Enregistrer les identifiants pour ce site",
-  "stream_audio.saved_credentials_failed": "Les identifiants enregistrés n'ont pas fonctionné. Veuillez les saisir à nouveau :"
+  "stream_audio.save_credentials": "Enregistrer les identifiants pour ce site (les gérer dans Options > Audio)",
+  "stream_audio.saved_credentials_failed": "Les identifiants enregistrés n'ont pas fonctionné. Veuillez les saisir à nouveau :",
+  "options.manage_site_credentials": "Gérer les identifiants des sites",
+  "site_credentials.title": "Identifiants enregistrés",
+  "site_credentials.sites_label": "Sites enregistrés :",
+  "site_credentials.remove": "Supprimer",
+  "site_credentials.remove_all": "Tout supprimer",
+  "site_credentials.close": "Fermer",
+  "site_credentials.empty": "Aucun identifiant enregistré.",
+  "site_credentials.remove_confirm": "Supprimer les identifiants enregistrés pour {site} ?",
+  "site_credentials.remove_all_confirm": "Supprimer tous les identifiants enregistrés ?",
+  "site_credentials.removed": "Identifiants enregistrés supprimés.",
+  "site_credentials.removed_all": "Tous les identifiants enregistrés ont été supprimés."
 }

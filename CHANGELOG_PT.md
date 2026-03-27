@@ -14,6 +14,7 @@ Melhorias
 • "Reproduzir áudio por streaming..." agora também permite pesquisar no YouTube escrevendo qualquer texto ou colar a ligação de um canal ou de uma playlist do YouTube para mostrar os respetivos resultados.
 • A apresentação dos resultados em "Reproduzir áudio por streaming..." foi melhorada: as entradas do YouTube agora incluem título, duração, canal e visualizações num formato mais claro.
 • Foram adicionados favoritos do YouTube para canais e playlists em "Reproduzir áudio por streaming...": podem ser adicionados a partir dos resultados através do menu contextual, abertos diretamente a partir da lista Favoritos acessível com Tab logo após o campo de URL/pesquisa do YouTube e removidos mais tarde dessa mesma lista também pelo menu contextual. Nos resultados de pesquisa do YouTube, o menu contextual está disponível apenas para canais e playlists.
+• "Reproduzir áudio por streaming..." agora pode pedir credenciais quando um site exige início de sessão. O utilizador pode inseri-las, guardá-las para esse site e gerir depois as credenciais guardadas em Opções > Áudio.
 • Melhorado o foco durante "Reproduzir áudio por streaming...", para que a janela de progresso permaneça mais estável durante a descarga e a conversão.
 • Adicionadas duas novas ações de leitura no menu Voz: `Frase anterior` e `Próxima frase`, com atalhos configuráveis para saltar durante a leitura do texto.
 • O atalho predefinido de `Executar ficheiro com interpretador` é agora `Ctrl+Shift+F5`, para que `Shift+F5` possa ser usado por predefinição para `Frase anterior`.
@@ -32,6 +33,7 @@ Correções
 • Melhorado o parser de páginas web: em algumas páginas WordPress não eram incluídos os itens de listas nem alguns títulos de secção.
 • Agora, ao usar «Ir para a linha», o campo é pré-preenchido com a linha atual.
 • Corrigida a exportação OPML de podcasts e feeds RSS, que agora gera ficheiros aceites pelo iTunes.
+• Corrigida a transcrição de ficheiros multimédia: agora, ao fechar com Alt+F4 o documento gerado, o Sonarpad pergunta se pretende guardar o ficheiro e propõe o nome correto com base no nome do ficheiro transcrito, em vez da primeira linha do texto.
 • Adicionadas mensagens de confirmação localizadas para a correta importação e exportação OPML de fontes RSS e podcasts.
 • Foi corrigido um problema em que, em "Reproduzir áudio por streaming...", ao digitar um texto de pesquisa e selecionar um canal do YouTube nos resultados, o programa podia parecer bloqueado em vez de abrir os vídeos desse canal.
 • Corrigido um erro em que a lista de ficheiros abertos era mostrada no menu Ajuda em vez do menu Janela.

@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Subskrybenci",
   "stream_audio.auth_username": "Nazwa użytkownika:",
   "stream_audio.auth_password": "Hasło:",
-  "stream_audio.save_credentials": "Zapisz dane logowania dla tej strony",
-  "stream_audio.saved_credentials_failed": "Zapisane dane logowania nie zadziałały. Wprowadź je ponownie:"
+  "stream_audio.save_credentials": "Zapisz dane logowania dla tej strony (zarządzaj nimi w Opcje > Audio)",
+  "stream_audio.saved_credentials_failed": "Zapisane dane logowania nie zadziałały. Wprowadź je ponownie:",
+  "options.manage_site_credentials": "Zarządzaj danymi logowania do stron",
+  "site_credentials.title": "Zapisane dane logowania",
+  "site_credentials.sites_label": "Zapisane strony:",
+  "site_credentials.remove": "Usuń",
+  "site_credentials.remove_all": "Usuń wszystko",
+  "site_credentials.close": "Zamknij",
+  "site_credentials.empty": "Brak zapisanych danych logowania.",
+  "site_credentials.remove_confirm": "Usunąć zapisane dane logowania dla {site}?",
+  "site_credentials.remove_all_confirm": "Usunąć wszystkie zapisane dane logowania?",
+  "site_credentials.removed": "Zapisane dane logowania usunięte.",
+  "site_credentials.removed_all": "Wszystkie zapisane dane logowania usunięte."
 }

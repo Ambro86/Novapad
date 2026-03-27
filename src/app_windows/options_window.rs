@@ -139,6 +139,7 @@ const OPTIONS_ID_RSS_TIME_DISPLAY: usize = 6084;
 const OPTIONS_ID_PODCAST_DATE_DISPLAY: usize = 6085;
 const OPTIONS_ID_PODCAST_TIME_DISPLAY: usize = 6086;
 const OPTIONS_ID_MANAGE_ASSOCIATIONS: usize = 6044;
+const OPTIONS_ID_MANAGE_SITE_CREDENTIALS: usize = 6131;
 const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_NETWORK_PROXY: usize = 6075;
 const OPTIONS_ID_NETWORK_PROXY_USERNAME: usize = 6076;
@@ -698,6 +699,7 @@ struct OptionsDialogState {
     checkbox_subtitle_ducking: HWND,
     label_subtitle_offset: HWND,
     edit_subtitle_offset: HWND,
+    button_manage_site_credentials: HWND,
     label_podcast_cache_limit: HWND,
     edit_podcast_cache_limit: HWND,
     checkbox_rss_show_article_preview: HWND,
@@ -917,6 +919,7 @@ struct OptionsLabels {
     label_rss_quick_copy_mode: String,
     label_file_associations: String,
     label_manage_associations: String,
+    label_manage_site_credentials: String,
     label_prompt_program: String,
     label_network_proxy: String,
     label_network_proxy_username: String,
@@ -1138,6 +1141,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_rss_quick_copy_mode: i18n::tr(language, "options.label.rss_quick_copy_mode"),
         label_file_associations: i18n::tr(language, "options.label.file_associations"),
         label_manage_associations: i18n::tr(language, "options.button.manage_associations"),
+        label_manage_site_credentials: i18n::tr(language, "options.manage_site_credentials"),
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
         label_network_proxy: i18n::tr(language, "options.label.network_proxy"),
         label_network_proxy_username: i18n::tr(language, "options.label.network_proxy_username"),
@@ -4064,6 +4068,22 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 30;
 
+                let button_manage_site_credentials = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_manage_site_credentials).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y - 2,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_MANAGE_SITE_CREDENTIALS as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 34;
+
                 let label_confirm_delete_rss_mode = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
@@ -5497,6 +5517,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_subtitle_ducking,
                     label_subtitle_offset,
                     edit_subtitle_offset,
+                    button_manage_site_credentials,
                     label_podcast_cache_limit,
                     edit_podcast_cache_limit,
                     checkbox_rss_show_article_preview,
@@ -5612,6 +5633,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     combo_rss_quick_copy_mode,
                     label_file_associations,
                     button_manage_associations,
+                    button_manage_site_credentials,
                     label_prompt_program,
                     combo_prompt_program,
                     label_network_proxy,
@@ -5693,6 +5715,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_subtitle_ducking,
                     label_subtitle_offset,
                     edit_subtitle_offset,
+                    button_manage_site_credentials,
                     label_podcast_cache_limit,
                     edit_podcast_cache_limit,
                     checkbox_rss_show_article_preview,
@@ -6072,6 +6095,16 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                             PCWSTR::null(),
                             SW_SHOWNORMAL,
                         );
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_MANAGE_SITE_CREDENTIALS => {
+                        if let Some(parent) = with_options_state(hwnd, |state| state.parent) {
+                            crate::app_windows::site_credentials_window::open(hwnd, parent);
+                        } else {
+                            crate::log_debug(
+                                "Failed to access state in options_window for site credentials",
+                            );
+                        }
                         LRESULT(0)
                     }
                     OPTIONS_ID_SHORTCUT_ACTION => {
@@ -12133,6 +12166,11 @@ fn layout_audio_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
         y,
         OPTIONS_EDIT_HEIGHT,
     );
+    y = layout_button(
+        "button_manage_site_credentials",
+        state.button_manage_site_credentials,
+        y,
+    );
     y + scroll_offset
 }
 
@@ -12699,6 +12737,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_subtitle_mode,
             state.label_subtitle_offset,
             state.edit_subtitle_offset,
+            state.button_manage_site_credentials,
         ] {
             crate::show_window_safe(control, if show_audio { SW_SHOW } else { SW_HIDE });
         }

@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Odběratelé",
   "stream_audio.auth_username": "Uživatelské jméno:",
   "stream_audio.auth_password": "Heslo:",
-  "stream_audio.save_credentials": "Uložit přihlašovací údaje pro tento web",
-  "stream_audio.saved_credentials_failed": "Uložené přihlašovací údaje nefungují. Zadejte je prosím znovu:"
+  "stream_audio.save_credentials": "Uložit přihlašovací údaje pro tento web (spravovat v Možnosti > Zvuk)",
+  "stream_audio.saved_credentials_failed": "Uložené přihlašovací údaje nefungují. Zadejte je prosím znovu:",
+  "options.manage_site_credentials": "Spravovat přihlašovací údaje pro weby",
+  "site_credentials.title": "Uložené přihlašovací údaje",
+  "site_credentials.sites_label": "Uložené weby:",
+  "site_credentials.remove": "Odstranit",
+  "site_credentials.remove_all": "Odstranit vše",
+  "site_credentials.close": "Zavřít",
+  "site_credentials.empty": "Žádné uložené přihlašovací údaje.",
+  "site_credentials.remove_confirm": "Odstranit uložené přihlašovací údaje pro {site}?",
+  "site_credentials.remove_all_confirm": "Odstranit všechny uložené přihlašovací údaje?",
+  "site_credentials.removed": "Uložené přihlašovací údaje byly odstraněny.",
+  "site_credentials.removed_all": "Všechny uložené přihlašovací údaje byly odstraněny."
 }

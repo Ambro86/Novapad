@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Prenumeranter",
   "stream_audio.auth_username": "Användarnamn:",
   "stream_audio.auth_password": "Lösenord:",
-  "stream_audio.save_credentials": "Spara inloggningsuppgifter för den här webbplatsen",
-  "stream_audio.saved_credentials_failed": "Sparade inloggningsuppgifter fungerade inte. Ange dem igen:"
+  "stream_audio.save_credentials": "Spara inloggningsuppgifter för den här webbplatsen (hantera i Alternativ > Ljud)",
+  "stream_audio.saved_credentials_failed": "Sparade inloggningsuppgifter fungerade inte. Ange dem igen:",
+  "options.manage_site_credentials": "Hantera webbplatsinloggningar",
+  "site_credentials.title": "Sparade inloggningsuppgifter",
+  "site_credentials.sites_label": "Sparade webbplatser:",
+  "site_credentials.remove": "Ta bort",
+  "site_credentials.remove_all": "Ta bort alla",
+  "site_credentials.close": "Stäng",
+  "site_credentials.empty": "Inga sparade inloggningsuppgifter.",
+  "site_credentials.remove_confirm": "Ta bort sparade inloggningsuppgifter för {site}?",
+  "site_credentials.remove_all_confirm": "Ta bort alla sparade inloggningsuppgifter?",
+  "site_credentials.removed": "Sparade inloggningsuppgifter borttagna.",
+  "site_credentials.removed_all": "Alla sparade inloggningsuppgifter borttagna."
 }

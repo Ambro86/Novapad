@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Subscribers",
   "stream_audio.auth_username": "Username:",
   "stream_audio.auth_password": "Password:",
-  "stream_audio.save_credentials": "Save credentials for this site",
-  "stream_audio.saved_credentials_failed": "Saved credentials did not work. Enter the credentials for this site again:"
+  "stream_audio.save_credentials": "Save credentials for this site (manage them in Options > Audio)",
+  "stream_audio.saved_credentials_failed": "Saved credentials did not work. Enter the credentials for this site again:",
+  "options.manage_site_credentials": "Manage site credentials",
+  "site_credentials.title": "Saved site credentials",
+  "site_credentials.sites_label": "Saved sites:",
+  "site_credentials.remove": "Remove",
+  "site_credentials.remove_all": "Remove all",
+  "site_credentials.close": "Close",
+  "site_credentials.empty": "No saved site credentials.",
+  "site_credentials.remove_confirm": "Remove saved credentials for {site}?",
+  "site_credentials.remove_all_confirm": "Remove all saved site credentials?",
+  "site_credentials.removed": "Saved site credentials removed.",
+  "site_credentials.removed_all": "All saved site credentials removed."
 }

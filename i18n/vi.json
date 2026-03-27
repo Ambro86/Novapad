@@ -1243,6 +1243,17 @@
   "stream_audio.subscribers_label": "Người đăng ký",
   "stream_audio.auth_username": "Tên người dùng:",
   "stream_audio.auth_password": "Mật khẩu:",
-  "stream_audio.save_credentials": "Lưu thông tin đăng nhập cho trang web này",
-  "stream_audio.saved_credentials_failed": "Thông tin đăng nhập đã lưu không hoạt động. Vui lòng nhập lại:"
+  "stream_audio.save_credentials": "Lưu thông tin đăng nhập cho trang web này (quản lý trong Tùy chọn > Âm thanh)",
+  "stream_audio.saved_credentials_failed": "Thông tin đăng nhập đã lưu không hoạt động. Vui lòng nhập lại:",
+  "options.manage_site_credentials": "Quản lý thông tin đăng nhập trang web",
+  "site_credentials.title": "Thông tin đăng nhập đã lưu",
+  "site_credentials.sites_label": "Trang web đã lưu:",
+  "site_credentials.remove": "Xóa",
+  "site_credentials.remove_all": "Xóa tất cả",
+  "site_credentials.close": "Đóng",
+  "site_credentials.empty": "Không có thông tin đăng nhập đã lưu.",
+  "site_credentials.remove_confirm": "Xóa thông tin đăng nhập đã lưu cho {site}?",
+  "site_credentials.remove_all_confirm": "Xóa tất cả thông tin đăng nhập đã lưu?",
+  "site_credentials.removed": "Đã xóa thông tin đăng nhập đã lưu.",
+  "site_credentials.removed_all": "Đã xóa tất cả thông tin đăng nhập đã lưu."
 }

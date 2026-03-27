@@ -2763,10 +2763,21 @@ fn start_whisper_transcription(hwnd: HWND) {
             );
 
             let base_name = media_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .or_else(|| media_path.file_name().and_then(|s| s.to_str()))
+                .unwrap_or("audio");
+            let mut title_path = PathBuf::from(i18n::tr_f(
+                language,
+                "whisper.output_title",
+                &[("name", base_name)],
+            ));
+            title_path.set_extension("txt");
+            let title = title_path
                 .file_name()
                 .and_then(|s| s.to_str())
-                .unwrap_or("audio");
-            let title = i18n::tr_f(language, "whisper.output_title", &[("name", base_name)]);
+                .unwrap_or("transcription.txt")
+                .to_string();
             Ok(WhisperTranscriptionResult {
                 title,
                 text,
@@ -2833,10 +2844,11 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
         if let Some(doc) = state.docs.get_mut(idx) {
             doc.title = result.title.clone();
             doc.path = None;
-            doc.dirty = false;
             doc.format = FileFormat::Text(TextEncoding::Utf8);
             editor_manager::set_edit_text(doc.hwnd_edit, &result.text);
-            editor_manager::update_tab_title(hwnd_tab, idx, &doc.title, false);
+            doc.dirty = true;
+            doc.prefer_title_for_save_suggestion = true;
+            editor_manager::update_tab_title(hwnd_tab, idx, &doc.title, true);
         }
     });
     editor_manager::update_window_title(hwnd);
@@ -11649,6 +11661,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 current_save_text_encoding: None,
                 from_rss: false,
                 is_temporary: false,
+                prefer_title_for_save_suggestion: false,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -11882,6 +11895,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 current_save_text_encoding: None,
                 from_rss: false,
                 is_temporary: false,
+                prefer_title_for_save_suggestion: false,
             };
             state.docs.push(doc);
             if large_file_no_wrap {

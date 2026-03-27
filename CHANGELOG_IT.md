@@ -14,6 +14,7 @@ Miglioramenti
 • "Riproduci audio da streaming..." ora permette anche di cercare su YouTube scrivendo una qualunque stringa di testo oppure di incollare il link di un canale o di una playlist YouTube per visualizzarne i risultati.
 • Migliorata la visualizzazione dei risultati in "Riproduci audio da streaming...": le voci YouTube ora includono titolo, durata, canale e visualizzazioni in un formato più chiaro.
 • Aggiunta in "Riproduci audio da streaming..." la possibilità di salvare canali e playlist YouTube nei preferiti: si possono aggiungere dai risultati tramite menu contestuale, aprire direttamente dalla lista Preferiti raggiungibile con Tab subito dopo il campo URL/query YouTube e rimuovere sempre dalla stessa lista tramite menu contestuale. Nei risultati della ricerca YouTube il menu contestuale è disponibile solo per canali e playlist.
+• In "Riproduci audio da streaming..." ora, quando un sito richiede l'accesso, Sonarpad può chiedere le credenziali. L'utente può inserirle, salvarle per il sito e gestire in seguito le credenziali salvate da Opzioni > Audio.
 • Migliorato il focus durante "Riproduci audio da streaming...", così la finestra di avanzamento resta più stabile durante il download e la conversione.
 • Aggiunte nel menu Voce due nuove azioni per la lettura: `Frase precedente` e `Frase successiva`, con scorciatoie personalizzabili per saltare durante la lettura del testo.
 • La scorciatoia predefinita di `Esegui file con interprete` è ora `Ctrl+Shift+F5`, così `Shift+F5` può essere usata di default per `Frase precedente`.
@@ -38,6 +39,7 @@ Correzioni
 • Corretta l'esportazione OPML di podcast e RSS, che ora genera file accettati da iTunes.
 • Aggiunti messaggi di conferma localizzati per la corretta importazione ed esportazione OPML di feed RSS e podcast.
 • Corretto un problema per cui, in "Riproduci audio da streaming...", scrivendo una stringa di ricerca e selezionando un canale YouTube dai risultati il programma poteva sembrare bloccato invece di aprire i video del canale.
+• Corretta la trascrizione dei file media: ora, chiudendo con Alt+F4 il documento generato, Sonarpad chiede se si vuole salvare il file e propone il nome corretto basandosi sul nome del file trascritto, invece che sulla prima riga del testo.
 • Corretto un bug per cui l’elenco dei file aperti veniva mostrato nel menu Aiuto invece che nel menu Finestra.
 • Corretto un caso limite nello streaming in cui la riproduzione poteva partire ma la finestra “Download streaming” restava aperta quando il file scaricato era già nel formato di destinazione.
 • Corretto il comportamento di conversione nello streaming MP3: quando lo stream è già MP3 e l’utente sceglie un bitrate MP3 esplicito (ad esempio 128 kbps), Sonarpad ora ricodifica al bitrate selezionato invece di saltare la conversione.

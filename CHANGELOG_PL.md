@@ -14,6 +14,7 @@ Ulepszenia
 • Funkcja „Odtwórz dźwięk ze streamingu...” pozwala teraz także wyszukiwać w YouTube po dowolnym tekście albo wkleić link do kanału lub playlisty YouTube, aby wyświetlić ich wyniki.
 • Ulepszono sposób wyświetlania wyników w „Odtwórz dźwięk ze streamingu...”: wpisy YouTube zawierają teraz tytuł, czas trwania, kanał i liczbę wyświetleń w czytelniejszym formacie.
 • Dodano ulubione YouTube dla kanałów i playlist w „Odtwórz dźwięk ze streamingu...”: można je dodawać z wyników za pomocą menu kontekstowego, otwierać bezpośrednio z listy Ulubione dostępnej po naciśnięciu Tab zaraz za polem adresu URL/zapytania YouTube oraz usuwać później z tej samej listy również przez menu kontekstowe. W wynikach wyszukiwania YouTube menu kontekstowe jest dostępne tylko dla kanałów i playlist.
+• Funkcja „Odtwórz dźwięk ze streamingu...” potrafi teraz poprosić o dane logowania, gdy strona wymaga zalogowania. Użytkownik może je wpisać, zapisać dla danej strony i później zarządzać zapisanymi danymi w Opcje > Audio.
 • Poprawiono fokus podczas „Odtwórz dźwięk ze streamingu...”, dzięki czemu okno postępu pozostaje stabilniejsze podczas pobierania i konwersji.
 • Dodano dwie nowe akcje czytania w menu Głos: `Poprzednie zdanie` i `Następne zdanie`, z konfigurowalnymi skrótami do przeskakiwania podczas czytania tekstu.
 • Domyślny skrót dla `Wykonaj plik w interpreterze` to teraz `Ctrl+Shift+F5`, dzięki czemu `Shift+F5` może być domyślnie używany dla `Poprzednie zdanie`.
@@ -32,6 +33,7 @@ Poprawki
 • Ulepszono parser stron internetowych: na niektórych stronach WordPress nie były uwzględniane elementy list oraz niektóre nagłówki sekcji.
 • Teraz przy użyciu „Przejdź do wiersza” pole jest wstępnie wypełniane bieżącym numerem wiersza.
 • Poprawiono eksport OPML podcastów i RSS, dzięki czemu eksportowane pliki są teraz akceptowane przez iTunes.
+• Poprawiono transkrypcję plików multimedialnych: teraz po zamknięciu wygenerowanego dokumentu skrótem Alt+F4 Sonarpad pyta, czy zapisać plik, i proponuje prawidłową nazwę opartą na nazwie transkrybowanego pliku zamiast na pierwszym wierszu tekstu.
 • Dodano lokalizowane komunikaty potwierdzenia poprawnego importu i eksportu OPML źródeł RSS oraz podcastów.
 • Naprawiono problem, przez który w „Odtwórz dźwięk ze streamingu...” po wpisaniu wyszukiwanej frazy i wybraniu kanału YouTube z wyników program mógł sprawiać wrażenie zawieszonego zamiast otworzyć filmy z tego kanału.
 • Naprawiono błąd, przez który lista otwartych plików była wyświetlana w menu Pomoc zamiast w menu Okno.

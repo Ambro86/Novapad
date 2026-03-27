@@ -84,6 +84,7 @@ const YTDLP_LATEST_API_URL: &str = "https://api.github.com/repos/yt-dlp/yt-dlp/r
 const YTDLP_USER_AGENT: &str = "Sonarpad/yt-dlp";
 const YTDLP_SOCKET_TIMEOUT_SECS: &str = "10";
 const YTDLP_PROGRESS_TEMPLATE_PREFIX: &str = "SONARPAD_PROGRESS";
+const FORCE_YTDLP_AUTH_PROMPT_FOR_TESTING: bool = false;
 const STREAM_DOWNLOAD_STALL_SECS: u64 = 180;
 const STREAM_POST_100_GRACE_SECS: u64 = 25;
 const STREAM_RETRY_TIMEOUT_SECS: u64 = 120;
@@ -2129,6 +2130,9 @@ fn drm_not_supported_stream_message(language: Language) -> String {
 }
 
 fn is_login_required_stream_error(err: &str) -> bool {
+    if FORCE_YTDLP_AUTH_PROMPT_FOR_TESTING {
+        return true;
+    }
     let err_lc = err.to_ascii_lowercase();
     err_lc.contains("use --username and --password") || err_lc.contains("login required")
 }
@@ -3493,6 +3497,10 @@ fn configure_ytdlp_stream_download_command(
         .arg(ytdlp_download_progress_template());
 
     if let Some(credentials) = credentials {
+        crate::log_debug(&format!(
+            "yt-dlp auth args enabled username={} password_arg=true",
+            credentials.username
+        ));
         cmd.arg("--username")
             .arg(&credentials.username)
             .arg("--password")
@@ -4833,6 +4841,29 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             .as_deref()
             .and_then(|site| load_saved_stream_site_credentials(parent, site));
         let mut credentials_to_persist: Option<(String, YtdlpAuthCredentials)> = None;
+        let forced_credentials = if FORCE_YTDLP_AUTH_PROMPT_FOR_TESTING {
+            if let Some(credentials) = saved_credentials.clone() {
+                Some(credentials)
+            } else {
+                let Some(prompted) =
+                    prompt_ytdlp_credentials(parent, language, "", site_key.is_some(), false)
+                else {
+                    close_progress_dialog(progress);
+                    post_focus_editor(parent);
+                    return;
+                };
+                if let Some(site) = site_key.as_ref() {
+                    if prompted.save_credentials {
+                        credentials_to_persist = Some((site.clone(), prompted.credentials.clone()));
+                    } else {
+                        clear_stream_site_credentials(parent, site);
+                    }
+                }
+                Some(prompted.credentials)
+            }
+        } else {
+            None
+        };
         let mut attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
             parent,
             progress,
@@ -4845,7 +4876,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             dialog_data: &dialog_data,
             selected_audio_format: selected_audio_format.as_deref(),
             ytdlp_debug,
-            credentials: saved_credentials.as_ref(),
+            credentials: forced_credentials.as_ref().or(saved_credentials.as_ref()),
         }) {
             Ok(attempt) => attempt,
             Err(message) => {

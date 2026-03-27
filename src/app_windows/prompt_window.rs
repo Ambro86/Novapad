@@ -328,7 +328,6 @@ pub fn prompt_user_with_options(
         }
 
         windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
-        SetForegroundWindow(parent);
 
         if data.confirmed {
             Some(data.value)
@@ -403,7 +402,6 @@ pub fn prompt_credentials(
         }
 
         windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
-        SetForegroundWindow(parent);
 
         if data.confirmed {
             Some(PromptCredentialsResult {
@@ -765,6 +763,22 @@ fn credentials_prompt_wndproc_inner(
                     None,
                 )
             };
+            let save_checkbox = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&save_credentials_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    20,
+                    150,
+                    358,
+                    24,
+                    hwnd,
+                    HMENU(IDC_CREDENTIALS_SAVE),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
             let ok = unsafe {
                 CreateWindowExW(
                     Default::default(),
@@ -793,22 +807,6 @@ fn credentials_prompt_wndproc_inner(
                     28,
                     hwnd,
                     HMENU(2),
-                    HINSTANCE(0),
-                    None,
-                )
-            };
-            let save_checkbox = unsafe {
-                CreateWindowExW(
-                    Default::default(),
-                    WC_BUTTON,
-                    PCWSTR(to_wide(&save_credentials_text).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                    20,
-                    150,
-                    358,
-                    24,
-                    hwnd,
-                    HMENU(IDC_CREDENTIALS_SAVE),
                     HINSTANCE(0),
                     None,
                 )

@@ -1492,7 +1492,15 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
         })
         .unwrap_or((None, None, None, Language::default()))
     };
-    download_podcast_episode(hwnd, url, title, cache_path, language);
+    let fallback_cache_path =
+        current_playback_media_path(hwnd).filter(|path| is_local_cached_media_path(path));
+    download_podcast_episode(
+        hwnd,
+        url,
+        title,
+        cache_path.or(fallback_cache_path),
+        language,
+    );
 }
 
 fn post_podcast_episode_save_result(hwnd: HWND, payload: PodcastEpisodeSaveResult) {
@@ -1553,7 +1561,7 @@ fn podcast_partial_cache_path(file_path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.part", file_path.to_string_lossy()))
 }
 
-fn podcast_cache_path_for_url(url: &str, mime: Option<&str>) -> PathBuf {
+fn podcast_cache_path_for_url(url: &str, mime: Option<&str>, title: Option<&str>) -> PathBuf {
     use sha2::Digest;
 
     let mut hasher = sha2::Sha256::new();
@@ -1594,6 +1602,12 @@ fn podcast_cache_path_for_url(url: &str, mime: Option<&str>) -> PathBuf {
 
     if ext.len() > 5 || ext.is_empty() {
         ext = "mp3";
+    }
+
+    if let Some(title) = title.and_then(suggested_filename_from_text) {
+        return settings::settings_dir()
+            .join("podcast cache")
+            .join(format!("{title}.{ext}"));
     }
 
     settings::settings_dir()
@@ -1648,7 +1662,7 @@ fn play_podcast_episode_from_url_internal(
     rai_origin: RaiAudioOrigin,
 ) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let cache_path = podcast_cache_path_for_url(&url, mime);
+    let cache_path = podcast_cache_path_for_url(&url, mime, title.as_deref());
     screen_reader_speak(&i18n::tr(language, "podcasts.loading"));
     open_podcast_play_progress_window(hwnd, language);
     std::thread::spawn(move || {
@@ -1760,6 +1774,15 @@ pub(crate) fn download_podcast_episode(
     let suggested_name = title
         .as_deref()
         .and_then(suggested_filename_from_text)
+        .or_else(|| {
+            cache_path
+                .as_ref()
+                .and_then(|p| p.file_stem())
+                .and_then(|s| s.to_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+        })
         .unwrap_or_else(|| "podcast_episode".to_string());
     let mut ext = cache_path
         .as_ref()
@@ -2353,6 +2376,36 @@ fn handle_chapter_list(hwnd: HWND) {
 fn is_direct_stream_url_path(path: &Path) -> bool {
     let s = path.to_string_lossy();
     s.starts_with("http://") || s.starts_with("https://")
+}
+
+pub(crate) fn is_local_cached_media_path(path: &Path) -> bool {
+    if is_direct_stream_url_path(path) || !path.starts_with(settings::settings_dir()) {
+        return false;
+    }
+
+    path.ancestors().any(|ancestor| {
+        ancestor
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name.to_ascii_lowercase().contains("cache"))
+            .unwrap_or(false)
+    })
+}
+
+pub(crate) fn current_playback_media_path(hwnd: HWND) -> Option<PathBuf> {
+    with_state(hwnd, |state| {
+        if let Some(player) = state.active_audiobook.as_ref() {
+            return Some(player.path.clone());
+        }
+        state.docs.get(state.current).and_then(|doc| {
+            if matches!(doc.format, crate::settings::FileFormat::Audiobook) {
+                doc.path.clone()
+            } else {
+                None
+            }
+        })
+    })
+    .flatten()
 }
 
 fn is_stream_cache_media(path: &Path) -> bool {
@@ -3170,6 +3223,9 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             toggle_audiobook_pause(hwnd);
         }
         PlayerCommand::Stop => {
+            stop_audiobook_playback(hwnd);
+        }
+        PlayerCommand::StopOnly => {
             stop_audiobook_playback(hwnd);
         }
         PlayerCommand::Seek(amount) => {

@@ -43,6 +43,8 @@ Correzioni
 • Corretto il comportamento di conversione nello streaming MP3: quando lo stream è già MP3 e l’utente sceglie un bitrate MP3 esplicito (ad esempio 128 kbps), Sonarpad ora ricodifica al bitrate selezionato invece di saltare la conversione.
 • Corretta la scorciatoia `Alt+Shift+L`: ora apre correttamente la lista capitoli durante la riproduzione.
 • Corretta la scorciatoia `Alt+Shift+T`: ora avvia correttamente “Trascrivi audio corrente” invece di aprire il menu Strumenti.
+• Corretto il comportamento del tasto `.` nel menu Riproduci: ora equivale a Stop e ferma solo il brano corrente, senza uscire dal player o dall’episodio.
+• Corretta la voce di salvataggio nel menu Riproduci per i media aperti da File recenti: quando il file proviene da una cache locale di Sonarpad, l'opzione localizzata per salvare il file viene ora mostrata correttamente anche in questo caso.
 • Se è già in corso la riproduzione di un audio, quando si avvia la trascrizione Sonarpad mette automaticamente quell’audio in pausa prima di iniziare.
 • Corretto un problema per cui, importando un articolo da Wikipedia, l’importazione poteva riuscire ma il testo dell’articolo non veniva mostrato sullo schermo.
 • Aggiunto il supporto ai capitoli podcast embedded nei file multimediali locali (es. metadati capitoli MP3): quando feed/URL non forniscono capitoli, Sonarpad li legge dal file scaricato in background, così la riproduzione parte subito e i capitoli vengono applicati appena disponibili.

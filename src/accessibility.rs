@@ -124,7 +124,7 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
                     PlayerCommand::Speed(-0.1)
                 }
             }
-            vk if vk == VK_OEM_PERIOD.0 as u32 => PlayerCommand::Stop,
+            vk if vk == VK_OEM_PERIOD.0 as u32 => PlayerCommand::StopOnly,
             vk if vk == VK_ESCAPE.0 as u32 => PlayerCommand::Stop,
             vk if vk == 'M' as u32 => PlayerCommand::MuteToggle,
             // Block navigation to prevent screen reader noise
@@ -154,6 +154,7 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
 pub enum PlayerCommand {
     TogglePause,
     Stop,
+    StopOnly,
     Seek(i64),
     Volume(f32),
     VolumeReset,

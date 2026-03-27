@@ -39,6 +39,8 @@ Bug fixes
 • Fixed MP3 streaming conversion behavior: when the stream is already MP3 and the user selects an explicit MP3 bitrate (for example 128 kbps), Sonarpad now re-encodes to the selected bitrate instead of skipping conversion.
 • Fixed the `Alt+Shift+L` shortcut: it now correctly opens the chapter list during playback.
 • Fixed the `Alt+Shift+T` shortcut: it now correctly starts “Transcribe current audio” instead of opening the Tools menu.
+• Fixed playback stop handling in the Play menu: pressing `.` now behaves like Stop and only stops the current track, instead of also exiting the player/episode.
+• Fixed the save entry in the Play menu for media opened from Recent Files: when the file comes from a local Sonarpad cache, the localized save action is now shown correctly there as well.
 • When transcription starts while audio is already playing, Sonarpad now pauses that audio automatically before starting transcription.
 • Fixed a bug where importing an article from Wikipedia could succeed without showing the article text on screen.
 • Added embedded podcast chapter support from local media files (e.g., MP3 chapter metadata): when feed/URL chapters are unavailable, Sonarpad now loads chapters from the downloaded file in the background, so playback starts immediately and chapter data is applied as soon as it is ready.

@@ -422,7 +422,23 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 .get(state.current)
                 .map(|doc| doc.from_rss)
                 .unwrap_or(false);
-            from_rss_doc || state.active_podcast_episode_url.is_some()
+            let cached_media_doc = state
+                .active_audiobook
+                .as_ref()
+                .map(|player| crate::is_local_cached_media_path(&player.path))
+                .or_else(|| {
+                    state.docs.get(state.current).and_then(|doc| {
+                        if matches!(doc.format, crate::settings::FileFormat::Audiobook) {
+                            doc.path
+                                .as_ref()
+                                .map(|path| crate::is_local_cached_media_path(path))
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .unwrap_or(false);
+            from_rss_doc || state.active_podcast_episode_url.is_some() || cached_media_doc
         })
         .unwrap_or(false);
         let stream_direct_no_download = with_state(hwnd, |state| {

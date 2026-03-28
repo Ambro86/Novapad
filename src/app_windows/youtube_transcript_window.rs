@@ -4833,6 +4833,9 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         std::thread::sleep(std::time::Duration::from_millis(15));
         keep_stream_progress_focus(progress);
         log_stream_focus_snapshot("play_streaming_audio.progress_opened", progress);
+        let downloading_status = i18n::tr(language, "stream_audio.progress_downloading");
+        report_progress_status(progress, &downloading_status);
+        crate::screen_reader_speak(&downloading_status);
         let stream_title = probe_stream_media_title(&ytdlp_path, &url);
 
         let mut progress = progress;
@@ -4840,7 +4843,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         let saved_credentials = site_key
             .as_deref()
             .and_then(|site| load_saved_stream_site_credentials(parent, site));
-        let mut credentials_to_persist: Option<(String, YtdlpAuthCredentials)> = None;
         let forced_credentials = if FORCE_YTDLP_AUTH_PROMPT_FOR_TESTING {
             if let Some(credentials) = saved_credentials.clone() {
                 Some(credentials)
@@ -4854,7 +4856,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 };
                 if let Some(site) = site_key.as_ref() {
                     if prompted.save_credentials {
-                        credentials_to_persist = Some((site.clone(), prompted.credentials.clone()));
+                        save_stream_site_credentials(parent, site, &prompted.credentials);
                     } else {
                         clear_stream_site_credentials(parent, site);
                     }
@@ -4920,7 +4922,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 };
                 if let Some(site) = site_key.as_ref() {
                     if prompted.save_credentials {
-                        credentials_to_persist = Some((site.clone(), prompted.credentials.clone()));
+                        save_stream_site_credentials(parent, site, &prompted.credentials);
                     } else {
                         clear_stream_site_credentials(parent, site);
                     }
@@ -4962,11 +4964,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 stderr_capture = attempt.stderr_capture;
                 stalled = attempt.stalled;
             }
-        }
-        if primary_path.is_some()
-            && let Some((site, credentials)) = credentials_to_persist.take()
-        {
-            save_stream_site_credentials(parent, &site, &credentials);
         }
         if ytdlp_debug && !stderr_capture.trim().is_empty() {
             crate::log_debug(&format!(

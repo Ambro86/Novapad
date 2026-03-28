@@ -130,25 +130,25 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreatePopupMenu, CreateWindowExW, DefWindowProcW, DeleteMenu, DestroyWindow, DispatchMessageW,
     DrawMenuBar, EN_CHANGE, EN_KILLFOCUS, ES_AUTOHSCROLL, EVENT_OBJECT_FOCUS, EnableMenuItem,
     EnumWindows, FALT, FCONTROL, FSHIFT, FVIRTKEY, FindWindowW, GWLP_USERDATA, GWLP_WNDPROC,
-    GetClassNameW, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetForegroundWindow, GetMenu,
-    GetMenuItemCount, GetMessageW, GetNextDlgTabItem, GetParent, GetSubMenu, GetWindowLongPtrW,
-    GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL, HCURSOR, HICON, HMENU,
-    IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsDialogMessageW, IsIconic, IsWindow, KillTimer,
-    LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO,
-    MENU_ITEM_FLAGS, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
-    MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW,
-    ModifyMenuW, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL,
-    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
-    TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage,
-    WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
-    WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_GETTEXTLENGTH,
-    WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE,
-    WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW,
-    WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP,
-    WS_VISIBLE,
+    GetClassNameW, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetForegroundWindow, GetLastActivePopup,
+    GetMenu, GetMenuItemCount, GetMessageW, GetNextDlgTabItem, GetParent, GetSubMenu,
+    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
+    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsDialogMessageW, IsIconic,
+    IsWindow, KillTimer, LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION,
+    MB_OK, MB_YESNO, MENU_ITEM_FLAGS, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND,
+    MF_BYPOSITION, MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
+    MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW, OBJID_CLIENT, PostMessageW, PostQuitMessage,
+    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
+    SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
+    ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
+    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
+    WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
+    WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN,
+    WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
+    WS_TABSTOP, WS_VISIBLE,
 };
-use windows::core::{HSTRING, Interface, PCWSTR, PWSTR, implement, w};
+use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
 const EM_SCROLLCARET: u32 = 0x00B7;
 const EM_CHARFROMPOS: u32 = 0x00D7;
@@ -359,6 +359,78 @@ pub(crate) fn focus_editor(hwnd: HWND) {
             );
         }
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BlockingModalKind {
+    // Add new blocking completion dialogs here when they must:
+    // 1. block editor/file-open focus handoff,
+    // 2. be reactivated if hidden behind the main window,
+    // 3. optionally defer WM_COPYDATA file opens until the user closes the modal.
+    AudiobookDone,
+    UpdateDialog,
+}
+
+#[derive(Default)]
+struct BlockingModalState {
+    active: Option<BlockingModalKind>,
+    deferred_copydata_open_paths: Vec<PathBuf>,
+}
+
+fn has_pending_blocking_modal(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| state.blocking_modal.active.is_some()).unwrap_or(false)
+}
+
+fn reactivate_pending_blocking_modal(hwnd: HWND) -> bool {
+    if !has_pending_blocking_modal(hwnd) {
+        return false;
+    }
+    let popup = unsafe { GetLastActivePopup(hwnd) };
+    if popup.0 != 0 && popup != hwnd && is_window_handle_valid(popup) {
+        bring_window_to_foreground(popup);
+    } else {
+        bring_window_to_foreground(hwnd);
+    }
+    true
+}
+
+fn defer_copydata_paths_for_pending_blocking_modal(hwnd: HWND, paths: &[PathBuf]) -> bool {
+    if !reactivate_pending_blocking_modal(hwnd) {
+        return false;
+    }
+    with_state(hwnd, |state| {
+        state
+            .blocking_modal
+            .deferred_copydata_open_paths
+            .extend(paths.iter().cloned());
+    });
+    true
+}
+
+fn take_deferred_copydata_paths_for_blocking_modal(hwnd: HWND) -> Vec<PathBuf> {
+    with_state(hwnd, |state| {
+        std::mem::take(&mut state.blocking_modal.deferred_copydata_open_paths)
+    })
+    .unwrap_or_default()
+}
+
+fn set_blocking_modal_active(hwnd: HWND, kind: Option<BlockingModalKind>) {
+    with_state(hwnd, |state| {
+        state.blocking_modal.active = kind;
+    });
+}
+
+fn open_copydata_paths(hwnd: HWND, paths: Vec<PathBuf>) {
+    if paths.iter().all(|path| is_audio_path(path)) {
+        queue_audio_files_and_play(hwnd, paths);
+    } else {
+        for path in paths {
+            editor_manager::open_document_from_copydata(hwnd, &path);
+        }
+    }
+    show_window_safe(hwnd, SW_SHOWMAXIMIZED);
+    bring_window_to_foreground(hwnd);
+    focus_editor(hwnd);
 }
 
 pub(crate) fn set_focus_safe(hwnd: HWND) {
@@ -3371,7 +3443,8 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
 fn has_secondary_window_open(hwnd: HWND) -> bool {
     {
         with_state(hwnd, |state| {
-            state.find_dialog.0 != 0
+            state.blocking_modal.active.is_some()
+                || state.find_dialog.0 != 0
                 || state.replace_dialog.0 != 0
                 || state.options_dialog.0 != 0
                 || state.help_window.0 != 0
@@ -3413,9 +3486,11 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
                 .get(state.current)
                 .map(|doc| matches!(doc.format, FileFormat::Audiobook))
                 .unwrap_or(false);
+            let blocking_modal_open = state.blocking_modal.active.is_some();
             let audiobook_progress_in_foreground =
                 state.audiobook_progress.0 != 0 && foreground == state.audiobook_progress;
-            state.update_progress_window.0 == 0
+            !blocking_modal_open
+                && state.update_progress_window.0 == 0
                 && state.transcription_progress_window.0 == 0
                 && state.bdciechi_window.0 == 0
                 && state.replace_progress_window.0 == 0
@@ -3551,6 +3626,7 @@ pub(crate) struct AppState {
 
     audiobook_progress: HWND,
     audiobook_cancel: Option<Arc<AtomicBool>>,
+    blocking_modal: BlockingModalState,
     active_audiobook: Option<AudiobookPlayer>,
     audiobook_session_id: u64,
     last_stopped_audiobook: Option<std::path::PathBuf>,
@@ -4963,6 +5039,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
 
                     audiobook_progress: HWND(0),
                     audiobook_cancel: None,
+                    blocking_modal: BlockingModalState::default(),
                     active_audiobook: None,
                     audiobook_session_id: 0,
                     last_stopped_audiobook: None,
@@ -5480,12 +5557,22 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 crate::log_debug("UI: Received WM_UPDATE_DIALOG");
                 let req = Box::from_raw(lparam.0 as *mut UpdateDialogRequest);
+                let text = to_wide(&req.text);
+                let title = to_wide(&req.title);
+                set_blocking_modal_active(hwnd, Some(BlockingModalKind::UpdateDialog));
                 let result = MessageBoxW(
                     hwnd,
-                    &HSTRING::from(&req.text),
-                    &HSTRING::from(&req.title),
+                    PCWSTR(text.as_ptr()),
+                    PCWSTR(title.as_ptr()),
                     req.flags,
                 );
+                set_blocking_modal_active(hwnd, None);
+                let pending_paths = take_deferred_copydata_paths_for_blocking_modal(hwnd);
+                if !pending_paths.is_empty() {
+                    open_copydata_paths(hwnd, pending_paths);
+                } else {
+                    restore_editor_focus(hwnd);
+                }
                 crate::log_debug(&format!("UI: Update dialog result: {:?}", result));
                 if let Err(e) = req.response_tx.send(result.0) {
                     crate::log_debug(&format!("UI: Failed to send response to channel: {}", e));
@@ -5798,12 +5885,23 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 } else {
                     MB_OK | MB_ICONERROR
                 };
+                // Pattern for future blocking completion dialogs:
+                // set the modal kind before MessageBoxW, clear it right after,
+                // then drain any deferred external file opens before restoring editor focus.
+                set_blocking_modal_active(hwnd, Some(BlockingModalKind::AudiobookDone));
                 MessageBoxW(
                     hwnd,
                     PCWSTR(message.as_ptr()),
                     PCWSTR(title.as_ptr()),
                     flags,
                 );
+                set_blocking_modal_active(hwnd, None);
+                let pending_paths = take_deferred_copydata_paths_for_blocking_modal(hwnd);
+                if !pending_paths.is_empty() {
+                    open_copydata_paths(hwnd, pending_paths);
+                } else {
+                    restore_editor_focus(hwnd);
+                }
                 LRESULT(0)
             }
             WM_FOCUS_EDITOR => {
@@ -6078,6 +6176,12 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_FILE_OPEN => {
                         if with_state(hwnd, |_| {}).is_none() {
                             log_debug("Menu: Open document ignored (not initialized)");
+                            return LRESULT(0);
+                        }
+                        if reactivate_pending_blocking_modal(hwnd) {
+                            log_debug(
+                                "Menu: Open document deferred while blocking modal dialog is pending",
+                            );
                             return LRESULT(0);
                         }
                         log_debug("Menu: Open document");
@@ -6855,16 +6959,13 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                             .filter(|path_str| !path_str.is_empty())
                             .map(PathBuf::from)
                             .collect();
-                        if paths.iter().all(|path| is_audio_path(path)) {
-                            queue_audio_files_and_play(hwnd, paths);
-                        } else {
-                            for path in paths {
-                                editor_manager::open_document_from_copydata(hwnd, &path);
-                            }
+                        if defer_copydata_paths_for_pending_blocking_modal(hwnd, &paths) {
+                            log_debug(
+                                "WM_COPYDATA open deferred while blocking modal dialog is pending",
+                            );
+                            return LRESULT(1);
                         }
-                        ShowWindow(hwnd, SW_SHOWMAXIMIZED);
-                        bring_window_to_foreground(hwnd);
-                        focus_editor(hwnd);
+                        open_copydata_paths(hwnd, paths);
                     }
                     return LRESULT(1);
                 }

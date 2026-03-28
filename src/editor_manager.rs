@@ -4520,27 +4520,27 @@ pub fn sync_dirty_from_edit(hwnd: HWND, index: usize) -> bool {
 }
 
 pub fn confirm_save_if_dirty_entry(hwnd: HWND, index: usize, title: &str) -> bool {
-    unsafe {
-        if !sync_dirty_from_edit(hwnd, index) {
-            return true;
-        }
+    if !sync_dirty_from_edit(hwnd, index) {
+        return true;
+    }
 
-        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-        let msg = confirm_save_message(language, title);
-        let title_w = confirm_title(language);
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let msg = confirm_save_message(language, title);
+    let title_w = confirm_title(language);
 
-        let result = MessageBoxW(
+    let result = unsafe {
+        MessageBoxW(
             hwnd,
             PCWSTR(to_wide(&msg).as_ptr()),
             PCWSTR(to_wide(&title_w).as_ptr()),
             MB_YESNOCANCEL | MB_ICONWARNING,
-        );
+        )
+    };
 
-        match result {
-            IDYES => save_document_at(hwnd, index, false),
-            IDNO => true,
-            _ => false,
-        }
+    match result {
+        IDYES => save_document_at(hwnd, index, false),
+        IDNO => true,
+        _ => false,
     }
 }
 

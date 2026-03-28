@@ -8916,12 +8916,14 @@ fn sentence_navigation_target(
     let current = current_pos.max(0);
     match direction {
         SentenceNavigationDirection::Previous => {
-            let effective_current = current.saturating_sub(SENTENCE_NAVIGATION_TOLERANCE_UTF16);
-            let previous_index = starts.partition_point(|start| *start < effective_current);
-            if previous_index == 0 {
+            let effective_current = current.saturating_add(SENTENCE_NAVIGATION_TOLERANCE_UTF16);
+            let current_index = starts
+                .partition_point(|start| *start <= effective_current)
+                .saturating_sub(1);
+            if current_index == 0 {
                 None
             } else {
-                starts.get(previous_index - 1).copied()
+                starts.get(current_index - 1).copied()
             }
         }
         SentenceNavigationDirection::Next => {
@@ -11533,6 +11535,21 @@ mod tests {
     fn sentence_navigation_does_not_split_on_thousands_separators() {
         let text = "Sono chiamati alle urne 51.424.729 cittadini, tra cui 5.477.619 residenti all’estero. Si vota.";
         assert_eq!(sentence_start_offsets_utf16(text), vec![0, 86]);
+    }
+
+    #[test]
+    fn previous_sentence_moves_to_real_previous_sentence() {
+        let text = "Prima frase. Seconda frase. Terza frase.";
+        let starts = sentence_start_offsets_utf16(text);
+        assert_eq!(starts, vec![0, 13, 28]);
+        assert_eq!(
+            sentence_navigation_target(text, 30, SentenceNavigationDirection::Previous),
+            Some(13)
+        );
+        assert_eq!(
+            sentence_navigation_target(text, 15, SentenceNavigationDirection::Previous),
+            Some(0)
+        );
     }
 }
 

@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "Usunąć zapisane dane logowania dla {site}?",
   "site_credentials.remove_all_confirm": "Usunąć wszystkie zapisane dane logowania?",
   "site_credentials.removed": "Zapisane dane logowania usunięte.",
-  "site_credentials.removed_all": "Wszystkie zapisane dane logowania usunięte."
+  "site_credentials.removed_all": "Wszystkie zapisane dane logowania usunięte.",
+  "tts_tuning.value_clamped": "Nieprawidłowa wartość. Wartość została dostosowana do dozwolonego limitu: {value}."
 }

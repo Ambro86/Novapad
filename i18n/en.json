@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "Remove saved credentials for {site}?",
   "site_credentials.remove_all_confirm": "Remove all saved site credentials?",
   "site_credentials.removed": "Saved site credentials removed.",
-  "site_credentials.removed_all": "All saved site credentials removed."
+  "site_credentials.removed_all": "All saved site credentials removed.",
+  "tts_tuning.value_clamped": "Invalid value. The value was adjusted to the allowed limit: {value}."
 }

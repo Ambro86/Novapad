@@ -1310,5 +1310,6 @@
   "site_credentials.remove_confirm": "Rimuovere le credenziali salvate per {site}?",
   "site_credentials.remove_all_confirm": "Rimuovere tutte le credenziali salvate?",
   "site_credentials.removed": "Credenziali salvate rimosse.",
-  "site_credentials.removed_all": "Tutte le credenziali salvate sono state rimosse."
+  "site_credentials.removed_all": "Tutte le credenziali salvate sono state rimosse.",
+  "tts_tuning.value_clamped": "Valore errato. Il valore è stato corretto al limite consentito: {value}."
 }

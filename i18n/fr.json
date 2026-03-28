@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "Supprimer les identifiants enregistrés pour {site} ?",
   "site_credentials.remove_all_confirm": "Supprimer tous les identifiants enregistrés ?",
   "site_credentials.removed": "Identifiants enregistrés supprimés.",
-  "site_credentials.removed_all": "Tous les identifiants enregistrés ont été supprimés."
+  "site_credentials.removed_all": "Tous les identifiants enregistrés ont été supprimés.",
+  "tts_tuning.value_clamped": "Valeur invalide. La valeur a été ajustée à la limite autorisée : {value}."
 }

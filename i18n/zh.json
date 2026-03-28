@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "是否移除 {site} 的已保存凭据？",
   "site_credentials.remove_all_confirm": "是否移除所有已保存的凭据？",
   "site_credentials.removed": "已移除已保存的凭据。",
-  "site_credentials.removed_all": "已移除所有已保存的凭据。"
+  "site_credentials.removed_all": "已移除所有已保存的凭据。",
+  "tts_tuning.value_clamped": "无效值。该值已调整为允许范围：{value}。"
 }

@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "Ta bort sparade inloggningsuppgifter för {site}?",
   "site_credentials.remove_all_confirm": "Ta bort alla sparade inloggningsuppgifter?",
   "site_credentials.removed": "Sparade inloggningsuppgifter borttagna.",
-  "site_credentials.removed_all": "Alla sparade inloggningsuppgifter borttagna."
+  "site_credentials.removed_all": "Alla sparade inloggningsuppgifter borttagna.",
+  "tts_tuning.value_clamped": "Ogiltigt värde. Värdet justerades till den tillåtna gränsen: {value}."
 }

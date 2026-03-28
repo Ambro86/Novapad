@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "Удалить сохранённые учетные данные для {site}?",
   "site_credentials.remove_all_confirm": "Удалить все сохранённые учетные данные?",
   "site_credentials.removed": "Сохранённые учетные данные удалены.",
-  "site_credentials.removed_all": "Все сохранённые учетные данные удалены."
+  "site_credentials.removed_all": "Все сохранённые учетные данные удалены.",
+  "tts_tuning.value_clamped": "Недопустимое значение. Значение было скорректировано до допустимого предела: {value}."
 }

@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "Pašalinti išsaugotus prisijungimo duomenis svetainei {site}?",
   "site_credentials.remove_all_confirm": "Pašalinti visus išsaugotus prisijungimo duomenis?",
   "site_credentials.removed": "Išsaugoti prisijungimo duomenys pašalinti.",
-  "site_credentials.removed_all": "Visi išsaugoti prisijungimo duomenys pašalinti."
+  "site_credentials.removed_all": "Visi išsaugoti prisijungimo duomenys pašalinti.",
+  "tts_tuning.value_clamped": "Netinkama reikšmė. Reikšmė buvo pakoreguota iki leidžiamos ribos: {value}."
 }

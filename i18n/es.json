@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "¿Eliminar las credenciales guardadas para {site}?",
   "site_credentials.remove_all_confirm": "¿Eliminar todas las credenciales guardadas?",
   "site_credentials.removed": "Credenciales guardadas eliminadas.",
-  "site_credentials.removed_all": "Todas las credenciales guardadas eliminadas."
+  "site_credentials.removed_all": "Todas las credenciales guardadas eliminadas.",
+  "tts_tuning.value_clamped": "Valor no válido. El valor se ajustó al límite permitido: {value}."
 }

@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "Видалити збережені облікові дані для {site}?",
   "site_credentials.remove_all_confirm": "Видалити всі збережені облікові дані?",
   "site_credentials.removed": "Збережені облікові дані видалено.",
-  "site_credentials.removed_all": "Усі збережені облікові дані видалено."
+  "site_credentials.removed_all": "Усі збережені облікові дані видалено.",
+  "tts_tuning.value_clamped": "Недопустиме значення. Значення було скориговано до дозволеної межі: {value}."
 }

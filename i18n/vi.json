@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "Xóa thông tin đăng nhập đã lưu cho {site}?",
   "site_credentials.remove_all_confirm": "Xóa tất cả thông tin đăng nhập đã lưu?",
   "site_credentials.removed": "Đã xóa thông tin đăng nhập đã lưu.",
-  "site_credentials.removed_all": "Đã xóa tất cả thông tin đăng nhập đã lưu."
+  "site_credentials.removed_all": "Đã xóa tất cả thông tin đăng nhập đã lưu.",
+  "tts_tuning.value_clamped": "Giá trị không hợp lệ. Giá trị đã được điều chỉnh về giới hạn cho phép: {value}."
 }

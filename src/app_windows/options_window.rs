@@ -8631,6 +8631,30 @@ fn read_tts_edit_value(edit: HWND, fallback: i32, min: i32, max: i32) -> i32 {
     }
 }
 
+fn read_tts_edit_value_with_clamp(
+    edit: HWND,
+    fallback: i32,
+    min: i32,
+    max: i32,
+) -> (i32, Option<i32>) {
+    unsafe {
+        let len = GetWindowTextLengthW(edit);
+        if len <= 0 {
+            return (fallback, None);
+        }
+        let mut buf = vec![0u16; (len + 1) as usize];
+        let read = GetWindowTextW(edit, &mut buf);
+        let text = String::from_utf16_lossy(&buf[..read as usize]);
+        if let Ok(parsed) = text.trim().parse::<i32>() {
+            let clamped = parsed.clamp(min, max);
+            let adjusted = (parsed != clamped).then_some(clamped);
+            (clamped, adjusted)
+        } else {
+            (fallback, None)
+        }
+    }
+}
+
 fn tts_ui_value_from_internal(value: i32) -> i32 {
     value + TTS_UI_OFFSET
 }
@@ -8641,6 +8665,19 @@ fn read_tts_tuning_edit_value(edit: HWND, fallback_internal: i32, min: i32, max:
     let ui_fallback = tts_ui_value_from_internal(fallback_internal).clamp(ui_min, ui_max);
     let ui_value = read_tts_edit_value(edit, ui_fallback, ui_min, ui_max);
     (ui_value - TTS_UI_OFFSET).clamp(min, max)
+}
+
+fn read_tts_tuning_edit_value_with_clamp(
+    edit: HWND,
+    fallback_internal: i32,
+    min: i32,
+    max: i32,
+) -> (i32, Option<i32>) {
+    let ui_min = min + TTS_UI_OFFSET;
+    let ui_max = max + TTS_UI_OFFSET;
+    let ui_fallback = tts_ui_value_from_internal(fallback_internal).clamp(ui_min, ui_max);
+    let (ui_value, adjusted) = read_tts_edit_value_with_clamp(edit, ui_fallback, ui_min, ui_max);
+    ((ui_value - TTS_UI_OFFSET).clamp(min, max), adjusted)
 }
 
 fn select_combo_nearest_value(hwnd: HWND, value: i32) {
@@ -10238,29 +10275,42 @@ fn apply_options_dialog(hwnd: HWND) {
             2 => TtsEngine::Sapi4,
             _ => TtsEngine::Edge,
         };
+        let mut clamped_manual_value: Option<i32> = None;
 
         settings.tts_manual_tuning =
             SendMessageW(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
                 == BST_CHECKED.0;
         if settings.tts_manual_tuning {
-            settings.tts_rate = read_tts_tuning_edit_value(
+            let (tts_rate, adjusted_rate) = read_tts_tuning_edit_value_with_clamp(
                 edit_tts_speed,
                 settings.tts_rate,
                 TTS_RATE_MIN,
                 TTS_RATE_MAX,
             );
-            settings.tts_pitch = read_tts_tuning_edit_value(
+            if clamped_manual_value.is_none() {
+                clamped_manual_value = adjusted_rate;
+            }
+            settings.tts_rate = tts_rate;
+            let (tts_pitch, adjusted_pitch) = read_tts_tuning_edit_value_with_clamp(
                 edit_tts_pitch,
                 settings.tts_pitch,
                 TTS_PITCH_MIN,
                 TTS_PITCH_MAX,
             );
-            settings.tts_volume = read_tts_edit_value(
+            if clamped_manual_value.is_none() {
+                clamped_manual_value = adjusted_pitch;
+            }
+            settings.tts_pitch = tts_pitch;
+            let (tts_volume, adjusted_volume) = read_tts_edit_value_with_clamp(
                 edit_tts_volume,
                 settings.tts_volume,
                 TTS_VOLUME_MIN,
                 TTS_VOLUME_MAX,
             );
+            if clamped_manual_value.is_none() {
+                clamped_manual_value = adjusted_volume;
+            }
+            settings.tts_volume = tts_volume;
         } else {
             settings.tts_rate = combo_value(combo_tts_speed);
             settings.tts_pitch = combo_value(combo_tts_pitch);
@@ -10743,42 +10793,72 @@ fn apply_options_dialog(hwnd: HWND) {
             }
         }
         if settings.tts_manual_tuning {
-            settings.dialogue_voice_rate = read_tts_tuning_edit_value(
-                edit_dialogue_voice_rate,
-                settings.dialogue_voice_rate,
-                TTS_RATE_MIN,
-                TTS_RATE_MAX,
-            );
-            settings.dialogue_voice_pitch = read_tts_tuning_edit_value(
-                edit_dialogue_voice_pitch,
-                settings.dialogue_voice_pitch,
-                TTS_PITCH_MIN,
-                TTS_PITCH_MAX,
-            );
-            settings.dialogue_voice_volume = read_tts_edit_value(
-                edit_dialogue_voice_volume,
-                settings.dialogue_voice_volume,
-                TTS_VOLUME_MIN,
-                TTS_VOLUME_MAX,
-            );
-            settings.dialogue_secondary_voice_rate = read_tts_tuning_edit_value(
-                edit_dialogue_secondary_voice_rate,
-                settings.dialogue_secondary_voice_rate,
-                TTS_RATE_MIN,
-                TTS_RATE_MAX,
-            );
-            settings.dialogue_secondary_voice_pitch = read_tts_tuning_edit_value(
-                edit_dialogue_secondary_voice_pitch,
-                settings.dialogue_secondary_voice_pitch,
-                TTS_PITCH_MIN,
-                TTS_PITCH_MAX,
-            );
-            settings.dialogue_secondary_voice_volume = read_tts_edit_value(
-                edit_dialogue_secondary_voice_volume,
-                settings.dialogue_secondary_voice_volume,
-                TTS_VOLUME_MIN,
-                TTS_VOLUME_MAX,
-            );
+            let (dialogue_voice_rate, adjusted_dialogue_voice_rate) =
+                read_tts_tuning_edit_value_with_clamp(
+                    edit_dialogue_voice_rate,
+                    settings.dialogue_voice_rate,
+                    TTS_RATE_MIN,
+                    TTS_RATE_MAX,
+                );
+            if clamped_manual_value.is_none() {
+                clamped_manual_value = adjusted_dialogue_voice_rate;
+            }
+            settings.dialogue_voice_rate = dialogue_voice_rate;
+            let (dialogue_voice_pitch, adjusted_dialogue_voice_pitch) =
+                read_tts_tuning_edit_value_with_clamp(
+                    edit_dialogue_voice_pitch,
+                    settings.dialogue_voice_pitch,
+                    TTS_PITCH_MIN,
+                    TTS_PITCH_MAX,
+                );
+            if clamped_manual_value.is_none() {
+                clamped_manual_value = adjusted_dialogue_voice_pitch;
+            }
+            settings.dialogue_voice_pitch = dialogue_voice_pitch;
+            let (dialogue_voice_volume, adjusted_dialogue_voice_volume) =
+                read_tts_edit_value_with_clamp(
+                    edit_dialogue_voice_volume,
+                    settings.dialogue_voice_volume,
+                    TTS_VOLUME_MIN,
+                    TTS_VOLUME_MAX,
+                );
+            if clamped_manual_value.is_none() {
+                clamped_manual_value = adjusted_dialogue_voice_volume;
+            }
+            settings.dialogue_voice_volume = dialogue_voice_volume;
+            let (dialogue_secondary_voice_rate, adjusted_dialogue_secondary_voice_rate) =
+                read_tts_tuning_edit_value_with_clamp(
+                    edit_dialogue_secondary_voice_rate,
+                    settings.dialogue_secondary_voice_rate,
+                    TTS_RATE_MIN,
+                    TTS_RATE_MAX,
+                );
+            if clamped_manual_value.is_none() {
+                clamped_manual_value = adjusted_dialogue_secondary_voice_rate;
+            }
+            settings.dialogue_secondary_voice_rate = dialogue_secondary_voice_rate;
+            let (dialogue_secondary_voice_pitch, adjusted_dialogue_secondary_voice_pitch) =
+                read_tts_tuning_edit_value_with_clamp(
+                    edit_dialogue_secondary_voice_pitch,
+                    settings.dialogue_secondary_voice_pitch,
+                    TTS_PITCH_MIN,
+                    TTS_PITCH_MAX,
+                );
+            if clamped_manual_value.is_none() {
+                clamped_manual_value = adjusted_dialogue_secondary_voice_pitch;
+            }
+            settings.dialogue_secondary_voice_pitch = dialogue_secondary_voice_pitch;
+            let (dialogue_secondary_voice_volume, adjusted_dialogue_secondary_voice_volume) =
+                read_tts_edit_value_with_clamp(
+                    edit_dialogue_secondary_voice_volume,
+                    settings.dialogue_secondary_voice_volume,
+                    TTS_VOLUME_MIN,
+                    TTS_VOLUME_MAX,
+                );
+            if clamped_manual_value.is_none() {
+                clamped_manual_value = adjusted_dialogue_secondary_voice_volume;
+            }
+            settings.dialogue_secondary_voice_volume = dialogue_secondary_voice_volume;
         } else {
             settings.dialogue_voice_rate = combo_value(combo_dialogue_voice_rate);
             settings.dialogue_voice_pitch = combo_value(combo_dialogue_voice_pitch);
@@ -10789,6 +10869,14 @@ fn apply_options_dialog(hwnd: HWND) {
                 combo_value(combo_dialogue_secondary_voice_pitch);
             settings.dialogue_secondary_voice_volume =
                 combo_value(combo_dialogue_secondary_voice_volume);
+        }
+        if let Some(value) = clamped_manual_value {
+            let message = i18n::tr_f(
+                settings.language,
+                "tts_tuning.value_clamped",
+                &[("value", &value.to_string())],
+            );
+            crate::show_error(hwnd, settings.language, &message);
         }
         let dialogue_open_quote_len = GetWindowTextLengthW(edit_dialogue_open_quote);
         if dialogue_open_quote_len >= 0 {

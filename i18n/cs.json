@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "Odstranit uložené přihlašovací údaje pro {site}?",
   "site_credentials.remove_all_confirm": "Odstranit všechny uložené přihlašovací údaje?",
   "site_credentials.removed": "Uložené přihlašovací údaje byly odstraněny.",
-  "site_credentials.removed_all": "Všechny uložené přihlašovací údaje byly odstraněny."
+  "site_credentials.removed_all": "Všechny uložené přihlašovací údaje byly odstraněny.",
+  "tts_tuning.value_clamped": "Neplatná hodnota. Hodnota byla upravena na povolený limit: {value}."
 }

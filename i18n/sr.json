@@ -1258,5 +1258,6 @@
   "site_credentials.remove_confirm": "Ukloniti sačuvane podatke za prijavu za {site}?",
   "site_credentials.remove_all_confirm": "Ukloniti sve sačuvane podatke za prijavu?",
   "site_credentials.removed": "Sačuvani podaci za prijavu su uklonjeni.",
-  "site_credentials.removed_all": "Svi sačuvani podaci za prijavu su uklonjeni."
+  "site_credentials.removed_all": "Svi sačuvani podaci za prijavu su uklonjeni.",
+  "tts_tuning.value_clamped": "Nevažeća vrednost. Vrednost je prilagođena dozvoljenom ograničenju: {value}."
 }

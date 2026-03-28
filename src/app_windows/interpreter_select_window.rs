@@ -3,9 +3,10 @@ use std::sync::{Arc, Mutex};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::UI::Controls::{
-    HTREEITEM, TVE_EXPAND, TVGN_CARET, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW, TVINSERTSTRUCTW_0,
-    TVITEMW, TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETITEMW, TVM_GETNEXTITEM, TVM_INSERTITEMW,
-    TVM_SELECTITEM, TVS_HASBUTTONS, TVS_HASLINES, TVS_LINESATROOT, TVS_SHOWSELALWAYS, WC_BUTTON,
+    HTREEITEM, TVE_EXPAND, TVGN_CARET, TVI_ROOT, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW,
+    TVINSERTSTRUCTW_0, TVITEMW, TVM_DELETEITEM, TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETITEMW,
+    TVM_GETNEXTITEM, TVM_INSERTITEMW, TVM_SELECTITEM, TVS_HASBUTTONS, TVS_HASLINES,
+    TVS_LINESATROOT, TVS_SHOWSELALWAYS, WC_BUTTON, WC_EDIT, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, SetFocus, VK_APPS, VK_DOWN, VK_END, VK_ESCAPE, VK_F10, VK_HOME, VK_LEFT, VK_NEXT,
@@ -13,13 +14,14 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW,
-    DefWindowProcW, DestroyMenu, DispatchMessageW, GWLP_USERDATA, GetCursorPos, HMENU,
-    HWND_TOPMOST, IDC_ARROW, IsDialogMessageW, LB_ADDSTRING, LB_GETCURSEL, LB_GETTEXT,
-    LB_GETTEXTLEN, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MF_STRING, MSG, PostMessageW, SWP_NOMOVE,
-    SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowPos, TPM_NONOTIFY,
-    TPM_RETURNCMD, TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
-    WM_CONTEXTMENU, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION,
-    WS_CHILD, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    DefWindowProcW, DestroyMenu, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, GWLP_USERDATA,
+    GetCursorPos, GetWindowTextLengthW, GetWindowTextW, HMENU, HWND_TOPMOST, IDC_ARROW,
+    IsDialogMessageW, LB_ADDSTRING, LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_RESETCONTENT,
+    LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MF_STRING, MSG, PostMessageW, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowPos, TPM_NONOTIFY, TPM_RETURNCMD,
+    TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
+    WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
     WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
@@ -34,6 +36,7 @@ const ID_LIST: usize = 9201;
 const ID_OK: usize = 9202;
 const ID_CANCEL: usize = 9203;
 const ID_SECONDARY: usize = 9204;
+const ID_FILTER_EDIT: usize = 9205;
 
 type ContextActionEnabled = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 type ContextActionHandler = Arc<dyn Fn(String) + Send + Sync>;
@@ -56,6 +59,7 @@ pub(crate) enum InterpreterSelectionResult {
     SecondaryAction,
 }
 
+#[derive(Clone)]
 enum InterpreterDialogInitMode {
     List(Vec<String>),
     Tree(Vec<GroupedSelectGroup>),
@@ -69,6 +73,7 @@ struct InterpreterSelectInit {
     context_action_label: Option<String>,
     initial_list_value: Option<String>,
     initial_tree_value: Option<String>,
+    filter_label: Option<String>,
     context_action_enabled: Option<ContextActionEnabled>,
     context_action_handler: Option<ContextActionHandler>,
     result: Arc<Mutex<Option<InterpreterSelectionResult>>>,
@@ -84,6 +89,7 @@ struct InterpreterSelectOptions {
     context_action_label: Option<String>,
     initial_list_value: Option<String>,
     initial_tree_value: Option<String>,
+    filter_label: Option<String>,
     context_action_enabled: Option<ContextActionEnabled>,
     context_action_handler: Option<ContextActionHandler>,
 }
@@ -95,6 +101,10 @@ enum ControlKind {
 
 struct InterpreterSelectState {
     control: ControlKind,
+    original_mode: InterpreterDialogInitMode,
+    initial_list_value: Option<String>,
+    initial_tree_value: Option<String>,
+    filter_edit: Option<HWND>,
     tree_values: Vec<String>,
     context_action_label: Option<String>,
     context_action_enabled: Option<ContextActionEnabled>,
@@ -106,6 +116,11 @@ pub struct InterpreterContextAction {
     pub label: String,
     pub enabled: ContextActionEnabled,
     pub handler: ContextActionHandler,
+}
+
+pub struct InterpreterSecondaryActionOptions {
+    pub label: String,
+    pub filter_label: Option<String>,
 }
 
 pub fn select_interpreter(
@@ -131,7 +146,7 @@ pub fn select_interpreter_with_secondary_action_and_context_action_and_initial_w
     items: Vec<String>,
     language: Language,
     title: String,
-    secondary_action_label: String,
+    secondary_action: InterpreterSecondaryActionOptions,
     initial_value: Option<String>,
     context_action: InterpreterContextAction,
 ) -> Option<InterpreterSelectionResult> {
@@ -141,7 +156,8 @@ pub fn select_interpreter_with_secondary_action_and_context_action_and_initial_w
         language,
         title,
         InterpreterSelectOptions {
-            secondary_action_label: Some(secondary_action_label),
+            filter_label: secondary_action.filter_label,
+            secondary_action_label: Some(secondary_action.label),
             initial_list_value: initial_value,
             context_action_label: Some(context_action.label),
             context_action_enabled: Some(context_action.enabled),
@@ -186,6 +202,7 @@ pub fn select_grouped_interpreter_with_context_action_without_parent_restore_on_
     groups: Vec<GroupedSelectGroup>,
     language: Language,
     title: String,
+    filter_label: Option<String>,
     initial_value: Option<String>,
     context_action: InterpreterContextAction,
 ) -> Option<String> {
@@ -195,6 +212,7 @@ pub fn select_grouped_interpreter_with_context_action_without_parent_restore_on_
         language,
         title,
         InterpreterSelectOptions {
+            filter_label,
             suppress_parent_restore_on_accept: true,
             suppress_parent_restore_on_cancel: true,
             pin_topmost: true,
@@ -240,12 +258,13 @@ fn select_interpreter_internal(
     let result = Arc::new(Mutex::new(None));
     let init = Box::new(InterpreterSelectInit {
         parent,
-        mode,
+        mode: mode.clone(),
         language,
         secondary_action_label: options.secondary_action_label,
         context_action_label: options.context_action_label,
         initial_list_value: options.initial_list_value,
         initial_tree_value: options.initial_tree_value,
+        filter_label: options.filter_label,
         context_action_enabled: options.context_action_enabled,
         context_action_handler: options.context_action_handler,
         result: result.clone(),
@@ -409,7 +428,7 @@ fn interpreter_select_wndproc_inner(
             let parent = init.parent;
             let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let (control, tree_values) = match init.mode {
+            let (control, tree_values) = match init.mode.clone() {
                 InterpreterDialogInitMode::List(items) => {
                     let list = unsafe {
                         CreateWindowExW(
@@ -424,7 +443,7 @@ fn interpreter_select_wndproc_inner(
                             10,
                             10,
                             580,
-                            250,
+                            214,
                             hwnd,
                             HMENU(ID_LIST as isize),
                             HINSTANCE(0),
@@ -469,7 +488,7 @@ fn interpreter_select_wndproc_inner(
                             10,
                             10,
                             580,
-                            250,
+                            214,
                             hwnd,
                             HMENU(ID_LIST as isize),
                             HINSTANCE(0),
@@ -534,6 +553,39 @@ fn interpreter_select_wndproc_inner(
                 }
             };
 
+            let mut filter_label_hwnd = None;
+            let filter_edit = init.filter_label.as_ref().map(|label| unsafe {
+                let label_hwnd = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    230,
+                    120,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                filter_label_hwnd = Some(label_hwnd);
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    10,
+                    248,
+                    580,
+                    24,
+                    hwnd,
+                    HMENU(ID_FILTER_EDIT as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            });
+
             let secondary_button = init.secondary_action_label.as_ref().map(|label| unsafe {
                 CreateWindowExW(
                     Default::default(),
@@ -541,7 +593,7 @@ fn interpreter_select_wndproc_inner(
                     PCWSTR(to_wide(label).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     10,
-                    280,
+                    282,
                     240,
                     28,
                     hwnd,
@@ -558,7 +610,7 @@ fn interpreter_select_wndproc_inner(
                     PCWSTR(to_wide(&i18n::tr(init.language, "options.ok")).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     390,
-                    280,
+                    282,
                     90,
                     28,
                     hwnd,
@@ -575,7 +627,7 @@ fn interpreter_select_wndproc_inner(
                     PCWSTR(to_wide(&i18n::tr(init.language, "options.cancel")).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     490,
-                    280,
+                    282,
                     90,
                     28,
                     hwnd,
@@ -600,6 +652,12 @@ fn interpreter_select_wndproc_inner(
                     if let Some(button) = secondary_button {
                         SendMessageW(button, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                     }
+                    if let Some(label) = filter_label_hwnd {
+                        SendMessageW(label, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
+                    if let Some(edit) = filter_edit {
+                        SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
                     SendMessageW(ok, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                     SendMessageW(cancel, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
@@ -607,6 +665,10 @@ fn interpreter_select_wndproc_inner(
 
             let state = Box::new(InterpreterSelectState {
                 control,
+                original_mode: init.mode,
+                initial_list_value: init.initial_list_value,
+                initial_tree_value: init.initial_tree_value,
+                filter_edit,
                 tree_values,
                 context_action_label: init.context_action_label,
                 context_action_enabled: init.context_action_enabled,
@@ -715,6 +777,13 @@ fn interpreter_select_wndproc_inner(
         WM_COMMAND => {
             let id = wparam.0;
             match id {
+                command
+                    if command & 0xffff == ID_FILTER_EDIT
+                        && ((command >> 16) & 0xffff) as u32 == EN_CHANGE =>
+                {
+                    refresh_filtered_control(hwnd);
+                    LRESULT(0)
+                }
                 ID_OK => {
                     with_interpreter_state(hwnd, |state| match &state.control {
                         ControlKind::List(list) => {
@@ -891,6 +960,162 @@ fn selected_tree_value(tree: HWND, tree_values: &[String]) -> Option<String> {
         return None;
     }
     tree_values.get(item.lParam.0 as usize).cloned()
+}
+
+fn refresh_filtered_control(hwnd: HWND) {
+    with_interpreter_state(hwnd, |state| {
+        let filter_text = state
+            .filter_edit
+            .map(read_window_text)
+            .unwrap_or_default()
+            .trim()
+            .to_lowercase();
+
+        let result_count = match (&state.control, &state.original_mode) {
+            (ControlKind::List(list), InterpreterDialogInitMode::List(items)) => {
+                let preferred =
+                    selected_list_value(*list).or_else(|| state.initial_list_value.clone());
+                repopulate_list(*list, items, preferred.as_deref(), &filter_text)
+            }
+            (ControlKind::Tree(tree), InterpreterDialogInitMode::Tree(groups)) => {
+                let preferred = selected_tree_value(*tree, &state.tree_values)
+                    .or_else(|| state.initial_tree_value.clone());
+                let (new_tree_values, count) =
+                    repopulate_tree(*tree, groups, preferred.as_deref(), &filter_text);
+                state.tree_values = new_tree_values;
+                count
+            }
+            _ => 0,
+        };
+
+        if state.filter_edit.is_some() && !filter_text.is_empty() {
+            crate::screen_reader_speak(&format!("{result_count} risultati"));
+        }
+    });
+}
+
+fn repopulate_list(
+    list: HWND,
+    items: &[String],
+    preferred: Option<&str>,
+    filter_text: &str,
+) -> usize {
+    crate::send_message_w_safe(list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let mut selected_index = None;
+    let mut inserted_count = 0usize;
+    for item in items {
+        if !matches_filter(item, filter_text) {
+            continue;
+        }
+        crate::send_message_w_safe(
+            list,
+            LB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(item).as_ptr() as isize),
+        );
+        if preferred == Some(item.as_str()) {
+            selected_index = Some(inserted_count);
+        }
+        inserted_count += 1;
+    }
+    if inserted_count == 0 {
+        return 0;
+    }
+    crate::send_message_w_safe(
+        list,
+        LB_SETCURSEL,
+        WPARAM(selected_index.unwrap_or(0)),
+        LPARAM(0),
+    );
+    inserted_count
+}
+
+fn repopulate_tree(
+    tree: HWND,
+    groups: &[GroupedSelectGroup],
+    preferred_value: Option<&str>,
+    filter_text: &str,
+) -> (Vec<String>, usize) {
+    crate::send_message_w_safe(tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
+    let mut tree_values = Vec::new();
+    let mut first_group = HTREEITEM(0);
+    let mut preferred_group = HTREEITEM(0);
+    let mut preferred_child = HTREEITEM(0);
+    let mut visible_group_count = 0usize;
+
+    for group in groups {
+        if !matches_filter(&group.label, filter_text) {
+            continue;
+        }
+        visible_group_count += 1;
+        let parent_item = insert_tree_item(tree, HTREEITEM(0), &group.label, -1);
+        if parent_item.0 == 0 {
+            continue;
+        }
+        if first_group.0 == 0 {
+            first_group = parent_item;
+        }
+        if preferred_group.0 == 0
+            && preferred_value
+                .is_some_and(|value| group.items.iter().any(|item| item.value == value))
+        {
+            preferred_group = parent_item;
+        }
+        for item in &group.items {
+            let value_index = tree_values.len();
+            tree_values.push(item.value.clone());
+            let child_item = insert_tree_item(tree, parent_item, &item.label, value_index as isize);
+            if filter_text.is_empty() && preferred_value == Some(item.value.as_str()) {
+                preferred_group = parent_item;
+                preferred_child = child_item;
+            }
+        }
+    }
+
+    if preferred_child.0 != 0 {
+        crate::send_message_w_safe(
+            tree,
+            TVM_EXPAND,
+            WPARAM(TVE_EXPAND.0 as usize),
+            LPARAM(preferred_group.0),
+        );
+    }
+
+    let target = if preferred_child.0 != 0 {
+        preferred_child
+    } else if preferred_group.0 != 0 {
+        preferred_group
+    } else {
+        first_group
+    };
+    if target.0 != 0 {
+        crate::send_message_w_safe(
+            tree,
+            TVM_SELECTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(target.0),
+        );
+        crate::send_message_w_safe(tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
+    }
+
+    (tree_values, visible_group_count)
+}
+
+fn matches_filter(text: &str, filter_text: &str) -> bool {
+    if filter_text.is_empty() {
+        return true;
+    }
+    text.trim_start().to_lowercase().starts_with(filter_text)
+}
+
+fn read_window_text(hwnd: HWND) -> String {
+    let len = unsafe { GetWindowTextLengthW(hwnd) };
+    if len <= 0 {
+        return String::new();
+    }
+    let mut buf = vec![0u16; len as usize + 1];
+    let written = unsafe { GetWindowTextW(hwnd, &mut buf) };
+    String::from_utf16_lossy(&buf[..written as usize])
 }
 
 fn insert_tree_item(tree: HWND, parent: HTREEITEM, label: &str, value_index: isize) -> HTREEITEM {

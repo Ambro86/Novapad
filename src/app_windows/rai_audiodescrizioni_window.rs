@@ -19,7 +19,8 @@ use windows::core::PCWSTR;
 
 use crate::app_windows::interpreter_select_window;
 use crate::app_windows::interpreter_select_window::{
-    GroupedSelectGroup, GroupedSelectItem, InterpreterContextAction, InterpreterSelectionResult,
+    GroupedSelectGroup, GroupedSelectItem, InterpreterContextAction,
+    InterpreterSecondaryActionOptions, InterpreterSelectionResult,
 };
 use crate::settings::Language;
 use crate::tools::rai_audiodescrizioni::{self, CatalogGroup, CatalogItem};
@@ -87,12 +88,16 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
     });
     let display_items_for_enabled = display_items.clone();
     let display_items_for_handler = display_items.clone();
+    let filter_label = crate::i18n::tr(language, "wikipedia.search_label");
     let selection = interpreter_select_window::select_interpreter_with_secondary_action_and_context_action_and_initial_without_parent_restore(
         parent,
         labels,
         language,
         "Rai audiodescrizioni".to_string(),
-        "Mostra tutte le audiodescrizioni".to_string(),
+        InterpreterSecondaryActionOptions {
+            label: "Mostra tutte le audiodescrizioni".to_string(),
+            filter_label: Some(filter_label),
+        },
         initial_label,
         InterpreterContextAction {
             label: tr_or(language, "rai_audiodescrizioni.copy_audio_url", "Copia URL audio"),
@@ -192,11 +197,13 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
         .collect();
     let item_by_id_for_enabled = item_by_id.clone();
     let item_by_id_for_handler = item_by_id.clone();
+    let filter_label = crate::i18n::tr(language, "wikipedia.search_label");
     let Some(selected_value) = interpreter_select_window::select_grouped_interpreter_with_context_action_without_parent_restore_on_accept(
         parent,
         grouped_items,
         language,
         "Tutte le audiodescrizioni Rai".to_string(),
+        Some(filter_label),
         initial_item_id,
         InterpreterContextAction {
             label: tr_or(language, "rai_audiodescrizioni.copy_audio_url", "Copia URL audio"),

@@ -369,6 +369,7 @@ pub(crate) enum BlockingModalKind {
     // 3. optionally defer WM_COPYDATA file opens until the user closes the modal.
     AudiobookDone,
     UpdateDialog,
+    InfoDialog,
 }
 
 #[derive(Default)]
@@ -418,6 +419,27 @@ fn set_blocking_modal_active(hwnd: HWND, kind: Option<BlockingModalKind>) {
     with_state(hwnd, |state| {
         state.blocking_modal.active = kind;
     });
+}
+
+pub(crate) fn show_blocking_modal_message_box(
+    hwnd: HWND,
+    kind: BlockingModalKind,
+    message: PCWSTR,
+    title: PCWSTR,
+    flags: MESSAGEBOX_STYLE,
+) -> MESSAGEBOX_RESULT {
+    watchdog::enter_modal_dialog();
+    set_blocking_modal_active(hwnd, Some(kind));
+    let result = unsafe { MessageBoxW(hwnd, message, title, flags) };
+    set_blocking_modal_active(hwnd, None);
+    let pending_paths = take_deferred_copydata_paths_for_blocking_modal(hwnd);
+    if !pending_paths.is_empty() {
+        open_copydata_paths(hwnd, pending_paths);
+    } else {
+        restore_editor_focus(hwnd);
+    }
+    watchdog::exit_modal_dialog();
+    result
 }
 
 fn open_copydata_paths(hwnd: HWND, paths: Vec<PathBuf>) {
@@ -12900,32 +12922,26 @@ pub(crate) fn show_error_with_id(
     log_debug(&format!("Error shown: {full_message}"));
     let wide = to_wide(&full_message);
     let title = to_wide(&error_title(language));
-    watchdog::enter_modal_dialog();
-    unsafe {
-        MessageBoxW(
-            hwnd,
-            PCWSTR(wide.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONERROR,
-        );
-    }
-    watchdog::exit_modal_dialog();
+    show_blocking_modal_message_box(
+        hwnd,
+        BlockingModalKind::InfoDialog,
+        PCWSTR(wide.as_ptr()),
+        PCWSTR(title.as_ptr()),
+        MB_OK | MB_ICONERROR,
+    );
 }
 
 pub(crate) fn show_info(hwnd: HWND, language: Language, message: &str) {
     log_debug(&format!("Info shown: {message}"));
     let wide = to_wide(message);
     let title = to_wide(&info_title(language));
-    watchdog::enter_modal_dialog();
-    unsafe {
-        MessageBoxW(
-            hwnd,
-            PCWSTR(wide.as_ptr()),
-            PCWSTR(title.as_ptr()),
-            MB_OK | MB_ICONINFORMATION,
-        );
-    }
-    watchdog::exit_modal_dialog();
+    show_blocking_modal_message_box(
+        hwnd,
+        BlockingModalKind::InfoDialog,
+        PCWSTR(wide.as_ptr()),
+        PCWSTR(title.as_ptr()),
+        MB_OK | MB_ICONINFORMATION,
+    );
 }
 
 /// Mostra un MessageBox generico sospendendo il watchdog durante la visualizzazione.

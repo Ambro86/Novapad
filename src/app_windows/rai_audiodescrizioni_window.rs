@@ -10,10 +10,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
     IDC_ARROW, IDYES, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MSG,
-    MessageBoxW, RegisterClassW, SetForegroundWindow, SetWindowLongPtrW, WINDOW_STYLE, WM_CLOSE,
-    WM_COMMAND, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE,
+    RegisterClassW, SetForegroundWindow, SetWindowLongPtrW, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::PCWSTR;
 
@@ -424,14 +423,13 @@ fn handle_missing_luce_key(parent: HWND, language: Language, err: &str) -> bool 
     }
     crate::log_debug(&format!("Rai Luce missing key handler invoked: {}", err));
 
-    let ask = unsafe {
-        MessageBoxW(
-            parent,
-            PCWSTR(crate::to_wide(MISSING_KEY_MESSAGE).as_ptr()),
-            PCWSTR(crate::to_wide(MISSING_KEY_TITLE).as_ptr()),
-            MB_YESNO | MB_ICONQUESTION,
-        )
-    };
+    let ask = crate::show_blocking_modal_message_box(
+        parent,
+        crate::BlockingModalKind::RaiLuceMissingKey,
+        PCWSTR(crate::to_wide(MISSING_KEY_MESSAGE).as_ptr()),
+        PCWSTR(crate::to_wide(MISSING_KEY_TITLE).as_ptr()),
+        MB_YESNO | MB_ICONQUESTION,
+    );
     if ask != IDYES {
         return true;
     }

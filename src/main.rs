@@ -370,6 +370,7 @@ pub(crate) enum BlockingModalKind {
     AudiobookDone,
     UpdateDialog,
     InfoDialog,
+    RaiLuceMissingKey,
 }
 
 #[derive(Default)]

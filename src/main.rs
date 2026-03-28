@@ -371,6 +371,7 @@ pub(crate) enum BlockingModalKind {
     UpdateDialog,
     InfoDialog,
     RaiLuceMissingKey,
+    DocumentSaveConfirm,
 }
 
 #[derive(Default)]

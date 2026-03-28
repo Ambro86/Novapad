@@ -26,10 +26,10 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     CallWindowProcW, DefWindowProcW, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN,
     GWLP_USERDATA, GWLP_WNDPROC, GetClientRect, GetParent, GetWindowLongPtrW, HMENU, IDNO, IDYES,
-    MB_ICONWARNING, MB_YESNOCANCEL, MessageBoxW, MoveWindow, PostMessageW, SW_HIDE, SW_SHOW,
-    SendMessageW, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU,
-    WM_GETTEXTLENGTH, WM_KEYDOWN, WM_LBUTTONUP, WM_SETFONT, WM_UNDO, WS_CHILD, WS_CLIPCHILDREN,
-    WS_EX_CLIENTEDGE, WS_GROUP, WS_HSCROLL, WS_VSCROLL,
+    MB_ICONWARNING, MB_YESNOCANCEL, MoveWindow, PostMessageW, SW_HIDE, SW_SHOW, SendMessageW,
+    SetWindowLongPtrW, SetWindowTextW, ShowWindow, WM_CHAR, WM_CONTEXTMENU, WM_GETTEXTLENGTH,
+    WM_KEYDOWN, WM_LBUTTONUP, WM_SETFONT, WM_UNDO, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE,
+    WS_GROUP, WS_HSCROLL, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -4528,14 +4528,13 @@ pub fn confirm_save_if_dirty_entry(hwnd: HWND, index: usize, title: &str) -> boo
     let msg = confirm_save_message(language, title);
     let title_w = confirm_title(language);
 
-    let result = unsafe {
-        MessageBoxW(
-            hwnd,
-            PCWSTR(to_wide(&msg).as_ptr()),
-            PCWSTR(to_wide(&title_w).as_ptr()),
-            MB_YESNOCANCEL | MB_ICONWARNING,
-        )
-    };
+    let result = crate::show_blocking_modal_message_box(
+        hwnd,
+        crate::BlockingModalKind::DocumentSaveConfirm,
+        PCWSTR(to_wide(&msg).as_ptr()),
+        PCWSTR(to_wide(&title_w).as_ptr()),
+        MB_YESNOCANCEL | MB_ICONWARNING,
+    );
 
     match result {
         IDYES => save_document_at(hwnd, index, false),

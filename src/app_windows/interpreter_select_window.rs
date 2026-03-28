@@ -1,12 +1,12 @@
 use std::sync::{Arc, Mutex};
 
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
-use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
+use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT, InvalidateRect};
 use windows::Win32::UI::Controls::{
-    HTREEITEM, TVE_EXPAND, TVGN_CARET, TVI_ROOT, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW,
-    TVINSERTSTRUCTW_0, TVITEMW, TVM_DELETEITEM, TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETITEMW,
-    TVM_GETNEXTITEM, TVM_INSERTITEMW, TVM_SELECTITEM, TVS_HASBUTTONS, TVS_HASLINES,
-    TVS_LINESATROOT, TVS_SHOWSELALWAYS, WC_BUTTON, WC_EDIT, WC_STATIC,
+    HTREEITEM, TVE_EXPAND, TVGN_CARET, TVGN_PARENT, TVIF_PARAM, TVIF_TEXT, TVINSERTSTRUCTW,
+    TVINSERTSTRUCTW_0, TVITEMW, TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETITEMW, TVM_GETNEXTITEM,
+    TVM_INSERTITEMW, TVM_SELECTITEM, TVS_HASBUTTONS, TVS_HASLINES, TVS_LINESATROOT,
+    TVS_SHOWSELALWAYS, WC_BUTTON, WC_EDIT, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, SetFocus, VK_APPS, VK_DOWN, VK_END, VK_ESCAPE, VK_F10, VK_HOME, VK_LEFT, VK_NEXT,
@@ -17,12 +17,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     DefWindowProcW, DestroyMenu, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, GWLP_USERDATA,
     GetCursorPos, GetWindowTextLengthW, GetWindowTextW, HMENU, HWND_TOPMOST, IDC_ARROW,
     IsDialogMessageW, LB_ADDSTRING, LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_RESETCONTENT,
-    LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MF_STRING, MSG, PostMessageW, SWP_NOMOVE, SWP_NOSIZE,
-    SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowPos, TPM_NONOTIFY, TPM_RETURNCMD,
-    TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
-    WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MF_STRING, MSG, PostMessageW, SW_HIDE, SW_SHOW,
+    SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowPos,
+    SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu, TranslateMessage,
+    WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY,
+    WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -37,6 +37,7 @@ const ID_OK: usize = 9202;
 const ID_CANCEL: usize = 9203;
 const ID_SECONDARY: usize = 9204;
 const ID_FILTER_EDIT: usize = 9205;
+const ID_FLAT_LIST: usize = 9206;
 
 type ContextActionEnabled = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 type ContextActionHandler = Arc<dyn Fn(String) + Send + Sync>;
@@ -103,8 +104,9 @@ struct InterpreterSelectState {
     control: ControlKind,
     original_mode: InterpreterDialogInitMode,
     initial_list_value: Option<String>,
-    initial_tree_value: Option<String>,
     filter_edit: Option<HWND>,
+    flat_list: Option<HWND>,
+    flat_list_values: Vec<String>,
     tree_values: Vec<String>,
     context_action_label: Option<String>,
     context_action_enabled: Option<ContextActionEnabled>,
@@ -332,6 +334,23 @@ fn select_interpreter_internal(
                 crate::log_if_err!(PostMessageW(hwnd, WM_COMMAND, WPARAM(ID_OK), LPARAM(0)));
                 continue;
             }
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RIGHT.0 as u32 {
+                let is_flat_list_focused = with_interpreter_state(hwnd, |state| {
+                    if let ControlKind::Tree(_) = state.control {
+                        state
+                            .flat_list
+                            .map(|flat_list| focused == flat_list)
+                            .unwrap_or(false)
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false);
+                if is_flat_list_focused {
+                    crate::log_if_err!(PostMessageW(hwnd, WM_COMMAND, WPARAM(ID_OK), LPARAM(0)));
+                    continue;
+                }
+            }
             if msg.message == WM_KEYDOWN
                 && (msg.wParam.0 as u32 == VK_APPS.0 as u32
                     || (msg.wParam.0 as u32 == VK_F10.0 as u32
@@ -428,7 +447,7 @@ fn interpreter_select_wndproc_inner(
             let parent = init.parent;
             let hfont = with_state(parent, |state| state.hfont).unwrap_or(HFONT(0));
 
-            let (control, tree_values) = match init.mode.clone() {
+            let (control, tree_values, flat_list) = match init.mode.clone() {
                 InterpreterDialogInitMode::List(items) => {
                     let list = unsafe {
                         CreateWindowExW(
@@ -467,7 +486,7 @@ fn interpreter_select_wndproc_inner(
                         SendMessageW(list, LB_SETCURSEL, WPARAM(initial_index), LPARAM(0));
                         SetFocus(list);
                     }
-                    (ControlKind::List(list), Vec::new())
+                    (ControlKind::List(list), Vec::new(), None)
                 }
                 InterpreterDialogInitMode::Tree(groups) => {
                     let tree = unsafe {
@@ -494,6 +513,24 @@ fn interpreter_select_wndproc_inner(
                             HINSTANCE(0),
                             None,
                         )
+                    };
+                    let flat_list = unsafe {
+                        let list = CreateWindowExW(
+                            Default::default(),
+                            w!("LISTBOX"),
+                            PCWSTR::null(),
+                            WS_CHILD | WS_TABSTOP | WS_VSCROLL | WINDOW_STYLE(LBS_NOTIFY as u32),
+                            10,
+                            10,
+                            580,
+                            214,
+                            hwnd,
+                            HMENU(ID_FLAT_LIST as isize),
+                            HINSTANCE(0),
+                            None,
+                        );
+                        ShowWindow(list, SW_HIDE);
+                        list
                     };
                     let mut tree_values = Vec::new();
                     let mut first_group = HTREEITEM(0);
@@ -549,7 +586,7 @@ fn interpreter_select_wndproc_inner(
                     unsafe {
                         SetFocus(tree);
                     }
-                    (ControlKind::Tree(tree), tree_values)
+                    (ControlKind::Tree(tree), tree_values, Some(flat_list))
                 }
             };
 
@@ -658,6 +695,9 @@ fn interpreter_select_wndproc_inner(
                     if let Some(edit) = filter_edit {
                         SendMessageW(edit, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                     }
+                    if let Some(list) = flat_list {
+                        SendMessageW(list, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
                     SendMessageW(ok, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                     SendMessageW(cancel, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
@@ -667,8 +707,9 @@ fn interpreter_select_wndproc_inner(
                 control,
                 original_mode: init.mode,
                 initial_list_value: init.initial_list_value,
-                initial_tree_value: init.initial_tree_value,
                 filter_edit,
+                flat_list,
+                flat_list_values: Vec::new(),
                 tree_values,
                 context_action_label: init.context_action_label,
                 context_action_enabled: init.context_action_enabled,
@@ -698,6 +739,12 @@ fn interpreter_select_wndproc_inner(
                         value
                     }
                     ControlKind::Tree(tree) => {
+                        if let Some(flat_list) = state.flat_list
+                            && unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(flat_list) }
+                                .as_bool()
+                        {
+                            return false;
+                        }
                         if target.0 != 0 && target != tree && target != hwnd {
                             return false;
                         }
@@ -785,6 +832,18 @@ fn interpreter_select_wndproc_inner(
                     LRESULT(0)
                 }
                 ID_OK => {
+                    let activated_filtered_group = with_interpreter_state(hwnd, |state| {
+                        if let ControlKind::Tree(tree) = &state.control
+                            && is_tree_filter_active(state)
+                        {
+                            return activate_filtered_tree_group_selection(state, *tree);
+                        }
+                        false
+                    })
+                    .unwrap_or(false);
+                    if activated_filtered_group {
+                        return LRESULT(0);
+                    }
                     with_interpreter_state(hwnd, |state| match &state.control {
                         ControlKind::List(list) => {
                             let sel = crate::send_message_w_safe(
@@ -978,12 +1037,13 @@ fn refresh_filtered_control(hwnd: HWND) {
                 repopulate_list(*list, items, preferred.as_deref(), &filter_text)
             }
             (ControlKind::Tree(tree), InterpreterDialogInitMode::Tree(groups)) => {
-                let preferred = selected_tree_value(*tree, &state.tree_values)
-                    .or_else(|| state.initial_tree_value.clone());
-                let (new_tree_values, count) =
-                    repopulate_tree(*tree, groups, preferred.as_deref(), &filter_text);
-                state.tree_values = new_tree_values;
-                count
+                repopulate_group_filter_list(
+                    *tree,
+                    state.flat_list,
+                    &mut state.flat_list_values,
+                    groups,
+                    &filter_text,
+                )
             }
             _ => 0,
         };
@@ -1000,6 +1060,7 @@ fn repopulate_list(
     preferred: Option<&str>,
     filter_text: &str,
 ) -> usize {
+    set_control_redraw(list, false);
     crate::send_message_w_safe(list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
     let mut selected_index = None;
     let mut inserted_count = 0usize;
@@ -1019,6 +1080,7 @@ fn repopulate_list(
         inserted_count += 1;
     }
     if inserted_count == 0 {
+        refresh_control_after_bulk_update(list);
         return 0;
     }
     crate::send_message_w_safe(
@@ -1027,78 +1089,224 @@ fn repopulate_list(
         WPARAM(selected_index.unwrap_or(0)),
         LPARAM(0),
     );
+    refresh_control_after_bulk_update(list);
     inserted_count
 }
 
-fn repopulate_tree(
+fn repopulate_group_filter_list(
     tree: HWND,
+    flat_list: Option<HWND>,
+    flat_list_values: &mut Vec<String>,
     groups: &[GroupedSelectGroup],
-    preferred_value: Option<&str>,
     filter_text: &str,
-) -> (Vec<String>, usize) {
-    crate::send_message_w_safe(tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
-    let mut tree_values = Vec::new();
-    let mut first_group = HTREEITEM(0);
-    let mut preferred_group = HTREEITEM(0);
-    let mut preferred_child = HTREEITEM(0);
-    let mut visible_group_count = 0usize;
+) -> usize {
+    let Some(flat_list) = flat_list else {
+        return 0;
+    };
 
+    if filter_text.is_empty() {
+        unsafe {
+            ShowWindow(flat_list, SW_HIDE);
+            ShowWindow(tree, SW_SHOW);
+        }
+        return 0;
+    }
+
+    unsafe {
+        ShowWindow(tree, SW_HIDE);
+        ShowWindow(flat_list, SW_SHOW);
+    }
+
+    set_control_redraw(flat_list, false);
+    crate::send_message_w_safe(flat_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    flat_list_values.clear();
+
+    let mut inserted_count = 0usize;
     for group in groups {
         if !matches_filter(&group.label, filter_text) {
             continue;
         }
-        visible_group_count += 1;
-        let parent_item = insert_tree_item(tree, HTREEITEM(0), &group.label, -1);
-        if parent_item.0 == 0 {
-            continue;
-        }
-        if first_group.0 == 0 {
-            first_group = parent_item;
-        }
-        if preferred_group.0 == 0
-            && preferred_value
-                .is_some_and(|value| group.items.iter().any(|item| item.value == value))
-        {
-            preferred_group = parent_item;
-        }
-        for item in &group.items {
-            let value_index = tree_values.len();
-            tree_values.push(item.value.clone());
-            let child_item = insert_tree_item(tree, parent_item, &item.label, value_index as isize);
-            if filter_text.is_empty() && preferred_value == Some(item.value.as_str()) {
-                preferred_group = parent_item;
-                preferred_child = child_item;
-            }
-        }
-    }
-
-    if preferred_child.0 != 0 {
         crate::send_message_w_safe(
-            tree,
-            TVM_EXPAND,
-            WPARAM(TVE_EXPAND.0 as usize),
-            LPARAM(preferred_group.0),
+            flat_list,
+            LB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&group.label).as_ptr() as isize),
         );
+        flat_list_values.push(group.label.clone());
+        inserted_count += 1;
     }
+    if inserted_count > 0 {
+        crate::send_message_w_safe(flat_list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+    }
+    refresh_control_after_bulk_update(flat_list);
+    inserted_count
+}
 
-    let target = if preferred_child.0 != 0 {
-        preferred_child
-    } else if preferred_group.0 != 0 {
-        preferred_group
-    } else {
-        first_group
+fn is_tree_filter_active(state: &InterpreterSelectState) -> bool {
+    state
+        .filter_edit
+        .map(read_window_text)
+        .is_some_and(|text| !text.trim().is_empty())
+}
+
+fn activate_filtered_tree_group_selection(state: &mut InterpreterSelectState, tree: HWND) -> bool {
+    let Some(flat_list) = state.flat_list else {
+        return false;
     };
-    if target.0 != 0 {
+    let selected_group = selected_flat_group_value(flat_list, &state.flat_list_values);
+    let Some(selected_group) = selected_group else {
+        return false;
+    };
+    let Some(group_item) = find_tree_group_by_label(tree, &selected_group) else {
+        return false;
+    };
+
+    if let Some(edit) = state.filter_edit {
+        crate::log_if_err!(unsafe { SetWindowTextW(edit, PCWSTR::null()) });
+    }
+    unsafe {
+        ShowWindow(flat_list, SW_HIDE);
+        ShowWindow(tree, SW_SHOW);
+        SetFocus(tree);
+    }
+    crate::send_message_w_safe(
+        tree,
+        TVM_SELECTITEM,
+        WPARAM(TVGN_CARET as usize),
+        LPARAM(group_item.0),
+    );
+    crate::send_message_w_safe(
+        tree,
+        TVM_EXPAND,
+        WPARAM(TVE_EXPAND.0 as usize),
+        LPARAM(group_item.0),
+    );
+    crate::send_message_w_safe(tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(group_item.0));
+    true
+}
+
+fn selected_flat_group_value(flat_list: HWND, flat_list_values: &[String]) -> Option<String> {
+    let sel = crate::send_message_w_safe(flat_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if sel < 0 {
+        return None;
+    }
+    flat_list_values.get(sel as usize).cloned()
+}
+
+fn find_tree_group_by_label(tree: HWND, target_label: &str) -> Option<HTREEITEM> {
+    let mut current = HTREEITEM(
         crate::send_message_w_safe(
             tree,
-            TVM_SELECTITEM,
+            TVM_GETNEXTITEM,
             WPARAM(TVGN_CARET as usize),
-            LPARAM(target.0),
+            LPARAM(0),
+        )
+        .0,
+    );
+    if current.0 != 0
+        && let Some(parent) = parent_tree_item(tree, current)
+    {
+        current = parent;
+    }
+    while let Some(label) = tree_item_label(tree, current) {
+        if label == target_label {
+            return Some(current);
+        }
+        current = HTREEITEM(
+            crate::send_message_w_safe(
+                tree,
+                TVM_GETNEXTITEM,
+                WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
+                LPARAM(current.0),
+            )
+            .0,
         );
-        crate::send_message_w_safe(tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(target.0));
+        if current.0 == 0 {
+            break;
+        }
     }
 
-    (tree_values, visible_group_count)
+    let mut current = HTREEITEM(
+        crate::send_message_w_safe(
+            tree,
+            TVM_GETNEXTITEM,
+            WPARAM(windows::Win32::UI::Controls::TVGN_ROOT as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    while current.0 != 0 {
+        if tree_item_label(tree, current).as_deref() == Some(target_label) {
+            return Some(current);
+        }
+        current = HTREEITEM(
+            crate::send_message_w_safe(
+                tree,
+                TVM_GETNEXTITEM,
+                WPARAM(windows::Win32::UI::Controls::TVGN_NEXT as usize),
+                LPARAM(current.0),
+            )
+            .0,
+        );
+    }
+    None
+}
+
+fn parent_tree_item(tree: HWND, item: HTREEITEM) -> Option<HTREEITEM> {
+    let parent = HTREEITEM(
+        crate::send_message_w_safe(
+            tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_PARENT as usize),
+            LPARAM(item.0),
+        )
+        .0,
+    );
+    if parent.0 == 0 { None } else { Some(parent) }
+}
+
+fn tree_item_label(tree: HWND, item: HTREEITEM) -> Option<String> {
+    if item.0 == 0 {
+        return None;
+    }
+    let mut entry = TVITEMW {
+        mask: TVIF_TEXT,
+        hItem: item,
+        ..Default::default()
+    };
+    let mut text = vec![0u16; 512];
+    entry.pszText = windows::core::PWSTR(text.as_mut_ptr());
+    entry.cchTextMax = text.len() as i32;
+    if crate::send_message_w_safe(
+        tree,
+        TVM_GETITEMW,
+        WPARAM(0),
+        LPARAM(&mut entry as *mut _ as isize),
+    )
+    .0 == 0
+    {
+        return None;
+    }
+    let len = text
+        .iter()
+        .position(|&value| value == 0)
+        .unwrap_or(text.len());
+    Some(String::from_utf16_lossy(&text[..len]))
+}
+
+fn set_control_redraw(hwnd: HWND, enabled: bool) {
+    unsafe {
+        SendMessageW(hwnd, WM_SETREDRAW, WPARAM(usize::from(enabled)), LPARAM(0));
+    }
+}
+
+fn refresh_control_after_bulk_update(hwnd: HWND) {
+    set_control_redraw(hwnd, true);
+    unsafe {
+        if !InvalidateRect(hwnd, None, BOOL(1)).as_bool() {
+            crate::log_debug("InvalidateRect failed after interpreter selection bulk update");
+        }
+    }
 }
 
 fn matches_filter(text: &str, filter_text: &str) -> bool {

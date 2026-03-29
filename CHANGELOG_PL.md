@@ -14,6 +14,7 @@ Ulepszenia
 • Dodano ponad 50 wybieralnych krajów dla katalogu podcastów, dzięki czemu można teraz wybierać spośród znacznie większej liczby katalogów narodowych.
 • Funkcja „Odtwórz dźwięk ze streamingu...” pozwala teraz także wyszukiwać w YouTube po dowolnym tekście albo wkleić link do kanału lub playlisty YouTube, aby wyświetlić ich wyniki.
 • Ulepszono sposób wyświetlania wyników w „Odtwórz dźwięk ze streamingu...”: wpisy YouTube zawierają teraz tytuł, czas trwania, kanał i liczbę wyświetleń w czytelniejszym formacie.
+• „Odtwórz dźwięk ze streamingu...” obsługuje teraz również komentarze YouTube: można je otworzyć z menu kontekstowego, czytać odpowiedzi i rozwijać wątki komentarzy klawiszem Strzałka w prawo.
 • Dodano ulubione YouTube dla kanałów i playlist w „Odtwórz dźwięk ze streamingu...”: można je dodawać z wyników za pomocą menu kontekstowego, otwierać bezpośrednio z listy Ulubione dostępnej po naciśnięciu Tab zaraz za polem adresu URL/zapytania YouTube oraz usuwać później z tej samej listy również przez menu kontekstowe. W wynikach wyszukiwania YouTube menu kontekstowe jest dostępne tylko dla kanałów i playlist.
 • Funkcja „Odtwórz dźwięk ze streamingu...” potrafi teraz poprosić o dane logowania, gdy strona wymaga zalogowania. Użytkownik może je wpisać, zapisać dla danej strony i później zarządzać zapisanymi danymi w Opcje > Audio.
 • Poprawiono fokus podczas „Odtwórz dźwięk ze streamingu...”, dzięki czemu okno postępu pozostaje stabilniejsze podczas pobierania i konwersji.

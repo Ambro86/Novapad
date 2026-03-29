@@ -14,6 +14,7 @@ Improvements
 • Added more than 50 selectable countries for the podcast directory, so users can choose from a much wider range of national catalogs.
 • "Play streaming audio..." can now also search YouTube from any text query, or accept a YouTube channel or playlist link and show its results.
 • Improved how results are shown in "Play streaming audio...": YouTube entries now include title, duration, channel, and view count in a clearer format.
+• "Play streaming audio..." now also supports YouTube comments: you can open them from the context menu, read replies, and expand comment threads with the Right Arrow key.
 • Added YouTube favorites for channels and playlists in "Play streaming audio...": they can be added from the results with the context menu, opened directly from the Favorites list reached with Tab right after the YouTube URL/query field, and removed later from that same list using the context menu. In YouTube search results, the context menu is available only for channels and playlists.
 • "Play streaming audio..." can now request credentials when a streaming site requires login. Users can enter them, save them for the site, and manage saved credentials later in Options > Audio.
 • Improved focus handling during "Play streaming audio...", so the progress window stays more stable during download and conversion.

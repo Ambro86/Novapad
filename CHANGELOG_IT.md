@@ -14,6 +14,7 @@ Miglioramenti
 • Aggiunte più di 50 nazioni selezionabili per la directory dei podcast, così è possibile scegliere tra molti più cataloghi nazionali.
 • "Riproduci audio da streaming..." ora permette anche di cercare su YouTube scrivendo una qualunque stringa di testo oppure di incollare il link di un canale o di una playlist YouTube per visualizzarne i risultati.
 • Migliorata la visualizzazione dei risultati in "Riproduci audio da streaming...": le voci YouTube ora includono titolo, durata, canale e visualizzazioni in un formato più chiaro.
+• "Riproduci audio da streaming..." ora supporta anche i commenti di YouTube: si possono aprire dal menu contestuale, leggere le risposte ed espandere i thread dei commenti con la Freccia destra.
 • Aggiunta in "Riproduci audio da streaming..." la possibilità di salvare canali e playlist YouTube nei preferiti: si possono aggiungere dai risultati tramite menu contestuale, aprire direttamente dalla lista Preferiti raggiungibile con Tab subito dopo il campo URL/query YouTube e rimuovere sempre dalla stessa lista tramite menu contestuale. Nei risultati della ricerca YouTube il menu contestuale è disponibile solo per canali e playlist.
 • In "Riproduci audio da streaming..." ora, quando un sito richiede l'accesso, Sonarpad può chiedere le credenziali. L'utente può inserirle, salvarle per il sito e gestire in seguito le credenziali salvate da Opzioni > Audio.
 • Migliorato il focus durante "Riproduci audio da streaming...", così la finestra di avanzamento resta più stabile durante il download e la conversione.

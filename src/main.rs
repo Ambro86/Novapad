@@ -1461,7 +1461,7 @@ pub(crate) fn set_pending_podcast_chapters_key(hwnd: HWND, key: Option<String>) 
 }
 
 pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
-    let (chapters, language, should_announce_unavailable, current_pos_ms) = {
+    let (chapters, language, current_pos_ms) = {
         with_state(hwnd, |state| {
             let key = state.pending_podcast_chapters_key.take();
             state.active_podcast_chapters_key = key.clone();
@@ -1475,7 +1475,6 @@ pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
                         return (
                             list.clone(),
                             state.settings.language,
-                            false,
                             audiobook_position_ms_from_state(state),
                         );
                     }
@@ -1484,7 +1483,6 @@ pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
                         return (
                             Vec::new(),
                             state.settings.language,
-                            true,
                             audiobook_position_ms_from_state(state),
                         );
                     }
@@ -1494,11 +1492,10 @@ pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
             (
                 Vec::new(),
                 state.settings.language,
-                false,
                 audiobook_position_ms_from_state(state),
             )
         })
-        .unwrap_or((Vec::new(), Language::default(), false, None))
+        .unwrap_or((Vec::new(), Language::default(), None))
     };
     unsafe {
         if !chapters.is_empty() {
@@ -1512,10 +1509,6 @@ pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
                 CHAPTER_ANNOUNCE_TIMER_ID,
                 "KillTimer CHAPTER_ANNOUNCE",
             );
-        }
-        if should_announce_unavailable {
-            let message = i18n::tr(language, "playback.chapters_unavailable");
-            nvda_speak(&message);
         }
         crate::menu::update_playback_menu(hwnd, true);
     }

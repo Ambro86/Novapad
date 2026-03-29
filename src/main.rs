@@ -11453,6 +11453,7 @@ pub(crate) fn goto_first_bookmark(
 
 pub(crate) fn rebuild_menus(hwnd: HWND) {
     let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let had_playback_menu = with_state(hwnd, |state| state.playback_menu.0 != 0).unwrap_or(false);
     let (_, recent_menu) = create_menus(hwnd, language);
     {
         with_state(hwnd, |state| {
@@ -11460,6 +11461,9 @@ pub(crate) fn rebuild_menus(hwnd: HWND) {
         });
     }
     update_recent_menu(hwnd, recent_menu);
+    if had_playback_menu {
+        crate::menu::update_playback_menu(hwnd, true);
+    }
     update_voice_panel_menu_check(hwnd);
 }
 

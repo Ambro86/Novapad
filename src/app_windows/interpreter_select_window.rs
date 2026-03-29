@@ -1400,6 +1400,76 @@ where
     crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
+pub fn restore_interpreter_select_focus(hwnd: HWND) -> bool {
+    if !crate::is_window_handle_valid(hwnd) {
+        crate::log_debug(&format!(
+            "interpreter_select restore focus aborted: invalid hwnd={:?}",
+            hwnd
+        ));
+        return false;
+    }
+    let mut class_buf = [0u16; 128];
+    let class_len = crate::get_class_name_w_safe(hwnd, &mut class_buf);
+    let class_name = if class_len > 0 {
+        String::from_utf16_lossy(&class_buf[..class_len as usize])
+    } else {
+        String::new()
+    };
+    if class_len <= 0 || class_name != INTERPRETER_SELECT_CLASS_NAME {
+        crate::log_debug(&format!(
+            "interpreter_select restore focus aborted: hwnd={:?} class='{}'",
+            hwnd, class_name
+        ));
+        return false;
+    }
+    crate::log_debug(&format!(
+        "interpreter_select restore focus start hwnd={:?} focus_before={:?}",
+        hwnd,
+        crate::get_focus_safe()
+    ));
+    crate::set_foreground_window_safe(hwnd);
+    with_interpreter_state(hwnd, |state| {
+        let target = match state.control {
+            ControlKind::List(list) => list,
+            ControlKind::Tree(tree) => {
+                if let Some(flat_list) = state.flat_list
+                    && unsafe {
+                        windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(flat_list)
+                    }
+                    .as_bool()
+                {
+                    flat_list
+                } else {
+                    tree
+                }
+            }
+        };
+        crate::log_debug(&format!(
+            "interpreter_select restore focus state hwnd={:?} target={:?} filter_edit={:?} flat_list={:?} focus_before_target={:?}",
+            hwnd,
+            target,
+            state.filter_edit,
+            state.flat_list,
+            crate::get_focus_safe()
+        ));
+        crate::log_debug(&format!(
+            "interpreter_select restore focus hwnd={:?} target={:?}",
+            hwnd, target
+        ));
+        unsafe {
+            SetFocus(target);
+        }
+        crate::log_debug(&format!(
+            "interpreter_select restore focus after SetFocus hwnd={:?} target={:?} focus_after={:?}",
+            hwnd,
+            target,
+            crate::get_focus_safe()
+        ));
+        true
+    })
+    .unwrap_or(false)
+}
+
 fn is_list_navigation_key(key: u32) -> bool {
     key == VK_UP.0 as u32
         || key == VK_DOWN.0 as u32

@@ -8,32 +8,39 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use encoding_rs::WINDOWS_1252;
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
-use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
+use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
+use windows::Win32::Graphics::Gdi::{
+    BeginPaint, COLOR_HIGHLIGHT, COLOR_WINDOW, DT_CALCRECT, DT_NOPREFIX, DT_WORDBREAK, DrawTextW,
+    EndPaint, FillRect, GetDC, HBRUSH, HFONT, HGDIOBJ, InvalidateRect, PAINTSTRUCT, ReleaseDC,
+    SelectObject, SetBkMode, TRANSPARENT,
+};
 use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL};
 use windows::Win32::UI::Controls::{
-    BST_CHECKED, EM_SCROLLCARET, EM_SETSEL, TVGN_CARET, TVI_ROOT, TVIF_CHILDREN, TVIF_PARAM,
-    TVIF_TEXT, TVINSERTSTRUCTW, TVINSERTSTRUCTW_0, TVITEMEXW, TVITEMEXW_CHILDREN, TVM_DELETEITEM,
-    TVM_INSERTITEMW, TVM_SELECTITEM, TVS_HASBUTTONS, TVS_HASLINES, TVS_LINESATROOT,
-    TVS_SHOWSELALWAYS, WC_BUTTON, WC_COMBOBOXW, WC_STATIC,
+    BST_CHECKED, EM_SCROLLCARET, EM_SETSEL, SetScrollInfo, ShowScrollBar, WC_BUTTON, WC_COMBOBOXW,
+    WC_LISTBOXW, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN,
+    EnableWindow, GetFocus, SetFocus, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_NEXT,
+    VK_PRIOR, VK_RETURN, VK_RIGHT, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING,
     CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW,
-    CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, DispatchMessageW,
-    EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE, ES_READONLY, GWLP_USERDATA, GetCursorPos,
-    GetForegroundWindow, GetWindowLongPtrW, HMENU, HWND_TOPMOST, IDC_ARROW, IDYES, IsChild,
-    IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MF_STRING, MSG, PM_REMOVE,
-    PeekMessageW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SWP_NOMOVE, SWP_NOSIZE,
-    SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
-    SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu, TranslateMessage,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_NOTIFY, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW, DLGC_WANTARROWS, DefWindowProcW, DestroyMenu,
+    DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE, ES_READONLY, GWLP_USERDATA,
+    GetCursorPos, GetForegroundWindow, GetParent, GetScrollInfo, GetWindowLongPtrW, HMENU,
+    HWND_TOPMOST, IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, LB_ADDSTRING,
+    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY,
+    LoadCursorW, MB_ICONQUESTION, MB_YESNO, MF_STRING, MSG, PM_REMOVE, PeekMessageW, PostMessageW,
+    RegisterClassW, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION,
+    SB_THUMBTRACK, SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS, SIF_RANGE, SIF_TRACKPOS,
+    SW_HIDE, SW_SHOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD,
+    TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
+    WM_CREATE, WM_DESTROY, WM_GETDLGCODE, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MOUSEWHEEL, WM_NCDESTROY,
+    WM_PAINT, WM_SETFONT, WM_SIZE, WM_VSCROLL, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
     WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
@@ -73,7 +80,9 @@ const STREAM_TRACK_ID_CANCEL: usize = 9323;
 const STREAM_DIALOG_CLASS_NAME: &str = "SonarpadStreamAudio";
 const STREAM_TRACK_DIALOG_CLASS_NAME: &str = "SonarpadStreamAudioTrack";
 const YOUTUBE_COMMENTS_DIALOG_CLASS_NAME: &str = "SonarpadYouTubeComments";
-const YOUTUBE_COMMENTS_ID_TREE: usize = 9331;
+const YOUTUBE_COMMENTS_VIEW_CLASS_NAME: &str = "SonarpadYouTubeCommentsView";
+const YOUTUBE_COMMENTS_ID_VIEW: usize = 9331;
+const YOUTUBE_COMMENTS_ID_ACCESSIBILITY_PROXY: usize = 9332;
 const YOUTUBE_COMMENTS_ID_CLOSE: usize = 9333;
 const WM_YT_LOAD_COMPLETE: u32 = WM_APP + 40;
 const WM_YT_TEXT_COMPLETE: u32 = WM_APP + 41;
@@ -1657,10 +1666,30 @@ struct YoutubeCommentsDialogInit {
     comments: Vec<YoutubeComment>,
 }
 
+#[derive(Clone)]
+struct YoutubeCommentRow {
+    comment_index: usize,
+    depth: usize,
+    height: i32,
+    has_children: bool,
+    expanded: bool,
+}
+
 struct YoutubeCommentsDialogState {
     language: Language,
-    tree: HWND,
+    title_label: HWND,
+    view: HWND,
+    accessibility_proxy: HWND,
+    close_button: HWND,
+    font: HFONT,
     comments: Vec<YoutubeComment>,
+    root_indices: Vec<usize>,
+    children_by_parent: HashMap<String, Vec<usize>>,
+    expanded_comment_ids: HashSet<String>,
+    rows: Vec<YoutubeCommentRow>,
+    selected_row: usize,
+    scroll_offset: i32,
+    content_height: i32,
 }
 
 struct ResolvedStreamSelection {
@@ -1920,8 +1949,32 @@ fn show_youtube_comments_for_stream_entry(
     ytdlp_path: &Path,
     entry: &StreamCollectionEntry,
 ) {
-    let progress = open_progress_dialog(
+    let foreground = crate::get_foreground_window_safe();
+    let ui_parent = {
+        let mut class_buf = [0u16; 128];
+        let class_len = if crate::is_window_handle_valid(foreground) {
+            crate::get_class_name_w_safe(foreground, &mut class_buf)
+        } else {
+            0
+        };
+        let foreground_is_stream_selector = class_len > 0
+            && String::from_utf16_lossy(&class_buf[..class_len as usize])
+                == "SonarpadInterpreterSelect";
+        if foreground_is_stream_selector {
+            foreground
+        } else {
+            parent
+        }
+    };
+    crate::log_debug(&format!(
+        "YT comments choose parent entry_parent={:?} ui_parent={:?} foreground={:?} focus={:?}",
         parent,
+        ui_parent,
+        foreground,
+        crate::get_focus_safe()
+    ));
+    let progress = open_progress_dialog(
+        ui_parent,
         language,
         "stream_audio.progress_title",
         "stream_audio.comments_loading",
@@ -1940,7 +1993,7 @@ fn show_youtube_comments_for_stream_entry(
         Ok(Ok(comments)) => comments,
         Ok(Err(err)) => {
             show_error(
-                parent,
+                ui_parent,
                 language,
                 &i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]),
             );
@@ -1948,7 +2001,7 @@ fn show_youtube_comments_for_stream_entry(
         }
         Err(_) => {
             show_error(
-                parent,
+                ui_parent,
                 language,
                 &tr_or(
                     language,
@@ -1961,7 +2014,7 @@ fn show_youtube_comments_for_stream_entry(
     };
     if comments.is_empty() {
         show_error(
-            parent,
+            ui_parent,
             language,
             &tr_or(
                 language,
@@ -1971,7 +2024,7 @@ fn show_youtube_comments_for_stream_entry(
         );
         return;
     }
-    open_youtube_comments_window(parent, language, entry.label.clone(), comments);
+    open_youtube_comments_window(ui_parent, language, entry.label.clone(), comments);
 }
 
 fn fetch_youtube_comments_with_ytdlp(
@@ -2051,6 +2104,7 @@ fn open_youtube_comments_window(
 ) {
     let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(YOUTUBE_COMMENTS_DIALOG_CLASS_NAME);
+    let view_class_name = to_wide(YOUTUBE_COMMENTS_VIEW_CLASS_NAME);
     let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
         hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
             LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
@@ -2062,6 +2116,17 @@ fn open_youtube_comments_window(
         ..Default::default()
     };
     crate::register_class_w_safe(&wc);
+    let view_wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
+            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
+        }),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(view_class_name.as_ptr()),
+        lpfnWndProc: Some(youtube_comments_view_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    crate::register_class_w_safe(&view_wc);
 
     let init = Box::new(YoutubeCommentsDialogInit {
         parent,
@@ -2110,7 +2175,59 @@ fn open_youtube_comments_window(
             break;
         }
         unsafe {
+            if msg.message == WM_KEYDOWN {
+                let focus = GetFocus();
+                crate::log_debug(&format!(
+                    "YT comments loop WM_KEYDOWN key={} focus={:?} hwnd={:?} msg_hwnd={:?}",
+                    msg.wParam.0, focus, hwnd, msg.hwnd
+                ));
+                if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    crate::log_debug("YT comments loop handling ESC as close");
+                    crate::send_message_w_safe(
+                        hwnd,
+                        WM_COMMAND,
+                        WPARAM(YOUTUBE_COMMENTS_ID_CLOSE),
+                        LPARAM(0),
+                    );
+                    continue;
+                }
+                let (should_capture, handled) = with_youtube_comments_state(hwnd, |state| {
+                    let should_capture = focus != state.close_button
+                        && is_youtube_comments_dialog_navigation_key(msg.wParam.0 as u32);
+                    crate::log_debug(&format!(
+                        "YT comments loop state before route view={:?} proxy={:?} close={:?} rows={} selected_row={} scroll_offset={} content_height={} should_capture={}",
+                        state.view,
+                        state.accessibility_proxy,
+                        state.close_button,
+                        state.rows.len(),
+                        state.selected_row,
+                        state.scroll_offset,
+                        state.content_height,
+                        should_capture
+                    ));
+                    let handled = should_capture
+                        && crate::is_window_handle_valid(state.view)
+                        && handle_youtube_comments_keydown_for_state(
+                            state,
+                            msg.wParam.0 as u32,
+                            true,
+                        );
+                    (should_capture, handled)
+                })
+                .unwrap_or((false, false));
+                crate::log_debug(&format!(
+                    "YT comments loop WM_KEYDOWN should_capture={} handled={} key={}",
+                    should_capture, handled, msg.wParam.0
+                ));
+                if should_capture {
+                    continue;
+                }
+            }
             if IsDialogMessageW(hwnd, &msg).as_bool() {
+                crate::log_debug(&format!(
+                    "YT comments IsDialogMessageW handled msg={} wparam={} hwnd={:?}",
+                    msg.message, msg.wParam.0, msg.hwnd
+                ));
                 continue;
             }
             TranslateMessage(&msg);
@@ -2120,8 +2237,16 @@ fn open_youtube_comments_window(
 
     unsafe {
         EnableWindow(parent, true);
-        SetForegroundWindow(parent);
     }
+    if crate::is_window_handle_valid(parent) {
+        crate::log_debug(&format!(
+            "YT comments closing restore start parent={:?} focus_before_fg_restore={:?}",
+            parent,
+            crate::get_focus_safe()
+        ));
+        crate::set_foreground_window_safe(parent);
+    }
+    restore_stream_dialog_focus(parent);
 }
 
 unsafe extern "system" fn youtube_comments_dialog_wndproc(
@@ -2155,6 +2280,7 @@ fn youtube_comments_dialog_wndproc_inner(
             }
             let init = crate::box_from_raw_safe(init_ptr);
             let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
+            let view_class_name = to_wide(YOUTUBE_COMMENTS_VIEW_CLASS_NAME);
 
             let title_label = unsafe {
                 CreateWindowExW(
@@ -2172,24 +2298,37 @@ fn youtube_comments_dialog_wndproc_inner(
                     None,
                 )
             };
-            let tree = unsafe {
+            let view = unsafe {
                 CreateWindowExW(
                     WS_EX_CLIENTEDGE,
-                    w!("SysTreeView32"),
+                    PCWSTR(view_class_name.as_ptr()),
                     PCWSTR::null(),
-                    WS_CHILD
-                        | WS_VISIBLE
-                        | WS_TABSTOP
-                        | WS_VSCROLL
-                        | WINDOW_STYLE(
-                            TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS,
-                        ),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL,
                     10,
                     40,
                     780,
                     450,
                     hwnd,
-                    HMENU(YOUTUBE_COMMENTS_ID_TREE as isize),
+                    HMENU(YOUTUBE_COMMENTS_ID_VIEW as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            let accessibility_proxy = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_LISTBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS) as u32),
+                    0,
+                    0,
+                    1,
+                    1,
+                    hwnd,
+                    HMENU(YOUTUBE_COMMENTS_ID_ACCESSIBILITY_PROXY as isize),
                     HINSTANCE(0),
                     None,
                 )
@@ -2213,27 +2352,135 @@ fn youtube_comments_dialog_wndproc_inner(
 
             if hfont.0 != 0 {
                 unsafe {
-                    for control in [title_label, tree, close_button] {
+                    for control in [title_label, view, accessibility_proxy, close_button] {
                         SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                     }
                 }
             }
 
+            let (root_indices, children_by_parent) = build_youtube_comment_threads(&init.comments);
+            let expanded_comment_ids = HashSet::new();
+            crate::log_debug(&format!(
+                "YT comments WM_CREATE title='{}' comments={} roots={} parents_with_children={}",
+                init.title,
+                init.comments.len(),
+                root_indices.len(),
+                children_by_parent.len()
+            ));
             let state = Box::new(YoutubeCommentsDialogState {
                 language: init.language,
-                tree,
+                title_label,
+                view,
+                accessibility_proxy,
+                close_button,
+                font: hfont,
                 comments: init.comments,
+                root_indices,
+                children_by_parent,
+                expanded_comment_ids,
+                rows: Vec::new(),
+                selected_row: 0,
+                scroll_offset: 0,
+                content_height: 0,
             });
             crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-            populate_youtube_comments_tree(hwnd);
+            relayout_youtube_comments_dialog(hwnd);
             unsafe {
-                SetFocus(tree);
+                SetFocus(accessibility_proxy);
             }
+            crate::log_debug(&format!(
+                "YT comments WM_CREATE completed hwnd={:?} view={:?} proxy={:?} close_button={:?}",
+                hwnd, view, accessibility_proxy, close_button
+            ));
             LRESULT(0)
         }
-        WM_NOTIFY => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
+        WM_SIZE => {
+            crate::log_debug(&format!(
+                "YT comments WM_SIZE hwnd={:?} width={} height={}",
+                hwnd,
+                (lparam.0 as u32 & 0xffff) as i16 as i32,
+                ((lparam.0 as u32 >> 16) & 0xffff) as i16 as i32
+            ));
+            relayout_youtube_comments_dialog(hwnd);
+            LRESULT(0)
+        }
+        WM_KEYDOWN => {
+            crate::log_debug(&format!(
+                "YT comments dialog WM_KEYDOWN key={} focus={:?}",
+                wparam.0,
+                unsafe { GetFocus() }
+            ));
+            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                crate::log_debug("YT comments dialog handling ESC as close");
+                crate::send_message_w_safe(
+                    hwnd,
+                    WM_COMMAND,
+                    WPARAM(YOUTUBE_COMMENTS_ID_CLOSE),
+                    LPARAM(0),
+                );
+                return LRESULT(0);
+            }
+            let handled = with_youtube_comments_state(hwnd, |state| {
+                let focus = unsafe { GetFocus() };
+                if focus == state.close_button
+                    || !is_youtube_comments_dialog_navigation_key(wparam.0 as u32)
+                {
+                    crate::log_debug(&format!(
+                        "YT comments dialog WM_KEYDOWN ignored key={} focus={:?} close_button={:?}",
+                        wparam.0, focus, state.close_button
+                    ));
+                    return false;
+                }
+                handle_youtube_comments_keydown_for_state(state, wparam.0 as u32, true)
+            })
+            .unwrap_or(false);
+            crate::log_debug(&format!(
+                "YT comments dialog WM_KEYDOWN handled={} key={}",
+                handled, wparam.0
+            ));
+            if handled || is_youtube_comments_dialog_navigation_key(wparam.0 as u32) {
+                return LRESULT(0);
+            }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
+        }
         WM_COMMAND => {
             let cmd_id = wparam.0 & 0xffff;
+            let notify = ((wparam.0 >> 16) & 0xffff) as u16;
+            if cmd_id == YOUTUBE_COMMENTS_ID_ACCESSIBILITY_PROXY && notify == LBN_SELCHANGE as u16 {
+                with_youtube_comments_state(hwnd, |state| {
+                    let sel = crate::send_message_w_safe(
+                        state.accessibility_proxy,
+                        LB_GETCURSEL,
+                        WPARAM(0),
+                        LPARAM(0),
+                    )
+                    .0 as i32;
+                    crate::log_debug(&format!(
+                        "YT comments proxy LBN_SELCHANGE sel={} previous_selected={} rows={}",
+                        sel,
+                        state.selected_row,
+                        state.rows.len()
+                    ));
+                    if sel >= 0 {
+                        let selected_row = sel as usize;
+                        if selected_row < state.rows.len() && selected_row != state.selected_row {
+                            state.selected_row = selected_row;
+                            let mut rect = windows::Win32::Foundation::RECT::default();
+                            if crate::get_client_rect_safe(state.view, &mut rect).is_ok() {
+                                let viewport_height = rect.bottom - rect.top;
+                                ensure_selected_youtube_comment_visible(state, viewport_height);
+                                update_youtube_comments_scrollbar(state, viewport_height);
+                            }
+                            if !unsafe { InvalidateRect(state.view, None, BOOL(1)) }.as_bool() {
+                                crate::log_debug(
+                                    "InvalidateRect failed after proxy selection change",
+                                );
+                            }
+                        }
+                    }
+                });
+                return LRESULT(0);
+            }
             if cmd_id == YOUTUBE_COMMENTS_ID_CLOSE || cmd_id == 1 {
                 crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 return LRESULT(0);
@@ -2267,106 +2514,231 @@ fn with_youtube_comments_state<R>(
     Some(f(unsafe { &mut *ptr }))
 }
 
-fn populate_youtube_comments_tree(hwnd: HWND) {
+fn build_youtube_comment_threads(
+    comments: &[YoutubeComment],
+) -> (Vec<usize>, HashMap<String, Vec<usize>>) {
+    let known_ids: HashSet<&str> = comments.iter().map(|comment| comment.id.as_str()).collect();
+    let mut root_indices = Vec::new();
+    let mut children_by_parent: HashMap<String, Vec<usize>> = HashMap::new();
+    for (index, comment) in comments.iter().enumerate() {
+        let parent_id = comment.parent.trim();
+        if parent_id.eq_ignore_ascii_case("root") || !known_ids.contains(parent_id) {
+            root_indices.push(index);
+        } else {
+            children_by_parent
+                .entry(parent_id.to_string())
+                .or_default()
+                .push(index);
+        }
+    }
+    crate::log_debug(&format!(
+        "YT comments build threads comments={} roots={} parent_buckets={}",
+        comments.len(),
+        root_indices.len(),
+        children_by_parent.len()
+    ));
+    (root_indices, children_by_parent)
+}
+
+const YOUTUBE_COMMENTS_MARGIN: i32 = 10;
+const YOUTUBE_COMMENTS_VIEW_TOP: i32 = 40;
+const YOUTUBE_COMMENTS_CLOSE_WIDTH: i32 = 90;
+const YOUTUBE_COMMENTS_CLOSE_HEIGHT: i32 = 28;
+const YOUTUBE_COMMENTS_CLOSE_BOTTOM_MARGIN: i32 = 12;
+const YOUTUBE_COMMENTS_VIEW_BOTTOM_GAP: i32 = 10;
+const YOUTUBE_COMMENTS_ROW_PADDING_X: i32 = 8;
+const YOUTUBE_COMMENTS_ROW_PADDING_Y: i32 = 6;
+const YOUTUBE_COMMENTS_ROW_GAP: i32 = 4;
+const YOUTUBE_COMMENTS_INDENT_WIDTH: i32 = 22;
+const YOUTUBE_COMMENTS_TOGGLE_WIDTH: i32 = 22;
+const YOUTUBE_COMMENTS_SCROLL_LINE: i32 = 40;
+const YOUTUBE_COMMENTS_WHEEL_DELTA: i32 = 120;
+
+fn relayout_youtube_comments_dialog(hwnd: HWND) {
+    let mut client = windows::Win32::Foundation::RECT::default();
+    if crate::get_client_rect_safe(hwnd, &mut client).is_err() {
+        crate::log_debug("Failed to query YouTube comments dialog client rect");
+        return;
+    }
+    with_youtube_comments_state(hwnd, |state| unsafe {
+        let width = (client.right - client.left).max(220);
+        let height = (client.bottom - client.top).max(180);
+        let close_x = width - YOUTUBE_COMMENTS_MARGIN - YOUTUBE_COMMENTS_CLOSE_WIDTH;
+        let close_y = height - YOUTUBE_COMMENTS_CLOSE_BOTTOM_MARGIN - YOUTUBE_COMMENTS_CLOSE_HEIGHT;
+        let view_height =
+            (close_y - YOUTUBE_COMMENTS_VIEW_TOP - YOUTUBE_COMMENTS_VIEW_BOTTOM_GAP).max(80);
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+            state.title_label,
+            YOUTUBE_COMMENTS_MARGIN,
+            YOUTUBE_COMMENTS_MARGIN,
+            width - (YOUTUBE_COMMENTS_MARGIN * 2),
+            22,
+            true
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+            state.view,
+            YOUTUBE_COMMENTS_MARGIN,
+            YOUTUBE_COMMENTS_VIEW_TOP,
+            width - (YOUTUBE_COMMENTS_MARGIN * 2),
+            view_height,
+            true
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+            state.close_button,
+            close_x,
+            close_y,
+            YOUTUBE_COMMENTS_CLOSE_WIDTH,
+            YOUTUBE_COMMENTS_CLOSE_HEIGHT,
+            true
+        ));
+        crate::log_if_err!(windows::Win32::UI::WindowsAndMessaging::MoveWindow(
+            state.accessibility_proxy,
+            close_x - 2,
+            close_y + YOUTUBE_COMMENTS_CLOSE_HEIGHT - 2,
+            1,
+            1,
+            true
+        ));
+    });
+    rebuild_youtube_comment_rows(hwnd);
+}
+
+fn rebuild_youtube_comment_rows(hwnd: HWND) {
     with_youtube_comments_state(hwnd, |state| {
-        crate::send_message_w_safe(state.tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
-        let known_ids: HashSet<&str> = state
-            .comments
+        let mut rect = windows::Win32::Foundation::RECT::default();
+        if crate::get_client_rect_safe(state.view, &mut rect).is_err() {
+            crate::log_debug("Failed to query comment custom view rect");
+            return;
+        }
+        let view_width = (rect.right - rect.left).max(120);
+        let viewport_height = (rect.bottom - rect.top).max(1);
+        let hdc = unsafe { GetDC(state.view) };
+        if hdc.0 == 0 {
+            crate::log_debug("Failed to acquire DC for YouTube comments view");
+            return;
+        }
+        let old_font = if state.font.0 != 0 {
+            unsafe { SelectObject(hdc, HGDIOBJ(state.font.0)) }
+        } else {
+            HGDIOBJ(0)
+        };
+        let mut rows = Vec::new();
+        for &comment_index in &state.root_indices {
+            append_youtube_comment_rows(state, hdc, view_width, comment_index, 0, &mut rows);
+        }
+        if old_font.0 != 0 {
+            unsafe {
+                let _prev = SelectObject(hdc, old_font);
+            }
+        }
+        let _released = unsafe { ReleaseDC(state.view, hdc) };
+
+        state.rows = rows;
+        state.content_height = state
+            .rows
             .iter()
-            .map(|comment| comment.id.as_str())
-            .collect();
-        let mut replies_by_parent: HashMap<&str, Vec<usize>> = HashMap::new();
-        let mut roots = Vec::new();
-        for (index, comment) in state.comments.iter().enumerate() {
-            let parent_id = comment.parent.as_str();
-            if parent_id.eq_ignore_ascii_case("root") || !known_ids.contains(parent_id) {
-                roots.push(index);
-            } else {
-                replies_by_parent.entry(parent_id).or_default().push(index);
-            }
+            .fold(0, |acc, row| acc + row.height + YOUTUBE_COMMENTS_ROW_GAP)
+            .saturating_sub(YOUTUBE_COMMENTS_ROW_GAP);
+        if !state.rows.is_empty() {
+            state.selected_row = state.selected_row.min(state.rows.len().saturating_sub(1));
+        } else {
+            state.selected_row = 0;
         }
-        let mut first_root = None;
-        for index in roots {
-            let item = insert_youtube_comment_tree_item(
-                state.tree,
-                TVI_ROOT.0,
-                state.language,
-                &state.comments,
-                &replies_by_parent,
-                index,
-            );
-            if first_root.is_none() && item.0 != 0 {
-                first_root = Some(item);
-            }
-        }
-        if let Some(first_root) = first_root {
-            crate::send_message_w_safe(
-                state.tree,
-                TVM_SELECTITEM,
-                WPARAM(TVGN_CARET as usize),
-                LPARAM(first_root.0),
-            );
+        clamp_youtube_comment_scroll(state, viewport_height);
+        ensure_selected_youtube_comment_visible(state, viewport_height);
+        update_youtube_comments_scrollbar(state, viewport_height);
+        crate::log_debug(&format!(
+            "YT comments rebuild rows comments={} roots={} rows={} selected_row={} scroll_offset={} content_height={} viewport_height={} view_width={}",
+            state.comments.len(),
+            state.root_indices.len(),
+            state.rows.len(),
+            state.selected_row,
+            state.scroll_offset,
+            state.content_height,
+            viewport_height,
+            view_width
+        ));
+        rebuild_youtube_comments_accessibility_proxy(state);
+        if !unsafe { InvalidateRect(state.view, None, BOOL(1)) }.as_bool() {
+            crate::log_debug("InvalidateRect failed for YouTube comments custom view");
         }
     });
 }
 
-fn insert_youtube_comment_tree_item(
-    tree: HWND,
-    parent_item: isize,
-    language: Language,
-    comments: &[YoutubeComment],
-    replies_by_parent: &HashMap<&str, Vec<usize>>,
-    index: usize,
-) -> windows::Win32::UI::Controls::HTREEITEM {
-    let Some(comment) = comments.get(index) else {
-        return windows::Win32::UI::Controls::HTREEITEM(0);
+fn append_youtube_comment_rows(
+    state: &YoutubeCommentsDialogState,
+    hdc: windows::Win32::Graphics::Gdi::HDC,
+    view_width: i32,
+    comment_index: usize,
+    depth: usize,
+    rows: &mut Vec<YoutubeCommentRow>,
+) {
+    let Some(comment) = state.comments.get(comment_index) else {
+        return;
     };
-    let has_children = replies_by_parent
+    let has_children = state
+        .children_by_parent
         .get(comment.id.as_str())
         .map(|items| !items.is_empty())
         .unwrap_or(false);
-    let label = format_youtube_comment_tree_label(language, comment);
-    let mut text = to_wide(&label);
-    let insert = TVINSERTSTRUCTW {
-        hParent: windows::Win32::UI::Controls::HTREEITEM(parent_item),
-        hInsertAfter: windows::Win32::UI::Controls::HTREEITEM(0xffff0002u32 as isize),
-        Anonymous: TVINSERTSTRUCTW_0 {
-            itemex: TVITEMEXW {
-                mask: TVIF_TEXT | TVIF_PARAM | TVIF_CHILDREN,
-                pszText: windows::core::PWSTR(text.as_mut_ptr()),
-                cchTextMax: text.len() as i32,
-                lParam: LPARAM(index as isize),
-                cChildren: if has_children {
-                    TVITEMEXW_CHILDREN(1)
-                } else {
-                    TVITEMEXW_CHILDREN(0)
-                },
-                ..Default::default()
-            },
-        },
-    };
-    let item = windows::Win32::UI::Controls::HTREEITEM(
-        crate::send_message_w_safe(
-            tree,
-            TVM_INSERTITEMW,
-            WPARAM(0),
-            LPARAM(&insert as *const _ as isize),
-        )
-        .0,
+    let expanded = has_children && state.expanded_comment_ids.contains(comment.id.as_str());
+    let height = measure_youtube_comment_row_height(
+        hdc,
+        view_width,
+        depth,
+        &format_youtube_comment_tree_label(state.language, comment),
     );
-    if let Some(replies) = replies_by_parent.get(comment.id.as_str()) {
-        for &reply_index in replies {
-            let _unused = insert_youtube_comment_tree_item(
-                tree,
-                item.0,
-                language,
-                comments,
-                replies_by_parent,
-                reply_index,
-            );
+    rows.push(YoutubeCommentRow {
+        comment_index,
+        depth,
+        height,
+        has_children,
+        expanded,
+    });
+    crate::log_debug(&format!(
+        "YT comments append row comment_index={} id={} depth={} has_children={} expanded={} current_rows={}",
+        comment_index,
+        comment.id,
+        depth,
+        has_children,
+        expanded,
+        rows.len()
+    ));
+    if expanded && let Some(children) = state.children_by_parent.get(comment.id.as_str()) {
+        for &child_index in children {
+            append_youtube_comment_rows(state, hdc, view_width, child_index, depth + 1, rows);
         }
     }
-    item
+}
+
+fn measure_youtube_comment_row_height(
+    hdc: windows::Win32::Graphics::Gdi::HDC,
+    view_width: i32,
+    depth: usize,
+    text: &str,
+) -> i32 {
+    let indent = (depth as i32 * YOUTUBE_COMMENTS_INDENT_WIDTH) + YOUTUBE_COMMENTS_TOGGLE_WIDTH;
+    let available_width = (view_width
+        - (YOUTUBE_COMMENTS_ROW_PADDING_X * 2)
+        - indent
+        - YOUTUBE_COMMENTS_ROW_PADDING_X)
+        .max(80);
+    let mut rect = windows::Win32::Foundation::RECT {
+        left: 0,
+        top: 0,
+        right: available_width,
+        bottom: 0,
+    };
+    let mut wide = to_wide(text);
+    unsafe {
+        let _drawn = DrawTextW(
+            hdc,
+            wide.as_mut_slice(),
+            &mut rect,
+            DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX,
+        );
+    }
+    (rect.bottom - rect.top + (YOUTUBE_COMMENTS_ROW_PADDING_Y * 2)).max(24)
 }
 
 fn format_youtube_comment_tree_label(language: Language, comment: &YoutubeComment) -> String {
@@ -2387,14 +2759,802 @@ fn normalize_comment_text(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+fn is_youtube_comments_dialog_navigation_key(key: u32) -> bool {
+    matches!(
+        key,
+        k if k == VK_UP.0 as u32
+            || k == VK_DOWN.0 as u32
+            || k == VK_LEFT.0 as u32
+            || k == VK_RIGHT.0 as u32
+            || k == VK_HOME.0 as u32
+            || k == VK_END.0 as u32
+            || k == VK_PRIOR.0 as u32
+            || k == VK_NEXT.0 as u32
+            || k == VK_RETURN.0 as u32
+    )
+}
+
+fn youtube_comment_row_accessibility_label(
+    state: &YoutubeCommentsDialogState,
+    row: &YoutubeCommentRow,
+) -> Option<String> {
+    let comment = state.comments.get(row.comment_index)?;
+    let mut label = String::new();
+    if row.depth > 0 {
+        label.push_str(&"  ".repeat(row.depth));
+    }
+    label.push_str(&format_youtube_comment_tree_label(state.language, comment));
+    if row.has_children {
+        let reply_count = state
+            .children_by_parent
+            .get(comment.id.as_str())
+            .map(|children| children.len())
+            .unwrap_or(0);
+        let reply_count_text = if reply_count == 1 {
+            tr_or(
+                state.language,
+                "stream_audio.comment_reply_count_one",
+                "1 reply",
+            )
+        } else {
+            i18n::tr_f(
+                state.language,
+                "stream_audio.comment_reply_count_many",
+                &[("count", &reply_count.to_string())],
+            )
+        };
+        let state_text = if row.expanded {
+            tr_or(
+                state.language,
+                "stream_audio.comment_expandable_expanded",
+                "expanded",
+            )
+        } else {
+            tr_or(
+                state.language,
+                "stream_audio.comment_expandable_collapsed",
+                "not expanded",
+            )
+        };
+        label.push_str(". ");
+        label.push_str(&reply_count_text);
+        label.push_str(". ");
+        label.push_str(&state_text);
+    }
+    Some(label)
+}
+
+fn rebuild_youtube_comments_accessibility_proxy(state: &YoutubeCommentsDialogState) {
+    crate::log_debug(&format!(
+        "YT comments rebuild proxy rows={} selected_row={} proxy={:?}",
+        state.rows.len(),
+        state.selected_row,
+        state.accessibility_proxy
+    ));
+    crate::send_message_w_safe(
+        state.accessibility_proxy,
+        LB_RESETCONTENT,
+        WPARAM(0),
+        LPARAM(0),
+    );
+    for row in &state.rows {
+        let Some(label) = youtube_comment_row_accessibility_label(state, row) else {
+            continue;
+        };
+        crate::send_message_w_safe(
+            state.accessibility_proxy,
+            LB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&label).as_ptr() as isize),
+        );
+    }
+    if !state.rows.is_empty() {
+        crate::send_message_w_safe(
+            state.accessibility_proxy,
+            LB_SETCURSEL,
+            WPARAM(state.selected_row),
+            LPARAM(0),
+        );
+    }
+}
+
+fn sync_youtube_comments_accessibility_proxy_selection(
+    state: &YoutubeCommentsDialogState,
+    focus_proxy: bool,
+) {
+    crate::log_debug(&format!(
+        "YT comments sync proxy selection selected_row={} focus_proxy={} proxy={:?}",
+        state.selected_row, focus_proxy, state.accessibility_proxy
+    ));
+    crate::send_message_w_safe(
+        state.accessibility_proxy,
+        LB_SETCURSEL,
+        WPARAM(state.selected_row),
+        LPARAM(0),
+    );
+    if focus_proxy {
+        unsafe {
+            SetFocus(state.accessibility_proxy);
+        }
+    }
+}
+
+unsafe extern "system" fn youtube_comments_view_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        crate::panic_guard::guard(
+            "youtube_comments_view_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || youtube_comments_view_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
+}
+
+fn youtube_comments_view_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_GETDLGCODE => {
+            crate::log_debug(&format!("YT comments view WM_GETDLGCODE hwnd={:?}", hwnd));
+            LRESULT(DLGC_WANTARROWS as isize)
+        }
+        WM_PAINT => {
+            paint_youtube_comments_view(hwnd);
+            LRESULT(0)
+        }
+        WM_VSCROLL => {
+            crate::log_debug(&format!(
+                "YT comments view WM_VSCROLL wparam={} hwnd={:?}",
+                wparam.0, hwnd
+            ));
+            if handle_youtube_comments_vscroll(hwnd, wparam) {
+                return LRESULT(0);
+            }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
+        }
+        WM_MOUSEWHEEL => {
+            crate::log_debug(&format!(
+                "YT comments view WM_MOUSEWHEEL wparam={} hwnd={:?}",
+                wparam.0, hwnd
+            ));
+            if handle_youtube_comments_mouse_wheel(hwnd, wparam) {
+                return LRESULT(0);
+            }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
+        }
+        WM_LBUTTONDOWN => {
+            crate::log_debug(&format!(
+                "YT comments view WM_LBUTTONDOWN lparam={} hwnd={:?}",
+                lparam.0, hwnd
+            ));
+            activate_youtube_comment_row_from_click(hwnd, lparam);
+            LRESULT(0)
+        }
+        WM_KEYDOWN => {
+            crate::log_debug(&format!(
+                "YT comments view WM_KEYDOWN key={} hwnd={:?}",
+                wparam.0, hwnd
+            ));
+            if handle_youtube_comments_keydown(hwnd, wparam.0 as u32) {
+                return LRESULT(0);
+            }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
+        }
+        _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
+    }
+}
+
+fn with_youtube_comments_view_state<R>(
+    hwnd: HWND,
+    f: impl FnOnce(&mut YoutubeCommentsDialogState) -> R,
+) -> Option<R> {
+    let parent = unsafe { GetParent(hwnd) };
+    if parent.0 == 0 {
+        return None;
+    }
+    with_youtube_comments_state(parent, f)
+}
+
+fn paint_youtube_comments_view(hwnd: HWND) {
+    let mut ps = PAINTSTRUCT::default();
+    let hdc = unsafe { BeginPaint(hwnd, &mut ps) };
+    if hdc.0 == 0 {
+        return;
+    }
+    with_youtube_comments_view_state(hwnd, |state| {
+        let mut client = windows::Win32::Foundation::RECT::default();
+        if crate::get_client_rect_safe(hwnd, &mut client).is_err() {
+            return;
+        }
+        unsafe {
+            let _filled = FillRect(hdc, &client, HBRUSH((COLOR_WINDOW.0 + 1) as isize));
+        }
+        let old_font = if state.font.0 != 0 {
+            unsafe { SelectObject(hdc, HGDIOBJ(state.font.0)) }
+        } else {
+            HGDIOBJ(0)
+        };
+        unsafe {
+            let _mode = SetBkMode(hdc, TRANSPARENT);
+        }
+        let mut y = -state.scroll_offset;
+        for (row_index, row) in state.rows.iter().enumerate() {
+            let top = y;
+            let bottom = y + row.height;
+            if bottom >= 0 && top <= client.bottom {
+                let row_rect = windows::Win32::Foundation::RECT {
+                    left: 0,
+                    top,
+                    right: client.right,
+                    bottom,
+                };
+                if row_index == state.selected_row {
+                    unsafe {
+                        let _filled =
+                            FillRect(hdc, &row_rect, HBRUSH((COLOR_HIGHLIGHT.0 + 1) as isize));
+                    }
+                }
+                let indent_left = YOUTUBE_COMMENTS_ROW_PADDING_X
+                    + (row.depth as i32 * YOUTUBE_COMMENTS_INDENT_WIDTH);
+                if row.has_children {
+                    let marker = if row.expanded { "[-]" } else { "[+]" };
+                    let mut marker_rect = windows::Win32::Foundation::RECT {
+                        left: indent_left,
+                        top: top + YOUTUBE_COMMENTS_ROW_PADDING_Y,
+                        right: indent_left + YOUTUBE_COMMENTS_TOGGLE_WIDTH,
+                        bottom: bottom - YOUTUBE_COMMENTS_ROW_PADDING_Y,
+                    };
+                    let mut marker_w = to_wide(marker);
+                    unsafe {
+                        let _drawn =
+                            DrawTextW(hdc, marker_w.as_mut_slice(), &mut marker_rect, DT_NOPREFIX);
+                    }
+                }
+                let mut text_rect = windows::Win32::Foundation::RECT {
+                    left: indent_left + YOUTUBE_COMMENTS_TOGGLE_WIDTH,
+                    top: top + YOUTUBE_COMMENTS_ROW_PADDING_Y,
+                    right: client.right - YOUTUBE_COMMENTS_ROW_PADDING_X,
+                    bottom: bottom - YOUTUBE_COMMENTS_ROW_PADDING_Y,
+                };
+                if let Some(comment) = state.comments.get(row.comment_index) {
+                    let mut wide =
+                        to_wide(&format_youtube_comment_tree_label(state.language, comment));
+                    unsafe {
+                        let _drawn = DrawTextW(
+                            hdc,
+                            wide.as_mut_slice(),
+                            &mut text_rect,
+                            DT_WORDBREAK | DT_NOPREFIX,
+                        );
+                    }
+                }
+            }
+            y = bottom + YOUTUBE_COMMENTS_ROW_GAP;
+        }
+        if old_font.0 != 0 {
+            unsafe {
+                let _prev = SelectObject(hdc, old_font);
+            }
+        }
+    });
+    unsafe {
+        let _ended = EndPaint(hwnd, &ps);
+    }
+}
+
+fn clamp_youtube_comment_scroll(state: &mut YoutubeCommentsDialogState, viewport_height: i32) {
+    let max_offset = (state.content_height - viewport_height.max(1)).max(0);
+    state.scroll_offset = state.scroll_offset.clamp(0, max_offset);
+}
+
+fn update_youtube_comments_scrollbar(state: &YoutubeCommentsDialogState, viewport_height: i32) {
+    let max_offset = (state.content_height - viewport_height.max(1)).max(0);
+    let info = SCROLLINFO {
+        cbSize: std::mem::size_of::<SCROLLINFO>() as u32,
+        fMask: SIF_RANGE | SIF_PAGE | SIF_POS,
+        nMin: 0,
+        nMax: max_offset,
+        nPage: viewport_height.max(1) as u32,
+        nPos: state.scroll_offset,
+        ..Default::default()
+    };
+    if unsafe { SetScrollInfo(state.view, SB_VERT, &info, true) } == 0 {
+        crate::log_debug("SetScrollInfo failed for YouTube comments custom view");
+    }
+    if unsafe { ShowScrollBar(state.view, SB_VERT, max_offset > 0) }.is_err() {
+        crate::log_debug("ShowScrollBar failed for YouTube comments custom view");
+    }
+}
+
+fn youtube_comment_row_bounds(
+    state: &YoutubeCommentsDialogState,
+    row_index: usize,
+) -> Option<(i32, i32)> {
+    let mut y = 0i32;
+    for (index, row) in state.rows.iter().enumerate() {
+        let bottom = y + row.height;
+        if index == row_index {
+            return Some((y, bottom));
+        }
+        y = bottom + YOUTUBE_COMMENTS_ROW_GAP;
+    }
+    None
+}
+
+fn ensure_selected_youtube_comment_visible(
+    state: &mut YoutubeCommentsDialogState,
+    viewport_height: i32,
+) {
+    let Some((top, bottom)) = youtube_comment_row_bounds(state, state.selected_row) else {
+        return;
+    };
+    if top < state.scroll_offset {
+        state.scroll_offset = top;
+    } else if bottom > state.scroll_offset + viewport_height {
+        state.scroll_offset = (bottom - viewport_height).max(0);
+    }
+    clamp_youtube_comment_scroll(state, viewport_height);
+}
+
+fn handle_youtube_comments_mouse_wheel(hwnd: HWND, wparam: WPARAM) -> bool {
+    let delta = (((wparam.0 >> 16) & 0xffff) as i16) as i32;
+    if delta == 0 {
+        return false;
+    }
+    let changed = with_youtube_comments_view_state(hwnd, |state| {
+        let mut rect = windows::Win32::Foundation::RECT::default();
+        if crate::get_client_rect_safe(hwnd, &mut rect).is_err() {
+            return false;
+        }
+        let viewport_height = rect.bottom - rect.top;
+        let steps = (delta.abs() / YOUTUBE_COMMENTS_WHEEL_DELTA).max(1);
+        let delta_pixels = steps * YOUTUBE_COMMENTS_SCROLL_LINE;
+        let old = state.scroll_offset;
+        state.scroll_offset = if delta > 0 {
+            old - delta_pixels
+        } else {
+            old + delta_pixels
+        };
+        clamp_youtube_comment_scroll(state, viewport_height);
+        if state.scroll_offset != old {
+            update_youtube_comments_scrollbar(state, viewport_height);
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+    crate::log_debug(&format!(
+        "YT comments mouse wheel delta={} changed={}",
+        delta, changed
+    ));
+    if changed && !unsafe { InvalidateRect(hwnd, None, BOOL(1)) }.as_bool() {
+        crate::log_debug("InvalidateRect failed after mouse wheel in comment custom view");
+    }
+    changed
+}
+
+fn handle_youtube_comments_vscroll(hwnd: HWND, wparam: WPARAM) -> bool {
+    let command = (wparam.0 & 0xffff) as u32;
+    let thumb_pos = ((wparam.0 >> 16) & 0xffff) as i32;
+    let changed = with_youtube_comments_view_state(hwnd, |state| {
+        let mut rect = windows::Win32::Foundation::RECT::default();
+        if crate::get_client_rect_safe(hwnd, &mut rect).is_err() {
+            return false;
+        }
+        let viewport_height = rect.bottom - rect.top;
+        let max_offset = (state.content_height - viewport_height.max(1)).max(0);
+        let old = state.scroll_offset;
+        let page_step =
+            (viewport_height - YOUTUBE_COMMENTS_SCROLL_LINE).max(YOUTUBE_COMMENTS_SCROLL_LINE);
+        let mut new = old;
+        match command {
+            c if c == SB_LINEUP.0 as u32 => new -= YOUTUBE_COMMENTS_SCROLL_LINE,
+            c if c == SB_LINEDOWN.0 as u32 => new += YOUTUBE_COMMENTS_SCROLL_LINE,
+            c if c == SB_PAGEUP.0 as u32 => new -= page_step,
+            c if c == SB_PAGEDOWN.0 as u32 => new += page_step,
+            c if c == SB_TOP.0 as u32 => new = 0,
+            c if c == SB_BOTTOM.0 as u32 => new = max_offset,
+            c if c == SB_THUMBPOSITION.0 as u32 || c == SB_THUMBTRACK.0 as u32 => {
+                let mut info = SCROLLINFO {
+                    cbSize: std::mem::size_of::<SCROLLINFO>() as u32,
+                    fMask: SIF_TRACKPOS,
+                    ..Default::default()
+                };
+                if unsafe { GetScrollInfo(hwnd, SB_VERT, &mut info) }.is_ok() {
+                    new = info.nTrackPos;
+                } else {
+                    new = thumb_pos;
+                }
+            }
+            _ => {}
+        }
+        state.scroll_offset = new.clamp(0, max_offset);
+        if state.scroll_offset != old {
+            update_youtube_comments_scrollbar(state, viewport_height);
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+    crate::log_debug(&format!(
+        "YT comments vscroll command={} thumb_pos={} changed={}",
+        command, thumb_pos, changed
+    ));
+    if changed && !unsafe { InvalidateRect(hwnd, None, BOOL(1)) }.as_bool() {
+        crate::log_debug("InvalidateRect failed after vscroll in comment custom view");
+    }
+    changed
+}
+
+fn activate_youtube_comment_row_from_click(hwnd: HWND, lparam: LPARAM) {
+    let click_x = (lparam.0 as u32 & 0xffff) as i16 as i32;
+    let click_y = ((lparam.0 as u32 >> 16) & 0xffff) as i16 as i32;
+    crate::log_debug(&format!(
+        "YT comments click x={} y={} hwnd={:?}",
+        click_x, click_y, hwnd
+    ));
+    let mut invalidate = false;
+    with_youtube_comments_view_state(hwnd, |state| {
+        if let Some(row_index) = hit_test_youtube_comment_row(state, click_y) {
+            crate::log_debug(&format!(
+                "YT comments click hit row_index={} previous_selected={}",
+                row_index, state.selected_row
+            ));
+            state.selected_row = row_index;
+            sync_youtube_comments_accessibility_proxy_selection(state, true);
+            if let Some(row) = state.rows.get(row_index) {
+                let toggle_left = YOUTUBE_COMMENTS_ROW_PADDING_X
+                    + (row.depth as i32 * YOUTUBE_COMMENTS_INDENT_WIDTH);
+                let toggle_right = toggle_left + YOUTUBE_COMMENTS_TOGGLE_WIDTH;
+                if row.has_children && click_x >= toggle_left && click_x <= toggle_right {
+                    toggle_youtube_comment_row_expansion(state, row_index);
+                } else {
+                    let mut rect = windows::Win32::Foundation::RECT::default();
+                    if crate::get_client_rect_safe(hwnd, &mut rect).is_ok() {
+                        ensure_selected_youtube_comment_visible(state, rect.bottom - rect.top);
+                        update_youtube_comments_scrollbar(state, rect.bottom - rect.top);
+                    }
+                }
+                invalidate = true;
+            }
+        }
+    });
+    if invalidate && !unsafe { InvalidateRect(hwnd, None, BOOL(1)) }.as_bool() {
+        crate::log_debug("InvalidateRect failed after comment row click");
+    }
+}
+
+fn hit_test_youtube_comment_row(state: &YoutubeCommentsDialogState, click_y: i32) -> Option<usize> {
+    let mut y = -state.scroll_offset;
+    for (index, row) in state.rows.iter().enumerate() {
+        let bottom = y + row.height;
+        if click_y >= y && click_y < bottom {
+            return Some(index);
+        }
+        y = bottom + YOUTUBE_COMMENTS_ROW_GAP;
+    }
+    None
+}
+
+fn announce_selected_youtube_comment(state: &YoutubeCommentsDialogState) {
+    let Some(announcement) = selected_youtube_comment_announcement(state) else {
+        return;
+    };
+    crate::log_debug(&format!(
+        "YT comments announce selected via proxy selected_row={} text='{}'",
+        state.selected_row, announcement
+    ));
+    let wide = to_wide(&announcement);
+    crate::log_if_err!(crate::set_window_text_w_safe(
+        state.accessibility_proxy,
+        PCWSTR(wide.as_ptr())
+    ));
+}
+
+fn announce_selected_youtube_comment_expand_state(
+    state: &YoutubeCommentsDialogState,
+    expanded: bool,
+) {
+    let key = if expanded {
+        "stream_audio.comment_expandable_expanded"
+    } else {
+        "stream_audio.comment_expandable_collapsed"
+    };
+    let fallback = if expanded { "expanded" } else { "not expanded" };
+    screen_reader_speak(&tr_or(state.language, key, fallback));
+}
+
+fn selected_youtube_comment_announcement(state: &YoutubeCommentsDialogState) -> Option<String> {
+    let row = state.rows.get(state.selected_row)?;
+    let comment = state.comments.get(row.comment_index)?;
+    let mut announcement = format_youtube_comment_tree_label(state.language, comment);
+    if row.has_children {
+        let reply_count = state
+            .children_by_parent
+            .get(comment.id.as_str())
+            .map(|children| children.len())
+            .unwrap_or(0);
+        let reply_count_text = if reply_count == 1 {
+            tr_or(
+                state.language,
+                "stream_audio.comment_reply_count_one",
+                "1 reply",
+            )
+        } else {
+            i18n::tr_f(
+                state.language,
+                "stream_audio.comment_reply_count_many",
+                &[("count", &reply_count.to_string())],
+            )
+        };
+        let state_text = if row.expanded {
+            tr_or(
+                state.language,
+                "stream_audio.comment_expandable_expanded",
+                "expanded",
+            )
+        } else {
+            tr_or(
+                state.language,
+                "stream_audio.comment_expandable_collapsed",
+                "not expanded",
+            )
+        };
+        announcement.push_str(". ");
+        announcement.push_str(&reply_count_text);
+        announcement.push_str(". ");
+        announcement.push_str(&state_text);
+    }
+    Some(announcement)
+}
+
+fn handle_youtube_comments_keydown(hwnd: HWND, key: u32) -> bool {
+    crate::log_debug(&format!(
+        "YT comments handle keydown entry hwnd={:?} key={}",
+        hwnd, key
+    ));
+    let handled = with_youtube_comments_view_state(hwnd, |state| {
+        let mut rect = windows::Win32::Foundation::RECT::default();
+        if crate::get_client_rect_safe(hwnd, &mut rect).is_err() {
+            crate::log_debug("YT comments handle keydown: get_client_rect failed");
+            return false;
+        }
+        handle_youtube_comments_keydown_inner(state, key, rect.bottom - rect.top)
+    })
+    .unwrap_or(false);
+    if handled && !unsafe { InvalidateRect(hwnd, None, BOOL(1)) }.as_bool() {
+        crate::log_debug("InvalidateRect failed after comment keydown");
+    }
+    handled
+}
+
+fn handle_youtube_comments_keydown_for_state(
+    state: &mut YoutubeCommentsDialogState,
+    key: u32,
+    focus_proxy: bool,
+) -> bool {
+    crate::log_debug(&format!(
+        "YT comments keydown for state key={} focus_proxy={} view={:?} proxy={:?} close_button={:?} rows={} selected_row={} scroll_offset={}",
+        key,
+        focus_proxy,
+        state.view,
+        state.accessibility_proxy,
+        state.close_button,
+        state.rows.len(),
+        state.selected_row,
+        state.scroll_offset
+    ));
+    if !crate::is_window_handle_valid(state.view)
+        || !crate::is_window_handle_valid(state.accessibility_proxy)
+    {
+        crate::log_debug("YT comments keydown for state aborted: invalid view or proxy handle");
+        return false;
+    }
+    let mut rect = windows::Win32::Foundation::RECT::default();
+    if crate::get_client_rect_safe(state.view, &mut rect).is_err() {
+        crate::log_debug("YT comments keydown for state aborted: failed get_client_rect");
+        return false;
+    }
+    if focus_proxy {
+        unsafe {
+            SetFocus(state.accessibility_proxy);
+        }
+        crate::log_debug(&format!(
+            "YT comments keydown for state forced focus to proxy={:?}",
+            state.accessibility_proxy
+        ));
+    }
+    let handled = handle_youtube_comments_keydown_inner(state, key, rect.bottom - rect.top);
+    crate::log_debug(&format!(
+        "YT comments keydown for state result handled={} key={} selected_row={} scroll_offset={}",
+        handled, key, state.selected_row, state.scroll_offset
+    ));
+    if handled && !unsafe { InvalidateRect(state.view, None, BOOL(1)) }.as_bool() {
+        crate::log_debug("InvalidateRect failed after dialog-routed comment keydown");
+    }
+    handled
+}
+
+fn handle_youtube_comments_keydown_inner(
+    state: &mut YoutubeCommentsDialogState,
+    key: u32,
+    viewport_height: i32,
+) -> bool {
+    if state.rows.is_empty() {
+        crate::log_debug("YT comments keydown inner aborted: rows is empty");
+        return false;
+    }
+    let previous_selected_row = state.selected_row;
+    let previous_scroll_offset = state.scroll_offset;
+    let selected_row_before = state.rows.get(state.selected_row).cloned();
+    match key {
+        k if k == VK_UP.0 as u32 => {
+            if state.selected_row > 0 {
+                state.selected_row -= 1;
+            }
+        }
+        k if k == VK_DOWN.0 as u32 => {
+            if state.selected_row + 1 < state.rows.len() {
+                state.selected_row += 1;
+            }
+        }
+        k if k == VK_HOME.0 as u32 => {
+            state.selected_row = 0;
+        }
+        k if k == VK_END.0 as u32 => {
+            state.selected_row = state.rows.len().saturating_sub(1);
+        }
+        k if k == VK_PRIOR.0 as u32 => {
+            move_youtube_comment_selection_by_page(state, -1);
+        }
+        k if k == VK_NEXT.0 as u32 => {
+            move_youtube_comment_selection_by_page(state, 1);
+        }
+        k if k == VK_LEFT.0 as u32 => {
+            if !collapse_or_select_parent_youtube_comment(state) {
+                return false;
+            }
+        }
+        k if k == VK_RIGHT.0 as u32 || k == VK_RETURN.0 as u32 => {
+            if !expand_or_toggle_youtube_comment(state) {
+                return false;
+            }
+        }
+        _ => return false,
+    }
+    ensure_selected_youtube_comment_visible(state, viewport_height);
+    update_youtube_comments_scrollbar(state, viewport_height);
+    if state.selected_row != previous_selected_row {
+        sync_youtube_comments_accessibility_proxy_selection(state, false);
+        announce_selected_youtube_comment(state);
+    } else if let Some(row_before) = selected_row_before {
+        if key == VK_LEFT.0 as u32 && row_before.has_children && row_before.expanded {
+            announce_selected_youtube_comment_expand_state(state, false);
+        } else if (key == VK_RIGHT.0 as u32 || key == VK_RETURN.0 as u32)
+            && row_before.has_children
+            && !row_before.expanded
+        {
+            announce_selected_youtube_comment_expand_state(state, true);
+        }
+    }
+    crate::log_debug(&format!(
+        "YT comments keydown inner key={} rows={} selected_row {}->{} scroll_offset {}->{} viewport_height={}",
+        key,
+        state.rows.len(),
+        previous_selected_row,
+        state.selected_row,
+        previous_scroll_offset,
+        state.scroll_offset,
+        viewport_height
+    ));
+    true
+}
+
+fn move_youtube_comment_selection_by_page(state: &mut YoutubeCommentsDialogState, direction: i32) {
+    let step = 8usize;
+    if direction < 0 {
+        state.selected_row = state.selected_row.saturating_sub(step);
+    } else if !state.rows.is_empty() {
+        state.selected_row = (state.selected_row + step).min(state.rows.len().saturating_sub(1));
+    }
+}
+
+fn collapse_or_select_parent_youtube_comment(state: &mut YoutubeCommentsDialogState) -> bool {
+    let Some(row) = state.rows.get(state.selected_row).cloned() else {
+        return false;
+    };
+    if row.has_children && row.expanded {
+        toggle_youtube_comment_row_expansion(state, state.selected_row);
+        return true;
+    }
+    if row.depth == 0 {
+        return false;
+    }
+    let Some(comment) = state.comments.get(row.comment_index) else {
+        return false;
+    };
+    let parent_id = comment.parent.as_str();
+    if let Some(parent_row_index) = state.rows.iter().position(|candidate| {
+        state
+            .comments
+            .get(candidate.comment_index)
+            .map(|candidate_comment| candidate_comment.id.as_str() == parent_id)
+            .unwrap_or(false)
+    }) {
+        state.selected_row = parent_row_index;
+        return true;
+    }
+    false
+}
+
+fn expand_or_toggle_youtube_comment(state: &mut YoutubeCommentsDialogState) -> bool {
+    let Some(row) = state.rows.get(state.selected_row).cloned() else {
+        return false;
+    };
+    if !row.has_children {
+        return false;
+    }
+    toggle_youtube_comment_row_expansion(state, state.selected_row);
+    true
+}
+
+fn toggle_youtube_comment_row_expansion(state: &mut YoutubeCommentsDialogState, row_index: usize) {
+    let Some(row) = state.rows.get(row_index).cloned() else {
+        return;
+    };
+    let Some(comment) = state.comments.get(row.comment_index) else {
+        return;
+    };
+    crate::log_debug(&format!(
+        "YT comments toggle expansion row_index={} comment_id={} expanded_before={} rows={} selected_row={}",
+        row_index,
+        comment.id,
+        row.expanded,
+        state.rows.len(),
+        state.selected_row
+    ));
+    if row.expanded {
+        state.expanded_comment_ids.remove(comment.id.as_str());
+    } else {
+        state.expanded_comment_ids.insert(comment.id.clone());
+    }
+    let parent_hwnd = unsafe { windows::Win32::UI::WindowsAndMessaging::GetParent(state.view) };
+    if parent_hwnd.0 != 0 {
+        rebuild_youtube_comment_rows(parent_hwnd);
+    }
+}
+
 fn localize_comment_time_text(language: Language, raw: &str) -> String {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return String::new();
     }
-    let normalized = trimmed.to_ascii_lowercase();
+    let raw_edited_suffix = " (edited)";
+    let localized_edited_suffix = format!(
+        " {}",
+        tr_or(language, "stream_audio.comment_edited_suffix", "(edited)")
+    );
+    let (base_text, edited) = if let Some(base) = trimmed.strip_suffix(raw_edited_suffix) {
+        (base.trim_end(), true)
+    } else {
+        (trimmed, false)
+    };
+    let normalized = base_text.to_ascii_lowercase();
     if normalized == "just now" {
-        return i18n::tr(language, "stream_audio.comment_time_just_now");
+        let mut localized = i18n::tr(language, "stream_audio.comment_time_just_now");
+        if edited {
+            localized.push_str(&localized_edited_suffix);
+        }
+        return localized;
     }
 
     let parts: Vec<&str> = normalized.split_whitespace().collect();
@@ -2412,7 +3572,7 @@ fn localize_comment_time_text(language: Language, raw: &str) -> String {
     let count_string = count.to_string();
     let args = [("count", count_string.as_str())];
 
-    match parts[1] {
+    let localized = match parts[1] {
         "minute" | "minutes" => {
             if count == 1 {
                 i18n::tr(language, "stream_audio.comment_time_minute_ago")
@@ -2455,7 +3615,13 @@ fn localize_comment_time_text(language: Language, raw: &str) -> String {
                 i18n::tr_f(language, "stream_audio.comment_time_years_ago", &args)
             }
         }
-        _ => trimmed.to_string(),
+        _ => return trimmed.to_string(),
+    };
+
+    if edited {
+        format!("{localized}{localized_edited_suffix}")
+    } else {
+        localized
     }
 }
 
@@ -3845,6 +5011,67 @@ fn reclaim_stream_modal_parent_foreground(parent: HWND, tag: &str) {
     ));
     crate::bring_window_to_foreground(parent);
     log_stream_transition(tag, parent);
+}
+
+fn restore_stream_dialog_focus(parent: HWND) {
+    crate::log_debug(&format!(
+        "stream focus restore after comments start parent={:?} focus_before={:?}",
+        parent,
+        crate::get_focus_safe()
+    ));
+    if crate::app_windows::interpreter_select_window::restore_interpreter_select_focus(parent) {
+        crate::log_debug(&format!(
+            "stream focus restore after comments: restored interpreter selection parent={:?}",
+            parent
+        ));
+        log_stream_focus_snapshot("youtube_comments.closed.after_restore", parent);
+        return;
+    }
+    let restored = with_stream_dialog_state(parent, |state| {
+        let target = if crate::is_window_handle_valid(state.url_edit) {
+            state.url_edit
+        } else if crate::is_window_handle_valid(state.favorites_combo) {
+            state.favorites_combo
+        } else if crate::is_window_handle_valid(state.ok_button) {
+            state.ok_button
+        } else {
+            HWND(0)
+        };
+        crate::log_debug(&format!(
+            "stream focus restore after comments fallback: parent={:?} target={:?} url_edit={:?} favorites_combo={:?} ok_button={:?} focus_before_target={:?}",
+            parent,
+            target,
+            state.url_edit,
+            state.favorites_combo,
+            state.ok_button,
+            crate::get_focus_safe()
+        ));
+        if target.0 != 0 {
+            unsafe {
+                SetFocus(target);
+            }
+            crate::log_debug(&format!(
+                "stream focus restore after comments fallback target applied: parent={:?} target={:?} focus_after={:?}",
+                parent,
+                target,
+                crate::get_focus_safe()
+            ));
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+    if !restored {
+        crate::log_debug(&format!(
+            "stream focus restore after comments: no stream dialog state for parent={:?}",
+            parent
+        ));
+        unsafe {
+            SetFocus(parent);
+        }
+    }
+    log_stream_focus_snapshot("youtube_comments.closed.after_restore", parent);
 }
 
 fn pin_stream_modal_window(hwnd: HWND) {

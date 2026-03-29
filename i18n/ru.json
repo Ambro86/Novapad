@@ -1281,5 +1281,13 @@
   "rai_audiodescrizioni.window.full_title": "Все аудиоописания Rai",
   "rai_audiodescrizioni.action.show_all": "Показать все аудиоописания",
   "rai_audiodescrizioni.item.default_title": "Аудиоописание Rai",
-  "rai_audiodescrizioni.error.open_selected": "Не удалось открыть выбранное аудиоописание."
+  "rai_audiodescrizioni.error.open_selected": "Не удалось открыть выбранное аудиоописание.",
+  "playback.transcribe_current_folder": "Транскрибировать текущую папку",
+  "whisper.folder.progress_title": "Транскрипция папки",
+  "whisper.folder.status.starting": "Запуск транскрипции папки...",
+  "whisper.folder.status.progress": "Транскрипция файла {current} из {total}: {name}",
+  "whisper.folder.status.completed": "Транскрипция папки завершена.",
+  "whisper.folder.error.no_audio_files": "В текущей папке не найдено аудиофайлов.",
+  "whisper.folder.cancel_confirm": "Вы хотите отменить транскрипцию текущей папки?",
+  "whisper.folder.output_title": "Транскрипция папки - {name}"
 }

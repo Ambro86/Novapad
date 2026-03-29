@@ -1281,5 +1281,13 @@
   "rai_audiodescrizioni.window.full_title": "Všechny audiopopisy Rai",
   "rai_audiodescrizioni.action.show_all": "Zobrazit všechny audiopopisy",
   "rai_audiodescrizioni.item.default_title": "Rai audiopopis",
-  "rai_audiodescrizioni.error.open_selected": "Nelze otevřít vybraný audiopopis."
+  "rai_audiodescrizioni.error.open_selected": "Nelze otevřít vybraný audiopopis.",
+  "playback.transcribe_current_folder": "Přepsat aktuální složku",
+  "whisper.folder.progress_title": "Přepis složky",
+  "whisper.folder.status.starting": "Spouštění přepisu složky...",
+  "whisper.folder.status.progress": "Přepis souboru {current} z {total}: {name}",
+  "whisper.folder.status.completed": "Přepis složky dokončen.",
+  "whisper.folder.error.no_audio_files": "V aktuální složce nebyly nalezeny žádné audio soubory.",
+  "whisper.folder.cancel_confirm": "Chcete zrušit přepis aktuální složky?",
+  "whisper.folder.output_title": "Přepis složky - {name}"
 }

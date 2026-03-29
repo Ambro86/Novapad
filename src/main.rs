@@ -197,6 +197,7 @@ const WM_DICTIONARY_LOADED: u32 = WM_APP + 32;
 const WM_PODCAST_EPISODE_SAVE_RESULT: u32 = WM_APP + 33;
 const WM_WHISPER_TRANSCRIPTION_DONE: u32 = WM_APP + 34;
 const WM_WHISPER_TRANSCRIPTION_PROGRESS: u32 = WM_APP + 35;
+const WM_WHISPER_TRANSCRIPTION_STATUS_TEXT: u32 = WM_APP + 39;
 const WM_DICTATION_DONE: u32 = WM_APP + 36;
 const WM_PODCAST_EPISODE_PLAY_READY: u32 = WM_APP + 37;
 const WM_PODCAST_EPISODE_PLAY_FAILED: u32 = WM_APP + 38;
@@ -2667,7 +2668,22 @@ pub(crate) fn open_whisper_progress_window(hwnd: HWND, language: Language) {
         cancel: i18n::tr(language, "playback.transcribe_cancel"),
         cancel_confirm: i18n::tr(language, "whisper.cancel_confirm"),
     };
-    let dialog = app_windows::podcast_save_window::open_with_labels(hwnd, language, labels, true);
+    open_whisper_progress_window_with_labels(hwnd, language, labels, false);
+}
+
+pub(crate) fn open_whisper_progress_window_with_labels(
+    hwnd: HWND,
+    language: Language,
+    labels: app_windows::podcast_save_window::SaveDialogLabels,
+    show_status_field: bool,
+) {
+    let dialog = app_windows::podcast_save_window::open_with_labels_and_status_field(
+        hwnd,
+        language,
+        labels,
+        true,
+        show_status_field,
+    );
     with_state(hwnd, |state| {
         state.transcription_progress_window = dialog;
     });
@@ -2685,6 +2701,13 @@ pub(crate) fn update_whisper_progress_window(hwnd: HWND, pct: usize) {
     }
 }
 
+pub(crate) fn update_whisper_progress_status(hwnd: HWND, text: &str) {
+    let dialog = with_state(hwnd, |state| state.transcription_progress_window).unwrap_or(HWND(0));
+    if dialog.0 != 0 {
+        app_windows::podcast_save_window::set_status_text(dialog, text);
+    }
+}
+
 pub(crate) fn close_whisper_progress_window(hwnd: HWND) {
     let dialog = with_state(hwnd, |state| state.transcription_progress_window).unwrap_or(HWND(0));
     if dialog.0 != 0 {
@@ -2698,6 +2721,71 @@ pub(crate) fn close_whisper_progress_window(hwnd: HWND) {
     with_state(hwnd, |state| {
         state.transcription_progress_window = HWND(0);
     });
+}
+
+fn post_whisper_progress_status(hwnd: HWND, text: String) {
+    let ptr = Box::into_raw(Box::new(text));
+    if let Err(err) = post_message_w_safe(
+        hwnd,
+        WM_WHISPER_TRANSCRIPTION_STATUS_TEXT,
+        WPARAM(0),
+        LPARAM(ptr as isize),
+    ) {
+        log_debug(&format!(
+            "Failed to post WM_WHISPER_TRANSCRIPTION_STATUS_TEXT: {err}"
+        ));
+        let _unused_box = box_from_raw_safe(ptr);
+    }
+}
+
+fn is_whisper_transcribable_audio_file(path: &Path) -> bool {
+    let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+        return false;
+    };
+    matches!(
+        ext.to_ascii_lowercase().as_str(),
+        "wav"
+            | "mp3"
+            | "flac"
+            | "ogg"
+            | "opus"
+            | "m4a"
+            | "aac"
+            | "wma"
+            | "webm"
+            | "mp4"
+            | "mkv"
+            | "mov"
+    )
+}
+
+fn collect_transcribable_audio_files_in_folder(folder: &Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    let read_dir = match std::fs::read_dir(folder) {
+        Ok(read_dir) => read_dir,
+        Err(err) => {
+            log_debug(&format!(
+                "Folder transcription: failed to read dir {}: {}",
+                folder.display(),
+                err
+            ));
+            return files;
+        }
+    };
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        if !path.is_file() || !is_whisper_transcribable_audio_file(&path) {
+            continue;
+        }
+        files.push(path);
+    }
+    files.sort_by_key(|path| {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name.to_ascii_lowercase())
+            .unwrap_or_default()
+    });
+    files
 }
 
 fn start_whisper_transcription(hwnd: HWND) {
@@ -2733,6 +2821,7 @@ fn start_whisper_transcription(hwnd: HWND) {
     }
 
     crate::audio_player::pause_audiobook_if_playing(hwnd);
+    prevent_sleep(true);
 
     let cancel_flag = Arc::new(AtomicBool::new(false));
     with_state(hwnd, |state| {
@@ -2851,7 +2940,8 @@ fn start_whisper_transcription(hwnd: HWND) {
                 return Ok(WhisperTranscriptionResult {
                     title: String::new(),
                     text: String::new(),
-                    error: None,
+                    error_message: None,
+                    completed_message: i18n::tr(language, "whisper.status.completed"),
                     cancelled: true,
                 });
             }
@@ -2881,7 +2971,8 @@ fn start_whisper_transcription(hwnd: HWND) {
             Ok(WhisperTranscriptionResult {
                 title,
                 text,
-                error: None,
+                error_message: None,
+                completed_message: i18n::tr(language, "whisper.status.completed"),
                 cancelled: false,
             })
         })();
@@ -2891,11 +2982,16 @@ fn start_whisper_transcription(hwnd: HWND) {
             Err(err) => WhisperTranscriptionResult {
                 title: String::new(),
                 text: String::new(),
-                error: Some(err),
+                error_message: Some(i18n::tr_f(
+                    language,
+                    "whisper.error.failed",
+                    &[("err", &err)],
+                )),
+                completed_message: i18n::tr(language, "whisper.status.completed"),
                 cancelled: cancel_flag.load(Ordering::Relaxed),
             },
         };
-        if let Some(err) = payload.error.as_ref() {
+        if let Some(err) = payload.error_message.as_ref() {
             crate::log_debug(&format!("Transcription: failed: {}", err));
         } else if payload.cancelled {
             crate::log_debug("Transcription: cancelled");
@@ -2912,7 +3008,221 @@ fn start_whisper_transcription(hwnd: HWND) {
             log_debug(&format!(
                 "Failed to post WM_WHISPER_TRANSCRIPTION_DONE: {err}"
             ));
-            let _unused_box = unsafe { Box::from_raw(ptr) };
+            let _unused_box = box_from_raw_safe(ptr);
+        }
+    });
+}
+
+fn start_whisper_folder_transcription(hwnd: HWND) {
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let whisper_keep_original_language =
+        with_state(hwnd, |state| state.settings.whisper_keep_original_language).unwrap_or(false);
+    let whisper_include_timestamps =
+        with_state(hwnd, |state| state.settings.whisper_include_timestamps).unwrap_or(false);
+    let whisper_cuda_enabled =
+        with_state(hwnd, |state| state.settings.whisper_cuda_enabled).unwrap_or(false);
+    let Some(whisper_profile) = choose_whisper_profile_if_needed(hwnd, language) else {
+        return;
+    };
+
+    let media_path = with_state(hwnd, |state| {
+        state
+            .active_audiobook
+            .as_ref()
+            .map(|player| player.path.clone())
+            .or_else(|| {
+                state.docs.get(state.current).and_then(|doc| {
+                    if matches!(doc.format, FileFormat::Audiobook) {
+                        doc.path.clone()
+                    } else {
+                        None
+                    }
+                })
+            })
+    })
+    .flatten();
+
+    let Some(media_path) = media_path else {
+        screen_reader_speak(&i18n::tr(language, "whisper.error.no_active_media"));
+        return;
+    };
+    let Some(folder) = media_path.parent() else {
+        screen_reader_speak(&i18n::tr(language, "whisper.folder.error.no_audio_files"));
+        return;
+    };
+    let folder = folder.to_path_buf();
+    let files = collect_transcribable_audio_files_in_folder(&folder);
+    if files.is_empty() {
+        screen_reader_speak(&i18n::tr(language, "whisper.folder.error.no_audio_files"));
+        return;
+    }
+
+    crate::audio_player::pause_audiobook_if_playing(hwnd);
+    prevent_sleep(true);
+
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    with_state(hwnd, |state| {
+        if let Some(prev) = state.transcription_cancel.take() {
+            prev.store(true, Ordering::Relaxed);
+        }
+        state.transcription_cancel = Some(cancel_flag.clone());
+        state.transcription_in_progress = true;
+    });
+
+    let labels = app_windows::podcast_save_window::SaveDialogLabels {
+        title: i18n::tr(language, "whisper.folder.progress_title"),
+        in_progress: i18n::tr(language, "whisper.folder.status.starting"),
+        cancel: i18n::tr(language, "playback.transcribe_cancel"),
+        cancel_confirm: i18n::tr(language, "whisper.folder.cancel_confirm"),
+    };
+    open_whisper_progress_window_with_labels(hwnd, language, labels, true);
+    update_whisper_progress_window(hwnd, 0);
+    update_whisper_progress_status(hwnd, &i18n::tr(language, "whisper.folder.status.starting"));
+    crate::menu::update_playback_menu(hwnd, true);
+    screen_reader_speak(&i18n::tr(language, "whisper.folder.status.starting"));
+
+    std::thread::spawn(move || {
+        let result = (|| -> Result<WhisperTranscriptionResult, String> {
+            let model = map_profile_to_bridge_model(whisper_profile);
+            let forced_language = if whisper_keep_original_language {
+                None
+            } else {
+                Some(language)
+            };
+            let total = files.len();
+            let mut full_text = String::new();
+
+            for (index, path) in files.iter().enumerate() {
+                if cancel_flag.load(Ordering::Relaxed) {
+                    return Ok(WhisperTranscriptionResult {
+                        title: String::new(),
+                        text: String::new(),
+                        error_message: None,
+                        completed_message: i18n::tr(language, "whisper.folder.status.completed"),
+                        cancelled: true,
+                    });
+                }
+
+                let file_name = path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("audio")
+                    .to_string();
+                post_whisper_progress_status(
+                    hwnd,
+                    i18n::tr_f(
+                        language,
+                        "whisper.folder.status.progress",
+                        &[
+                            ("current", &(index + 1).to_string()),
+                            ("total", &total.to_string()),
+                            ("name", &file_name),
+                        ],
+                    ),
+                );
+
+                let input_path = if supports_direct_whisper_input(path, None) {
+                    path.clone()
+                } else {
+                    crate::audio_player::prepare_media_wav_for_transcription(path, None)?
+                };
+
+                let mut progress_last = -1;
+                let hwnd_progress = hwnd;
+                let total_files = total;
+                let current_index = index;
+                let progress_callback: Box<dyn FnMut(i32) + Send> = Box::new(move |pct| {
+                    let clamped = pct.clamp(0, 100) as usize;
+                    let mapped = (((current_index * 100) + clamped) / total_files).min(99);
+                    if mapped as i32 > progress_last {
+                        progress_last = mapped as i32;
+                        let _unused = post_message_w_safe(
+                            hwnd_progress,
+                            WM_WHISPER_TRANSCRIPTION_PROGRESS,
+                            WPARAM(mapped),
+                            LPARAM(0),
+                        );
+                    }
+                });
+
+                let text = crate::tools::faster_whisper_bridge::transcribe_wav_with_shared_worker(
+                    &input_path,
+                    model,
+                    forced_language,
+                    whisper_include_timestamps,
+                    whisper_cuda_enabled,
+                    &cancel_flag,
+                    crate::tools::faster_whisper_bridge::BridgeProgressCallbacks {
+                        download: None,
+                        transcription: Some(progress_callback),
+                    },
+                )?;
+
+                if !text.trim().is_empty() {
+                    if !full_text.is_empty() {
+                        full_text.push_str("\r\n\r\n");
+                    }
+                    full_text.push_str(text.trim());
+                }
+            }
+
+            let _unused = post_message_w_safe(
+                hwnd,
+                WM_WHISPER_TRANSCRIPTION_PROGRESS,
+                WPARAM(100),
+                LPARAM(0),
+            );
+
+            let folder_name = folder
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("audio");
+            let mut title_path = PathBuf::from(i18n::tr_f(
+                language,
+                "whisper.folder.output_title",
+                &[("name", folder_name)],
+            ));
+            title_path.set_extension("txt");
+            let title = title_path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("transcription.txt")
+                .to_string();
+
+            Ok(WhisperTranscriptionResult {
+                title,
+                text: full_text,
+                error_message: None,
+                completed_message: i18n::tr(language, "whisper.folder.status.completed"),
+                cancelled: false,
+            })
+        })();
+
+        let payload = match result {
+            Ok(done) => done,
+            Err(err) => WhisperTranscriptionResult {
+                title: String::new(),
+                text: String::new(),
+                error_message: Some(i18n::tr_f(
+                    language,
+                    "whisper.error.failed",
+                    &[("err", &err)],
+                )),
+                completed_message: i18n::tr(language, "whisper.folder.status.completed"),
+                cancelled: cancel_flag.load(Ordering::Relaxed),
+            },
+        };
+        let ptr = Box::into_raw(Box::new(payload));
+        if let Err(err) = post_message_w_safe(
+            hwnd,
+            WM_WHISPER_TRANSCRIPTION_DONE,
+            WPARAM(0),
+            LPARAM(ptr as isize),
+        ) {
+            log_debug(&format!(
+                "Failed to post WM_WHISPER_TRANSCRIPTION_DONE: {err}"
+            ));
+            let _unused_box = box_from_raw_safe(ptr);
         }
     });
 }
@@ -2924,6 +3234,7 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
         state.settings.language
     })
     .unwrap_or_default();
+    prevent_sleep(false);
     close_whisper_progress_window(hwnd);
     crate::menu::update_playback_menu(hwnd, true);
 
@@ -2931,9 +3242,8 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
         screen_reader_speak(&i18n::tr(language, "whisper.status.cancelled"));
         return;
     }
-    if let Some(err) = result.error {
-        let msg = i18n::tr_f(language, "whisper.error.failed", &[("err", &err)]);
-        screen_reader_speak(&msg);
+    if let Some(err) = result.error_message {
+        screen_reader_speak(&err);
         return;
     }
 
@@ -2958,7 +3268,7 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
         WPARAM(0),
         LPARAM(0)
     ));
-    screen_reader_speak(&i18n::tr(language, "whisper.status.completed"));
+    screen_reader_speak(&result.completed_message);
 }
 
 fn insert_text_into_edit(hwnd_edit: HWND, text: &str) -> bool {
@@ -3738,7 +4048,8 @@ struct RecentFileStore {
 struct WhisperTranscriptionResult {
     title: String,
     text: String,
-    error: Option<String>,
+    error_message: Option<String>,
+    completed_message: String,
     cancelled: bool,
 }
 
@@ -5488,6 +5799,15 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 update_whisper_progress_window(hwnd, wparam.0.min(100));
                 LRESULT(0)
             }
+            WM_WHISPER_TRANSCRIPTION_STATUS_TEXT => {
+                let ptr = lparam.0 as *mut String;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let payload = box_from_raw_safe(ptr);
+                update_whisper_progress_status(hwnd, &payload);
+                LRESULT(0)
+            }
             WM_DICTATION_DONE => {
                 let ptr = lparam.0 as *mut DictationResult;
                 if ptr.is_null() {
@@ -6630,6 +6950,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     }
                     IDM_PLAYBACK_TRANSCRIBE_CURRENT => {
                         start_whisper_transcription(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_TRANSCRIBE_CURRENT_FOLDER => {
+                        start_whisper_folder_transcription(hwnd);
                         LRESULT(0)
                     }
                     IDM_PLAYBACK_TRANSCRIBE_CANCEL => {
@@ -10726,6 +11050,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     }
     if key == 'T' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_PLAYBACK_TRANSCRIBE_CURRENT);
+        return true;
+    }
+    if key == 'C' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_PLAYBACK_TRANSCRIBE_CURRENT_FOLDER);
         return true;
     }
     if key == 'L' as u16 && !ctrl_down && shift_down && alt_down {

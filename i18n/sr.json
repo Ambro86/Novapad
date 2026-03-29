@@ -1281,5 +1281,13 @@
   "rai_audiodescrizioni.window.full_title": "Svi Rai audio opisi",
   "rai_audiodescrizioni.action.show_all": "Prikaži sve audio opise",
   "rai_audiodescrizioni.item.default_title": "Rai audio opis",
-  "rai_audiodescrizioni.error.open_selected": "Nije moguće otvoriti izabrani audio opis."
+  "rai_audiodescrizioni.error.open_selected": "Nije moguće otvoriti izabrani audio opis.",
+  "playback.transcribe_current_folder": "Transkribuj trenutni folder",
+  "whisper.folder.progress_title": "Transkripcija foldera",
+  "whisper.folder.status.starting": "Pokretanje transkripcije foldera...",
+  "whisper.folder.status.progress": "Transkripcija fajla {current} od {total}: {name}",
+  "whisper.folder.status.completed": "Transkripcija foldera završena.",
+  "whisper.folder.error.no_audio_files": "Nema audio fajlova u trenutnom folderu.",
+  "whisper.folder.cancel_confirm": "Da li želite da otkažete transkripciju trenutnog foldera?",
+  "whisper.folder.output_title": "Transkripcija foldera - {name}"
 }

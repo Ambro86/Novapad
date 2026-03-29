@@ -1,21 +1,21 @@
-use crate::accessibility::{handle_accessibility, to_wide};
+use crate::accessibility::{ES_READONLY, handle_accessibility, to_wide};
 use crate::i18n;
 use crate::settings::Language;
 use crate::with_state;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Controls::{PBM_SETPOS, PBM_SETRANGE, WC_BUTTON};
+use windows::Win32::UI::Controls::{PBM_SETPOS, PBM_SETRANGE, WC_BUTTON, WC_EDIT};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, GWLP_USERDATA,
-    GetParent, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING, MB_YESNO, MSG, PostMessageW,
-    RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS,
-    WM_SETFONT, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_DLGMODALFRAME,
-    WS_POPUP, WS_TABSTOP, WS_VISIBLE,
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
+    ES_AUTOHSCROLL, GWLP_USERDATA, GetParent, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING,
+    MB_YESNO, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer,
+    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE,
+    WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW,
+    WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -42,11 +42,13 @@ struct SaveCreateParams {
     language: Language,
     labels: SaveDialogLabels,
     show_cancel: bool,
+    show_status_field: bool,
 }
 
 struct SaveState {
     parent: HWND,
     label: HWND,
+    status_field: HWND,
     progress: HWND,
     cancel_button: HWND,
     cancel_requested: bool,
@@ -176,6 +178,7 @@ pub fn open(parent: HWND) -> HWND {
             language,
             labels,
             show_cancel: true,
+            show_status_field: false,
         });
         let params_ptr = Box::into_raw(params);
         let window = CreateWindowExW(
@@ -232,6 +235,16 @@ pub fn open_with_labels(
     labels: SaveDialogLabels,
     show_cancel: bool,
 ) -> HWND {
+    open_with_labels_and_status_field(parent, language, labels, show_cancel, false)
+}
+
+pub fn open_with_labels_and_status_field(
+    parent: HWND,
+    language: Language,
+    labels: SaveDialogLabels,
+    show_cancel: bool,
+    show_status_field: bool,
+) -> HWND {
     unsafe {
         let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
         let class_name = to_wide(SAVE_CLASS_NAME);
@@ -252,6 +265,7 @@ pub fn open_with_labels(
             language,
             labels,
             show_cancel,
+            show_status_field,
         });
         let params_ptr = Box::into_raw(params);
         let window = CreateWindowExW(
@@ -262,7 +276,7 @@ pub fn open_with_labels(
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             300,
-            150,
+            if show_status_field { 180 } else { 150 },
             parent,
             HMENU(0),
             hinstance,
@@ -326,6 +340,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             let language = params.language;
             let labels = params.labels;
             let show_cancel = params.show_cancel;
+            let show_status_field = params.show_status_field;
             let main = crate::get_parent_safe(parent);
             let hfont = { with_state(main, |state| state.hfont) }.unwrap_or(HFONT(0));
             let label_text = format!("{} 0%", labels.in_progress);
@@ -354,7 +369,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE,
                     20,
-                    50,
+                    if show_status_field { 80 } else { 50 },
                     260,
                     20,
                     hwnd,
@@ -362,6 +377,31 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                     HINSTANCE(0),
                     None,
                 )
+            };
+
+            let status_field = if show_status_field {
+                unsafe {
+                    CreateWindowExW(
+                        Default::default(),
+                        WC_EDIT,
+                        PCWSTR(to_wide(&labels.in_progress).as_ptr()),
+                        WS_CHILD
+                            | WS_VISIBLE
+                            | WS_TABSTOP
+                            | WS_BORDER
+                            | WINDOW_STYLE((ES_AUTOHSCROLL as u32) | ES_READONLY),
+                        20,
+                        45,
+                        260,
+                        24,
+                        hwnd,
+                        HMENU(0),
+                        HINSTANCE(0),
+                        None,
+                    )
+                }
+            } else {
+                HWND(0)
             };
 
             let cancel_button = if show_cancel {
@@ -372,7 +412,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                         PCWSTR(to_wide(&labels.cancel).as_ptr()),
                         WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                         95,
-                        80,
+                        if show_status_field { 115 } else { 80 },
                         90,
                         28,
                         hwnd,
@@ -392,6 +432,12 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             }
             unsafe {
                 SendMessageW(label, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                SendMessageW(
+                    status_field,
+                    WM_SETFONT,
+                    WPARAM(hfont.0 as usize),
+                    LPARAM(1),
+                );
                 SendMessageW(progress, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
             }
             if cancel_button.0 != 0 {
@@ -410,6 +456,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             let state = SaveState {
                 parent,
                 label,
+                status_field,
                 progress,
                 cancel_button,
                 cancel_requested: false,
@@ -427,7 +474,9 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                     "podcast_save_window WM_CREATE: hwnd={:?} parent={:?} label={:?} progress={:?} cancel_button={:?} show_cancel={}",
                     hwnd, parent, label, progress, cancel_button, show_cancel
                 ));
-                if cancel_button.0 != 0 {
+                if status_field.0 != 0 {
+                    SetFocus(status_field);
+                } else if cancel_button.0 != 0 {
                     SetFocus(cancel_button);
                 } else {
                     SetFocus(hwnd);
@@ -441,7 +490,9 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
         WM_SETFOCUS => {
             crate::log_debug(&format!("podcast_save_window WM_SETFOCUS: hwnd={:?}", hwnd));
             if with_save_state(hwnd, |state| {
-                if state.cancel_button.0 != 0 {
+                if state.status_field.0 != 0 {
+                    crate::set_focus_safe(state.status_field);
+                } else if state.cancel_button.0 != 0 {
                     crate::log_debug(&format!(
                         "podcast_save_window WM_SETFOCUS focusing cancel: hwnd={:?} cancel={:?}",
                         hwnd, state.cancel_button
@@ -475,8 +526,18 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 && cancel.0 != 0
             {
                 let focus = crate::get_focus_safe();
+                let status_field =
+                    with_save_state(hwnd, |state| state.status_field).unwrap_or(HWND(0));
                 let shift_down =
                     (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                if !shift_down && status_field.0 != 0 && focus == status_field {
+                    crate::set_focus_safe(cancel);
+                    return LRESULT(0);
+                }
+                if shift_down && status_field.0 != 0 && focus == cancel {
+                    crate::set_focus_safe(status_field);
+                    return LRESULT(0);
+                }
                 if !shift_down && focus != cancel {
                     crate::set_focus_safe(cancel);
                     return LRESULT(0);
@@ -602,6 +663,14 @@ fn update_progress_label(state: &SaveState) {
     unsafe {
         if let Err(e) = SetWindowTextW(state.label, PCWSTR(to_wide(&text).as_ptr())) {
             crate::log_debug(&format!("Failed to set label text: {}", e));
+        }
+        if state.status_field.0 != 0
+            && let Err(e) = SetWindowTextW(
+                state.status_field,
+                PCWSTR(to_wide(&state.status_text).as_ptr()),
+            )
+        {
+            crate::log_debug(&format!("Failed to set status field text: {}", e));
         }
     }
 }

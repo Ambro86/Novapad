@@ -1281,5 +1281,13 @@
   "rai_audiodescrizioni.window.full_title": "All Rai audio descriptions",
   "rai_audiodescrizioni.action.show_all": "Show all audio descriptions",
   "rai_audiodescrizioni.item.default_title": "Rai audio description",
-  "rai_audiodescrizioni.error.open_selected": "Unable to open the selected audio description."
+  "rai_audiodescrizioni.error.open_selected": "Unable to open the selected audio description.",
+  "playback.transcribe_current_folder": "Transcribe current folder",
+  "whisper.folder.progress_title": "Folder transcription",
+  "whisper.folder.status.starting": "Starting folder transcription...",
+  "whisper.folder.status.progress": "Transcribing file {current} of {total}: {name}",
+  "whisper.folder.status.completed": "Folder transcription completed.",
+  "whisper.folder.error.no_audio_files": "No audio files found in the current folder.",
+  "whisper.folder.cancel_confirm": "Do you want to cancel the current folder transcription?",
+  "whisper.folder.output_title": "Folder transcription - {name}"
 }

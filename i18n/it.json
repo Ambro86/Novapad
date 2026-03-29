@@ -1333,5 +1333,13 @@
   "rai_audiodescrizioni.window.full_title": "Tutte le audiodescrizioni Rai",
   "rai_audiodescrizioni.action.show_all": "Mostra tutte le audiodescrizioni",
   "rai_audiodescrizioni.item.default_title": "Audiodescrizione Rai",
-  "rai_audiodescrizioni.error.open_selected": "Impossibile aprire l'audiodescrizione selezionata."
+  "rai_audiodescrizioni.error.open_selected": "Impossibile aprire l'audiodescrizione selezionata.",
+  "playback.transcribe_current_folder": "Trascrivi cartella corrente",
+  "whisper.folder.progress_title": "Trascrizione cartella",
+  "whisper.folder.status.starting": "Avvio trascrizione cartella...",
+  "whisper.folder.status.progress": "Trascrizione file {current} di {total}: {name}",
+  "whisper.folder.status.completed": "Trascrizione cartella completata.",
+  "whisper.folder.error.no_audio_files": "Nessun file audio trovato nella cartella corrente.",
+  "whisper.folder.cancel_confirm": "Vuoi annullare la trascrizione della cartella corrente?",
+  "whisper.folder.output_title": "Trascrizione cartella - {name}"
 }

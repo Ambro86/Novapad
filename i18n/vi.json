@@ -1281,5 +1281,13 @@
   "rai_audiodescrizioni.window.full_title": "Tất cả mô tả âm thanh Rai",
   "rai_audiodescrizioni.action.show_all": "Hiển thị tất cả mô tả âm thanh",
   "rai_audiodescrizioni.item.default_title": "Mô tả âm thanh Rai",
-  "rai_audiodescrizioni.error.open_selected": "Không thể mở mô tả âm thanh đã chọn."
+  "rai_audiodescrizioni.error.open_selected": "Không thể mở mô tả âm thanh đã chọn.",
+  "playback.transcribe_current_folder": "Chuyển đổi thư mục hiện tại",
+  "whisper.folder.progress_title": "Chuyển đổi thư mục",
+  "whisper.folder.status.starting": "Bắt đầu chuyển đổi thư mục...",
+  "whisper.folder.status.progress": "Đang chuyển đổi tệp {current} trên {total}: {name}",
+  "whisper.folder.status.completed": "Hoàn tất chuyển đổi thư mục.",
+  "whisper.folder.error.no_audio_files": "Không tìm thấy tệp âm thanh trong thư mục hiện tại.",
+  "whisper.folder.cancel_confirm": "Bạn có muốn hủy chuyển đổi thư mục hiện tại không?",
+  "whisper.folder.output_title": "Chuyển đổi thư mục - {name}"
 }

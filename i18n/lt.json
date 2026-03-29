@@ -1281,5 +1281,13 @@
   "rai_audiodescrizioni.window.full_title": "Visi Rai audiopasakojimai",
   "rai_audiodescrizioni.action.show_all": "Rodyti visus audiopasakojimus",
   "rai_audiodescrizioni.item.default_title": "Rai audiopasakojimas",
-  "rai_audiodescrizioni.error.open_selected": "Nepavyko atidaryti pasirinkto audiopasakojimo."
+  "rai_audiodescrizioni.error.open_selected": "Nepavyko atidaryti pasirinkto audiopasakojimo.",
+  "playback.transcribe_current_folder": "Transkribuoti dabartinį aplanką",
+  "whisper.folder.progress_title": "Aplanko transkripcija",
+  "whisper.folder.status.starting": "Pradedama aplanko transkripcija...",
+  "whisper.folder.status.progress": "Transkribuojamas failas {current} iš {total}: {name}",
+  "whisper.folder.status.completed": "Aplanko transkripcija baigta.",
+  "whisper.folder.error.no_audio_files": "Dabartiniame aplanke nerasta garso failų.",
+  "whisper.folder.cancel_confirm": "Ar norite atšaukti dabartinio aplanko transkripciją?",
+  "whisper.folder.output_title": "Aplanko transkripcija - {name}"
 }

@@ -1281,5 +1281,13 @@
   "rai_audiodescrizioni.window.full_title": "Alla Rai ljudbeskrivningar",
   "rai_audiodescrizioni.action.show_all": "Visa alla ljudbeskrivningar",
   "rai_audiodescrizioni.item.default_title": "Rai ljudbeskrivning",
-  "rai_audiodescrizioni.error.open_selected": "Det gick inte att öppna den valda ljudbeskrivningen."
+  "rai_audiodescrizioni.error.open_selected": "Det gick inte att öppna den valda ljudbeskrivningen.",
+  "playback.transcribe_current_folder": "Transkribera aktuell mapp",
+  "whisper.folder.progress_title": "Mapptranskribering",
+  "whisper.folder.status.starting": "Startar transkribering av mapp...",
+  "whisper.folder.status.progress": "Transkriberar fil {current} av {total}: {name}",
+  "whisper.folder.status.completed": "Mapptranskribering slutförd.",
+  "whisper.folder.error.no_audio_files": "Inga ljudfiler hittades i den aktuella mappen.",
+  "whisper.folder.cancel_confirm": "Vill du avbryta transkriberingen av den aktuella mappen?",
+  "whisper.folder.output_title": "Mapptranskribering - {name}"
 }

@@ -1281,5 +1281,13 @@
   "rai_audiodescrizioni.window.full_title": "所有 Rai 音频描述",
   "rai_audiodescrizioni.action.show_all": "显示所有音频描述",
   "rai_audiodescrizioni.item.default_title": "Rai 音频描述",
-  "rai_audiodescrizioni.error.open_selected": "无法打开所选的音频描述。"
+  "rai_audiodescrizioni.error.open_selected": "无法打开所选的音频描述。",
+  "playback.transcribe_current_folder": "转录当前文件夹",
+  "whisper.folder.progress_title": "文件夹转录",
+  "whisper.folder.status.starting": "开始文件夹转录...",
+  "whisper.folder.status.progress": "正在转录文件 {current}/{total}：{name}",
+  "whisper.folder.status.completed": "文件夹转录完成。",
+  "whisper.folder.error.no_audio_files": "当前文件夹中未找到音频文件。",
+  "whisper.folder.cancel_confirm": "是否要取消当前文件夹的转录？",
+  "whisper.folder.output_title": "文件夹转录 - {name}"
 }

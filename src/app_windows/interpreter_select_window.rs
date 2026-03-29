@@ -71,12 +71,10 @@ struct InterpreterSelectInit {
     mode: InterpreterDialogInitMode,
     language: Language,
     secondary_action_label: Option<String>,
-    context_action_label: Option<String>,
     initial_list_value: Option<String>,
     initial_tree_value: Option<String>,
     filter_label: Option<String>,
-    context_action_enabled: Option<ContextActionEnabled>,
-    context_action_handler: Option<ContextActionHandler>,
+    context_actions: Vec<InterpreterContextAction>,
     result: Arc<Mutex<Option<InterpreterSelectionResult>>>,
 }
 
@@ -87,12 +85,10 @@ struct InterpreterSelectOptions {
     suppress_parent_restore_on_cancel: bool,
     pin_topmost: bool,
     secondary_action_label: Option<String>,
-    context_action_label: Option<String>,
     initial_list_value: Option<String>,
     initial_tree_value: Option<String>,
     filter_label: Option<String>,
-    context_action_enabled: Option<ContextActionEnabled>,
-    context_action_handler: Option<ContextActionHandler>,
+    context_actions: Vec<InterpreterContextAction>,
 }
 
 enum ControlKind {
@@ -109,12 +105,11 @@ struct InterpreterSelectState {
     flat_list: Option<HWND>,
     flat_list_values: Vec<String>,
     tree_values: Vec<String>,
-    context_action_label: Option<String>,
-    context_action_enabled: Option<ContextActionEnabled>,
-    context_action_handler: Option<ContextActionHandler>,
+    context_actions: Vec<InterpreterContextAction>,
     result: Arc<Mutex<Option<InterpreterSelectionResult>>>,
 }
 
+#[derive(Clone)]
 pub struct InterpreterContextAction {
     pub label: String,
     pub enabled: ContextActionEnabled,
@@ -153,6 +148,26 @@ pub fn select_interpreter_with_secondary_action_and_context_action_and_initial_w
     initial_value: Option<String>,
     context_action: InterpreterContextAction,
 ) -> Option<InterpreterSelectionResult> {
+    select_interpreter_with_secondary_action_and_context_actions_and_initial_without_parent_restore(
+        parent,
+        items,
+        language,
+        title,
+        secondary_action,
+        initial_value,
+        vec![context_action],
+    )
+}
+
+pub fn select_interpreter_with_secondary_action_and_context_actions_and_initial_without_parent_restore(
+    parent: HWND,
+    items: Vec<String>,
+    language: Language,
+    title: String,
+    secondary_action: InterpreterSecondaryActionOptions,
+    initial_value: Option<String>,
+    context_actions: Vec<InterpreterContextAction>,
+) -> Option<InterpreterSelectionResult> {
     select_interpreter_internal(
         parent,
         InterpreterDialogInitMode::List(items),
@@ -162,9 +177,7 @@ pub fn select_interpreter_with_secondary_action_and_context_action_and_initial_w
             filter_label: secondary_action.filter_label,
             secondary_action_label: Some(secondary_action.label),
             initial_list_value: initial_value,
-            context_action_label: Some(context_action.label),
-            context_action_enabled: Some(context_action.enabled),
-            context_action_handler: Some(context_action.handler),
+            context_actions,
             suppress_parent_restore_on_accept: true,
             suppress_parent_restore_on_secondary: true,
             ..Default::default()
@@ -172,13 +185,13 @@ pub fn select_interpreter_with_secondary_action_and_context_action_and_initial_w
     )
 }
 
-pub fn select_interpreter_with_context_action_without_parent_restore_on_accept(
+pub fn select_interpreter_with_context_actions_without_parent_restore_on_accept(
     parent: HWND,
     items: Vec<String>,
     language: Language,
     title: String,
     initial_value: Option<String>,
-    context_action: InterpreterContextAction,
+    context_actions: Vec<InterpreterContextAction>,
 ) -> Option<String> {
     match select_interpreter_internal(
         parent,
@@ -186,10 +199,8 @@ pub fn select_interpreter_with_context_action_without_parent_restore_on_accept(
         language,
         title,
         InterpreterSelectOptions {
-            context_action_label: Some(context_action.label),
             initial_list_value: initial_value,
-            context_action_enabled: Some(context_action.enabled),
-            context_action_handler: Some(context_action.handler),
+            context_actions,
             suppress_parent_restore_on_accept: true,
             suppress_parent_restore_on_cancel: true,
             ..Default::default()
@@ -209,6 +220,26 @@ pub fn select_grouped_interpreter_with_context_action_without_parent_restore_on_
     initial_value: Option<String>,
     context_action: InterpreterContextAction,
 ) -> Option<String> {
+    select_grouped_interpreter_with_context_actions_without_parent_restore_on_accept(
+        parent,
+        groups,
+        language,
+        title,
+        filter_label,
+        initial_value,
+        vec![context_action],
+    )
+}
+
+pub fn select_grouped_interpreter_with_context_actions_without_parent_restore_on_accept(
+    parent: HWND,
+    groups: Vec<GroupedSelectGroup>,
+    language: Language,
+    title: String,
+    filter_label: Option<String>,
+    initial_value: Option<String>,
+    context_actions: Vec<InterpreterContextAction>,
+) -> Option<String> {
     match select_interpreter_internal(
         parent,
         InterpreterDialogInitMode::Tree(groups),
@@ -220,9 +251,7 @@ pub fn select_grouped_interpreter_with_context_action_without_parent_restore_on_
             suppress_parent_restore_on_cancel: true,
             pin_topmost: true,
             initial_tree_value: initial_value,
-            context_action_label: Some(context_action.label),
-            context_action_enabled: Some(context_action.enabled),
-            context_action_handler: Some(context_action.handler),
+            context_actions,
             ..Default::default()
         },
     ) {
@@ -264,12 +293,10 @@ fn select_interpreter_internal(
         mode: mode.clone(),
         language,
         secondary_action_label: options.secondary_action_label,
-        context_action_label: options.context_action_label,
         initial_list_value: options.initial_list_value,
         initial_tree_value: options.initial_tree_value,
         filter_label: options.filter_label,
-        context_action_enabled: options.context_action_enabled,
-        context_action_handler: options.context_action_handler,
+        context_actions: options.context_actions,
         result: result.clone(),
     });
     let title = to_wide(&title);
@@ -713,9 +740,7 @@ fn interpreter_select_wndproc_inner(
                 flat_list,
                 flat_list_values: Vec::new(),
                 tree_values,
-                context_action_label: init.context_action_label,
-                context_action_enabled: init.context_action_enabled,
-                context_action_handler: init.context_action_handler,
+                context_actions: init.context_actions,
                 result: init.result.clone(),
             });
             crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
@@ -724,12 +749,9 @@ fn interpreter_select_wndproc_inner(
         WM_CONTEXTMENU => {
             let target = HWND(wparam.0 as isize);
             let handled = with_interpreter_state(hwnd, |state| {
-                let Some(label) = state.context_action_label.clone() else {
+                if state.context_actions.is_empty() {
                     return false;
-                };
-                let Some(handler) = state.context_action_handler.clone() else {
-                    return false;
-                };
+                }
                 let value = match state.control {
                     ControlKind::List(list) => {
                         if target.0 != 0 && target != list && target != hwnd {
@@ -756,9 +778,13 @@ fn interpreter_select_wndproc_inner(
                         value
                     }
                 };
-                if let Some(enabled) = state.context_action_enabled.as_ref()
-                    && !enabled(&value)
-                {
+                let applicable_actions: Vec<InterpreterContextAction> = state
+                    .context_actions
+                    .iter()
+                    .filter(|action| (action.enabled)(&value))
+                    .cloned()
+                    .collect();
+                if applicable_actions.is_empty() {
                     return false;
                 }
                 let menu = match unsafe { CreatePopupMenu() } {
@@ -771,16 +797,18 @@ fn interpreter_select_wndproc_inner(
                         return false;
                     }
                 };
-                let label_w = to_wide(&label);
-                if let Err(err) =
-                    unsafe { AppendMenuW(menu, MF_STRING, 1, PCWSTR(label_w.as_ptr())) }
-                {
-                    crate::log_debug(&format!(
-                        "Failed to append interpreter selection context menu item: {}",
-                        err
-                    ));
-                    crate::log_if_err!(unsafe { DestroyMenu(menu) });
-                    return false;
+                for (index, action) in applicable_actions.iter().enumerate() {
+                    let label_w = to_wide(&action.label);
+                    if let Err(err) = unsafe {
+                        AppendMenuW(menu, MF_STRING, index + 1, PCWSTR(label_w.as_ptr()))
+                    } {
+                        crate::log_debug(&format!(
+                            "Failed to append interpreter selection context menu item: {}",
+                            err
+                        ));
+                        crate::log_if_err!(unsafe { DestroyMenu(menu) });
+                        return false;
+                    }
                 }
                 let point = if lparam.0 == -1 {
                     let mut pt = POINT::default();
@@ -811,10 +839,16 @@ fn interpreter_select_wndproc_inner(
                     )
                 };
                 crate::log_if_err!(unsafe { DestroyMenu(menu) });
-                if command.0 != 1 {
+                if command.0 == 0 {
                     return true;
                 }
-                handler(value);
+                let Some(action_index) = usize::try_from(command.0.saturating_sub(1)).ok() else {
+                    return true;
+                };
+                let Some(action) = applicable_actions.get(action_index) else {
+                    return true;
+                };
+                (action.handler)(value);
                 true
             })
             .unwrap_or(false);

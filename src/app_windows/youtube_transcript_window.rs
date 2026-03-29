@@ -1,5 +1,5 @@
 use std::cmp::Ordering as CmpOrdering;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read};
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
@@ -14,7 +14,10 @@ use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL};
 use windows::Win32::UI::Controls::{
-    BST_CHECKED, EM_SCROLLCARET, EM_SETSEL, WC_BUTTON, WC_COMBOBOXW, WC_STATIC,
+    BST_CHECKED, EM_SCROLLCARET, EM_SETSEL, TVGN_CARET, TVI_ROOT, TVIF_CHILDREN, TVIF_PARAM,
+    TVIF_TEXT, TVINSERTSTRUCTW, TVINSERTSTRUCTW_0, TVITEMEXW, TVITEMEXW_CHILDREN, TVM_DELETEITEM,
+    TVM_INSERTITEMW, TVM_SELECTITEM, TVS_HASBUTTONS, TVS_HASLINES, TVS_LINESATROOT,
+    TVS_SHOWSELALWAYS, WC_BUTTON, WC_COMBOBOXW, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN,
@@ -30,8 +33,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
     SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu, TranslateMessage,
     WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WM_NCDESTROY, WM_NOTIFY, WM_SETFONT, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -69,6 +72,9 @@ const STREAM_TRACK_ID_OK: usize = 9322;
 const STREAM_TRACK_ID_CANCEL: usize = 9323;
 const STREAM_DIALOG_CLASS_NAME: &str = "SonarpadStreamAudio";
 const STREAM_TRACK_DIALOG_CLASS_NAME: &str = "SonarpadStreamAudioTrack";
+const YOUTUBE_COMMENTS_DIALOG_CLASS_NAME: &str = "SonarpadYouTubeComments";
+const YOUTUBE_COMMENTS_ID_TREE: usize = 9331;
+const YOUTUBE_COMMENTS_ID_CLOSE: usize = 9333;
 const WM_YT_LOAD_COMPLETE: u32 = WM_APP + 40;
 const WM_YT_TEXT_COMPLETE: u32 = WM_APP + 41;
 const WM_YT_LOAD_CANCEL: u32 = WM_APP + 42;
@@ -1635,6 +1641,28 @@ struct StreamCollectionEntry {
     url: String,
 }
 
+#[derive(Clone)]
+struct YoutubeComment {
+    id: String,
+    parent: String,
+    author: String,
+    text: String,
+    time_text: String,
+}
+
+struct YoutubeCommentsDialogInit {
+    parent: HWND,
+    language: Language,
+    title: String,
+    comments: Vec<YoutubeComment>,
+}
+
+struct YoutubeCommentsDialogState {
+    language: Language,
+    tree: HWND,
+    comments: Vec<YoutubeComment>,
+}
+
 struct ResolvedStreamSelection {
     url: String,
     collection_url: Option<String>,
@@ -1798,6 +1826,7 @@ fn probe_youtube_search_entries(
 fn choose_stream_collection_entry_page(
     parent: HWND,
     language: Language,
+    ytdlp_path: &Path,
     entries: &[StreamCollectionEntry],
     has_previous: bool,
     has_more: bool,
@@ -1812,43 +1841,622 @@ fn choose_stream_collection_entry_page(
         labels.push(i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY));
     }
     let favorite_candidates = Arc::new(entries.to_vec());
-    let context_action_enabled = {
-        let favorite_candidates = Arc::clone(&favorite_candidates);
-        Arc::new(move |selected: &str| {
-            favorite_candidates
-                .iter()
-                .find(|entry| entry.label == selected)
-                .map(|entry| is_youtube_collection_url(&entry.url))
-                .unwrap_or(false)
-        })
-    };
-    let context_action_handler = {
-        let favorite_candidates = Arc::clone(&favorite_candidates);
-        Arc::new(move |selected: String| {
-            if let Some(entry) = favorite_candidates
-                .iter()
-                .find(|entry| entry.label == selected && is_youtube_collection_url(&entry.url))
-            {
-                add_stream_favorite(parent, entry.label.clone(), entry.url.clone());
-            }
-        })
-    };
-    crate::app_windows::interpreter_select_window::select_interpreter_with_context_action_without_parent_restore_on_accept(
-        parent,
-        labels,
-        language,
-        i18n::tr(language, "stream_audio.prompt_title"),
-        None,
+    let ytdlp_path = Arc::new(ytdlp_path.to_path_buf());
+    let add_to_favorites_action =
         crate::app_windows::interpreter_select_window::InterpreterContextAction {
             label: tr_or(
                 language,
                 "stream_audio.add_to_favorites",
                 "Add to favorites",
             ),
-            enabled: context_action_enabled,
-            handler: context_action_handler,
-        },
+            enabled: {
+                let favorite_candidates = Arc::clone(&favorite_candidates);
+                Arc::new(move |selected: &str| {
+                    favorite_candidates
+                        .iter()
+                        .find(|entry| entry.label == selected)
+                        .map(|entry| is_youtube_collection_url(&entry.url))
+                        .unwrap_or(false)
+                })
+            },
+            handler: {
+                let favorite_candidates = Arc::clone(&favorite_candidates);
+                Arc::new(move |selected: String| {
+                    if let Some(entry) = favorite_candidates.iter().find(|entry| {
+                        entry.label == selected && is_youtube_collection_url(&entry.url)
+                    }) {
+                        add_stream_favorite(parent, entry.label.clone(), entry.url.clone());
+                    }
+                })
+            },
+        };
+    let view_comments_action =
+        crate::app_windows::interpreter_select_window::InterpreterContextAction {
+            label: tr_or(language, "stream_audio.view_comments", "View comments"),
+            enabled: {
+                let favorite_candidates = Arc::clone(&favorite_candidates);
+                Arc::new(move |selected: &str| {
+                    favorite_candidates
+                        .iter()
+                        .find(|entry| entry.label == selected)
+                        .map(|entry| {
+                            !is_youtube_collection_url(&entry.url)
+                                && extract_video_id(&entry.url).is_some()
+                        })
+                        .unwrap_or(false)
+                })
+            },
+            handler: {
+                let favorite_candidates = Arc::clone(&favorite_candidates);
+                let ytdlp_path = Arc::clone(&ytdlp_path);
+                Arc::new(move |selected: String| {
+                    if let Some(entry) = favorite_candidates
+                        .iter()
+                        .find(|entry| entry.label == selected)
+                    {
+                        show_youtube_comments_for_stream_entry(
+                            parent,
+                            language,
+                            &ytdlp_path,
+                            entry,
+                        );
+                    }
+                })
+            },
+        };
+    crate::app_windows::interpreter_select_window::select_interpreter_with_context_actions_without_parent_restore_on_accept(
+        parent,
+        labels,
+        language,
+        i18n::tr(language, "stream_audio.prompt_title"),
+        None,
+        vec![view_comments_action, add_to_favorites_action],
     )
+}
+
+fn show_youtube_comments_for_stream_entry(
+    parent: HWND,
+    language: Language,
+    ytdlp_path: &Path,
+    entry: &StreamCollectionEntry,
+) {
+    let progress = open_progress_dialog(
+        parent,
+        language,
+        "stream_audio.progress_title",
+        "stream_audio.comments_loading",
+        false,
+    );
+    let ytdlp_path = ytdlp_path.to_path_buf();
+    let entry_url = entry.url.clone();
+    let worker =
+        std::thread::spawn(move || fetch_youtube_comments_with_ytdlp(&ytdlp_path, &entry_url));
+    while !worker.is_finished() {
+        ignore_bool(pump_messages_detect_stream_cancel(parent, progress));
+        std::thread::sleep(std::time::Duration::from_millis(30));
+    }
+    close_progress_dialog(progress);
+    let comments = match worker.join() {
+        Ok(Ok(comments)) => comments,
+        Ok(Err(err)) => {
+            show_error(
+                parent,
+                language,
+                &i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]),
+            );
+            return;
+        }
+        Err(_) => {
+            show_error(
+                parent,
+                language,
+                &tr_or(
+                    language,
+                    "stream_audio.comments_load_failed",
+                    "Failed to load video comments.",
+                ),
+            );
+            return;
+        }
+    };
+    if comments.is_empty() {
+        show_error(
+            parent,
+            language,
+            &tr_or(
+                language,
+                "stream_audio.no_comments",
+                "No comments are available for this video.",
+            ),
+        );
+        return;
+    }
+    open_youtube_comments_window(parent, language, entry.label.clone(), comments);
+}
+
+fn fetch_youtube_comments_with_ytdlp(
+    ytdlp_path: &Path,
+    url: &str,
+) -> Result<Vec<YoutubeComment>, String> {
+    let output = ytdlp_command(ytdlp_path)
+        .arg("--no-playlist")
+        .arg("--skip-download")
+        .arg("--write-comments")
+        .arg("--dump-single-json")
+        .arg("--no-warnings")
+        .arg("--")
+        .arg(url)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            "yt-dlp comments extraction failed".to_string()
+        } else {
+            stderr
+        });
+    }
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())?;
+    let Some(items) = json.get("comments").and_then(|value| value.as_array()) else {
+        return Ok(Vec::new());
+    };
+    let mut comments = Vec::with_capacity(items.len());
+    for item in items {
+        let Some(id) = item.get("id").and_then(|value| value.as_str()) else {
+            continue;
+        };
+        let text = item
+            .get("text")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .unwrap_or("");
+        if text.is_empty() {
+            continue;
+        }
+        let parent = item
+            .get("parent")
+            .and_then(|value| value.as_str())
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or("root");
+        let author = item
+            .get("author")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("Unknown");
+        let time_text = item
+            .get("_time_text")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .unwrap_or("");
+        comments.push(YoutubeComment {
+            id: id.to_string(),
+            parent: parent.to_string(),
+            author: author.to_string(),
+            text: text.to_string(),
+            time_text: time_text.to_string(),
+        });
+    }
+    Ok(comments)
+}
+
+fn open_youtube_comments_window(
+    parent: HWND,
+    language: Language,
+    title: String,
+    comments: Vec<YoutubeComment>,
+) {
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
+    let class_name = to_wide(YOUTUBE_COMMENTS_DIALOG_CLASS_NAME);
+    let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
+            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
+        }),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(youtube_comments_dialog_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    crate::register_class_w_safe(&wc);
+
+    let init = Box::new(YoutubeCommentsDialogInit {
+        parent,
+        language,
+        title: plain_label(&title),
+        comments,
+    });
+    let title = to_wide(&tr_or(
+        language,
+        "stream_audio.comments_window_title",
+        "Video comments",
+    ));
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            820,
+            560,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(Box::into_raw(init) as *const _),
+        )
+    };
+    if hwnd.0 == 0 {
+        return;
+    }
+
+    unsafe {
+        EnableWindow(parent, false);
+        SetForegroundWindow(hwnd);
+    }
+    pin_stream_modal_window(hwnd);
+
+    let mut msg = MSG::default();
+    loop {
+        if !crate::is_window_handle_valid(hwnd) {
+            break;
+        }
+        let res = crate::get_message_w_safe(&mut msg, HWND(0), 0, 0);
+        if res.0 == 0 || res.0 == -1 {
+            break;
+        }
+        unsafe {
+            if IsDialogMessageW(hwnd, &msg).as_bool() {
+                continue;
+            }
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+
+    unsafe {
+        EnableWindow(parent, true);
+        SetForegroundWindow(parent);
+    }
+}
+
+unsafe extern "system" fn youtube_comments_dialog_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        crate::panic_guard::guard(
+            "youtube_comments_dialog_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || youtube_comments_dialog_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
+}
+
+fn youtube_comments_dialog_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    match msg {
+        WM_CREATE => {
+            let create_struct = lparam.0 as *const CREATESTRUCTW;
+            let init_ptr =
+                unsafe { (*create_struct).lpCreateParams as *mut YoutubeCommentsDialogInit };
+            if init_ptr.is_null() {
+                return LRESULT(0);
+            }
+            let init = crate::box_from_raw_safe(init_ptr);
+            let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
+
+            let title_label = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&init.title).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    10,
+                    10,
+                    780,
+                    22,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            let tree = unsafe {
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("SysTreeView32"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WS_VSCROLL
+                        | WINDOW_STYLE(
+                            TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS,
+                        ),
+                    10,
+                    40,
+                    780,
+                    450,
+                    hwnd,
+                    HMENU(YOUTUBE_COMMENTS_ID_TREE as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            let close_button = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    700,
+                    500,
+                    90,
+                    28,
+                    hwnd,
+                    HMENU(YOUTUBE_COMMENTS_ID_CLOSE as isize),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+
+            if hfont.0 != 0 {
+                unsafe {
+                    for control in [title_label, tree, close_button] {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
+                }
+            }
+
+            let state = Box::new(YoutubeCommentsDialogState {
+                language: init.language,
+                tree,
+                comments: init.comments,
+            });
+            crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+            populate_youtube_comments_tree(hwnd);
+            unsafe {
+                SetFocus(tree);
+            }
+            LRESULT(0)
+        }
+        WM_NOTIFY => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
+        WM_COMMAND => {
+            let cmd_id = wparam.0 & 0xffff;
+            if cmd_id == YOUTUBE_COMMENTS_ID_CLOSE || cmd_id == 1 {
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                return LRESULT(0);
+            }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
+        }
+        WM_CLOSE => {
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
+            LRESULT(0)
+        }
+        WM_NCDESTROY => {
+            let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
+                as *mut YoutubeCommentsDialogState;
+            if !ptr.is_null() {
+                let _unused_box = crate::box_from_raw_safe(ptr);
+            }
+            LRESULT(0)
+        }
+        _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
+    }
+}
+
+fn with_youtube_comments_state<R>(
+    hwnd: HWND,
+    f: impl FnOnce(&mut YoutubeCommentsDialogState) -> R,
+) -> Option<R> {
+    let ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *mut YoutubeCommentsDialogState;
+    if ptr.is_null() {
+        return None;
+    }
+    Some(f(unsafe { &mut *ptr }))
+}
+
+fn populate_youtube_comments_tree(hwnd: HWND) {
+    with_youtube_comments_state(hwnd, |state| {
+        crate::send_message_w_safe(state.tree, TVM_DELETEITEM, WPARAM(0), LPARAM(TVI_ROOT.0));
+        let known_ids: HashSet<&str> = state
+            .comments
+            .iter()
+            .map(|comment| comment.id.as_str())
+            .collect();
+        let mut replies_by_parent: HashMap<&str, Vec<usize>> = HashMap::new();
+        let mut roots = Vec::new();
+        for (index, comment) in state.comments.iter().enumerate() {
+            let parent_id = comment.parent.as_str();
+            if parent_id.eq_ignore_ascii_case("root") || !known_ids.contains(parent_id) {
+                roots.push(index);
+            } else {
+                replies_by_parent.entry(parent_id).or_default().push(index);
+            }
+        }
+        let mut first_root = None;
+        for index in roots {
+            let item = insert_youtube_comment_tree_item(
+                state.tree,
+                TVI_ROOT.0,
+                state.language,
+                &state.comments,
+                &replies_by_parent,
+                index,
+            );
+            if first_root.is_none() && item.0 != 0 {
+                first_root = Some(item);
+            }
+        }
+        if let Some(first_root) = first_root {
+            crate::send_message_w_safe(
+                state.tree,
+                TVM_SELECTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(first_root.0),
+            );
+        }
+    });
+}
+
+fn insert_youtube_comment_tree_item(
+    tree: HWND,
+    parent_item: isize,
+    language: Language,
+    comments: &[YoutubeComment],
+    replies_by_parent: &HashMap<&str, Vec<usize>>,
+    index: usize,
+) -> windows::Win32::UI::Controls::HTREEITEM {
+    let Some(comment) = comments.get(index) else {
+        return windows::Win32::UI::Controls::HTREEITEM(0);
+    };
+    let has_children = replies_by_parent
+        .get(comment.id.as_str())
+        .map(|items| !items.is_empty())
+        .unwrap_or(false);
+    let label = format_youtube_comment_tree_label(language, comment);
+    let mut text = to_wide(&label);
+    let insert = TVINSERTSTRUCTW {
+        hParent: windows::Win32::UI::Controls::HTREEITEM(parent_item),
+        hInsertAfter: windows::Win32::UI::Controls::HTREEITEM(0xffff0002u32 as isize),
+        Anonymous: TVINSERTSTRUCTW_0 {
+            itemex: TVITEMEXW {
+                mask: TVIF_TEXT | TVIF_PARAM | TVIF_CHILDREN,
+                pszText: windows::core::PWSTR(text.as_mut_ptr()),
+                cchTextMax: text.len() as i32,
+                lParam: LPARAM(index as isize),
+                cChildren: if has_children {
+                    TVITEMEXW_CHILDREN(1)
+                } else {
+                    TVITEMEXW_CHILDREN(0)
+                },
+                ..Default::default()
+            },
+        },
+    };
+    let item = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            tree,
+            TVM_INSERTITEMW,
+            WPARAM(0),
+            LPARAM(&insert as *const _ as isize),
+        )
+        .0,
+    );
+    if let Some(replies) = replies_by_parent.get(comment.id.as_str()) {
+        for &reply_index in replies {
+            let _unused = insert_youtube_comment_tree_item(
+                tree,
+                item.0,
+                language,
+                comments,
+                replies_by_parent,
+                reply_index,
+            );
+        }
+    }
+    item
+}
+
+fn format_youtube_comment_tree_label(language: Language, comment: &YoutubeComment) -> String {
+    let mut parts = vec![comment.author.clone()];
+    if !comment.time_text.is_empty() {
+        parts.push(localize_comment_time_text(language, &comment.time_text));
+    }
+    let mut label = parts.join(" - ");
+    let text = normalize_comment_text(&comment.text);
+    if !text.is_empty() {
+        label.push_str(" - ");
+        label.push_str(&text);
+    }
+    label
+}
+
+fn normalize_comment_text(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn localize_comment_time_text(language: Language, raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let normalized = trimmed.to_ascii_lowercase();
+    if normalized == "just now" {
+        return i18n::tr(language, "stream_audio.comment_time_just_now");
+    }
+
+    let parts: Vec<&str> = normalized.split_whitespace().collect();
+    if parts.len() < 3 || parts.last() != Some(&"ago") {
+        return trimmed.to_string();
+    }
+
+    let count = match parts[0] {
+        "a" | "an" => 1u64,
+        value => match value.parse::<u64>() {
+            Ok(value) => value,
+            Err(_) => return trimmed.to_string(),
+        },
+    };
+    let count_string = count.to_string();
+    let args = [("count", count_string.as_str())];
+
+    match parts[1] {
+        "minute" | "minutes" => {
+            if count == 1 {
+                i18n::tr(language, "stream_audio.comment_time_minute_ago")
+            } else {
+                i18n::tr_f(language, "stream_audio.comment_time_minutes_ago", &args)
+            }
+        }
+        "hour" | "hours" => {
+            if count == 1 {
+                i18n::tr(language, "stream_audio.comment_time_hour_ago")
+            } else {
+                i18n::tr_f(language, "stream_audio.comment_time_hours_ago", &args)
+            }
+        }
+        "day" | "days" => {
+            if count == 1 {
+                i18n::tr(language, "stream_audio.comment_time_day_ago")
+            } else {
+                i18n::tr_f(language, "stream_audio.comment_time_days_ago", &args)
+            }
+        }
+        "week" | "weeks" => {
+            if count == 1 {
+                i18n::tr(language, "stream_audio.comment_time_week_ago")
+            } else {
+                i18n::tr_f(language, "stream_audio.comment_time_weeks_ago", &args)
+            }
+        }
+        "month" | "months" => {
+            if count == 1 {
+                i18n::tr(language, "stream_audio.comment_time_month_ago")
+            } else {
+                i18n::tr_f(language, "stream_audio.comment_time_months_ago", &args)
+            }
+        }
+        "year" | "years" => {
+            if count == 1 {
+                i18n::tr(language, "stream_audio.comment_time_year_ago")
+            } else {
+                i18n::tr_f(language, "stream_audio.comment_time_years_ago", &args)
+            }
+        }
+        _ => trimmed.to_string(),
+    }
 }
 
 fn choose_youtube_collection_entry(
@@ -1923,9 +2531,14 @@ fn choose_youtube_collection_entry(
             };
         }
 
-        let Some(selected) =
-            choose_stream_collection_entry_page(parent, language, &entries, page > 0, has_more)
-        else {
+        let Some(selected) = choose_stream_collection_entry_page(
+            parent,
+            language,
+            ytdlp_path,
+            &entries,
+            page > 0,
+            has_more,
+        ) else {
             restore_stream_parent_after_selection_cancel(parent);
             return Ok(None);
         };
@@ -2039,9 +2652,14 @@ fn choose_youtube_search_entry(
             };
         }
 
-        let Some(selected) =
-            choose_stream_collection_entry_page(parent, language, &entries, page > 0, has_more)
-        else {
+        let Some(selected) = choose_stream_collection_entry_page(
+            parent,
+            language,
+            ytdlp_path,
+            &entries,
+            page > 0,
+            has_more,
+        ) else {
             restore_stream_parent_after_selection_cancel(parent);
             return Ok(None);
         };

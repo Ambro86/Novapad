@@ -10341,6 +10341,8 @@ fn go_to_spelling_error(hwnd: HWND, forward: bool) {
         return;
     }
 
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+
     // Find the next/previous error relative to current position (no wrap-around)
     let target = if forward {
         // Find first error after current position
@@ -10371,6 +10373,13 @@ fn go_to_spelling_error(hwnd: HWND, forward: bool) {
                 LPARAM(0),
             );
         }
+    } else {
+        let key = if forward {
+            "spellcheck.no_next_error"
+        } else {
+            "spellcheck.no_previous_error"
+        };
+        screen_reader_speak(&i18n::tr(language, key));
     }
 }
 

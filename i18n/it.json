@@ -33,6 +33,8 @@
   "spellcheck.announce_misspelled": "Errore ortografico: {word}",
   "spellcheck.disabled": "Controllo ortografico disabilitato.",
   "spellcheck.no_errors": "Nessun errore ortografico trovato.",
+  "spellcheck.no_previous_error": "Nessun errore ortografico precedente",
+  "spellcheck.no_next_error": "Nessun errore ortografico successivo",
   "spellcheck.language_fallback": "Lingua non supportata ({requested}), uso {language}.",
   "menu.file": "&File",
   "menu.edit": "&Modifica",

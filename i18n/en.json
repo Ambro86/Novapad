@@ -34,6 +34,8 @@
   "spellcheck.language_fallback": "Language not supported ({requested}), using {language}.",
   "spellcheck.disabled": "Spell check is disabled.",
   "spellcheck.no_errors": "No spelling errors found.",
+  "spellcheck.no_previous_error": "No previous spelling error",
+  "spellcheck.no_next_error": "No next spelling error",
   "menu.file": "&File",
   "menu.edit": "&Edit",
   "menu.view": "&View",

@@ -34,6 +34,8 @@
   "spellcheck.language_fallback": "Язык не поддерживается ({requested}), используется {language}.",
   "spellcheck.disabled": "Проверка орфографии отключена.",
   "spellcheck.no_errors": "Орфографических ошибок не найдено.",
+  "spellcheck.no_previous_error": "Нет предыдущей орфографической ошибки",
+  "spellcheck.no_next_error": "Нет следующей орфографической ошибки",
   "menu.file": "&Файл",
   "menu.edit": "&Правка",
   "menu.view": "&Вид",

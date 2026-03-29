@@ -311,12 +311,8 @@ impl ShortcutAction {
 
 fn shortcut_action_label(language: Language, action: ShortcutAction) -> String {
     match action {
-        ShortcutAction::ReadPreviousSentence => {
-            shortcut_action_tr_or(language, "file.read_previous_sentence", "Previous sentence")
-        }
-        ShortcutAction::ReadNextSentence => {
-            shortcut_action_tr_or(language, "file.read_next_sentence", "Next sentence")
-        }
+        ShortcutAction::ReadPreviousSentence => i18n::tr(language, "file.read_previous_sentence"),
+        ShortcutAction::ReadNextSentence => i18n::tr(language, "file.read_next_sentence"),
         ShortcutAction::ChapterPrev => i18n::tr(language, "playback.chapter_prev"),
         ShortcutAction::ChapterNext => i18n::tr(language, "playback.chapter_next"),
         _ => i18n::tr(language, shortcut_action_i18n_key(action)),
@@ -441,15 +437,6 @@ fn set_shortcut_binding_for_action(
         ShortcutAction::MediaNext => settings.media_next = binding,
         ShortcutAction::ChapterPrev => settings.chapter_prev = binding,
         ShortcutAction::ChapterNext => settings.chapter_next = binding,
-    }
-}
-
-fn shortcut_action_tr_or(language: Language, key: &str, fallback: &str) -> String {
-    let translated = i18n::tr(language, key);
-    if translated == key {
-        fallback.to_string()
-    } else {
-        translated
     }
 }
 

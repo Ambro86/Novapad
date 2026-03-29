@@ -103,6 +103,7 @@ enum ControlKind {
 struct InterpreterSelectState {
     control: ControlKind,
     original_mode: InterpreterDialogInitMode,
+    language: Language,
     initial_list_value: Option<String>,
     filter_edit: Option<HWND>,
     flat_list: Option<HWND>,
@@ -706,6 +707,7 @@ fn interpreter_select_wndproc_inner(
             let state = Box::new(InterpreterSelectState {
                 control,
                 original_mode: init.mode,
+                language: init.language,
                 initial_list_value: init.initial_list_value,
                 filter_edit,
                 flat_list,
@@ -1049,7 +1051,12 @@ fn refresh_filtered_control(hwnd: HWND) {
         };
 
         if state.filter_edit.is_some() && !filter_text.is_empty() {
-            crate::screen_reader_speak(&format!("{result_count} risultati"));
+            let message = crate::i18n::tr_f(
+                state.language,
+                "interpreter_select.results_count",
+                &[("count", &result_count.to_string())],
+            );
+            crate::screen_reader_speak(&message);
         }
     });
 }

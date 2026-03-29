@@ -26,9 +26,6 @@ use crate::tools::rai_audiodescrizioni::{self, CatalogGroup, CatalogItem};
 use crate::{RaiAudioOrigin, show_error, with_state};
 
 const AUTHOR_EMAIL: &str = "ambro86@gmail.com";
-const MISSING_KEY_MESSAGE: &str = "Per utilizzare questa funzione devi fare richiesta all'autore del programma. Questo è necessario per garantire che le informazioni contenute non vengano utilizzate in modo dannoso. L'autore, Ambrogio Riili, condivide il programma e tutte le sue funzioni in modo gratuito. Vuoi inviare una mail all'autore adesso?";
-const MISSING_KEY_TITLE: &str = "Codice Rai";
-const REQUEST_SUBJECT: &str = "Richiesta codice Sonarpad";
 const REQUEST_FORM_CLASS: &str = "SonarpadRaiCodeRequest";
 const REQUEST_ID_NAME: usize = 8201;
 const REQUEST_ID_SURNAME: usize = 8202;
@@ -38,6 +35,7 @@ const REQUEST_ID_CANCEL: usize = 8205;
 
 struct RequestCodeState {
     parent: HWND,
+    language: Language,
     name_edit: HWND,
     surname_edit: HWND,
     email_edit: HWND,
@@ -56,7 +54,10 @@ pub fn open(parent: HWND) {
 }
 
 fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option<String>) {
-    crate::screen_reader_speak("Caricamento audiodescrizioni Rai");
+    crate::screen_reader_speak(&crate::i18n::tr(
+        language,
+        "rai_audiodescrizioni.loading_recent",
+    ));
     let catalog = match rai_audiodescrizioni::load_catalog() {
         Ok(catalog) => catalog,
         Err(err) => {
@@ -72,13 +73,16 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
         show_error(
             parent,
             language,
-            "Nessuna audiodescrizione Rai disponibile nel catalogo.",
+            &crate::i18n::tr(language, "rai_audiodescrizioni.error.empty_recent_catalog"),
         );
         return;
     }
 
-    crate::screen_reader_speak("Caricamento audiodescrizioni Rai");
-    let (display_items, labels) = build_display_items(&catalog.items);
+    crate::screen_reader_speak(&crate::i18n::tr(
+        language,
+        "rai_audiodescrizioni.loading_recent",
+    ));
+    let (display_items, labels) = build_display_items(&catalog.items, language);
     let initial_label = initial_item_id.as_deref().and_then(|item_id| {
         display_items
             .iter()
@@ -92,14 +96,14 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
         parent,
         labels,
         language,
-        "Rai audiodescrizioni".to_string(),
+        crate::i18n::tr(language, "rai_audiodescrizioni.window.recent_title"),
         InterpreterSecondaryActionOptions {
-            label: "Mostra tutte le audiodescrizioni".to_string(),
+            label: crate::i18n::tr(language, "rai_audiodescrizioni.action.show_all"),
             filter_label: Some(filter_label),
         },
         initial_label,
         InterpreterContextAction {
-            label: tr_or(language, "rai_audiodescrizioni.copy_audio_url", "Copia URL audio"),
+            label: crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url"),
             enabled: Arc::new(move |selected_label: &str| {
                 display_items_for_enabled
                     .iter()
@@ -127,7 +131,7 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
                 show_error(
                     parent,
                     language,
-                    "Impossibile aprire l'audiodescrizione selezionata.",
+                    &crate::i18n::tr(language, "rai_audiodescrizioni.error.open_selected"),
                 );
                 return;
             };
@@ -156,7 +160,10 @@ pub fn open_grouped(parent: HWND) {
 }
 
 fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Option<String>) {
-    crate::screen_reader_speak("Caricamento catalogo completo audiodescrizioni Rai");
+    crate::screen_reader_speak(&crate::i18n::tr(
+        language,
+        "rai_audiodescrizioni.loading_full_catalog",
+    ));
     let groups = match rai_audiodescrizioni::load_grouped_catalog() {
         Ok(groups) => groups,
         Err(err) => {
@@ -172,7 +179,7 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
         show_error(
             parent,
             language,
-            "Nessuna audiodescrizione Rai disponibile nel catalogo completo.",
+            &crate::i18n::tr(language, "rai_audiodescrizioni.error.empty_full_catalog"),
         );
         return;
     }
@@ -201,11 +208,11 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
         parent,
         grouped_items,
         language,
-        "Tutte le audiodescrizioni Rai".to_string(),
+        crate::i18n::tr(language, "rai_audiodescrizioni.window.full_title"),
         Some(filter_label),
         initial_item_id,
         InterpreterContextAction {
-            label: tr_or(language, "rai_audiodescrizioni.copy_audio_url", "Copia URL audio"),
+            label: crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url"),
             enabled: Arc::new(move |selected_value: &str| {
                 item_by_id_for_enabled
                     .get(selected_value)
@@ -244,17 +251,8 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
     show_error(
         parent,
         language,
-        "Impossibile aprire l'audiodescrizione selezionata.",
+        &crate::i18n::tr(language, "rai_audiodescrizioni.error.open_selected"),
     );
-}
-
-fn tr_or(language: Language, key: &str, fallback: &str) -> String {
-    let translated = crate::i18n::tr(language, key);
-    if translated == key {
-        fallback.to_string()
-    } else {
-        translated
-    }
 }
 
 fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
@@ -343,13 +341,16 @@ fn build_grouped_items(groups: &[CatalogGroup]) -> Vec<GroupedSelectGroup> {
         .collect()
 }
 
-fn build_display_items(items: &[CatalogItem]) -> (Vec<(String, CatalogItem)>, Vec<String>) {
+fn build_display_items(
+    items: &[CatalogItem],
+    language: Language,
+) -> (Vec<(String, CatalogItem)>, Vec<String>) {
     let mut used = HashSet::new();
     let mut display_items = Vec::with_capacity(items.len());
     let mut labels = Vec::with_capacity(items.len());
 
     for item in items {
-        let base_label = format_item_label(item);
+        let base_label = format_item_label(item, language);
         let unique_label = ensure_unique_label(base_label, item, &mut used);
         labels.push(unique_label.clone());
         display_items.push((unique_label, item.clone()));
@@ -358,7 +359,7 @@ fn build_display_items(items: &[CatalogItem]) -> (Vec<(String, CatalogItem)>, Ve
     (display_items, labels)
 }
 
-fn format_item_label(item: &CatalogItem) -> String {
+fn format_item_label(item: &CatalogItem, language: Language) -> String {
     let mut parts = Vec::new();
     let title = item.title.trim();
     if !title.is_empty() {
@@ -384,7 +385,7 @@ fn format_item_label(item: &CatalogItem) -> String {
     }
 
     if parts.is_empty() {
-        "Audiodescrizione Rai".to_string()
+        crate::i18n::tr(language, "rai_audiodescrizioni.item.default_title")
     } else {
         parts.join(" - ")
     }
@@ -426,15 +427,27 @@ fn handle_missing_luce_key(parent: HWND, language: Language, err: &str) -> bool 
     let ask = crate::show_blocking_modal_message_box(
         parent,
         crate::BlockingModalKind::RaiLuceMissingKey,
-        PCWSTR(crate::to_wide(MISSING_KEY_MESSAGE).as_ptr()),
-        PCWSTR(crate::to_wide(MISSING_KEY_TITLE).as_ptr()),
+        PCWSTR(
+            crate::to_wide(&crate::i18n::tr(
+                language,
+                "rai_audiodescrizioni.missing_key_message",
+            ))
+            .as_ptr(),
+        ),
+        PCWSTR(
+            crate::to_wide(&crate::i18n::tr(
+                language,
+                "rai_audiodescrizioni.missing_key_title",
+            ))
+            .as_ptr(),
+        ),
         MB_YESNO | MB_ICONQUESTION,
     );
     if ask != IDYES {
         return true;
     }
 
-    let Some((nome, cognome, mail)) = request_code_contact(parent) else {
+    let Some((nome, cognome, mail)) = request_code_contact(parent, language) else {
         return true;
     };
 
@@ -451,7 +464,10 @@ fn handle_missing_luce_key(parent: HWND, language: Language, err: &str) -> bool 
     );
     let uri = format!(
         "mailto:{AUTHOR_EMAIL}?subject={}&body={}",
-        mailto_encode_component(REQUEST_SUBJECT),
+        mailto_encode_component(&crate::i18n::tr(
+            language,
+            "rai_audiodescrizioni.request_code.subject",
+        )),
         mailto_encode_component(&body)
     );
     if let Err(open_err) = crate::audio_utils::open_url_in_browser(&uri) {
@@ -498,7 +514,7 @@ fn mailto_encode_component(value: &str) -> String {
     encoded
 }
 
-fn request_code_contact(parent: HWND) -> Option<(String, String, String)> {
+fn request_code_contact(parent: HWND, language: Language) -> Option<(String, String, String)> {
     unsafe {
         let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
         let class_name = crate::to_wide(REQUEST_FORM_CLASS);
@@ -516,6 +532,7 @@ fn request_code_contact(parent: HWND) -> Option<(String, String, String)> {
 
         let state = Box::new(RequestCodeState {
             parent,
+            language,
             name_edit: HWND(0),
             surname_edit: HWND(0),
             email_edit: HWND(0),
@@ -526,7 +543,13 @@ fn request_code_contact(parent: HWND) -> Option<(String, String, String)> {
         let hwnd = CreateWindowExW(
             WS_EX_DLGMODALFRAME | WS_EX_CONTROLPARENT,
             PCWSTR(class_name.as_ptr()),
-            PCWSTR(crate::to_wide("Richiesta codice Sonarpad").as_ptr()),
+            PCWSTR(
+                crate::to_wide(&crate::i18n::tr(
+                    language,
+                    "rai_audiodescrizioni.request_code.title",
+                ))
+                .as_ptr(),
+            ),
             WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -647,12 +670,21 @@ unsafe extern "system" fn request_code_wndproc(
 }
 
 fn create_request_code_controls(hwnd: HWND) {
+    let language = request_code_state_mut(hwnd)
+        .map(|state| state.language)
+        .unwrap_or_default();
     unsafe {
         let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
         CreateWindowExW(
             Default::default(),
             windows::core::w!("STATIC"),
-            PCWSTR(crate::to_wide("Inserisci nome").as_ptr()),
+            PCWSTR(
+                crate::to_wide(&crate::i18n::tr(
+                    language,
+                    "rai_audiodescrizioni.request_code.name",
+                ))
+                .as_ptr(),
+            ),
             WS_CHILD | WS_VISIBLE,
             12,
             16,
@@ -680,7 +712,13 @@ fn create_request_code_controls(hwnd: HWND) {
         CreateWindowExW(
             Default::default(),
             windows::core::w!("STATIC"),
-            PCWSTR(crate::to_wide("Inserisci cognome").as_ptr()),
+            PCWSTR(
+                crate::to_wide(&crate::i18n::tr(
+                    language,
+                    "rai_audiodescrizioni.request_code.surname",
+                ))
+                .as_ptr(),
+            ),
             WS_CHILD | WS_VISIBLE,
             12,
             68,
@@ -708,7 +746,13 @@ fn create_request_code_controls(hwnd: HWND) {
         CreateWindowExW(
             Default::default(),
             windows::core::w!("STATIC"),
-            PCWSTR(crate::to_wide("Inserisci mail").as_ptr()),
+            PCWSTR(
+                crate::to_wide(&crate::i18n::tr(
+                    language,
+                    "rai_audiodescrizioni.request_code.email",
+                ))
+                .as_ptr(),
+            ),
             WS_CHILD | WS_VISIBLE,
             12,
             120,
@@ -736,7 +780,7 @@ fn create_request_code_controls(hwnd: HWND) {
         CreateWindowExW(
             Default::default(),
             windows::core::w!("BUTTON"),
-            PCWSTR(crate::to_wide("OK").as_ptr()),
+            PCWSTR(crate::to_wide(&crate::i18n::tr(language, "common.ok")).as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
             206,
             178,
@@ -750,7 +794,7 @@ fn create_request_code_controls(hwnd: HWND) {
         CreateWindowExW(
             Default::default(),
             windows::core::w!("BUTTON"),
-            PCWSTR(crate::to_wide("Annulla").as_ptr()),
+            PCWSTR(crate::to_wide(&crate::i18n::tr(language, "common.cancel")).as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP,
             302,
             178,

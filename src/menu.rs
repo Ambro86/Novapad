@@ -317,12 +317,8 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         file_close: i18n::tr(language, "file.close"),
         file_recent: i18n::tr(language, "file.recent"),
         file_read_start: i18n::tr(language, "file.read_start"),
-        file_read_previous_sentence: tr_or(
-            language,
-            "file.read_previous_sentence",
-            "Previous sentence",
-        ),
-        file_read_next_sentence: tr_or(language, "file.read_next_sentence", "Next sentence"),
+        file_read_previous_sentence: i18n::tr(language, "file.read_previous_sentence"),
+        file_read_next_sentence: i18n::tr(language, "file.read_next_sentence"),
         file_execute: i18n::tr(language, "file.execute"),
         file_read_pause: i18n::tr(language, "file.read_pause"),
         file_read_stop: i18n::tr(language, "file.read_stop"),
@@ -381,15 +377,6 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         help_about: i18n::tr(language, "help.about"),
         recent_empty: i18n::tr(language, "recent.empty"),
         recent_clear: i18n::tr(language, "recent.clear"),
-    }
-}
-
-fn tr_or(language: Language, key: &str, fallback: &str) -> String {
-    let translated = i18n::tr(language, key);
-    if translated == key {
-        fallback.to_string()
-    } else {
-        translated
     }
 }
 

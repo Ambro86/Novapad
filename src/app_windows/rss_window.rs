@@ -710,15 +710,6 @@ fn decode_mail_text_component(input: &str) -> String {
         .to_string()
 }
 
-fn tr_or(language: crate::settings::Language, key: &str, fallback: &str) -> String {
-    let translated = i18n::tr(language, key);
-    if translated == key {
-        fallback.to_string()
-    } else {
-        translated
-    }
-}
-
 fn google_news_params(
     language: crate::settings::Language,
 ) -> (&'static str, &'static str, &'static str) {
@@ -7043,7 +7034,7 @@ fn show_rss_search_dialog(parent_hwnd: HWND) {
 
     let main_hwnd = with_rss_state(parent_hwnd, |s| s.parent).unwrap_or(HWND(0));
     let language = { with_state(main_hwnd, |s| s.settings.language) }.unwrap_or_default();
-    let title = tr_or(language, "rss.search_dialog.title", "Search RSS by keyword");
+    let title = i18n::tr(language, "rss.search_dialog.title");
     let init_ptr = Box::into_raw(Box::new(SearchDialogInit {
         parent: parent_hwnd,
     }));
@@ -7100,7 +7091,7 @@ fn search_keyword_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, parent.0);
 
                 let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
-                let keyword_label = tr_or(language, "rss.search_dialog.keyword_label", "Keyword:");
+                let keyword_label = i18n::tr(language, "rss.search_dialog.keyword_label");
                 CreateWindowExW(
                     Default::default(),
                     w!("STATIC"),
@@ -7185,13 +7176,8 @@ fn search_keyword_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                             as usize;
                     let keyword = String::from_utf16_lossy(&buf[..len]).trim().to_string();
                     if keyword.is_empty() {
-                        let title =
-                            tr_or(language, "rss.search_dialog.title", "Search RSS by keyword");
-                        let message = tr_or(
-                            language,
-                            "rss.search_dialog.empty_keyword",
-                            "Please enter a keyword.",
-                        );
+                        let title = i18n::tr(language, "rss.search_dialog.title");
+                        let message = i18n::tr(language, "rss.search_dialog.empty_keyword");
                         MessageBoxW(
                             hwnd,
                             PCWSTR(to_wide(&message).as_ptr()),

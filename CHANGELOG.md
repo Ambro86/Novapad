@@ -4,6 +4,7 @@ Version 0.6.8 – 2026-03-24
 
 What's New
 • Added a new item to the Play menu that lets you transcribe any audio or video file with Whisper. A new “AI and Transcription” section is now available in Options, where you can choose the model, enable optional CUDA support for NVIDIA graphics cards, preserve the original language, and enable or disable timestamps.
+• Added a new Play menu action, `Transcribe current folder`, which transcribes all supported audio files in the folder of the currently open media into a single combined document, with dedicated progress, current-file status, and cancellation support. It can also be started with `Alt+Shift+C`.
 • Added offline voice dictation, using the same workflow as audio transcription. By default, press `Ctrl+Shift+Space` to start dictation and press the same shortcut again to stop it; the shortcut can be customized in Options. From the second activation onward, dictation is faster because the engine stays ready in memory; this preloading and reuse are automatically disabled on PCs with less than 4 GB of RAM.
 • Podcast search now uses `iTunes + Spreaker` by default, with duplicate filtering when the same podcast is found on both platforms.
 • Improved Apple podcast browsing and search: podcast search, category browsing, and top podcasts by category now use the selected podcast directory country. In Options > RSS / Podcast you can leave it on `Automatic` to use the system country, or choose a different country manually.

@@ -4,6 +4,7 @@ Phiên bản 0.6.8 – 2026-03-24
 
 Có gì mới
 • Đã thêm một mục mới trong menu Phát để chép lời bất kỳ tệp âm thanh hoặc video nào bằng Whisper. Trong Tùy chọn có một phần mới tên là “AI và Chuyển lời”, nơi bạn có thể chọn mô hình, bật hỗ trợ CUDA tùy chọn cho card đồ họa NVIDIA, giữ nguyên ngôn ngữ gốc và bật hoặc tắt dấu thời gian.
+• Đã thêm vào menu Phát hành động mới `Chuyển đổi thư mục hiện tại`, cho phép chuyển đổi tất cả các tệp âm thanh được hỗ trợ trong thư mục của media đang mở và gộp chúng thành một tài liệu duy nhất, với cửa sổ tiến trình riêng, thông tin tệp hiện tại và khả năng hủy. Cũng có thể gọi bằng phím tắt `Alt+Shift+C`.
 • Đã thêm khả năng dùng đọc chính tả bằng giọng nói ngoại tuyến, với cách hoạt động giống như chép lời âm thanh. Mặc định, nhấn `Ctrl+Shift+Space` để bắt đầu đọc chính tả và nhấn lại đúng phím tắt đó để kết thúc; có thể tùy chỉnh phím tắt trong phần Tùy chọn. Từ lần kích hoạt thứ hai trở đi, việc đọc chính tả sẽ nhanh hơn vì bộ máy vẫn sẵn sàng trong bộ nhớ; trên các PC có dưới 4 GB RAM, việc nạp sẵn và tái sử dụng này sẽ tự động bị tắt.
 • Tìm kiếm podcast giờ mặc định dùng `iTunes + Spreaker`, với bộ lọc loại bỏ kết quả trùng lặp khi cùng một podcast xuất hiện trên cả hai nền tảng.
 • Đã cải thiện tìm kiếm và duyệt podcast Apple: tìm kiếm podcast, duyệt theo danh mục và top podcast theo danh mục giờ dùng quốc gia thư mục podcast đã chọn. Trong Tùy chọn > RSS / Podcast, có thể để `Tự động` để dùng quốc gia hệ thống hoặc tự chọn một quốc gia khác.

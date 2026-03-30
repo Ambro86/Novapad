@@ -70,10 +70,11 @@ const STREAM_ID_OK: usize = 9313;
 const STREAM_ID_CANCEL: usize = 9314;
 const STREAM_ID_DIRECT_PLAY: usize = 9315;
 const STREAM_ID_FAVORITES: usize = 9316;
+const STREAM_ID_OPEN_COMMENTS: usize = 9317;
 
 #[inline]
 fn ignore_bool(_value: bool) {}
-const STREAM_ID_QUALITY: usize = 9317;
+const STREAM_ID_QUALITY: usize = 9318;
 const STREAM_TRACK_ID_COMBO: usize = 9321;
 const STREAM_TRACK_ID_OK: usize = 9322;
 const STREAM_TRACK_ID_CANCEL: usize = 9323;
@@ -2741,8 +2742,55 @@ fn measure_youtube_comment_row_height(
     (rect.bottom - rect.top + (YOUTUBE_COMMENTS_ROW_PADDING_Y * 2)).max(24)
 }
 
+fn youtube_comment_reply_position(
+    state: &YoutubeCommentsDialogState,
+    comment: &YoutubeComment,
+    depth: usize,
+) -> Option<(usize, usize)> {
+    if depth == 0 {
+        return None;
+    }
+    let siblings = state.children_by_parent.get(comment.parent.as_str())?;
+    let total = siblings.len();
+    let index = siblings.iter().position(|&comment_index| {
+        state
+            .comments
+            .get(comment_index)
+            .map(|item| item.id.as_str())
+            == Some(comment.id.as_str())
+    })?;
+    Some((index + 1, total))
+}
+
 fn format_youtube_comment_tree_label(language: Language, comment: &YoutubeComment) -> String {
     let mut parts = vec![comment.author.clone()];
+    if !comment.time_text.is_empty() {
+        parts.push(localize_comment_time_text(language, &comment.time_text));
+    }
+    let mut label = parts.join(" - ");
+    let text = normalize_comment_text(&comment.text);
+    if !text.is_empty() {
+        label.push_str(" - ");
+        label.push_str(&text);
+    }
+    label
+}
+
+fn format_youtube_comment_accessibility_label(
+    state: &YoutubeCommentsDialogState,
+    comment: &YoutubeComment,
+    depth: usize,
+) -> String {
+    let language = state.language;
+    let mut parts = Vec::new();
+    if let Some((index, total)) = youtube_comment_reply_position(state, comment, depth) {
+        parts.push(i18n::tr_f(
+            language,
+            "stream_audio.comment_reply_position",
+            &[("index", &index.to_string()), ("total", &total.to_string())],
+        ));
+    }
+    parts.push(comment.author.clone());
     if !comment.time_text.is_empty() {
         parts.push(localize_comment_time_text(language, &comment.time_text));
     }
@@ -2783,7 +2831,9 @@ fn youtube_comment_row_accessibility_label(
     if row.depth > 0 {
         label.push_str(&"  ".repeat(row.depth));
     }
-    label.push_str(&format_youtube_comment_tree_label(state.language, comment));
+    label.push_str(&format_youtube_comment_accessibility_label(
+        state, comment, row.depth,
+    ));
     if row.has_children {
         let reply_count = state
             .children_by_parent
@@ -3276,7 +3326,7 @@ fn announce_selected_youtube_comment_expand_state(
 fn selected_youtube_comment_announcement(state: &YoutubeCommentsDialogState) -> Option<String> {
     let row = state.rows.get(state.selected_row)?;
     let comment = state.comments.get(row.comment_index)?;
-    let mut announcement = format_youtube_comment_tree_label(state.language, comment);
+    let mut announcement = format_youtube_comment_accessibility_label(state, comment, row.depth);
     if row.has_children {
         let reply_count = state
             .children_by_parent
@@ -4120,6 +4170,7 @@ struct StreamDialogState {
     format_combo: HWND,
     quality_combo: HWND,
     direct_play_check: HWND,
+    open_comments_button: HWND,
     ok_button: HWND,
     result: Arc<Mutex<Option<StreamDialogResult>>>,
 }
@@ -4320,6 +4371,27 @@ fn refill_stream_quality_combo(state: &StreamDialogState, keep_selection: bool) 
     );
 }
 
+fn current_stream_dialog_input(state: &StreamDialogState) -> String {
+    let url = read_edit_text(state.url_edit);
+    if !url.trim().is_empty() {
+        return url;
+    }
+    let favorite_idx =
+        crate::send_message_w_safe(state.favorites_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if favorite_idx >= 0
+        && let Some(favorite) = state.favorites.get(favorite_idx as usize)
+    {
+        return favorite.url.clone();
+    }
+    String::new()
+}
+
+fn update_stream_open_comments_button(state: &StreamDialogState) {
+    let input = current_stream_dialog_input(state);
+    let is_enabled = extract_video_id(&input).is_some() && !is_youtube_collection_url(&input);
+    crate::enable_window_safe(state.open_comments_button, is_enabled);
+}
+
 fn with_stream_dialog_state<F, R>(hwnd: HWND, f: F) -> Option<R>
 where
     F: FnOnce(&mut StreamDialogState) -> R,
@@ -4498,6 +4570,22 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     HINSTANCE(0),
                     None,
                 );
+                let open_comments_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(
+                        to_wide(&i18n::tr(init.language, "stream_audio.open_comments")).as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    110,
+                    178,
+                    130,
+                    28,
+                    hwnd,
+                    HMENU(STREAM_ID_OPEN_COMMENTS as isize),
+                    HINSTANCE(0),
+                    None,
+                );
                 let ok_button = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -4537,6 +4625,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     quality_label,
                     quality_combo,
                     direct_play_check,
+                    open_comments_button,
                     ok_button,
                     cancel_button,
                 ] {
@@ -4571,11 +4660,13 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     format_combo,
                     quality_combo,
                     direct_play_check,
+                    open_comments_button,
                     ok_button,
                     result: init.result.clone(),
                 });
                 refill_stream_quality_combo(&state, false);
                 refill_stream_favorites_combo(&state, Some(0));
+                update_stream_open_comments_button(&state);
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
                 SetFocus(url_edit);
                 LRESULT(0)
@@ -4673,27 +4764,91 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     }
                     return LRESULT(0);
                 }
+                if cmd_id == STREAM_ID_URL && notify_code == EN_CHANGE as usize {
+                    if with_stream_dialog_state(hwnd, |state| {
+                        update_stream_open_comments_button(state);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to update stream open comments button");
+                    }
+                    return LRESULT(0);
+                }
+                if cmd_id == STREAM_ID_FAVORITES && notify_code == CBN_SELCHANGE as usize {
+                    if with_stream_dialog_state(hwnd, |state| {
+                        update_stream_open_comments_button(state);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to update stream open comments button");
+                    }
+                    return LRESULT(0);
+                }
+                if cmd_id == STREAM_ID_OPEN_COMMENTS {
+                    let Some((language, input)) = with_stream_dialog_state(hwnd, |state| {
+                        (state.language, current_stream_dialog_input(state))
+                    }) else {
+                        crate::log_debug("Failed to access stream dialog state");
+                        return LRESULT(0);
+                    };
+                    let Some(normalized_url) = normalize_youtube_input_for_download(&input) else {
+                        return LRESULT(0);
+                    };
+                    if extract_video_id(&normalized_url).is_none()
+                        || is_youtube_collection_url(&normalized_url)
+                    {
+                        return LRESULT(0);
+                    }
+
+                    let labels_data = labels(language);
+                    let progress = open_progress_dialog(
+                        hwnd,
+                        language,
+                        "stream_audio.progress_title",
+                        "stream_audio.comments_loading",
+                        false,
+                    );
+                    let ytdlp_path = match ensure_ytdlp_available(
+                        hwnd,
+                        language,
+                        &labels_data,
+                        Some(progress),
+                    ) {
+                        Ok(Some(path)) => path,
+                        Ok(None) => return LRESULT(0),
+                        Err(err) => {
+                            close_progress_dialog(progress);
+                            let message = i18n::tr_f(
+                                language,
+                                "stream_audio.download_failed",
+                                &[("err", &err)],
+                            );
+                            show_error(hwnd, language, &message);
+                            return LRESULT(0);
+                        }
+                    };
+                    close_progress_dialog(progress);
+                    let entry = StreamCollectionEntry {
+                        label: normalized_url.clone(),
+                        url: normalized_url,
+                    };
+                    show_youtube_comments_for_stream_entry(hwnd, language, &ytdlp_path, &entry);
+                    if with_stream_dialog_state(hwnd, |state| {
+                        update_stream_open_comments_button(state);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to refresh stream open comments button");
+                    }
+                    return LRESULT(0);
+                }
                 if cmd_id == STREAM_ID_OK || cmd_id == 1 {
                     if with_stream_dialog_state(hwnd, |state| {
                         let msg = i18n::tr(state.language, "stream_audio.progress_downloading");
                         if !screen_reader_speak(&msg) {
                             crate::log_debug("Screen reader speak failed");
                         }
-                        let mut url = read_edit_text(state.url_edit);
-                        if url.trim().is_empty() {
-                            let favorite_idx = SendMessageW(
-                                state.favorites_combo,
-                                CB_GETCURSEL,
-                                WPARAM(0),
-                                LPARAM(0),
-                            )
-                            .0;
-                            if favorite_idx >= 0
-                                && let Some(favorite) = state.favorites.get(favorite_idx as usize)
-                            {
-                                url = favorite.url.clone();
-                            }
-                        }
+                        let url = current_stream_dialog_input(state);
                         let format_idx =
                             SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
                         let format = StreamOutputFormat::combo_items(state.language)

@@ -17,11 +17,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     DefWindowProcW, DestroyMenu, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, GWLP_USERDATA,
     GetCursorPos, GetWindowTextLengthW, GetWindowTextW, HMENU, HWND_TOPMOST, IDC_ARROW,
     IsDialogMessageW, LB_ADDSTRING, LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_RESETCONTENT,
-    LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MF_STRING, MSG, PostMessageW, SW_HIDE, SW_SHOW,
-    SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetWindowPos,
-    SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu, TranslateMessage,
-    WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY,
-    WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    LB_SETCARETINDEX, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MF_STRING, MSG, PostMessageW, SW_HIDE,
+    SW_SHOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
+    SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu,
+    TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
     WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
@@ -1458,6 +1458,24 @@ pub fn restore_interpreter_select_focus(hwnd: HWND) -> bool {
         ));
         unsafe {
             SetFocus(target);
+        }
+        if matches!(state.control, ControlKind::List(_))
+            || state.flat_list.is_some_and(|flat_list| flat_list == target)
+        {
+            let sel = crate::send_message_w_safe(target, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+            if sel >= 0 {
+                crate::send_message_w_safe(target, LB_SETCURSEL, WPARAM(sel as usize), LPARAM(0));
+                crate::send_message_w_safe(
+                    target,
+                    LB_SETCARETINDEX,
+                    WPARAM(sel as usize),
+                    LPARAM(0),
+                );
+                crate::log_debug(&format!(
+                    "interpreter_select restore focus listbox reseated hwnd={:?} target={:?} sel={}",
+                    hwnd, target, sel
+                ));
+            }
         }
         crate::log_debug(&format!(
             "interpreter_select restore focus after SetFocus hwnd={:?} target={:?} focus_after={:?}",

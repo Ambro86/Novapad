@@ -1879,6 +1879,7 @@ fn choose_stream_collection_entry_page(
                 "stream_audio.add_to_favorites",
                 "Add to favorites",
             ),
+            ctrl_c_shortcut: false,
             enabled: {
                 let favorite_candidates = Arc::clone(&favorite_candidates);
                 Arc::new(move |selected: &str| {
@@ -1903,6 +1904,7 @@ fn choose_stream_collection_entry_page(
     let view_comments_action =
         crate::app_windows::interpreter_select_window::InterpreterContextAction {
             label: tr_or(language, "stream_audio.view_comments", "View comments"),
+            ctrl_c_shortcut: false,
             enabled: {
                 let favorite_candidates = Arc::clone(&favorite_candidates);
                 Arc::new(move |selected: &str| {

@@ -103,7 +103,11 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
         },
         initial_label,
         InterpreterContextAction {
-            label: crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url"),
+            label: format!(
+                "{} (Ctrl+C)",
+                crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
+            ),
+            ctrl_c_shortcut: true,
             enabled: Arc::new(move |selected_label: &str| {
                 display_items_for_enabled
                     .iter()
@@ -116,7 +120,10 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
                     .iter()
                     .find(|(label, _)| label == &selected_label)
                 {
-                    copy_text_to_clipboard(parent, &item.audio_url);
+                    copy_text_to_clipboard(
+                        parent,
+                        &format_audio_url_clipboard_text(language, &item.title, &item.audio_url),
+                    );
                 }
             }),
         },
@@ -212,7 +219,11 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
         Some(filter_label),
         initial_item_id,
         InterpreterContextAction {
-            label: crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url"),
+            label: format!(
+                "{} (Ctrl+C)",
+                crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
+            ),
+            ctrl_c_shortcut: true,
             enabled: Arc::new(move |selected_value: &str| {
                 item_by_id_for_enabled
                     .get(selected_value)
@@ -221,7 +232,10 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
             }),
             handler: Arc::new(move |selected_value: String| {
                 if let Some(item) = item_by_id_for_handler.get(&selected_value) {
-                    copy_text_to_clipboard(parent, &item.audio_url);
+                    copy_text_to_clipboard(
+                        parent,
+                        &format_audio_url_clipboard_text(language, &item.title, &item.audio_url),
+                    );
                 }
             }),
         },
@@ -253,6 +267,16 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
         language,
         &crate::i18n::tr(language, "rai_audiodescrizioni.error.open_selected"),
     );
+}
+
+fn format_audio_url_clipboard_text(language: Language, title: &str, audio_url: &str) -> String {
+    let title_label = crate::i18n::tr(language, "properties.title");
+    let url_label = crate::i18n::tr(language, "properties.url");
+    format!(
+        "{title_label}: {}\r\n{url_label}: {}",
+        title.trim(),
+        audio_url
+    )
 }
 
 fn copy_text_to_clipboard(hwnd: HWND, text: &str) {

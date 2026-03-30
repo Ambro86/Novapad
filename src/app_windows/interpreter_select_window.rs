@@ -9,8 +9,8 @@ use windows::Win32::UI::Controls::{
     TVS_SHOWSELALWAYS, WC_BUTTON, WC_EDIT, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, SetFocus, VK_APPS, VK_DOWN, VK_END, VK_ESCAPE, VK_F10, VK_HOME, VK_LEFT, VK_NEXT,
-    VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_UP,
+    EnableWindow, SetFocus, VK_APPS, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_F10, VK_HOME,
+    VK_LEFT, VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW,
@@ -20,9 +20,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     LB_SETCARETINDEX, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MF_STRING, MSG, PostMessageW, SW_HIDE,
     SW_SHOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
     SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu,
-    TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
+    WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -38,6 +39,7 @@ const ID_CANCEL: usize = 9203;
 const ID_SECONDARY: usize = 9204;
 const ID_FILTER_EDIT: usize = 9205;
 const ID_FLAT_LIST: usize = 9206;
+const WM_RESTORE_LIST_FOCUS: u32 = WM_APP + 1;
 
 type ContextActionEnabled = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 type ContextActionHandler = Arc<dyn Fn(String) + Send + Sync>;
@@ -112,6 +114,7 @@ struct InterpreterSelectState {
 #[derive(Clone)]
 pub struct InterpreterContextAction {
     pub label: String,
+    pub ctrl_c_shortcut: bool,
     pub enabled: ContextActionEnabled,
     pub handler: ContextActionHandler,
 }
@@ -397,6 +400,55 @@ fn select_interpreter_internal(
                         WPARAM(focused.0 as usize),
                         LPARAM(-1),
                     ));
+                    continue;
+                }
+            }
+            if msg.message == WM_KEYDOWN
+                && msg.wParam.0 as u32 == 'C' as u32
+                && crate::get_key_state_safe(VK_CONTROL.0 as i32) < 0
+            {
+                let handled = with_interpreter_state(hwnd, |state| {
+                    let value = match state.control {
+                        ControlKind::List(list) => {
+                            if focused != list {
+                                return false;
+                            }
+                            let Some(value) = selected_list_value(list) else {
+                                return false;
+                            };
+                            value
+                        }
+                        ControlKind::Tree(tree) => {
+                            if focused != tree {
+                                return false;
+                            }
+                            if let Some(flat_list) = state.flat_list
+                                && windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(
+                                    flat_list,
+                                )
+                                .as_bool()
+                            {
+                                return false;
+                            }
+                            let Some(value) = selected_tree_value(tree, &state.tree_values) else {
+                                return false;
+                            };
+                            value
+                        }
+                    };
+                    let Some(action) = state
+                        .context_actions
+                        .iter()
+                        .find(|action| action.ctrl_c_shortcut && (action.enabled)(&value))
+                        .cloned()
+                    else {
+                        return false;
+                    };
+                    (action.handler)(value);
+                    true
+                })
+                .unwrap_or(false);
+                if handled {
                     continue;
                 }
             }
@@ -744,6 +796,18 @@ fn interpreter_select_wndproc_inner(
                 result: init.result.clone(),
             });
             crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+            LRESULT(0)
+        }
+        WM_ACTIVATE => {
+            if wparam.0 & 0xFFFF != 0 {
+                crate::log_if_err!(unsafe {
+                    PostMessageW(hwnd, WM_RESTORE_LIST_FOCUS, WPARAM(0), LPARAM(0))
+                });
+            }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
+        }
+        WM_RESTORE_LIST_FOCUS => {
+            restore_interpreter_select_focus(hwnd);
             LRESULT(0)
         }
         WM_CONTEXTMENU => {
@@ -1427,7 +1491,6 @@ pub fn restore_interpreter_select_focus(hwnd: HWND) -> bool {
         hwnd,
         crate::get_focus_safe()
     ));
-    crate::set_foreground_window_safe(hwnd);
     with_interpreter_state(hwnd, |state| {
         let target = match state.control {
             ControlKind::List(list) => list,

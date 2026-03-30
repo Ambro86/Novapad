@@ -34,9 +34,9 @@ use windows::Win32::UI::Controls::{
     WC_TABCONTROLW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetAsyncKeyState, GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE,
-    VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_MENU, VK_RCONTROL, VK_RETURN, VK_RMENU, VK_RSHIFT,
-    VK_SHIFT, VK_SPACE, VK_TAB,
+    EnableWindow, GetAsyncKeyState, GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE, VK_F3,
+    VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_MENU, VK_NEXT, VK_OEM_COMMA, VK_OEM_PERIOD, VK_PRIOR,
+    VK_RCONTROL, VK_RETURN, VK_RMENU, VK_RSHIFT, VK_SHIFT, VK_SPACE, VK_TAB,
 };
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -313,10 +313,38 @@ fn shortcut_action_label(language: Language, action: ShortcutAction) -> String {
     match action {
         ShortcutAction::ReadPreviousSentence => i18n::tr(language, "file.read_previous_sentence"),
         ShortcutAction::ReadNextSentence => i18n::tr(language, "file.read_next_sentence"),
-        ShortcutAction::ChapterPrev => i18n::tr(language, "playback.chapter_prev"),
-        ShortcutAction::ChapterNext => i18n::tr(language, "playback.chapter_next"),
+        ShortcutAction::ChapterPrev => {
+            plain_shortcut_action_label(&i18n::tr(language, "playback.chapter_prev"))
+        }
+        ShortcutAction::ChapterNext => {
+            plain_shortcut_action_label(&i18n::tr(language, "playback.chapter_next"))
+        }
         _ => i18n::tr(language, shortcut_action_i18n_key(action)),
     }
+}
+
+fn plain_shortcut_action_label(label: &str) -> String {
+    let base = label
+        .split_once('\t')
+        .map(|(left, _)| left)
+        .unwrap_or(label);
+    let base = base
+        .rsplit_once(" Alt+")
+        .map(|(left, _)| left)
+        .unwrap_or(base);
+    let mut out = String::with_capacity(base.len());
+    let mut chars = base.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '&' {
+            if chars.peek() == Some(&'&') {
+                out.push('&');
+                chars.next();
+            }
+            continue;
+        }
+        out.push(ch);
+    }
+    out
 }
 
 fn shortcut_action_i18n_key(action: ShortcutAction) -> &'static str {
@@ -450,6 +478,186 @@ fn find_shortcut_conflict(
     })
 }
 
+fn find_fixed_shortcut_conflict_label(
+    language: Language,
+    candidate: ShortcutBinding,
+) -> Option<String> {
+    let labels = crate::menu::menu_labels(language);
+    let fixed = vec![
+        (
+            ShortcutBinding::new(true, false, false, 'N' as u16),
+            labels.file_new,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, 'O' as u16),
+            labels.file_open,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, 'S' as u16),
+            labels.file_save,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'S' as u16),
+            labels.file_save_all,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, 'W' as u16),
+            labels.file_close,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'W' as u16),
+            labels.window_close_others,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'F' as u16),
+            labels.edit_find_in_files,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'M' as u16),
+            labels.edit_strip_markdown,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'H' as u16),
+            labels.edit_hard_line_break,
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'O' as u16),
+            labels.edit_order_items,
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'K' as u16),
+            labels.edit_keep_unique_items,
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'Z' as u16),
+            labels.edit_reverse_items,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, VK_RETURN.0),
+            labels.edit_normalize_whitespace,
+        ),
+        (
+            ShortcutBinding::new(false, false, false, VK_F3.0),
+            labels.edit_find_next,
+        ),
+        (
+            ShortcutBinding::new(false, true, false, VK_F3.0),
+            labels.edit_find_previous,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, 'H' as u16),
+            labels.edit_replace,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, 'J' as u16),
+            labels.edit_goto_line,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, 'A' as u16),
+            labels.edit_select_all,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, VK_OEM_PERIOD.0),
+            labels.edit_indent,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, VK_OEM_PERIOD.0),
+            i18n::tr(language, "edit.insert_ellipsis"),
+        ),
+        (
+            ShortcutBinding::new(true, true, false, VK_OEM_COMMA.0),
+            labels.edit_outdent,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'J' as u16),
+            labels.edit_join_lines,
+        ),
+        (
+            ShortcutBinding::new(true, true, true, 'Y' as u16),
+            labels.edit_text_stats,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, 'D' as u16),
+            labels.edit_remove_duplicate_lines,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'C' as u16),
+            labels.edit_remove_duplicate_consecutive_lines,
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'H' as u16),
+            labels.edit_clean_eol_hyphens,
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'D' as u16),
+            labels.menu_dictionary_lookup,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, VK_TAB.0),
+            "Next tab\tCtrl+Tab".to_string(),
+        ),
+        (
+            ShortcutBinding::new(false, true, false, VK_NEXT.0),
+            labels.insert_goto_next_bookmark,
+        ),
+        (
+            ShortcutBinding::new(false, true, false, VK_PRIOR.0),
+            labels.insert_goto_prev_bookmark,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'G' as u16),
+            labels.manage_bookmarks,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'L' as u16),
+            labels.insert_clear_bookmarks,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, 'B' as u16),
+            labels.insert_bookmark,
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'S' as u16),
+            labels.menu_stream_audio,
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'T' as u16),
+            i18n::tr(language, "playback.transcribe_current"),
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'C' as u16),
+            format!(
+                "{}\tAlt+Shift+C",
+                i18n::tr(language, "playback.transcribe_current_folder")
+            ),
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'L' as u16),
+            i18n::tr(language, "playback.chapter_list"),
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'A' as u16),
+            if !labels.menu_rai_audiodescrizioni.is_empty() {
+                labels.menu_rai_audiodescrizioni
+            } else {
+                "Rai audiodescrizioni\tAlt+Shift+A".to_string()
+            },
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'B' as u16),
+            if !labels.menu_bdciechi.is_empty() {
+                labels.menu_bdciechi
+            } else {
+                "BDCiechi\tAlt+Shift+B".to_string()
+            },
+        ),
+    ];
+    fixed
+        .into_iter()
+        .find(|(binding, _)| *binding == candidate)
+        .map(|(_, label)| plain_shortcut_action_label(&label))
+}
+
 fn is_modifier_vk(key: u16) -> bool {
     matches!(key, 0x10 | 0x11 | 0x12 | 0xA0..=0xA5)
 }
@@ -533,20 +741,21 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
             let candidate = ShortcutBinding::new(ctrl, shift, alt, normalized_key);
 
             let conflict = with_options_state(hwnd, |state| {
-                find_shortcut_conflict(&state.shortcut_draft, action, candidate).map(
-                    |conflict_action| {
-                        let language = with_state(state.parent, |app| app.settings.language)
-                            .unwrap_or_default();
-                        let shortcut = format_shortcut(candidate);
-                        let conflict_label = shortcut_action_label(language, conflict_action);
-                        let message = i18n::tr_f(
-                            language,
-                            "options.shortcuts.duplicate_error",
-                            &[("shortcut", &shortcut), ("action", &conflict_label)],
-                        );
-                        (language, message)
-                    },
-                )
+                let language =
+                    with_state(state.parent, |app| app.settings.language).unwrap_or_default();
+                let conflict_label =
+                    find_shortcut_conflict(&state.shortcut_draft, action, candidate)
+                        .map(|conflict_action| shortcut_action_label(language, conflict_action))
+                        .or_else(|| find_fixed_shortcut_conflict_label(language, candidate));
+                conflict_label.map(|conflict_label| {
+                    let shortcut = format_shortcut(candidate);
+                    let message = i18n::tr_f(
+                        language,
+                        "options.shortcuts.duplicate_error",
+                        &[("shortcut", &shortcut), ("action", &conflict_label)],
+                    );
+                    (language, message)
+                })
             })
             .flatten();
             if let Some((language, message)) = conflict {
@@ -6186,21 +6395,26 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         let defaults = ShortcutSettings::default();
                         let default_binding = shortcut_binding_for_action(&defaults, action);
                         let conflict = with_options_state(hwnd, |state| {
-                            find_shortcut_conflict(&state.shortcut_draft, action, default_binding)
-                                .map(|conflict_action| {
-                                    let language =
-                                        with_state(state.parent, |app| app.settings.language)
-                                            .unwrap_or_default();
-                                    let shortcut = format_shortcut(default_binding);
-                                    let conflict_label =
-                                        shortcut_action_label(language, conflict_action);
-                                    let message = i18n::tr_f(
-                                        language,
-                                        "options.shortcuts.duplicate_error",
-                                        &[("shortcut", &shortcut), ("action", &conflict_label)],
-                                    );
-                                    (language, message)
-                                })
+                            let language = with_state(state.parent, |app| app.settings.language)
+                                .unwrap_or_default();
+                            let conflict_label = find_shortcut_conflict(
+                                &state.shortcut_draft,
+                                action,
+                                default_binding,
+                            )
+                            .map(|conflict_action| shortcut_action_label(language, conflict_action))
+                            .or_else(|| {
+                                find_fixed_shortcut_conflict_label(language, default_binding)
+                            });
+                            conflict_label.map(|conflict_label| {
+                                let shortcut = format_shortcut(default_binding);
+                                let message = i18n::tr_f(
+                                    language,
+                                    "options.shortcuts.duplicate_error",
+                                    &[("shortcut", &shortcut), ("action", &conflict_label)],
+                                );
+                                (language, message)
+                            })
                         })
                         .flatten();
                         if let Some((language, message)) = conflict {

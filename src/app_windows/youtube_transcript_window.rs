@@ -3474,8 +3474,13 @@ fn handle_youtube_comments_keydown_inner(
                 return false;
             }
         }
-        k if k == VK_RIGHT.0 as u32 || k == VK_RETURN.0 as u32 => {
-            if !expand_or_toggle_youtube_comment(state) {
+        k if k == VK_RIGHT.0 as u32 => {
+            if !expand_youtube_comment(state) {
+                return false;
+            }
+        }
+        k if k == VK_RETURN.0 as u32 => {
+            if !toggle_youtube_comment_expansion(state) {
                 return false;
             }
         }
@@ -3540,13 +3545,32 @@ fn collapse_or_select_parent_youtube_comment(state: &mut YoutubeCommentsDialogSt
             .map(|candidate_comment| candidate_comment.id.as_str() == parent_id)
             .unwrap_or(false)
     }) {
+        if let Some(parent_row) = state.rows.get(parent_row_index)
+            && parent_row.has_children
+            && parent_row.expanded
+        {
+            toggle_youtube_comment_row_expansion(state, parent_row_index);
+            state.selected_row = parent_row_index.min(state.rows.len().saturating_sub(1));
+            return true;
+        }
         state.selected_row = parent_row_index;
         return true;
     }
     false
 }
 
-fn expand_or_toggle_youtube_comment(state: &mut YoutubeCommentsDialogState) -> bool {
+fn expand_youtube_comment(state: &mut YoutubeCommentsDialogState) -> bool {
+    let Some(row) = state.rows.get(state.selected_row).cloned() else {
+        return false;
+    };
+    if !row.has_children || row.expanded {
+        return false;
+    }
+    toggle_youtube_comment_row_expansion(state, state.selected_row);
+    true
+}
+
+fn toggle_youtube_comment_expansion(state: &mut YoutubeCommentsDialogState) -> bool {
     let Some(row) = state.rows.get(state.selected_row).cloned() else {
         return false;
     };

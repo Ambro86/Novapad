@@ -6744,7 +6744,13 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             .filter(|s| !s.trim().is_empty())
             .map(|s| s.to_string())
             .or_else(|| Some(url.clone()));
-        crate::set_active_podcast_episode_info(parent, Some(url), episode_title, Some(stream_path));
+        crate::set_active_podcast_episode_info(
+            parent,
+            Some(url),
+            None,
+            episode_title,
+            Some(stream_path),
+        );
         if should_reopen_selection {
             let return_input = collection_url.clone().unwrap_or_else(|| input.clone());
             crate::set_active_youtube_return_context(parent, Some(return_input), collection_page);
@@ -7382,6 +7388,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         crate::set_active_podcast_episode_info(
             parent,
             Some(url),
+            None,
             episode_title,
             Some(playback_path),
         );

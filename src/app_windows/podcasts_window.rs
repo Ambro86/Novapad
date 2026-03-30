@@ -939,6 +939,7 @@ struct SearchResultMsg {
 struct PlayReadyMsg {
     path: PathBuf,
     enclosure_url: String,
+    podcast_title: Option<String>,
     title: String,
     item_key: String,
     chapters_prefetch_started: bool,
@@ -1164,10 +1165,38 @@ fn selected_tree_item(hwnd: HWND) -> HTREEITEM {
 
 fn selected_source_index(hwnd: HWND) -> Option<usize> {
     let hitem = selected_tree_item(hwnd);
+    selected_source_index_for_item(hwnd, hitem)
+}
+
+fn selected_source_index_for_item(hwnd: HWND, hitem: HTREEITEM) -> Option<usize> {
     if hitem.0 == 0 {
         return None;
     }
-    with_podcast_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+    let direct = with_podcast_state(hwnd, |s| match s.node_data.get(&hitem.0) {
+        Some(NodeData::Source(idx)) => Some(*idx),
+        _ => None,
+    })
+    .flatten();
+    if direct.is_some() {
+        return direct;
+    }
+    let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return None;
+    }
+    let parent_hitem = HTREEITEM(
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_PARENT as usize),
+            LPARAM(hitem.0),
+        )
+        .0,
+    );
+    if parent_hitem.0 == 0 {
+        return None;
+    }
+    with_podcast_state(hwnd, |s| match s.node_data.get(&parent_hitem.0) {
         Some(NodeData::Source(idx)) => Some(*idx),
         _ => None,
     })
@@ -2255,6 +2284,7 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
     }
     let url = url.clone();
     let episode_title = episode.title.clone();
+    let podcast_title = selected_source_name(hwnd);
     let enclosure_type = episode.enclosure_type.clone();
     let cached_path = podcast_cache_path(&url, enclosure_type.as_deref());
     let cached_ok = cached_path
@@ -2265,6 +2295,7 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
         let msg = Box::new(PlayReadyMsg {
             path: cached_path,
             enclosure_url: url.clone(),
+            podcast_title: podcast_title.clone(),
             title: episode_title.clone(),
             item_key: play_key.clone(),
             chapters_prefetch_started,
@@ -2426,6 +2457,7 @@ fn open_episode_in_player(hwnd: HWND, parent: HWND, episode: &PodcastEpisode) {
                 let msg = Box::new(PlayReadyMsg {
                     path: file_path,
                     enclosure_url: url.clone(),
+                    podcast_title: podcast_title.clone(),
                     title: episode_title.clone(),
                     item_key: play_key.clone(),
                     chapters_prefetch_started,
@@ -5515,6 +5547,7 @@ fn handle_episode_action(hwnd: HWND, action: EpisodeAction) {
             crate::download_podcast_episode(
                 parent,
                 Some(url),
+                selected_source_name(hwnd),
                 Some(item.title.clone()),
                 Some(cache_path),
                 { with_state(parent, |s| s.settings.language) }.unwrap_or_default(),
@@ -8287,6 +8320,12 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     mark_episode_played_with_ui_delay(hwnd, parent, msg.item_key.clone(), 150, 8);
                 }
                 editor_manager::open_document(parent, &msg.path);
+                if let Some(title) = crate::podcast_episode_display_title(
+                    msg.podcast_title.as_deref(),
+                    Some(msg.title.as_str()),
+                ) {
+                    editor_manager::set_current_document_title(parent, &title);
+                }
                 if parent.0 != 0 {
                     if !msg.item_key.trim().is_empty() {
                         cache_embedded_podcast_chapters_if_missing(
@@ -8300,6 +8339,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     crate::set_active_podcast_episode_info(
                         parent,
                         Some(msg.enclosure_url.clone()),
+                        msg.podcast_title.clone(),
                         Some(msg.title.clone()),
                         Some(msg.path.clone()),
                     );

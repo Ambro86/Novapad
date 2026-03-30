@@ -864,6 +864,7 @@ struct PodcastEpisodeSaveResult {
 
 struct PodcastEpisodePlayReady {
     url: String,
+    podcast_title: Option<String>,
     title: Option<String>,
     cache_path: PathBuf,
     prefer_title_for_document: bool,
@@ -1405,6 +1406,7 @@ pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
             state.active_podcast_chapters.clear();
             state.last_announced_chapter_index = None;
             state.active_podcast_episode_url = None;
+            state.active_podcast_title = None;
             state.active_podcast_episode_title = None;
             state.active_podcast_episode_cache = None;
             state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
@@ -1439,6 +1441,7 @@ pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
                 state.active_podcast_chapters.clear();
                 state.last_announced_chapter_index = None;
                 state.active_podcast_episode_url = None;
+                state.active_podcast_title = None;
                 state.active_podcast_episode_title = None;
                 state.active_podcast_episode_cache = None;
                 state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
@@ -1518,6 +1521,7 @@ pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
 pub(crate) fn set_active_podcast_episode_info(
     hwnd: HWND,
     url: Option<String>,
+    podcast_title: Option<String>,
     title: Option<String>,
     cache_path: Option<PathBuf>,
 ) {
@@ -1528,6 +1532,7 @@ pub(crate) fn set_active_podcast_episode_info(
                     .unwrap_or(false);
             if with_state(hwnd, |state| {
                 state.active_podcast_episode_url = Some(url_value.clone());
+                state.active_podcast_title = podcast_title;
                 state.active_podcast_episode_title = title;
                 state.active_podcast_episode_cache = cache_path;
             })
@@ -1571,22 +1576,24 @@ pub(crate) fn set_active_youtube_return_context(
 }
 
 pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
-    let (url, title, cache_path, language) = {
+    let (url, podcast_title, title, cache_path, language) = {
         with_state(hwnd, |state| {
             (
                 state.active_podcast_episode_url.clone(),
+                state.active_podcast_title.clone(),
                 state.active_podcast_episode_title.clone(),
                 state.active_podcast_episode_cache.clone(),
                 state.settings.language,
             )
         })
-        .unwrap_or((None, None, None, Language::default()))
+        .unwrap_or((None, None, None, None, Language::default()))
     };
     let fallback_cache_path =
         current_playback_media_path(hwnd).filter(|path| is_local_cached_media_path(path));
     download_podcast_episode(
         hwnd,
         url,
+        podcast_title,
         title,
         cache_path.or(fallback_cache_path),
         language,
@@ -1712,7 +1719,7 @@ pub(crate) fn play_named_remote_audio_from_url_with_rai_origin(
     mime: Option<&str>,
     rai_origin: RaiAudioOrigin,
 ) {
-    play_podcast_episode_from_url_internal(hwnd, url, title, mime, true, rai_origin);
+    play_podcast_episode_from_url_internal(hwnd, url, None, title, mime, true, rai_origin);
 }
 
 fn open_podcast_play_progress_window(hwnd: HWND, language: Language) {
@@ -1746,6 +1753,7 @@ fn close_podcast_play_progress_window(hwnd: HWND) {
 fn play_podcast_episode_from_url_internal(
     hwnd: HWND,
     url: String,
+    podcast_title: Option<String>,
     title: Option<String>,
     mime: Option<&str>,
     prefer_title_for_document: bool,
@@ -1771,6 +1779,7 @@ fn play_podcast_episode_from_url_internal(
                 hwnd,
                 PodcastEpisodePlayReady {
                     url,
+                    podcast_title,
                     title,
                     cache_path,
                     prefer_title_for_document,
@@ -1868,23 +1877,23 @@ fn download_podcast_episode_cache_with_resume(
 pub(crate) fn download_podcast_episode(
     hwnd: HWND,
     url: Option<String>,
+    podcast_title: Option<String>,
     title: Option<String>,
     cache_path: Option<PathBuf>,
     language: Language,
 ) {
-    let suggested_name = title
-        .as_deref()
-        .and_then(suggested_filename_from_text)
-        .or_else(|| {
-            cache_path
-                .as_ref()
-                .and_then(|p| p.file_stem())
-                .and_then(|s| s.to_str())
-                .map(str::trim)
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-        })
-        .unwrap_or_else(|| "podcast_episode".to_string());
+    let suggested_name =
+        suggested_podcast_episode_filename(podcast_title.as_deref(), title.as_deref())
+            .or_else(|| {
+                cache_path
+                    .as_ref()
+                    .and_then(|p| p.file_stem())
+                    .and_then(|s| s.to_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+            })
+            .unwrap_or_else(|| "podcast_episode".to_string());
     let mut ext = cache_path
         .as_ref()
         .and_then(|p| p.extension().and_then(|e| e.to_str()))
@@ -2000,6 +2009,46 @@ fn ensure_path_extension(mut path: PathBuf, desired_ext: &str) -> PathBuf {
         path.set_extension(desired_ext);
     }
     path
+}
+
+fn suggested_podcast_episode_filename(
+    podcast_title: Option<&str>,
+    episode_title: Option<&str>,
+) -> Option<String> {
+    let podcast_title = podcast_title
+        .map(str::trim)
+        .filter(|title| !title.is_empty());
+    let episode_title = episode_title
+        .map(str::trim)
+        .filter(|title| !title.is_empty());
+    match (podcast_title, episode_title) {
+        (Some(podcast_title), Some(episode_title)) => {
+            suggested_filename_from_text(&format!("{podcast_title} - {episode_title}"))
+        }
+        (_, Some(episode_title)) => suggested_filename_from_text(episode_title),
+        (Some(podcast_title), None) => suggested_filename_from_text(podcast_title),
+        (None, None) => None,
+    }
+}
+
+pub(crate) fn podcast_episode_display_title(
+    podcast_title: Option<&str>,
+    episode_title: Option<&str>,
+) -> Option<String> {
+    let podcast_title = podcast_title
+        .map(str::trim)
+        .filter(|title| !title.is_empty());
+    let episode_title = episode_title
+        .map(str::trim)
+        .filter(|title| !title.is_empty());
+    match (podcast_title, episode_title) {
+        (Some(podcast_title), Some(episode_title)) => {
+            Some(format!("{podcast_title} - {episode_title}"))
+        }
+        (_, Some(episode_title)) => Some(episode_title.to_string()),
+        (Some(podcast_title), None) => Some(podcast_title.to_string()),
+        (None, None) => None,
+    }
 }
 
 fn save_podcast_episode_dialog(
@@ -3958,6 +4007,7 @@ pub(crate) struct AppState {
     audiobook_session_id: u64,
     last_stopped_audiobook: Option<std::path::PathBuf>,
     active_podcast_episode_url: Option<String>,
+    active_podcast_title: Option<String>,
     active_podcast_episode_title: Option<String>,
     active_podcast_episode_cache: Option<PathBuf>,
     active_podcast_episode_from_rai: RaiAudioOrigin,
@@ -5372,6 +5422,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     audiobook_session_id: 0,
                     last_stopped_audiobook: None,
                     active_podcast_episode_url: None,
+                    active_podcast_title: None,
                     active_podcast_episode_title: None,
                     active_podcast_episode_cache: None,
                     active_podcast_episode_from_rai: RaiAudioOrigin::None,
@@ -5754,9 +5805,12 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 close_podcast_play_progress_window(hwnd);
                 editor_manager::open_document(hwnd, &payload.cache_path);
                 if payload.prefer_title_for_document
-                    && let Some(title) = payload.title.as_deref()
+                    && let Some(title) = podcast_episode_display_title(
+                        payload.podcast_title.as_deref(),
+                        payload.title.as_deref(),
+                    )
                 {
-                    editor_manager::set_current_document_title(hwnd, title);
+                    editor_manager::set_current_document_title(hwnd, &title);
                 }
                 if with_state(hwnd, |state| {
                     state.active_podcast_episode_from_rai = payload.rai_origin;
@@ -5769,6 +5823,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 set_active_podcast_episode_info(
                     hwnd,
                     Some(payload.url),
+                    payload.podcast_title,
                     payload.title,
                     Some(payload.cache_path),
                 );

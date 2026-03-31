@@ -4217,7 +4217,7 @@ fn start_audiobook_with_text(
     hwnd: HWND,
     mut text: String,
     suggested_name: Option<String>,
-    epub_chapters: Option<Vec<String>>,
+    mut epub_chapters: Option<Vec<String>>,
     is_unsaved_doc: bool,
     _doc_path: Option<&Path>,
 ) {
@@ -4290,6 +4290,14 @@ fn start_audiobook_with_text(
     let dialogue_settings =
         { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
     text = crate::dialogue_voice::apply_dialogue_tags_from_settings(&text, &dialogue_settings);
+    if let Some(chapters) = epub_chapters.as_mut() {
+        for chapter in chapters {
+            *chapter = crate::dialogue_voice::apply_dialogue_tags_from_settings(
+                chapter,
+                &dialogue_settings,
+            );
+        }
+    }
 
     let base_split_option_visible = audiobook_split_by_time
         || audiobook_split_by_text
@@ -4297,8 +4305,14 @@ fn start_audiobook_with_text(
         || (audiobook_split_by_epub_chapter && epub_chapters.as_ref().is_some());
 
     let cleaned = strip_dashed_lines(&text);
-    let mixed_needed = has_voice_tags(&cleaned);
     let use_epub_split = audiobook_split_by_epub_chapter && epub_chapters.as_ref().is_some();
+    let mixed_needed = if use_epub_split {
+        epub_chapters
+            .as_ref()
+            .is_some_and(|chapters| chapters.iter().any(|chapter| has_voice_tags(chapter)))
+    } else {
+        has_voice_tags(&cleaned)
+    };
     let mut split_by_time = audiobook_split_by_time;
     let split_minutes = audiobook_split_minutes.clamp(1, 60);
     let split_start_number = audiobook_split_start_number.clamp(1, 99);

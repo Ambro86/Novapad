@@ -36,7 +36,7 @@ jobs:
         script: |
           const version = process.env.APP_VERSION;
           const prefix = `v${version}-beta`;
-          const forcedBeta = 5;
+          const forcedBeta = 6;
           let page = 1;
           const releases = [];
           while (true) {

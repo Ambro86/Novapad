@@ -72,6 +72,7 @@ const BATCH_ID_LOG: usize = 9414;
 const BATCH_ID_PROGRESS: usize = 9415;
 
 const WM_BATCH_EVENT: u32 = WM_APP + 120;
+const WM_BATCH_PROGRESS_CONTEXT: u32 = WM_APP + 121;
 const BATCH_TIMER_ID: usize = 1;
 const EM_LIMITTEXT: u32 = 0x00C5;
 
@@ -114,6 +115,18 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
         }
     }
     false
+}
+
+pub fn restore_batch_focus(hwnd: HWND) -> bool {
+    with_batch_state(hwnd, |state| {
+        let target = if state.running {
+            state.log_edit
+        } else {
+            state.list
+        };
+        crate::set_focus_safe(target);
+    })
+    .is_some()
 }
 
 struct BatchItem {
@@ -184,6 +197,14 @@ struct BatchState {
     running: bool,
     cancel_flag: Option<Arc<AtomicBool>>,
     message_queue: Arc<Mutex<VecDeque<BatchMessage>>>,
+    overall_completed: usize,
+    overall_total: usize,
+    current_running_index: Option<usize>,
+    current_item_progress: usize,
+    current_item_total: usize,
+    current_item_phase_finalizing: bool,
+    current_item_progress_base: usize,
+    current_item_progress_local_total: usize,
 }
 
 struct StatusUpdate {
@@ -840,6 +861,14 @@ unsafe extern "system" fn batch_wndproc(
                     running: false,
                     cancel_flag: None,
                     message_queue,
+                    overall_completed: 0,
+                    overall_total: 0,
+                    current_running_index: None,
+                    current_item_progress: 0,
+                    current_item_total: 0,
+                    current_item_phase_finalizing: false,
+                    current_item_progress_base: 0,
+                    current_item_progress_local_total: 0,
                 });
                 SetWindowLongPtrW(
                     hwnd,
@@ -1005,6 +1034,69 @@ unsafe extern "system" fn batch_wndproc(
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            crate::WM_UPDATE_PROGRESS => {
+                if with_batch_state(hwnd, |state| {
+                    let mut current = wparam.0;
+                    if state.current_item_progress_local_total > 0 {
+                        current = current.min(state.current_item_progress_local_total);
+                    }
+                    let current = state.current_item_progress_base.saturating_add(current);
+                    if current >= state.current_item_progress {
+                        state.current_item_progress = current;
+                    }
+                    refresh_progress_label(state);
+                    refresh_running_item_status(state);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access batch state for WM_UPDATE_PROGRESS");
+                }
+                LRESULT(0)
+            }
+            crate::app_windows::audiobook_window::WM_SET_PROGRESS_TOTAL => {
+                if with_batch_state(hwnd, |state| {
+                    let total = wparam.0.max(1);
+                    if state.current_item_progress_local_total != total
+                        || state.current_item_progress < state.current_item_progress_base
+                    {
+                        state.current_item_progress_local_total = total;
+                        state.current_item_progress = state.current_item_progress_base;
+                        refresh_progress_label(state);
+                        refresh_running_item_status(state);
+                    }
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access batch state for WM_SET_PROGRESS_TOTAL");
+                }
+                LRESULT(0)
+            }
+            WM_BATCH_PROGRESS_CONTEXT => {
+                if with_batch_state(hwnd, |state| {
+                    state.current_item_progress_base = wparam.0;
+                    state.current_item_total = (lparam.0 as usize).max(1);
+                    state.current_item_progress = state.current_item_progress_base;
+                    state.current_item_progress_local_total = 0;
+                    refresh_progress_label(state);
+                    refresh_running_item_status(state);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access batch state for WM_BATCH_PROGRESS_CONTEXT");
+                }
+                LRESULT(0)
+            }
+            crate::app_windows::audiobook_window::WM_SET_PROGRESS_PHASE => {
+                if with_batch_state(hwnd, |state| {
+                    state.current_item_phase_finalizing = wparam.0 == 1;
+                    refresh_progress_label(state);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access batch state for WM_SET_PROGRESS_PHASE");
+                }
+                LRESULT(0)
             }
             WM_DESTROY => {
                 log_debug("Batch WM_DESTROY");
@@ -1469,16 +1561,45 @@ fn update_item_status(state: &mut BatchState, index: usize, status: BatchStatusC
         item.status = status;
         item.output = output.to_string();
     }
+    match status {
+        BatchStatusCode::Running => {
+            state.current_running_index = Some(index);
+            state.current_item_progress = 0;
+            state.current_item_total = 0;
+            state.current_item_phase_finalizing = false;
+            state.current_item_progress_base = 0;
+            state.current_item_progress_local_total = 0;
+        }
+        BatchStatusCode::Done | BatchStatusCode::Failed | BatchStatusCode::Canceled => {
+            if state.current_running_index == Some(index) {
+                state.current_running_index = None;
+                state.current_item_progress = 0;
+                state.current_item_total = 0;
+                state.current_item_phase_finalizing = false;
+                state.current_item_progress_base = 0;
+                state.current_item_progress_local_total = 0;
+            }
+        }
+        BatchStatusCode::Pending => {}
+    }
     if !crate::is_window_handle_valid(state.list) {
+        refresh_progress_label(state);
         return;
     }
     let count =
         crate::send_message_w_safe(state.list, LVM_GETITEMCOUNT, WPARAM(0), LPARAM(0)).0 as usize;
     if index >= count {
+        refresh_progress_label(state);
         return;
     }
-    set_list_subitem(state.list, index as i32, 1, status_text(&labels, status));
+    let status_text_owned = if status == BatchStatusCode::Running {
+        running_status_text(state)
+    } else {
+        status_text(&labels, status).to_string()
+    };
+    set_list_subitem(state.list, index as i32, 1, &status_text_owned);
     set_list_subitem(state.list, index as i32, 2, output);
+    refresh_progress_label(state);
 }
 
 fn handle_batch_messages(hwnd: HWND) {
@@ -1550,6 +1671,8 @@ fn handle_batch_messages(hwnd: HWND) {
 }
 
 fn update_progress(state: &mut BatchState, completed: usize, total: usize) {
+    state.overall_completed = completed;
+    state.overall_total = total;
     let percent = if total == 0 {
         0
     } else {
@@ -1563,14 +1686,7 @@ fn update_progress(state: &mut BatchState, completed: usize, total: usize) {
             LPARAM(0),
         );
     }
-    let label = i18n::tr_f(
-        state.language,
-        "batch_audiobooks.progress_text",
-        &[
-            ("done", &completed.to_string()),
-            ("total", &total.to_string()),
-        ],
-    );
+    let label = progress_label_text(state);
     if is_window_valid(state.progress_label, "progress_label") {
         let wide = to_wide(&label);
         unsafe {
@@ -1579,6 +1695,79 @@ fn update_progress(state: &mut BatchState, completed: usize, total: usize) {
             }
         }
     }
+}
+
+fn running_status_text(state: &BatchState) -> String {
+    let labels = labels(state.language);
+    if state.current_item_total == 0 {
+        labels.status_running
+    } else {
+        format!(
+            "{} {}%",
+            labels.status_running,
+            current_item_percent(state.current_item_progress, state.current_item_total)
+        )
+    }
+}
+
+fn current_item_percent(current: usize, total: usize) -> u32 {
+    if total == 0 {
+        0
+    } else {
+        (((current.min(total)) as f32 / total as f32) * 100.0).round() as u32
+    }
+}
+
+fn progress_label_text(state: &BatchState) -> String {
+    let overall = i18n::tr_f(
+        state.language,
+        "batch_audiobooks.progress_text",
+        &[
+            ("done", &state.overall_completed.to_string()),
+            ("total", &state.overall_total.to_string()),
+        ],
+    );
+    if state.current_running_index.is_some() && state.current_item_total > 0 {
+        let pct = current_item_percent(state.current_item_progress, state.current_item_total);
+        let key = if state.current_item_phase_finalizing {
+            "audiobook.finalizing_progress"
+        } else {
+            "audiobook.progress"
+        };
+        let detail = i18n::tr_f(state.language, key, &[("pct", &pct.to_string())]);
+        format!("{} ({})", overall, detail)
+    } else {
+        overall
+    }
+}
+
+fn refresh_progress_label(state: &BatchState) {
+    if !is_window_valid(state.progress_label, "progress_label") {
+        return;
+    }
+    let label = progress_label_text(state);
+    let wide = to_wide(&label);
+    unsafe {
+        if let Err(e) = SetWindowTextW(state.progress_label, PCWSTR(wide.as_ptr())) {
+            crate::log_debug(&format!("Failed to set progress label: {}", e));
+        }
+    }
+}
+
+fn refresh_running_item_status(state: &BatchState) {
+    let Some(index) = state.current_running_index else {
+        return;
+    };
+    if !crate::is_window_handle_valid(state.list) {
+        return;
+    }
+    let count =
+        crate::send_message_w_safe(state.list, LVM_GETITEMCOUNT, WPARAM(0), LPARAM(0)).0 as usize;
+    if index >= count {
+        return;
+    }
+    let status = running_status_text(state);
+    set_list_subitem(state.list, index as i32, 1, &status);
 }
 
 fn append_log(state: &mut BatchState, line: &str) {
@@ -1889,6 +2078,7 @@ fn run_batch(
                 &batch_settings,
                 &tts_settings,
                 cancel.clone(),
+                hwnd,
                 sapi_voice.as_ref(),
             ) {
                 Ok(outputs) => {
@@ -2031,6 +2221,7 @@ fn export_single_audiobook(
     batch_settings: &BatchSettings,
     tts: &TtsSettings,
     cancel: Arc<AtomicBool>,
+    progress_hwnd: HWND,
     sapi_voice: Option<&crate::sapi5_engine::SapiVoice>,
 ) -> Result<Vec<PathBuf>, String> {
     let use_epub_split = tts.audiobook_split_by_epub_chapter && is_epub_path(input);
@@ -2203,7 +2394,7 @@ fn export_single_audiobook(
             tts.audiobook_part_naming_mode,
             split_by_time,
         );
-        match export_parts_mixed(&parts, &render_outputs, tts, cancel.clone()) {
+        match export_parts_mixed(&parts, &render_outputs, tts, cancel.clone(), progress_hwnd) {
             Ok(()) => {
                 if split_by_time {
                     let Some(output) = render_outputs.first() else {
@@ -2276,7 +2467,14 @@ fn export_single_audiobook(
             tts.audiobook_part_naming_mode,
             split_by_time,
         );
-        match export_parts(&parts, &render_outputs, tts, cancel.clone(), sapi_voice) {
+        match export_parts(
+            &parts,
+            &render_outputs,
+            tts,
+            cancel.clone(),
+            progress_hwnd,
+            sapi_voice,
+        ) {
             Ok(()) => {
                 if split_by_time {
                     let Some(output) = render_outputs.first() else {
@@ -2638,23 +2836,32 @@ fn export_parts(
     outputs: &[PathBuf],
     tts: &TtsSettings,
     cancel: Arc<AtomicBool>,
+    progress_hwnd: HWND,
     sapi_voice: Option<&crate::sapi5_engine::SapiVoice>,
 ) -> Result<(), String> {
     if parts.len() != outputs.len() {
         return Err("Output count mismatch.".to_string());
     }
     let mut progress = 0usize;
+    let total_units: usize = outputs
+        .iter()
+        .zip(parts.iter())
+        .map(|(output, part_chunks)| progress_units_for_output(output, part_chunks.len()))
+        .sum::<usize>()
+        .max(1);
+    let mut progress_base = 0usize;
     for (part_idx, part_chunks) in parts.iter().enumerate() {
         if cancel.load(Ordering::SeqCst) {
             return Err(i18n::tr(tts.language, "tts.cancelled"));
         }
         let output = &outputs[part_idx];
+        post_batch_progress_context(progress_hwnd, progress_base, total_units);
         match tts.tts_engine {
             TtsEngine::Edge => {
                 let options = crate::tts_engine::AudiobookCommonOptions {
                     voice: &tts.voice,
                     output,
-                    progress_hwnd: HWND(0),
+                    progress_hwnd,
                     cancel: cancel.clone(),
                     language: tts.language,
                     part_naming_mode: tts.audiobook_part_naming_mode,
@@ -2671,7 +2878,7 @@ fn export_parts(
                 let options = crate::tts_engine::AudiobookCommonOptions {
                     voice: &tts.voice,
                     output,
-                    progress_hwnd: HWND(0),
+                    progress_hwnd,
                     cancel: cancel.clone(),
                     language: tts.language,
                     part_naming_mode: tts.audiobook_part_naming_mode,
@@ -2717,11 +2924,27 @@ fn export_parts(
                             options,
                             |_chunk_idx| {
                                 progress += 1;
+                                if progress_hwnd.0 != 0 {
+                                    crate::send_message_w_safe(
+                                        progress_hwnd,
+                                        crate::WM_UPDATE_PROGRESS,
+                                        WPARAM(progress),
+                                        LPARAM(0),
+                                    );
+                                }
                             },
                         )?;
                     } else {
                         crate::sapi5_engine::speak_sapi_to_file(options, |_chunk_idx| {
                             progress += 1;
+                            if progress_hwnd.0 != 0 {
+                                crate::send_message_w_safe(
+                                    progress_hwnd,
+                                    crate::WM_UPDATE_PROGRESS,
+                                    WPARAM(progress),
+                                    LPARAM(0),
+                                );
+                            }
                         })?;
                     }
 
@@ -2779,11 +3002,27 @@ fn export_parts(
                             options,
                             |_chunk_idx| {
                                 progress += 1;
+                                if progress_hwnd.0 != 0 {
+                                    crate::send_message_w_safe(
+                                        progress_hwnd,
+                                        crate::WM_UPDATE_PROGRESS,
+                                        WPARAM(progress),
+                                        LPARAM(0),
+                                    );
+                                }
                             },
                         )?;
                     } else {
                         crate::sapi5_engine::speak_sapi_to_file(options, |_chunk_idx| {
                             progress += 1;
+                            if progress_hwnd.0 != 0 {
+                                crate::send_message_w_safe(
+                                    progress_hwnd,
+                                    crate::WM_UPDATE_PROGRESS,
+                                    WPARAM(progress),
+                                    LPARAM(0),
+                                );
+                            }
                         })?;
                     }
                 }
@@ -2794,6 +3033,8 @@ fn export_parts(
                 ));
             }
         }
+        progress_base =
+            progress_base.saturating_add(progress_units_for_output(output, part_chunks.len()));
     }
     Ok(())
 }
@@ -2845,20 +3086,29 @@ fn export_parts_mixed(
     outputs: &[PathBuf],
     tts: &TtsSettings,
     cancel: Arc<AtomicBool>,
+    progress_hwnd: HWND,
 ) -> Result<(), String> {
     if parts.len() != outputs.len() {
         return Err("Output count mismatch.".to_string());
     }
     let mut progress = 0usize;
+    let total_units: usize = outputs
+        .iter()
+        .zip(parts.iter())
+        .map(|(output, part_chunks)| progress_units_for_output(output, part_chunks.len()))
+        .sum::<usize>()
+        .max(1);
+    let mut progress_base = 0usize;
     for (part_idx, part_chunks) in parts.iter().enumerate() {
         if cancel.load(Ordering::SeqCst) {
             return Err(i18n::tr(tts.language, "tts.cancelled"));
         }
         let output = &outputs[part_idx];
+        post_batch_progress_context(progress_hwnd, progress_base, total_units);
         let options = crate::tts_engine::AudiobookCommonOptions {
             voice: &tts.voice,
             output,
-            progress_hwnd: HWND(0),
+            progress_hwnd,
             cancel: cancel.clone(),
             language: tts.language,
             part_naming_mode: tts.audiobook_part_naming_mode,
@@ -2872,8 +3122,39 @@ fn export_parts_mixed(
             main_engine: tts.tts_engine,
         };
         render_mixed_audiobook_part(part_chunks, &mut progress, output, &options, &config)?;
+        progress_base =
+            progress_base.saturating_add(progress_units_for_output(output, part_chunks.len()));
     }
     Ok(())
+}
+
+fn progress_units_for_output(output: &Path, chunk_count: usize) -> usize {
+    let ext = output
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if ext == "mp3" || ext == "m4b" || ext == "m4a" || ext == "mp4" {
+        200
+    } else {
+        chunk_count.max(1)
+    }
+}
+
+fn post_batch_progress_context(hwnd: HWND, completed_before_part: usize, total_units: usize) {
+    if hwnd.0 == 0 {
+        return;
+    }
+    unsafe {
+        if let Err(e) = PostMessageW(
+            hwnd,
+            WM_BATCH_PROGRESS_CONTEXT,
+            WPARAM(completed_before_part),
+            LPARAM(total_units as isize),
+        ) {
+            crate::log_debug(&format!("Failed to post WM_BATCH_PROGRESS_CONTEXT: {}", e));
+        }
+    }
 }
 
 fn read_text_for_audiobook(path: &Path, language: Language) -> Result<String, String> {

@@ -321,6 +321,16 @@ fn reactivate_bdciechi_window(hwnd: HWND) -> bool {
     true
 }
 
+fn reactivate_batch_audiobooks_window(hwnd: HWND) -> bool {
+    let batch_window = with_state(hwnd, |state| state.batch_audiobooks_window).unwrap_or(HWND(0));
+    if batch_window.0 == 0 || !is_window_handle_valid(batch_window) {
+        return false;
+    }
+    show_window_safe(batch_window, SW_SHOW);
+    set_foreground_window_safe(batch_window);
+    app_windows::batch_audiobooks_window::restore_batch_focus(batch_window)
+}
+
 pub(crate) fn focus_editor(hwnd: HWND) {
     if has_secondary_window_open(hwnd) {
         return;
@@ -5552,6 +5562,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
             WM_ACTIVATE => {
                 let is_activating = (wparam.0 & 0xFFFF) != 0;
                 if is_activating {
+                    if reactivate_batch_audiobooks_window(hwnd) {
+                        return LRESULT(0);
+                    }
                     if reactivate_bdciechi_window(hwnd) {
                         return LRESULT(0);
                     }

@@ -434,6 +434,44 @@ fn set_blocking_modal_active(hwnd: HWND, kind: Option<BlockingModalKind>) {
     });
 }
 
+pub(crate) fn copydata_utf16_payload(
+    cds_ptr: *const COPYDATASTRUCT,
+    log_tag: &str,
+) -> Option<String> {
+    if cds_ptr.is_null() {
+        log_debug(&format!("{log_tag}: null COPYDATASTRUCT"));
+        return None;
+    }
+    let cds = unsafe { &*cds_ptr };
+    if cds.cbData == 0 {
+        log_debug(&format!("{log_tag}: empty WM_COPYDATA payload"));
+        return None;
+    }
+    if cds.cbData % 2 != 0 {
+        log_debug(&format!(
+            "{log_tag}: invalid WM_COPYDATA payload size {}",
+            cds.cbData
+        ));
+        return None;
+    }
+    if cds.lpData.is_null() {
+        log_debug(&format!(
+            "{log_tag}: null WM_COPYDATA payload pointer ({} bytes)",
+            cds.cbData
+        ));
+        return None;
+    }
+
+    let len_u16 = (cds.cbData as usize) / 2;
+    let slice = unsafe { std::slice::from_raw_parts(cds.lpData as *const u16, len_u16) };
+    let len = if slice.last().copied() == Some(0) {
+        len_u16 - 1
+    } else {
+        len_u16
+    };
+    Some(String::from_utf16_lossy(&slice[..len]))
+}
+
 pub(crate) fn show_blocking_modal_message_box(
     hwnd: HWND,
     kind: BlockingModalKind,
@@ -7352,16 +7390,13 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 LRESULT(0)
             }
             WM_COPYDATA => {
-                let cds = &*(lparam.0 as *const COPYDATASTRUCT);
-                if cds.dwData == COPYDATA_OPEN_FILE && !cds.lpData.is_null() {
-                    let len_u16 = (cds.cbData as usize) / 2;
-                    let slice = std::slice::from_raw_parts(cds.lpData as *const u16, len_u16);
-                    let len = if len_u16 > 0 && slice[len_u16 - 1] == 0 {
-                        len_u16 - 1
-                    } else {
-                        len_u16
+                let cds_ptr = lparam.0 as *const COPYDATASTRUCT;
+                if !cds_ptr.is_null() && (*cds_ptr).dwData == COPYDATA_OPEN_FILE {
+                    let Some(joined_paths) =
+                        copydata_utf16_payload(cds_ptr, "WM_COPYDATA open files")
+                    else {
+                        return LRESULT(1);
                     };
-                    let joined_paths = String::from_utf16_lossy(&slice[..len]);
                     if !joined_paths.is_empty() {
                         let paths: Vec<PathBuf> = joined_paths
                             .split('|')

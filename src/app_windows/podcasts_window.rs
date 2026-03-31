@@ -7939,16 +7939,13 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_COPYDATA => {
-                let cds = &*(lparam.0 as *const COPYDATASTRUCT);
-                if cds.dwData == PODCAST_ADD_COPYDATA {
-                    let len_u16 = (cds.cbData as usize) / 2;
-                    let slice = std::slice::from_raw_parts(cds.lpData as *const u16, len_u16);
-                    let len = if len_u16 > 0 && slice[len_u16 - 1] == 0 {
-                        len_u16 - 1
-                    } else {
-                        len_u16
+                let cds_ptr = lparam.0 as *const COPYDATASTRUCT;
+                if !cds_ptr.is_null() && (*cds_ptr).dwData == PODCAST_ADD_COPYDATA {
+                    let Some(url) =
+                        crate::copydata_utf16_payload(cds_ptr, "podcasts WM_COPYDATA add source")
+                    else {
+                        return LRESULT(0);
                     };
-                    let url = String::from_utf16_lossy(&slice[..len]);
                     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                     if let Some(index) = add_podcast_source(parent, &url, "") {
                         let language =

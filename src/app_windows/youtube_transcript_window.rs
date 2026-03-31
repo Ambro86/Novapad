@@ -1992,19 +1992,38 @@ fn show_youtube_comments_for_stream_entry(
         std::thread::sleep(std::time::Duration::from_millis(30));
     }
     close_progress_dialog(progress);
+    let restore_video_selection = || {
+        crate::log_debug(&format!(
+            "YT comments restore selection parent={:?} ui_parent={:?} focus_before={:?}",
+            parent,
+            ui_parent,
+            crate::get_focus_safe()
+        ));
+        if crate::is_window_handle_valid(ui_parent) {
+            crate::bring_window_to_foreground(ui_parent);
+            if !crate::app_windows::interpreter_select_window::restore_interpreter_select_focus(
+                ui_parent,
+            ) {
+                restore_stream_dialog_focus(ui_parent);
+            }
+        } else {
+            restore_stream_dialog_focus(parent);
+        }
+    };
     let comments = match worker.join() {
         Ok(Ok(comments)) => comments,
         Ok(Err(err)) => {
             show_error(
-                ui_parent,
+                parent,
                 language,
                 &i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]),
             );
+            restore_video_selection();
             return;
         }
         Err(_) => {
             show_error(
-                ui_parent,
+                parent,
                 language,
                 &tr_or(
                     language,
@@ -2012,12 +2031,13 @@ fn show_youtube_comments_for_stream_entry(
                     "Failed to load video comments.",
                 ),
             );
+            restore_video_selection();
             return;
         }
     };
     if comments.is_empty() {
         show_error(
-            ui_parent,
+            parent,
             language,
             &tr_or(
                 language,
@@ -2025,6 +2045,7 @@ fn show_youtube_comments_for_stream_entry(
                 "No comments are available for this video.",
             ),
         );
+        restore_video_selection();
         return;
     }
     open_youtube_comments_window(ui_parent, language, entry.label.clone(), comments);

@@ -2866,12 +2866,12 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
             }
             windows::Win32::UI::WindowsAndMessaging::WM_COPYDATA => {
                 let cds = lparam.0 as *const COPYDATASTRUCT;
-                if (*cds).dwData == 0x52535331 {
-                    let len = ((*cds).cbData / 2) as usize;
-                    let slice = std::slice::from_raw_parts((*cds).lpData as *const u16, len);
-                    // Need 0-term
-                    let s = String::from_utf16_lossy(slice);
-                    let payload = s.trim_matches(char::from(0)).to_string();
+                if !cds.is_null() && (*cds).dwData == 0x52535331 {
+                    let Some(payload) =
+                        crate::copydata_utf16_payload(cds, "rss WM_COPYDATA add source")
+                    else {
+                        return LRESULT(0);
+                    };
                     let mut lines = payload.lines();
                     let first = lines.next().unwrap_or("");
                     let second = lines.next();

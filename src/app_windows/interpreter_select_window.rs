@@ -946,33 +946,11 @@ fn interpreter_select_wndproc_inner(
                     }
                     with_interpreter_state(hwnd, |state| match &state.control {
                         ControlKind::List(list) => {
-                            let sel = crate::send_message_w_safe(
-                                *list,
-                                LB_GETCURSEL,
-                                WPARAM(0),
-                                LPARAM(0),
-                            )
-                            .0;
-                            if sel >= 0 {
-                                let len = crate::send_message_w_safe(
-                                    *list,
-                                    LB_GETTEXTLEN,
-                                    WPARAM(sel as usize),
-                                    LPARAM(0),
-                                )
-                                .0;
-                                if len >= 0 {
-                                    let mut buf = vec![0u16; (len + 1) as usize];
-                                    crate::send_message_w_safe(
-                                        *list,
-                                        LB_GETTEXT,
-                                        WPARAM(sel as usize),
-                                        LPARAM(buf.as_mut_ptr() as isize),
-                                    );
-                                    let value = String::from_utf16_lossy(&buf[..len as usize]);
-                                    *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
-                                        Some(InterpreterSelectionResult::Item(value));
-                                }
+                            if let Some(value) =
+                                read_listbox_selected_text(*list, "ok_command.read_selected_text")
+                            {
+                                *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
+                                    Some(InterpreterSelectionResult::Item(value));
                             }
                         }
                         ControlKind::Tree(tree) => {
@@ -1069,22 +1047,7 @@ fn interpreter_select_wndproc_inner(
 }
 
 fn selected_list_value(list: HWND) -> Option<String> {
-    let sel = crate::send_message_w_safe(list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    if sel < 0 {
-        return None;
-    }
-    let len = crate::send_message_w_safe(list, LB_GETTEXTLEN, WPARAM(sel as usize), LPARAM(0)).0;
-    if len < 0 {
-        return None;
-    }
-    let mut buf = vec![0u16; (len + 1) as usize];
-    crate::send_message_w_safe(
-        list,
-        LB_GETTEXT,
-        WPARAM(sel as usize),
-        LPARAM(buf.as_mut_ptr() as isize),
-    );
-    Some(String::from_utf16_lossy(&buf[..len as usize]))
+    read_listbox_selected_text(list, "selected_list_value")
 }
 
 fn selected_tree_value(tree: HWND, tree_values: &[String]) -> Option<String> {
@@ -1431,6 +1394,71 @@ fn read_window_text(hwnd: HWND) -> String {
     String::from_utf16_lossy(&buf[..written as usize])
 }
 
+fn log_interpreter_control_state(tag: &str, hwnd: HWND) {
+    let mut class_buf = [0u16; 128];
+    let class_len = if crate::is_window_handle_valid(hwnd) {
+        crate::get_class_name_w_safe(hwnd, &mut class_buf)
+    } else {
+        0
+    };
+    let class_name = if class_len > 0 {
+        String::from_utf16_lossy(&class_buf[..class_len as usize])
+    } else {
+        String::new()
+    };
+    crate::log_debug(&format!(
+        "interpreter_select control [{}] hwnd={:?} valid={} class='{}' focus={:?}",
+        tag,
+        hwnd,
+        crate::is_window_handle_valid(hwnd),
+        class_name,
+        crate::get_focus_safe()
+    ));
+}
+
+fn read_listbox_selected_text(list: HWND, log_tag: &str) -> Option<String> {
+    log_interpreter_control_state(log_tag, list);
+    if !crate::is_window_handle_valid(list) {
+        crate::log_debug(&format!(
+            "interpreter_select {} aborted: invalid list hwnd={:?}",
+            log_tag, list
+        ));
+        return None;
+    }
+    let sel = crate::send_message_w_safe(list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    crate::log_debug(&format!(
+        "interpreter_select {} selection hwnd={:?} sel={}",
+        log_tag, list, sel
+    ));
+    if sel < 0 {
+        return None;
+    }
+    let len = crate::send_message_w_safe(list, LB_GETTEXTLEN, WPARAM(sel as usize), LPARAM(0)).0;
+    crate::log_debug(&format!(
+        "interpreter_select {} textlen hwnd={:?} sel={} len={}",
+        log_tag, list, sel, len
+    ));
+    if len < 0 {
+        return None;
+    }
+    const MAX_LISTBOX_TEXT_LEN: isize = 32_768;
+    if len > MAX_LISTBOX_TEXT_LEN {
+        crate::log_debug(&format!(
+            "interpreter_select {} rejected suspicious textlen hwnd={:?} sel={} len={}",
+            log_tag, list, sel, len
+        ));
+        return None;
+    }
+    let mut buf = vec![0u16; (len + 1) as usize];
+    crate::send_message_w_safe(
+        list,
+        LB_GETTEXT,
+        WPARAM(sel as usize),
+        LPARAM(buf.as_mut_ptr() as isize),
+    );
+    Some(String::from_utf16_lossy(&buf[..len as usize]))
+}
+
 fn insert_tree_item(tree: HWND, parent: HTREEITEM, label: &str, value_index: isize) -> HTREEITEM {
     let text = to_wide(label);
     let mut insert = TVINSERTSTRUCTW {
@@ -1519,6 +1547,7 @@ pub fn restore_interpreter_select_focus(hwnd: HWND) -> bool {
             "interpreter_select restore focus hwnd={:?} target={:?}",
             hwnd, target
         ));
+        log_interpreter_control_state("restore_focus.target_before", target);
         unsafe {
             SetFocus(target);
         }
@@ -1526,6 +1555,10 @@ pub fn restore_interpreter_select_focus(hwnd: HWND) -> bool {
             || state.flat_list.is_some_and(|flat_list| flat_list == target)
         {
             let sel = crate::send_message_w_safe(target, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+            crate::log_debug(&format!(
+                "interpreter_select restore focus listbox state hwnd={:?} target={:?} sel={}",
+                hwnd, target, sel
+            ));
             if sel >= 0 {
                 crate::send_message_w_safe(target, LB_SETCURSEL, WPARAM(sel as usize), LPARAM(0));
                 crate::send_message_w_safe(

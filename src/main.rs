@@ -931,6 +931,7 @@ pub(crate) enum RaiAudioOrigin {
 pub(crate) struct YouTubeReturnContext {
     pub input: Option<String>,
     pub collection_page: Option<usize>,
+    pub selected_label: Option<String>,
 }
 
 struct PodcastEpisodePlayFailed {
@@ -1616,6 +1617,7 @@ pub(crate) fn set_active_youtube_return_context(
     if with_state(hwnd, |state| {
         state.active_youtube_return_context.input = input;
         state.active_youtube_return_context.collection_page = collection_page;
+        state.active_youtube_return_context.selected_label = None;
     })
     .is_none()
     {

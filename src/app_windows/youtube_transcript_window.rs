@@ -1697,6 +1697,7 @@ struct ResolvedStreamSelection {
     url: String,
     collection_url: Option<String>,
     collection_page: Option<usize>,
+    selected_label: Option<String>,
 }
 
 const STREAM_SELECTION_PAGE_SIZE: usize = 20;
@@ -1860,6 +1861,7 @@ fn choose_stream_collection_entry_page(
     entries: &[StreamCollectionEntry],
     has_previous: bool,
     has_more: bool,
+    initial_selected_label: Option<&str>,
 ) -> Option<String> {
     let mut labels =
         Vec::with_capacity(entries.len() + usize::from(has_previous) + usize::from(has_more));
@@ -1941,7 +1943,7 @@ fn choose_stream_collection_entry_page(
         labels,
         language,
         i18n::tr(language, "stream_audio.prompt_title"),
-        None,
+        initial_selected_label.map(ToOwned::to_owned),
         vec![view_comments_action, add_to_favorites_action],
     )
 }
@@ -3728,6 +3730,7 @@ fn choose_youtube_collection_entry(
     ytdlp_path: &Path,
     url: &str,
     initial_page: Option<usize>,
+    initial_selected_label: Option<&str>,
     initial_progress: Option<HWND>,
 ) -> Result<Option<ResolvedStreamSelection>, String> {
     if !is_youtube_collection_url(url) {
@@ -3735,6 +3738,7 @@ fn choose_youtube_collection_entry(
             url: url.to_string(),
             collection_url: None,
             collection_page: None,
+            selected_label: None,
         }));
     }
 
@@ -3801,6 +3805,7 @@ fn choose_youtube_collection_entry(
             &entries,
             page > 0,
             has_more,
+            initial_selected_label.filter(|_| page == initial_page.unwrap_or(0)),
         ) else {
             restore_stream_parent_after_selection_cancel(parent);
             return Ok(None);
@@ -3840,6 +3845,7 @@ fn choose_youtube_collection_entry(
                     &selected_url,
                     None,
                     None,
+                    None,
                 );
             }
             crate::log_debug(&format!(
@@ -3850,6 +3856,7 @@ fn choose_youtube_collection_entry(
                 url: selected_url,
                 collection_url: Some(url.to_string()),
                 collection_page: Some(page),
+                selected_label: Some(selected),
             }));
         }
         return Ok(None);
@@ -3861,6 +3868,7 @@ fn choose_youtube_search_entry(
     language: Language,
     ytdlp_path: &Path,
     query: &str,
+    initial_selected_label: Option<&str>,
     initial_progress: Option<HWND>,
 ) -> Result<Option<ResolvedStreamSelection>, String> {
     let mut page = 0usize;
@@ -3922,6 +3930,7 @@ fn choose_youtube_search_entry(
             &entries,
             page > 0,
             has_more,
+            initial_selected_label.filter(|_| page == 0),
         ) else {
             restore_stream_parent_after_selection_cancel(parent);
             return Ok(None);
@@ -3951,12 +3960,14 @@ fn choose_youtube_search_entry(
                     &selected_url,
                     None,
                     None,
+                    None,
                 );
             }
             return Ok(Some(ResolvedStreamSelection {
                 url: selected_url,
                 collection_url: None,
                 collection_page: None,
+                selected_label: Some(selected),
             }));
         }
         return Ok(None);
@@ -3968,6 +3979,7 @@ fn resolve_stream_input_url(
     ytdlp_path: &Path,
     input: &str,
     initial_collection_page: Option<usize>,
+    initial_selected_label: Option<&str>,
     initial_progress: Option<HWND>,
 ) -> Result<Option<ResolvedStreamSelection>, String> {
     if looks_like_valid_stream_url(input) {
@@ -3977,10 +3989,18 @@ fn resolve_stream_input_url(
             ytdlp_path,
             input,
             initial_collection_page,
+            initial_selected_label,
             initial_progress,
         );
     }
-    choose_youtube_search_entry(parent, language, ytdlp_path, input, initial_progress)
+    choose_youtube_search_entry(
+        parent,
+        language,
+        ytdlp_path,
+        input,
+        initial_selected_label,
+        initial_progress,
+    )
 }
 
 fn is_members_only_stream_error(err: &str) -> bool {
@@ -4166,6 +4186,7 @@ struct StreamDialogResult {
     quality: StreamQualitySelection,
     direct_play: bool,
     reopen_collection_page: Option<usize>,
+    reopen_selected_label: Option<String>,
 }
 
 #[derive(Clone)]
@@ -4922,6 +4943,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                                 quality,
                                 direct_play,
                                 reopen_collection_page: None,
+                                reopen_selected_label: None,
                             });
                     })
                     .is_none()
@@ -5023,6 +5045,7 @@ fn show_stream_dialog(
             quality: StreamQualitySelection::Original,
             direct_play: false,
             reopen_collection_page: context.collection_page,
+            reopen_selected_label: context.selected_label,
         });
     }
     let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
@@ -5124,15 +5147,26 @@ fn update_youtube_return_context_from_selection(
     original_input: &str,
     collection_url: Option<&str>,
     collection_page: Option<usize>,
+    selected_label: Option<&str>,
 ) {
     let return_input = collection_url
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| original_input.to_string());
     crate::log_debug(&format!(
-        "stream transition [update_return_context_from_selection]: input={} collection_page={:?}",
-        return_input, collection_page
+        "stream transition [update_return_context_from_selection]: input={} collection_page={:?} selected_label={}",
+        return_input,
+        collection_page,
+        selected_label.unwrap_or("")
     ));
-    crate::set_active_youtube_return_context(parent, Some(return_input), collection_page);
+    if crate::with_state(parent, |state| {
+        state.active_youtube_return_context.input = Some(return_input);
+        state.active_youtube_return_context.collection_page = collection_page;
+        state.active_youtube_return_context.selected_label = selected_label.map(ToOwned::to_owned);
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to update YouTube return context from selection");
+    }
 }
 
 pub(crate) fn reopen_stream_selection(parent: HWND, context: crate::YouTubeReturnContext) {
@@ -6673,6 +6707,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     let mut url = input.clone();
     let mut collection_url: Option<String> = None;
     let mut collection_page: Option<usize> = None;
+    let mut selected_label = dialog_data.reopen_selected_label.clone();
     let mut ytdlp_path = None;
     if needs_ytdlp_selection {
         let bootstrap_progress = open_progress_dialog(
@@ -6706,6 +6741,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             &path,
             &input,
             dialog_data.reopen_collection_page,
+            dialog_data.reopen_selected_label.as_deref(),
             Some(bootstrap_progress),
         ) {
             Ok(Some(selection)) => selection,
@@ -6723,6 +6759,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         url = resolved.url;
         collection_url = resolved.collection_url;
         collection_page = resolved.collection_page;
+        selected_label = resolved.selected_label;
         crate::log_debug(&format!(
             "stream transition [resolved_selection]: url={} collection_url={} collection_page={:?}",
             url,
@@ -6734,6 +6771,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             &input,
             collection_url.as_deref(),
             collection_page,
+            selected_label.as_deref(),
         );
         ytdlp_path = Some(path);
     }
@@ -6750,6 +6788,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             &input,
             collection_url.as_deref(),
             collection_page,
+            selected_label.as_deref(),
         );
     }
     let should_reopen_selection =
@@ -6773,8 +6812,13 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             Some(stream_path),
         );
         if should_reopen_selection {
-            let return_input = collection_url.clone().unwrap_or_else(|| input.clone());
-            crate::set_active_youtube_return_context(parent, Some(return_input), collection_page);
+            update_youtube_return_context_from_selection(
+                parent,
+                &input,
+                collection_url.as_deref(),
+                collection_page,
+                selected_label.as_deref(),
+            );
         } else {
             crate::set_active_youtube_return_context(parent, None, None);
         }
@@ -6824,6 +6868,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                             source_collection_url,
                             collection_page,
                             None,
+                            None,
                         ) {
                             Ok(Some(selection)) => selection,
                             Ok(None) => {
@@ -6843,11 +6888,13 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                         url = next_selection.url;
                         collection_url = next_selection.collection_url;
                         collection_page = next_selection.collection_page;
+                        selected_label = next_selection.selected_label;
                         update_youtube_return_context_from_selection(
                             parent,
                             &input,
                             collection_url.as_deref(),
                             collection_page,
+                            selected_label.as_deref(),
                         );
                         continue 'select_video;
                     }
@@ -7419,6 +7466,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 &input,
                 collection_url.as_deref(),
                 collection_page,
+                selected_label.as_deref(),
             );
         } else {
             crate::set_active_youtube_return_context(parent, None, None);

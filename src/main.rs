@@ -13060,7 +13060,7 @@ pub(crate) fn save_audio_dialog(
 
         let current_bitrate =
             with_state(hwnd, |state| state.settings.audiobook_m4b_bitrate).unwrap_or(128);
-        let bitrate_options = [64u32, 80, 96, 128, 160, 192, 256];
+        let bitrate_options = [64u32, 80, 96, 128, 160, 192, 256, 320];
         let initial_bitrate = if bitrate_options.contains(&current_bitrate) {
             current_bitrate
         } else {
@@ -13123,7 +13123,7 @@ pub(crate) fn save_audio_dialog(
             let selected_bitrate = selected_bitrate
                 .lock()
                 .map(|v| *v)
-                .unwrap_or(current_bitrate.clamp(64, 256));
+                .unwrap_or(current_bitrate.clamp(64, 320));
             log_debug(&format!(
                 "Save audio dialog: selected bitrate {} kbps (current {} kbps)",
                 selected_bitrate, current_bitrate

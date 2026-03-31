@@ -1476,7 +1476,7 @@ fn request_cancel(state: &mut BatchState) {
 }
 
 fn m4b_bitrate_options() -> &'static [u32] {
-    &[64, 80, 96, 128, 160, 192, 256]
+    &[64, 80, 96, 128, 160, 192, 256, 320]
 }
 
 fn current_audio_format(combo: HWND) -> AudioFormat {

@@ -11896,7 +11896,8 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        audio_bookmark_position_and_snippet, clamp_tts_chunk_offset, sentence_start_offsets_utf16,
+        SentenceNavigationDirection, audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
+        sentence_navigation_target, sentence_start_offsets_utf16,
     };
 
     #[test]

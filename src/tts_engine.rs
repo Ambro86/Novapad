@@ -4075,7 +4075,7 @@ fn parse_edge_binary_audio_payload(data: &[u8]) -> Result<Option<Vec<u8>>, Strin
     }
 }
 
-fn split_text_for_engine(text: &str, engine: TtsEngine) -> Vec<String> {
+pub(crate) fn split_text_for_engine(text: &str, engine: TtsEngine) -> Vec<String> {
     if engine == TtsEngine::Edge {
         split_text_edge(text)
     } else {
@@ -4974,7 +4974,7 @@ pub fn start_audiobook_from_selection(hwnd: HWND) {
     );
 }
 
-fn parse_sapi4_voice_index(voice: &str) -> i32 {
+pub(crate) fn parse_sapi4_voice_index(voice: &str) -> i32 {
     if let Some(hash_pos) = voice.find('#') {
         let rest = &voice[hash_pos + 1..];
         if let Some(pipe_pos) = rest.find('|') {
@@ -5195,7 +5195,7 @@ fn run_marker_split_sapi4_audiobook(
     Ok(())
 }
 
-fn run_sapi4_parallel_part(
+pub(crate) fn run_sapi4_parallel_part(
     chunks: &[String],
     voice_idx: i32,
     global_progress: &mut usize,

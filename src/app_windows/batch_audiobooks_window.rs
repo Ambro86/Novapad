@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -23,8 +23,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, SetFocus, VK_ESCAPE, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST,
-    CREATESTRUCTW, CreateWindowExW, DefWindowProcW, ES_AUTOVSCROLL, ES_MULTILINE,
+    BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBN_SELCHANGE,
+    CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW, ES_AUTOVSCROLL, ES_MULTILINE,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, KillTimer,
     LoadCursorW, MSG, PostMessageW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
     SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
@@ -48,7 +48,7 @@ use crate::tts_engine::{
     build_audiobook_parts_from_sections, build_mixed_audiobook_parts_by_positions,
     build_mixed_audiobook_parts_from_sections, collect_marker_entries,
     format_audiobook_part_filename, has_voice_tags, prepare_tts_text, render_mixed_audiobook_part,
-    run_tts_audiobook_part, split_into_tts_chunks, split_text, strip_dashed_lines,
+    run_tts_audiobook_part, split_into_tts_chunks, strip_dashed_lines,
 };
 use crate::{log_debug, sanitize_filename, show_error, with_state};
 
@@ -62,6 +62,7 @@ const BATCH_ID_CLEAR: usize = 9405;
 const BATCH_ID_OUTPUT_EDIT: usize = 9406;
 const BATCH_ID_OUTPUT_BROWSE: usize = 9407;
 const BATCH_ID_FORMAT: usize = 9408;
+const BATCH_ID_BITRATE: usize = 9416;
 const BATCH_ID_SUBFOLDER: usize = 9409;
 const BATCH_ID_AVOID_OVERWRITE: usize = 9410;
 const BATCH_ID_START: usize = 9411;
@@ -134,7 +135,9 @@ struct BatchLabels {
     browse: String,
     format: String,
     format_mp3: String,
+    format_m4b: String,
     format_wav: String,
+    bitrate: String,
     option_subfolder: String,
     option_avoid_overwrite: String,
     start: String,
@@ -166,6 +169,8 @@ struct BatchState {
     output_edit: HWND,
     browse: HWND,
     format_combo: HWND,
+    bitrate_label: HWND,
+    bitrate_combo: HWND,
     checkbox_subfolder: HWND,
     checkbox_avoid_overwrite: HWND,
     start_button: HWND,
@@ -206,6 +211,7 @@ enum BatchMessage {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum AudioFormat {
     Mp3,
+    M4b,
     Wav,
 }
 
@@ -235,6 +241,9 @@ struct TtsSettings {
     tts_pitch: i32,
     tts_volume: i32,
     language: Language,
+    dialogue_settings: crate::settings::AppSettings,
+    marker_selections: HashMap<PathBuf, BatchMarkerSelection>,
+    sapi4_threads: Option<u32>,
 }
 
 struct BatchResultItem {
@@ -242,6 +251,13 @@ struct BatchResultItem {
     status: BatchStatusCode,
     outputs: Vec<PathBuf>,
     error: Option<String>,
+}
+
+#[derive(Clone)]
+struct BatchMarkerSelection {
+    normalized_text: String,
+    positions: Vec<usize>,
+    titles: Vec<String>,
 }
 
 fn labels(language: Language) -> BatchLabels {
@@ -258,7 +274,9 @@ fn labels(language: Language) -> BatchLabels {
         browse: i18n::tr(language, "batch_audiobooks.browse"),
         format: i18n::tr(language, "batch_audiobooks.format"),
         format_mp3: i18n::tr(language, "batch_audiobooks.format.mp3"),
+        format_m4b: "M4B".to_string(),
         format_wav: i18n::tr(language, "batch_audiobooks.format.wav"),
+        bitrate: i18n::tr(language, "options.label.audiobook_bitrate"),
         option_subfolder: i18n::tr(language, "batch_audiobooks.option_subfolder"),
         option_avoid_overwrite: i18n::tr(language, "batch_audiobooks.option_avoid_overwrite"),
         start: i18n::tr(language, "batch_audiobooks.start"),
@@ -541,9 +559,56 @@ unsafe extern "system" fn batch_wndproc(
                     format_combo,
                     CB_ADDSTRING,
                     WPARAM(0),
+                    LPARAM(to_wide(&labels.format_m4b).as_ptr() as isize),
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
                     LPARAM(to_wide(&labels.format_wav).as_ptr() as isize),
                 );
                 SendMessageW(format_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+
+                let bitrate_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.bitrate).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    232,
+                    300,
+                    180,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let bitrate_combo = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    420,
+                    296,
+                    120,
+                    200,
+                    hwnd,
+                    HMENU(BATCH_ID_BITRATE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                for bitrate in m4b_bitrate_options() {
+                    SendMessageW(
+                        bitrate_combo,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(&format!("{bitrate} kbps")).as_ptr() as isize),
+                    );
+                }
+                set_bitrate_combo_selection(
+                    bitrate_combo,
+                    with_state(parent, |state| state.settings.audiobook_m4b_bitrate).unwrap_or(128),
+                );
 
                 let checkbox_subfolder = CreateWindowExW(
                     Default::default(),
@@ -706,6 +771,8 @@ unsafe extern "system" fn batch_wndproc(
                     browse,
                     format_label,
                     format_combo,
+                    bitrate_label,
+                    bitrate_combo,
                     checkbox_subfolder,
                     checkbox_avoid_overwrite,
                     progress_label,
@@ -721,10 +788,23 @@ unsafe extern "system" fn batch_wndproc(
                     }
                 }
 
-                let initial_folder = std::env::current_dir()
-                    .unwrap_or_else(|_| PathBuf::from("."))
-                    .to_string_lossy()
-                    .to_string();
+                let initial_folder = with_state(parent, |state| {
+                    let configured = state.settings.audiobook_save_folder.trim().to_string();
+                    if configured.is_empty() {
+                        std::env::current_dir()
+                            .unwrap_or_else(|_| PathBuf::from("."))
+                            .to_string_lossy()
+                            .to_string()
+                    } else {
+                        configured
+                    }
+                })
+                .unwrap_or_else(|| {
+                    std::env::current_dir()
+                        .unwrap_or_else(|_| PathBuf::from("."))
+                        .to_string_lossy()
+                        .to_string()
+                });
                 if let Err(e) =
                     SetWindowTextW(output_edit, PCWSTR(to_wide(&initial_folder).as_ptr()))
                 {
@@ -745,6 +825,8 @@ unsafe extern "system" fn batch_wndproc(
                     output_edit,
                     browse,
                     format_combo,
+                    bitrate_label,
+                    bitrate_combo,
                     checkbox_subfolder,
                     checkbox_avoid_overwrite,
                     start_button,
@@ -766,6 +848,13 @@ unsafe extern "system" fn batch_wndproc(
                 );
                 if SetTimer(hwnd, BATCH_TIMER_ID, 200, None) == 0 {
                     crate::log_debug("Failed to set BATCH_TIMER");
+                }
+                if with_batch_state(hwnd, |state| {
+                    update_m4b_bitrate_controls(state);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to initialize batch bitrate controls");
                 }
 
                 LRESULT(0)
@@ -826,6 +915,32 @@ unsafe extern "system" fn batch_wndproc(
                                     ));
                                 }
                             }
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access batch state");
+                        }
+                        LRESULT(0)
+                    }
+                    command
+                        if command == BATCH_ID_FORMAT
+                            && ((wparam.0 >> 16) & 0xffff) as u32 == CBN_SELCHANGE =>
+                    {
+                        if with_batch_state(hwnd, |state| {
+                            update_m4b_bitrate_controls(state);
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug("Failed to access batch state");
+                        }
+                        LRESULT(0)
+                    }
+                    command
+                        if command == BATCH_ID_BITRATE
+                            && ((wparam.0 >> 16) & 0xffff) as u32 == CBN_SELCHANGE =>
+                    {
+                        if with_batch_state(hwnd, |state| {
+                            persist_selected_m4b_bitrate(state);
                         })
                         .is_none()
                         {
@@ -1125,13 +1240,7 @@ fn start_batch(state: &mut BatchState) {
         );
         return;
     }
-    let format_sel =
-        crate::send_message_w_safe(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-    let format = if format_sel == 1 {
-        AudioFormat::Wav
-    } else {
-        AudioFormat::Mp3
-    };
+    let format = current_audio_format(state.format_combo);
     let (tts_engine, tts_voice) = {
         with_state(state.parent, |app| {
             (app.settings.tts_engine, app.settings.tts_voice.clone())
@@ -1142,11 +1251,17 @@ fn start_batch(state: &mut BatchState) {
         show_error(state.hwnd, state.language, &labels.wav_not_supported);
         return;
     }
+    if format == AudioFormat::M4b {
+        persist_selected_m4b_bitrate(state);
+    }
 
     let create_subfolder = is_checked(state.checkbox_subfolder);
     let avoid_overwrite = is_checked(state.checkbox_avoid_overwrite);
 
-    let tts_settings = load_tts_settings(state.parent, tts_voice, state.language);
+    let mut tts_settings = load_tts_settings(state.parent, tts_voice, state.language);
+    if !prepare_batch_tts_preflight(state, &mut tts_settings) {
+        return;
+    }
     let batch_settings = BatchSettings {
         output_folder,
         format,
@@ -1178,6 +1293,82 @@ fn start_batch(state: &mut BatchState) {
     });
 }
 
+fn prepare_batch_tts_preflight(state: &mut BatchState, tts: &mut TtsSettings) -> bool {
+    if tts.tts_engine == TtsEngine::Sapi4 {
+        let title = i18n::tr(state.language, "audiobook.sapi4_threads_title");
+        let body = i18n::tr(state.language, "audiobook.sapi4_threads_body");
+        let Some(value) = crate::app_windows::prompt_window::prompt_user(
+            state.hwnd,
+            &title,
+            &body,
+            "30",
+            state.language,
+        ) else {
+            return false;
+        };
+        if let Ok(parsed) = value.parse::<u32>() {
+            tts.sapi4_threads = Some(parsed.clamp(1, 100));
+        }
+    }
+
+    if !tts.audiobook_split_by_text || tts.audiobook_split_by_time {
+        return true;
+    }
+
+    let mut selections = HashMap::new();
+    for item in &state.items {
+        if tts.audiobook_split_by_epub_chapter && is_epub_path(&item.input) {
+            continue;
+        }
+        let text = match read_text_for_audiobook(&item.input, tts.language) {
+            Ok(text) => text,
+            Err(err) => {
+                show_error(state.hwnd, state.language, &err);
+                return false;
+            }
+        };
+        let text =
+            crate::dialogue_voice::apply_dialogue_tags_from_settings(&text, &tts.dialogue_settings);
+        let cleaned = strip_dashed_lines(&text);
+        let (normalized, entries) = collect_marker_entries(
+            &cleaned,
+            &tts.audiobook_split_text,
+            tts.audiobook_split_text_requires_newline,
+        );
+        if entries.is_empty() {
+            continue;
+        }
+        let labels: Vec<String> = entries.iter().map(|entry| entry.label.clone()).collect();
+        let Some(selected) = crate::app_windows::marker_select_window::select_marker_entries(
+            state.hwnd,
+            &labels,
+            state.language,
+        ) else {
+            return false;
+        };
+        let positions: Vec<usize> = selected
+            .iter()
+            .filter_map(|idx| entries.get(*idx).map(|entry| entry.pos))
+            .collect();
+        if positions.is_empty() {
+            continue;
+        }
+        selections.insert(
+            item.input.clone(),
+            BatchMarkerSelection {
+                normalized_text: normalized.clone(),
+                positions,
+                titles: selected
+                    .iter()
+                    .filter_map(|idx| entries.get(*idx).map(|entry| entry.label.clone()))
+                    .collect(),
+            },
+        );
+    }
+    tts.marker_selections = selections;
+    true
+}
+
 fn request_cancel(state: &mut BatchState) {
     if !state.running {
         return;
@@ -1189,6 +1380,58 @@ fn request_cancel(state: &mut BatchState) {
     append_log(state, &labels.log_cancel_requested);
     unsafe {
         EnableWindow(state.cancel_button, false);
+    }
+}
+
+fn m4b_bitrate_options() -> &'static [u32] {
+    &[64, 80, 96, 128, 160, 192, 256]
+}
+
+fn current_audio_format(combo: HWND) -> AudioFormat {
+    match crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32 {
+        1 => AudioFormat::M4b,
+        2 => AudioFormat::Wav,
+        _ => AudioFormat::Mp3,
+    }
+}
+
+fn selected_m4b_bitrate(combo: HWND) -> u32 {
+    let index = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+    let options = m4b_bitrate_options();
+    usize::try_from(index)
+        .ok()
+        .and_then(|idx| options.get(idx).copied())
+        .unwrap_or(128)
+}
+
+fn set_bitrate_combo_selection(combo: HWND, bitrate: u32) {
+    let index = m4b_bitrate_options()
+        .iter()
+        .position(|candidate| *candidate == bitrate)
+        .unwrap_or(3);
+    crate::send_message_w_safe(combo, CB_SETCURSEL, WPARAM(index), LPARAM(0));
+}
+
+fn persist_selected_m4b_bitrate(state: &BatchState) {
+    let bitrate = selected_m4b_bitrate(state.bitrate_combo);
+    if let Some(settings) = with_state(state.parent, |app| {
+        app.settings.audiobook_m4b_bitrate = bitrate;
+        app.settings.clone()
+    }) {
+        crate::save_settings(settings);
+    } else {
+        crate::log_debug("Failed to persist batch audiobook bitrate");
+    }
+}
+
+fn update_m4b_bitrate_controls(state: &BatchState) {
+    let enabled = !state.running && current_audio_format(state.format_combo) != AudioFormat::Wav;
+    unsafe {
+        EnableWindow(state.bitrate_label, enabled);
+        EnableWindow(state.bitrate_combo, enabled);
+    }
+    if enabled {
+        persist_selected_m4b_bitrate(state);
     }
 }
 
@@ -1208,6 +1451,7 @@ fn set_running(state: &mut BatchState, running: bool) {
         EnableWindow(state.cancel_button, running);
         EnableWindow(state.close_button, !running);
     }
+    update_m4b_bitrate_controls(state);
 }
 
 fn finish_batch(state: &mut BatchState, _report_path: Option<&PathBuf>) -> (HWND, Language, HWND) {
@@ -1529,6 +1773,9 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             tts_pitch: state.settings.tts_pitch,
             tts_volume: state.settings.tts_volume,
             language,
+            dialogue_settings: state.settings.clone(),
+            marker_selections: HashMap::new(),
+            sapi4_threads: None,
         })
         .unwrap_or_else(|| TtsSettings {
             voice: "it-IT-IsabellaNeural".to_string(),
@@ -1549,6 +1796,9 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             tts_pitch: 0,
             tts_volume: 100,
             language,
+            dialogue_settings: crate::settings::AppSettings::default(),
+            marker_selections: HashMap::new(),
+            sapi4_threads: None,
         })
     }
 }
@@ -1794,6 +2044,21 @@ fn export_single_audiobook(
     } else {
         read_text_for_audiobook(input, tts.language)?
     };
+    let epub_chapters = if use_epub_split {
+        epub_chapters
+            .into_iter()
+            .map(|chapter| {
+                crate::dialogue_voice::apply_dialogue_tags_from_settings(
+                    &chapter,
+                    &tts.dialogue_settings,
+                )
+            })
+            .collect()
+    } else {
+        epub_chapters
+    };
+    let text =
+        crate::dialogue_voice::apply_dialogue_tags_from_settings(&text, &tts.dialogue_settings);
     if use_epub_split {
         if epub_chapters
             .iter()
@@ -1817,7 +2082,7 @@ fn export_single_audiobook(
     let split_minutes = tts.audiobook_split_minutes.clamp(1, 60);
     let split_start_number = tts.audiobook_split_start_number.clamp(1, 99);
     let split_by_text = tts.audiobook_split_by_text && !split_by_time && !use_epub_split;
-    let split_parts = if split_by_time || use_epub_split {
+    let mut split_parts = if split_by_time || use_epub_split {
         0
     } else {
         tts.audiobook_split
@@ -1851,37 +2116,35 @@ fn export_single_audiobook(
             )
         }
     } else if split_by_text {
-        let (normalized, entries) = collect_marker_entries(
-            &cleaned,
-            &tts.audiobook_split_text,
-            tts.audiobook_split_text_requires_newline,
-        );
-        if entries.is_empty() {
-            (None, None)
-        } else {
-            let positions: Vec<usize> = entries.iter().map(|e| e.pos).collect();
-            if mixed_needed {
-                (
-                    None,
-                    build_mixed_audiobook_parts_by_positions(
-                        &normalized,
-                        &positions,
-                        tts.split_on_newline,
-                        &tts.dictionary,
-                        tts.tts_engine,
-                    ),
-                )
-            } else {
-                (
-                    build_audiobook_parts_by_positions(
-                        &normalized,
-                        &positions,
-                        tts.split_on_newline,
-                        &tts.dictionary,
-                        tts.tts_engine,
-                    ),
-                    None,
-                )
+        match tts.marker_selections.get(input) {
+            Some(selection) if !selection.positions.is_empty() => {
+                if mixed_needed {
+                    (
+                        None,
+                        build_mixed_audiobook_parts_by_positions(
+                            &selection.normalized_text,
+                            &selection.positions,
+                            tts.split_on_newline,
+                            &tts.dictionary,
+                            tts.tts_engine,
+                        ),
+                    )
+                } else {
+                    (
+                        build_audiobook_parts_by_positions(
+                            &selection.normalized_text,
+                            &selection.positions,
+                            tts.split_on_newline,
+                            &tts.dictionary,
+                            tts.tts_engine,
+                        ),
+                        None,
+                    )
+                }
+            }
+            _ => {
+                split_parts = 0;
+                (None, None)
             }
         }
     } else {
@@ -1890,6 +2153,23 @@ fn export_single_audiobook(
     if use_epub_split && parts.is_none() && mixed_parts.is_none() {
         return Err(crate::settings::tts_no_text_message(tts.language));
     }
+
+    let chapter_titles = if use_epub_split {
+        Some(
+            epub_chapters
+                .iter()
+                .map(|chapter| chapter.trim())
+                .filter(|chapter| !chapter.is_empty())
+                .map(|chapter| chapter.to_string())
+                .collect::<Vec<_>>(),
+        )
+        .filter(|titles| !titles.is_empty())
+    } else {
+        tts.marker_selections
+            .get(input)
+            .map(|selection| selection.titles.clone())
+            .filter(|titles| !titles.is_empty())
+    };
 
     if mixed_needed {
         let parts = match mixed_parts {
@@ -1907,26 +2187,59 @@ fn export_single_audiobook(
         if parts.is_empty() {
             return Err(crate::settings::tts_no_text_message(tts.language));
         }
-        let output_paths = build_output_paths(
+        let merge_m4b =
+            batch_settings.format == AudioFormat::M4b && (split_by_time || parts.len() > 1);
+        let final_outputs = build_output_paths(
             input,
-            parts.len(),
+            if merge_m4b { 1 } else { parts.len() },
             batch_settings,
             tts.audiobook_part_naming_mode,
             tts.language,
         )?;
-        match export_parts_mixed(&parts, &output_paths, tts, cancel.clone()) {
+        let render_outputs = build_render_output_paths(
+            &final_outputs,
+            parts.len(),
+            batch_settings.format,
+            tts.audiobook_part_naming_mode,
+            split_by_time,
+        );
+        match export_parts_mixed(&parts, &render_outputs, tts, cancel.clone()) {
             Ok(()) => {
                 if split_by_time {
-                    let Some(output) = output_paths.first() else {
+                    let Some(output) = render_outputs.first() else {
                         return Err("Batch: missing output path for time split".to_string());
                     };
+                    if merge_m4b {
+                        let Some(final_output) = final_outputs.first() else {
+                            return Err(
+                                "Batch: missing final output path for M4B merge".to_string()
+                            );
+                        };
+                        return segment_batch_output_and_merge_m4b(
+                            output,
+                            final_output,
+                            split_minutes,
+                            split_start_number,
+                        );
+                    }
                     return segment_batch_output(output, split_minutes, split_start_number);
                 }
-                Ok(output_paths)
+                if merge_m4b {
+                    let Some(final_output) = final_outputs.first() else {
+                        return Err("Batch: missing final output path for M4B merge".to_string());
+                    };
+                    merge_batch_m4b_outputs(
+                        &render_outputs,
+                        final_output,
+                        chapter_titles.as_deref(),
+                    )?;
+                    return Ok(vec![final_output.clone()]);
+                }
+                Ok(final_outputs)
             }
             Err(err) => {
                 if !cancel.load(Ordering::SeqCst) {
-                    for path in &output_paths {
+                    for path in &render_outputs {
                         if let Err(e) = std::fs::remove_file(path) {
                             crate::log_debug(&format!("Failed to remove temp batch file: {}", e));
                         }
@@ -1940,33 +2253,66 @@ fn export_single_audiobook(
             Some(parts) => parts,
             None => {
                 let prepared = prepare_tts_text(&cleaned, tts.split_on_newline, &tts.dictionary);
-                let chunks = split_text(&prepared);
+                let chunks = crate::tts_engine::split_text_for_engine(&prepared, tts.tts_engine);
                 split_chunks_by_count(&chunks, split_parts)
             }
         };
         if parts.is_empty() {
             return Err(crate::settings::tts_no_text_message(tts.language));
         }
-        let output_paths = build_output_paths(
+        let merge_m4b =
+            batch_settings.format == AudioFormat::M4b && (split_by_time || parts.len() > 1);
+        let final_outputs = build_output_paths(
             input,
-            parts.len(),
+            if merge_m4b { 1 } else { parts.len() },
             batch_settings,
             tts.audiobook_part_naming_mode,
             tts.language,
         )?;
-        match export_parts(&parts, &output_paths, tts, cancel.clone(), sapi_voice) {
+        let render_outputs = build_render_output_paths(
+            &final_outputs,
+            parts.len(),
+            batch_settings.format,
+            tts.audiobook_part_naming_mode,
+            split_by_time,
+        );
+        match export_parts(&parts, &render_outputs, tts, cancel.clone(), sapi_voice) {
             Ok(()) => {
                 if split_by_time {
-                    let Some(output) = output_paths.first() else {
+                    let Some(output) = render_outputs.first() else {
                         return Err("Batch: missing output path for time split".to_string());
                     };
+                    if merge_m4b {
+                        let Some(final_output) = final_outputs.first() else {
+                            return Err(
+                                "Batch: missing final output path for M4B merge".to_string()
+                            );
+                        };
+                        return segment_batch_output_and_merge_m4b(
+                            output,
+                            final_output,
+                            split_minutes,
+                            split_start_number,
+                        );
+                    }
                     return segment_batch_output(output, split_minutes, split_start_number);
                 }
-                Ok(output_paths)
+                if merge_m4b {
+                    let Some(final_output) = final_outputs.first() else {
+                        return Err("Batch: missing final output path for M4B merge".to_string());
+                    };
+                    merge_batch_m4b_outputs(
+                        &render_outputs,
+                        final_output,
+                        chapter_titles.as_deref(),
+                    )?;
+                    return Ok(vec![final_output.clone()]);
+                }
+                Ok(final_outputs)
             }
             Err(err) => {
                 if !cancel.load(Ordering::SeqCst) {
-                    for path in &output_paths {
+                    for path in &render_outputs {
                         if let Err(e) = std::fs::remove_file(path) {
                             crate::log_debug(&format!("Failed to remove temp batch file: {}", e));
                         }
@@ -2036,6 +2382,106 @@ fn segment_batch_output(
         ));
     }
     Ok(outputs)
+}
+
+fn segment_batch_output_and_merge_m4b(
+    work_output: &Path,
+    final_output: &Path,
+    split_minutes: u32,
+    split_start_number: u32,
+) -> Result<Vec<PathBuf>, String> {
+    let part_files = segment_batch_output(work_output, split_minutes, split_start_number)?;
+    merge_batch_m4b_outputs(&part_files, final_output, None)?;
+    Ok(vec![final_output.to_path_buf()])
+}
+
+fn merge_batch_m4b_outputs(
+    part_files: &[PathBuf],
+    final_output: &Path,
+    chapter_titles: Option<&[String]>,
+) -> Result<(), String> {
+    match crate::ffmpeg_export::merge_audio_files_with_chapters_copy(
+        part_files,
+        final_output,
+        chapter_titles,
+    ) {
+        Ok(()) => {
+            for file in part_files {
+                if let Err(e) = std::fs::remove_file(file) {
+                    crate::log_debug(&format!(
+                        "Batch M4B merge cleanup: failed to remove part {}: {}",
+                        file.display(),
+                        e
+                    ));
+                }
+            }
+            Ok(())
+        }
+        Err(err) => {
+            if let Err(e) = std::fs::remove_file(final_output) {
+                crate::log_debug(&format!(
+                    "Batch M4B merge cleanup: failed to remove output {}: {}",
+                    final_output.display(),
+                    e
+                ));
+            }
+            Err(err)
+        }
+    }
+}
+
+fn build_render_output_paths(
+    final_outputs: &[PathBuf],
+    parts_len: usize,
+    format: AudioFormat,
+    naming_mode: AudiobookPartNamingMode,
+    split_by_time: bool,
+) -> Vec<PathBuf> {
+    if format != AudioFormat::M4b {
+        return final_outputs.to_vec();
+    }
+    let Some(final_output) = final_outputs.first() else {
+        return Vec::new();
+    };
+    if split_by_time {
+        let stem = final_output
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("audiobook");
+        let ext = final_output
+            .extension()
+            .and_then(|s| s.to_str())
+            .unwrap_or("m4b");
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        return vec![final_output.with_file_name(format!("{stem}.chapbuild.{stamp}.{ext}"))];
+    }
+    if parts_len <= 1 {
+        return final_outputs.to_vec();
+    }
+    let base = final_output
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("audiobook");
+    let ext = final_output
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("m4b");
+    let width = std::cmp::max(2, parts_len.to_string().len());
+    let parent = final_output.parent().unwrap_or_else(|| Path::new("."));
+    (0..parts_len)
+        .map(|idx| {
+            parent.join(format_audiobook_part_filename(
+                base,
+                ext,
+                (idx + 1) as u32,
+                width,
+                naming_mode,
+            ))
+        })
+        .collect()
 }
 
 fn split_chunks_by_count(chunks: &[String], split_parts: u32) -> Vec<Vec<String>> {
@@ -2111,6 +2557,7 @@ fn build_output_paths(
     }
     let ext = match settings.format {
         AudioFormat::Mp3 => "mp3",
+        AudioFormat::M4b => "m4b",
         AudioFormat::Wav => "wav",
     };
 
@@ -2215,13 +2662,31 @@ fn export_parts(
                     rate: tts.tts_rate,
                     pitch: tts.tts_pitch,
                     volume: tts.tts_volume,
-                    sapi4_threads: None,
+                    sapi4_threads: tts.sapi4_threads,
                 };
                 run_tts_audiobook_part(part_chunks, &mut progress, &options)?;
             }
             TtsEngine::Sapi4 => {
-                // SAPI4 not implemented for batch yet in this context, or maybe it was empty before too?
-                // The original code had empty block for Sapi4.
+                let voice_idx = crate::tts_engine::parse_sapi4_voice_index(&tts.voice);
+                let options = crate::tts_engine::AudiobookCommonOptions {
+                    voice: &tts.voice,
+                    output,
+                    progress_hwnd: HWND(0),
+                    cancel: cancel.clone(),
+                    language: tts.language,
+                    part_naming_mode: tts.audiobook_part_naming_mode,
+                    audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
+                    rate: tts.tts_rate,
+                    pitch: tts.tts_pitch,
+                    volume: tts.tts_volume,
+                    sapi4_threads: tts.sapi4_threads,
+                };
+                crate::tts_engine::run_sapi4_parallel_part(
+                    part_chunks,
+                    voice_idx,
+                    &mut progress,
+                    &options,
+                )?;
             }
             TtsEngine::Sapi5 => {
                 crate::log_debug(&format!(
@@ -2401,7 +2866,7 @@ fn export_parts_mixed(
             rate: tts.tts_rate,
             pitch: tts.tts_pitch,
             volume: tts.tts_volume,
-            sapi4_threads: None,
+            sapi4_threads: tts.sapi4_threads,
         };
         let config = MixedAudiobookConfig {
             main_engine: tts.tts_engine,
@@ -2524,6 +2989,7 @@ fn write_report(
         "Format: {}",
         match batch.format {
             AudioFormat::Mp3 => "MP3",
+            AudioFormat::M4b => "M4B",
             AudioFormat::Wav => "WAV",
         }
     ));

@@ -465,6 +465,7 @@
   "options.label.whisper_model": "Whisper model:",
   "options.label.wikipedia_language": "Jezik za Vikipediju:",
   "options.label.word_wrap": "Prelamanje teksta u uređivaču",
+  "options.label.editor_escape_closes_window": "Escape zatvara prozor editora",
   "options.label.wrap_width": "Širina prelamanja (u znakovima):",
   "options.lang.cs": "Češki",
   "options.lang.en": "Engleski",

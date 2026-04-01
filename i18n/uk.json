@@ -465,6 +465,7 @@
   "options.label.whisper_model": "Модель Whisper:",
   "options.label.wikipedia_language": "Мова Вікіпедії:",
   "options.label.word_wrap": "Перенесення слів",
+  "options.label.editor_escape_closes_window": "Escape закриває вікно редактора",
   "options.label.wrap_width": "Ширина рядка (симв.):",
   "options.lang.cs": "Чеська",
   "options.lang.en": "Англійська",

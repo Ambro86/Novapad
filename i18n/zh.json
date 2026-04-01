@@ -465,6 +465,7 @@
   "options.label.whisper_model": "Whisper 模型：",
   "options.label.wikipedia_language": "维基百科语言：",
   "options.label.word_wrap": "编辑器中的自动换行",
+  "options.label.editor_escape_closes_window": "Esc 关闭编辑器窗口",
   "options.label.wrap_width": "换行宽度（字符）：",
   "options.lang.cs": "捷克",
   "options.lang.en": "英语",

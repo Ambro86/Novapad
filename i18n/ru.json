@@ -465,6 +465,7 @@
   "options.label.whisper_model": "Модель Whisper:",
   "options.label.wikipedia_language": "Язык Википедии:",
   "options.label.word_wrap": "Перенос по словам в редакторе",
+  "options.label.editor_escape_closes_window": "Escape закрывает окно редактора",
   "options.label.wrap_width": "Ширина переноса (символов):",
   "options.lang.cs": "Чешский",
   "options.lang.en": "Английский",

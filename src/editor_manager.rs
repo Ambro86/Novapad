@@ -20,8 +20,8 @@ use windows::Win32::UI::Controls::{
     TCM_INSERTITEMW, TCM_SETCURSEL, TCM_SETITEMW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyState, SetFocus, VK_CONTROL, VK_DOWN, VK_END, VK_HOME, VK_LEFT, VK_MENU, VK_NEXT,
-    VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_TAB, VK_UP,
+    GetKeyState, SetFocus, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_MENU,
+    VK_NEXT, VK_PRIOR, VK_RIGHT, VK_SHIFT, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallWindowProcW, DefWindowProcW, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN,
@@ -155,6 +155,15 @@ fn edit_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
         }
         if msg == WM_KEYDOWN {
             let vk = wparam.0 as u32;
+            if vk == VK_ESCAPE.0 as u32 {
+                let parent = GetParent(hwnd);
+                if with_state(parent, |state| state.settings.editor_escape_closes_window)
+                    .unwrap_or(false)
+                {
+                    try_close_app(parent);
+                    return LRESULT(0);
+                }
+            }
             if matches!(
                 vk,
                 v if v == VK_LEFT.0 as u32

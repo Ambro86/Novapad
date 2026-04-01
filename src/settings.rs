@@ -704,6 +704,8 @@ pub struct AppSettings {
     pub editor_font_face: String,
     #[serde(default)]
     pub editor_read_only: bool,
+    #[serde(default)]
+    pub editor_escape_closes_window: bool,
     pub show_voice_panel: bool,
     pub show_favorite_panel: bool,
     pub check_updates_on_startup: bool,
@@ -1040,6 +1042,7 @@ impl Default for AppSettings {
             active_voice_profile: default_voice_profile_name(),
             editor_font_face: String::new(),
             editor_read_only: false,
+            editor_escape_closes_window: false,
             show_voice_panel: false,
             show_favorite_panel: false,
             check_updates_on_startup: true,

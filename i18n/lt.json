@@ -465,6 +465,7 @@
   "options.label.whisper_model": "Whisper modelis:",
   "options.label.wikipedia_language": "Vikipedijos kalba:",
   "options.label.word_wrap": "Žodžių perkelimas redaktoriuje",
+  "options.label.editor_escape_closes_window": "Escape uždaro redaktoriaus langą",
   "options.label.wrap_width": "Apvyniojimo plotis (simboliai):",
   "options.lang.cs": "Čekų",
   "options.lang.en": "Anglų",

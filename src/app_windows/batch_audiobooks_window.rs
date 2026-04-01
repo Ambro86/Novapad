@@ -1307,29 +1307,35 @@ fn clear_items(state: &mut BatchState) {
     update_progress(state, 0, 0);
 }
 
+fn show_batch_error(state: &BatchState, message: &str) {
+    show_error(state.parent, state.language, message);
+    if crate::is_window_handle_valid(state.hwnd) {
+        crate::bring_window_to_foreground(state.hwnd);
+        if !restore_batch_focus(state.hwnd) {
+            crate::log_debug("Failed to restore batch focus after error");
+        }
+    }
+}
+
 fn start_batch(state: &mut BatchState) {
     if state.running {
         return;
     }
     let labels = labels(state.language);
     if state.items.is_empty() {
-        show_error(state.hwnd, state.language, &labels.empty_queue);
+        show_batch_error(state, &labels.empty_queue);
         return;
     }
     let output_folder = read_control_text(state.output_edit);
     if output_folder.trim().is_empty() {
-        show_error(state.hwnd, state.language, &labels.no_output_folder);
+        show_batch_error(state, &labels.no_output_folder);
         return;
     }
     let output_folder = PathBuf::from(output_folder.trim());
     if !output_folder.exists()
         && let Err(err) = std::fs::create_dir_all(&output_folder)
     {
-        show_error(
-            state.hwnd,
-            state.language,
-            &format!("{}: {}", labels.invalid_output_folder, err),
-        );
+        show_batch_error(state, &format!("{}: {}", labels.invalid_output_folder, err));
         return;
     }
     let format = current_audio_format(state.format_combo);
@@ -1340,7 +1346,7 @@ fn start_batch(state: &mut BatchState) {
         .unwrap_or((TtsEngine::Edge, "it-IT-IsabellaNeural".to_string()))
     };
     if tts_engine == TtsEngine::Edge && format == AudioFormat::Wav {
-        show_error(state.hwnd, state.language, &labels.wav_not_supported);
+        show_batch_error(state, &labels.wav_not_supported);
         return;
     }
     if format == AudioFormat::M4b {
@@ -1415,7 +1421,7 @@ fn prepare_batch_tts_preflight(state: &mut BatchState, tts: &mut TtsSettings) ->
         let text = match read_text_for_audiobook(&item.input, tts.language) {
             Ok(text) => text,
             Err(err) => {
-                show_error(state.hwnd, state.language, &err);
+                show_batch_error(state, &err);
                 return false;
             }
         };

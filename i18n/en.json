@@ -465,6 +465,7 @@
   "options.label.whisper_model": "Whisper model:",
   "options.label.wikipedia_language": "Wikipedia Language:",
   "options.label.word_wrap": "Word Wrap in Editor",
+  "options.label.editor_escape_closes_window": "Escape closes the editor window",
   "options.label.wrap_width": "Wrap Width (Chars):",
   "options.lang.cs": "Czech",
   "options.lang.en": "English",

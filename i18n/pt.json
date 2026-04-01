@@ -465,6 +465,7 @@
   "options.label.whisper_model": "Modelo Whisper:",
   "options.label.wikipedia_language": "Idioma da Wikipédia:",
   "options.label.word_wrap": "Quebra automática no editor",
+  "options.label.editor_escape_closes_window": "Escape fecha a janela do editor",
   "options.label.wrap_width": "Largura da linha (caracteres):",
   "options.lang.cs": "Tcheco",
   "options.lang.en": "Inglês",

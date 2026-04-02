@@ -31,8 +31,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     IDC_ARROW, IDOK, LoadCursorW, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK,
     MB_OKCANCEL, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
     SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_TIMER, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE,
 };
 use windows::core::PCWSTR;
 
@@ -1019,6 +1020,15 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     crate::log_debug("Failed to set PODCAST_TIMER");
                 }
                 SetFocus(include_mic);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut PodcastState;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let state = &mut *ptr;
+                SetFocus(state.include_mic);
                 LRESULT(0)
             }
             WM_COMMAND => {

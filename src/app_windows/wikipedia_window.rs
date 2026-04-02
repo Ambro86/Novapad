@@ -20,8 +20,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT,
     LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
     SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -324,6 +325,14 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     SetWindowLongPtrW(control, GWLP_USERDATA, prev);
                 }
                 SetFocus(input);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut WikipediaWindowState;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                SetFocus((*ptr).input);
                 LRESULT(0)
             }
             WM_KEYDOWN => {

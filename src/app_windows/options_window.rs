@@ -52,8 +52,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
     SetWindowPos, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
     WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
-    WM_SETFONT, WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    WM_SETFOCUS, WM_SETFONT, WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -631,6 +631,10 @@ fn find_fixed_shortcut_conflict_label(
                 "{}\tAlt+Shift+C",
                 i18n::tr(language, "playback.transcribe_current_folder")
             ),
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'E' as u16),
+            i18n::tr(language, "playback.download_episode"),
         ),
         (
             ShortcutBinding::new(false, true, true, 'L' as u16),
@@ -6144,6 +6148,12 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(dialog_state) as isize);
                 initialize_options_dialog(hwnd);
                 set_active_tab(hwnd, OPTIONS_TAB_GENERAL);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                let active_tab = with_options_state(hwnd, |state| state.active_tab)
+                    .unwrap_or(OPTIONS_TAB_GENERAL);
+                focus_tab_first(hwnd, active_tab);
                 LRESULT(0)
             }
             WM_NOTIFY => {

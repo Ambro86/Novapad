@@ -7676,6 +7676,10 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 resize_controls(hwnd);
                 LRESULT(0)
             }
+            WM_SETFOCUS => {
+                focus_library(hwnd);
+                LRESULT(0)
+            }
             WM_NOTIFY => {
                 let nmhdr = &*(lparam.0 as *const windows::Win32::UI::Controls::NMHDR);
                 if nmhdr.idFrom == ID_TREE {

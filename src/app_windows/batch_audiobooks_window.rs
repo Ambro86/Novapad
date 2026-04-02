@@ -8,6 +8,7 @@ use std::time::Duration;
 use chrono::Local;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
+use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
     OFN_ALLOWMULTISELECT, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_PATHMUSTEXIST,
     OPENFILENAMEW,
@@ -20,16 +21,17 @@ use windows::Win32::UI::Controls::{
     WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, SetFocus, VK_ESCAPE, VK_SHIFT, VK_TAB,
+    EnableWindow, SetActiveWindow, SetFocus, VK_ESCAPE, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBN_SELCHANGE,
-    CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW, ES_AUTOVSCROLL, ES_MULTILINE,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, KillTimer,
-    LoadCursorW, MSG, PostMessageW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
-    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    CBS_DROPDOWNLIST, CHILDID_SELF, CREATESTRUCTW, CreateWindowExW, DefWindowProcW, ES_AUTOVSCROLL,
+    ES_MULTILINE, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW,
+    KillTimer, LoadCursorW, MSG, OBJID_CLIENT, PostMessageW, SendMessageW, SetForegroundWindow,
+    SetTimer, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_SETFOCUS, WM_SETFONT,
+    WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -127,6 +129,53 @@ pub fn restore_batch_focus(hwnd: HWND) -> bool {
         crate::set_focus_safe(target);
     })
     .is_some()
+}
+
+fn force_focus_editor_on_parent(parent: HWND) {
+    if parent.0 == 0 {
+        return;
+    }
+    unsafe {
+        SetForegroundWindow(parent);
+        SetActiveWindow(parent);
+        SendMessageW(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+    }
+    if crate::get_active_edit(parent).is_none() {
+        crate::send_message_w_safe(
+            parent,
+            WM_COMMAND,
+            WPARAM(crate::menu::IDM_FILE_NEW),
+            LPARAM(0),
+        );
+    }
+    if let Some(hwnd_edit) = crate::get_active_edit(parent) {
+        unsafe {
+            SetFocus(hwnd_edit);
+            SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+            SendMessageW(
+                parent,
+                WM_NEXTDLGCTL,
+                WPARAM(hwnd_edit.0 as usize),
+                LPARAM(1),
+            );
+        }
+        unsafe {
+            SetFocus(hwnd_edit);
+            SendMessageW(hwnd_edit, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+            NotifyWinEvent(
+                crate::EVENT_OBJECT_FOCUS,
+                hwnd_edit,
+                OBJID_CLIENT.0,
+                CHILDID_SELF as i32,
+            );
+        }
+    }
+    crate::send_message_w_safe(parent, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+    if let Err(_e) =
+        crate::post_message_w_safe(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0))
+    {
+        crate::log_debug(&format!("Error: {:?}", _e));
+    }
 }
 
 struct BatchItem {
@@ -888,6 +937,10 @@ unsafe extern "system" fn batch_wndproc(
 
                 LRESULT(0)
             }
+            WM_SETFOCUS => {
+                restore_batch_focus(hwnd);
+                LRESULT(0)
+            }
             WM_COMMAND => {
                 let cmd_id = wparam.0 & 0xffff;
                 match cmd_id {
@@ -1111,18 +1164,17 @@ unsafe extern "system" fn batch_wndproc(
                 {
                     crate::log_debug("Failed to access batch state");
                 }
-                if with_state(
-                    windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd),
-                    |state| {
-                        state.batch_audiobooks_window = HWND(0);
-                    },
-                )
+                let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
+                if with_state(parent, |state| {
+                    state.batch_audiobooks_window = HWND(0);
+                })
                 .is_none()
                 {
                     crate::log_debug("Failed to access parent state in WM_DESTROY");
                 }
-                let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
-                crate::focus_editor(parent);
+                if parent.0 != 0 && !crate::editor_manager::is_current_audiobook(parent) {
+                    force_focus_editor_on_parent(parent);
+                }
                 LRESULT(0)
             }
             WM_NCDESTROY => {
@@ -1131,11 +1183,15 @@ unsafe extern "system" fn batch_wndproc(
                     GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                         as *mut BatchState;
                 if !ptr.is_null() {
+                    let parent = (*ptr).parent;
                     SetWindowLongPtrW(
                         hwnd,
                         windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
                         0,
                     );
+                    if parent.0 != 0 && !crate::editor_manager::is_current_audiobook(parent) {
+                        force_focus_editor_on_parent(parent);
+                    }
                     let _unused_box = Box::from_raw(ptr);
                 }
                 LRESULT(0)

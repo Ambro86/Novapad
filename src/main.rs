@@ -11161,6 +11161,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         dispatch_shortcut_command(hwnd, IDM_PLAYBACK_TRANSCRIBE_CURRENT_FOLDER);
         return true;
     }
+    if key == 'E' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_PLAYBACK_DOWNLOAD_EPISODE);
+        return true;
+    }
     if key == 'L' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_PLAYBACK_CHAPTER_LIST);
         return true;

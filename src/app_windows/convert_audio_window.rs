@@ -17,9 +17,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow,
     ES_AUTOHSCROLL, GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LoadCursorW, PostMessageW,
     SendMessageW, SetForegroundWindow, SetWindowLongPtrW, ShowWindow, WINDOW_STYLE, WM_CLOSE,
-    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE,
+    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
+    WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -548,6 +548,17 @@ fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     Box::into_raw(state) as isize,
                 );
                 SetFocus(input_edit);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                let ptr =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut ConvertWindowState;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let state = &mut *ptr;
+                SetFocus(state.input_edit);
                 LRESULT(0)
             }
             WM_COMMAND => {

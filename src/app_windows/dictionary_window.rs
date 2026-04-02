@@ -18,9 +18,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     LB_RESETCONTENT, LB_SETCURSEL, LB_SETITEMDATA, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY,
     LoadCursorW, MSG, PostMessageW, RegisterClassW, SW_HIDE, SendMessageW, SetForegroundWindow,
     SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -305,6 +305,13 @@ fn dictionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 refresh_dictionary_list(hwnd);
                 update_button_states(hwnd);
                 SetFocus(hwnd_list);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                let list = with_dictionary_state(hwnd, |s| s.hwnd_list).unwrap_or(HWND(0));
+                if list.0 != 0 {
+                    SetFocus(list);
+                }
                 LRESULT(0)
             }
             WM_COMMAND => {

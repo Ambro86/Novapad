@@ -510,7 +510,10 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 shortcuts.chapter_next,
             );
             let chapter_list = i18n::tr(language, "playback.chapter_list");
-            let download_episode = i18n::tr(language, "playback.download_episode");
+            let download_episode = format!(
+                "{}\tAlt+Shift+E",
+                i18n::tr(language, "playback.download_episode")
+            );
             let transcribe_current = i18n::tr(language, "playback.transcribe_current");
             let transcribe_current_folder = format!(
                 "{}\tAlt+Shift+C",

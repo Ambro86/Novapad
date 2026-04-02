@@ -40,7 +40,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD,
     TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
     WM_CREATE, WM_DESTROY, WM_GETDLGCODE, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MOUSEWHEEL, WM_NCDESTROY,
-    WM_PAINT, WM_SETFONT, WM_SIZE, WM_VSCROLL, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WM_PAINT, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_VSCROLL, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
     WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
@@ -622,6 +622,15 @@ fn import_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) ->
                     LPARAM(0),
                 );
                 SetFocus(url_edit);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ImportState;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let state = &mut *ptr;
+                SetFocus(state.url_edit);
                 LRESULT(0)
             }
             WM_COMMAND => {
@@ -4737,6 +4746,15 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 update_stream_open_comments_button(&state);
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
                 SetFocus(url_edit);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamDialogState;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let state = &mut *ptr;
+                SetFocus(state.url_edit);
                 LRESULT(0)
             }
             WM_CONTEXTMENU => {

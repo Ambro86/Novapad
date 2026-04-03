@@ -1674,6 +1674,7 @@ struct YoutubeCommentsDialogInit {
     language: Language,
     title: String,
     comments: Vec<YoutubeComment>,
+    flat_selection: Option<YoutubeFlatSelectionInit>,
 }
 
 #[derive(Clone)]
@@ -1700,6 +1701,20 @@ struct YoutubeCommentsDialogState {
     selected_row: usize,
     scroll_offset: i32,
     content_height: i32,
+    flat_list_mode: bool,
+    flat_selection_result: Option<Arc<Mutex<Option<String>>>>,
+}
+
+#[derive(Clone)]
+pub(crate) struct MultilineSelectionItem {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) description: Option<String>,
+}
+
+struct YoutubeFlatSelectionInit {
+    initial_selected_id: Option<String>,
+    result: Arc<Mutex<Option<String>>>,
 }
 
 struct ResolvedStreamSelection {
@@ -2062,6 +2077,49 @@ fn show_youtube_comments_for_stream_entry(
     open_youtube_comments_window(ui_parent, language, entry.label.clone(), comments);
 }
 
+pub(crate) fn select_multiline_items(
+    parent: HWND,
+    language: Language,
+    title: String,
+    items: Vec<MultilineSelectionItem>,
+    initial_selected_id: Option<String>,
+) -> Option<String> {
+    let comments = items
+        .into_iter()
+        .map(|item| {
+            let title = normalize_comment_text(&item.title);
+            let description = item
+                .description
+                .as_deref()
+                .map(normalize_comment_text)
+                .unwrap_or_default();
+            YoutubeComment {
+                id: item.id,
+                parent: "root".to_string(),
+                author: if title.is_empty() {
+                    "Elemento".to_string()
+                } else {
+                    title
+                },
+                text: description,
+                time_text: String::new(),
+            }
+        })
+        .collect::<Vec<_>>();
+    let result = Arc::new(Mutex::new(None));
+    open_youtube_comments_window_with_mode(
+        parent,
+        language,
+        title,
+        comments,
+        Some(YoutubeFlatSelectionInit {
+            initial_selected_id,
+            result: Arc::clone(&result),
+        }),
+    );
+    result.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
 fn fetch_youtube_comments_with_ytdlp(
     ytdlp_path: &Path,
     url: &str,
@@ -2137,6 +2195,16 @@ fn open_youtube_comments_window(
     title: String,
     comments: Vec<YoutubeComment>,
 ) {
+    open_youtube_comments_window_with_mode(parent, language, title, comments, None);
+}
+
+fn open_youtube_comments_window_with_mode(
+    parent: HWND,
+    language: Language,
+    title: String,
+    comments: Vec<YoutubeComment>,
+    flat_selection: Option<YoutubeFlatSelectionInit>,
+) {
     let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(YOUTUBE_COMMENTS_DIALOG_CLASS_NAME);
     let view_class_name = to_wide(YOUTUBE_COMMENTS_VIEW_CLASS_NAME);
@@ -2168,12 +2236,18 @@ fn open_youtube_comments_window(
         language,
         title: plain_label(&title),
         comments,
+        flat_selection,
     });
-    let title = to_wide(&tr_or(
-        language,
-        "stream_audio.comments_window_title",
-        "Video comments",
-    ));
+    let window_title = if init.flat_selection.is_some() {
+        init.title.clone()
+    } else {
+        tr_or(
+            language,
+            "stream_audio.comments_window_title",
+            "Video comments",
+        )
+    };
+    let title = to_wide(&window_title);
     let hwnd = unsafe {
         CreateWindowExW(
             WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
@@ -2228,7 +2302,7 @@ fn open_youtube_comments_window(
                 }
                 let (should_capture, handled) = with_youtube_comments_state(hwnd, |state| {
                     let should_capture = focus != state.close_button
-                        && is_youtube_comments_dialog_navigation_key(msg.wParam.0 as u32);
+                        && is_youtube_comments_dialog_navigation_key(state, msg.wParam.0 as u32);
                     crate::log_debug(&format!(
                         "YT comments loop state before route view={:?} proxy={:?} close={:?} rows={} selected_row={} scroll_offset={} content_height={} should_capture={}",
                         state.view,
@@ -2240,6 +2314,12 @@ fn open_youtube_comments_window(
                         state.content_height,
                         should_capture
                     ));
+                    if should_capture
+                        && state.flat_list_mode
+                        && msg.wParam.0 as u32 == VK_RETURN.0 as u32
+                    {
+                        return (true, false);
+                    }
                     let handled = should_capture
                         && crate::is_window_handle_valid(state.view)
                         && handle_youtube_comments_keydown_for_state(
@@ -2254,6 +2334,12 @@ fn open_youtube_comments_window(
                     "YT comments loop WM_KEYDOWN should_capture={} handled={} key={}",
                     should_capture, handled, msg.wParam.0
                 ));
+                if should_capture
+                    && msg.wParam.0 as u32 == VK_RETURN.0 as u32
+                    && accept_youtube_comments_flat_selection(hwnd)
+                {
+                    continue;
+                }
                 if should_capture {
                     continue;
                 }
@@ -2395,6 +2481,7 @@ fn youtube_comments_dialog_wndproc_inner(
 
             let (root_indices, children_by_parent) = build_youtube_comment_threads(&init.comments);
             let expanded_comment_ids = HashSet::new();
+            let flat_selection = init.flat_selection;
             crate::log_debug(&format!(
                 "YT comments WM_CREATE title='{}' comments={} roots={} parents_with_children={}",
                 init.title,
@@ -2402,7 +2489,7 @@ fn youtube_comments_dialog_wndproc_inner(
                 root_indices.len(),
                 children_by_parent.len()
             ));
-            let state = Box::new(YoutubeCommentsDialogState {
+            let mut state = Box::new(YoutubeCommentsDialogState {
                 language: init.language,
                 title_label,
                 view,
@@ -2417,7 +2504,18 @@ fn youtube_comments_dialog_wndproc_inner(
                 selected_row: 0,
                 scroll_offset: 0,
                 content_height: 0,
+                flat_list_mode: flat_selection.is_some(),
+                flat_selection_result: flat_selection
+                    .as_ref()
+                    .map(|selection| Arc::clone(&selection.result)),
             });
+            if let Some(selection) = flat_selection.as_ref()
+                && let Some(index) = state.comments.iter().position(|comment| {
+                    Some(comment.id.as_str()) == selection.initial_selected_id.as_deref()
+                })
+            {
+                state.selected_row = index;
+            }
             crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
             relayout_youtube_comments_dialog(hwnd);
             unsafe {
@@ -2439,6 +2537,23 @@ fn youtube_comments_dialog_wndproc_inner(
             relayout_youtube_comments_dialog(hwnd);
             LRESULT(0)
         }
+        WM_SETFOCUS => {
+            with_youtube_comments_state(hwnd, |state| {
+                let target = if crate::is_window_handle_valid(state.accessibility_proxy) {
+                    state.accessibility_proxy
+                } else if crate::is_window_handle_valid(state.view) {
+                    state.view
+                } else {
+                    HWND(0)
+                };
+                if target.0 != 0 {
+                    unsafe {
+                        SetFocus(target);
+                    }
+                }
+            });
+            LRESULT(0)
+        }
         WM_KEYDOWN => {
             crate::log_debug(&format!(
                 "YT comments dialog WM_KEYDOWN key={} focus={:?}",
@@ -2458,13 +2573,16 @@ fn youtube_comments_dialog_wndproc_inner(
             let handled = with_youtube_comments_state(hwnd, |state| {
                 let focus = unsafe { GetFocus() };
                 if focus == state.close_button
-                    || !is_youtube_comments_dialog_navigation_key(wparam.0 as u32)
+                    || !is_youtube_comments_dialog_navigation_key(state, wparam.0 as u32)
                 {
                     crate::log_debug(&format!(
                         "YT comments dialog WM_KEYDOWN ignored key={} focus={:?} close_button={:?}",
                         wparam.0, focus, state.close_button
                     ));
                     return false;
+                }
+                if state.flat_list_mode && wparam.0 as u32 == VK_RETURN.0 as u32 {
+                    return accept_youtube_comments_flat_selection(hwnd);
                 }
                 handle_youtube_comments_keydown_for_state(state, wparam.0 as u32, true)
             })
@@ -2473,7 +2591,12 @@ fn youtube_comments_dialog_wndproc_inner(
                 "YT comments dialog WM_KEYDOWN handled={} key={}",
                 handled, wparam.0
             ));
-            if handled || is_youtube_comments_dialog_navigation_key(wparam.0 as u32) {
+            if handled
+                || with_youtube_comments_state(hwnd, |state| {
+                    is_youtube_comments_dialog_navigation_key(state, wparam.0 as u32)
+                })
+                .unwrap_or(false)
+            {
                 return LRESULT(0);
             }
             crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
@@ -2517,6 +2640,9 @@ fn youtube_comments_dialog_wndproc_inner(
                 return LRESULT(0);
             }
             if cmd_id == YOUTUBE_COMMENTS_ID_CLOSE || cmd_id == 1 {
+                if lparam.0 != 0 && accept_youtube_comments_flat_selection(hwnd) {
+                    return LRESULT(0);
+                }
                 crate::log_if_err!(crate::destroy_window_safe(hwnd));
                 return LRESULT(0);
             }
@@ -2547,6 +2673,30 @@ fn with_youtube_comments_state<R>(
         return None;
     }
     Some(f(unsafe { &mut *ptr }))
+}
+
+fn accept_youtube_comments_flat_selection(hwnd: HWND) -> bool {
+    let accepted = with_youtube_comments_state(hwnd, |state| {
+        if !state.flat_list_mode {
+            return false;
+        }
+        let Some(row) = state.rows.get(state.selected_row) else {
+            return false;
+        };
+        let Some(comment) = state.comments.get(row.comment_index) else {
+            return false;
+        };
+        let Some(result) = &state.flat_selection_result else {
+            return false;
+        };
+        *result.lock().unwrap_or_else(|e| e.into_inner()) = Some(comment.id.clone());
+        true
+    })
+    .unwrap_or(false);
+    if accepted {
+        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+    }
+    accepted
 }
 
 fn build_youtube_comment_threads(
@@ -2716,16 +2866,17 @@ fn append_youtube_comment_rows(
         .get(comment.id.as_str())
         .map(|items| !items.is_empty())
         .unwrap_or(false);
+    let effective_depth = if state.flat_list_mode { 0 } else { depth };
     let expanded = has_children && state.expanded_comment_ids.contains(comment.id.as_str());
     let height = measure_youtube_comment_row_height(
         hdc,
         view_width,
-        depth,
-        &format_youtube_comment_tree_label(state.language, comment),
+        effective_depth,
+        &format_youtube_comment_tree_label(state, comment),
     );
     rows.push(YoutubeCommentRow {
         comment_index,
-        depth,
+        depth: effective_depth,
         height,
         has_children,
         expanded,
@@ -2796,7 +2947,22 @@ fn youtube_comment_reply_position(
     Some((index + 1, total))
 }
 
-fn format_youtube_comment_tree_label(language: Language, comment: &YoutubeComment) -> String {
+fn format_youtube_comment_tree_label(
+    state: &YoutubeCommentsDialogState,
+    comment: &YoutubeComment,
+) -> String {
+    if state.flat_list_mode {
+        let title = normalize_comment_text(&comment.author);
+        let description = normalize_comment_text(&comment.text);
+        if title.is_empty() {
+            return description;
+        }
+        if description.is_empty() {
+            return title;
+        }
+        return format!("{title}\r\n{description}");
+    }
+    let language = state.language;
     let mut parts = vec![comment.author.clone()];
     if !comment.time_text.is_empty() {
         parts.push(localize_comment_time_text(language, &comment.time_text));
@@ -2815,6 +2981,17 @@ fn format_youtube_comment_accessibility_label(
     comment: &YoutubeComment,
     depth: usize,
 ) -> String {
+    if state.flat_list_mode {
+        let title = normalize_comment_text(&comment.author);
+        let description = normalize_comment_text(&comment.text);
+        if title.is_empty() {
+            return description;
+        }
+        if description.is_empty() {
+            return title;
+        }
+        return format!("{title} - {description}");
+    }
     let language = state.language;
     let mut parts = Vec::new();
     if let Some((index, total)) = youtube_comment_reply_position(state, comment, depth) {
@@ -2841,7 +3018,19 @@ fn normalize_comment_text(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn is_youtube_comments_dialog_navigation_key(key: u32) -> bool {
+fn is_youtube_comments_dialog_navigation_key(state: &YoutubeCommentsDialogState, key: u32) -> bool {
+    if state.flat_list_mode {
+        return matches!(
+            key,
+            k if k == VK_UP.0 as u32
+                || k == VK_DOWN.0 as u32
+                || k == VK_HOME.0 as u32
+                || k == VK_END.0 as u32
+                || k == VK_PRIOR.0 as u32
+                || k == VK_NEXT.0 as u32
+                || k == VK_RETURN.0 as u32
+        );
+    }
     matches!(
         key,
         k if k == VK_UP.0 as u32
@@ -3108,8 +3297,7 @@ fn paint_youtube_comments_view(hwnd: HWND) {
                     bottom: bottom - YOUTUBE_COMMENTS_ROW_PADDING_Y,
                 };
                 if let Some(comment) = state.comments.get(row.comment_index) {
-                    let mut wide =
-                        to_wide(&format_youtube_comment_tree_label(state.language, comment));
+                    let mut wide = to_wide(&format_youtube_comment_tree_label(state, comment));
                     unsafe {
                         let _drawn = DrawTextW(
                             hdc,

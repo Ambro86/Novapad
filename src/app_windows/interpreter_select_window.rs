@@ -214,32 +214,6 @@ pub fn select_interpreter_with_context_actions_without_parent_restore_on_accept(
     }
 }
 
-pub fn select_interpreter_with_context_actions_without_parent_restore_on_accept_but_restore_on_cancel(
-    parent: HWND,
-    items: Vec<String>,
-    language: Language,
-    title: String,
-    initial_value: Option<String>,
-    context_actions: Vec<InterpreterContextAction>,
-) -> Option<String> {
-    match select_interpreter_internal(
-        parent,
-        InterpreterDialogInitMode::List(items),
-        language,
-        title,
-        InterpreterSelectOptions {
-            initial_list_value: initial_value,
-            context_actions,
-            suppress_parent_restore_on_accept: true,
-            suppress_parent_restore_on_cancel: false,
-            ..Default::default()
-        },
-    ) {
-        Some(InterpreterSelectionResult::Item(value)) => Some(value),
-        _ => None,
-    }
-}
-
 pub fn select_grouped_interpreter_with_context_action_without_parent_restore_on_accept(
     parent: HWND,
     groups: Vec<GroupedSelectGroup>,

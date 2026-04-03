@@ -1,6 +1,6 @@
 use windows::Win32::Foundation::HWND;
 
-use crate::app_windows::interpreter_select_window;
+use crate::app_windows::youtube_transcript_window::{self, MultilineSelectionItem};
 use crate::settings::Language;
 use crate::tools::raiplaysound::{self, BrowseItem, BrowseItemKind, BrowsePage};
 use crate::{RaiAudioOrigin, show_error, with_state};
@@ -83,25 +83,22 @@ fn browse_page(
             return BrowseOutcome::Cancelled;
         }
 
-        let labels = page
+        let selection_items = page
             .items
             .iter()
-            .map(|item| item.label.clone())
+            .map(|item| MultilineSelectionItem {
+                id: item.id.clone(),
+                title: item.title.clone(),
+                description: item.description.clone(),
+            })
             .collect::<Vec<_>>();
-        let initial_label = selected_id.as_deref().and_then(|id| {
-            page.items
-                .iter()
-                .find(|item| item.id == id)
-                .map(|item| item.label.clone())
-        });
 
-        let Some(selected_label) = interpreter_select_window::select_interpreter_with_context_actions_without_parent_restore_on_accept_but_restore_on_cancel(
+        let Some(selected_item_id) = youtube_transcript_window::select_multiline_items(
             parent,
-            labels,
             language,
             page.title.clone(),
-            initial_label,
-            Vec::new(),
+            selection_items,
+            selected_id.clone(),
         ) else {
             if let Some((previous_page_path, previous_selected_id)) = history.pop() {
                 match raiplaysound::load_page(&previous_page_path) {
@@ -121,7 +118,7 @@ fn browse_page(
         let Some(selected_item) = page
             .items
             .iter()
-            .find(|item| item.label == selected_label)
+            .find(|item| item.id == selected_item_id)
             .cloned()
         else {
             show_error(

@@ -13,8 +13,8 @@ pub(crate) enum BrowseItemKind {
 #[derive(Clone, Debug)]
 pub(crate) struct BrowseItem {
     pub(crate) id: String,
-    pub(crate) label: String,
     pub(crate) title: String,
+    pub(crate) description: Option<String>,
     pub(crate) path_id: Option<String>,
     pub(crate) audio_url: Option<String>,
     pub(crate) kind: BrowseItemKind,
@@ -37,6 +37,7 @@ pub(crate) fn load_page(path_or_url: &str) -> Result<BrowsePage, String> {
 
 fn load_page_from_url(url: &str) -> Result<BrowsePage, String> {
     let root = fetch_json(url)?;
+    let is_root_page = url.eq_ignore_ascii_case(RAIPLAYSOUND_GENRES_URL);
     let title = string_field(&root, "title")
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| "RaiPlay Sound".to_string());
@@ -48,14 +49,20 @@ fn load_page_from_url(url: &str) -> Result<BrowsePage, String> {
         .and_then(|block| block.get("cards"))
         .and_then(Value::as_array)
     {
-        collect_cards(cards, None, &mut seen, &mut items);
+        collect_cards(cards, None, is_root_page, &mut seen, &mut items);
     }
 
     if let Some(blocks) = root.get("blocks").and_then(Value::as_array) {
         for block in blocks {
             let section = string_field(block, "title").filter(|value| !value.is_empty());
             if let Some(cards) = block.get("cards").and_then(Value::as_array) {
-                collect_cards(cards, section.as_deref(), &mut seen, &mut items);
+                collect_cards(
+                    cards,
+                    section.as_deref(),
+                    is_root_page,
+                    &mut seen,
+                    &mut items,
+                );
             }
         }
     }
@@ -70,11 +77,12 @@ fn load_page_from_url(url: &str) -> Result<BrowsePage, String> {
 fn collect_cards(
     cards: &[Value],
     section: Option<&str>,
+    is_root_page: bool,
     seen: &mut HashSet<String>,
     items: &mut Vec<BrowseItem>,
 ) {
     for card in cards {
-        if let Some(item) = parse_card(card, section)
+        if let Some(item) = parse_card(card, section, is_root_page)
             && seen.insert(item.id.clone())
         {
             items.push(item);
@@ -82,9 +90,12 @@ fn collect_cards(
     }
 }
 
-fn parse_card(card: &Value, section: Option<&str>) -> Option<BrowseItem> {
+fn parse_card(card: &Value, _section: Option<&str>, is_root_page: bool) -> Option<BrowseItem> {
     let path_id = string_field(card, "path_id").or_else(|| string_field(card, "pathId"));
     let title = preferred_title(card);
+    if is_root_page && should_hide_root_item(&title) {
+        return None;
+    }
     let description = preferred_description(card);
     let audio_url = card
         .get("downloadable_audio")
@@ -115,8 +126,8 @@ fn parse_card(card: &Value, section: Option<&str>) -> Option<BrowseItem> {
 
     Some(BrowseItem {
         id,
-        label: build_label(section, &title, description.as_deref()),
         title,
+        description,
         path_id: path_id.map(|value| absolute_url(&value)),
         audio_url,
         kind,
@@ -139,21 +150,6 @@ fn preferred_description(card: &Value) -> Option<String> {
         }
     }
     None
-}
-
-fn build_label(_section: Option<&str>, title: &str, description: Option<&str>) -> String {
-    let mut parts = Vec::new();
-    if !title.trim().is_empty() {
-        parts.push(title.trim().to_string());
-    }
-    if let Some(description) = description.filter(|value| !value.trim().is_empty()) {
-        parts.push(description.trim().to_string());
-    }
-    if parts.is_empty() {
-        "Elemento RaiPlay Sound".to_string()
-    } else {
-        parts.join(" - ")
-    }
 }
 
 fn fetch_json(url: &str) -> Result<Value, String> {
@@ -179,4 +175,11 @@ fn absolute_url(path_or_url: &str) -> String {
     } else {
         format!("{RAIPLAYSOUND_BASE_URL}{trimmed}")
     }
+}
+
+fn should_hide_root_item(title: &str) -> bool {
+    matches!(
+        title.trim(),
+        "Audiodescrizioni-fiction" | "Audiodescrizioni_film"
+    )
 }

@@ -925,6 +925,7 @@ pub(crate) enum RaiAudioOrigin {
     None,
     Recenti,
     Tutte,
+    RaiPlaySound,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -4064,6 +4065,9 @@ pub(crate) struct AppState {
     active_youtube_return_context: YouTubeReturnContext,
     last_rai_recent_item_id: Option<String>,
     last_rai_grouped_item_id: Option<String>,
+    raiplaysound_navigation_stack: Vec<(String, Option<String>)>,
+    last_raiplaysound_page_path: Option<String>,
+    last_raiplaysound_item_id: Option<String>,
     podcast_chapters_cache: HashMap<String, Option<Vec<Chapter>>>,
     pending_podcast_chapters_key: Option<String>,
     active_podcast_chapters_key: Option<String>,
@@ -4724,6 +4728,8 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                                     app_windows::rai_audiodescrizioni_window::open(hwnd);
                                 } else if from_rai == RaiAudioOrigin::Tutte {
                                     app_windows::rai_audiodescrizioni_window::open_grouped(hwnd);
+                                } else if from_rai == RaiAudioOrigin::RaiPlaySound {
+                                    app_windows::raiplaysound_window::reopen_last(hwnd);
                                 } else if youtube_return_context.input.is_some() {
                                     app_windows::youtube_transcript_window::reopen_stream_selection(
                                         hwnd,
@@ -5479,6 +5485,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_youtube_return_context: YouTubeReturnContext::default(),
                     last_rai_recent_item_id: None,
                     last_rai_grouped_item_id: None,
+                    raiplaysound_navigation_stack: Vec::new(),
+                    last_raiplaysound_page_path: None,
+                    last_raiplaysound_item_id: None,
                     podcast_chapters_cache: HashMap::new(),
                     pending_podcast_chapters_key: None,
                     active_podcast_chapters_key: None,
@@ -7319,6 +7328,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_TOOLS_RAI_AUDIODESCRIZIONI => {
                         log_debug("Menu: Rai audiodescrizioni");
                         app_windows::rai_audiodescrizioni_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_RAIPLAYSOUND => {
+                        log_debug("Menu: RaiPlay Sound");
+                        app_windows::raiplaysound_window::open(hwnd);
                         LRESULT(0)
                     }
                     IDM_HELP_GUIDE => {

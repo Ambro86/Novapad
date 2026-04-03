@@ -14,8 +14,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, GWLP_USERDATA, GetWindowLongPtrW,
     HMENU, IDC_ARROW, LoadCursorW, MB_ICONERROR, MB_OK, MSG, RegisterClassW, SW_SHOW,
     SetForegroundWindow, SetWindowLongPtrW, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -240,6 +240,14 @@ fn feedback_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
                 (*init_ptr).send_button = send_button;
                 (*init_ptr).cancel_button = cancel_button;
                 SetFocus(subject_edit);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut FeedbackState;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                SetFocus((*ptr).subject_edit);
                 LRESULT(0)
             }
             WM_COMMAND => {

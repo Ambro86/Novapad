@@ -143,6 +143,7 @@ pub const IDM_TOOLS_STREAM_AUDIO: usize = 5009;
 pub const IDM_TOOLS_BDCIECHI: usize = 5010;
 pub const IDM_TOOLS_TOGGLE_DICTATION: usize = 5011;
 pub const IDM_TOOLS_RAI_AUDIODESCRIZIONI: usize = 5012;
+pub const IDM_TOOLS_RAIPLAYSOUND: usize = 5013;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -169,6 +170,7 @@ pub struct MenuLabels {
     pub menu_stream_audio: String,
     pub menu_bdciechi: String,
     pub menu_rai_audiodescrizioni: String,
+    pub menu_raiplaysound: String,
     pub menu_prompt: String,
     pub menu_rss: String,
     pub menu_podcasts: String,
@@ -283,6 +285,11 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         },
         menu_rai_audiodescrizioni: if language == Language::Italian {
             "Rai audiodescrizioni...\tAlt+Shift+A".to_string()
+        } else {
+            String::new()
+        },
+        menu_raiplaysound: if language == Language::Italian {
+            "RaiPlay Sound...".to_string()
         } else {
             String::new()
         },
@@ -1340,6 +1347,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 MF_STRING,
                 IDM_TOOLS_RAI_AUDIODESCRIZIONI,
                 &labels.menu_rai_audiodescrizioni,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_RAIPLAYSOUND,
+                &labels.menu_raiplaysound,
             );
             append_menu_string(
                 tools_menu,

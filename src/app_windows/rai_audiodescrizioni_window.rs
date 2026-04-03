@@ -53,6 +53,17 @@ pub fn open(parent: HWND) {
     open_recent_catalog(parent, language, initial_item_id);
 }
 
+pub(crate) fn ensure_rai_luce_access(parent: HWND, language: Language) -> bool {
+    if crate::settings::load_saved_rai_luce_code().is_some() {
+        return true;
+    }
+    !handle_missing_luce_key(
+        parent,
+        language,
+        "Chiave Luce mancante: inserisci il codice nelle impostazioni RSS/Podcast.",
+    )
+}
+
 fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option<String>) {
     crate::screen_reader_speak(&crate::i18n::tr(
         language,

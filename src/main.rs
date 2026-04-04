@@ -133,21 +133,21 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetClassNameW, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetForegroundWindow, GetLastActivePopup,
     GetMenu, GetMenuItemCount, GetMessageW, GetNextDlgTabItem, GetParent, GetSubMenu,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
-    HCURSOR, HICON, HMENU, HWND_NOTOPMOST, HWND_TOPMOST, IDC_ARROW, IDI_APPLICATION, IDYES,
-    IsChild, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW,
-    MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO, MENU_ITEM_FLAGS,
-    MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED,
-    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW,
-    OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
-    SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
-    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW,
-    ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
-    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND,
-    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
-    WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
-    WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN,
-    WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
-    WS_TABSTOP, WS_VISIBLE,
+    HCURSOR, HICON, HMENU, HWND_NOTOPMOST, HWND_TOPMOST, IDC_ARROW, IDCANCEL, IDI_APPLICATION,
+    IDNO, IDYES, IsChild, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW,
+    MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO,
+    MB_YESNOCANCEL, MENU_ITEM_FLAGS, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND,
+    MF_BYPOSITION, MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
+    MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW, OBJID_CLIENT, PostMessageW, PostQuitMessage,
+    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
+    SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
+    SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_RETURNCMD,
+    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE,
+    WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA,
+    WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN,
+    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
+    WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD,
+    WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
@@ -1530,6 +1530,7 @@ pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
             state.active_podcast_chapters.clear();
             state.last_announced_chapter_index = None;
             state.active_podcast_episode_url = None;
+            state.active_podcast_episode_media_url = None;
             state.active_podcast_title = None;
             state.active_podcast_episode_title = None;
             state.active_podcast_episode_cache = None;
@@ -1568,6 +1569,7 @@ pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
                 state.active_podcast_chapters.clear();
                 state.last_announced_chapter_index = None;
                 state.active_podcast_episode_url = None;
+                state.active_podcast_episode_media_url = None;
                 state.active_podcast_title = None;
                 state.active_podcast_episode_title = None;
                 state.active_podcast_episode_cache = None;
@@ -1651,6 +1653,7 @@ pub(crate) fn activate_pending_podcast_chapters(hwnd: HWND) {
 pub(crate) fn set_active_podcast_episode_info(
     hwnd: HWND,
     url: Option<String>,
+    media_url: Option<String>,
     podcast_title: Option<String>,
     title: Option<String>,
     cache_path: Option<PathBuf>,
@@ -1662,6 +1665,7 @@ pub(crate) fn set_active_podcast_episode_info(
                     .unwrap_or(false);
             if with_state(hwnd, |state| {
                 state.active_podcast_episode_url = Some(url_value.clone());
+                state.active_podcast_episode_media_url = media_url.clone();
                 state.active_podcast_title = podcast_title;
                 state.active_podcast_episode_title = title;
                 state.active_podcast_episode_cache = cache_path;
@@ -1707,10 +1711,11 @@ pub(crate) fn set_active_youtube_return_context(
 }
 
 pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
-    let (url, podcast_title, title, cache_path, language, is_raiplay_on_demand) = {
+    let (url, media_url, podcast_title, title, cache_path, language, is_raiplay_on_demand) = {
         with_state(hwnd, |state| {
             (
                 state.active_podcast_episode_url.clone(),
+                state.active_podcast_episode_media_url.clone(),
                 state.active_podcast_title.clone(),
                 state.active_podcast_episode_title.clone(),
                 state.active_podcast_episode_cache.clone(),
@@ -1719,7 +1724,7 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
                     && state.raiplay_live_audio_variants.is_empty(),
             )
         })
-        .unwrap_or((None, None, None, None, Language::default(), false))
+        .unwrap_or((None, None, None, None, None, Language::default(), false))
     };
     let fallback_cache_path =
         current_playback_media_path(hwnd).filter(|path| is_local_cached_media_path(path));
@@ -1727,6 +1732,7 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
         download_podcast_episode_with_progress(
             hwnd,
             url,
+            media_url,
             podcast_title,
             title,
             cache_path.or(fallback_cache_path),
@@ -1747,6 +1753,7 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
 fn download_podcast_episode_with_progress(
     hwnd: HWND,
     url: Option<String>,
+    media_url: Option<String>,
     podcast_title: Option<String>,
     title: Option<String>,
     cache_path: Option<PathBuf>,
@@ -1764,30 +1771,21 @@ fn download_podcast_episode_with_progress(
                     .map(|s| s.to_string())
             })
             .unwrap_or_else(|| "podcast_episode".to_string());
-    let mut ext = cache_path
-        .as_ref()
-        .and_then(|p| p.extension().and_then(|e| e.to_str()))
-        .map(|e| e.to_string());
-    if ext.is_none()
-        && let Some(url) = url.as_deref()
-    {
-        ext = audio_extension_from_url(url);
-    }
-    if ext
-        .as_deref()
-        .map(|value| value.eq_ignore_ascii_case("m3u8"))
-        .unwrap_or(false)
-    {
-        ext = Some("mp3".to_string());
-    }
-    let ext = ext.unwrap_or_else(|| "mp3".to_string());
+    let Some(ext) = choose_raiplay_episode_save_extension(hwnd, language) else {
+        return;
+    };
     let suggested_full = format!("{}.{}", suggested_name, ext);
     let target = save_podcast_episode_dialog(hwnd, language, &suggested_full);
     let Some(target) = target else {
         return;
     };
-    let target = ensure_path_extension(target, &ext);
-    let Some(stream_url) = url
+    let target = replace_path_extension(target, &ext);
+    let stream_source_url = if ext.eq_ignore_ascii_case("mp4") {
+        media_url.or(url.clone())
+    } else {
+        url.clone()
+    };
+    let Some(stream_url) = stream_source_url
         .as_deref()
         .filter(|value| value.starts_with("http://") || value.starts_with("https://"))
         .map(ToOwned::to_owned)
@@ -1812,6 +1810,10 @@ fn download_podcast_episode_with_progress(
         }
     };
     let selected_audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    with_state(hwnd, |state| {
+        state.podcast_save_cancel_token = Some(cancel_flag.clone());
+    });
     open_podcast_save_progress_window(hwnd, language);
     update_podcast_save_progress_window(hwnd, 0);
     let hwnd_copy = hwnd;
@@ -1820,23 +1822,43 @@ fn download_podcast_episode_with_progress(
         let mut progress_callback = |pct: u32| {
             update_podcast_save_progress_window(hwnd_copy, normalize_ffmpeg_progress_pct(pct));
         };
-        let result = crate::ffmpeg_export::convert_audio_file_with_preferred_stream(
-            &input_path,
-            &target,
-            &convert_settings,
-            None,
-            Some(&mut progress_callback),
-            selected_audio_track,
-        );
+        let is_mp4_video_save = target
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(|value| value.eq_ignore_ascii_case("mp4"))
+            .unwrap_or(false);
+        let result = if is_mp4_video_save {
+            crate::ffmpeg_export::remux_media_file_to_mp4_with_preferred_audio_stream(
+                &input_path,
+                &target,
+                selected_audio_track,
+                Some(cancel_flag.clone()),
+                Some(&mut progress_callback),
+            )
+        } else {
+            crate::ffmpeg_export::convert_audio_file_with_preferred_stream(
+                &input_path,
+                &target,
+                &convert_settings,
+                Some(cancel_flag.clone()),
+                Some(&mut progress_callback),
+                selected_audio_track,
+            )
+        };
         match result {
-            Ok(()) => post_podcast_episode_save_result(
-                hwnd_copy,
-                PodcastEpisodeSaveResult {
-                    language,
-                    target_path: target,
-                    error: None,
-                },
-            ),
+            Ok(()) => {
+                if is_mp4_video_save {
+                    update_podcast_save_progress_window(hwnd_copy, 100);
+                }
+                post_podcast_episode_save_result(
+                    hwnd_copy,
+                    PodcastEpisodeSaveResult {
+                        language,
+                        target_path: target,
+                        error: None,
+                    },
+                )
+            }
             Err(err) => post_podcast_episode_save_result(
                 hwnd_copy,
                 PodcastEpisodeSaveResult {
@@ -2012,7 +2034,7 @@ pub(crate) fn play_live_stream_audio_from_url_with_rai_origin(
         log_debug("Failed to set active podcast Rai origin flag for live stream");
     }
     editor_manager::mark_current_document_from_rss(hwnd, true);
-    set_active_podcast_episode_info(hwnd, Some(url), podcast_title, title, None);
+    set_active_podcast_episode_info(hwnd, Some(url), None, podcast_title, title, None);
     menu::update_playback_menu(hwnd, true);
     activate_pending_podcast_chapters(hwnd);
 }
@@ -2201,6 +2223,7 @@ fn clear_managed_mpv_state(hwnd: HWND) {
     if with_state(hwnd, |state| {
         state.active_mpv_session = None;
         state.active_podcast_episode_url = None;
+        state.active_podcast_episode_media_url = None;
         state.active_podcast_title = None;
         state.active_podcast_episode_title = None;
         state.active_podcast_episode_cache = None;
@@ -2458,6 +2481,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
             set_active_podcast_episode_info(
                 hwnd,
                 Some(url.to_string()),
+                Some(url.to_string()),
                 podcast_title.map(ToOwned::to_owned),
                 title.map(ToOwned::to_owned),
                 None,
@@ -2490,7 +2514,7 @@ fn open_podcast_save_progress_window(hwnd: HWND, language: Language) {
         cancel: i18n::tr(language, "podcast.save.cancel"),
         cancel_confirm: i18n::tr(language, "podcast.cancel_confirm"),
     };
-    let dialog = app_windows::podcast_save_window::open_with_labels(hwnd, language, labels, false);
+    let dialog = app_windows::podcast_save_window::open_with_labels(hwnd, language, labels, true);
     with_state(hwnd, |state| {
         state.podcast_save_window = dialog;
     });
@@ -2509,7 +2533,11 @@ fn update_podcast_save_progress_window(hwnd: HWND, pct: u32) {
 }
 
 fn normalize_ffmpeg_progress_pct(raw_pct: u32) -> u32 {
-    (raw_pct / 100).min(100)
+    if raw_pct <= 100 {
+        raw_pct
+    } else {
+        (raw_pct / 100).min(100)
+    }
 }
 
 fn close_podcast_play_progress_window(hwnd: HWND) {
@@ -2524,6 +2552,7 @@ fn close_podcast_play_progress_window(hwnd: HWND) {
     }
     with_state(hwnd, |state| {
         state.podcast_save_window = HWND(0);
+        state.podcast_save_cancel_token = None;
     });
 }
 
@@ -2930,6 +2959,37 @@ fn ensure_path_extension(mut path: PathBuf, desired_ext: &str) -> PathBuf {
         path.set_extension(desired_ext);
     }
     path
+}
+
+fn replace_path_extension(mut path: PathBuf, desired_ext: &str) -> PathBuf {
+    path.set_extension(desired_ext);
+    path
+}
+
+fn choose_raiplay_episode_save_extension(hwnd: HWND, language: Language) -> Option<String> {
+    let (message, title) = match language {
+        Language::Italian => (
+            "Vuoi salvare l'episodio di RaiPlay solo audio in MP3?\n\nPremi Sì per MP3.\nPremi No per MP4.\nPremi Annulla per non salvare.",
+            "Formato salvataggio RaiPlay",
+        ),
+        _ => (
+            "Do you want to save this RaiPlay episode as audio-only MP3?\n\nPress Yes for MP3.\nPress No for MP4.\nPress Cancel to stop.",
+            "RaiPlay Save Format",
+        ),
+    };
+    let message_w = to_wide(message);
+    let title_w = to_wide(title);
+    match message_box_modal(
+        hwnd,
+        PCWSTR(message_w.as_ptr()),
+        PCWSTR(title_w.as_ptr()),
+        MB_YESNOCANCEL | MB_ICONQUESTION,
+    ) {
+        IDYES => Some("mp3".to_string()),
+        IDNO => Some("mp4".to_string()),
+        result if result == MESSAGEBOX_RESULT(IDCANCEL.0) => None,
+        _ => None,
+    }
 }
 
 fn suggested_podcast_episode_filename(
@@ -5234,6 +5294,7 @@ pub(crate) struct AppState {
     find_replace_in_all_docs: bool,
     replace_cancel_requested: bool,
     replace_cancel_token: Option<Arc<AtomicBool>>,
+    podcast_save_cancel_token: Option<Arc<AtomicBool>>,
     pdf_loading: Vec<PdfLoadingState>,
     next_timer_id: usize,
     tts_session: Option<TtsSession>,
@@ -5252,6 +5313,7 @@ pub(crate) struct AppState {
     last_stopped_audiobook_position_secs: Option<u64>,
     stopped_audiobook_positions: HashMap<PathBuf, u64>,
     active_podcast_episode_url: Option<String>,
+    active_podcast_episode_media_url: Option<String>,
     active_podcast_title: Option<String>,
     active_podcast_episode_title: Option<String>,
     active_podcast_episode_cache: Option<PathBuf>,
@@ -6676,6 +6738,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     find_replace_in_all_docs: false,
                     replace_cancel_requested: false,
                     replace_cancel_token: None,
+                    podcast_save_cancel_token: None,
                     pdf_loading: Vec::new(),
                     next_timer_id: 1,
                     tts_session: None,
@@ -6694,6 +6757,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     last_stopped_audiobook_position_secs: None,
                     stopped_audiobook_positions: HashMap::new(),
                     active_podcast_episode_url: None,
+                    active_podcast_episode_media_url: None,
                     active_podcast_title: None,
                     active_podcast_episode_title: None,
                     active_podcast_episode_cache: None,
@@ -7040,6 +7104,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 let payload = Box::from_raw(ptr);
                 close_podcast_save_progress_window(hwnd);
                 if let Some(err) = payload.error {
+                    if err == "Saving canceled." {
+                        screen_reader_speak(&i18n::tr(payload.language, "podcast.save.canceled"));
+                        return LRESULT(0);
+                    }
                     let body = i18n::tr_f(
                         payload.language,
                         "podcasts.save_error_body",
@@ -7133,6 +7201,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 set_active_podcast_episode_info(
                     hwnd,
                     Some(payload.url),
+                    None,
                     payload.podcast_title,
                     payload.title,
                     Some(payload.cache_path),
@@ -7363,6 +7432,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
             }
             app_windows::podcast_save_window::WM_PODCAST_SAVE_CANCEL => {
                 let source_hwnd = HWND(lparam.0);
+                let is_podcast_save = with_state(hwnd, |state| {
+                    source_hwnd.0 != 0 && state.podcast_save_window == source_hwnd
+                })
+                .unwrap_or(false);
                 let is_replace = with_state(hwnd, |state| {
                     source_hwnd.0 != 0 && state.replace_progress_window == source_hwnd
                 })
@@ -7383,6 +7456,13 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 if is_whisper {
                     cancel_whisper_transcription(hwnd);
+                }
+                if is_podcast_save {
+                    with_state(hwnd, |state| {
+                        if let Some(token) = state.podcast_save_cancel_token.as_ref() {
+                            token.store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
+                    });
                 }
                 LRESULT(0)
             }

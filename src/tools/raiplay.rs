@@ -50,6 +50,7 @@ pub(crate) struct LiveAudioTrack {
 pub(crate) enum PlaybackTarget {
     DirectStream {
         url: String,
+        media_url: String,
         is_live: bool,
         live_audio_tracks: Vec<LiveAudioTrack>,
     },
@@ -189,6 +190,7 @@ pub(crate) fn resolve_playback_target(media_url: &str) -> Result<PlaybackTarget,
         ));
         Ok(PlaybackTarget::DirectStream {
             url: audio_only_url,
+            media_url: resolved_url,
             is_live,
             live_audio_tracks,
         })

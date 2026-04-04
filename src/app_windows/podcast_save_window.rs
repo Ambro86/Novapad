@@ -2,6 +2,7 @@ use crate::accessibility::{ES_READONLY, handle_accessibility, to_wide};
 use crate::i18n;
 use crate::settings::Language;
 use crate::with_state;
+use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -28,6 +29,7 @@ const SAVE_ID_CANCEL: usize = 12002;
 const SAVE_PROGRESS_TIMER_ID: usize = 1;
 const SAVE_PROGRESS_TICK_MS: u32 = 250;
 const SAVE_PROGRESS_MAX_FAKE: usize = 95;
+const SAVE_PROGRESS_FAKE_DELAY: Duration = Duration::from_secs(5);
 const STATIC_CENTER_STYLE: u32 = 0x0000_0001;
 
 pub struct SaveDialogLabels {
@@ -56,6 +58,7 @@ struct SaveState {
     status_text: String,
     current_pct: usize,
     has_real_progress: bool,
+    opened_at: Instant,
     labels: SaveDialogLabels,
     show_cancel: bool,
     suppress_parent_restore: bool,
@@ -464,6 +467,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 status_text: labels.in_progress.clone(),
                 current_pct: 0,
                 has_real_progress: false,
+                opened_at: Instant::now(),
                 labels,
                 show_cancel,
                 suppress_parent_restore: false,
@@ -568,6 +572,9 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 hwnd, pct
             ));
             if with_save_state(hwnd, |state| {
+                if pct == 0 && state.current_pct == 0 && !state.has_real_progress {
+                    return;
+                }
                 crate::send_message_w_safe(state.progress, PBM_SETPOS, WPARAM(pct), LPARAM(0));
                 state.has_real_progress = true;
                 state.current_pct = pct;
@@ -582,7 +589,10 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
         WM_TIMER => {
             if wparam.0 == SAVE_PROGRESS_TIMER_ID {
                 if with_save_state(hwnd, |state| {
-                    if !state.has_real_progress && state.current_pct < SAVE_PROGRESS_MAX_FAKE {
+                    if !state.has_real_progress
+                        && state.current_pct < SAVE_PROGRESS_MAX_FAKE
+                        && state.opened_at.elapsed() >= SAVE_PROGRESS_FAKE_DELAY
+                    {
                         state.current_pct = (state.current_pct + 1).min(SAVE_PROGRESS_MAX_FAKE);
                         crate::send_message_w_safe(
                             state.progress,

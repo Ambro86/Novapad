@@ -193,6 +193,8 @@ fn browse_page(
                 initial_query: current_search_query.clone(),
                 search_button_label: "Cerca".to_string(),
                 context_action: Some(context_action),
+                right_arrow_accepts_selection: true,
+                left_arrow_closes: true,
             },
         );
         let selected_item_id = match selection {
@@ -338,6 +340,7 @@ fn open_media_item(
         }
         PlaybackTarget::DirectStream {
             url,
+            media_url,
             is_live,
             live_audio_tracks,
         } => {
@@ -359,6 +362,13 @@ fn open_media_item(
             ) {
                 show_error(parent, language, &err);
                 return false;
+            }
+            if with_state(parent, |state| {
+                state.active_podcast_episode_media_url = Some(media_url);
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to persist RaiPlay media URL for save");
             }
         }
     };

@@ -11,6 +11,7 @@ use rodio::Source;
 use sha2::Digest;
 use std::collections::VecDeque;
 use std::ffi::CString;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::ptr;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -31,6 +32,30 @@ const DEFAULT_AAC_BITRATE: i64 = 192_000;
 const AVIO_FLAG_WRITE: i32 = 2;
 const AV_CODEC_FLAG_QSCALE_FALLBACK: i32 = 1 << 1;
 const FF_QP2LAMBDA_FALLBACK: i32 = 118;
+const AV_NOPTS_VALUE_I64: i64 = i64::MIN;
+
+struct MuxProgressState {
+    start_us: Option<i64>,
+    cursor_us: i64,
+    last_pct: Option<u32>,
+    last_hls_log_pct_bucket: Option<u32>,
+}
+
+struct HlsProgressEstimate {
+    estimated_total_bytes: u64,
+    variant_url: String,
+    bandwidth_bits_per_sec: u64,
+    duration_secs: f64,
+}
+
+struct MuxProgressSample<'a> {
+    pts: i64,
+    dts: i64,
+    duration: i64,
+    time_base: AVRational,
+    out_path: &'a Path,
+    hls_progress_estimate: Option<&'a HlsProgressEstimate>,
+}
 
 fn ffmpeg_error_text(api: &FfmpegApi, code: i32) -> String {
     crate::ffmpeg_source::ffmpeg_err(api, code)
@@ -1421,7 +1446,11 @@ fn mux_video_with_audio(
     video_path: &Path,
     audio_path: &Path,
     out_path: &Path,
+    preferred_audio_stream_index: Option<i32>,
+    cancel: Option<Arc<AtomicBool>>,
+    mut progress: Option<&mut dyn FnMut(u32)>,
 ) -> Result<(), String> {
+    let hls_progress_estimate = estimate_hls_progress(video_path);
     let video_c = CString::new(video_path.to_string_lossy().as_bytes())
         .map_err(|_| "FFmpeg: invalid video path".to_string())?;
     let audio_c = CString::new(audio_path.to_string_lossy().as_bytes())
@@ -1468,6 +1497,10 @@ fn mux_video_with_audio(
         }
         return Err("FFmpeg: audio stream info failed".to_string());
     }
+    let total_duration_us = unsafe {
+        let duration = (*in_video).duration;
+        if duration > 0 { Some(duration) } else { None }
+    };
 
     let video_stream_idx = crate::ffmpeg_source::av_find_best_stream_safe(
         api,
@@ -1485,15 +1518,28 @@ fn mux_video_with_audio(
         }
         return Err("FFmpeg: video stream not found".to_string());
     }
-    let audio_stream_idx = crate::ffmpeg_source::av_find_best_stream_safe(
-        api,
-        in_audio,
-        AVMediaType_AVMEDIA_TYPE_AUDIO,
-        -1,
-        -1,
-        ptr::null_mut(),
-        0,
-    );
+    let audio_stream_idx = preferred_audio_stream_index
+        .filter(|preferred_index| unsafe {
+            let stream_count = (*in_audio).nb_streams as usize;
+            let idx = *preferred_index as usize;
+            idx < stream_count && !(*in_audio).streams.is_null() && {
+                let stream = *(*in_audio).streams.add(idx);
+                !stream.is_null()
+                    && !(*stream).codecpar.is_null()
+                    && (*(*stream).codecpar).codec_type == AVMediaType_AVMEDIA_TYPE_AUDIO
+            }
+        })
+        .unwrap_or_else(|| {
+            crate::ffmpeg_source::av_find_best_stream_safe(
+                api,
+                in_audio,
+                AVMediaType_AVMEDIA_TYPE_AUDIO,
+                -1,
+                -1,
+                ptr::null_mut(),
+                0,
+            )
+        });
     if audio_stream_idx < 0 {
         unsafe {
             (api.avformat_close_input)(&mut in_audio);
@@ -1530,8 +1576,18 @@ fn mux_video_with_audio(
         return Err("FFmpeg: failed to create output streams".to_string());
     }
     unsafe {
-        (api.avcodec_parameters_copy)((*out_v_stream).codecpar, (*in_v_stream).codecpar);
-        (api.avcodec_parameters_copy)((*out_a_stream).codecpar, (*in_a_stream).codecpar);
+        crate::ffmpeg_source::avcodec_parameters_copy_safe(
+            api,
+            (*out_v_stream).codecpar,
+            (*in_v_stream).codecpar,
+        );
+        crate::ffmpeg_source::avcodec_parameters_copy_safe(
+            api,
+            (*out_a_stream).codecpar,
+            (*in_a_stream).codecpar,
+        );
+        (*(*out_v_stream).codecpar).codec_tag = 0;
+        (*(*out_a_stream).codecpar).codec_tag = 0;
         (*out_v_stream).time_base = (*in_v_stream).time_base;
         (*out_a_stream).time_base = (*in_a_stream).time_base;
     }
@@ -1566,8 +1622,33 @@ fn mux_video_with_audio(
     let mut pkt_a = crate::ffmpeg_source::av_packet_alloc_safe(api);
     let mut has_v = read_next_packet_for_stream(api, in_video, pkt_v, video_stream_idx);
     let mut has_a = read_next_packet_for_stream(api, in_audio, pkt_a, audio_stream_idx);
+    let mut progress_state = MuxProgressState {
+        start_us: None,
+        cursor_us: 0,
+        last_pct: None,
+        last_hls_log_pct_bucket: None,
+    };
 
     while has_v || has_a {
+        if cancel
+            .as_ref()
+            .map(|flag| flag.load(Ordering::Relaxed))
+            .unwrap_or(false)
+        {
+            unsafe {
+                if !pkt_v.is_null() {
+                    crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt_v);
+                }
+                if !pkt_a.is_null() {
+                    crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt_a);
+                }
+                (api.avio_closep)(&mut io);
+                (api.avformat_free_context)(out_ctx);
+                (api.avformat_close_input)(&mut in_audio);
+                (api.avformat_close_input)(&mut in_video);
+            }
+            return Err("Saving canceled.".to_string());
+        }
         let write_video = if !has_a {
             true
         } else if !has_v {
@@ -1601,6 +1682,21 @@ fn mux_video_with_audio(
                         write_ret
                     ));
                 }
+                if let Some(progress_cb) = progress.as_deref_mut() {
+                    report_mux_progress(
+                        progress_cb,
+                        total_duration_us,
+                        MuxProgressSample {
+                            pts: (*pkt_v).pts,
+                            dts: (*pkt_v).dts,
+                            duration: (*pkt_v).duration,
+                            time_base: (*in_v_stream).time_base,
+                            out_path,
+                            hls_progress_estimate: hls_progress_estimate.as_ref(),
+                        },
+                        &mut progress_state,
+                    );
+                }
                 crate::ffmpeg_source::av_packet_unref_safe(api, pkt_v);
             }
             has_v = read_next_packet_for_stream(api, in_video, pkt_v, video_stream_idx);
@@ -1620,6 +1716,21 @@ fn mux_video_with_audio(
                         "FFmpeg: av_interleaved_write_frame (A) failed: {}",
                         write_ret
                     ));
+                }
+                if let Some(progress_cb) = progress.as_deref_mut() {
+                    report_mux_progress(
+                        progress_cb,
+                        total_duration_us,
+                        MuxProgressSample {
+                            pts: (*pkt_a).pts,
+                            dts: (*pkt_a).dts,
+                            duration: (*pkt_a).duration,
+                            time_base: (*in_a_stream).time_base,
+                            out_path,
+                            hls_progress_estimate: hls_progress_estimate.as_ref(),
+                        },
+                        &mut progress_state,
+                    );
                 }
                 crate::ffmpeg_source::av_packet_unref_safe(api, pkt_a);
             }
@@ -1644,6 +1755,218 @@ fn mux_video_with_audio(
         (api.avformat_close_input)(&mut in_video);
     }
     Ok(())
+}
+
+fn report_mux_progress(
+    progress_cb: &mut dyn FnMut(u32),
+    total_duration_us: Option<i64>,
+    sample: MuxProgressSample<'_>,
+    progress_state: &mut MuxProgressState,
+) {
+    if let Some(estimate) = sample.hls_progress_estimate
+        && estimate.estimated_total_bytes > 0
+        && let Ok(meta) = fs::metadata(sample.out_path)
+    {
+        let written = meta.len().min(estimate.estimated_total_bytes);
+        let pct = ((written as u128 * 100) / estimate.estimated_total_bytes as u128) as u32;
+        let pct = pct.clamp(1, 99);
+        let log_bucket = if pct < 5 { pct } else { (pct / 10) * 10 };
+        if progress_state
+            .last_hls_log_pct_bucket
+            .is_none_or(|previous| previous != log_bucket)
+        {
+            progress_state.last_hls_log_pct_bucket = Some(log_bucket);
+            log_debug(&format!(
+                "FFmpeg HLS progress: out={} written_bytes={} estimated_total_bytes={} pct={} bandwidth_bps={} duration_secs={:.3} variant={}",
+                sample.out_path.display(),
+                written,
+                estimate.estimated_total_bytes,
+                pct,
+                estimate.bandwidth_bits_per_sec,
+                estimate.duration_secs,
+                estimate.variant_url
+            ));
+        }
+        if progress_state
+            .last_pct
+            .is_some_and(|previous| previous == pct)
+        {
+            return;
+        }
+        progress_state.last_pct = Some(pct);
+        progress_cb(pct);
+        return;
+    }
+    let Some(total_duration_us) = total_duration_us.filter(|value| *value > 0) else {
+        return;
+    };
+    let pts_us = if sample.pts != AV_NOPTS_VALUE_I64 {
+        Some(rescale_q(
+            sample.pts,
+            sample.time_base,
+            AVRational {
+                num: 1,
+                den: 1_000_000,
+            },
+        ))
+    } else {
+        None
+    };
+    let dts_us = if sample.dts != AV_NOPTS_VALUE_I64 {
+        Some(rescale_q(
+            sample.dts,
+            sample.time_base,
+            AVRational {
+                num: 1,
+                den: 1_000_000,
+            },
+        ))
+    } else {
+        None
+    };
+    let duration_us = if sample.duration > 0 {
+        rescale_q(
+            sample.duration,
+            sample.time_base,
+            AVRational {
+                num: 1,
+                den: 1_000_000,
+            },
+        )
+        .max(0)
+    } else {
+        0
+    };
+    let mut current_us = pts_us.or(dts_us).unwrap_or(progress_state.cursor_us);
+    if duration_us > 0 && current_us <= progress_state.cursor_us {
+        current_us = progress_state.cursor_us.saturating_add(duration_us);
+    }
+    progress_state.cursor_us = progress_state.cursor_us.max(current_us);
+    let start_us = *progress_state
+        .start_us
+        .get_or_insert(progress_state.cursor_us.max(0));
+    let elapsed_us = progress_state
+        .cursor_us
+        .saturating_sub(start_us)
+        .clamp(0, total_duration_us);
+    let mut pct = (((elapsed_us as u128) * 100) / total_duration_us as u128) as u32;
+    if elapsed_us > 0 && pct == 0 {
+        pct = 1;
+    }
+    let pct = pct.min(99);
+    if progress_state
+        .last_pct
+        .is_some_and(|previous| previous == pct)
+    {
+        return;
+    }
+    progress_state.last_pct = Some(pct);
+    progress_cb(pct);
+}
+
+fn estimate_hls_progress(input_path: &Path) -> Option<HlsProgressEstimate> {
+    let url = input_path.to_str()?.trim();
+    if !url.contains(".m3u8") {
+        return None;
+    }
+    let bytes = crate::curl_client::CurlClient::fetch_url_impersonated(url).ok()?;
+    let playlist = String::from_utf8(bytes).ok()?;
+    let (variant_url, bandwidth_bits_per_sec) = select_hls_video_variant(url, &playlist)?;
+    let duration_secs = sum_hls_media_playlist_duration_secs(&variant_url)?;
+    let estimated_total_bytes = ((duration_secs * bandwidth_bits_per_sec as f64) / 8.0)
+        .round()
+        .max(1.0) as u64;
+    log_debug(&format!(
+        "FFmpeg HLS estimate: master={} variant={} bandwidth_bps={} duration_secs={:.3} estimated_total_bytes={}",
+        url, variant_url, bandwidth_bits_per_sec, duration_secs, estimated_total_bytes
+    ));
+    Some(HlsProgressEstimate {
+        estimated_total_bytes,
+        variant_url,
+        bandwidth_bits_per_sec,
+        duration_secs,
+    })
+}
+
+fn select_hls_video_variant(master_url: &str, playlist: &str) -> Option<(String, u64)> {
+    let mut pending_bandwidth: Option<u64> = None;
+    let mut best: Option<(String, u64)> = None;
+    for line in playlist.lines() {
+        let trimmed = line.trim();
+        if let Some(attrs) = trimmed.strip_prefix("#EXT-X-STREAM-INF:") {
+            pending_bandwidth = parse_hls_bandwidth(attrs);
+            continue;
+        }
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if let Some(bandwidth) = pending_bandwidth.take() {
+            let child = resolve_hls_child_url(master_url, trimmed);
+            if best
+                .as_ref()
+                .map(|(_, current_bw)| bandwidth > *current_bw)
+                .unwrap_or(true)
+            {
+                best = Some((child, bandwidth));
+            }
+        }
+    }
+    best
+}
+
+fn parse_hls_bandwidth(attrs: &str) -> Option<u64> {
+    let mut average_bandwidth = None;
+    let mut bandwidth = None;
+    for part in attrs.split(',') {
+        let Some((key, value)) = part.split_once('=') else {
+            continue;
+        };
+        let key = key.trim();
+        let value = value.trim();
+        if key.eq_ignore_ascii_case("AVERAGE-BANDWIDTH") {
+            average_bandwidth = value.parse::<u64>().ok();
+        } else if key.eq_ignore_ascii_case("BANDWIDTH") {
+            bandwidth = value.parse::<u64>().ok();
+        }
+    }
+    average_bandwidth.or(bandwidth)
+}
+
+fn sum_hls_media_playlist_duration_secs(url: &str) -> Option<f64> {
+    let bytes = crate::curl_client::CurlClient::fetch_url_impersonated(url).ok()?;
+    let playlist = String::from_utf8(bytes).ok()?;
+    let total = playlist.lines().fold(0.0f64, |acc, line| {
+        let trimmed = line.trim();
+        if let Some(value) = trimmed.strip_prefix("#EXTINF:") {
+            let number = value.split(',').next().unwrap_or("").trim();
+            if let Ok(seconds) = number.parse::<f64>() {
+                return acc + seconds.max(0.0);
+            }
+        }
+        acc
+    });
+    (total > 0.0).then_some(total)
+}
+
+fn resolve_hls_child_url(master_url: &str, child_uri: &str) -> String {
+    let trimmed = child_uri.trim();
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        return trimmed.to_string();
+    }
+
+    let (base_without_query, query_suffix) = master_url
+        .split_once('?')
+        .map(|(base, query)| (base, format!("?{query}")))
+        .unwrap_or((master_url, String::new()));
+
+    let mut base_parts = base_without_query.rsplitn(2, '/');
+    let _file_name = base_parts.next();
+    let parent = base_parts.next().unwrap_or(base_without_query);
+    if trimmed.contains('?') {
+        format!("{parent}/{trimmed}")
+    } else {
+        format!("{parent}/{trimmed}{query_suffix}")
+    }
 }
 
 pub fn export_mixed_media(
@@ -1716,7 +2039,7 @@ pub fn export_mixed_media(
         "Subtitle: muxing video+audio to {}",
         out_mp4.display()
     ));
-    mux_video_with_audio(api, media_path, &out_audio, &out_mp4)?;
+    mux_video_with_audio(api, media_path, &out_audio, &out_mp4, None, None, None)?;
     if let Err(e) = std::fs::remove_file(&out_audio) {
         crate::log_debug(&format!(
             "Subtitle: failed to delete temp audio {}: {}",
@@ -1859,6 +2182,25 @@ pub fn convert_audio_file_with_preferred_stream(
         progress,
         None,
         preferred_stream_index,
+    )
+}
+
+pub fn remux_media_file_to_mp4_with_preferred_audio_stream(
+    input_path: &Path,
+    output_path: &Path,
+    preferred_audio_stream_index: Option<i32>,
+    cancel: Option<Arc<AtomicBool>>,
+    progress: Option<&mut dyn FnMut(u32)>,
+) -> Result<(), String> {
+    let api = ffmpeg_api()?;
+    mux_video_with_audio(
+        api,
+        input_path,
+        input_path,
+        output_path,
+        preferred_audio_stream_index,
+        cancel,
+        progress,
     )
 }
 

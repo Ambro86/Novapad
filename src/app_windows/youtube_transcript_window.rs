@@ -1715,6 +1715,8 @@ struct YoutubeCommentsDialogState {
     flat_search_result: Option<Arc<Mutex<Option<String>>>>,
     flat_context_action:
         Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
+    right_arrow_accepts_selection: bool,
+    left_arrow_closes: bool,
 }
 
 #[derive(Clone)]
@@ -1729,6 +1731,8 @@ pub(crate) struct MultilineSearchOptions {
     pub(crate) search_button_label: String,
     pub(crate) context_action:
         Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
+    pub(crate) right_arrow_accepts_selection: bool,
+    pub(crate) left_arrow_closes: bool,
 }
 
 struct YoutubeFlatSelectionInit {
@@ -1740,6 +1744,8 @@ struct YoutubeFlatSearchInit {
     initial_query: String,
     button_label: String,
     result: Arc<Mutex<Option<String>>>,
+    right_arrow_accepts_selection: bool,
+    left_arrow_closes: bool,
 }
 
 pub(crate) enum MultilineSelectionResult {
@@ -2153,6 +2159,8 @@ pub(crate) fn select_multiline_items_with_search(
             initial_query: search_options.initial_query,
             button_label: search_options.search_button_label,
             result: Arc::clone(&search_result),
+            right_arrow_accepts_selection: search_options.right_arrow_accepts_selection,
+            left_arrow_closes: search_options.left_arrow_closes,
         }),
         search_options.context_action,
     );
@@ -2403,6 +2411,25 @@ fn open_youtube_comments_window_with_mode(
                     );
                     continue;
                 }
+                let left_arrow_close_handled = with_youtube_comments_state(hwnd, |state| {
+                    msg.wParam.0 as u32 == VK_LEFT.0 as u32
+                        && state.flat_list_mode
+                        && state.left_arrow_closes
+                        && focus != state.search_edit
+                        && focus != state.search_button
+                        && focus != state.close_button
+                })
+                .unwrap_or(false);
+                if left_arrow_close_handled {
+                    crate::log_debug("YT comments loop handling LEFT as close");
+                    crate::send_message_w_safe(
+                        hwnd,
+                        WM_COMMAND,
+                        WPARAM(YOUTUBE_COMMENTS_ID_CLOSE),
+                        LPARAM(0),
+                    );
+                    continue;
+                }
                 if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
                     crate::log_debug("YT comments loop handling ESC as close");
                     crate::send_message_w_safe(
@@ -2418,7 +2445,10 @@ fn open_youtube_comments_window_with_mode(
                     let keep_edit_navigation = search_edit_has_focus
                         && matches!(
                             msg.wParam.0 as u32,
-                            k if k == VK_HOME.0 as u32 || k == VK_END.0 as u32
+                            k if k == VK_HOME.0 as u32
+                                || k == VK_END.0 as u32
+                                || k == VK_LEFT.0 as u32
+                                || k == VK_RIGHT.0 as u32
                         );
                     let should_capture = focus != state.close_button
                         && !keep_edit_navigation
@@ -2462,6 +2492,19 @@ fn open_youtube_comments_window_with_mode(
                     && msg.wParam.0 as u32 == VK_RETURN.0 as u32
                     && accept_youtube_comments_flat_selection(hwnd)
                 {
+                    continue;
+                }
+                let right_arrow_accept_handled = with_youtube_comments_state(hwnd, |state| {
+                    let focus_is_flat_list =
+                        focus == state.view || focus == state.accessibility_proxy;
+                    should_capture
+                        && msg.wParam.0 as u32 == VK_RIGHT.0 as u32
+                        && state.flat_list_mode
+                        && state.right_arrow_accepts_selection
+                        && focus_is_flat_list
+                })
+                .unwrap_or(false);
+                if right_arrow_accept_handled && accept_youtube_comments_flat_selection(hwnd) {
                     continue;
                 }
                 if should_capture {
@@ -2708,6 +2751,16 @@ fn youtube_comments_dialog_wndproc_inner(
                     .as_ref()
                     .map(|search| Arc::clone(&search.result)),
                 flat_context_action: init.flat_context_action,
+                right_arrow_accepts_selection: init
+                    .flat_search
+                    .as_ref()
+                    .map(|search| search.right_arrow_accepts_selection)
+                    .unwrap_or(false),
+                left_arrow_closes: init
+                    .flat_search
+                    .as_ref()
+                    .map(|search| search.left_arrow_closes)
+                    .unwrap_or(false),
             });
             if let Some(selection) = flat_selection.as_ref()
                 && let Some(index) = state.comments.iter().position(|comment| {
@@ -2785,6 +2838,17 @@ fn youtube_comments_dialog_wndproc_inner(
                 }
                 if state.flat_list_mode && wparam.0 as u32 == VK_RETURN.0 as u32 {
                     if focus == state.search_edit || focus == state.search_button {
+                        return false;
+                    }
+                    return accept_youtube_comments_flat_selection(hwnd);
+                }
+                if state.flat_list_mode
+                    && state.right_arrow_accepts_selection
+                    && wparam.0 as u32 == VK_RIGHT.0 as u32
+                {
+                    let focus_is_flat_list =
+                        focus == state.view || focus == state.accessibility_proxy;
+                    if !focus_is_flat_list {
                         return false;
                     }
                     return accept_youtube_comments_flat_selection(hwnd);
@@ -3313,6 +3377,7 @@ fn is_youtube_comments_dialog_navigation_key(state: &YoutubeCommentsDialogState,
                 || k == VK_END.0 as u32
                 || k == VK_PRIOR.0 as u32
                 || k == VK_NEXT.0 as u32
+                || (state.right_arrow_accepts_selection && k == VK_RIGHT.0 as u32)
                 || k == VK_RETURN.0 as u32
         );
     }
@@ -7412,6 +7477,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             Some(url),
             None,
             episode_title,
+            None,
             Some(stream_path),
         );
         if should_reopen_selection {
@@ -8061,6 +8127,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             Some(url),
             None,
             episode_title,
+            None,
             Some(playback_path),
         );
         if should_reopen_selection {

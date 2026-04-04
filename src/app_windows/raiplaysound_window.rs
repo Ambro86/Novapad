@@ -145,6 +145,8 @@ fn browse_page(
                 initial_query: current_search_query.clone(),
                 search_button_label: "Cerca".to_string(),
                 context_action: Some(context_action),
+                right_arrow_accepts_selection: false,
+                left_arrow_closes: false,
             },
         );
         let selected_item_id = match selection {

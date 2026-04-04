@@ -8340,6 +8340,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     crate::set_active_podcast_episode_info(
                         parent,
                         Some(msg.enclosure_url.clone()),
+                        None,
                         msg.podcast_title.clone(),
                         Some(msg.title.clone()),
                         Some(msg.path.clone()),

@@ -308,6 +308,7 @@ fn open_media_item(
     } else {
         Some(title.to_string())
     };
+    let container_title = preferred_container_title(page, item);
     let playback_target = match raiplay::resolve_playback_target(media_url) {
         Ok(target) => target,
         Err(err) => {
@@ -334,7 +335,7 @@ fn open_media_item(
                 parent,
                 url,
                 title,
-                None,
+                container_title.as_deref(),
                 RaiAudioOrigin::RaiPlay,
             );
         }
@@ -348,7 +349,7 @@ fn open_media_item(
                 crate::play_live_stream_audio_from_url_with_rai_origin(
                     parent,
                     url,
-                    Some(page.title.clone()),
+                    container_title.clone(),
                     title,
                     live_audio_tracks,
                     RaiAudioOrigin::RaiPlay,
@@ -356,7 +357,7 @@ fn open_media_item(
             } else if let Err(err) = crate::launch_raiplay_in_mpv(
                 parent,
                 &url,
-                Some(page.title.as_str()),
+                container_title.as_deref(),
                 title.as_deref(),
                 RaiAudioOrigin::RaiPlay,
             ) {
@@ -373,4 +374,29 @@ fn open_media_item(
         }
     };
     true
+}
+
+fn preferred_container_title(page: &BrowsePage, item: &BrowseItem) -> Option<String> {
+    let page_title = page.title.trim();
+    if page_title.is_empty() {
+        return None;
+    }
+    if !page_title.eq_ignore_ascii_case("Episodi") {
+        return Some(page_title.to_string());
+    }
+    if let Some(program_title) = item
+        .program_title
+        .as_deref()
+        .map(str::trim)
+        .filter(|title| !title.is_empty() && !title.eq_ignore_ascii_case("Episodi"))
+    {
+        return Some(program_title.to_string());
+    }
+    let description = item.description.as_deref()?.trim();
+    let inferred = description.rsplit_once(" - ")?.1.trim();
+    if inferred.is_empty() || inferred.eq_ignore_ascii_case("Episodi") {
+        None
+    } else {
+        Some(inferred.to_string())
+    }
 }

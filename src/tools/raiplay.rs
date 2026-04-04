@@ -28,6 +28,7 @@ pub(crate) struct BrowseItem {
     pub(crate) id: String,
     pub(crate) title: String,
     pub(crate) description: Option<String>,
+    pub(crate) program_title: Option<String>,
     pub(crate) path_id: Option<String>,
     pub(crate) media_url: Option<String>,
     pub(crate) kind: BrowseItemKind,
@@ -314,6 +315,9 @@ fn parse_root_section(section: &Value) -> Result<Option<BrowseItem>, String> {
         Some(value) if !value.is_empty() => value,
         _ => return Ok(None),
     };
+    if raw_title.eq_ignore_ascii_case("Altro") {
+        return Ok(None);
+    }
     let title = if raw_title.eq_ignore_ascii_case("Cerca") {
         "Esplora".to_string()
     } else {
@@ -331,6 +335,7 @@ fn parse_root_section(section: &Value) -> Result<Option<BrowseItem>, String> {
             title,
             description: string_field(section, "title")
                 .or_else(|| string_field(section, "menu_type")),
+            program_title: None,
             path_id: Some(section_source),
             media_url: None,
             kind: BrowseItemKind::Page,
@@ -343,6 +348,7 @@ fn parse_root_section(section: &Value) -> Result<Option<BrowseItem>, String> {
             id: format!("page|{}", path_id.trim()),
             title,
             description: string_field(section, "menu_type"),
+            program_title: None,
             path_id: Some(absolute_url(&path_id)?),
             media_url: None,
             kind: BrowseItemKind::Page,
@@ -388,6 +394,7 @@ fn parse_card(card: &Value) -> Result<Option<BrowseItem>, String> {
 
     let title = preferred_title(card)?;
     let description = preferred_description(card);
+    let program_title = preferred_program_title(card);
     let id = match kind {
         BrowseItemKind::Media => {
             format!(
@@ -403,6 +410,7 @@ fn parse_card(card: &Value) -> Result<Option<BrowseItem>, String> {
         id,
         title,
         description,
+        program_title,
         path_id: path_id.map(|value| absolute_url(&value)).transpose()?,
         media_url,
         kind,
@@ -437,6 +445,15 @@ fn preferred_description(card: &Value) -> Option<String> {
         "duration_in_minutes",
         "menu_type",
     ] {
+        if let Some(value) = string_field(card, key).filter(|value| !value.is_empty()) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn preferred_program_title(card: &Value) -> Option<String> {
+    for key in ["program_name", "programma"] {
         if let Some(value) = string_field(card, key).filter(|value| !value.is_empty()) {
             return Some(value);
         }

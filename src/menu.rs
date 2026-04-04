@@ -419,6 +419,9 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
         let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
         let existing = with_state(hwnd, |state| state.playback_menu).unwrap_or(HMENU(0));
         let show_download = with_state(hwnd, |state| {
+            let is_raiplay_live = state.active_podcast_episode_from_rai
+                == crate::RaiAudioOrigin::RaiPlay
+                && !state.raiplay_live_audio_variants.is_empty();
             let from_rss_doc = state
                 .docs
                 .get(state.current)
@@ -440,7 +443,8 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     })
                 })
                 .unwrap_or(false);
-            from_rss_doc || state.active_podcast_episode_url.is_some() || cached_media_doc
+            !is_raiplay_live
+                && (from_rss_doc || state.active_podcast_episode_url.is_some() || cached_media_doc)
         })
         .unwrap_or(false);
         let stream_direct_no_download = with_state(hwnd, |state| {

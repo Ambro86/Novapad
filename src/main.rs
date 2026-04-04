@@ -3372,6 +3372,10 @@ fn announce_player_volume(hwnd: HWND) {
 
 fn announce_mpv_volume(hwnd: HWND) {
     let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let is_muted = query_managed_mpv_property(hwnd, "mute")
+        .ok()
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false);
     let volume = match query_managed_mpv_property(hwnd, "volume")
         .ok()
         .and_then(|value| value.as_f64())
@@ -3395,7 +3399,11 @@ fn announce_mpv_volume(hwnd: HWND) {
         .flatten()
         .unwrap_or(100.0),
     };
-    let percent = volume.round().clamp(0.0, 300.0) as u32;
+    let percent = if is_muted {
+        0
+    } else {
+        volume.round().clamp(0.0, 300.0) as u32
+    };
     let message = i18n::tr_f(
         language,
         "player.volume_announce",
@@ -4867,6 +4875,14 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
                     hwnd,
                     r#"{"command":["set_property","volume",100]}"#,
                 );
+                if result.is_ok() {
+                    announce_mpv_volume(hwnd);
+                }
+                result
+            }
+            PlayerCommand::MuteToggle => {
+                let result =
+                    try_send_command_to_managed_mpv(hwnd, r#"{"command":["cycle","mute"]}"#);
                 if result.is_ok() {
                     announce_mpv_volume(hwnd);
                 }

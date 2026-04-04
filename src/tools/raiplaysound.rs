@@ -2,12 +2,10 @@ use base64::Engine;
 use serde_json::Value;
 use std::collections::HashSet;
 
-const RAIPLAYSOUND_URL_KEY_A: &[u8] = b"sonarpad-raiplaysound-static-url-key-v1-";
-const RAIPLAYSOUND_URL_KEY_B: &[u8] = b"sonarpad-raiplaysound-static-url-key-v1-";
-const RAIPLAYSOUND_BASE_URL_B64: &str = "GxsaEQFKTktaBRZHAg0ICR8ODB0LWB0QTx0d";
-const RAIPLAYSOUND_GENRES_URL_B64: &str = "GxsaEQFKTktaBRZHAg0ICR8ODB0LWB0QTx0dTEoQHAlfAksTXhlf";
-const RAIPLAYSOUND_SEARCH_URL_B64: &str = "GxsaEQFKTktaBRZHAg0ICR8ODB0LWB0QTx0dTEwBHQFMHwwaAgRQRF4cCwAAEwlJXhcTHxkPBFYSHxxBEhxcGRIRCBFOHQ==";
-const RAIPLAYSOUND_SUGGESTION_URL_B64: &str = "GxsaEQFKTktaBRZHAg0ICR8ODB0LWB0QTx0dTEwBHQFMHwwaAgRQRF4cCwAAEwlJXhcTHxkPBFYSHxxBEh9cBw4BBwcCBgcLSg4WDUQZXw==";
+const RAIPLAYSOUND_BASE_URL_B64: &str = "BT9NUQVqHVc7T1RfJlUTPlshCyReBjdSSi9E";
+const RAIPLAYSOUND_GENRES_URL_B64: &str = "BT9NUQVqHVc7T1RfJlUTPlshCyReBjdSSi9ERy1WGycIPFwmQi0H";
+const RAIPLAYSOUND_SEARCH_URL_B64: &str = "BT9NUQVqHVc7T1RfJlUTPlshCyReBjdSSi9ERytHGi8bIRsvHjAIG2AzGT0fKFEMBTVADiVbRl41RBNhQXFdOkIWOEQHLg==";
+const RAIPLAYSOUND_SUGGESTION_URL_B64: &str = "BT9NUQVqHVc7T1RfJlUTPlshCyReBjdSSi9ERytHGi8bIRsvHjAIG2AzGT0fKFEMBTVADiVbRl41RBNhQXJdJF4GN1JLNUUPLVYGNhM6HA==";
 const RAIPLAYSOUND_SEARCH_SOURCE_PREFIX: &str = "raiplaysound-search:";
 const RAIPLAYSOUND_SEARCH_TEMPLATE_IN: &str = "650d4cc74d28b941fec3218c";
 const RAIPLAYSOUND_SEARCH_TEMPLATE_OUT: &str = "6516d22540da6c377b151643";
@@ -371,9 +369,7 @@ fn decode_raiplaysound_url(encoded: &str) -> Result<String, String> {
 }
 
 fn raiplaysound_obfuscated_url_key() -> Result<Vec<u8>, String> {
-    let mut key = [RAIPLAYSOUND_URL_KEY_A, RAIPLAYSOUND_URL_KEY_B].concat();
-    key.extend_from_slice(resolve_raiplaysound_secret_key()?.as_bytes());
-    Ok(key)
+    Ok(resolve_raiplaysound_secret_key()?.into_bytes())
 }
 
 fn resolve_raiplaysound_secret_key() -> Result<String, String> {

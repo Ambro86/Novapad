@@ -3,12 +3,10 @@ use quick_xml::{Reader, events::Event};
 use serde_json::Value;
 use std::collections::HashSet;
 
-const RAIPLAY_URL_KEY_A: &[u8] = b"sonarpad-raiplay-static-url-key-v1-";
-const RAIPLAY_URL_KEY_B: &[u8] = b"sonarpad-raiplay-static-url-key-v1-";
-const RAIPLAY_BASE_URL_B64: &str = "GxsaEQFKTktaBRZHAg0ICUESDU8dHQ==";
-const RAIPLAY_MENU_URL_B64: &str = "GxsaEQFKTktaBRZHAg0ICUESDU8dHUxAEBwZAwEWFkM=";
+const RAIPLAY_BASE_URL_B64: &str = "BT9NUQVqHVc7T1RfJlUTPlshC3lYBw==";
+const RAIPLAY_MENU_URL_B64: &str = "BT9NUQVqHVc7T1RfJlUTPlshC3lYB3ZbAShFRiBAGiw=";
 const RAIPLAY_SEARCH_URL_B64: &str =
-    "GxsaEQFKTktaBRZHAg0ICUESDU8dHUxMAR0BTB8MGgIEUEQDAw8YXwMEBV8RCUQDCRMPRBARThUZCgIDQ0NAGAAYXxVZ";
+    "BT9NUQVqHVc7T1RfJlUTPlshC3lYB3ZXECldCT5aFm0INBs8XSMQXz4lHS4OIxRSEyJEES9dDBAkXVU4Bm8fJFQSK1UM";
 const RAIPLAY_MENU_SECTION_SOURCE_PREFIX: &str = "raiplay-menu-section:";
 const RAIPLAY_SEARCH_SOURCE_PREFIX: &str = "raiplay-search:";
 const RAIPLAY_ROOT_SOURCE: &str = "raiplay-root";
@@ -847,9 +845,7 @@ fn decode_raiplay_url(encoded: &str) -> Result<String, String> {
 }
 
 fn raiplay_obfuscated_url_key() -> Result<Vec<u8>, String> {
-    let mut key = [RAIPLAY_URL_KEY_A, RAIPLAY_URL_KEY_B].concat();
-    key.extend_from_slice(resolve_raiplay_secret_key()?.as_bytes());
-    Ok(key)
+    Ok(resolve_raiplay_secret_key()?.into_bytes())
 }
 
 fn resolve_raiplay_secret_key() -> Result<String, String> {

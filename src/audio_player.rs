@@ -1085,7 +1085,13 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
     enum ToggleAction {
         StartFromDocument {
             path: PathBuf,
-            from_start: bool,
+            resume_seconds: Option<u64>,
+        },
+        StartRaiPlayInMpv {
+            url: String,
+            podcast_title: Option<String>,
+            title: Option<String>,
+            resume_seconds: Option<u64>,
         },
         RestartFromPosition {
             path: PathBuf,
@@ -1102,48 +1108,51 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
     {
         crate::log_debug("Audio player: toggle_audiobook_pause triggered");
         let action = with_state(hwnd, |state| {
+            let current_doc_path = state.docs.get(state.current).and_then(|doc| {
+                if matches!(doc.format, FileFormat::Audiobook) {
+                    doc.path.clone()
+                } else {
+                    None
+                }
+            });
             if let Some(mut player) = state.active_audiobook.take() {
-                if player.output.is_stopped() {
-                    crate::log_debug(
-                        "Audio player: toggle on stopped stream, restarting from saved position",
-                    );
+                if let Some(doc_path) = current_doc_path.as_ref()
+                    && doc_path != &player.path
+                {
+                    crate::log_debug(&format!(
+                        "Audio player: switching playback target from {} to {}",
+                        player.path.display(),
+                        doc_path.display()
+                    ));
                     stop_shared_subtitle_speech(
                         &player.subtitle_speech_cancel,
                         &player.subtitle_speech_command,
-                        "stopped_restart",
+                        "switch_target",
                     );
-                    let resume_seconds = player.accumulated_seconds;
+                    let stopped_position_secs = audiobook_position_secs(&player).floor() as u64;
+                    state.last_stopped_audiobook_position_secs = Some(stopped_position_secs);
+                    state.last_stopped_audiobook = Some(player.path.clone());
+                    state
+                        .stopped_audiobook_positions
+                        .insert(player.path.clone(), stopped_position_secs);
                     player.subtitle_cancel.store(true, Ordering::Relaxed);
                     player.stop();
-                    return Some(ToggleAction::RestartFromPosition {
-                        path: player.path.clone(),
-                        seconds: resume_seconds,
-                        speed: player.speed,
-                        pitch: player.pitch,
-                        volume: player.volume,
-                        muted: player.muted,
-                        prev_volume: player.prev_volume,
-                        audio_track: state.selected_audio_track,
-                    });
-                }
-
-                if player.is_paused {
-                    crate::log_debug("Audio player: Resuming playback");
-                    let resumed = player.play();
-                    if !resumed || player.output.is_stopped() {
+                } else {
+                    if player.output.is_stopped() {
                         crate::log_debug(
-                            "Audio player: resume failed on current stream, restarting from pause position",
+                            "Audio player: toggle on stopped stream, restarting from saved position",
                         );
                         stop_shared_subtitle_speech(
                             &player.subtitle_speech_cancel,
                             &player.subtitle_speech_command,
-                            "resume_restart",
+                            "stopped_restart",
                         );
+                        let resume_seconds = player.accumulated_seconds;
                         player.subtitle_cancel.store(true, Ordering::Relaxed);
                         player.stop();
                         return Some(ToggleAction::RestartFromPosition {
                             path: player.path.clone(),
-                            seconds: player.accumulated_seconds,
+                            seconds: resume_seconds,
                             speed: player.speed,
                             pitch: player.pitch,
                             volume: player.volume,
@@ -1152,20 +1161,49 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
                             audio_track: state.selected_audio_track,
                         });
                     }
-                    player.is_paused = false;
-                    player.start_instant = std::time::Instant::now();
-                } else {
-                    crate::log_debug("Audio player: Pausing playback");
-                    let paused = player.pause();
-                    if !paused || player.output.is_stopped() {
-                        crate::log_debug("Audio player: pause failed because stream is already stopped");
+
+                    if player.is_paused {
+                        crate::log_debug("Audio player: Resuming playback");
+                        let resumed = player.play();
+                        if !resumed || player.output.is_stopped() {
+                            crate::log_debug(
+                                "Audio player: resume failed on current stream, restarting from pause position",
+                            );
+                            stop_shared_subtitle_speech(
+                                &player.subtitle_speech_cancel,
+                                &player.subtitle_speech_command,
+                                "resume_restart",
+                            );
+                            player.subtitle_cancel.store(true, Ordering::Relaxed);
+                            player.stop();
+                            return Some(ToggleAction::RestartFromPosition {
+                                path: player.path.clone(),
+                                seconds: player.accumulated_seconds,
+                                speed: player.speed,
+                                pitch: player.pitch,
+                                volume: player.volume,
+                                muted: player.muted,
+                                prev_volume: player.prev_volume,
+                                audio_track: state.selected_audio_track,
+                            });
+                        }
+                        player.is_paused = false;
+                        player.start_instant = std::time::Instant::now();
+                    } else {
+                        crate::log_debug("Audio player: Pausing playback");
+                        let paused = player.pause();
+                        if !paused || player.output.is_stopped() {
+                            crate::log_debug(
+                                "Audio player: pause failed because stream is already stopped",
+                            );
+                        }
+                        player.is_paused = true;
+                        let pos = audiobook_position_secs(&player);
+                        player.accumulated_seconds = pos.floor() as u64;
                     }
-                    player.is_paused = true;
-                    let pos = audiobook_position_secs(&player);
-                    player.accumulated_seconds = pos.floor() as u64;
+                    state.active_audiobook = Some(player);
+                    return None::<ToggleAction>;
                 }
-                state.active_audiobook = Some(player);
-                return None::<ToggleAction>;
             }
 
             let doc = state.docs.get(state.current)?;
@@ -1173,25 +1211,82 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
                 return None::<ToggleAction>;
             }
             let path = doc.path.clone()?;
-            let from_start = state
-                .last_stopped_audiobook
-                .as_ref()
-                .map(|p| p == &path)
-                .unwrap_or(false);
-            if from_start {
-                state.last_stopped_audiobook = None;
+            let current_url = path.to_string_lossy().into_owned();
+            let should_resume_raiplay_in_mpv = crate::is_direct_stream_url_path(&path)
+                && state.raiplay_live_audio_variants.is_empty()
+                && (state.active_podcast_episode_from_rai == crate::RaiAudioOrigin::RaiPlay
+                    || state
+                        .active_podcast_episode_url
+                        .as_ref()
+                        .is_some_and(|url| url == &current_url)
+                    || state
+                        .last_stopped_mpv_url
+                        .as_ref()
+                        .is_some_and(|url| url == &current_url));
+            if should_resume_raiplay_in_mpv {
+                return Some(ToggleAction::StartRaiPlayInMpv {
+                    url: current_url.clone(),
+                    podcast_title: state.active_podcast_title.clone(),
+                    title: state.active_podcast_episode_title.clone(),
+                    resume_seconds: state
+                        .last_stopped_mpv_url
+                        .as_ref()
+                        .zip(state.last_stopped_mpv_position_secs)
+                        .and_then(|(last_url, secs)| (last_url == &current_url).then_some(secs)),
+                });
             }
-            Some(ToggleAction::StartFromDocument { path, from_start })
+            let resume_seconds = state
+                .stopped_audiobook_positions
+                .remove(&path)
+                .or_else(|| {
+                    state
+                        .last_stopped_audiobook
+                        .as_ref()
+                        .filter(|p| *p == &path)
+                        .and(state.last_stopped_audiobook_position_secs)
+                });
+            if resume_seconds.is_some() {
+                state.last_stopped_audiobook = None;
+                state.last_stopped_audiobook_position_secs = None;
+            }
+            Some(ToggleAction::StartFromDocument {
+                path,
+                resume_seconds,
+            })
         })
         .flatten();
 
         if let Some(action) = action {
             match action {
-                ToggleAction::StartFromDocument { path, from_start } => {
-                    if from_start {
-                        start_audiobook_at(hwnd, &path, 0);
+                ToggleAction::StartFromDocument {
+                    path,
+                    resume_seconds,
+                } => {
+                    if let Some(seconds) = resume_seconds.filter(|seconds| *seconds > 0) {
+                        start_audiobook_at(hwnd, &path, seconds);
                     } else {
                         start_audiobook_playback(hwnd, &path);
+                    }
+                }
+                ToggleAction::StartRaiPlayInMpv {
+                    url,
+                    podcast_title,
+                    title,
+                    resume_seconds,
+                } => {
+                    if let Err(err) = crate::launch_raiplay_in_mpv_with_resume(
+                        hwnd,
+                        &url,
+                        podcast_title.as_deref(),
+                        title.as_deref(),
+                        crate::RaiAudioOrigin::RaiPlay,
+                        resume_seconds,
+                    ) {
+                        crate::log_debug(&format!(
+                            "Audio player: failed to relaunch RaiPlay in mpv: {}",
+                            err
+                        ));
+                        crate::accessibility::screen_reader_speak(&err);
                     }
                 }
                 ToggleAction::RestartFromPosition {
@@ -1444,7 +1539,12 @@ pub fn stop_audiobook_playback(hwnd: HWND) {
                     &player.subtitle_speech_command,
                     "stop",
                 );
+                let stopped_position_secs = audiobook_position_secs(&player).floor() as u64;
+                state.last_stopped_audiobook_position_secs = Some(stopped_position_secs);
                 state.last_stopped_audiobook = Some(player.path.clone());
+                state
+                    .stopped_audiobook_positions
+                    .insert(player.path.clone(), stopped_position_secs);
                 player.subtitle_cancel.store(true, Ordering::Relaxed);
                 player.stop();
             }
@@ -1596,6 +1696,9 @@ pub fn retry_current_after_unexpected_stop(hwnd: HWND) -> bool {
 
 pub fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
     {
+        if crate::is_mpv_playback_active(hwnd) {
+            crate::stop_managed_mpv_playback(hwnd);
+        }
         crate::log_debug(&format!(
             "Audio player: start_audiobook_at called for {} at {}s",
             path.display(),

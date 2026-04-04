@@ -2471,10 +2471,6 @@ fn convert_audio_file_with_stream_index(
         return Err("Conversion canceled.".to_string());
     }
 
-    if let Some(cb) = progress.as_mut() {
-        cb(10000);
-    }
-
     unsafe {
         (api.avcodec_send_frame)(codec_ctx, ptr::null());
         loop {
@@ -2510,6 +2506,10 @@ fn convert_audio_file_with_stream_index(
         (api.avformat_free_context)(out_ctx);
         (api.av_channel_layout_uninit)(&mut in_layout);
         (api.av_channel_layout_uninit)(&mut out_layout);
+    }
+
+    if let Some(cb) = progress.as_mut() {
+        cb(10000);
     }
 
     Ok(())

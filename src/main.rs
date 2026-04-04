@@ -133,13 +133,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetClassNameW, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetForegroundWindow, GetLastActivePopup,
     GetMenu, GetMenuItemCount, GetMessageW, GetNextDlgTabItem, GetParent, GetSubMenu,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
-    HCURSOR, HICON, HMENU, IDC_ARROW, IDI_APPLICATION, IDYES, IsChild, IsDialogMessageW, IsIconic,
-    IsWindow, KillTimer, LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION,
-    MB_OK, MB_YESNO, MENU_ITEM_FLAGS, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND,
-    MF_BYPOSITION, MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
-    MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW, OBJID_CLIENT, PostMessageW, PostQuitMessage,
-    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
-    SW_SHOWNORMAL, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
+    HCURSOR, HICON, HMENU, HWND_NOTOPMOST, HWND_TOPMOST, IDC_ARROW, IDI_APPLICATION, IDYES,
+    IsChild, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW,
+    MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO, MENU_ITEM_FLAGS,
+    MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED,
+    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW,
+    OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
+    SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW,
     ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
     TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND,
     WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
@@ -205,6 +206,10 @@ const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
 const FOCUS_EDITOR_TIMER_ID4: usize = 4;
+const MPV_BASS_FOCUS_DEBUG_TIMER_ID1: usize = 8;
+const MPV_BASS_FOCUS_DEBUG_TIMER_ID2: usize = 9;
+const MPV_BASS_FOCUS_DEBUG_TIMER_ID3: usize = 10;
+const MPV_BASS_FOCUS_DEBUG_TIMER_ID4: usize = 11;
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
 const AUDIO_PLAYLIST_TIMER_ID: usize = 7;
@@ -236,6 +241,10 @@ pub(crate) fn bring_window_to_foreground(hwnd: HWND) {
         let foreground = GetForegroundWindow();
         let current_thread = GetCurrentThreadId();
         let mut attached_thread = None;
+        log_debug(&format!(
+            "bring_window_to_foreground: target={:?} initial_foreground={:?}",
+            hwnd, foreground
+        ));
         if foreground.0 != 0 {
             let foreground_thread = GetWindowThreadProcessId(foreground, None);
             if foreground_thread != 0 && foreground_thread != current_thread {
@@ -255,8 +264,25 @@ pub(crate) fn bring_window_to_foreground(hwnd: HWND) {
         if !SetForegroundWindow(hwnd).as_bool() {
             log_debug("SetForegroundWindow failed");
         }
+        if GetForegroundWindow() != hwnd {
+            log_debug(&format!(
+                "bring_window_to_foreground: foreground after first attempt is {:?}, applying SetWindowPos fallback",
+                GetForegroundWindow()
+            ));
+            let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW;
+            if let Err(err) = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags) {
+                log_debug(&format!("SetWindowPos(HWND_TOPMOST) failed: {}", err));
+            }
+            if let Err(err) = SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags) {
+                log_debug(&format!("SetWindowPos(HWND_NOTOPMOST) failed: {}", err));
+            }
+            if !SetForegroundWindow(hwnd).as_bool() {
+                log_debug("SetForegroundWindow retry failed");
+            }
+        }
         SetActiveWindow(hwnd);
         notify_active_editor_focus(hwnd, false);
+        log_foreground_snapshot("bring_window_to_foreground.final");
 
         if let Some(foreground_thread) = attached_thread
             && !AttachThreadInput(foreground_thread, current_thread, false).as_bool()
@@ -502,8 +528,7 @@ fn open_copydata_paths(hwnd: HWND, paths: Vec<PathBuf>) {
         }
     }
     show_window_safe(hwnd, SW_SHOWMAXIMIZED);
-    bring_window_to_foreground(hwnd);
-    focus_editor(hwnd);
+    restore_editor_focus(hwnd);
 }
 
 pub(crate) fn set_focus_safe(hwnd: HWND) {
@@ -774,6 +799,35 @@ pub(crate) fn get_window_text_length_w_safe(hwnd: HWND) -> i32 {
 
 pub(crate) fn get_window_text_w_safe(hwnd: HWND, string: &mut [u16]) -> i32 {
     unsafe { GetWindowTextW(hwnd, string) }
+}
+
+fn log_foreground_snapshot(tag: &str) {
+    let foreground = unsafe { GetForegroundWindow() };
+    let focus = unsafe { GetFocus() };
+    let describe_hwnd = |hwnd: HWND| {
+        let mut class_buf = [0u16; 128];
+        let class_len = get_class_name_w_safe(hwnd, &mut class_buf);
+        let class_name = if class_len > 0 {
+            String::from_utf16_lossy(&class_buf[..class_len as usize])
+        } else {
+            String::new()
+        };
+        let text_len = get_window_text_length_w_safe(hwnd);
+        let window_text = if text_len > 0 {
+            let mut text_buf = vec![0u16; text_len as usize + 1];
+            let read = get_window_text_w_safe(hwnd, &mut text_buf);
+            String::from_utf16_lossy(&text_buf[..read.max(0) as usize])
+        } else {
+            String::new()
+        };
+        (class_name, window_text)
+    };
+    let (foreground_class, foreground_text) = describe_hwnd(foreground);
+    let (focus_class, focus_text) = describe_hwnd(focus);
+    log_debug(&format!(
+        "{}: foreground={:?} class='{}' text='{}' focus={:?} focus_class='{}' focus_text='{}'",
+        tag, foreground, foreground_class, foreground_text, focus, focus_class, focus_text
+    ));
 }
 
 pub(crate) fn get_key_state_safe(vkey: i32) -> i16 {
@@ -1717,17 +1771,14 @@ fn download_podcast_episode_with_progress(
     if ext.is_none()
         && let Some(url) = url.as_deref()
     {
-        ext = Path::new(url)
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.to_string());
+        ext = audio_extension_from_url(url);
     }
     if ext
         .as_deref()
         .map(|value| value.eq_ignore_ascii_case("m3u8"))
         .unwrap_or(false)
     {
-        ext = Some("m4a".to_string());
+        ext = Some("mp3".to_string());
     }
     let ext = ext.unwrap_or_else(|| "mp3".to_string());
     let suggested_full = format!("{}.{}", suggested_name, ext);
@@ -1767,7 +1818,7 @@ fn download_podcast_episode_with_progress(
     std::thread::spawn(move || {
         let input_path = PathBuf::from(&stream_url);
         let mut progress_callback = |pct: u32| {
-            update_podcast_save_progress_window(hwnd_copy, pct);
+            update_podcast_save_progress_window(hwnd_copy, normalize_ffmpeg_progress_pct(pct));
         };
         let result = crate::ffmpeg_export::convert_audio_file_with_preferred_stream(
             &input_path,
@@ -2226,6 +2277,11 @@ fn send_mpv_ipc_request(ipc_path: &Path, command_json: &str) -> Result<serde_jso
     serde_json::from_str(trimmed).map_err(|err| format!("Risposta IPC di mpv non valida: {err}"))
 }
 
+fn is_mpv_ipc_unavailable_error(err: &str) -> bool {
+    err.contains("Impossibile aprire il canale IPC di mpv")
+        || err.contains("Impossibile trovare il file specificato. (os error 2)")
+}
+
 fn try_send_command_to_managed_mpv(hwnd: HWND, command_json: &str) -> Result<(), String> {
     let session = with_state(hwnd, |state| state.active_mpv_session.clone())
         .flatten()
@@ -2239,6 +2295,9 @@ fn try_send_command_to_managed_mpv(hwnd: HWND, command_json: &str) -> Result<(),
                 command_json,
                 err
             ));
+            if is_mpv_ipc_unavailable_error(&err) {
+                clear_managed_mpv_state(hwnd);
+            }
             Err(err)
         }
     }
@@ -2258,6 +2317,9 @@ fn query_managed_mpv_property(hwnd: HWND, property: &str) -> Result<serde_json::
                 property,
                 err
             ));
+            if is_mpv_ipc_unavailable_error(&err) {
+                clear_managed_mpv_state(hwnd);
+            }
             return Err(err);
         }
     };
@@ -2273,6 +2335,26 @@ pub(crate) fn is_mpv_playback_active(hwnd: HWND) -> bool {
 
 pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
     let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
+    let active_url = with_state(hwnd, |state| state.active_podcast_episode_url.clone()).flatten();
+    log_debug(&format!(
+        "stop_managed_mpv_playback: foreground_before={:?} focus_before={:?} has_session={}",
+        unsafe { GetForegroundWindow() },
+        unsafe { GetFocus() },
+        session.is_some()
+    ));
+    let resume_position_secs = query_managed_mpv_property(hwnd, "time-pos")
+        .ok()
+        .and_then(|value| value.as_f64())
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .map(|value| value.floor() as u64);
+    if with_state(hwnd, |state| {
+        state.last_stopped_mpv_url = active_url.clone();
+        state.last_stopped_mpv_position_secs = resume_position_secs;
+    })
+    .is_none()
+    {
+        log_debug("Failed to persist last stopped mpv position");
+    }
     if let Some(session) = session {
         if let Err(err) = send_mpv_ipc_command(&session.ipc_path, r#"{"command":["quit"]}"#) {
             log_debug(&format!("Managed mpv quit command failed: {}", err));
@@ -2285,6 +2367,11 @@ pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
         }
     }
     clear_managed_mpv_state(hwnd);
+    log_debug(&format!(
+        "stop_managed_mpv_playback: foreground_after={:?} focus_after={:?}",
+        unsafe { GetForegroundWindow() },
+        unsafe { GetFocus() }
+    ));
 }
 
 pub(crate) fn launch_raiplay_in_mpv(
@@ -2293,6 +2380,17 @@ pub(crate) fn launch_raiplay_in_mpv(
     podcast_title: Option<&str>,
     title: Option<&str>,
     rai_origin: RaiAudioOrigin,
+) -> Result<(), String> {
+    launch_raiplay_in_mpv_with_resume(hwnd, url, podcast_title, title, rai_origin, None)
+}
+
+pub(crate) fn launch_raiplay_in_mpv_with_resume(
+    hwnd: HWND,
+    url: &str,
+    podcast_title: Option<&str>,
+    title: Option<&str>,
+    rai_origin: RaiAudioOrigin,
+    resume_seconds: Option<u64>,
 ) -> Result<(), String> {
     let mpv_exe = ensure_mpv_runtime_available(hwnd)?;
     let mpv_dir = mpv_exe
@@ -2313,9 +2411,13 @@ pub(crate) fn launch_raiplay_in_mpv(
     command
         .current_dir(&mpv_dir)
         .arg(url)
+        .arg("--no-video")
         .arg("--no-terminal")
         .arg("--volume-max=300")
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
+    if let Some(resume_seconds) = resume_seconds.filter(|value| *value > 0) {
+        command.arg(format!("--start={resume_seconds}"));
+    }
     if let Some(title) = title.filter(|value| !value.trim().is_empty()) {
         command.arg(format!("--title={title}"));
     }
@@ -2346,6 +2448,8 @@ pub(crate) fn launch_raiplay_in_mpv(
                 state.raiplay_live_audio_variants.clear();
                 state.available_audio_tracks.clear();
                 state.selected_audio_track = None;
+                state.last_stopped_mpv_url = None;
+                state.last_stopped_mpv_position_secs = None;
             })
             .is_none()
             {
@@ -2402,6 +2506,10 @@ fn update_podcast_save_progress_window(hwnd: HWND, pct: u32) {
             LPARAM(0),
         );
     }
+}
+
+fn normalize_ffmpeg_progress_pct(raw_pct: u32) -> u32 {
+    (raw_pct / 100).min(100)
 }
 
 fn close_podcast_play_progress_window(hwnd: HWND) {
@@ -2574,17 +2682,14 @@ pub(crate) fn download_podcast_episode(
     if ext.is_none()
         && let Some(url) = url.as_deref()
     {
-        ext = Path::new(url)
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| e.to_string());
+        ext = audio_extension_from_url(url);
     }
     if ext
         .as_deref()
         .map(|value| value.eq_ignore_ascii_case("m3u8"))
         .unwrap_or(false)
     {
-        ext = Some("m4a".to_string());
+        ext = Some("mp3".to_string());
     }
     let ext = ext.unwrap_or_else(|| "mp3".to_string());
     let suggested_full = format!("{}.{}", suggested_name, ext);
@@ -2845,6 +2950,14 @@ fn suggested_podcast_episode_filename(
         (Some(podcast_title), None) => suggested_filename_from_text(podcast_title),
         (None, None) => None,
     }
+}
+
+fn audio_extension_from_url(url: &str) -> Option<String> {
+    let clean_url = url.split('?').next().unwrap_or(url);
+    Path::new(clean_url)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_string())
 }
 
 pub(crate) fn podcast_episode_display_title(
@@ -3599,6 +3712,27 @@ fn is_raiplay_live_stream_playback_active(hwnd: HWND) -> bool {
                 .as_ref()
                 .map(|player| is_direct_stream_url_path(&player.path))
                 .unwrap_or(false)
+    })
+    .unwrap_or(false)
+}
+
+fn should_route_player_command_to_mpv(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| {
+        if state.active_mpv_session.is_none() {
+            return false;
+        }
+        let current_doc_path = state.docs.get(state.current).and_then(|doc| {
+            if matches!(doc.format, FileFormat::Audiobook) {
+                doc.path.as_ref()
+            } else {
+                None
+            }
+        });
+        match (current_doc_path, state.active_podcast_episode_url.as_ref()) {
+            (Some(path), Some(active_url)) => path.to_string_lossy() == active_url.as_str(),
+            (Some(_), None) => false,
+            (None, _) => true,
+        }
     })
     .unwrap_or(false)
 }
@@ -4641,7 +4775,7 @@ fn toggle_voice_dictation(hwnd: HWND) {
 }
 
 fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
-    if is_mpv_playback_active(hwnd) {
+    if should_route_player_command_to_mpv(hwnd) {
         let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         let result = match command {
             PlayerCommand::TogglePause => {
@@ -5011,6 +5145,23 @@ fn schedule_editor_focus_retry(hwnd: HWND) {
     }
 }
 
+pub(crate) fn schedule_mpv_bass_focus_debug_snapshots(hwnd: HWND) {
+    unsafe {
+        if SetTimer(hwnd, MPV_BASS_FOCUS_DEBUG_TIMER_ID1, 100, None) == 0 {
+            crate::log_debug("Failed to set MPV_BASS_FOCUS_DEBUG_TIMER_ID1");
+        }
+        if SetTimer(hwnd, MPV_BASS_FOCUS_DEBUG_TIMER_ID2, 300, None) == 0 {
+            crate::log_debug("Failed to set MPV_BASS_FOCUS_DEBUG_TIMER_ID2");
+        }
+        if SetTimer(hwnd, MPV_BASS_FOCUS_DEBUG_TIMER_ID3, 700, None) == 0 {
+            crate::log_debug("Failed to set MPV_BASS_FOCUS_DEBUG_TIMER_ID3");
+        }
+        if SetTimer(hwnd, MPV_BASS_FOCUS_DEBUG_TIMER_ID4, 1200, None) == 0 {
+            crate::log_debug("Failed to set MPV_BASS_FOCUS_DEBUG_TIMER_ID4");
+        }
+    }
+}
+
 pub(crate) fn restore_editor_focus(hwnd: HWND) {
     bring_window_to_foreground(hwnd);
     if should_force_editor_focus_on_foreground(hwnd) {
@@ -5098,6 +5249,8 @@ pub(crate) struct AppState {
     active_audiobook: Option<AudiobookPlayer>,
     audiobook_session_id: u64,
     last_stopped_audiobook: Option<std::path::PathBuf>,
+    last_stopped_audiobook_position_secs: Option<u64>,
+    stopped_audiobook_positions: HashMap<PathBuf, u64>,
     active_podcast_episode_url: Option<String>,
     active_podcast_title: Option<String>,
     active_podcast_episode_title: Option<String>,
@@ -5106,6 +5259,8 @@ pub(crate) struct AppState {
     raiplay_live_audio_variants: Vec<RaiPlayLiveAudioVariant>,
     active_mpv_session: Option<MpvPlaybackSession>,
     active_mpv_status: Option<MpvPlaybackStatus>,
+    last_stopped_mpv_url: Option<String>,
+    last_stopped_mpv_position_secs: Option<u64>,
     active_youtube_return_context: YouTubeReturnContext,
     last_rai_recent_item_id: Option<String>,
     last_rai_grouped_item_id: Option<String>,
@@ -5351,6 +5506,7 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     WPARAM(0),
                     LPARAM(&mut cds as *mut _ as isize),
                 );
+                bring_window_to_foreground(existing);
                 return Ok(());
             }
         }
@@ -6535,6 +6691,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_audiobook: None,
                     audiobook_session_id: 0,
                     last_stopped_audiobook: None,
+                    last_stopped_audiobook_position_secs: None,
+                    stopped_audiobook_positions: HashMap::new(),
                     active_podcast_episode_url: None,
                     active_podcast_title: None,
                     active_podcast_episode_title: None,
@@ -6543,6 +6701,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     raiplay_live_audio_variants: Vec::new(),
                     active_mpv_session: None,
                     active_mpv_status: None,
+                    last_stopped_mpv_url: None,
+                    last_stopped_mpv_position_secs: None,
                     active_youtube_return_context: YouTubeReturnContext::default(),
                     last_rai_recent_item_id: None,
                     last_rai_grouped_item_id: None,
@@ -6737,8 +6897,31 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     || wparam.0 == FOCUS_EDITOR_TIMER_ID3
                     || wparam.0 == FOCUS_EDITOR_TIMER_ID4
                 {
+                    log_foreground_snapshot(&format!("focus_timer.before.{}", wparam.0));
                     kill_timer_best_effort(hwnd, wparam.0, "KillTimer FOCUS_EDITOR");
                     force_active_editor_focus(hwnd);
+                    log_foreground_snapshot(&format!("focus_timer.after.{}", wparam.0));
+                    return LRESULT(0);
+                }
+                if wparam.0 == MPV_BASS_FOCUS_DEBUG_TIMER_ID1
+                    || wparam.0 == MPV_BASS_FOCUS_DEBUG_TIMER_ID2
+                    || wparam.0 == MPV_BASS_FOCUS_DEBUG_TIMER_ID3
+                    || wparam.0 == MPV_BASS_FOCUS_DEBUG_TIMER_ID4
+                {
+                    log_foreground_snapshot(&format!("mpv_bass_focus_debug.{}", wparam.0));
+                    kill_timer_best_effort(hwnd, wparam.0, "KillTimer MPV_BASS_FOCUS_DEBUG");
+                    if wparam.0 == MPV_BASS_FOCUS_DEBUG_TIMER_ID1
+                        || wparam.0 == MPV_BASS_FOCUS_DEBUG_TIMER_ID2
+                    {
+                        bring_window_to_foreground(hwnd);
+                        if let Some(hwnd_tab) = with_state(hwnd, |state| state.hwnd_tab) {
+                            set_focus_safe(hwnd_tab);
+                        }
+                        log_foreground_snapshot(&format!(
+                            "mpv_bass_focus_debug.refocus.{}",
+                            wparam.0
+                        ));
+                    }
                     return LRESULT(0);
                 }
                 if wparam.0 == CHAPTER_ANNOUNCE_TIMER_ID {
@@ -13138,7 +13321,33 @@ fn play_audio_playlist_item(hwnd: HWND, index: usize) {
     if let Some(tab_index) = tab_index {
         editor_manager::select_tab(hwnd, tab_index);
     }
+    let mpv_was_active = is_mpv_playback_active(hwnd);
+    if mpv_was_active {
+        log_debug(&format!(
+            "Audio player: mpv->audio handoff start target={} foreground_before_stop={:?} focus_before_stop={:?}",
+            path.display(),
+            unsafe { GetForegroundWindow() },
+            unsafe { GetFocus() }
+        ));
+    }
     audio_player::stop_audiobook_playback(hwnd);
+    if mpv_was_active {
+        log_debug(&format!(
+            "Audio player: mpv->audio handoff after stop foreground={:?} focus={:?}",
+            unsafe { GetForegroundWindow() },
+            unsafe { GetFocus() }
+        ));
+        bring_window_to_foreground(hwnd);
+        if let Some(hwnd_tab) = with_state(hwnd, |state| state.hwnd_tab) {
+            set_focus_safe(hwnd_tab);
+        }
+        schedule_mpv_bass_focus_debug_snapshots(hwnd);
+        log_debug(&format!(
+            "Audio player: mpv->audio handoff after player focus foreground={:?} focus={:?}",
+            unsafe { GetForegroundWindow() },
+            unsafe { GetFocus() }
+        ));
+    }
     audio_player::start_audiobook_playback(hwnd, &path);
 }
 
@@ -13195,6 +13404,8 @@ pub(crate) fn queue_audio_files_and_play(hwnd: HWND, paths: Vec<PathBuf>) {
         .unwrap_or(0);
 
         play_audio_playlist_item(hwnd, target_index);
+        show_window_safe(hwnd, SW_SHOWMAXIMIZED);
+        restore_editor_focus(hwnd);
     }
 }
 

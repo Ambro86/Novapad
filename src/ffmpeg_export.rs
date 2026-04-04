@@ -46,6 +46,7 @@ struct HlsProgressEstimate {
     variant_url: String,
     bandwidth_bits_per_sec: u64,
     duration_secs: f64,
+    total_duration_us: i64,
 }
 
 struct MuxProgressSample<'a> {
@@ -1763,43 +1764,6 @@ fn report_mux_progress(
     sample: MuxProgressSample<'_>,
     progress_state: &mut MuxProgressState,
 ) {
-    if let Some(estimate) = sample.hls_progress_estimate
-        && estimate.estimated_total_bytes > 0
-        && let Ok(meta) = fs::metadata(sample.out_path)
-    {
-        let written = meta.len().min(estimate.estimated_total_bytes);
-        let pct = ((written as u128 * 100) / estimate.estimated_total_bytes as u128) as u32;
-        let pct = pct.clamp(1, 99);
-        let log_bucket = if pct < 5 { pct } else { (pct / 10) * 10 };
-        if progress_state
-            .last_hls_log_pct_bucket
-            .is_none_or(|previous| previous != log_bucket)
-        {
-            progress_state.last_hls_log_pct_bucket = Some(log_bucket);
-            log_debug(&format!(
-                "FFmpeg HLS progress: out={} written_bytes={} estimated_total_bytes={} pct={} bandwidth_bps={} duration_secs={:.3} variant={}",
-                sample.out_path.display(),
-                written,
-                estimate.estimated_total_bytes,
-                pct,
-                estimate.bandwidth_bits_per_sec,
-                estimate.duration_secs,
-                estimate.variant_url
-            ));
-        }
-        if progress_state
-            .last_pct
-            .is_some_and(|previous| previous == pct)
-        {
-            return;
-        }
-        progress_state.last_pct = Some(pct);
-        progress_cb(pct);
-        return;
-    }
-    let Some(total_duration_us) = total_duration_us.filter(|value| *value > 0) else {
-        return;
-    };
     let pts_us = if sample.pts != AV_NOPTS_VALUE_I64 {
         Some(rescale_q(
             sample.pts,
@@ -1836,6 +1800,95 @@ fn report_mux_progress(
         .max(0)
     } else {
         0
+    };
+    if let Some(estimate) = sample.hls_progress_estimate {
+        let mut current_us = pts_us.or(dts_us).unwrap_or(progress_state.cursor_us);
+        if duration_us > 0 && current_us <= progress_state.cursor_us {
+            current_us = progress_state.cursor_us.saturating_add(duration_us);
+        }
+        progress_state.cursor_us = progress_state.cursor_us.max(current_us);
+        let start_us = *progress_state
+            .start_us
+            .get_or_insert(progress_state.cursor_us.max(0));
+        let elapsed_us = progress_state
+            .cursor_us
+            .saturating_sub(start_us)
+            .clamp(0, estimate.total_duration_us);
+        let mut pct = (((elapsed_us as u128) * 100) / estimate.total_duration_us as u128) as u32;
+        if elapsed_us > 0 && pct == 0 {
+            pct = 1;
+        }
+        if pct > 0 {
+            let pct = pct.min(99);
+            let log_bucket = if pct < 5 { pct } else { (pct / 10) * 10 };
+            if progress_state
+                .last_hls_log_pct_bucket
+                .is_none_or(|previous| previous != log_bucket)
+            {
+                progress_state.last_hls_log_pct_bucket = Some(log_bucket);
+                let written = fs::metadata(sample.out_path)
+                    .map(|meta| meta.len())
+                    .unwrap_or(0);
+                log_debug(&format!(
+                    "FFmpeg HLS progress: out={} elapsed_us={} total_duration_us={} written_bytes={} estimated_total_bytes={} pct={} bandwidth_bps={} duration_secs={:.3} variant={}",
+                    sample.out_path.display(),
+                    elapsed_us,
+                    estimate.total_duration_us,
+                    written,
+                    estimate.estimated_total_bytes,
+                    pct,
+                    estimate.bandwidth_bits_per_sec,
+                    estimate.duration_secs,
+                    estimate.variant_url
+                ));
+            }
+            if progress_state
+                .last_pct
+                .is_some_and(|previous| previous == pct)
+            {
+                return;
+            }
+            progress_state.last_pct = Some(pct);
+            progress_cb(pct);
+            return;
+        }
+        if estimate.estimated_total_bytes > 0
+            && let Ok(meta) = fs::metadata(sample.out_path)
+        {
+            let written = meta.len().min(estimate.estimated_total_bytes);
+            let pct = ((written as u128 * 100) / estimate.estimated_total_bytes as u128) as u32;
+            let pct = pct.clamp(1, 99);
+            let log_bucket = if pct < 5 { pct } else { (pct / 10) * 10 };
+            if progress_state
+                .last_hls_log_pct_bucket
+                .is_none_or(|previous| previous != log_bucket)
+            {
+                progress_state.last_hls_log_pct_bucket = Some(log_bucket);
+                log_debug(&format!(
+                    "FFmpeg HLS progress: out={} elapsed_us=0 total_duration_us={} written_bytes={} estimated_total_bytes={} pct={} bandwidth_bps={} duration_secs={:.3} variant={}",
+                    sample.out_path.display(),
+                    estimate.total_duration_us,
+                    written,
+                    estimate.estimated_total_bytes,
+                    pct,
+                    estimate.bandwidth_bits_per_sec,
+                    estimate.duration_secs,
+                    estimate.variant_url
+                ));
+            }
+            if progress_state
+                .last_pct
+                .is_some_and(|previous| previous == pct)
+            {
+                return;
+            }
+            progress_state.last_pct = Some(pct);
+            progress_cb(pct);
+            return;
+        }
+    }
+    let Some(total_duration_us) = total_duration_us.filter(|value| *value > 0) else {
+        return;
     };
     let mut current_us = pts_us.or(dts_us).unwrap_or(progress_state.cursor_us);
     if duration_us > 0 && current_us <= progress_state.cursor_us {
@@ -1876,6 +1929,7 @@ fn estimate_hls_progress(input_path: &Path) -> Option<HlsProgressEstimate> {
     let estimated_total_bytes = ((duration_secs * bandwidth_bits_per_sec as f64) / 8.0)
         .round()
         .max(1.0) as u64;
+    let total_duration_us = (duration_secs * 1_000_000.0).round().max(1.0) as i64;
     log_debug(&format!(
         "FFmpeg HLS estimate: master={} variant={} bandwidth_bps={} duration_secs={:.3} estimated_total_bytes={}",
         url, variant_url, bandwidth_bits_per_sec, duration_secs, estimated_total_bytes
@@ -1885,6 +1939,7 @@ fn estimate_hls_progress(input_path: &Path) -> Option<HlsProgressEstimate> {
         variant_url,
         bandwidth_bits_per_sec,
         duration_secs,
+        total_duration_us,
     })
 }
 

@@ -1026,10 +1026,20 @@ pub fn start_audiobook_playback(hwnd: HWND, path: &Path) {
             }
         };
 
-        // Store tracks in state and clear any previous selection for new files
+        // Preserve a valid preferred track for the current item; otherwise reset it.
         with_state(hwnd, |state| {
+            let preserve_raiplay_live_tracks = path_buf.to_string_lossy().starts_with("http")
+                && state.active_podcast_episode_from_rai == crate::RaiAudioOrigin::RaiPlay
+                && !state.raiplay_live_audio_variants.is_empty()
+                && audio_tracks.is_empty();
+            if preserve_raiplay_live_tracks {
+                return;
+            }
+            let preserved_selected_track = state
+                .selected_audio_track
+                .filter(|selected| audio_tracks.iter().any(|track| track.index == *selected));
             state.available_audio_tracks = audio_tracks;
-            state.selected_audio_track = None;
+            state.selected_audio_track = preserved_selected_track;
         });
         crate::menu::update_playback_menu(hwnd, true);
 
@@ -2001,6 +2011,56 @@ pub fn switch_audio_track(hwnd: HWND, track_index: i32) {
         // Update the playback menu to reflect the new selection
         crate::menu::update_playback_menu(hwnd, true);
     }
+}
+
+pub fn switch_to_live_stream_url(hwnd: HWND, url: String, track_index: i32) {
+    let restart = with_state(hwnd, |state| {
+        state.selected_audio_track = Some(track_index);
+        if let Some(player) = state.active_audiobook.take() {
+            let current = audiobook_position_secs(&player).floor() as u64;
+            player.stop();
+            Some((
+                current,
+                player.speed,
+                player.pitch,
+                player.is_paused,
+                player.volume,
+                player.muted,
+                player.prev_volume,
+            ))
+        } else {
+            None
+        }
+    })
+    .flatten();
+
+    let Some((current, speed, pitch, paused, volume, muted, prev_volume)) = restart else {
+        return;
+    };
+
+    log_debug(&format!(
+        "Audio player: switching RaiPlay live stream to track {} at {}s",
+        track_index, current
+    ));
+
+    start_audiobook_at_with_options(
+        hwnd,
+        PathBuf::from(url),
+        current,
+        AudiobookPlaybackOptions {
+            speed,
+            pitch,
+            paused,
+            volume,
+            muted,
+            prev_volume,
+            mix_export: false,
+            audio_track: None,
+            force_ffmpeg_stream: true,
+        },
+    );
+
+    crate::menu::update_playback_menu(hwnd, true);
 }
 
 pub fn toggle_audiobook_mute(hwnd: HWND) {

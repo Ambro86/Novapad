@@ -919,12 +919,19 @@ struct PodcastEpisodePlayReady {
     rai_origin: RaiAudioOrigin,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct RaiPlayLiveAudioVariant {
+    pub(crate) track: crate::ffmpeg_source::AudioStreamInfo,
+    pub(crate) url: String,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum RaiAudioOrigin {
     #[default]
     None,
     Recenti,
     Tutte,
+    RaiPlay,
     RaiPlaySound,
 }
 
@@ -1460,6 +1467,7 @@ pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
             state.active_podcast_episode_title = None;
             state.active_podcast_episode_cache = None;
             state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
+            state.raiplay_live_audio_variants.clear();
             state.active_youtube_return_context = YouTubeReturnContext::default();
         })
         .is_none()
@@ -1495,6 +1503,7 @@ pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
                 state.active_podcast_episode_title = None;
                 state.active_podcast_episode_cache = None;
                 state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
+                state.raiplay_live_audio_variants.clear();
                 state.active_youtube_return_context = YouTubeReturnContext::default();
             });
             kill_timer_best_effort(
@@ -1770,7 +1779,134 @@ pub(crate) fn play_named_remote_audio_from_url_with_rai_origin(
     mime: Option<&str>,
     rai_origin: RaiAudioOrigin,
 ) {
+    with_state(hwnd, |state| {
+        state.raiplay_live_audio_variants.clear();
+    });
     play_podcast_episode_from_url_internal(hwnd, url, None, title, mime, true, rai_origin);
+}
+
+pub(crate) fn play_cached_stream_audio_from_url_with_rai_origin(
+    hwnd: HWND,
+    url: String,
+    podcast_title: Option<String>,
+    title: Option<String>,
+    rai_origin: RaiAudioOrigin,
+) {
+    with_state(hwnd, |state| {
+        state.raiplay_live_audio_variants.clear();
+    });
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let cache_path = stream_audio_cache_path_for_url(&url, title.as_deref());
+    screen_reader_speak(&i18n::tr(language, "podcasts.loading"));
+    open_podcast_play_progress_window(hwnd, language);
+    std::thread::spawn(move || {
+        let cache_ok = cache_path
+            .metadata()
+            .map(|meta| meta.is_file() && meta.len() > 0)
+            .unwrap_or(false);
+        let result = if cache_ok {
+            Ok(())
+        } else {
+            match cache_path.parent() {
+                Some(parent) => {
+                    if let Err(err) = std::fs::create_dir_all(parent) {
+                        Err(format!("Impossibile creare la cache audio: {err}"))
+                    } else {
+                        let settings = crate::ffmpeg_export::ConvertAudioSettings {
+                            format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
+                            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(192),
+                        };
+                        crate::ffmpeg_export::convert_audio_file_with_preferred_stream(
+                            &PathBuf::from(&url),
+                            &cache_path,
+                            &settings,
+                            None,
+                            None,
+                            None,
+                        )
+                        .map_err(|err| format!("Impossibile preparare l'audio RaiPlay: {err}"))
+                    }
+                }
+                None => Err("Percorso cache audio non valido.".to_string()),
+            }
+        };
+
+        match result {
+            Ok(()) => post_podcast_episode_play_ready(
+                hwnd,
+                PodcastEpisodePlayReady {
+                    url,
+                    podcast_title,
+                    title,
+                    cache_path,
+                    prefer_title_for_document: true,
+                    rai_origin,
+                },
+            ),
+            Err(error) => {
+                post_podcast_episode_play_failed(hwnd, PodcastEpisodePlayFailed { language, error })
+            }
+        }
+    });
+}
+
+pub(crate) fn play_live_stream_audio_from_url_with_rai_origin(
+    hwnd: HWND,
+    url: String,
+    podcast_title: Option<String>,
+    title: Option<String>,
+    live_audio_variants: Vec<crate::tools::raiplay::LiveAudioTrack>,
+    rai_origin: RaiAudioOrigin,
+) {
+    let stream_path = PathBuf::from(&url);
+    queue_audio_files_and_play(hwnd, vec![stream_path.clone()]);
+    if let Some(display_title) =
+        podcast_episode_display_title(podcast_title.as_deref(), title.as_deref())
+    {
+        editor_manager::set_current_document_title(hwnd, &display_title);
+    }
+    if with_state(hwnd, |state| {
+        state.active_podcast_episode_from_rai = rai_origin;
+        state.raiplay_live_audio_variants = live_audio_variants
+            .iter()
+            .map(|variant| RaiPlayLiveAudioVariant {
+                track: variant.info.clone(),
+                url: variant.url.clone(),
+            })
+            .collect();
+        state.available_audio_tracks = live_audio_variants
+            .iter()
+            .map(|variant| variant.info.clone())
+            .collect();
+        state.selected_audio_track = live_audio_variants
+            .iter()
+            .find(|variant| variant.url == url)
+            .map(|variant| variant.info.index);
+    })
+    .is_none()
+    {
+        log_debug("Failed to set active podcast Rai origin flag for live stream");
+    }
+    editor_manager::mark_current_document_from_rss(hwnd, true);
+    set_active_podcast_episode_info(hwnd, Some(url), podcast_title, title, None);
+    menu::update_playback_menu(hwnd, true);
+    activate_pending_podcast_chapters(hwnd);
+}
+
+fn stream_audio_cache_path_for_url(url: &str, title: Option<&str>) -> PathBuf {
+    use sha2::Digest;
+
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(url.as_bytes());
+    let hash = hex::encode(hasher.finalize());
+
+    let file_stem = title
+        .and_then(suggested_filename_from_text)
+        .unwrap_or_else(|| format!("raiplay_audio_{}", &hash[..16]));
+
+    settings::settings_dir()
+        .join("podcast cache")
+        .join(format!("{file_stem}.m4a"))
 }
 
 fn open_podcast_play_progress_window(hwnd: HWND, language: Language) {
@@ -1957,6 +2093,13 @@ pub(crate) fn download_podcast_episode(
             .and_then(|e| e.to_str())
             .map(|e| e.to_string());
     }
+    if ext
+        .as_deref()
+        .map(|value| value.eq_ignore_ascii_case("m3u8"))
+        .unwrap_or(false)
+    {
+        ext = Some("m4a".to_string());
+    }
     let ext = ext.unwrap_or_else(|| "mp3".to_string());
     let suggested_full = format!("{}.{}", suggested_name, ext);
     let target = save_podcast_episode_dialog(hwnd, language, &suggested_full);
@@ -1966,8 +2109,94 @@ pub(crate) fn download_podcast_episode(
     let target = ensure_path_extension(target, &ext);
     let cache_path = cache_path.clone();
     let url = url.clone();
+    let selected_audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
     let hwnd_copy = hwnd;
     std::thread::spawn(move || {
+        let stream_url = url
+            .as_deref()
+            .filter(|value| value.starts_with("http://") || value.starts_with("https://"));
+        let can_export_stream_directly = cache_path
+            .as_ref()
+            .map(|path| is_direct_stream_url_path(path))
+            .unwrap_or(false)
+            || cache_path.is_none() && stream_url.is_some();
+
+        if can_export_stream_directly {
+            let Some(stream_url) = stream_url else {
+                let err = "no source URL for direct stream export".to_string();
+                log_debug(&format!("podcast_episode_save_failed {}", err));
+                post_podcast_episode_save_result(
+                    hwnd_copy,
+                    PodcastEpisodeSaveResult {
+                        language,
+                        target_path: target.clone(),
+                        error: Some(err),
+                    },
+                );
+                return;
+            };
+
+            log_debug(&format!(
+                "podcast_episode_save: exporting direct stream from {} to {}",
+                stream_url,
+                target.to_string_lossy()
+            ));
+            screen_reader_speak(&i18n::tr(language, "podcasts.loading"));
+            let input_path = PathBuf::from(stream_url);
+            let convert_settings = match convert_settings_for_save_target(&target) {
+                Ok(settings) => settings,
+                Err(err) => {
+                    log_debug(&format!("podcast_episode_save_failed {}", err));
+                    post_podcast_episode_save_result(
+                        hwnd_copy,
+                        PodcastEpisodeSaveResult {
+                            language,
+                            target_path: target.clone(),
+                            error: Some(err),
+                        },
+                    );
+                    return;
+                }
+            };
+            let result = crate::ffmpeg_export::convert_audio_file_with_preferred_stream(
+                &input_path,
+                &target,
+                &convert_settings,
+                None,
+                None,
+                selected_audio_track,
+            );
+            match result {
+                Ok(()) => {
+                    log_debug(&format!(
+                        "podcast_episode_saved src=stream dst={}",
+                        target.to_string_lossy()
+                    ));
+                    post_podcast_episode_save_result(
+                        hwnd_copy,
+                        PodcastEpisodeSaveResult {
+                            language,
+                            target_path: target,
+                            error: None,
+                        },
+                    );
+                }
+                Err(err) => {
+                    let error = format!("stream export failed: {err}");
+                    log_debug(&format!("podcast_episode_save_failed {}", error));
+                    post_podcast_episode_save_result(
+                        hwnd_copy,
+                        PodcastEpisodeSaveResult {
+                            language,
+                            target_path: target.clone(),
+                            error: Some(error),
+                        },
+                    );
+                }
+            }
+            return;
+        }
+
         let Some(cache_path) = cache_path.as_ref() else {
             let err = "no cache path".to_string();
             log_debug(&format!("podcast_episode_save_failed {}", err));
@@ -2048,6 +2277,56 @@ pub(crate) fn download_podcast_episode(
             );
         }
     });
+}
+
+fn convert_settings_for_save_target(
+    target: &Path,
+) -> Result<crate::ffmpeg_export::ConvertAudioSettings, String> {
+    use crate::ffmpeg_export::{ConvertAudioFormat, ConvertAudioQuality, ConvertAudioSettings};
+
+    let extension = target
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+        .unwrap_or_else(|| "m4a".to_string());
+
+    let settings = match extension.as_str() {
+        "mp3" => ConvertAudioSettings {
+            format: ConvertAudioFormat::Mp3,
+            quality: ConvertAudioQuality::BitrateKbps(192),
+        },
+        "m4a" | "aac" | "mp4" => ConvertAudioSettings {
+            format: ConvertAudioFormat::Aac,
+            quality: ConvertAudioQuality::BitrateKbps(192),
+        },
+        "opus" => ConvertAudioSettings {
+            format: ConvertAudioFormat::Opus,
+            quality: ConvertAudioQuality::BitrateKbps(160),
+        },
+        "ogg" => ConvertAudioSettings {
+            format: ConvertAudioFormat::Ogg,
+            quality: ConvertAudioQuality::OggQuality(5),
+        },
+        "flac" => ConvertAudioSettings {
+            format: ConvertAudioFormat::Flac,
+            quality: ConvertAudioQuality::FlacCompression(5),
+        },
+        "wav" => ConvertAudioSettings {
+            format: ConvertAudioFormat::Wav,
+            quality: ConvertAudioQuality::None,
+        },
+        "aiff" => ConvertAudioSettings {
+            format: ConvertAudioFormat::Aiff,
+            quality: ConvertAudioQuality::None,
+        },
+        other => {
+            return Err(format!(
+                "Formato di salvataggio non supportato per lo stream: {other}"
+            ));
+        }
+    };
+
+    Ok(settings)
 }
 
 fn ensure_path_extension(mut path: PathBuf, desired_ext: &str) -> PathBuf {
@@ -2681,6 +2960,31 @@ fn is_direct_stream_playback_active(hwnd: HWND) -> bool {
         })
         .unwrap_or(false)
     }
+}
+
+fn is_raiplay_stream_playback_active(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| {
+        state.active_podcast_episode_from_rai == RaiAudioOrigin::RaiPlay
+            && state
+                .active_audiobook
+                .as_ref()
+                .map(|player| is_direct_stream_url_path(&player.path))
+                .unwrap_or(false)
+    })
+    .unwrap_or(false)
+}
+
+fn is_raiplay_live_stream_playback_active(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| {
+        state.active_podcast_episode_from_rai == RaiAudioOrigin::RaiPlay
+            && !state.raiplay_live_audio_variants.is_empty()
+            && state
+                .active_audiobook
+                .as_ref()
+                .map(|player| is_direct_stream_url_path(&player.path))
+                .unwrap_or(false)
+    })
+    .unwrap_or(false)
 }
 
 #[derive(Clone, Copy)]
@@ -3721,6 +4025,13 @@ fn toggle_voice_dictation(hwnd: HWND) {
 }
 
 fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
+    let disable_seek_for_live_raiplay = matches!(
+        command,
+        PlayerCommand::Seek(_)
+            | PlayerCommand::SeekToStart
+            | PlayerCommand::SeekToEnd
+            | PlayerCommand::GoToTime
+    ) && is_raiplay_live_stream_playback_active(hwnd);
     let disable_seek_rate_pitch = matches!(
         command,
         PlayerCommand::Seek(_)
@@ -3731,8 +4042,9 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             | PlayerCommand::SpeedReset
             | PlayerCommand::Pitch(_)
             | PlayerCommand::PitchReset
-    ) && is_direct_stream_playback_active(hwnd);
-    if disable_seek_rate_pitch {
+    ) && is_direct_stream_playback_active(hwnd)
+        && !is_raiplay_stream_playback_active(hwnd);
+    if disable_seek_for_live_raiplay || disable_seek_rate_pitch {
         let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         let message = i18n::tr(language, "playback.direct_stream_command_disabled");
         if !message.is_empty() {
@@ -4062,9 +4374,13 @@ pub(crate) struct AppState {
     active_podcast_episode_title: Option<String>,
     active_podcast_episode_cache: Option<PathBuf>,
     active_podcast_episode_from_rai: RaiAudioOrigin,
+    raiplay_live_audio_variants: Vec<RaiPlayLiveAudioVariant>,
     active_youtube_return_context: YouTubeReturnContext,
     last_rai_recent_item_id: Option<String>,
     last_rai_grouped_item_id: Option<String>,
+    raiplay_navigation_stack: Vec<(String, Option<String>)>,
+    last_raiplay_page_path: Option<String>,
+    last_raiplay_item_id: Option<String>,
     raiplaysound_navigation_stack: Vec<(String, Option<String>)>,
     last_raiplaysound_page_path: Option<String>,
     last_raiplaysound_item_id: Option<String>,
@@ -4728,6 +5044,8 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                                     app_windows::rai_audiodescrizioni_window::open(hwnd);
                                 } else if from_rai == RaiAudioOrigin::Tutte {
                                     app_windows::rai_audiodescrizioni_window::open_grouped(hwnd);
+                                } else if from_rai == RaiAudioOrigin::RaiPlay {
+                                    app_windows::raiplay_window::reopen_last(hwnd);
                                 } else if from_rai == RaiAudioOrigin::RaiPlaySound {
                                     app_windows::raiplaysound_window::reopen_last(hwnd);
                                 } else if youtube_return_context.input.is_some() {
@@ -5482,9 +5800,13 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_podcast_episode_title: None,
                     active_podcast_episode_cache: None,
                     active_podcast_episode_from_rai: RaiAudioOrigin::None,
+                    raiplay_live_audio_variants: Vec::new(),
                     active_youtube_return_context: YouTubeReturnContext::default(),
                     last_rai_recent_item_id: None,
                     last_rai_grouped_item_id: None,
+                    raiplay_navigation_stack: Vec::new(),
+                    last_raiplay_page_path: None,
+                    last_raiplay_item_id: None,
                     raiplaysound_navigation_stack: Vec::new(),
                     last_raiplaysound_page_path: None,
                     last_raiplaysound_item_id: None,
@@ -7166,14 +7488,27 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                             .contains(&cmd_id) =>
                     {
                         let track_menu_index = cmd_id - IDM_PLAYBACK_AUDIO_TRACK_BASE;
-                        let track_index = with_state(hwnd, |state| {
+                        let live_variant = with_state(hwnd, |state| {
+                            state
+                                .raiplay_live_audio_variants
+                                .get(track_menu_index)
+                                .cloned()
+                        })
+                        .flatten();
+                        if let Some(variant) = live_variant {
+                            audio_player::switch_to_live_stream_url(
+                                hwnd,
+                                variant.url,
+                                variant.track.index,
+                            );
+                        } else if let Some(idx) = with_state(hwnd, |state| {
                             state
                                 .available_audio_tracks
                                 .get(track_menu_index)
                                 .map(|t| t.index)
                         })
-                        .flatten();
-                        if let Some(idx) = track_index {
+                        .flatten()
+                        {
                             audio_player::switch_audio_track(hwnd, idx);
                         }
                         LRESULT(0)
@@ -7333,6 +7668,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_TOOLS_RAIPLAYSOUND => {
                         log_debug("Menu: RaiPlay Sound");
                         app_windows::raiplaysound_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_RAIPLAY => {
+                        log_debug("Menu: RaiPlay");
+                        app_windows::raiplay_window::open(hwnd);
                         LRESULT(0)
                     }
                     IDM_HELP_GUIDE => {

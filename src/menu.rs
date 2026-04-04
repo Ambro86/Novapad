@@ -144,6 +144,7 @@ pub const IDM_TOOLS_BDCIECHI: usize = 5010;
 pub const IDM_TOOLS_TOGGLE_DICTATION: usize = 5011;
 pub const IDM_TOOLS_RAI_AUDIODESCRIZIONI: usize = 5012;
 pub const IDM_TOOLS_RAIPLAYSOUND: usize = 5013;
+pub const IDM_TOOLS_RAIPLAY: usize = 5014;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -170,6 +171,7 @@ pub struct MenuLabels {
     pub menu_stream_audio: String,
     pub menu_bdciechi: String,
     pub menu_rai_audiodescrizioni: String,
+    pub menu_raiplay: String,
     pub menu_raiplaysound: String,
     pub menu_prompt: String,
     pub menu_rss: String,
@@ -285,6 +287,11 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         },
         menu_rai_audiodescrizioni: if language == Language::Italian {
             "Rai audiodescrizioni...\tAlt+Shift+A".to_string()
+        } else {
+            String::new()
+        },
+        menu_raiplay: if language == Language::Italian {
+            "RaiPlay...".to_string()
         } else {
             String::new()
         },
@@ -467,6 +474,11 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 .unwrap_or(false)
         })
         .unwrap_or(false);
+        let raiplay_live_stream_playback = with_state(hwnd, |state| {
+            state.active_podcast_episode_from_rai == crate::RaiAudioOrigin::RaiPlay
+                && !state.raiplay_live_audio_variants.is_empty()
+        })
+        .unwrap_or(false);
         if show {
             if existing.0 != 0 {
                 remove_playback_menu(hmenu, existing);
@@ -604,7 +616,7 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     &chapter_list,
                 );
             }
-            if show_download && !stream_direct_no_download {
+            if show_download && !stream_direct_no_download && !raiplay_live_stream_playback {
                 append_menu_string(
                     playback_menu,
                     MF_STRING,
@@ -612,18 +624,20 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     &download_episode,
                 );
             }
-            append_menu_string(
-                playback_menu,
-                MF_STRING,
-                IDM_PLAYBACK_TRANSCRIBE_CURRENT,
-                &transcribe_current,
-            );
-            append_menu_string(
-                playback_menu,
-                MF_STRING,
-                IDM_PLAYBACK_TRANSCRIBE_CURRENT_FOLDER,
-                &transcribe_current_folder,
-            );
+            if !raiplay_live_stream_playback {
+                append_menu_string(
+                    playback_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_TRANSCRIBE_CURRENT,
+                    &transcribe_current,
+                );
+                append_menu_string(
+                    playback_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_TRANSCRIBE_CURRENT_FOLDER,
+                    &transcribe_current_folder,
+                );
+            }
             append_menu_string(
                 playback_menu,
                 if direct_stream_playback {
@@ -640,18 +654,20 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 IDM_PLAYBACK_ANNOUNCE_TIME,
                 &announce_time,
             );
-            append_menu_string(
-                playback_menu,
-                MF_STRING,
-                IDM_PLAYBACK_ADD_SUBTITLES,
-                &add_subtitles,
-            );
-            append_menu_string(
-                playback_menu,
-                MF_STRING,
-                IDM_PLAYBACK_REMOVE_SUBTITLES,
-                &remove_subtitles,
-            );
+            if !raiplay_live_stream_playback {
+                append_menu_string(
+                    playback_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_ADD_SUBTITLES,
+                    &add_subtitles,
+                );
+                append_menu_string(
+                    playback_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_REMOVE_SUBTITLES,
+                    &remove_subtitles,
+                );
+            }
             // Audio tracks submenu
             if !audio_tracks.is_empty() {
                 let audio_track_label = i18n::tr(language, "playback.audio_track");
@@ -668,10 +684,12 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                         if let Some(ref title) = track.title {
                             label.push_str(&format!(" - {}", title));
                         }
-                        label.push_str(&format!(
-                            " ({}, {}ch, {}Hz)",
-                            track.codec, track.channels, track.sample_rate
-                        ));
+                        if track.channels > 0 && track.sample_rate > 0 && !track.codec.is_empty() {
+                            label.push_str(&format!(
+                                " ({}, {}ch, {}Hz)",
+                                track.codec, track.channels, track.sample_rate
+                            ));
+                        }
                         let is_selected = selected_track
                             .map(|s| s == track.index)
                             .unwrap_or(track.is_default);
@@ -1347,6 +1365,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 MF_STRING,
                 IDM_TOOLS_RAI_AUDIODESCRIZIONI,
                 &labels.menu_rai_audiodescrizioni,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_RAIPLAY,
+                &labels.menu_raiplay,
             );
             append_menu_string(
                 tools_menu,

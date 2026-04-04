@@ -1832,7 +1832,34 @@ pub fn convert_audio_file(
     cancel: Option<Arc<AtomicBool>>,
     progress: Option<&mut dyn FnMut(u32)>,
 ) -> Result<(), String> {
-    convert_audio_file_with_channels(input_path, output_path, settings, cancel, progress, None)
+    convert_audio_file_with_stream_index(
+        input_path,
+        output_path,
+        settings,
+        cancel,
+        progress,
+        None,
+        None,
+    )
+}
+
+pub fn convert_audio_file_with_preferred_stream(
+    input_path: &Path,
+    output_path: &Path,
+    settings: &ConvertAudioSettings,
+    cancel: Option<Arc<AtomicBool>>,
+    progress: Option<&mut dyn FnMut(u32)>,
+    preferred_stream_index: Option<i32>,
+) -> Result<(), String> {
+    convert_audio_file_with_stream_index(
+        input_path,
+        output_path,
+        settings,
+        cancel,
+        progress,
+        None,
+        preferred_stream_index,
+    )
 }
 
 pub fn convert_audio_file_with_channels(
@@ -1840,8 +1867,28 @@ pub fn convert_audio_file_with_channels(
     output_path: &Path,
     settings: &ConvertAudioSettings,
     cancel: Option<Arc<AtomicBool>>,
+    progress: Option<&mut dyn FnMut(u32)>,
+    forced_channels: Option<u16>,
+) -> Result<(), String> {
+    convert_audio_file_with_stream_index(
+        input_path,
+        output_path,
+        settings,
+        cancel,
+        progress,
+        forced_channels,
+        None,
+    )
+}
+
+fn convert_audio_file_with_stream_index(
+    input_path: &Path,
+    output_path: &Path,
+    settings: &ConvertAudioSettings,
+    cancel: Option<Arc<AtomicBool>>,
     mut progress: Option<&mut dyn FnMut(u32)>,
     forced_channels: Option<u16>,
+    preferred_stream_index: Option<i32>,
 ) -> Result<(), String> {
     let api = ffmpeg_api()?;
     let args = build_ffmpeg_args(settings);
@@ -1853,11 +1900,15 @@ pub fn convert_audio_file_with_channels(
     ));
 
     let streams = list_audio_streams(input_path)?;
-    let preferred_stream = streams
-        .iter()
-        .find(|s| s.is_default)
-        .or_else(|| streams.first())
-        .map(|s| s.index);
+    let preferred_stream = preferred_stream_index
+        .and_then(|preferred_index| {
+            streams
+                .iter()
+                .find(|s| s.index == preferred_index)
+                .map(|s| s.index)
+        })
+        .or_else(|| streams.iter().find(|s| s.is_default).map(|s| s.index))
+        .or_else(|| streams.first().map(|s| s.index));
     let Some(stream_index) = preferred_stream else {
         return Err("FFmpeg: no audio streams found".to_string());
     };

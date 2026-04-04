@@ -63,7 +63,7 @@ mod win_ocr;
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
@@ -925,6 +925,19 @@ pub(crate) struct RaiPlayLiveAudioVariant {
     pub(crate) url: String,
 }
 
+#[derive(Clone)]
+struct MpvPlaybackSession {
+    ipc_path: PathBuf,
+    process_id: u32,
+}
+
+#[derive(Clone)]
+struct MpvPlaybackStatus {
+    volume: f32,
+    speed: f32,
+    pitch: f32,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum RaiAudioOrigin {
     #[default]
@@ -1468,6 +1481,8 @@ pub(crate) fn clear_active_podcast_chapters(hwnd: HWND) {
             state.active_podcast_episode_cache = None;
             state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
             state.raiplay_live_audio_variants.clear();
+            state.active_mpv_session = None;
+            state.active_mpv_status = None;
             state.active_youtube_return_context = YouTubeReturnContext::default();
         })
         .is_none()
@@ -1504,6 +1519,8 @@ pub(crate) fn reset_active_podcast_chapters_for_playback(hwnd: HWND) {
                 state.active_podcast_episode_cache = None;
                 state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
                 state.raiplay_live_audio_variants.clear();
+                state.active_mpv_session = None;
+                state.active_mpv_status = None;
                 state.active_youtube_return_context = YouTubeReturnContext::default();
             });
             kill_timer_best_effort(
@@ -1636,7 +1653,7 @@ pub(crate) fn set_active_youtube_return_context(
 }
 
 pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
-    let (url, podcast_title, title, cache_path, language) = {
+    let (url, podcast_title, title, cache_path, language, is_raiplay_on_demand) = {
         with_state(hwnd, |state| {
             (
                 state.active_podcast_episode_url.clone(),
@@ -1644,12 +1661,25 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
                 state.active_podcast_episode_title.clone(),
                 state.active_podcast_episode_cache.clone(),
                 state.settings.language,
+                state.active_podcast_episode_from_rai == RaiAudioOrigin::RaiPlay
+                    && state.raiplay_live_audio_variants.is_empty(),
             )
         })
-        .unwrap_or((None, None, None, None, Language::default()))
+        .unwrap_or((None, None, None, None, Language::default(), false))
     };
     let fallback_cache_path =
         current_playback_media_path(hwnd).filter(|path| is_local_cached_media_path(path));
+    if is_raiplay_on_demand {
+        download_podcast_episode_with_progress(
+            hwnd,
+            url,
+            podcast_title,
+            title,
+            cache_path.or(fallback_cache_path),
+            language,
+        );
+        return;
+    }
     download_podcast_episode(
         hwnd,
         url,
@@ -1658,6 +1688,114 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
         cache_path.or(fallback_cache_path),
         language,
     );
+}
+
+fn download_podcast_episode_with_progress(
+    hwnd: HWND,
+    url: Option<String>,
+    podcast_title: Option<String>,
+    title: Option<String>,
+    cache_path: Option<PathBuf>,
+    language: Language,
+) {
+    let suggested_name =
+        suggested_podcast_episode_filename(podcast_title.as_deref(), title.as_deref())
+            .or_else(|| {
+                cache_path
+                    .as_ref()
+                    .and_then(|p| p.file_stem())
+                    .and_then(|s| s.to_str())
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+            })
+            .unwrap_or_else(|| "podcast_episode".to_string());
+    let mut ext = cache_path
+        .as_ref()
+        .and_then(|p| p.extension().and_then(|e| e.to_str()))
+        .map(|e| e.to_string());
+    if ext.is_none()
+        && let Some(url) = url.as_deref()
+    {
+        ext = Path::new(url)
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_string());
+    }
+    if ext
+        .as_deref()
+        .map(|value| value.eq_ignore_ascii_case("m3u8"))
+        .unwrap_or(false)
+    {
+        ext = Some("m4a".to_string());
+    }
+    let ext = ext.unwrap_or_else(|| "mp3".to_string());
+    let suggested_full = format!("{}.{}", suggested_name, ext);
+    let target = save_podcast_episode_dialog(hwnd, language, &suggested_full);
+    let Some(target) = target else {
+        return;
+    };
+    let target = ensure_path_extension(target, &ext);
+    let Some(stream_url) = url
+        .as_deref()
+        .filter(|value| value.starts_with("http://") || value.starts_with("https://"))
+        .map(ToOwned::to_owned)
+    else {
+        download_podcast_episode(hwnd, url, podcast_title, title, cache_path, language);
+        return;
+    };
+    let convert_settings = match convert_settings_for_save_target(&target) {
+        Ok(settings) => settings,
+        Err(err) => {
+            let body = i18n::tr_f(language, "podcasts.save_error_body", &[("err", &err)]);
+            let title = i18n::tr(language, "podcasts.save_error_title");
+            let body_w = to_wide(&body);
+            let title_w = to_wide(&title);
+            message_box_modal(
+                hwnd,
+                PCWSTR(body_w.as_ptr()),
+                PCWSTR(title_w.as_ptr()),
+                MB_OK | MB_ICONERROR,
+            );
+            return;
+        }
+    };
+    let selected_audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
+    open_podcast_save_progress_window(hwnd, language);
+    update_podcast_save_progress_window(hwnd, 0);
+    let hwnd_copy = hwnd;
+    std::thread::spawn(move || {
+        let input_path = PathBuf::from(&stream_url);
+        let mut progress_callback = |pct: u32| {
+            update_podcast_save_progress_window(hwnd_copy, pct);
+        };
+        let result = crate::ffmpeg_export::convert_audio_file_with_preferred_stream(
+            &input_path,
+            &target,
+            &convert_settings,
+            None,
+            Some(&mut progress_callback),
+            selected_audio_track,
+        );
+        match result {
+            Ok(()) => post_podcast_episode_save_result(
+                hwnd_copy,
+                PodcastEpisodeSaveResult {
+                    language,
+                    target_path: target,
+                    error: None,
+                },
+            ),
+            Err(err) => post_podcast_episode_save_result(
+                hwnd_copy,
+                PodcastEpisodeSaveResult {
+                    language,
+                    target_path: target.clone(),
+                    error: Some(format!("stream export failed: {err}")),
+                },
+            ),
+        }
+    });
 }
 
 fn post_podcast_episode_save_result(hwnd: HWND, payload: PodcastEpisodeSaveResult) {
@@ -1785,71 +1923,6 @@ pub(crate) fn play_named_remote_audio_from_url_with_rai_origin(
     play_podcast_episode_from_url_internal(hwnd, url, None, title, mime, true, rai_origin);
 }
 
-pub(crate) fn play_cached_stream_audio_from_url_with_rai_origin(
-    hwnd: HWND,
-    url: String,
-    podcast_title: Option<String>,
-    title: Option<String>,
-    rai_origin: RaiAudioOrigin,
-) {
-    with_state(hwnd, |state| {
-        state.raiplay_live_audio_variants.clear();
-    });
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let cache_path = stream_audio_cache_path_for_url(&url, title.as_deref());
-    screen_reader_speak(&i18n::tr(language, "podcasts.loading"));
-    open_podcast_play_progress_window(hwnd, language);
-    std::thread::spawn(move || {
-        let cache_ok = cache_path
-            .metadata()
-            .map(|meta| meta.is_file() && meta.len() > 0)
-            .unwrap_or(false);
-        let result = if cache_ok {
-            Ok(())
-        } else {
-            match cache_path.parent() {
-                Some(parent) => {
-                    if let Err(err) = std::fs::create_dir_all(parent) {
-                        Err(format!("Impossibile creare la cache audio: {err}"))
-                    } else {
-                        let settings = crate::ffmpeg_export::ConvertAudioSettings {
-                            format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
-                            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(192),
-                        };
-                        crate::ffmpeg_export::convert_audio_file_with_preferred_stream(
-                            &PathBuf::from(&url),
-                            &cache_path,
-                            &settings,
-                            None,
-                            None,
-                            None,
-                        )
-                        .map_err(|err| format!("Impossibile preparare l'audio RaiPlay: {err}"))
-                    }
-                }
-                None => Err("Percorso cache audio non valido.".to_string()),
-            }
-        };
-
-        match result {
-            Ok(()) => post_podcast_episode_play_ready(
-                hwnd,
-                PodcastEpisodePlayReady {
-                    url,
-                    podcast_title,
-                    title,
-                    cache_path,
-                    prefer_title_for_document: true,
-                    rai_origin,
-                },
-            ),
-            Err(error) => {
-                post_podcast_episode_play_failed(hwnd, PodcastEpisodePlayFailed { language, error })
-            }
-        }
-    });
-}
-
 pub(crate) fn play_live_stream_audio_from_url_with_rai_origin(
     hwnd: HWND,
     url: String,
@@ -1893,20 +1966,404 @@ pub(crate) fn play_live_stream_audio_from_url_with_rai_origin(
     activate_pending_podcast_chapters(hwnd);
 }
 
-fn stream_audio_cache_path_for_url(url: &str, title: Option<&str>) -> PathBuf {
-    use sha2::Digest;
+const MPV_RUNTIME_URL: &str =
+    "https://github.com/Ambro86/Sonarpad-Tools/releases/download/0.7/mpv.zip";
 
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(url.as_bytes());
-    let hash = hex::encode(hasher.finalize());
+fn mpv_runtime_dir() -> PathBuf {
+    settings::settings_dir().join("mpv")
+}
 
-    let file_stem = title
-        .and_then(suggested_filename_from_text)
-        .unwrap_or_else(|| format!("raiplay_audio_{}", &hash[..16]));
+fn mpv_runtime_executable_path() -> PathBuf {
+    mpv_runtime_dir().join("mpv.exe")
+}
 
-    settings::settings_dir()
-        .join("podcast cache")
-        .join(format!("{file_stem}.m4a"))
+fn find_mpv_executable_in_tree(root: &Path) -> Option<PathBuf> {
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        let entries = std::fs::read_dir(&dir).ok()?;
+        for entry in entries {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            if path.is_dir() {
+                pending.push(path);
+                continue;
+            }
+            if path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.eq_ignore_ascii_case("mpv.exe"))
+            {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+fn download_and_extract_mpv_runtime(
+    hwnd: HWND,
+    language: Language,
+    target_dir: &Path,
+) -> Result<(), String> {
+    std::fs::create_dir_all(target_dir)
+        .map_err(|err| format!("Impossibile creare la cartella di mpv: {err}"))?;
+    let zip_path = settings::settings_dir().join("mpv.zip.download");
+    log_debug(&format!(
+        "Downloading mpv runtime from {} to {}",
+        MPV_RUNTIME_URL,
+        zip_path.display()
+    ));
+    let client = reqwest::blocking::Client::builder()
+        .build()
+        .map_err(|err| format!("Impossibile inizializzare il download di mpv: {err}"))?;
+    let mut response = client
+        .get(MPV_RUNTIME_URL)
+        .send()
+        .map_err(|err| format!("Impossibile scaricare mpv: {err}"))?
+        .error_for_status()
+        .map_err(|err| format!("Download di mpv non riuscito: {err}"))?;
+    let total_bytes = response.content_length();
+    open_podcast_save_progress_window(hwnd, language);
+    update_podcast_save_progress_window(hwnd, 0);
+    {
+        let mut file = std::fs::File::create(&zip_path)
+            .map_err(|err| format!("Impossibile creare l'archivio temporaneo di mpv: {err}"))?;
+        let mut buffer = [0u8; 64 * 1024];
+        let mut downloaded = 0u64;
+        loop {
+            let read = response
+                .read(&mut buffer)
+                .map_err(|err| format!("Impossibile salvare l'archivio di mpv: {err}"))?;
+            if read == 0 {
+                break;
+            }
+            file.write_all(&buffer[..read])
+                .map_err(|err| format!("Impossibile salvare l'archivio di mpv: {err}"))?;
+            downloaded = downloaded.saturating_add(read as u64);
+            if let Some(total_bytes) = total_bytes.filter(|value| *value > 0) {
+                let pct = ((downloaded.saturating_mul(90)) / total_bytes).min(90) as u32;
+                update_podcast_save_progress_window(hwnd, pct);
+            }
+        }
+        file.flush()
+            .map_err(|err| format!("Impossibile finalizzare l'archivio di mpv: {err}"))?;
+    }
+    update_podcast_save_progress_window(hwnd, 92);
+
+    let extract_result = (|| -> Result<(), String> {
+        let file = std::fs::File::open(&zip_path)
+            .map_err(|err| format!("Impossibile aprire l'archivio di mpv: {err}"))?;
+        let mut archive =
+            zip::ZipArchive::new(file).map_err(|err| format!("Archivio mpv non valido: {err}"))?;
+        let entry_count = archive.len().max(1);
+        for index in 0..archive.len() {
+            let mut entry = archive
+                .by_index(index)
+                .map_err(|err| format!("Impossibile leggere l'archivio di mpv: {err}"))?;
+            let relative_path = entry
+                .enclosed_name()
+                .map(Path::to_path_buf)
+                .ok_or_else(|| {
+                    format!(
+                        "Archivio mpv contiene un percorso non valido: {}",
+                        entry.name()
+                    )
+                })?;
+            let output_path = target_dir.join(relative_path);
+            if entry.is_dir() {
+                std::fs::create_dir_all(&output_path).map_err(|err| {
+                    format!(
+                        "Impossibile creare la cartella estratta di mpv {}: {err}",
+                        output_path.display()
+                    )
+                })?;
+                continue;
+            }
+            if let Some(parent) = output_path.parent() {
+                std::fs::create_dir_all(parent).map_err(|err| {
+                    format!(
+                        "Impossibile creare la cartella estratta di mpv {}: {err}",
+                        parent.display()
+                    )
+                })?;
+            }
+            let mut output = std::fs::File::create(&output_path).map_err(|err| {
+                format!(
+                    "Impossibile creare il file estratto di mpv {}: {err}",
+                    output_path.display()
+                )
+            })?;
+            std::io::copy(&mut entry, &mut output).map_err(|err| {
+                format!(
+                    "Impossibile estrarre il file di mpv {}: {err}",
+                    output_path.display()
+                )
+            })?;
+            output.flush().map_err(|err| {
+                format!(
+                    "Impossibile finalizzare il file estratto di mpv {}: {err}",
+                    output_path.display()
+                )
+            })?;
+            let extract_pct = 92 + (((index + 1) * 8) / entry_count) as u32;
+            update_podcast_save_progress_window(hwnd, extract_pct.min(100));
+        }
+        Ok(())
+    })();
+
+    if let Err(err) = std::fs::remove_file(&zip_path) {
+        log_debug(&format!(
+            "Temporary mpv archive cleanup failed for {}: {}",
+            zip_path.display(),
+            err
+        ));
+    }
+
+    extract_result
+}
+
+fn ensure_mpv_runtime_available(hwnd: HWND) -> Result<PathBuf, String> {
+    let preferred_path = mpv_runtime_executable_path();
+    if preferred_path.is_file() {
+        return Ok(preferred_path);
+    }
+
+    let runtime_dir = mpv_runtime_dir();
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let result = download_and_extract_mpv_runtime(hwnd, language, &runtime_dir);
+    close_podcast_save_progress_window(hwnd);
+    result?;
+
+    if preferred_path.is_file() {
+        return Ok(preferred_path);
+    }
+
+    find_mpv_executable_in_tree(&runtime_dir).ok_or_else(|| {
+        format!(
+            "mpv scaricato ma mpv.exe non trovato in {}.",
+            runtime_dir.display()
+        )
+    })
+}
+
+fn clear_managed_mpv_state(hwnd: HWND) {
+    if with_state(hwnd, |state| {
+        state.active_mpv_session = None;
+        state.active_podcast_episode_url = None;
+        state.active_podcast_title = None;
+        state.active_podcast_episode_title = None;
+        state.active_podcast_episode_cache = None;
+        state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
+        state.raiplay_live_audio_variants.clear();
+        state.active_mpv_status = None;
+        state.available_audio_tracks.clear();
+        state.selected_audio_track = None;
+    })
+    .is_none()
+    {
+        log_debug("Failed to clear managed mpv state");
+    }
+    menu::update_playback_menu(hwnd, false);
+}
+
+fn send_mpv_ipc_command(ipc_path: &Path, command_json: &str) -> Result<(), String> {
+    log_debug(&format!(
+        "Managed mpv IPC command send: pipe={} command={}",
+        ipc_path.display(),
+        command_json
+    ));
+    let mut pipe = std::fs::OpenOptions::new()
+        .write(true)
+        .open(ipc_path)
+        .map_err(|err| format!("Impossibile aprire il canale IPC di mpv: {err}"))?;
+    use std::io::Write as _;
+    pipe.write_all(command_json.as_bytes())
+        .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+    pipe.write_all(b"\n")
+        .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+    pipe.flush()
+        .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+    log_debug(&format!(
+        "Managed mpv IPC command ok: pipe={} command={}",
+        ipc_path.display(),
+        command_json
+    ));
+    Ok(())
+}
+
+fn send_mpv_ipc_request(ipc_path: &Path, command_json: &str) -> Result<serde_json::Value, String> {
+    use std::io::{BufRead as _, BufReader, Write as _};
+
+    log_debug(&format!(
+        "Managed mpv IPC request send: pipe={} command={}",
+        ipc_path.display(),
+        command_json
+    ));
+    let mut pipe = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(ipc_path)
+        .map_err(|err| format!("Impossibile aprire il canale IPC di mpv: {err}"))?;
+    pipe.write_all(command_json.as_bytes())
+        .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+    pipe.write_all(b"\n")
+        .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+    pipe.flush()
+        .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+
+    let mut reader = BufReader::new(pipe);
+    let mut response = String::new();
+    reader
+        .read_line(&mut response)
+        .map_err(|err| format!("Impossibile leggere la risposta da mpv: {err}"))?;
+    let trimmed = response.trim();
+    log_debug(&format!(
+        "Managed mpv IPC request response: pipe={} command={} response={}",
+        ipc_path.display(),
+        command_json,
+        trimmed
+    ));
+    serde_json::from_str(trimmed).map_err(|err| format!("Risposta IPC di mpv non valida: {err}"))
+}
+
+fn try_send_command_to_managed_mpv(hwnd: HWND, command_json: &str) -> Result<(), String> {
+    let session = with_state(hwnd, |state| state.active_mpv_session.clone())
+        .flatten()
+        .ok_or_else(|| "Nessuna riproduzione mpv attiva.".to_string())?;
+    match send_mpv_ipc_command(&session.ipc_path, command_json) {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            log_debug(&format!(
+                "Managed mpv IPC command failed: pipe={} command={} err={}",
+                session.ipc_path.display(),
+                command_json,
+                err
+            ));
+            Err(err)
+        }
+    }
+}
+
+fn query_managed_mpv_property(hwnd: HWND, property: &str) -> Result<serde_json::Value, String> {
+    let session = with_state(hwnd, |state| state.active_mpv_session.clone())
+        .flatten()
+        .ok_or_else(|| "Nessuna riproduzione mpv attiva.".to_string())?;
+    let request = format!(r#"{{"command":["get_property","{}"]}}"#, property);
+    let response = match send_mpv_ipc_request(&session.ipc_path, &request) {
+        Ok(response) => response,
+        Err(err) => {
+            log_debug(&format!(
+                "Managed mpv IPC request failed: pipe={} property={} err={}",
+                session.ipc_path.display(),
+                property,
+                err
+            ));
+            return Err(err);
+        }
+    };
+    Ok(response
+        .get("data")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null))
+}
+
+pub(crate) fn is_mpv_playback_active(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| state.active_mpv_session.is_some()).unwrap_or(false)
+}
+
+pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
+    let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
+    if let Some(session) = session {
+        if let Err(err) = send_mpv_ipc_command(&session.ipc_path, r#"{"command":["quit"]}"#) {
+            log_debug(&format!("Managed mpv quit command failed: {}", err));
+        }
+        if let Err(err) = std::process::Command::new("taskkill")
+            .args(["/PID", &session.process_id.to_string(), "/T", "/F"])
+            .spawn()
+        {
+            log_debug(&format!("Managed mpv taskkill failed: {}", err));
+        }
+    }
+    clear_managed_mpv_state(hwnd);
+}
+
+pub(crate) fn launch_raiplay_in_mpv(
+    hwnd: HWND,
+    url: &str,
+    podcast_title: Option<&str>,
+    title: Option<&str>,
+    rai_origin: RaiAudioOrigin,
+) -> Result<(), String> {
+    let mpv_exe = ensure_mpv_runtime_available(hwnd)?;
+    let mpv_dir = mpv_exe
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| "Cartella di mpv non valida.".to_string())?;
+    let ipc_name = format!(
+        "sonarpad-mpv-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    );
+    let ipc_path = PathBuf::from(format!(r"\\.\pipe\{ipc_name}"));
+
+    let mut command = std::process::Command::new(&mpv_exe);
+    command
+        .current_dir(&mpv_dir)
+        .arg(url)
+        .arg("--no-terminal")
+        .arg("--volume-max=300")
+        .arg(format!("--input-ipc-server={}", ipc_path.display()));
+    if let Some(title) = title.filter(|value| !value.trim().is_empty()) {
+        command.arg(format!("--title={title}"));
+    }
+    let child = command
+        .spawn()
+        .map_err(|err| format!("Impossibile avviare mpv: {err}"))?;
+    for _ in 0..40 {
+        if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
+            let playback_path = PathBuf::from(url);
+            if let Some(index) = editor_manager::ensure_audio_document_tab(hwnd, &playback_path) {
+                editor_manager::select_tab(hwnd, index);
+            }
+            if let Some(display_title) = podcast_episode_display_title(podcast_title, title) {
+                editor_manager::set_current_document_title(hwnd, &display_title);
+            }
+            editor_manager::mark_current_document_from_rss(hwnd, true);
+            if with_state(hwnd, |state| {
+                state.active_mpv_session = Some(MpvPlaybackSession {
+                    ipc_path: ipc_path.clone(),
+                    process_id: child.id(),
+                });
+                state.active_mpv_status = Some(MpvPlaybackStatus {
+                    volume: 100.0,
+                    speed: 1.0,
+                    pitch: 0.0,
+                });
+                state.active_podcast_episode_from_rai = rai_origin;
+                state.raiplay_live_audio_variants.clear();
+                state.available_audio_tracks.clear();
+                state.selected_audio_track = None;
+            })
+            .is_none()
+            {
+                log_debug("Failed to persist managed mpv state");
+            }
+            set_active_podcast_episode_info(
+                hwnd,
+                Some(url.to_string()),
+                podcast_title.map(ToOwned::to_owned),
+                title.map(ToOwned::to_owned),
+                None,
+            );
+            menu::update_playback_menu(hwnd, true);
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    Err("Impossibile inizializzare il controllo di mpv.".to_string())
 }
 
 fn open_podcast_play_progress_window(hwnd: HWND, language: Language) {
@@ -1922,6 +2379,31 @@ fn open_podcast_play_progress_window(hwnd: HWND, language: Language) {
     });
 }
 
+fn open_podcast_save_progress_window(hwnd: HWND, language: Language) {
+    let labels = app_windows::podcast_save_window::SaveDialogLabels {
+        title: i18n::tr(language, "podcast.save.title"),
+        in_progress: i18n::tr(language, "podcast.save.in_progress"),
+        cancel: i18n::tr(language, "podcast.save.cancel"),
+        cancel_confirm: i18n::tr(language, "podcast.cancel_confirm"),
+    };
+    let dialog = app_windows::podcast_save_window::open_with_labels(hwnd, language, labels, false);
+    with_state(hwnd, |state| {
+        state.podcast_save_window = dialog;
+    });
+}
+
+fn update_podcast_save_progress_window(hwnd: HWND, pct: u32) {
+    let dialog = with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
+    if dialog.0 != 0 {
+        crate::send_message_w_safe(
+            dialog,
+            app_windows::podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
+            WPARAM(pct.min(100) as usize),
+            LPARAM(0),
+        );
+    }
+}
+
 fn close_podcast_play_progress_window(hwnd: HWND) {
     let dialog = with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
     if dialog.0 != 0 {
@@ -1935,6 +2417,10 @@ fn close_podcast_play_progress_window(hwnd: HWND) {
     with_state(hwnd, |state| {
         state.podcast_save_window = HWND(0);
     });
+}
+
+fn close_podcast_save_progress_window(hwnd: HWND) {
+    close_podcast_play_progress_window(hwnd);
 }
 
 fn play_podcast_episode_from_url_internal(
@@ -2714,6 +3200,136 @@ fn announce_player_volume(hwnd: HWND) {
         &[("pct", &percent.to_string())],
     );
     nvda_speak(&message);
+}
+
+fn announce_mpv_volume(hwnd: HWND) {
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let volume = match query_managed_mpv_property(hwnd, "volume")
+        .ok()
+        .and_then(|value| value.as_f64())
+    {
+        Some(volume) => {
+            let volume = volume as f32;
+            if with_state(hwnd, |state| {
+                if let Some(status) = state.active_mpv_status.as_mut() {
+                    status.volume = volume;
+                }
+            })
+            .is_none()
+            {
+                log_debug("Failed to persist managed mpv volume state");
+            }
+            volume
+        }
+        None => with_state(hwnd, |state| {
+            state.active_mpv_status.as_ref().map(|s| s.volume)
+        })
+        .flatten()
+        .unwrap_or(100.0),
+    };
+    let percent = volume.round().clamp(0.0, 300.0) as u32;
+    let message = i18n::tr_f(
+        language,
+        "player.volume_announce",
+        &[("pct", &percent.to_string())],
+    );
+    nvda_speak(&message);
+}
+
+fn announce_mpv_time(hwnd: HWND) -> Result<(), String> {
+    let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+    let current = query_managed_mpv_property(hwnd, "time-pos")?;
+    let total = query_managed_mpv_property(hwnd, "duration").ok();
+    let current_secs = current.as_f64().unwrap_or(0.0).max(0.0).floor() as u64;
+    let current_str = format_time_hms(current_secs);
+    let message = if let Some(total_secs) = total
+        .and_then(|value| value.as_f64())
+        .map(|value| value.max(0.0).floor() as u64)
+    {
+        let total_str = format_time_hms(total_secs);
+        i18n::tr_f(
+            language,
+            "player.time_announce",
+            &[("current", &current_str), ("total", &total_str)],
+        )
+    } else {
+        i18n::tr_f(
+            language,
+            "player.time_announce_no_total",
+            &[("current", &current_str)],
+        )
+    };
+    nvda_speak(&message);
+    Ok(())
+}
+
+fn sync_mpv_speed_status(hwnd: HWND) -> Option<f32> {
+    let speed = query_managed_mpv_property(hwnd, "speed")
+        .ok()
+        .and_then(|value| value.as_f64())
+        .map(|value| value as f32)?;
+    if with_state(hwnd, |state| {
+        if let Some(status) = state.active_mpv_status.as_mut() {
+            status.speed = speed;
+        }
+    })
+    .is_none()
+    {
+        log_debug("Failed to persist managed mpv speed state");
+    }
+    Some(speed)
+}
+
+fn extract_mpv_rubberband_pitch_scale(value: &serde_json::Value) -> Option<f32> {
+    match value {
+        serde_json::Value::String(text) => {
+            let marker = "rubberband=pitch=";
+            let start = text.find(marker)? + marker.len();
+            let tail = &text[start..];
+            let number: String = tail
+                .chars()
+                .take_while(|ch| ch.is_ascii_digit() || matches!(ch, '+' | '-' | '.' | 'e' | 'E'))
+                .collect();
+            number.parse::<f32>().ok()
+        }
+        serde_json::Value::Array(items) => {
+            items.iter().find_map(extract_mpv_rubberband_pitch_scale)
+        }
+        serde_json::Value::Object(map) => map.values().find_map(extract_mpv_rubberband_pitch_scale),
+        _ => None,
+    }
+}
+
+fn sync_mpv_pitch_status(hwnd: HWND) -> Option<f32> {
+    let filters = query_managed_mpv_property(hwnd, "af").ok()?;
+    let pitch = extract_mpv_rubberband_pitch_scale(&filters)
+        .map(|scale| 12.0 * scale.log2())
+        .unwrap_or(0.0);
+    if with_state(hwnd, |state| {
+        if let Some(status) = state.active_mpv_status.as_mut() {
+            status.pitch = pitch;
+        }
+    })
+    .is_none()
+    {
+        log_debug("Failed to persist managed mpv pitch state");
+    }
+    Some(pitch)
+}
+
+fn apply_mpv_pitch(hwnd: HWND, pitch: f32) -> Result<(), String> {
+    let scale = 2f32.powf(pitch / 12.0);
+    if pitch.abs() < f32::EPSILON {
+        try_send_command_to_managed_mpv(hwnd, r#"{"command":["af","clr",""]}"#)
+    } else {
+        try_send_command_to_managed_mpv(
+            hwnd,
+            &format!(
+                r#"{{"command":["af","set","lavfi=[rubberband=pitch={:.6}]"]}}"#,
+                scale
+            ),
+        )
+    }
 }
 
 fn announce_player_speed(language: Language, speed: f32) {
@@ -4025,6 +4641,119 @@ fn toggle_voice_dictation(hwnd: HWND) {
 }
 
 fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
+    if is_mpv_playback_active(hwnd) {
+        let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
+        let result = match command {
+            PlayerCommand::TogglePause => {
+                try_send_command_to_managed_mpv(hwnd, r#"{"command":["cycle","pause"]}"#)
+            }
+            PlayerCommand::Stop | PlayerCommand::StopOnly => {
+                stop_managed_mpv_playback(hwnd);
+                return;
+            }
+            PlayerCommand::Seek(amount) => try_send_command_to_managed_mpv(
+                hwnd,
+                &format!(r#"{{"command":["seek",{},"relative"]}}"#, amount),
+            ),
+            PlayerCommand::SeekToStart => {
+                try_send_command_to_managed_mpv(hwnd, r#"{"command":["seek",0,"absolute"]}"#)
+            }
+            PlayerCommand::SeekToEnd => try_send_command_to_managed_mpv(
+                hwnd,
+                r#"{"command":["seek",100,"absolute-percent"]}"#,
+            ),
+            PlayerCommand::Volume(delta) => {
+                let volume_delta = if delta > 0.0 { 5 } else { -5 };
+                let result = try_send_command_to_managed_mpv(
+                    hwnd,
+                    &format!(r#"{{"command":["add","volume",{}]}}"#, volume_delta),
+                );
+                if result.is_ok() {
+                    announce_mpv_volume(hwnd);
+                }
+                result
+            }
+            PlayerCommand::VolumeReset => {
+                let result = try_send_command_to_managed_mpv(
+                    hwnd,
+                    r#"{"command":["set_property","volume",100]}"#,
+                );
+                if result.is_ok() {
+                    announce_mpv_volume(hwnd);
+                }
+                result
+            }
+            PlayerCommand::Speed(delta) => {
+                let base_speed = sync_mpv_speed_status(hwnd).unwrap_or_else(|| {
+                    with_state(hwnd, |state| {
+                        state.active_mpv_status.as_ref().map(|s| s.speed)
+                    })
+                    .flatten()
+                    .unwrap_or(1.0)
+                });
+                let new_speed = (base_speed + delta).clamp(0.5, 3.0);
+                let result = try_send_command_to_managed_mpv(
+                    hwnd,
+                    &format!(r#"{{"command":["set_property","speed",{}]}}"#, new_speed),
+                );
+                if result.is_ok() {
+                    let announced_speed = sync_mpv_speed_status(hwnd).unwrap_or(new_speed);
+                    announce_player_speed(language, announced_speed);
+                }
+                result
+            }
+            PlayerCommand::SpeedReset => {
+                let result = try_send_command_to_managed_mpv(
+                    hwnd,
+                    r#"{"command":["set_property","speed",1.0]}"#,
+                );
+                if result.is_ok() {
+                    let announced_speed = sync_mpv_speed_status(hwnd).unwrap_or(1.0);
+                    announce_player_speed(language, announced_speed);
+                }
+                result
+            }
+            PlayerCommand::Pitch(delta) => {
+                let base_pitch = sync_mpv_pitch_status(hwnd).unwrap_or_else(|| {
+                    with_state(hwnd, |state| {
+                        state.active_mpv_status.as_ref().map(|s| s.pitch)
+                    })
+                    .flatten()
+                    .unwrap_or(0.0)
+                });
+                let new_pitch = (base_pitch + delta).clamp(-12.0, 12.0);
+                let result = apply_mpv_pitch(hwnd, new_pitch);
+                if result.is_ok() {
+                    let announced_pitch = sync_mpv_pitch_status(hwnd).unwrap_or(new_pitch);
+                    announce_player_pitch(language, announced_pitch);
+                }
+                result
+            }
+            PlayerCommand::PitchReset => {
+                let result = apply_mpv_pitch(hwnd, 0.0);
+                if result.is_ok() {
+                    let announced_pitch = sync_mpv_pitch_status(hwnd).unwrap_or(0.0);
+                    announce_player_pitch(language, announced_pitch);
+                }
+                result
+            }
+            PlayerCommand::AnnounceTime => announce_mpv_time(hwnd),
+            _ => {
+                let message = i18n::tr(language, "playback.direct_stream_command_disabled");
+                if !message.is_empty() {
+                    crate::accessibility::screen_reader_speak(&message);
+                }
+                return;
+            }
+        };
+        if let Err(err) = result {
+            log_debug(&format!("Managed mpv command failed: {}", err));
+            if !err.is_empty() {
+                crate::accessibility::screen_reader_speak(&err);
+            }
+        }
+        return;
+    }
     let disable_seek_for_live_raiplay = matches!(
         command,
         PlayerCommand::Seek(_)
@@ -4375,6 +5104,8 @@ pub(crate) struct AppState {
     active_podcast_episode_cache: Option<PathBuf>,
     active_podcast_episode_from_rai: RaiAudioOrigin,
     raiplay_live_audio_variants: Vec<RaiPlayLiveAudioVariant>,
+    active_mpv_session: Option<MpvPlaybackSession>,
+    active_mpv_status: Option<MpvPlaybackStatus>,
     active_youtube_return_context: YouTubeReturnContext,
     last_rai_recent_item_id: Option<String>,
     last_rai_grouped_item_id: Option<String>,
@@ -4897,8 +5628,10 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                 || (msg.message == WM_APPCOMMAND
                     && appcommand_from_lparam(msg.lParam) == APPCOMMAND_MEDIA_PLAY_PAUSE)
             {
-                let has_player =
-                    with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false);
+                let has_player = with_state(hwnd, |state| {
+                    state.active_audiobook.is_some() || state.active_mpv_session.is_some()
+                })
+                .unwrap_or(false);
                 if has_player {
                     handle_player_command(hwnd, PlayerCommand::TogglePause);
                     continue;
@@ -4998,11 +5731,12 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
             with_state(hwnd, |state| {
                 // Audiobook keyboard controls (ONLY if no secondary window is open)
                 if msg.message == WM_KEYDOWN {
-                    let is_audiobook = state
-                        .docs
-                        .get(state.current)
-                        .map(|d| matches!(d.format, FileFormat::Audiobook))
-                        .unwrap_or(false);
+                    let is_audiobook = state.active_mpv_session.is_some()
+                        || state
+                            .docs
+                            .get(state.current)
+                            .map(|d| matches!(d.format, FileFormat::Audiobook))
+                            .unwrap_or(false);
                     let secondary_open = state.bookmarks_window.0 != 0
                         || state.options_dialog.0 != 0
                         || state.help_window.0 != 0
@@ -5036,10 +5770,16 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                             let from_rai = state.active_podcast_episode_from_rai;
                             let youtube_return_context =
                                 state.active_youtube_return_context.clone();
+                            let is_mpv = state.active_mpv_session.is_some();
                             if is_stop {
                                 // close_current_document() already stops audiobook playback
                                 // for audiobook tabs, so avoid duplicate stop work here.
-                                editor_manager::close_current_document(hwnd);
+                                if is_mpv {
+                                    stop_managed_mpv_playback(hwnd);
+                                    editor_manager::close_current_document(hwnd);
+                                } else {
+                                    editor_manager::close_current_document(hwnd);
+                                }
                                 if from_rai == RaiAudioOrigin::Recenti {
                                     app_windows::rai_audiodescrizioni_window::open(hwnd);
                                 } else if from_rai == RaiAudioOrigin::Tutte {
@@ -5801,6 +6541,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_podcast_episode_cache: None,
                     active_podcast_episode_from_rai: RaiAudioOrigin::None,
                     raiplay_live_audio_variants: Vec::new(),
+                    active_mpv_session: None,
+                    active_mpv_status: None,
                     active_youtube_return_context: YouTubeReturnContext::default(),
                     last_rai_recent_item_id: None,
                     last_rai_grouped_item_id: None,
@@ -6113,6 +6855,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     return LRESULT(0);
                 }
                 let payload = Box::from_raw(ptr);
+                close_podcast_save_progress_window(hwnd);
                 if let Some(err) = payload.error {
                     let body = i18n::tr_f(
                         payload.language,
@@ -11499,12 +12242,20 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     let ctrl_down = (crate::get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
     let shift_down = (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
     let alt_down = (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+    let has_active_player = with_state(hwnd, |state| {
+        state.active_audiobook.is_some() || state.active_mpv_session.is_some()
+    })
+    .unwrap_or(false);
     if key == 'B' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_BDCIECHI);
         return true;
     }
     if key == 'S' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_STREAM_AUDIO);
+        return true;
+    }
+    if key == 'P' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_RAIPLAY);
         return true;
     }
     if key == 'T' as u16 && !ctrl_down && shift_down && alt_down {
@@ -11520,8 +12271,11 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         return true;
     }
     if key == 'L' as u16 && !ctrl_down && shift_down && alt_down {
-        dispatch_shortcut_command(hwnd, IDM_PLAYBACK_CHAPTER_LIST);
-        return true;
+        if has_active_player {
+            dispatch_shortcut_command(hwnd, IDM_PLAYBACK_CHAPTER_LIST);
+            return true;
+        }
+        return false;
     }
     if key == 'A' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_RAI_AUDIODESCRIZIONI);

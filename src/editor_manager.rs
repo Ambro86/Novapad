@@ -4472,8 +4472,10 @@ pub fn try_close_app(hwnd: HWND) -> bool {
             }
         }
     }
-    let has_active_audiobook =
-        with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false);
+    let has_active_audiobook = with_state(hwnd, |state| {
+        state.active_audiobook.is_some() || state.active_mpv_session.is_some()
+    })
+    .unwrap_or(false);
     if has_active_audiobook {
         crate::audio_player::stop_audiobook_playback(hwnd);
     }

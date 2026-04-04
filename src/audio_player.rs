@@ -1453,6 +1453,9 @@ pub fn stop_audiobook_playback(hwnd: HWND) {
         {
             crate::log_debug("Failed to access audio player state");
         }
+        if crate::is_mpv_playback_active(hwnd) {
+            crate::stop_managed_mpv_playback(hwnd);
+        }
     }
 }
 

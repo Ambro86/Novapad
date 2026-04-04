@@ -291,7 +291,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
             String::new()
         },
         menu_raiplay: if language == Language::Italian {
-            "RaiPlay...".to_string()
+            "RaiPlay...\tAlt+Shift+P".to_string()
         } else {
             String::new()
         },
@@ -474,6 +474,44 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 .unwrap_or(false)
         })
         .unwrap_or(false);
+        let mpv_playback_active =
+            with_state(hwnd, |state| state.active_mpv_session.is_some()).unwrap_or(false);
+        let hls_m3u8_playback = with_state(hwnd, |state| {
+            let active_player_url = state
+                .active_audiobook
+                .as_ref()
+                .map(|player| player.path.to_string_lossy().to_ascii_lowercase());
+            let active_doc_url = state
+                .docs
+                .get(state.current)
+                .and_then(|doc| {
+                    if matches!(doc.format, crate::settings::FileFormat::Audiobook) {
+                        doc.path.as_ref()
+                    } else {
+                        None
+                    }
+                })
+                .map(|path| path.to_string_lossy().to_ascii_lowercase());
+            let active_episode_url = state
+                .active_podcast_episode_url
+                .as_ref()
+                .map(|url| url.to_ascii_lowercase());
+            let active_cache = state
+                .active_podcast_episode_cache
+                .as_ref()
+                .map(|path| path.to_string_lossy().to_ascii_lowercase());
+
+            [
+                active_player_url,
+                active_doc_url,
+                active_episode_url,
+                active_cache,
+            ]
+            .into_iter()
+            .flatten()
+            .any(|value| value.contains(".m3u8"))
+        })
+        .unwrap_or(false);
         let raiplay_live_stream_playback = with_state(hwnd, |state| {
             state.active_podcast_episode_from_rai == crate::RaiAudioOrigin::RaiPlay
                 && !state.raiplay_live_audio_variants.is_empty()
@@ -624,7 +662,7 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     &download_episode,
                 );
             }
-            if !raiplay_live_stream_playback {
+            if !hls_m3u8_playback {
                 append_menu_string(
                     playback_menu,
                     MF_STRING,
@@ -720,7 +758,7 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 IDM_PLAYBACK_VOLUME_DOWN,
                 &volume_down,
             );
-            let rate_flags = if direct_stream_playback {
+            let rate_flags = if direct_stream_playback && !mpv_playback_active {
                 MF_STRING | MF_GRAYED
             } else {
                 MF_STRING
@@ -749,7 +787,7 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 );
                 append_menu_string(
                     reset_menu,
-                    if direct_stream_playback {
+                    if direct_stream_playback && !mpv_playback_active {
                         MF_STRING | MF_GRAYED
                     } else {
                         MF_STRING
@@ -759,7 +797,7 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 );
                 append_menu_string(
                     reset_menu,
-                    if direct_stream_playback {
+                    if direct_stream_playback && !mpv_playback_active {
                         MF_STRING | MF_GRAYED
                     } else {
                         MF_STRING

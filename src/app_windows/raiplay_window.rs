@@ -350,14 +350,15 @@ fn open_media_item(
                     live_audio_tracks,
                     RaiAudioOrigin::RaiPlay,
                 );
-            } else {
-                crate::play_cached_stream_audio_from_url_with_rai_origin(
-                    parent,
-                    url,
-                    Some(page.title.clone()),
-                    title,
-                    RaiAudioOrigin::RaiPlay,
-                );
+            } else if let Err(err) = crate::launch_raiplay_in_mpv(
+                parent,
+                &url,
+                Some(page.title.as_str()),
+                title.as_deref(),
+                RaiAudioOrigin::RaiPlay,
+            ) {
+                show_error(parent, language, &err);
+                return false;
             }
         }
     };

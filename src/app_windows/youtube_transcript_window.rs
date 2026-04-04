@@ -4905,8 +4905,10 @@ struct StreamDialogState {
 struct StreamTrackDialogInit {
     parent: HWND,
     language: Language,
-    tracks: Vec<StreamAudioTrack>,
-    result: Arc<Mutex<Option<Option<String>>>>,
+    label: String,
+    options: Vec<String>,
+    default_selection: usize,
+    result: Arc<Mutex<Option<usize>>>,
 }
 
 struct StreamTrackDialogState {
@@ -4914,8 +4916,8 @@ struct StreamTrackDialogState {
     language: Language,
     combo: HWND,
     ok_button: HWND,
-    tracks: Vec<StreamAudioTrack>,
-    result: Arc<Mutex<Option<Option<String>>>>,
+    options: Vec<String>,
+    result: Arc<Mutex<Option<usize>>>,
 }
 
 impl StreamOutputFormat {
@@ -7052,13 +7054,7 @@ fn stream_track_dialog_wndproc_inner(
                 let label = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
-                    PCWSTR(
-                        to_wide(&plain_label(&i18n::tr(
-                            init.language,
-                            "playback.audio_track",
-                        )))
-                        .as_ptr(),
-                    ),
+                    PCWSTR(to_wide(&plain_label(&init.label)).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
                     18,
@@ -7118,26 +7114,21 @@ fn stream_track_dialog_wndproc_inner(
                     }
                 }
 
-                let auto_label = i18n::tr(init.language, "stream_audio.track.auto");
-                let auto_w = to_wide(&auto_label);
-                SendMessageW(
-                    combo,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(auto_w.as_ptr() as isize),
-                );
-                for track in &init.tracks {
-                    let w = to_wide(&track.label);
+                for option in &init.options {
+                    let w = to_wide(option);
                     SendMessageW(combo, CB_ADDSTRING, WPARAM(0), LPARAM(w.as_ptr() as isize));
                 }
-                SendMessageW(combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+                let default_selection = init
+                    .default_selection
+                    .min(init.options.len().saturating_sub(1));
+                SendMessageW(combo, CB_SETCURSEL, WPARAM(default_selection), LPARAM(0));
 
                 let state = Box::new(StreamTrackDialogState {
                     parent: init.parent,
                     language: init.language,
                     combo,
                     ok_button,
-                    tracks: init.tracks,
+                    options: init.options,
                     result: init.result,
                 });
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
@@ -7153,15 +7144,13 @@ fn stream_track_dialog_wndproc_inner(
                             crate::log_debug("Screen reader speak failed");
                         }
                         let idx = SendMessageW(state.combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                        let selected: Option<Option<String>> = if idx <= 0 {
-                            Some(None)
-                        } else {
-                            state
-                                .tracks
-                                .get((idx - 1) as usize)
-                                .map(|t| Some(t.format_id.clone()))
-                        };
-                        *state.result.lock().unwrap_or_else(|e| e.into_inner()) = selected;
+                        let selected = (idx >= 0)
+                            .then_some(idx as usize)
+                            .filter(|idx| *idx < state.options.len());
+                        if let Some(selected) = selected {
+                            *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
+                                Some(selected);
+                        }
                     })
                     .is_none()
                     {
@@ -7171,11 +7160,7 @@ fn stream_track_dialog_wndproc_inner(
                     return LRESULT(0);
                 }
                 if cmd_id == STREAM_TRACK_ID_CANCEL || cmd_id == 2 {
-                    if with_stream_track_dialog_state(hwnd, |state| {
-                        *state.result.lock().unwrap_or_else(|e| e.into_inner()) = None;
-                    })
-                    .is_none()
-                    {
+                    if with_stream_track_dialog_state(hwnd, |_state| {}).is_none() {
                         crate::log_debug("Failed to access stream track dialog state");
                     }
                     crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
@@ -7242,11 +7227,17 @@ fn stream_track_dialog_wndproc_inner(
     }
 }
 
-fn choose_stream_audio_track(
+pub(crate) fn choose_combo_option_dialog(
     parent: HWND,
     language: Language,
-    tracks: Vec<StreamAudioTrack>,
-) -> Option<Option<String>> {
+    title: String,
+    label: String,
+    options: Vec<String>,
+    default_selection: usize,
+) -> Option<usize> {
+    if options.is_empty() {
+        return None;
+    }
     let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(STREAM_TRACK_DIALOG_CLASS_NAME);
     let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
@@ -7266,10 +7257,12 @@ fn choose_stream_audio_track(
     let init = Box::new(StreamTrackDialogInit {
         parent,
         language,
-        tracks,
+        label,
+        options,
+        default_selection,
         result: Arc::clone(&result),
     });
-    let title = to_wide(&plain_label(&i18n::tr(language, "playback.audio_track")));
+    let title = to_wide(&plain_label(&title));
     let hwnd = unsafe {
         CreateWindowExW(
             WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
@@ -7287,7 +7280,7 @@ fn choose_stream_audio_track(
         )
     };
     if hwnd.0 == 0 {
-        return Some(None);
+        return None;
     }
     unsafe {
         EnableWindow(parent, false);
@@ -7310,7 +7303,7 @@ fn choose_stream_audio_track(
             DispatchMessageW(&msg);
         }
     }
-    let result_value = result.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let result_value = *result.lock().unwrap_or_else(|e| e.into_inner());
     unsafe {
         EnableWindow(parent, true);
         if result_value.is_none() {
@@ -7318,6 +7311,31 @@ fn choose_stream_audio_track(
         }
     }
     result_value
+}
+
+fn choose_stream_audio_track(
+    parent: HWND,
+    language: Language,
+    tracks: Vec<StreamAudioTrack>,
+) -> Option<Option<String>> {
+    let mut options = Vec::with_capacity(tracks.len() + 1);
+    options.push(i18n::tr(language, "stream_audio.track.auto"));
+    options.extend(tracks.iter().map(|track| track.label.clone()));
+    let selected = choose_combo_option_dialog(
+        parent,
+        language,
+        i18n::tr(language, "playback.audio_track"),
+        i18n::tr(language, "playback.audio_track"),
+        options,
+        0,
+    );
+    match selected {
+        Some(0) => Some(None),
+        Some(index) => tracks
+            .get(index - 1)
+            .map(|track| Some(track.format_id.clone())),
+        None => None,
+    }
 }
 
 pub fn play_streaming_audio_from_url(parent: HWND) {

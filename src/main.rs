@@ -133,21 +133,21 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetClassNameW, GetCursorPos, GetDlgCtrlID, GetDlgItem, GetForegroundWindow, GetLastActivePopup,
     GetMenu, GetMenuItemCount, GetMessageW, GetNextDlgTabItem, GetParent, GetSubMenu,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
-    HCURSOR, HICON, HMENU, HWND_NOTOPMOST, HWND_TOPMOST, IDC_ARROW, IDCANCEL, IDI_APPLICATION,
-    IDNO, IDYES, IsChild, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW,
-    MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO,
-    MB_YESNOCANCEL, MENU_ITEM_FLAGS, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND,
-    MF_BYPOSITION, MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
-    MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW, OBJID_CLIENT, PostMessageW, PostQuitMessage,
-    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
-    SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
-    SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_RETURNCMD,
-    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE,
-    WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA,
-    WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN,
-    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
-    WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD,
-    WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    HCURSOR, HICON, HMENU, HWND_NOTOPMOST, HWND_TOPMOST, IDC_ARROW, IDI_APPLICATION, IDYES,
+    IsChild, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW,
+    MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO, MENU_ITEM_FLAGS,
+    MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED,
+    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW,
+    OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
+    SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW,
+    ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
+    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
+    WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
+    WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN,
+    WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
+    WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
@@ -2967,27 +2967,22 @@ fn replace_path_extension(mut path: PathBuf, desired_ext: &str) -> PathBuf {
 }
 
 fn choose_raiplay_episode_save_extension(hwnd: HWND, language: Language) -> Option<String> {
-    let (message, title) = match language {
-        Language::Italian => (
-            "Vuoi salvare l'episodio di RaiPlay solo audio in MP3?\n\nPremi Sì per MP3.\nPremi No per MP4.\nPremi Annulla per non salvare.",
-            "Formato salvataggio RaiPlay",
-        ),
-        _ => (
-            "Do you want to save this RaiPlay episode as audio-only MP3?\n\nPress Yes for MP3.\nPress No for MP4.\nPress Cancel to stop.",
-            "RaiPlay Save Format",
-        ),
+    let (title, label) = match language {
+        Language::Italian => ("Formato salvataggio RaiPlay", "Seleziona il formato"),
+        _ => ("RaiPlay Save Format", "Select format"),
     };
-    let message_w = to_wide(message);
-    let title_w = to_wide(title);
-    match message_box_modal(
+    let options = vec!["MP3".to_string(), "MP4".to_string()];
+    let selected = app_windows::youtube_transcript_window::choose_combo_option_dialog(
         hwnd,
-        PCWSTR(message_w.as_ptr()),
-        PCWSTR(title_w.as_ptr()),
-        MB_YESNOCANCEL | MB_ICONQUESTION,
-    ) {
-        IDYES => Some("mp3".to_string()),
-        IDNO => Some("mp4".to_string()),
-        result if result == MESSAGEBOX_RESULT(IDCANCEL.0) => None,
+        language,
+        title.to_string(),
+        label.to_string(),
+        options,
+        0,
+    )?;
+    match selected {
+        0 => Some("mp3".to_string()),
+        1 => Some("mp4".to_string()),
         _ => None,
     }
 }

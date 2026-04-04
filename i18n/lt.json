@@ -912,6 +912,7 @@
   "rai_audiodescrizioni.missing_key_message": "Norėdami naudoti šią funkciją, turite paprašyti kodo iš programos autoriaus. Tai būtina, kad informacija nebūtų naudojama žalingu būdu. Autorius Ambrogio Riili dalijasi programa ir visomis jos funkcijomis nemokamai. Ar norite dabar išsiųsti el. laišką autoriui?",
   "rai_audiodescrizioni.missing_key_title": "Rai kodas",
   "rai_audiodescrizioni.request_code.email": "Įveskite el. paštą",
+  "rai_audiodescrizioni.request_code.fill_all_fields": "Prieš tęsdami įveskite vardą, pavardę ir el. paštą.",
   "rai_audiodescrizioni.request_code.name": "Įveskite vardą",
   "rai_audiodescrizioni.request_code.subject": "Sonarpad kodo užklausa",
   "rai_audiodescrizioni.request_code.surname": "Įveskite pavardę",

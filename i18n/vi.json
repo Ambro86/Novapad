@@ -912,6 +912,7 @@
   "rai_audiodescrizioni.missing_key_message": "Để sử dụng tính năng này, bạn cần yêu cầu mã từ tác giả chương trình. Điều này nhằm đảm bảo rằng thông tin không bị sử dụng theo cách gây hại. Tác giả, Ambrogio Riili, chia sẻ chương trình và tất cả các tính năng của nó miễn phí. Bạn có muốn gửi email cho tác giả ngay bây giờ không?",
   "rai_audiodescrizioni.missing_key_title": "Mã Rai",
   "rai_audiodescrizioni.request_code.email": "Nhập email",
+  "rai_audiodescrizioni.request_code.fill_all_fields": "Nhập tên, họ và email trước khi tiếp tục.",
   "rai_audiodescrizioni.request_code.name": "Nhập tên",
   "rai_audiodescrizioni.request_code.subject": "Yêu cầu mã Sonarpad",
   "rai_audiodescrizioni.request_code.surname": "Nhập họ",

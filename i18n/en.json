@@ -912,6 +912,7 @@
   "rai_audiodescrizioni.missing_key_message": "To use this feature you need to request a code from the program author. This is necessary to ensure that the information contained is not used in a harmful way. The author, Ambrogio Riili, shares the program and all its features free of charge. Do you want to send an email to the author now?",
   "rai_audiodescrizioni.missing_key_title": "Rai code",
   "rai_audiodescrizioni.request_code.email": "Enter email",
+  "rai_audiodescrizioni.request_code.fill_all_fields": "Fill in first name, last name and email before continuing.",
   "rai_audiodescrizioni.request_code.name": "Enter first name",
   "rai_audiodescrizioni.request_code.subject": "Sonarpad code request",
   "rai_audiodescrizioni.request_code.surname": "Enter last name",

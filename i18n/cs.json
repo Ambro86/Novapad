@@ -912,6 +912,7 @@
   "rai_audiodescrizioni.missing_key_message": "Pro použití této funkce musíte požádat autora programu o kód. Je to nutné, aby se zajistilo, že obsažené informace nebudou použity škodlivým způsobem. Autor, Ambrogio Riili, sdílí program a všechny jeho funkce zdarma. Chcete nyní odeslat e-mail autorovi?",
   "rai_audiodescrizioni.missing_key_title": "Kód Rai",
   "rai_audiodescrizioni.request_code.email": "Zadejte e-mail",
+  "rai_audiodescrizioni.request_code.fill_all_fields": "Před pokračováním vyplňte jméno, příjmení a e-mail.",
   "rai_audiodescrizioni.request_code.name": "Zadejte jméno",
   "rai_audiodescrizioni.request_code.subject": "Žádost o kód Sonarpad",
   "rai_audiodescrizioni.request_code.surname": "Zadejte příjmení",

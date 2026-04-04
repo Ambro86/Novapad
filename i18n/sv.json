@@ -912,6 +912,7 @@
   "rai_audiodescrizioni.missing_key_message": "För att använda denna funktion behöver du begära en kod från programmets författare. Detta är nödvändigt för att säkerställa att informationen inte används på ett skadligt sätt. Författaren, Ambrogio Riili, delar programmet och alla dess funktioner gratis. Vill du skicka ett e-postmeddelande till författaren nu?",
   "rai_audiodescrizioni.missing_key_title": "Rai-kod",
   "rai_audiodescrizioni.request_code.email": "Ange e-post",
+  "rai_audiodescrizioni.request_code.fill_all_fields": "Fyll i förnamn, efternamn och e-post innan du fortsätter.",
   "rai_audiodescrizioni.request_code.name": "Ange förnamn",
   "rai_audiodescrizioni.request_code.subject": "Begäran om Sonarpad-kod",
   "rai_audiodescrizioni.request_code.surname": "Ange efternamn",

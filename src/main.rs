@@ -11187,6 +11187,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_RAI_AUDIODESCRIZIONI);
         return true;
     }
+    if key == 'S' as u16 && ctrl_down && shift_down && !alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_RAIPLAYSOUND);
+        return true;
+    }
     if shortcut_matches_message(shortcuts.read_pause_resume, msg) {
         dispatch_shortcut_command(hwnd, IDM_FILE_READ_PAUSE);
         return true;

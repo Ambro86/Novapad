@@ -149,6 +149,16 @@ pub(crate) fn resolve_audio_url(audio_url: &str) -> Result<String, String> {
     Ok(audio_url.to_string())
 }
 
+pub(crate) fn resolve_audio_url_for_clipboard(audio_url: &str) -> Result<String, String> {
+    let audio_url = resolve_audio_url(audio_url)?;
+    if !audio_url.contains("/relinker/relinkerServlet") {
+        return Ok(audio_url);
+    }
+
+    crate::curl_client::CurlClient::resolve_final_url_iphone_impersonated(&audio_url)
+        .map_err(|err| format!("Impossibile risolvere l'URL audio Rai: {err}"))
+}
+
 fn fetch_catalog() -> Result<Catalog, String> {
     let source_url =
         decode_obfuscated_url(RAI_AUDIODESCRIZIONI_LIST_URL_B64, &obfuscated_url_key())?;

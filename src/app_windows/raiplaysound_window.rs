@@ -1,6 +1,9 @@
+use std::sync::Arc;
 use windows::Win32::Foundation::HWND;
 
-use crate::app_windows::youtube_transcript_window::{self, MultilineSelectionItem};
+use crate::app_windows::youtube_transcript_window::{
+    self, MultilineSearchOptions, MultilineSelectionItem, MultilineSelectionResult,
+};
 use crate::settings::Language;
 use crate::tools::raiplaysound::{self, BrowseItem, BrowseItemKind, BrowsePage};
 use crate::{RaiAudioOrigin, show_error, with_state};
@@ -73,6 +76,7 @@ fn browse_page(
     mut selected_id: Option<String>,
     mut history: Vec<(String, Option<String>)>,
 ) -> BrowseOutcome {
+    let mut current_search_query = String::new();
     loop {
         if page.items.is_empty() {
             show_error(
@@ -92,27 +96,94 @@ fn browse_page(
                 description: item.description.clone(),
             })
             .collect::<Vec<_>>();
+        let context_items_for_enabled = page.items.clone();
+        let context_items_for_handler = page.items.clone();
+        let context_action =
+            crate::app_windows::interpreter_select_window::InterpreterContextAction {
+                label: format!(
+                    "{} (Ctrl+C)",
+                    crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
+                ),
+                ctrl_c_shortcut: true,
+                enabled: Arc::new(move |selected_id: &str| {
+                    context_items_for_enabled
+                        .iter()
+                        .find(|item| item.id == selected_id)
+                        .map(|item| {
+                            item.kind == BrowseItemKind::Audio
+                                && item
+                                    .audio_url
+                                    .as_ref()
+                                    .map(|url| !url.trim().is_empty())
+                                    .unwrap_or(false)
+                        })
+                        .unwrap_or(false)
+                }),
+                handler: Arc::new(move |selected_id: String| {
+                    if let Some(item) = context_items_for_handler
+                        .iter()
+                        .find(|item| item.id == selected_id)
+                        && let Some(audio_url) = item.audio_url.as_ref()
+                    {
+                        crate::app_windows::rai_audiodescrizioni_window::copy_text_to_clipboard(
+                            parent,
+                            &crate::app_windows::rai_audiodescrizioni_window::format_resolved_audio_url_clipboard_text(
+                                language, &item.title, audio_url,
+                            ),
+                        );
+                    }
+                }),
+            };
 
-        let Some(selected_item_id) = youtube_transcript_window::select_multiline_items(
+        let selection = youtube_transcript_window::select_multiline_items_with_search(
             parent,
             language,
             page.title.clone(),
             selection_items,
             selected_id.clone(),
-        ) else {
-            if let Some((previous_page_path, previous_selected_id)) = history.pop() {
-                match raiplaysound::load_page(&previous_page_path) {
-                    Ok(previous_page) => {
-                        page = previous_page;
-                        selected_id = previous_selected_id;
+            MultilineSearchOptions {
+                initial_query: current_search_query.clone(),
+                search_button_label: "Cerca".to_string(),
+                context_action: Some(context_action),
+            },
+        );
+        let selected_item_id = match selection {
+            MultilineSelectionResult::Selected(id) => id,
+            MultilineSelectionResult::Search(query) => {
+                let trimmed_query = query.trim();
+                if trimmed_query.is_empty() {
+                    continue;
+                }
+                crate::screen_reader_speak("Ricerca RaiPlay Sound in corso");
+                match raiplaysound::search(trimmed_query) {
+                    Ok(search_page) => {
+                        history.push((page.source.clone(), selected_id.clone()));
+                        page = search_page;
+                        selected_id = None;
+                        current_search_query = trimmed_query.to_string();
                         continue;
                     }
                     Err(err) => {
                         show_error(parent, language, &err);
+                        continue;
                     }
                 }
             }
-            return BrowseOutcome::Cancelled;
+            MultilineSelectionResult::Cancelled => {
+                if let Some((previous_page_path, previous_selected_id)) = history.pop() {
+                    match raiplaysound::load_page(&previous_page_path) {
+                        Ok(previous_page) => {
+                            page = previous_page;
+                            selected_id = previous_selected_id;
+                            continue;
+                        }
+                        Err(err) => {
+                            show_error(parent, language, &err);
+                        }
+                    }
+                }
+                return BrowseOutcome::Cancelled;
+            }
         };
 
         let Some(selected_item) = page
@@ -130,6 +201,7 @@ fn browse_page(
         };
 
         selected_id = Some(selected_item.id.clone());
+        current_search_query.clear();
         match selected_item.kind {
             BrowseItemKind::Page => {
                 let Some(path_id) = selected_item.path_id.as_deref() else {

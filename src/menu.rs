@@ -289,7 +289,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
             String::new()
         },
         menu_raiplaysound: if language == Language::Italian {
-            "RaiPlay Sound...".to_string()
+            "RaiPlay Sound...\tCtrl+Shift+S".to_string()
         } else {
             String::new()
         },

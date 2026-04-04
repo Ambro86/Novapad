@@ -7,7 +7,7 @@ use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Input::KeyboardAndMouse::{SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
+    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, EN_CHANGE,
     ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
     IDC_ARROW, IDYES, IsDialogMessageW, IsWindow, LoadCursorW, MB_ICONQUESTION, MB_YESNO, MSG,
     RegisterClassW, SetForegroundWindow, SetWindowLongPtrW, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
@@ -39,6 +39,8 @@ struct RequestCodeState {
     name_edit: HWND,
     surname_edit: HWND,
     email_edit: HWND,
+    error_label: HWND,
+    ok_button: HWND,
     result: Option<(String, String, String)>,
     opened_at: Instant,
 }
@@ -133,7 +135,11 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
                 {
                     copy_text_to_clipboard(
                         parent,
-                        &format_audio_url_clipboard_text(language, &item.title, &item.audio_url),
+                        &format_resolved_audio_url_clipboard_text(
+                            language,
+                            &item.title,
+                            &item.audio_url,
+                        ),
                     );
                 }
             }),
@@ -245,7 +251,11 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
                 if let Some(item) = item_by_id_for_handler.get(&selected_value) {
                     copy_text_to_clipboard(
                         parent,
-                        &format_audio_url_clipboard_text(language, &item.title, &item.audio_url),
+                        &format_resolved_audio_url_clipboard_text(
+                            language,
+                            &item.title,
+                            &item.audio_url,
+                        ),
                     );
                 }
             }),
@@ -280,7 +290,11 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
     );
 }
 
-fn format_audio_url_clipboard_text(language: Language, title: &str, audio_url: &str) -> String {
+pub(crate) fn format_audio_url_clipboard_text(
+    language: Language,
+    title: &str,
+    audio_url: &str,
+) -> String {
     let title_label = crate::i18n::tr(language, "properties.title");
     let url_label = crate::i18n::tr(language, "properties.url");
     format!(
@@ -290,7 +304,26 @@ fn format_audio_url_clipboard_text(language: Language, title: &str, audio_url: &
     )
 }
 
-fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
+pub(crate) fn format_resolved_audio_url_clipboard_text(
+    language: Language,
+    title: &str,
+    audio_url: &str,
+) -> String {
+    let resolved_audio_url = match rai_audiodescrizioni::resolve_audio_url_for_clipboard(audio_url)
+    {
+        Ok(url) => url,
+        Err(err) => {
+            crate::log_debug(&format!(
+                "Rai audio URL copy fallback to original URL: {}",
+                err
+            ));
+            audio_url.trim().to_string()
+        }
+    };
+    format_audio_url_clipboard_text(language, title, &resolved_audio_url)
+}
+
+pub(crate) fn copy_text_to_clipboard(hwnd: HWND, text: &str) {
     use windows::Win32::Foundation::HANDLE;
     use windows::Win32::System::Memory::GMEM_MOVEABLE;
 
@@ -571,6 +604,8 @@ fn request_code_contact(parent: HWND, language: Language) -> Option<(String, Str
             name_edit: HWND(0),
             surname_edit: HWND(0),
             email_edit: HWND(0),
+            error_label: HWND(0),
+            ok_button: HWND(0),
             result: None,
             opened_at: Instant::now(),
         });
@@ -589,7 +624,7 @@ fn request_code_contact(parent: HWND, language: Language) -> Option<(String, Str
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             420,
-            240,
+            270,
             parent,
             HMENU(0),
             hinstance,
@@ -607,6 +642,24 @@ fn request_code_contact(parent: HWND, language: Language) -> Option<(String, Str
             if windows::Win32::UI::WindowsAndMessaging::GetMessageW(&mut msg, HWND(0), 0, 0).0 == 0
             {
                 break;
+            }
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u16 == VK_RETURN.0 {
+                let handled_enter = request_code_state_mut(hwnd).is_some_and(|state| {
+                    let focus = windows::Win32::UI::Input::KeyboardAndMouse::GetFocus();
+                    if focus != state.ok_button {
+                        return false;
+                    }
+                    windows::Win32::UI::WindowsAndMessaging::SendMessageW(
+                        hwnd,
+                        WM_COMMAND,
+                        WPARAM(REQUEST_ID_OK),
+                        LPARAM(0),
+                    );
+                    true
+                });
+                if handled_enter {
+                    continue;
+                }
             }
             if !IsDialogMessageW(hwnd, &msg).as_bool() {
                 windows::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
@@ -637,20 +690,60 @@ unsafe extern "system" fn request_code_wndproc(
         }
         WM_COMMAND => {
             let id = wparam.0 & 0xffff;
+            let notify = (wparam.0 >> 16) & 0xffff;
+            if notify == EN_CHANGE as usize {
+                clear_request_code_error(hwnd);
+                return LRESULT(0);
+            }
             match id {
                 REQUEST_ID_OK => {
-                    if let Some(state) = request_code_state_mut(hwnd) {
-                        let name = read_edit_text(state.name_edit);
-                        let surname = read_edit_text(state.surname_edit);
-                        let email = read_edit_text(state.email_edit);
-                        if !name.trim().is_empty()
-                            && !surname.trim().is_empty()
-                            && !email.trim().is_empty()
-                        {
+                    let Some((language, name_edit, surname_edit, email_edit)) =
+                        request_code_state_mut(hwnd).map(|state| {
+                            (
+                                state.language,
+                                state.name_edit,
+                                state.surname_edit,
+                                state.email_edit,
+                            )
+                        })
+                    else {
+                        return LRESULT(0);
+                    };
+
+                    let name = read_edit_text(name_edit);
+                    let surname = read_edit_text(surname_edit);
+                    let email = read_edit_text(email_edit);
+                    if !name.trim().is_empty()
+                        && !surname.trim().is_empty()
+                        && !email.trim().is_empty()
+                    {
+                        if let Some(state) = request_code_state_mut(hwnd) {
                             state.result = Some((name, surname, email));
                         }
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        return LRESULT(0);
                     }
-                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
+
+                    let message = crate::i18n::tr(
+                        language,
+                        "rai_audiodescrizioni.request_code.fill_all_fields",
+                    );
+                    crate::log_debug(&format!("Request code validation failed: {message}"));
+                    set_request_code_error(hwnd, &message);
+                    crate::screen_reader_speak(&message);
+
+                    let focus_target = if name.trim().is_empty() {
+                        name_edit
+                    } else if surname.trim().is_empty() {
+                        surname_edit
+                    } else {
+                        email_edit
+                    };
+                    if focus_target.0 != 0 {
+                        unsafe {
+                            SetFocus(focus_target);
+                        }
+                    }
                     LRESULT(0)
                 }
                 REQUEST_ID_CANCEL => {
@@ -812,13 +905,27 @@ fn create_request_code_controls(hwnd: HWND) {
             hinstance,
             None,
         );
-        CreateWindowExW(
+        let error_label = CreateWindowExW(
+            Default::default(),
+            windows::core::w!("STATIC"),
+            PCWSTR::null(),
+            WS_CHILD | WS_VISIBLE,
+            12,
+            170,
+            380,
+            18,
+            hwnd,
+            HMENU(0),
+            hinstance,
+            None,
+        );
+        let ok_button = CreateWindowExW(
             Default::default(),
             windows::core::w!("BUTTON"),
             PCWSTR(crate::to_wide(&crate::i18n::tr(language, "common.ok")).as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
             206,
-            178,
+            202,
             90,
             26,
             hwnd,
@@ -832,7 +939,7 @@ fn create_request_code_controls(hwnd: HWND) {
             PCWSTR(crate::to_wide(&crate::i18n::tr(language, "common.cancel")).as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP,
             302,
-            178,
+            202,
             90,
             26,
             hwnd,
@@ -845,6 +952,8 @@ fn create_request_code_controls(hwnd: HWND) {
             state.name_edit = name_edit;
             state.surname_edit = surname_edit;
             state.email_edit = email_edit;
+            state.error_label = error_label;
+            state.ok_button = ok_button;
         }
         SetFocus(name_edit);
     }
@@ -867,4 +976,22 @@ fn read_edit_text(hwnd: HWND) -> String {
     let mut buf = vec![0u16; len as usize + 1];
     let written = unsafe { GetWindowTextW(hwnd, &mut buf) };
     String::from_utf16_lossy(&buf[..written as usize])
+}
+
+fn set_request_code_error(hwnd: HWND, message: &str) {
+    let Some(error_label) = request_code_state_mut(hwnd).map(|state| state.error_label) else {
+        return;
+    };
+    if error_label.0 == 0 {
+        return;
+    }
+    let wide = crate::to_wide(message);
+    crate::log_if_err!(crate::set_window_text_w_safe(
+        error_label,
+        PCWSTR(wide.as_ptr())
+    ));
+}
+
+fn clear_request_code_error(hwnd: HWND) {
+    set_request_code_error(hwnd, "");
 }

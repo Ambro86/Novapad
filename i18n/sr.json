@@ -912,6 +912,7 @@
   "rai_audiodescrizioni.missing_key_message": "Da biste koristili ovu funkciju, potrebno je da zatražite kod od autora programa. To je neophodno kako bi se obezbedilo da se sadržane informacije ne koriste na štetan način. Autor, Ambrogio Riili, deli program i sve njegove funkcije besplatno. Da li želite da sada pošaljete e-mail autoru?",
   "rai_audiodescrizioni.missing_key_title": "Rai kod",
   "rai_audiodescrizioni.request_code.email": "Unesite e-mail",
+  "rai_audiodescrizioni.request_code.fill_all_fields": "Unesite ime, prezime i e-mail pre nego što nastavite.",
   "rai_audiodescrizioni.request_code.name": "Unesite ime",
   "rai_audiodescrizioni.request_code.subject": "Zahtev za Sonarpad kod",
   "rai_audiodescrizioni.request_code.surname": "Unesite prezime",

@@ -912,6 +912,7 @@
   "rai_audiodescrizioni.missing_key_message": "要使用此功能，您需要向程序作者请求代码。这是为了确保所包含的信息不会被以有害方式使用。作者 Ambrogio Riili 免费分享该程序及其所有功能。您现在要向作者发送电子邮件吗？",
   "rai_audiodescrizioni.missing_key_title": "Rai 代码",
   "rai_audiodescrizioni.request_code.email": "输入邮箱",
+  "rai_audiodescrizioni.request_code.fill_all_fields": "继续之前请输入名字、姓氏和电子邮件。",
   "rai_audiodescrizioni.request_code.name": "输入名字",
   "rai_audiodescrizioni.request_code.subject": "Sonarpad 代码请求",
   "rai_audiodescrizioni.request_code.surname": "输入姓氏",

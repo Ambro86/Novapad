@@ -199,6 +199,48 @@ impl CurlClient {
         Ok(data)
     }
 
+    pub fn resolve_final_url_iphone_impersonated(
+        url: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let mut easy = Easy::new();
+        easy.url(url)?;
+        easy.follow_location(true)?;
+        easy.max_redirections(10)?;
+        easy.timeout(Duration::from_secs(30))?;
+        easy.connect_timeout(Duration::from_secs(30))?;
+        easy.accept_encoding("gzip, deflate, br")?;
+        easy.pipewait(true)?;
+        easy.cookie_file("")?;
+        // Request only the first byte when possible to avoid downloading the full media.
+        easy.range("0-0")?;
+
+        apply_tls_ca(&mut easy)?;
+
+        easy.ssl_cipher_list("ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305")?;
+
+        let mut list = List::new();
+        list.append("User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1")?;
+        list.append("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")?;
+        list.append("Accept-Language: it-IT,it;q=0.9,en-US;q=0.8")?;
+        list.append("Upgrade-Insecure-Requests: 1")?;
+        list.append("Connection: keep-alive")?;
+        easy.http_headers(list)?;
+
+        {
+            let mut transfer = easy.transfer();
+            transfer.write_function(|new_data| Ok(new_data.len()))?;
+            transfer.perform()?;
+        }
+
+        if let Some(effective_url) = easy.effective_url()?
+            && !effective_url.trim().is_empty()
+        {
+            return Ok(effective_url.to_string());
+        }
+
+        Ok(url.to_string())
+    }
+
     fn fetch_iphone<F: FnMut(u32)>(
         url: &str,
         mut progress_cb: F,

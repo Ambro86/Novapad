@@ -210,6 +210,10 @@ const MPV_BASS_FOCUS_DEBUG_TIMER_ID1: usize = 8;
 const MPV_BASS_FOCUS_DEBUG_TIMER_ID2: usize = 9;
 const MPV_BASS_FOCUS_DEBUG_TIMER_ID3: usize = 10;
 const MPV_BASS_FOCUS_DEBUG_TIMER_ID4: usize = 11;
+const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID1: usize = 12;
+const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID2: usize = 13;
+const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID3: usize = 14;
+const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID4: usize = 15;
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
 const AUDIO_PLAYLIST_TIMER_ID: usize = 7;
@@ -5233,6 +5237,23 @@ pub(crate) fn schedule_mpv_bass_focus_debug_snapshots(hwnd: HWND) {
     }
 }
 
+pub(crate) fn schedule_italiaonline_close_focus_debug_snapshots(hwnd: HWND) {
+    unsafe {
+        if SetTimer(hwnd, ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID1, 100, None) == 0 {
+            crate::log_debug("Failed to set ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID1");
+        }
+        if SetTimer(hwnd, ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID2, 300, None) == 0 {
+            crate::log_debug("Failed to set ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID2");
+        }
+        if SetTimer(hwnd, ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID3, 700, None) == 0 {
+            crate::log_debug("Failed to set ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID3");
+        }
+        if SetTimer(hwnd, ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID4, 1200, None) == 0 {
+            crate::log_debug("Failed to set ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID4");
+        }
+    }
+}
+
 pub(crate) fn restore_editor_focus(hwnd: HWND) {
     bring_window_to_foreground(hwnd);
     if should_force_editor_focus_on_foreground(hwnd) {
@@ -7010,6 +7031,22 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     }
                     return LRESULT(0);
                 }
+                if wparam.0 == ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID1
+                    || wparam.0 == ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID2
+                    || wparam.0 == ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID3
+                    || wparam.0 == ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID4
+                {
+                    log_foreground_snapshot(&format!(
+                        "italiaonline_close_focus_debug.{}",
+                        wparam.0
+                    ));
+                    kill_timer_best_effort(
+                        hwnd,
+                        wparam.0,
+                        "KillTimer ITALIAONLINE_CLOSE_FOCUS_DEBUG",
+                    );
+                    return LRESULT(0);
+                }
                 if wparam.0 == CHAPTER_ANNOUNCE_TIMER_ID {
                     update_chapter_announcement(hwnd);
                     return LRESULT(0);
@@ -7709,12 +7746,22 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 LRESULT(0)
             }
             WM_FOCUS_EDITOR => {
+                log_debug(&format!(
+                    "WM_FOCUS_EDITOR received: hwnd={:?} foreground_before={:?} focus_before={:?} should_force={} has_secondary={}",
+                    hwnd,
+                    get_foreground_window_safe(),
+                    get_focus_safe(),
+                    should_force_editor_focus_on_foreground(hwnd),
+                    has_secondary_window_open(hwnd)
+                ));
+                log_foreground_snapshot("wm_focus_editor.before");
                 if should_force_editor_focus_on_foreground(hwnd) {
                     force_active_editor_focus(hwnd);
                     schedule_editor_focus_retry(hwnd);
                 } else if !has_secondary_window_open(hwnd) {
                     focus_editor(hwnd);
                 }
+                log_foreground_snapshot("wm_focus_editor.after");
                 LRESULT(0)
             }
             WM_KEYDOWN => {

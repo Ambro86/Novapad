@@ -508,6 +508,21 @@ pub fn prompt_directory_search(
         }
 
         windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
+        if !data.confirmed && parent.0 != 0 {
+            crate::log_debug(&format!(
+                "prompt_directory_search close restore: parent={:?} foreground_before={:?} focus_before={:?}",
+                parent,
+                crate::get_foreground_window_safe(),
+                crate::get_focus_safe()
+            ));
+            crate::bring_window_to_foreground(parent);
+            crate::log_if_err!(crate::post_message_w_safe(
+                parent,
+                crate::WM_FOCUS_EDITOR,
+                WPARAM(0),
+                LPARAM(0)
+            ));
+        }
 
         if data.confirmed {
             Some(PromptDirectoryResult {

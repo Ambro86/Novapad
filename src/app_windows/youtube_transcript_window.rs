@@ -238,6 +238,12 @@ fn ytdlp_debug_enabled() -> bool {
 }
 
 fn post_focus_editor(parent: HWND) {
+    crate::log_debug(&format!(
+        "post_focus_editor: parent={:?} foreground_before={:?} focus_before={:?}",
+        parent,
+        crate::get_foreground_window_safe(),
+        crate::get_focus_safe()
+    ));
     unsafe {
         if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
             crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
@@ -6019,9 +6025,14 @@ fn restore_stream_dialog_focus(parent: HWND) {
             "stream focus restore after comments: no stream dialog state for parent={:?}",
             parent
         ));
-        unsafe {
-            SetFocus(parent);
-        }
+        post_focus_editor(parent);
+        crate::schedule_italiaonline_close_focus_debug_snapshots(parent);
+        crate::log_debug(&format!(
+            "stream focus restore after comments: posted WM_FOCUS_EDITOR parent={:?} foreground_after_post={:?} focus_after_post={:?}",
+            parent,
+            crate::get_foreground_window_safe(),
+            crate::get_focus_safe()
+        ));
     }
     log_stream_focus_snapshot("youtube_comments.closed.after_restore", parent);
 }

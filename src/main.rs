@@ -2307,6 +2307,30 @@ fn send_mpv_ipc_request(ipc_path: &Path, command_json: &str) -> Result<serde_jso
 fn is_mpv_ipc_unavailable_error(err: &str) -> bool {
     err.contains("Impossibile aprire il canale IPC di mpv")
         || err.contains("Impossibile trovare il file specificato. (os error 2)")
+        || err.contains("Tutte le istanze della pipe sono impegnate. (os error 231)")
+}
+
+fn invalidate_managed_mpv_session(hwnd: HWND) {
+    let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
+    let active_url = with_state(hwnd, |state| state.active_podcast_episode_url.clone()).flatten();
+    if with_state(hwnd, |state| {
+        state.last_stopped_mpv_url = active_url;
+    })
+    .is_none()
+    {
+        log_debug("Failed to persist last stopped mpv url");
+    }
+    if let Some(session) = session
+        && let Err(err) = std::process::Command::new("taskkill")
+            .args(["/PID", &session.process_id.to_string(), "/T", "/F"])
+            .spawn()
+    {
+        log_debug(&format!(
+            "Managed mpv taskkill after IPC failure failed: {}",
+            err
+        ));
+    }
+    clear_managed_mpv_state(hwnd);
 }
 
 fn try_send_command_to_managed_mpv(hwnd: HWND, command_json: &str) -> Result<(), String> {
@@ -2323,7 +2347,7 @@ fn try_send_command_to_managed_mpv(hwnd: HWND, command_json: &str) -> Result<(),
                 err
             ));
             if is_mpv_ipc_unavailable_error(&err) {
-                clear_managed_mpv_state(hwnd);
+                invalidate_managed_mpv_session(hwnd);
             }
             Err(err)
         }
@@ -2345,7 +2369,7 @@ fn query_managed_mpv_property(hwnd: HWND, property: &str) -> Result<serde_json::
                 err
             ));
             if is_mpv_ipc_unavailable_error(&err) {
-                clear_managed_mpv_state(hwnd);
+                invalidate_managed_mpv_session(hwnd);
             }
             return Err(err);
         }

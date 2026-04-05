@@ -103,6 +103,7 @@ pub struct PromptDirectoryOptions {
     pub type_label: String,
     pub options: Vec<String>,
     pub default_selection: usize,
+    pub focus_primary_field: bool,
     pub primary_label: String,
     pub primary_labels: Vec<String>,
     pub primary_default: String,
@@ -472,6 +473,7 @@ pub fn prompt_directory_search(
             mode: CredentialsPromptMode::DirectorySearch {
                 options: options.options,
                 selected_index: options.default_selection,
+                focus_primary_field: options.focus_primary_field,
                 primary_label: options.primary_label,
                 primary_labels: options.primary_labels,
                 secondary_label: options.secondary_label,
@@ -561,6 +563,7 @@ enum CredentialsPromptMode {
     DirectorySearch {
         options: Vec<String>,
         selected_index: usize,
+        focus_primary_field: bool,
         primary_label: String,
         primary_labels: Vec<String>,
         secondary_label: String,
@@ -1000,6 +1003,7 @@ fn credentials_prompt_wndproc_inner(
                 CredentialsPromptMode::DirectorySearch {
                     options,
                     selected_index,
+                    focus_primary_field,
                     primary_label,
                     primary_labels,
                     secondary_label,
@@ -1185,7 +1189,11 @@ fn credentials_prompt_wndproc_inner(
                     }
 
                     unsafe {
-                        SetFocus(kind_combo);
+                        if focus_primary_field {
+                            SetFocus(user_edit);
+                        } else {
+                            SetFocus(kind_combo);
+                        }
                     }
                 }
             }

@@ -111,6 +111,15 @@ fn prompt_search_query(
     language: Language,
     initial: &SearchQuery,
 ) -> Option<SearchQuery> {
+    prompt_search_query_with_focus(parent, language, initial, false)
+}
+
+fn prompt_search_query_with_focus(
+    parent: HWND,
+    language: Language,
+    initial: &SearchQuery,
+    focus_primary_field: bool,
+) -> Option<SearchQuery> {
     let kind_options = vec![
         DirectoryKind::PagineBianche.label().to_string(),
         DirectoryKind::PagineGialle.label().to_string(),
@@ -126,6 +135,7 @@ fn prompt_search_query(
             type_label: "Tipo".to_string(),
             options: kind_options,
             default_selection: default_kind,
+            focus_primary_field,
             primary_label: initial.kind.primary_field_label().to_string(),
             primary_labels: vec![
                 DirectoryKind::PagineBianche
@@ -153,7 +163,17 @@ fn prompt_search_query(
             language,
             &format!("Il campo {} è vuoto.", kind.primary_field_name()),
         );
-        return prompt_search_query(parent, language, initial);
+        return prompt_search_query_with_focus(
+            parent,
+            language,
+            &SearchQuery {
+                kind,
+                what: prompt.primary_value,
+                where_: prompt.secondary_value,
+                page: 1,
+            },
+            true,
+        );
     }
 
     Some(SearchQuery {

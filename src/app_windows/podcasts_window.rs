@@ -3326,30 +3326,55 @@ async fn load_by_category(
     mode: Mode,
     category: Category,
     search_term: &str,
-    language: Language,
-    fetch_config: rss::RssFetchConfig,
-    podcastindex_auth: Option<(String, String)>,
+    env: &CategoryLoadEnv,
 ) -> Result<(Vec<PodcastSearchResult>, Option<String>), String> {
     match source {
         Source::Apple => {
+            log_debug(&format!(
+                "podcasts_categories apple load start: mode={:?} category_id={} category_name={} term={}",
+                mode,
+                category.id,
+                category.name,
+                search_term.trim()
+            ));
             let mut status = None;
-            let settings = settings::load_settings();
-            let country = apple_country_from_settings(&settings);
             let results = match mode {
                 Mode::Top => {
-                    let url = apple_top_podcasts_by_genre(category.id, &country, APPLE_LIMIT);
-                    let ids = match rss::fetch_url_bytes(&url, fetch_config).await {
+                    let url =
+                        apple_top_podcasts_by_genre(category.id, &env.apple_country, APPLE_LIMIT);
+                    log_debug(&format!(
+                        "podcasts_categories apple top fetch ids start: category_id={} country={} url={}",
+                        category.id, env.apple_country, url
+                    ));
+                    let ids = match rss::fetch_url_bytes(&url, env.fetch_config).await {
                         Ok(bytes) => parse_apple_top_ids(&bytes),
                         Err(err) => {
                             log_debug(&format!("apple_top_fetch_failed: {}", err));
                             Vec::new()
                         }
                     };
-                    let lookup_url = apple_lookup_by_ids(&ids, &country);
+                    log_debug(&format!(
+                        "podcasts_categories apple top fetch ids done: category_id={} id_count={}",
+                        category.id,
+                        ids.len()
+                    ));
+                    let lookup_url = apple_lookup_by_ids(&ids, &env.apple_country);
                     if let Some(lookup_url) = lookup_url
-                        && let Ok(bytes) = rss::fetch_url_bytes(&lookup_url, fetch_config).await
+                        && {
+                            log_debug(&format!(
+                                "podcasts_categories apple top lookup start: category_id={} url={}",
+                                category.id, lookup_url
+                            ));
+                            true
+                        }
+                        && let Ok(bytes) = rss::fetch_url_bytes(&lookup_url, env.fetch_config).await
                         && let Ok(parsed) = serde_json::from_slice::<ItunesSearchResponse>(&bytes)
                     {
+                        log_debug(&format!(
+                            "podcasts_categories apple top lookup done: category_id={} result_count={}",
+                            category.id,
+                            parsed.results.len()
+                        ));
                         log_itunes_items("apple_top_lookup", category.id, &parsed.results);
                         let mut map = HashMap::new();
                         for item in parsed.results {
@@ -3377,12 +3402,12 @@ async fn load_by_category(
                             return Ok((ordered, None));
                         }
                     }
-                    status = Some(i18n::tr(language, "podcasts.categories.top_fallback"));
+                    status = Some(i18n::tr(env.language, "podcasts.categories.top_fallback"));
                     Vec::new()
                 }
                 Mode::SearchInCategory => {
                     if search_term.trim().is_empty() {
-                        return Err(i18n::tr(language, "podcasts.categories.term_required"));
+                        return Err(i18n::tr(env.language, "podcasts.categories.term_required"));
                     }
                     Vec::new()
                 }
@@ -3391,18 +3416,35 @@ async fn load_by_category(
                 return Ok((results, status));
             }
             let url = if matches!(mode, Mode::SearchInCategory) {
-                apple_search_in_category(search_term, category.id, &country, APPLE_LIMIT)
+                apple_search_in_category(search_term, category.id, &env.apple_country, APPLE_LIMIT)
             } else {
-                apple_search_by_category(category.id, &country, APPLE_LIMIT)
+                apple_search_by_category(category.id, &env.apple_country, APPLE_LIMIT)
             };
-            let bytes = rss::fetch_url_bytes(&url, fetch_config)
+            log_debug(&format!(
+                "podcasts_categories apple search fetch start: mode={:?} category_id={} url={}",
+                mode, category.id, url
+            ));
+            let bytes = rss::fetch_url_bytes(&url, env.fetch_config)
                 .await
                 .map_err(|e| e.to_string())?;
+            log_debug(&format!(
+                "podcasts_categories apple search fetch done: mode={:?} category_id={} bytes={}",
+                mode,
+                category.id,
+                bytes.len()
+            ));
             let parsed: ItunesSearchResponse =
                 serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            log_debug(&format!(
+                "podcasts_categories apple parse done: mode={:?} category_id={} result_count={}",
+                mode,
+                category.id,
+                parsed.results.len()
+            ));
             let items = parsed.results;
             log_itunes_items("apple_search", category.id, &items);
-            let (filtered, fallback_status) = itunes_filter_by_genre(&items, category.id, language);
+            let (filtered, fallback_status) =
+                itunes_filter_by_genre(&items, category.id, env.language);
             let results = if filtered.is_empty() && fallback_status.is_some() {
                 itunes_items_to_results_slice(&items)
             } else {
@@ -3414,11 +3456,13 @@ async fn load_by_category(
             Ok((results, status))
         }
         Source::PodcastIndex => {
-            let (key, secret) = podcastindex_auth
-                .ok_or_else(|| i18n::tr(language, "podcasts.categories.missing_credentials"))?;
+            let (key, secret) = env
+                .podcastindex_auth
+                .clone()
+                .ok_or_else(|| i18n::tr(env.language, "podcasts.categories.missing_credentials"))?;
             let client = podcastindex_client()?;
             let mut status = None;
-            let lang_code = podcastindex_language_code(language);
+            let lang_code = podcastindex_language_code(env.language);
             let feeds = match mode {
                 Mode::Top => {
                     let url = format!(
@@ -3439,7 +3483,7 @@ async fn load_by_category(
                 }
                 Mode::SearchInCategory => {
                     if search_term.trim().is_empty() {
-                        return Err(i18n::tr(language, "podcasts.categories.term_required"));
+                        return Err(i18n::tr(env.language, "podcasts.categories.term_required"));
                     }
                     let url = format!(
                         "https://api.podcastindex.org/api/1.0/search/byterm?q={}&max=50&cat={}",
@@ -3460,13 +3504,23 @@ async fn load_by_category(
                 }
             };
             let (results, has_categories) =
-                podcastindex_feeds_to_results(feeds, Some(&category), language);
+                podcastindex_feeds_to_results(feeds, Some(&category), env.language);
             if !has_categories {
-                status = Some(i18n::tr(language, "podcasts.categories.unfiltered_notice"));
+                status = Some(i18n::tr(
+                    env.language,
+                    "podcasts.categories.unfiltered_notice",
+                ));
             }
             Ok((results, status))
         }
     }
+}
+
+struct CategoryLoadEnv {
+    language: Language,
+    apple_country: String,
+    fetch_config: rss::RssFetchConfig,
+    podcastindex_auth: Option<(String, String)>,
 }
 
 fn update_category_status(hwnd: HWND, message: Option<&str>) {
@@ -3502,6 +3556,10 @@ fn update_category_list(hwnd: HWND, categories: Vec<Category>) {
 
 fn load_categories_for_source(hwnd: HWND, source: Source) {
     let language = with_category_dialog_state(hwnd, |s| s.language).unwrap_or_default();
+    crate::log_debug(&format!(
+        "podcasts_categories load source: hwnd={:?} source={:?}",
+        hwnd, source
+    ));
     with_category_dialog_state(hwnd, |s| s.source = source);
     match source {
         Source::Apple => {
@@ -3564,41 +3622,92 @@ fn trigger_category_load(
     category: Category,
     search_term: String,
 ) {
+    crate::log_debug(&format!(
+        "podcasts_categories trigger load: hwnd={:?} source={:?} mode={:?} category_id={} category_name={} term={}",
+        hwnd,
+        source,
+        mode,
+        category.id,
+        category.name,
+        search_term.trim()
+    ));
     show_search_loading(hwnd);
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
     let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
-    let fetch_config = rss_fetch_config(parent);
-    let podcastindex_auth = if matches!(source, Source::PodcastIndex) {
-        podcastindex_credentials_or_prompt(hwnd, parent)
-    } else {
-        None
+    let env = CategoryLoadEnv {
+        language,
+        apple_country: if matches!(source, Source::Apple) {
+            apple_country_for_parent(parent)
+        } else {
+            String::new()
+        },
+        fetch_config: rss_fetch_config(parent),
+        podcastindex_auth: if matches!(source, Source::PodcastIndex) {
+            podcastindex_credentials_or_prompt(hwnd, parent)
+        } else {
+            None
+        },
     };
-    if matches!(source, Source::PodcastIndex) && podcastindex_auth.is_none() {
+    if matches!(source, Source::PodcastIndex) && env.podcastindex_auth.is_none() {
+        crate::log_debug(
+            "podcasts_categories trigger load aborted: missing PodcastIndex credentials",
+        );
         return;
     }
     let hwnd_copy = hwnd;
     std::thread::spawn(move || {
+        crate::log_debug(&format!(
+            "podcasts_categories worker start: hwnd={:?} source={:?} mode={:?} category_id={} category_name={} term={}",
+            hwnd_copy,
+            source,
+            mode,
+            category.id,
+            category.name,
+            search_term.trim()
+        ));
         let rt = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
         {
-            Ok(rt) => rt,
+            Ok(rt) => {
+                crate::log_debug(&format!(
+                    "podcasts_categories worker runtime ready: source={:?} mode={:?} category_id={}",
+                    source, mode, category.id
+                ));
+                rt
+            }
             Err(e) => {
                 crate::log_debug(&format!("Failed to build tokio runtime: {}", e));
                 return;
             }
         };
+        crate::log_debug(&format!(
+            "podcasts_categories worker before load_by_category: source={:?} mode={:?} category_id={} category_name={}",
+            source, mode, category.id, category.name
+        ));
         let result = rt.block_on(load_by_category(
             source,
             mode,
             category.clone(),
             &search_term,
-            language,
-            fetch_config,
-            podcastindex_auth,
+            &env,
+        ));
+        crate::log_debug(&format!(
+            "podcasts_categories worker after load_by_category: source={:?} mode={:?} category_id={} ok={}",
+            source,
+            mode,
+            category.id,
+            result.is_ok()
+        ));
+        crate::log_debug(&format!(
+            "podcasts_categories load result: source={:?} mode={:?} category_id={} ok={}",
+            source,
+            mode,
+            category.id,
+            result.is_ok()
         ));
         let msg = match result {
             Ok((results, status)) => SearchResultMsg {
@@ -3612,6 +3721,15 @@ fn trigger_category_load(
                 error: Some(err),
             },
         };
+        crate::log_debug(&format!(
+            "podcasts_categories worker posting search complete: hwnd={:?} source={:?} mode={:?} category_id={} error_present={} result_count={}",
+            hwnd_copy,
+            source,
+            mode,
+            category.id,
+            msg.error.is_some(),
+            msg.results.len()
+        ));
         if let Err(e) = crate::post_message_w_safe(
             hwnd_copy,
             WM_PODCAST_SEARCH_COMPLETE,
@@ -3619,6 +3737,11 @@ fn trigger_category_load(
             LPARAM(Box::into_raw(Box::new(msg)) as isize),
         ) {
             crate::log_debug(&format!("PostMessageW failed: {:?}", e));
+        } else {
+            crate::log_debug(&format!(
+                "podcasts_categories worker posted search complete: hwnd={:?} category_id={}",
+                hwnd_copy, category.id
+            ));
         }
     });
 }
@@ -3627,6 +3750,10 @@ fn apply_category_selection(hwnd: HWND) {
     let (list, mode, term_edit, parent) =
         with_category_dialog_state(hwnd, |s| (s.hwnd_list, s.mode, s.hwnd_term_edit, s.parent))
             .unwrap_or((HWND(0), Mode::Top, HWND(0), HWND(0)));
+    crate::log_debug(&format!(
+        "podcasts_categories apply selection: hwnd={:?} mode={:?} parent={:?}",
+        hwnd, mode, parent
+    ));
     if list.0 == 0 {
         return;
     }
@@ -3655,6 +3782,14 @@ fn apply_category_selection(hwnd: HWND) {
     } else {
         String::new()
     };
+    crate::log_debug(&format!(
+        "podcasts_categories selected: source={:?} mode={:?} category_id={} category_name={} term={}",
+        source,
+        mode,
+        category.id,
+        category.name,
+        term.trim()
+    ));
     if matches!(mode, Mode::SearchInCategory) && term.trim().is_empty() {
         let language = with_category_dialog_state(hwnd, |s| s.language).unwrap_or_default();
         let message = i18n::tr(language, "podcasts.categories.term_required");
@@ -3709,6 +3844,13 @@ fn show_categories_dialog(parent_hwnd: HWND) {
     };
     let search_edit = with_podcast_state(parent_hwnd, |s| s.hwnd_search).unwrap_or(HWND(0));
     let initial_term = read_window_text(search_edit);
+    crate::log_debug(&format!(
+        "podcasts_categories open dialog: parent_hwnd={:?} main_hwnd={:?} initial_source={:?} initial_term={}",
+        parent_hwnd,
+        main_hwnd,
+        initial_source,
+        initial_term.trim()
+    ));
     let init_ptr = Box::into_raw(Box::new(CategoryDialogInit {
         parent: parent_hwnd,
         initial_source,
@@ -3765,6 +3907,13 @@ fn categories_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 } else {
                     Box::from_raw(init_ptr)
                 };
+                crate::log_debug(&format!(
+                    "podcasts_categories WM_CREATE: hwnd={:?} parent={:?} initial_source={:?} initial_term={}",
+                    hwnd,
+                    init.parent,
+                    init.initial_source,
+                    init.initial_term.trim()
+                ));
                 let language = with_podcast_state(init.parent, |s| s.language).unwrap_or_default();
                 let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
 
@@ -4265,6 +4414,10 @@ fn categories_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                             } else {
                                 Source::Apple
                             };
+                            crate::log_debug(&format!(
+                                "podcasts_categories source changed: hwnd={:?} sel={} source={:?}",
+                                hwnd, sel, source
+                            ));
                             load_categories_for_source(hwnd, source);
                         }
                         LRESULT(0)
@@ -4284,6 +4437,10 @@ fn categories_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                             } else {
                                 Mode::Top
                             };
+                            crate::log_debug(&format!(
+                                "podcasts_categories mode changed: hwnd={:?} sel={} mode={:?}",
+                                hwnd, sel, mode
+                            ));
                             set_category_mode(hwnd, mode);
                             SendMessageW(hwnd, WM_SIZE, WPARAM(0), LPARAM(0));
                         }
@@ -8278,9 +8435,18 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
             WM_PODCAST_SEARCH_COMPLETE => {
                 let ptr = lparam.0 as *mut SearchResultMsg;
                 if ptr.is_null() {
+                    crate::log_debug(
+                        "podcasts_categories WM_PODCAST_SEARCH_COMPLETE received with null payload",
+                    );
                     return LRESULT(0);
                 }
                 let msg = Box::from_raw(ptr);
+                crate::log_debug(&format!(
+                    "podcasts_categories WM_PODCAST_SEARCH_COMPLETE: error_present={} result_count={} status_present={}",
+                    msg.error.is_some(),
+                    msg.results.len(),
+                    msg.status.is_some()
+                ));
                 if let Some(error) = msg.error.as_deref() {
                     let language = with_podcast_state(hwnd, |s| s.language).unwrap_or_default();
                     let title = i18n::tr(language, "app.error_title");

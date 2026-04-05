@@ -40,8 +40,15 @@ impl DirectoryKind {
 
     pub(crate) fn primary_field_label(self) -> &'static str {
         match self {
-            Self::PagineBianche => "Inserisci nome",
+            Self::PagineBianche => "Inserisci nome o cognome",
             Self::PagineGialle => "Inserisci attività",
+        }
+    }
+
+    pub(crate) fn primary_field_name(self) -> &'static str {
+        match self {
+            Self::PagineBianche => "nome o cognome",
+            Self::PagineGialle => "attività",
         }
     }
 }
@@ -51,6 +58,7 @@ pub(crate) struct SearchQuery {
     pub(crate) kind: DirectoryKind,
     pub(crate) what: String,
     pub(crate) where_: String,
+    pub(crate) page: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -67,6 +75,8 @@ pub(crate) struct SearchResult {
 #[derive(Clone, Debug)]
 pub(crate) struct SearchResponse {
     pub(crate) display_where: Option<String>,
+    pub(crate) current_page: usize,
+    pub(crate) is_last_page: bool,
     pub(crate) results: Vec<SearchResult>,
 }
 
@@ -91,12 +101,22 @@ struct DetailAccumulator {
     public_url: Option<String>,
 }
 
+#[derive(Default)]
+struct SearchAccumulator {
+    status: Option<String>,
+    display_where: Option<String>,
+    current_page: usize,
+    is_last_page: Option<bool>,
+    result_count: Option<usize>,
+    max_results: Option<usize>,
+}
+
 pub(crate) fn search(query: &SearchQuery) -> Result<SearchResponse, String> {
     let trimmed_what = query.what.trim();
     if trimmed_what.is_empty() {
         return Err(format!(
-            "Inserisci un valore nel campo {}.",
-            query.kind.primary_field_label()
+            "Il campo {} è vuoto.",
+            query.kind.primary_field_name()
         ));
     }
 
@@ -138,6 +158,9 @@ fn build_search_url(query: &SearchQuery) -> Result<String, String> {
     if !query.where_.trim().is_empty() {
         serializer.append_pair("where", query.where_.trim());
     }
+    if query.page > 1 {
+        serializer.append_pair("page", &query.page.to_string());
+    }
     Ok(format!(
         "{}{}?{}",
         italiaonline_base_url()?,
@@ -167,8 +190,10 @@ fn parse_search_response(xml: &str, kind: DirectoryKind) -> Result<SearchRespons
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
     let mut path: Vec<Vec<u8>> = Vec::new();
-    let mut status = None;
-    let mut display_where = None;
+    let mut search = SearchAccumulator {
+        current_page: 1,
+        ..SearchAccumulator::default()
+    };
     let mut results = Vec::new();
     let mut current_result: Option<SearchResult> = None;
 
@@ -203,13 +228,7 @@ fn parse_search_response(xml: &str, kind: DirectoryKind) -> Result<SearchRespons
                 let decoded = text.decode().map_err(|err| {
                     format!("Risposta XML {} non decodificabile: {err}", kind.label())
                 })?;
-                assign_search_text(
-                    &path,
-                    decoded.trim(),
-                    &mut status,
-                    &mut display_where,
-                    current_result.as_mut(),
-                );
+                assign_search_text(&path, decoded.trim(), &mut search, current_result.as_mut());
             }
             Ok(Event::Eof) => break,
             Ok(_) => {}
@@ -219,16 +238,29 @@ fn parse_search_response(xml: &str, kind: DirectoryKind) -> Result<SearchRespons
         }
     }
 
-    if status.as_deref() != Some("200") {
+    if search.status.as_deref() != Some("200") {
         return Err(format!(
             "Ricerca {} non riuscita (status {}).",
             kind.label(),
-            status.unwrap_or_else(|| "sconosciuto".to_string())
+            search.status.unwrap_or_else(|| "sconosciuto".to_string())
         ));
     }
 
+    let parsed_result_count = search.result_count.unwrap_or(results.len());
+    let computed_is_last_page = search.is_last_page.unwrap_or_else(|| {
+        if parsed_result_count == 0 {
+            true
+        } else if let Some(max_results) = search.max_results {
+            search.current_page.saturating_mul(parsed_result_count) >= max_results
+        } else {
+            true
+        }
+    });
+
     Ok(SearchResponse {
-        display_where,
+        display_where: search.display_where,
+        current_page: search.current_page,
+        is_last_page: computed_is_last_page,
         results,
     })
 }
@@ -236,8 +268,7 @@ fn parse_search_response(xml: &str, kind: DirectoryKind) -> Result<SearchRespons
 fn assign_search_text(
     path: &[Vec<u8>],
     text: &str,
-    status: &mut Option<String>,
-    display_where: &mut Option<String>,
+    search: &mut SearchAccumulator,
     current_result: Option<&mut SearchResult>,
 ) {
     if text.is_empty() {
@@ -247,12 +278,42 @@ fn assign_search_text(
         [response, status_tag]
             if response.as_slice() == b"response" && status_tag.as_slice() == b"status" =>
         {
-            *status = Some(text.to_string());
+            search.status = Some(text.to_string());
         }
         [response, where_tag]
             if response.as_slice() == b"response" && where_tag.as_slice() == b"where" =>
         {
-            *display_where = Some(text.to_string());
+            search.display_where = Some(text.to_string());
+        }
+        [response, current_page_tag]
+            if response.as_slice() == b"response"
+                && current_page_tag.as_slice() == b"current_page" =>
+        {
+            if let Ok(value) = text.parse::<usize>() {
+                search.current_page = value.max(1);
+            }
+        }
+        [response, result_count_tag]
+            if response.as_slice() == b"response"
+                && result_count_tag.as_slice() == b"result_count" =>
+        {
+            if let Ok(value) = text.parse::<usize>() {
+                search.result_count = Some(value);
+            }
+        }
+        [response, max_results_tag]
+            if response.as_slice() == b"response"
+                && max_results_tag.as_slice() == b"max_results" =>
+        {
+            if let Ok(value) = text.parse::<usize>() {
+                search.max_results = Some(value);
+            }
+        }
+        [response, is_last_page_tag]
+            if response.as_slice() == b"response"
+                && is_last_page_tag.as_slice() == b"isLastPage" =>
+        {
+            search.is_last_page = Some(text == "1");
         }
         [response, results_tag, result_tag, field]
             if response.as_slice() == b"response"

@@ -11,6 +11,9 @@ use crate::tools::italiaonline::{
 };
 use crate::{show_error, with_state};
 
+const ITALIAONLINE_PREVIOUS_PAGE_ID: &str = "__italiaonline_previous_page__";
+const ITALIAONLINE_NEXT_PAGE_ID: &str = "__italiaonline_next_page__";
+
 pub fn open(parent: HWND) {
     let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
     if language != Language::Italian {
@@ -24,6 +27,7 @@ pub fn open(parent: HWND) {
         kind: DirectoryKind::PagineBianche,
         what: String::new(),
         where_: String::new(),
+        page: 1,
     };
     run_search_flow(parent, language, initial_query);
 }
@@ -147,10 +151,7 @@ fn prompt_search_query(
         show_error(
             parent,
             language,
-            &format!(
-                "Inserisci un valore nel campo {}.",
-                kind.primary_field_label()
-            ),
+            &format!("Il campo {} è vuoto.", kind.primary_field_name()),
         );
         return prompt_search_query(parent, language, initial);
     }
@@ -159,6 +160,7 @@ fn prompt_search_query(
         kind,
         what: trimmed_what.to_string(),
         where_: prompt.secondary_value.trim().to_string(),
+        page: 1,
     })
 }
 
@@ -169,24 +171,50 @@ fn browse_results(
     response: &SearchResponse,
     initial_selected_id: Option<String>,
 ) -> BrowseResultsOutcome {
+    let mut current_query = query.clone();
+    let mut current_response = response.clone();
+    let mut current_selected_id = initial_selected_id;
+
     loop {
-        let title = results_title(query, response.display_where.as_deref());
-        let items = response
-            .results
-            .iter()
-            .map(|result| MultilineSelectionItem {
-                id: result.id.clone(),
-                title: result.name.clone(),
-                description: Some(format_result_description(result)),
-            })
-            .collect::<Vec<_>>();
+        let title = results_title(&current_query, &current_response);
+        let mut items = Vec::new();
+        if current_response.current_page > 1 {
+            items.push(MultilineSelectionItem {
+                id: ITALIAONLINE_PREVIOUS_PAGE_ID.to_string(),
+                title: "Risultati precedenti".to_string(),
+                description: Some(format!(
+                    "Torna alla pagina {} dei risultati",
+                    current_response.current_page.saturating_sub(1)
+                )),
+            });
+        }
+        items.extend(
+            current_response
+                .results
+                .iter()
+                .map(|result| MultilineSelectionItem {
+                    id: result.id.clone(),
+                    title: result.name.clone(),
+                    description: Some(format_result_description(result)),
+                }),
+        );
+        if !current_response.is_last_page {
+            items.push(MultilineSelectionItem {
+                id: ITALIAONLINE_NEXT_PAGE_ID.to_string(),
+                title: "Risultati successivi".to_string(),
+                description: Some(format!(
+                    "Vai alla pagina {} dei risultati",
+                    current_response.current_page + 1
+                )),
+            });
+        }
 
         match youtube_transcript_window::select_multiline_items_with_search(
             parent,
             language,
             title,
             items,
-            initial_selected_id.clone(),
+            current_selected_id.clone(),
             youtube_transcript_window::MultilineSearchOptions {
                 initial_query: String::new(),
                 search_button_label: "Nuova ricerca".to_string(),
@@ -197,11 +225,35 @@ fn browse_results(
             },
         ) {
             MultilineSelectionResult::Selected(id) => {
+                if id == ITALIAONLINE_PREVIOUS_PAGE_ID || id == ITALIAONLINE_NEXT_PAGE_ID {
+                    let next_page = if id == ITALIAONLINE_PREVIOUS_PAGE_ID {
+                        current_query.page.saturating_sub(1).max(1)
+                    } else {
+                        current_query.page + 1
+                    };
+                    crate::screen_reader_speak("Caricamento risultati");
+                    let next_query = SearchQuery {
+                        page: next_page,
+                        ..current_query.clone()
+                    };
+                    match italiaonline::search(&next_query) {
+                        Ok(next_response) => {
+                            current_query = next_query;
+                            current_response = next_response;
+                            current_selected_id = None;
+                            continue;
+                        }
+                        Err(err) => {
+                            show_error(parent, language, &err);
+                            continue;
+                        }
+                    }
+                }
                 crate::screen_reader_speak("Caricamento dettaglio");
-                match italiaonline::load_detail(query, &id) {
+                match italiaonline::load_detail(&current_query, &id) {
                     Ok(detail) => {
                         with_state(parent, |state| {
-                            state.last_italiaonline_query = Some(query.clone());
+                            state.last_italiaonline_query = Some(current_query.clone());
                             state.last_italiaonline_result_id = Some(id.clone());
                         });
                         open_detail_document(parent, detail);
@@ -219,9 +271,11 @@ fn browse_results(
     }
 }
 
-fn results_title(query: &SearchQuery, display_where: Option<&str>) -> String {
+fn results_title(query: &SearchQuery, response: &SearchResponse) -> String {
     let mut title = format!("{} - {}", query.kind.label(), query.what.trim());
-    let where_display = display_where
+    let where_display = response
+        .display_where
+        .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .or_else(|| {
@@ -231,6 +285,9 @@ fn results_title(query: &SearchQuery, display_where: Option<&str>) -> String {
     if let Some(where_display) = where_display {
         title.push_str(" - ");
         title.push_str(where_display);
+    }
+    if response.current_page > 1 {
+        title.push_str(&format!(" - Pagina {}", response.current_page));
     }
     title
 }

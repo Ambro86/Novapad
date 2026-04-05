@@ -192,6 +192,7 @@ fn browse_page(
             MultilineSearchOptions {
                 initial_query: current_search_query.clone(),
                 search_button_label: "Cerca".to_string(),
+                show_search_edit: true,
                 context_action: Some(context_action),
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,

@@ -123,6 +123,14 @@ fn prompt_search_query(
             options: kind_options,
             default_selection: default_kind,
             primary_label: initial.kind.primary_field_label().to_string(),
+            primary_labels: vec![
+                DirectoryKind::PagineBianche
+                    .primary_field_label()
+                    .to_string(),
+                DirectoryKind::PagineGialle
+                    .primary_field_label()
+                    .to_string(),
+            ],
             primary_default: initial.what.clone(),
             secondary_label: "Dove".to_string(),
             secondary_default: initial.where_.clone(),
@@ -182,6 +190,7 @@ fn browse_results(
             youtube_transcript_window::MultilineSearchOptions {
                 initial_query: String::new(),
                 search_button_label: "Nuova ricerca".to_string(),
+                show_search_edit: false,
                 context_action: None,
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: false,

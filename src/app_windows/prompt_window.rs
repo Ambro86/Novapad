@@ -104,6 +104,7 @@ pub struct PromptDirectoryOptions {
     pub options: Vec<String>,
     pub default_selection: usize,
     pub primary_label: String,
+    pub primary_labels: Vec<String>,
     pub primary_default: String,
     pub secondary_label: String,
     pub secondary_default: String,
@@ -472,6 +473,7 @@ pub fn prompt_directory_search(
                 options: options.options,
                 selected_index: options.default_selection,
                 primary_label: options.primary_label,
+                primary_labels: options.primary_labels,
                 secondary_label: options.secondary_label,
             },
         };
@@ -545,6 +547,7 @@ enum CredentialsPromptMode {
         options: Vec<String>,
         selected_index: usize,
         primary_label: String,
+        primary_labels: Vec<String>,
         secondary_label: String,
     },
 }
@@ -772,6 +775,7 @@ fn credentials_prompt_wndproc_inner(
     const IDC_CREDENTIALS_PASS: isize = 202;
     const IDC_CREDENTIALS_SAVE: isize = 203;
     const IDC_CREDENTIALS_KIND: i32 = 204;
+    const IDC_CREDENTIALS_USER_LABEL: isize = 205;
     match msg {
         WM_CREATE => {
             let create_struct =
@@ -982,6 +986,7 @@ fn credentials_prompt_wndproc_inner(
                     options,
                     selected_index,
                     primary_label,
+                    primary_labels,
                     secondary_label,
                 } => {
                     let kind_label = unsafe {
@@ -1030,7 +1035,7 @@ fn credentials_prompt_wndproc_inner(
                             100,
                             20,
                             hwnd,
-                            HMENU(0),
+                            HMENU(IDC_CREDENTIALS_USER_LABEL),
                             HINSTANCE(0),
                             None,
                         )
@@ -1141,6 +1146,12 @@ fn credentials_prompt_wndproc_inner(
                             LPARAM(0),
                         );
                     }
+                    if let Some(selected_primary_label) = primary_labels.get(selected_index) {
+                        crate::log_if_err!(crate::set_window_text_w_safe(
+                            user_label,
+                            PCWSTR(to_wide(selected_primary_label).as_ptr())
+                        ));
+                    }
 
                     if hfont.0 != 0 {
                         unsafe {
@@ -1167,7 +1178,37 @@ fn credentials_prompt_wndproc_inner(
         }
         WM_COMMAND => {
             let id = wparam.0 & 0xffff;
-            if id == 1 {
+            let notify = ((wparam.0 >> 16) & 0xffff) as u16;
+            if id == IDC_CREDENTIALS_KIND as usize
+                && notify == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE as u16
+            {
+                let combo_value = crate::send_message_w_safe(
+                    crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_KIND),
+                    CB_GETCURSEL,
+                    WPARAM(0),
+                    LPARAM(0),
+                )
+                .0;
+                let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
+                    as *mut CredentialsPromptData;
+                if combo_value >= 0 {
+                    let _updated = crate::with_raw_mut_ptr_safe(ptr, |data| {
+                        data.directory_selected_index = combo_value as usize;
+                        if let CredentialsPromptMode::DirectorySearch { primary_labels, .. } =
+                            &data.mode
+                            && let Some(label) = primary_labels.get(combo_value as usize)
+                        {
+                            let user_label =
+                                crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_USER_LABEL as i32);
+                            crate::log_if_err!(crate::set_window_text_w_safe(
+                                user_label,
+                                PCWSTR(to_wide(label).as_ptr())
+                            ));
+                        }
+                    });
+                }
+                return LRESULT(0);
+            } else if id == 1 {
                 let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
                     as *mut CredentialsPromptData;
                 if !ptr.is_null() {

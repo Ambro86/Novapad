@@ -1743,6 +1743,7 @@ pub(crate) struct MultilineSelectionItem {
 pub(crate) struct MultilineSearchOptions {
     pub(crate) initial_query: String,
     pub(crate) search_button_label: String,
+    pub(crate) show_search_edit: bool,
     pub(crate) context_action:
         Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     pub(crate) right_arrow_accepts_selection: bool,
@@ -2173,7 +2174,7 @@ pub(crate) fn select_multiline_items_with_search(
                 initial_query: search_options.initial_query,
                 button_label: search_options.search_button_label,
                 result: Arc::clone(&search_result),
-                show_edit: true,
+                show_edit: search_options.show_search_edit,
             }),
             flat_close_button_label: None,
             flat_context_action: search_options.context_action,

@@ -5335,6 +5335,8 @@ pub(crate) struct AppState {
     last_stopped_mpv_url: Option<String>,
     last_stopped_mpv_position_secs: Option<u64>,
     active_youtube_return_context: YouTubeReturnContext,
+    last_italiaonline_query: Option<crate::tools::italiaonline::SearchQuery>,
+    last_italiaonline_result_id: Option<String>,
     last_rai_recent_item_id: Option<String>,
     last_rai_grouped_item_id: Option<String>,
     raiplay_navigation_stack: Vec<(String, Option<String>)>,
@@ -5814,6 +5816,13 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     && editor_manager::current_document_is_from_rss(hwnd)
                 {
                     app_windows::rss_window::focus_library(rss_hwnd);
+                    continue;
+                }
+                if let Some(hwnd_edit) = get_active_edit(hwnd)
+                    && GetFocus() == hwnd_edit
+                    && editor_manager::current_document_is_from_italiaonline(hwnd)
+                {
+                    app_windows::italiaonline_window::reopen_last(hwnd);
                     continue;
                 }
                 let save_hwnd =
@@ -6779,6 +6788,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     last_stopped_mpv_url: None,
                     last_stopped_mpv_position_secs: None,
                     active_youtube_return_context: YouTubeReturnContext::default(),
+                    last_italiaonline_query: None,
+                    last_italiaonline_result_id: None,
                     last_rai_recent_item_id: None,
                     last_rai_grouped_item_id: None,
                     raiplay_navigation_stack: Vec::new(),
@@ -8690,6 +8701,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_TOOLS_RAIPLAY => {
                         log_debug("Menu: RaiPlay");
                         app_windows::raiplay_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_ITALIAONLINE => {
+                        log_debug("Menu: Italiaonline directories");
+                        app_windows::italiaonline_window::open(hwnd);
                         LRESULT(0)
                     }
                     IDM_HELP_GUIDE => {
@@ -12555,6 +12571,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_RAI_AUDIODESCRIZIONI);
         return true;
     }
+    if key == 'G' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_ITALIAONLINE);
+        return true;
+    }
     if key == 'S' as u16 && ctrl_down && shift_down && !alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_RAIPLAYSOUND);
         return true;
@@ -13671,6 +13691,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 opened_text_encoding: None,
                 current_save_text_encoding: None,
                 from_rss: false,
+                from_italiaonline: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
             };
@@ -13905,6 +13926,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 opened_text_encoding: loaded.opened_text_encoding,
                 current_save_text_encoding: None,
                 from_rss: false,
+                from_italiaonline: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
             };

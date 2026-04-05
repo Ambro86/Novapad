@@ -1,0 +1,549 @@
+use base64::Engine;
+use quick_xml::{Reader, events::Event};
+use url::{Url, form_urlencoded::Serializer};
+
+const ITALIAONLINE_BASE_URL_B64: &str = "BT9NUUx/HRUjWkodMRoTOlYsGzZeHTVfCiMeAT4c";
+const ITALIAONLINE_SEARCH_PB_B64: &str = "Hi5YUxU4Qho=";
+const ITALIAONLINE_SEARCH_PG_B64: &str = "Hi5YUxU4Qh8=";
+const ITALIAONLINE_DETAIL_PB_B64: &str = "CS5NQB88Qho=";
+const ITALIAONLINE_DETAIL_PG_B64: &str = "CS5NQB88Qh8=";
+const ITALIAONLINE_CLIENT_B64: &str = "HSlUThQ5Xh0=";
+const ITALIAONLINE_VERSION_B64: &str = "XmUAD0M=";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DirectoryKind {
+    PagineBianche,
+    PagineGialle,
+}
+
+impl DirectoryKind {
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::PagineBianche => "Pagine Bianche",
+            Self::PagineGialle => "Pagine Gialle",
+        }
+    }
+
+    fn search_endpoint(self) -> Result<String, String> {
+        match self {
+            Self::PagineBianche => decode_italiaonline_url(ITALIAONLINE_SEARCH_PB_B64),
+            Self::PagineGialle => decode_italiaonline_url(ITALIAONLINE_SEARCH_PG_B64),
+        }
+    }
+
+    fn detail_endpoint(self) -> Result<String, String> {
+        match self {
+            Self::PagineBianche => decode_italiaonline_url(ITALIAONLINE_DETAIL_PB_B64),
+            Self::PagineGialle => decode_italiaonline_url(ITALIAONLINE_DETAIL_PG_B64),
+        }
+    }
+
+    pub(crate) fn primary_field_label(self) -> &'static str {
+        match self {
+            Self::PagineBianche => "Inserisci nome",
+            Self::PagineGialle => "Inserisci attività",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SearchQuery {
+    pub(crate) kind: DirectoryKind,
+    pub(crate) what: String,
+    pub(crate) where_: String,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SearchResult {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) address: Option<String>,
+    pub(crate) city: Option<String>,
+    pub(crate) province: Option<String>,
+    pub(crate) category: Option<String>,
+    pub(crate) phones: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SearchResponse {
+    pub(crate) display_where: Option<String>,
+    pub(crate) results: Vec<SearchResult>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DetailResponse {
+    pub(crate) title: String,
+    pub(crate) body: String,
+}
+
+#[derive(Default)]
+struct DetailAccumulator {
+    status: Option<String>,
+    title: Option<String>,
+    description: Option<String>,
+    category: Option<String>,
+    address: Option<String>,
+    city: Option<String>,
+    province: Option<String>,
+    phones: Vec<String>,
+    websites: Vec<String>,
+    emails: Vec<String>,
+    public_url: Option<String>,
+}
+
+pub(crate) fn search(query: &SearchQuery) -> Result<SearchResponse, String> {
+    let trimmed_what = query.what.trim();
+    if trimmed_what.is_empty() {
+        return Err(format!(
+            "Inserisci un valore nel campo {}.",
+            query.kind.primary_field_label()
+        ));
+    }
+
+    let url = build_search_url(query)?;
+    let bytes = crate::curl_client::CurlClient::fetch_url_impersonated(&url)
+        .map_err(|err| format!("Impossibile cercare in {}: {err}", query.kind.label()))?;
+    let xml = String::from_utf8(bytes)
+        .map_err(|err| format!("Risposta XML {} non valida: {err}", query.kind.label()))?;
+    parse_search_response(&xml, query.kind)
+}
+
+pub(crate) fn load_detail(query: &SearchQuery, id: &str) -> Result<DetailResponse, String> {
+    let trimmed_id = id.trim();
+    if trimmed_id.is_empty() {
+        return Err("Risultato non valido: identificativo mancante.".to_string());
+    }
+
+    let url = build_detail_url(query, trimmed_id)?;
+    let bytes = crate::curl_client::CurlClient::fetch_url_impersonated(&url).map_err(|err| {
+        format!(
+            "Impossibile caricare il dettaglio di {}: {err}",
+            query.kind.label()
+        )
+    })?;
+    let xml = String::from_utf8(bytes).map_err(|err| {
+        format!(
+            "Risposta dettaglio {} non valida: {err}",
+            query.kind.label()
+        )
+    })?;
+    parse_detail_response(&xml, query.kind)
+}
+
+fn build_search_url(query: &SearchQuery) -> Result<String, String> {
+    let mut serializer = Serializer::new(String::new());
+    serializer.append_pair("client", &italiaonline_client()?);
+    serializer.append_pair("version", &italiaonline_version()?);
+    serializer.append_pair("what", query.what.trim());
+    if !query.where_.trim().is_empty() {
+        serializer.append_pair("where", query.where_.trim());
+    }
+    Ok(format!(
+        "{}{}?{}",
+        italiaonline_base_url()?,
+        query.kind.search_endpoint()?,
+        serializer.finish()
+    ))
+}
+
+fn build_detail_url(query: &SearchQuery, id: &str) -> Result<String, String> {
+    let mut serializer = Serializer::new(String::new());
+    serializer.append_pair("client", &italiaonline_client()?);
+    serializer.append_pair("version", &italiaonline_version()?);
+    serializer.append_pair("id", id);
+    serializer.append_pair("what", query.what.trim());
+    if !query.where_.trim().is_empty() {
+        serializer.append_pair("where", query.where_.trim());
+    }
+    Ok(format!(
+        "{}{}?{}",
+        italiaonline_base_url()?,
+        query.kind.detail_endpoint()?,
+        serializer.finish()
+    ))
+}
+
+fn parse_search_response(xml: &str, kind: DirectoryKind) -> Result<SearchResponse, String> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut path: Vec<Vec<u8>> = Vec::new();
+    let mut status = None;
+    let mut display_where = None;
+    let mut results = Vec::new();
+    let mut current_result: Option<SearchResult> = None;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(event)) => {
+                let name = event.name().as_ref().to_vec();
+                if name.as_slice() == b"result" {
+                    current_result = Some(SearchResult {
+                        id: String::new(),
+                        name: String::new(),
+                        address: None,
+                        city: None,
+                        province: None,
+                        category: None,
+                        phones: Vec::new(),
+                    });
+                }
+                path.push(name);
+            }
+            Ok(Event::End(event)) => {
+                if event.name().as_ref() == b"result"
+                    && let Some(result) = current_result.take()
+                    && !result.id.trim().is_empty()
+                    && !result.name.trim().is_empty()
+                {
+                    results.push(result);
+                }
+                let _unused = path.pop();
+            }
+            Ok(Event::Text(text)) => {
+                let decoded = text.decode().map_err(|err| {
+                    format!("Risposta XML {} non decodificabile: {err}", kind.label())
+                })?;
+                assign_search_text(
+                    &path,
+                    decoded.trim(),
+                    &mut status,
+                    &mut display_where,
+                    current_result.as_mut(),
+                );
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(err) => {
+                return Err(format!("Risposta XML {} non valida: {err}", kind.label()));
+            }
+        }
+    }
+
+    if status.as_deref() != Some("200") {
+        return Err(format!(
+            "Ricerca {} non riuscita (status {}).",
+            kind.label(),
+            status.unwrap_or_else(|| "sconosciuto".to_string())
+        ));
+    }
+
+    Ok(SearchResponse {
+        display_where,
+        results,
+    })
+}
+
+fn assign_search_text(
+    path: &[Vec<u8>],
+    text: &str,
+    status: &mut Option<String>,
+    display_where: &mut Option<String>,
+    current_result: Option<&mut SearchResult>,
+) {
+    if text.is_empty() {
+        return;
+    }
+    match path {
+        [response, status_tag]
+            if response.as_slice() == b"response" && status_tag.as_slice() == b"status" =>
+        {
+            *status = Some(text.to_string());
+        }
+        [response, where_tag]
+            if response.as_slice() == b"response" && where_tag.as_slice() == b"where" =>
+        {
+            *display_where = Some(text.to_string());
+        }
+        [response, results_tag, result_tag, field]
+            if response.as_slice() == b"response"
+                && results_tag.as_slice() == b"results"
+                && result_tag.as_slice() == b"result" =>
+        {
+            if let Some(result) = current_result {
+                match field.as_slice() {
+                    b"id" => result.id = text.to_string(),
+                    b"name" => result.name = text.to_string(),
+                    b"address" => result.address = Some(text.to_string()),
+                    b"city" => result.city = Some(text.to_string()),
+                    b"province" => result.province = Some(text.to_string()),
+                    b"category" => result.category = Some(text.to_string()),
+                    _ => {}
+                }
+            }
+        }
+        [
+            response,
+            results_tag,
+            result_tag,
+            phones_tag,
+            phone_tag,
+            number_tag,
+        ] if response.as_slice() == b"response"
+            && results_tag.as_slice() == b"results"
+            && result_tag.as_slice() == b"result"
+            && phones_tag.as_slice() == b"phones"
+            && phone_tag.as_slice() == b"phone"
+            && number_tag.as_slice() == b"number" =>
+        {
+            if let Some(result) = current_result {
+                result.phones.push(text.to_string());
+            }
+        }
+        _ => {}
+    }
+}
+
+fn parse_detail_response(xml: &str, kind: DirectoryKind) -> Result<DetailResponse, String> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut path: Vec<Vec<u8>> = Vec::new();
+    let mut detail = DetailAccumulator::default();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(event)) => path.push(event.name().as_ref().to_vec()),
+            Ok(Event::End(_)) => {
+                let _unused = path.pop();
+            }
+            Ok(Event::Text(text)) => {
+                let decoded = text.decode().map_err(|err| {
+                    format!("Dettaglio XML {} non decodificabile: {err}", kind.label())
+                })?;
+                assign_detail_text(&path, decoded.trim(), &mut detail);
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(err) => {
+                return Err(format!("Dettaglio XML {} non valido: {err}", kind.label()));
+            }
+        }
+    }
+
+    if detail.status.as_deref() != Some("200") {
+        return Err(format!(
+            "Dettaglio {} non disponibile (status {}).",
+            kind.label(),
+            detail.status.unwrap_or_else(|| "sconosciuto".to_string())
+        ));
+    }
+
+    let final_title = detail
+        .title
+        .clone()
+        .unwrap_or_else(|| kind.label().to_string());
+    Ok(DetailResponse {
+        title: final_title.clone(),
+        body: format_detail_body(&final_title, &detail),
+    })
+}
+
+fn assign_detail_text(path: &[Vec<u8>], text: &str, detail: &mut DetailAccumulator) {
+    if text.is_empty() {
+        return;
+    }
+    match path {
+        [response, status_tag]
+            if response.as_slice() == b"response" && status_tag.as_slice() == b"status" =>
+        {
+            detail.status = Some(text.to_string());
+        }
+        [response, detail_tag, field]
+            if response.as_slice() == b"response" && detail_tag.as_slice() == b"detail" =>
+        {
+            match field.as_slice() {
+                b"name" => detail.title = Some(text.to_string()),
+                b"description" => detail.description = Some(text.to_string()),
+                b"category" => detail.category = Some(text.to_string()),
+                b"address" => detail.address = Some(text.to_string()),
+                b"city" => detail.city = Some(text.to_string()),
+                b"province" => detail.province = Some(text.to_string()),
+                b"email_address" => detail.emails.push(text.to_string()),
+                b"web_address" | b"visualsite" | b"urldetail" => {
+                    detail.websites.push(text.to_string())
+                }
+                _ => {}
+            }
+        }
+        [response, detail_tag, phones_tag, phone_tag, number_tag]
+            if response.as_slice() == b"response"
+                && detail_tag.as_slice() == b"detail"
+                && phones_tag.as_slice() == b"phones"
+                && phone_tag.as_slice() == b"phone"
+                && number_tag.as_slice() == b"number" =>
+        {
+            detail.phones.push(text.to_string());
+        }
+        [response, detail_tag, wwws_tag, _, url_tag]
+            if response.as_slice() == b"response"
+                && detail_tag.as_slice() == b"detail"
+                && wwws_tag.as_slice() == b"wwws"
+                && url_tag.as_slice() == b"url" =>
+        {
+            detail.websites.push(text.to_string());
+        }
+        [response, detail_tag, urldetail_tag]
+            if response.as_slice() == b"response"
+                && detail_tag.as_slice() == b"detail"
+                && urldetail_tag.as_slice() == b"urldetail" =>
+        {
+            detail.public_url = Some(text.to_string());
+        }
+        _ => {}
+    }
+}
+
+fn format_detail_body(title: &str, detail: &DetailAccumulator) -> String {
+    let mut lines = vec![title.to_string()];
+
+    if let Some(value) = detail
+        .category
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        lines.push(String::new());
+        lines.push(format!("Categoria: {value}"));
+    }
+
+    if let Some(value) = detail
+        .description
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        lines.push(String::new());
+        lines.push("Descrizione:".to_string());
+        lines.push(value.to_string());
+    }
+
+    if detail.address.is_some() || detail.city.is_some() || detail.province.is_some() {
+        lines.push(String::new());
+        lines.push("Indirizzo:".to_string());
+        if let Some(value) = detail
+            .address
+            .as_ref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            lines.push(value.to_string());
+        }
+        let locality = format_locality_line(detail.city.as_deref(), detail.province.as_deref());
+        if !locality.is_empty() {
+            lines.push(locality);
+        }
+    }
+
+    if !detail.phones.is_empty() {
+        lines.push(String::new());
+        lines.push("Telefoni:".to_string());
+        lines.extend(detail.phones.iter().cloned());
+    }
+
+    if !detail.emails.is_empty() {
+        lines.push(String::new());
+        lines.push("Email:".to_string());
+        lines.extend(detail.emails.iter().cloned());
+    }
+
+    let unique_websites = detail
+        .websites
+        .iter()
+        .filter_map(|value| {
+            let trimmed = value.trim();
+            if trimmed.is_empty() || is_italiaonline_directory_url(trimmed) {
+                return None;
+            }
+            Some(trimmed.to_string())
+        })
+        .collect::<Vec<_>>();
+    let unique_websites = dedupe_trimmed(&unique_websites);
+    if !unique_websites.is_empty() {
+        lines.push(String::new());
+        lines.push("Siti web:".to_string());
+        lines.extend(unique_websites);
+    }
+
+    if let Some(value) = detail
+        .public_url
+        .as_ref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        lines.push(String::new());
+        lines.push("Scheda web:".to_string());
+        lines.push(value.to_string());
+    }
+
+    lines.join("\r\n")
+}
+
+fn format_locality_line(city: Option<&str>, province: Option<&str>) -> String {
+    match (
+        city.map(str::trim).filter(|value| !value.is_empty()),
+        province.map(str::trim).filter(|value| !value.is_empty()),
+    ) {
+        (Some(city), Some(province)) => format!("{city} ({province})"),
+        (Some(city), None) => city.to_string(),
+        (None, Some(province)) => province.to_string(),
+        (None, None) => String::new(),
+    }
+}
+
+fn dedupe_trimmed(values: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for value in values {
+        let trimmed = value.trim();
+        if trimmed.is_empty() || out.iter().any(|item: &String| item == trimmed) {
+            continue;
+        }
+        out.push(trimmed.to_string());
+    }
+    out
+}
+
+fn is_italiaonline_directory_url(value: &str) -> bool {
+    let Ok(url) = Url::parse(value) else {
+        return false;
+    };
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    matches!(
+        host.trim_start_matches("www.")
+            .to_ascii_lowercase()
+            .as_str(),
+        "paginegialle.it" | "paginebianche.it"
+    )
+}
+
+fn italiaonline_base_url() -> Result<String, String> {
+    decode_italiaonline_url(ITALIAONLINE_BASE_URL_B64)
+}
+
+fn italiaonline_client() -> Result<String, String> {
+    decode_italiaonline_url(ITALIAONLINE_CLIENT_B64)
+}
+
+fn italiaonline_version() -> Result<String, String> {
+    decode_italiaonline_url(ITALIAONLINE_VERSION_B64)
+}
+
+fn decode_italiaonline_url(encoded: &str) -> Result<String, String> {
+    let key = resolve_italiaonline_secret_key()?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|err| format!("URL Italiaonline offuscato non valido: {err}"))?;
+    let decoded: Vec<u8> = bytes
+        .into_iter()
+        .enumerate()
+        .map(|(index, byte)| byte ^ key[index % key.len()])
+        .collect();
+    String::from_utf8(decoded)
+        .map_err(|err| format!("URL Italiaonline decodificato non valido: {err}"))
+}
+
+fn resolve_italiaonline_secret_key() -> Result<Vec<u8>, String> {
+    if let Some(secret_key) = crate::settings::load_saved_rai_luce_code() {
+        let trimmed = secret_key.trim();
+        if !trimmed.is_empty() {
+            return Ok(trimmed.as_bytes().to_vec());
+        }
+    }
+    Err("Chiave Luce mancante: inserisci il codice nelle impostazioni RSS/Podcast.".to_string())
+}

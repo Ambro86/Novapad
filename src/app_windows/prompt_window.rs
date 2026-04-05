@@ -21,16 +21,17 @@ use windows::Win32::System::Power::{
     ES_CONTINUOUS, ES_SYSTEM_REQUIRED, EXECUTION_STATE, SetThreadExecutionState,
 };
 
-use windows::Win32::UI::Controls::{BST_CHECKED, WC_BUTTON, WC_EDIT, WC_STATIC};
+use windows::Win32::UI::Controls::{BST_CHECKED, WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_STATIC};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, DefWindowProcW, DispatchMessageW,
-    ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_PASSWORD, ES_READONLY, GWLP_USERDATA,
-    GetClientRect, GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
-    HMENU, IDC_ARROW, IsDialogMessageW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION,
-    MB_OKCANCEL, MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW,
+    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL,
+    CBS_DROPDOWNLIST, CreateWindowExW, DefWindowProcW, DispatchMessageW, ES_AUTOHSCROLL,
+    ES_AUTOVSCROLL, ES_MULTILINE, ES_PASSWORD, ES_READONLY, GWLP_USERDATA, GetClientRect,
+    GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
+    IDC_ARROW, IsDialogMessageW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION, MB_OKCANCEL,
+    MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SendMessageW,
     SetForegroundWindow, SetTimer, SetWindowLongPtrW, TranslateMessage, WINDOW_STYLE, WM_APP,
     WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
     WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
@@ -89,6 +90,23 @@ pub struct PromptCredentialsResult {
     pub username: String,
     pub password: String,
     pub save_credentials: bool,
+}
+
+pub struct PromptDirectoryResult {
+    pub selected_index: usize,
+    pub primary_value: String,
+    pub secondary_value: String,
+}
+
+pub struct PromptDirectoryOptions {
+    pub title: String,
+    pub type_label: String,
+    pub options: Vec<String>,
+    pub default_selection: usize,
+    pub primary_label: String,
+    pub primary_default: String,
+    pub secondary_label: String,
+    pub secondary_default: String,
 }
 
 struct AnsiStripper {
@@ -368,8 +386,10 @@ pub fn prompt_credentials(
             username: username_default.to_string(),
             password: String::new(),
             save_credentials: save_credentials_default,
+            directory_selected_index: 0,
             confirmed: false,
             language,
+            mode: CredentialsPromptMode::Credentials,
         };
 
         let hwnd = CreateWindowExW(
@@ -415,6 +435,90 @@ pub fn prompt_credentials(
     }
 }
 
+pub fn prompt_directory_search(
+    parent: HWND,
+    options: PromptDirectoryOptions,
+    language: Language,
+) -> Option<PromptDirectoryResult> {
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide("SonarpadCredentialsPrompt");
+
+        static ONCE_CREDENTIALS: std::sync::Once = std::sync::Once::new();
+        ONCE_CREDENTIALS.call_once(|| {
+            let wc = WNDCLASSW {
+                hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                    LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+                ),
+                hInstance: hinstance,
+                lpszClassName: PCWSTR(class_name.as_ptr()),
+                lpfnWndProc: Some(credentials_prompt_wndproc),
+                ..Default::default()
+            };
+            RegisterClassW(&wc);
+        });
+
+        let mut data = CredentialsPromptData {
+            body: options.type_label,
+            username: options.primary_default,
+            password: options.secondary_default,
+            save_credentials: false,
+            directory_selected_index: options
+                .default_selection
+                .min(options.options.len().saturating_sub(1)),
+            confirmed: false,
+            language,
+            mode: CredentialsPromptMode::DirectorySearch {
+                options: options.options,
+                selected_index: options.default_selection,
+                primary_label: options.primary_label,
+                secondary_label: options.secondary_label,
+            },
+        };
+
+        let hwnd = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(to_wide(&options.title).as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            200,
+            200,
+            430,
+            264,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(&mut data as *mut _ as *const std::ffi::c_void),
+        );
+
+        if hwnd.0 == 0 {
+            return None;
+        }
+
+        windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, false);
+
+        let mut msg = MSG::default();
+        while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
+            if !IsDialogMessageW(hwnd, &msg).as_bool() {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+
+        windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
+
+        if data.confirmed {
+            Some(PromptDirectoryResult {
+                selected_index: data.directory_selected_index,
+                primary_value: data.username,
+                secondary_value: data.password,
+            })
+        } else {
+            None
+        }
+    }
+}
+
 struct SimplePromptData {
     body: String,
     value: String,
@@ -428,8 +532,21 @@ struct CredentialsPromptData {
     username: String,
     password: String,
     save_credentials: bool,
+    directory_selected_index: usize,
     confirmed: bool,
     language: Language,
+    mode: CredentialsPromptMode,
+}
+
+#[derive(Clone)]
+enum CredentialsPromptMode {
+    Credentials,
+    DirectorySearch {
+        options: Vec<String>,
+        selected_index: usize,
+        primary_label: String,
+        secondary_label: String,
+    },
 }
 
 unsafe extern "system" fn simple_prompt_wndproc(
@@ -654,19 +771,22 @@ fn credentials_prompt_wndproc_inner(
     const IDC_CREDENTIALS_USER: isize = 201;
     const IDC_CREDENTIALS_PASS: isize = 202;
     const IDC_CREDENTIALS_SAVE: isize = 203;
+    const IDC_CREDENTIALS_KIND: i32 = 204;
     match msg {
         WM_CREATE => {
             let create_struct =
                 lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
             let data_ptr = unsafe { (*create_struct).lpCreateParams as *mut CredentialsPromptData };
             crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, data_ptr as isize);
-            let Some((body_text, username_value, save_credentials, language)) =
+            let Some((body_text, username_value, password_value, save_credentials, language, mode)) =
                 crate::with_raw_mut_ptr_safe(data_ptr, |data| {
                     (
                         data.body.clone(),
                         data.username.clone(),
+                        data.password.clone(),
                         data.save_credentials,
                         data.language,
+                        data.mode.clone(),
                     )
                 })
             else {
@@ -676,173 +796,372 @@ fn credentials_prompt_wndproc_inner(
             let hfont = HFONT(
                 crate::get_stock_object_safe(windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT).0,
             );
-            let username_label_text = i18n::tr(language, "stream_audio.auth_username");
-            let password_label_text = i18n::tr(language, "stream_audio.auth_password");
-            let save_credentials_text = i18n::tr(language, "stream_audio.save_credentials");
+            match mode {
+                CredentialsPromptMode::Credentials => {
+                    let username_label_text = i18n::tr(language, "stream_audio.auth_username");
+                    let password_label_text = i18n::tr(language, "stream_audio.auth_password");
+                    let save_credentials_text = i18n::tr(language, "stream_audio.save_credentials");
 
-            let body_label = unsafe {
-                CreateWindowExW(
-                    Default::default(),
-                    WC_STATIC,
-                    PCWSTR(to_wide(&body_text).as_ptr()),
-                    WS_CHILD | WS_VISIBLE,
-                    20,
-                    18,
-                    380,
-                    40,
-                    hwnd,
-                    HMENU(0),
-                    HINSTANCE(0),
-                    None,
-                )
-            };
-            let user_label = unsafe {
-                CreateWindowExW(
-                    Default::default(),
-                    WC_STATIC,
-                    PCWSTR(to_wide(&username_label_text).as_ptr()),
-                    WS_CHILD | WS_VISIBLE,
-                    20,
-                    76,
-                    100,
-                    20,
-                    hwnd,
-                    HMENU(0),
-                    HINSTANCE(0),
-                    None,
-                )
-            };
-            let user_edit = unsafe {
-                CreateWindowExW(
-                    WS_EX_CLIENTEDGE,
-                    WC_EDIT,
-                    PCWSTR(to_wide(&username_value).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
-                    128,
-                    72,
-                    250,
-                    24,
-                    hwnd,
-                    HMENU(IDC_CREDENTIALS_USER),
-                    HINSTANCE(0),
-                    None,
-                )
-            };
-            let pass_label = unsafe {
-                CreateWindowExW(
-                    Default::default(),
-                    WC_STATIC,
-                    PCWSTR(to_wide(&password_label_text).as_ptr()),
-                    WS_CHILD | WS_VISIBLE,
-                    20,
-                    112,
-                    100,
-                    20,
-                    hwnd,
-                    HMENU(0),
-                    HINSTANCE(0),
-                    None,
-                )
-            };
-            let pass_edit = unsafe {
-                CreateWindowExW(
-                    WS_EX_CLIENTEDGE,
-                    WC_EDIT,
-                    PCWSTR::null(),
-                    WS_CHILD
-                        | WS_VISIBLE
-                        | WS_TABSTOP
-                        | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
-                    128,
-                    108,
-                    250,
-                    24,
-                    hwnd,
-                    HMENU(IDC_CREDENTIALS_PASS),
-                    HINSTANCE(0),
-                    None,
-                )
-            };
-            let save_checkbox = unsafe {
-                CreateWindowExW(
-                    Default::default(),
-                    WC_BUTTON,
-                    PCWSTR(to_wide(&save_credentials_text).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                    20,
-                    150,
-                    358,
-                    24,
-                    hwnd,
-                    HMENU(IDC_CREDENTIALS_SAVE),
-                    HINSTANCE(0),
-                    None,
-                )
-            };
-            let ok = unsafe {
-                CreateWindowExW(
-                    Default::default(),
-                    WC_BUTTON,
-                    PCWSTR(to_wide(&i18n::tr(language, "options.ok")).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                    193,
-                    192,
-                    80,
-                    28,
-                    hwnd,
-                    HMENU(1),
-                    HINSTANCE(0),
-                    None,
-                )
-            };
-            let cancel = unsafe {
-                CreateWindowExW(
-                    Default::default(),
-                    WC_BUTTON,
-                    PCWSTR(to_wide(&i18n::tr(language, "options.cancel")).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                    283,
-                    192,
-                    95,
-                    28,
-                    hwnd,
-                    HMENU(2),
-                    HINSTANCE(0),
-                    None,
-                )
-            };
+                    let body_label = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_STATIC,
+                            PCWSTR(to_wide(&body_text).as_ptr()),
+                            WS_CHILD | WS_VISIBLE,
+                            20,
+                            18,
+                            380,
+                            40,
+                            hwnd,
+                            HMENU(0),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let user_label = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_STATIC,
+                            PCWSTR(to_wide(&username_label_text).as_ptr()),
+                            WS_CHILD | WS_VISIBLE,
+                            20,
+                            76,
+                            100,
+                            20,
+                            hwnd,
+                            HMENU(0),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let user_edit = unsafe {
+                        CreateWindowExW(
+                            WS_EX_CLIENTEDGE,
+                            WC_EDIT,
+                            PCWSTR(to_wide(&username_value).as_ptr()),
+                            WS_CHILD
+                                | WS_VISIBLE
+                                | WS_TABSTOP
+                                | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                            128,
+                            72,
+                            250,
+                            24,
+                            hwnd,
+                            HMENU(IDC_CREDENTIALS_USER),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let pass_label = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_STATIC,
+                            PCWSTR(to_wide(&password_label_text).as_ptr()),
+                            WS_CHILD | WS_VISIBLE,
+                            20,
+                            112,
+                            100,
+                            20,
+                            hwnd,
+                            HMENU(0),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let pass_edit = unsafe {
+                        CreateWindowExW(
+                            WS_EX_CLIENTEDGE,
+                            WC_EDIT,
+                            PCWSTR::null(),
+                            WS_CHILD
+                                | WS_VISIBLE
+                                | WS_TABSTOP
+                                | WINDOW_STYLE((ES_AUTOHSCROLL | ES_PASSWORD) as u32),
+                            128,
+                            108,
+                            250,
+                            24,
+                            hwnd,
+                            HMENU(IDC_CREDENTIALS_PASS),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let save_checkbox = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_BUTTON,
+                            PCWSTR(to_wide(&save_credentials_text).as_ptr()),
+                            WS_CHILD
+                                | WS_VISIBLE
+                                | WS_TABSTOP
+                                | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                            20,
+                            150,
+                            358,
+                            24,
+                            hwnd,
+                            HMENU(IDC_CREDENTIALS_SAVE),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let ok = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_BUTTON,
+                            PCWSTR(to_wide(&i18n::tr(language, "options.ok")).as_ptr()),
+                            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                            193,
+                            192,
+                            80,
+                            28,
+                            hwnd,
+                            HMENU(1),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let cancel = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_BUTTON,
+                            PCWSTR(to_wide(&i18n::tr(language, "options.cancel")).as_ptr()),
+                            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                            283,
+                            192,
+                            95,
+                            28,
+                            hwnd,
+                            HMENU(2),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
 
-            if hfont.0 != 0 {
-                unsafe {
-                    for control in [
-                        body_label,
-                        user_label,
-                        user_edit,
-                        pass_label,
-                        pass_edit,
-                        save_checkbox,
-                        ok,
-                        cancel,
-                    ] {
-                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    if hfont.0 != 0 {
+                        unsafe {
+                            for control in [
+                                body_label,
+                                user_label,
+                                user_edit,
+                                pass_label,
+                                pass_edit,
+                                save_checkbox,
+                                ok,
+                                cancel,
+                            ] {
+                                SendMessageW(
+                                    control,
+                                    WM_SETFONT,
+                                    WPARAM(hfont.0 as usize),
+                                    LPARAM(1),
+                                );
+                            }
+                        }
+                    }
+
+                    if save_credentials {
+                        unsafe {
+                            SendMessageW(
+                                save_checkbox,
+                                BM_SETCHECK,
+                                WPARAM(BST_CHECKED.0 as usize),
+                                LPARAM(0),
+                            );
+                        }
+                    }
+
+                    unsafe {
+                        SetFocus(user_edit);
+                        SendMessageW(user_edit, 0x00B1, WPARAM(0), LPARAM(-1));
                     }
                 }
-            }
+                CredentialsPromptMode::DirectorySearch {
+                    options,
+                    selected_index,
+                    primary_label,
+                    secondary_label,
+                } => {
+                    let kind_label = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_STATIC,
+                            PCWSTR(to_wide(&body_text).as_ptr()),
+                            WS_CHILD | WS_VISIBLE,
+                            20,
+                            24,
+                            100,
+                            20,
+                            hwnd,
+                            HMENU(0),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let kind_combo = unsafe {
+                        CreateWindowExW(
+                            WS_EX_CLIENTEDGE,
+                            WC_COMBOBOXW,
+                            PCWSTR::null(),
+                            WS_CHILD
+                                | WS_VISIBLE
+                                | WS_TABSTOP
+                                | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                            128,
+                            20,
+                            250,
+                            180,
+                            hwnd,
+                            HMENU(IDC_CREDENTIALS_KIND as isize),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let user_label = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_STATIC,
+                            PCWSTR(to_wide(&primary_label).as_ptr()),
+                            WS_CHILD | WS_VISIBLE,
+                            20,
+                            68,
+                            100,
+                            20,
+                            hwnd,
+                            HMENU(0),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let user_edit = unsafe {
+                        CreateWindowExW(
+                            WS_EX_CLIENTEDGE,
+                            WC_EDIT,
+                            PCWSTR(to_wide(&username_value).as_ptr()),
+                            WS_CHILD
+                                | WS_VISIBLE
+                                | WS_TABSTOP
+                                | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                            128,
+                            64,
+                            250,
+                            24,
+                            hwnd,
+                            HMENU(IDC_CREDENTIALS_USER),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let pass_label = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_STATIC,
+                            PCWSTR(to_wide(&secondary_label).as_ptr()),
+                            WS_CHILD | WS_VISIBLE,
+                            20,
+                            104,
+                            100,
+                            20,
+                            hwnd,
+                            HMENU(0),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let pass_edit = unsafe {
+                        CreateWindowExW(
+                            WS_EX_CLIENTEDGE,
+                            WC_EDIT,
+                            PCWSTR(to_wide(&password_value).as_ptr()),
+                            WS_CHILD
+                                | WS_VISIBLE
+                                | WS_TABSTOP
+                                | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                            128,
+                            100,
+                            250,
+                            24,
+                            hwnd,
+                            HMENU(IDC_CREDENTIALS_PASS),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let ok = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_BUTTON,
+                            PCWSTR(to_wide(&i18n::tr(language, "options.ok")).as_ptr()),
+                            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                            193,
+                            156,
+                            80,
+                            28,
+                            hwnd,
+                            HMENU(1),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let cancel = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_BUTTON,
+                            PCWSTR(to_wide(&i18n::tr(language, "options.cancel")).as_ptr()),
+                            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                            283,
+                            156,
+                            95,
+                            28,
+                            hwnd,
+                            HMENU(2),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
 
-            if save_credentials {
-                unsafe {
-                    SendMessageW(
-                        save_checkbox,
-                        BM_SETCHECK,
-                        WPARAM(BST_CHECKED.0 as usize),
-                        LPARAM(0),
-                    );
+                    for option in &options {
+                        let option_wide = to_wide(option);
+                        unsafe {
+                            SendMessageW(
+                                kind_combo,
+                                CB_ADDSTRING,
+                                WPARAM(0),
+                                LPARAM(option_wide.as_ptr() as isize),
+                            );
+                        }
+                    }
+                    unsafe {
+                        SendMessageW(
+                            kind_combo,
+                            CB_SETCURSEL,
+                            WPARAM(selected_index.min(options.len().saturating_sub(1))),
+                            LPARAM(0),
+                        );
+                    }
+
+                    if hfont.0 != 0 {
+                        unsafe {
+                            for control in [
+                                kind_label, kind_combo, user_label, user_edit, pass_label,
+                                pass_edit, ok, cancel,
+                            ] {
+                                SendMessageW(
+                                    control,
+                                    WM_SETFONT,
+                                    WPARAM(hfont.0 as usize),
+                                    LPARAM(1),
+                                );
+                            }
+                        }
+                    }
+
+                    unsafe {
+                        SetFocus(kind_combo);
+                    }
                 }
-            }
-
-            unsafe {
-                SetFocus(user_edit);
-                SendMessageW(user_edit, 0x00B1, WPARAM(0), LPARAM(-1));
             }
             LRESULT(0)
         }
@@ -871,10 +1190,20 @@ fn credentials_prompt_wndproc_inner(
                     )
                     .0 as u32
                         == BST_CHECKED.0;
+                    let combo_value = crate::send_message_w_safe(
+                        crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_KIND),
+                        CB_GETCURSEL,
+                        WPARAM(0),
+                        LPARAM(0),
+                    )
+                    .0;
                     if crate::with_raw_mut_ptr_safe(ptr, |data| {
                         data.username = username;
                         data.password = password;
                         data.save_credentials = save_credentials;
+                        if combo_value >= 0 {
+                            data.directory_selected_index = combo_value as usize;
+                        }
                         data.confirmed = true;
                     })
                     .is_none()
@@ -896,13 +1225,37 @@ fn credentials_prompt_wndproc_inner(
                 let shift_down =
                     (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
                 let current_focus = crate::get_focus_safe();
-                let order = [
-                    crate::get_dlg_item_safe(hwnd, 201),
-                    crate::get_dlg_item_safe(hwnd, 202),
-                    crate::get_dlg_item_safe(hwnd, 203),
-                    crate::get_dlg_item_safe(hwnd, 1),
-                    crate::get_dlg_item_safe(hwnd, 2),
-                ];
+                let order = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
+                    .try_into()
+                    .ok()
+                    .and_then(|ptr: usize| {
+                        crate::with_raw_mut_ptr_safe(ptr as *mut CredentialsPromptData, |data| {
+                            match data.mode {
+                                CredentialsPromptMode::Credentials => vec![
+                                    crate::get_dlg_item_safe(hwnd, 201),
+                                    crate::get_dlg_item_safe(hwnd, 202),
+                                    crate::get_dlg_item_safe(hwnd, 203),
+                                    crate::get_dlg_item_safe(hwnd, 1),
+                                    crate::get_dlg_item_safe(hwnd, 2),
+                                ],
+                                CredentialsPromptMode::DirectorySearch { .. } => vec![
+                                    crate::get_dlg_item_safe(hwnd, 204),
+                                    crate::get_dlg_item_safe(hwnd, 201),
+                                    crate::get_dlg_item_safe(hwnd, 202),
+                                    crate::get_dlg_item_safe(hwnd, 1),
+                                    crate::get_dlg_item_safe(hwnd, 2),
+                                ],
+                            }
+                        })
+                    })
+                    .unwrap_or_else(|| {
+                        vec![
+                            crate::get_dlg_item_safe(hwnd, 201),
+                            crate::get_dlg_item_safe(hwnd, 202),
+                            crate::get_dlg_item_safe(hwnd, 1),
+                            crate::get_dlg_item_safe(hwnd, 2),
+                        ]
+                    });
                 let mut idx = order.iter().position(|&h| h == current_focus).unwrap_or(0);
                 if shift_down {
                     idx = if idx == 0 { order.len() - 1 } else { idx - 1 };

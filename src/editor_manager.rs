@@ -1152,6 +1152,7 @@ pub struct Document {
     pub opened_text_encoding: Option<TextEncoding>,
     pub current_save_text_encoding: Option<TextEncoding>,
     pub from_rss: bool,
+    pub from_italiaonline: bool,
     pub is_temporary: bool,
     pub prefer_title_for_save_suggestion: bool,
 }
@@ -1176,6 +1177,7 @@ impl Default for Document {
             opened_text_encoding: None,
             current_save_text_encoding: None,
             from_rss: false,
+            from_italiaonline: false,
             is_temporary: false,
             prefer_title_for_save_suggestion: false,
         }
@@ -3058,6 +3060,7 @@ pub fn new_document(hwnd: HWND) {
                 opened_text_encoding: None,
                 current_save_text_encoding: None,
                 from_rss: false,
+                from_italiaonline: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
             };
@@ -3099,6 +3102,7 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
                 opened_text_encoding: None,
                 current_save_text_encoding: None,
                 from_rss: false,
+                from_italiaonline: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
             };
@@ -3366,6 +3370,19 @@ pub fn mark_current_document_from_rss(hwnd: HWND, from_rss: bool) {
     }
 }
 
+pub fn mark_current_document_from_italiaonline(hwnd: HWND, from_italiaonline: bool) {
+    let result = {
+        with_state(hwnd, |state| {
+            if let Some(doc) = state.docs.get_mut(state.current) {
+                doc.from_italiaonline = from_italiaonline;
+            }
+        })
+    };
+    if result.is_none() {
+        crate::log_debug("Failed to access editor state");
+    }
+}
+
 pub fn set_current_document_title(hwnd: HWND, title: &str) {
     let new_title = title.trim();
     if new_title.is_empty() {
@@ -3408,6 +3425,19 @@ pub fn current_document_is_from_rss(hwnd: HWND) -> bool {
     }
 }
 
+pub fn current_document_is_from_italiaonline(hwnd: HWND) -> bool {
+    {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| doc.from_italiaonline)
+                .unwrap_or(false)
+        })
+        .unwrap_or(false)
+    }
+}
+
 pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
     {
         let (index, hwnd_edit) = with_state(hwnd, |state| {
@@ -3435,6 +3465,7 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
                 opened_text_encoding: None,
                 current_save_text_encoding: None,
                 from_rss: true,
+                from_italiaonline: false,
                 is_temporary: true,
                 prefer_title_for_save_suggestion: false,
             };

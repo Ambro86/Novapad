@@ -145,6 +145,7 @@ pub const IDM_TOOLS_TOGGLE_DICTATION: usize = 5011;
 pub const IDM_TOOLS_RAI_AUDIODESCRIZIONI: usize = 5012;
 pub const IDM_TOOLS_RAIPLAYSOUND: usize = 5013;
 pub const IDM_TOOLS_RAIPLAY: usize = 5014;
+pub const IDM_TOOLS_ITALIAONLINE: usize = 5015;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -173,6 +174,7 @@ pub struct MenuLabels {
     pub menu_rai_audiodescrizioni: String,
     pub menu_raiplay: String,
     pub menu_raiplaysound: String,
+    pub menu_italiaonline: String,
     pub menu_prompt: String,
     pub menu_rss: String,
     pub menu_podcasts: String,
@@ -297,6 +299,11 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         },
         menu_raiplaysound: if language == Language::Italian {
             "RaiPlay Sound...\tCtrl+Shift+S".to_string()
+        } else {
+            String::new()
+        },
+        menu_italiaonline: if language == Language::Italian {
+            "Pagine Bianche e Gialle...\tAlt+Shift+G".to_string()
         } else {
             String::new()
         },
@@ -1419,6 +1426,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 MF_STRING,
                 IDM_TOOLS_RAIPLAYSOUND,
                 &labels.menu_raiplaysound,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_ITALIAONLINE,
+                &labels.menu_italiaonline,
             );
             append_menu_string(
                 tools_menu,

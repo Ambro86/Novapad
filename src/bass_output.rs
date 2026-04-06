@@ -128,6 +128,7 @@ fn load_plugins_once(api: &BassApi) -> Result<Vec<Hplugin>, String> {
                 "bass_alac.dll",
                 "bassflac.dll",
                 "bassopus.dll",
+                "basswebm.dll",
                 "basswma.dll",
             ];
             let mut handles = Vec::new();

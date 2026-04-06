@@ -22,6 +22,7 @@ const BASS_AAC_DLL: &[u8] = include_bytes!("../dll/bass_aac.dll");
 const BASS_ALAC_DLL: &[u8] = include_bytes!("../dll/bass_alac.dll");
 const BASS_FLAC_DLL: &[u8] = include_bytes!("../dll/bassflac.dll");
 const BASS_OPUS_DLL: &[u8] = include_bytes!("../dll/bassopus.dll");
+const BASS_WEBM_DLL: &[u8] = include_bytes!("../dll/basswebm.dll");
 const BASS_WMA_DLL: &[u8] = include_bytes!("../dll/basswma.dll");
 // PDFium: rendering/estrazione testo PDF più robusta.
 const PDFIUM_DLL: &[u8] = include_bytes!("../dll/pdfium.dll");
@@ -93,6 +94,7 @@ pub fn extract_all() -> std::io::Result<PathBuf> {
         ("bass_alac.dll", BASS_ALAC_DLL),
         ("bassflac.dll", BASS_FLAC_DLL),
         ("bassopus.dll", BASS_OPUS_DLL),
+        ("basswebm.dll", BASS_WEBM_DLL),
         ("basswma.dll", BASS_WMA_DLL),
         ("pdfium.dll", PDFIUM_DLL),
         ("avcodec-62.dll", AVCODEC_DLL),

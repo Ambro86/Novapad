@@ -779,7 +779,7 @@ fn start_audiobook_at_with_options(
         } else if !force_ffmpeg_stream {
             // Formats that are frequently problematic with direct BASS open:
             // prefer FFmpeg streaming path (already used for webm fallback).
-            force_ffmpeg_stream = matches!(extension.as_str(), "m4a" | "aac" | "mp4");
+            force_ffmpeg_stream = matches!(extension.as_str(), "m4a" | "aac");
         }
         if !force_ffmpeg_stream && !prefer_precise_subtitle_backend {
             force_ffmpeg_stream = {

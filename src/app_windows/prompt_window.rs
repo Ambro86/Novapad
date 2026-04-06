@@ -96,6 +96,7 @@ pub struct PromptDirectoryResult {
     pub selected_index: usize,
     pub primary_value: String,
     pub secondary_value: String,
+    pub tertiary_value: String,
 }
 
 pub struct PromptDirectoryOptions {
@@ -109,6 +110,8 @@ pub struct PromptDirectoryOptions {
     pub primary_default: String,
     pub secondary_label: String,
     pub secondary_default: String,
+    pub tertiary_label: String,
+    pub tertiary_default: String,
 }
 
 struct AnsiStripper {
@@ -387,6 +390,7 @@ pub fn prompt_credentials(
             body: body.to_string(),
             username: username_default.to_string(),
             password: String::new(),
+            tertiary: String::new(),
             save_credentials: save_credentials_default,
             directory_selected_index: 0,
             confirmed: false,
@@ -464,6 +468,7 @@ pub fn prompt_directory_search(
             body: options.type_label,
             username: options.primary_default,
             password: options.secondary_default,
+            tertiary: options.tertiary_default,
             save_credentials: false,
             directory_selected_index: options
                 .default_selection
@@ -477,6 +482,7 @@ pub fn prompt_directory_search(
                 primary_label: options.primary_label,
                 primary_labels: options.primary_labels,
                 secondary_label: options.secondary_label,
+                tertiary_label: options.tertiary_label,
             },
         };
 
@@ -488,7 +494,7 @@ pub fn prompt_directory_search(
             200,
             200,
             430,
-            264,
+            304,
             parent,
             HMENU(0),
             hinstance,
@@ -531,6 +537,7 @@ pub fn prompt_directory_search(
                 selected_index: data.directory_selected_index,
                 primary_value: data.username,
                 secondary_value: data.password,
+                tertiary_value: data.tertiary,
             })
         } else {
             None
@@ -550,6 +557,7 @@ struct CredentialsPromptData {
     body: String,
     username: String,
     password: String,
+    tertiary: String,
     save_credentials: bool,
     directory_selected_index: usize,
     confirmed: bool,
@@ -567,6 +575,7 @@ enum CredentialsPromptMode {
         primary_label: String,
         primary_labels: Vec<String>,
         secondary_label: String,
+        tertiary_label: String,
     },
 }
 
@@ -794,23 +803,32 @@ fn credentials_prompt_wndproc_inner(
     const IDC_CREDENTIALS_SAVE: isize = 203;
     const IDC_CREDENTIALS_KIND: i32 = 204;
     const IDC_CREDENTIALS_USER_LABEL: isize = 205;
+    const IDC_CREDENTIALS_TERTIARY: i32 = 206;
     match msg {
         WM_CREATE => {
             let create_struct =
                 lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
             let data_ptr = unsafe { (*create_struct).lpCreateParams as *mut CredentialsPromptData };
             crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, data_ptr as isize);
-            let Some((body_text, username_value, password_value, save_credentials, language, mode)) =
-                crate::with_raw_mut_ptr_safe(data_ptr, |data| {
-                    (
-                        data.body.clone(),
-                        data.username.clone(),
-                        data.password.clone(),
-                        data.save_credentials,
-                        data.language,
-                        data.mode.clone(),
-                    )
-                })
+            let Some((
+                body_text,
+                username_value,
+                password_value,
+                tertiary_value,
+                save_credentials,
+                language,
+                mode,
+            )) = crate::with_raw_mut_ptr_safe(data_ptr, |data| {
+                (
+                    data.body.clone(),
+                    data.username.clone(),
+                    data.password.clone(),
+                    data.tertiary.clone(),
+                    data.save_credentials,
+                    data.language,
+                    data.mode.clone(),
+                )
+            })
             else {
                 crate::log_debug("Credentials prompt create params pointer unavailable");
                 return LRESULT(0);
@@ -1007,6 +1025,7 @@ fn credentials_prompt_wndproc_inner(
                     primary_label,
                     primary_labels,
                     secondary_label,
+                    tertiary_label,
                 } => {
                     let kind_label = unsafe {
                         CreateWindowExW(
@@ -1113,6 +1132,41 @@ fn credentials_prompt_wndproc_inner(
                             None,
                         )
                     };
+                    let tertiary_label_hwnd = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_STATIC,
+                            PCWSTR(to_wide(&tertiary_label).as_ptr()),
+                            WS_CHILD | WS_VISIBLE,
+                            20,
+                            140,
+                            100,
+                            20,
+                            hwnd,
+                            HMENU(0),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let tertiary_edit = unsafe {
+                        CreateWindowExW(
+                            WS_EX_CLIENTEDGE,
+                            WC_EDIT,
+                            PCWSTR(to_wide(&tertiary_value).as_ptr()),
+                            WS_CHILD
+                                | WS_VISIBLE
+                                | WS_TABSTOP
+                                | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                            128,
+                            136,
+                            250,
+                            24,
+                            hwnd,
+                            HMENU(IDC_CREDENTIALS_TERTIARY as isize),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
                     let ok = unsafe {
                         CreateWindowExW(
                             Default::default(),
@@ -1120,7 +1174,7 @@ fn credentials_prompt_wndproc_inner(
                             PCWSTR(to_wide(&i18n::tr(language, "options.ok")).as_ptr()),
                             WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                             193,
-                            156,
+                            192,
                             80,
                             28,
                             hwnd,
@@ -1136,7 +1190,7 @@ fn credentials_prompt_wndproc_inner(
                             PCWSTR(to_wide(&i18n::tr(language, "options.cancel")).as_ptr()),
                             WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                             283,
-                            156,
+                            192,
                             95,
                             28,
                             hwnd,
@@ -1175,8 +1229,16 @@ fn credentials_prompt_wndproc_inner(
                     if hfont.0 != 0 {
                         unsafe {
                             for control in [
-                                kind_label, kind_combo, user_label, user_edit, pass_label,
-                                pass_edit, ok, cancel,
+                                kind_label,
+                                kind_combo,
+                                user_label,
+                                user_edit,
+                                pass_label,
+                                pass_edit,
+                                tertiary_label_hwnd,
+                                tertiary_edit,
+                                ok,
+                                cancel,
                             ] {
                                 SendMessageW(
                                     control,
@@ -1237,15 +1299,22 @@ fn credentials_prompt_wndproc_inner(
                 if !ptr.is_null() {
                     let user_edit = crate::get_dlg_item_safe(hwnd, 201);
                     let pass_edit = crate::get_dlg_item_safe(hwnd, 202);
+                    let tertiary_edit = crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_TERTIARY);
                     let save_checkbox = crate::get_dlg_item_safe(hwnd, 203);
                     let user_len = crate::get_window_text_length_w_safe(user_edit);
                     let pass_len = crate::get_window_text_length_w_safe(pass_edit);
+                    let tertiary_len = crate::get_window_text_length_w_safe(tertiary_edit);
                     let mut user_buf = vec![0u16; (user_len + 1) as usize];
                     let mut pass_buf = vec![0u16; (pass_len + 1) as usize];
+                    let mut tertiary_buf = vec![0u16; (tertiary_len + 1) as usize];
                     let user_read = crate::get_window_text_w_safe(user_edit, &mut user_buf);
                     let pass_read = crate::get_window_text_w_safe(pass_edit, &mut pass_buf);
+                    let tertiary_read =
+                        crate::get_window_text_w_safe(tertiary_edit, &mut tertiary_buf);
                     let username = String::from_utf16_lossy(&user_buf[..user_read as usize]);
                     let password = String::from_utf16_lossy(&pass_buf[..pass_read as usize]);
+                    let tertiary =
+                        String::from_utf16_lossy(&tertiary_buf[..tertiary_read as usize]);
                     let save_credentials = crate::send_message_w_safe(
                         save_checkbox,
                         BM_GETCHECK,
@@ -1264,6 +1333,7 @@ fn credentials_prompt_wndproc_inner(
                     if crate::with_raw_mut_ptr_safe(ptr, |data| {
                         data.username = username;
                         data.password = password;
+                        data.tertiary = tertiary;
                         data.save_credentials = save_credentials;
                         if combo_value >= 0 {
                             data.directory_selected_index = combo_value as usize;
@@ -1306,6 +1376,7 @@ fn credentials_prompt_wndproc_inner(
                                     crate::get_dlg_item_safe(hwnd, 204),
                                     crate::get_dlg_item_safe(hwnd, 201),
                                     crate::get_dlg_item_safe(hwnd, 202),
+                                    crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_TERTIARY),
                                     crate::get_dlg_item_safe(hwnd, 1),
                                     crate::get_dlg_item_safe(hwnd, 2),
                                 ],

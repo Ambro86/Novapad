@@ -1,5 +1,6 @@
 use base64::Engine;
 use quick_xml::{Reader, events::Event};
+use std::collections::HashSet;
 use url::{Url, form_urlencoded::Serializer};
 
 const ITALIAONLINE_BASE_URL_B64: &str = "BT9NUUx/HRUjWkodMRoTOlYsGzZeHTVfCiMeAT4c";
@@ -81,6 +82,17 @@ pub(crate) struct SearchResponse {
 }
 
 #[derive(Clone, Debug)]
+pub(crate) struct AmbiguousPlaceResponse {
+    pub(crate) places: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum SearchOutcome {
+    Results(SearchResponse),
+    AmbiguousAddress(AmbiguousPlaceResponse),
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct DetailResponse {
     pub(crate) title: String,
     pub(crate) body: String,
@@ -109,9 +121,10 @@ struct SearchAccumulator {
     is_last_page: Option<bool>,
     result_count: Option<usize>,
     max_results: Option<usize>,
+    places: Vec<String>,
 }
 
-pub(crate) fn search(query: &SearchQuery) -> Result<SearchResponse, String> {
+pub(crate) fn search(query: &SearchQuery) -> Result<SearchOutcome, String> {
     let trimmed_what = query.what.trim();
     if trimmed_what.is_empty() {
         return Err(format!(
@@ -186,7 +199,7 @@ fn build_detail_url(query: &SearchQuery, id: &str) -> Result<String, String> {
     ))
 }
 
-fn parse_search_response(xml: &str, kind: DirectoryKind) -> Result<SearchResponse, String> {
+fn parse_search_response(xml: &str, kind: DirectoryKind) -> Result<SearchOutcome, String> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
     let mut path: Vec<Vec<u8>> = Vec::new();
@@ -238,6 +251,18 @@ fn parse_search_response(xml: &str, kind: DirectoryKind) -> Result<SearchRespons
         }
     }
 
+    if search.status.as_deref() == Some("302") {
+        let places = search
+            .places
+            .into_iter()
+            .map(|place| place.trim().to_string())
+            .filter(|place| !place.is_empty())
+            .collect::<Vec<_>>();
+        return Ok(SearchOutcome::AmbiguousAddress(AmbiguousPlaceResponse {
+            places,
+        }));
+    }
+
     if search.status.as_deref() != Some("200") {
         return Err(format!(
             "Ricerca {} non riuscita (status {}).",
@@ -247,6 +272,7 @@ fn parse_search_response(xml: &str, kind: DirectoryKind) -> Result<SearchRespons
     }
 
     let parsed_result_count = search.result_count.unwrap_or(results.len());
+    deduplicate_search_results(&mut results);
     let computed_is_last_page = search.is_last_page.unwrap_or_else(|| {
         if parsed_result_count == 0 {
             true
@@ -257,12 +283,12 @@ fn parse_search_response(xml: &str, kind: DirectoryKind) -> Result<SearchRespons
         }
     });
 
-    Ok(SearchResponse {
+    Ok(SearchOutcome::Results(SearchResponse {
         display_where: search.display_where,
         current_page: search.current_page,
         is_last_page: computed_is_last_page,
         results,
-    })
+    }))
 }
 
 fn assign_search_text(
@@ -315,6 +341,14 @@ fn assign_search_text(
         {
             search.is_last_page = Some(text == "1");
         }
+        [response, places_tag, place_tag, address_tag]
+            if response.as_slice() == b"response"
+                && places_tag.as_slice() == b"places"
+                && place_tag.as_slice() == b"place"
+                && address_tag.as_slice() == b"address" =>
+        {
+            search.places.push(text.to_string());
+        }
         [response, results_tag, result_tag, field]
             if response.as_slice() == b"response"
                 && results_tag.as_slice() == b"results"
@@ -352,6 +386,48 @@ fn assign_search_text(
         }
         _ => {}
     }
+}
+
+fn deduplicate_search_results(results: &mut Vec<SearchResult>) {
+    let mut seen = HashSet::new();
+    results.retain(|result| {
+        let phones = result
+            .phones
+            .iter()
+            .map(|phone| phone.trim().to_ascii_lowercase())
+            .collect::<Vec<_>>()
+            .join("|");
+        let key = format!(
+            "content:{}|{}|{}|{}|{}|{}",
+            result.name.trim().to_ascii_lowercase(),
+            result
+                .category
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .to_ascii_lowercase(),
+            result
+                .address
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .to_ascii_lowercase(),
+            result
+                .city
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .to_ascii_lowercase(),
+            result
+                .province
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .to_ascii_lowercase(),
+            phones
+        );
+        seen.insert(key)
+    });
 }
 
 fn parse_detail_response(xml: &str, kind: DirectoryKind) -> Result<DetailResponse, String> {

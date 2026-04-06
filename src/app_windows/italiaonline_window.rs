@@ -2,12 +2,12 @@ use windows::Win32::Foundation::HWND;
 
 use crate::app_windows::prompt_window;
 use crate::app_windows::youtube_transcript_window::{
-    self, MultilineSelectionItem, MultilineSelectionResult,
+    self, MultilineSelectionItem, MultilineSelectionResult, choose_combo_option_dialog,
 };
 use crate::editor_manager;
 use crate::settings::Language;
 use crate::tools::italiaonline::{
-    self, DetailResponse, DirectoryKind, SearchQuery, SearchResponse,
+    self, DetailResponse, DirectoryKind, SearchOutcome, SearchQuery, SearchResponse,
 };
 use crate::{show_error, with_state};
 
@@ -51,22 +51,29 @@ pub fn reopen_last(parent: HWND) {
         return;
     };
     crate::screen_reader_speak(&format!("Ricerca {} in corso", query.kind.label()));
-    let response = match italiaonline::search(&query) {
-        Ok(response) => response,
+    let resolved = match resolve_search_outcome(parent, language, query.clone()) {
+        Ok(Some(resolved)) => resolved,
+        Ok(None) => return,
         Err(err) => {
             show_error(parent, language, &err);
             return;
         }
     };
-    if response.results.is_empty() {
+    if resolved.response.results.is_empty() {
         show_error(parent, language, "Nessun risultato trovato.");
         return;
     }
-    match browse_results(parent, language, &query, &response, selected_id) {
+    match browse_results(
+        parent,
+        language,
+        &resolved.query,
+        &resolved.response,
+        selected_id,
+    ) {
         BrowseResultsOutcome::OpenedDetail => {}
         BrowseResultsOutcome::NewSearch => {
             editor_manager::mark_current_document_from_italiaonline(parent, false);
-            run_search_flow(parent, language, query);
+            run_search_flow(parent, language, resolved.query);
         }
         BrowseResultsOutcome::Closed => {
             editor_manager::mark_current_document_from_italiaonline(parent, false);
@@ -81,18 +88,19 @@ fn run_search_flow(parent: HWND, language: Language, mut initial_query: SearchQu
         };
         initial_query = query.clone();
         crate::screen_reader_speak(&format!("Ricerca {} in corso", query.kind.label()));
-        let response = match italiaonline::search(&query) {
-            Ok(response) => response,
+        let resolved = match resolve_search_outcome(parent, language, query.clone()) {
+            Ok(Some(resolved)) => resolved,
+            Ok(None) => continue,
             Err(err) => {
                 show_error(parent, language, &err);
                 continue;
             }
         };
-        if response.results.is_empty() {
+        if resolved.response.results.is_empty() {
             show_error(parent, language, "Nessun risultato trovato.");
             continue;
         }
-        match browse_results(parent, language, &query, &response, None) {
+        match browse_results(parent, language, &resolved.query, &resolved.response, None) {
             BrowseResultsOutcome::OpenedDetail => return,
             BrowseResultsOutcome::NewSearch => continue,
             BrowseResultsOutcome::Closed => return,
@@ -104,6 +112,11 @@ enum BrowseResultsOutcome {
     Closed,
     OpenedDetail,
     NewSearch,
+}
+
+struct ResolvedSearch {
+    query: SearchQuery,
+    response: SearchResponse,
 }
 
 fn prompt_search_query(
@@ -120,6 +133,7 @@ fn prompt_search_query_with_focus(
     initial: &SearchQuery,
     focus_primary_field: bool,
 ) -> Option<SearchQuery> {
+    let (initial_city, initial_address) = split_where_fields(&initial.where_);
     let kind_options = vec![
         DirectoryKind::PagineBianche.label().to_string(),
         DirectoryKind::PagineGialle.label().to_string(),
@@ -146,8 +160,10 @@ fn prompt_search_query_with_focus(
                     .to_string(),
             ],
             primary_default: initial.what.clone(),
-            secondary_label: "Dove".to_string(),
-            secondary_default: initial.where_.clone(),
+            secondary_label: "Città".to_string(),
+            secondary_default: initial_city,
+            tertiary_label: "Indirizzo (facoltativo)".to_string(),
+            tertiary_default: initial_address,
         },
         language,
     )?;
@@ -169,7 +185,7 @@ fn prompt_search_query_with_focus(
             &SearchQuery {
                 kind,
                 what: prompt.primary_value,
-                where_: prompt.secondary_value,
+                where_: compose_where_value(&prompt.secondary_value, &prompt.tertiary_value),
                 page: 1,
             },
             true,
@@ -179,9 +195,80 @@ fn prompt_search_query_with_focus(
     Some(SearchQuery {
         kind,
         what: trimmed_what.to_string(),
-        where_: prompt.secondary_value.trim().to_string(),
+        where_: compose_where_value(&prompt.secondary_value, &prompt.tertiary_value),
         page: 1,
     })
+}
+
+fn split_where_fields(value: &str) -> (String, String) {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return (String::new(), String::new());
+    }
+    if let Some((city, address)) = trimmed.split_once(',') {
+        return (city.trim().to_string(), address.trim().to_string());
+    }
+    (trimmed.to_string(), String::new())
+}
+
+fn compose_where_value(city: &str, address: &str) -> String {
+    let trimmed_city = city.trim();
+    let trimmed_address = address.trim();
+    match (trimmed_city.is_empty(), trimmed_address.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => trimmed_city.to_string(),
+        (true, false) => trimmed_address.to_string(),
+        (false, false) => format!("{trimmed_city}, {trimmed_address}"),
+    }
+}
+
+fn resolve_search_outcome(
+    parent: HWND,
+    language: Language,
+    mut query: SearchQuery,
+) -> Result<Option<ResolvedSearch>, String> {
+    loop {
+        match italiaonline::search(&query)? {
+            SearchOutcome::Results(response) => {
+                return Ok(Some(ResolvedSearch { query, response }));
+            }
+            SearchOutcome::AmbiguousAddress(ambiguous) => {
+                let places =
+                    if ambiguous.places.is_empty() && query.kind == DirectoryKind::PagineBianche {
+                        match italiaonline::search(&SearchQuery {
+                            kind: DirectoryKind::PagineGialle,
+                            ..query.clone()
+                        })? {
+                            SearchOutcome::AmbiguousAddress(fallback) => fallback.places,
+                            SearchOutcome::Results(_) => Vec::new(),
+                        }
+                    } else {
+                        ambiguous.places
+                    };
+                if places.is_empty() {
+                    return Err(format!(
+                        "Ricerca {} non riuscita: indirizzo ambiguo. Specifica meglio la via o il numero civico.",
+                        query.kind.label()
+                    ));
+                }
+                let Some(selected_index) = choose_combo_option_dialog(
+                    parent,
+                    language,
+                    "Seleziona via".to_string(),
+                    "Sono state trovate più vie. Seleziona quella corretta".to_string(),
+                    places.clone(),
+                    0,
+                ) else {
+                    return Ok(None);
+                };
+                let Some(selected_place) = places.get(selected_index) else {
+                    return Ok(None);
+                };
+                let (city, _) = split_where_fields(&query.where_);
+                query.where_ = compose_where_value(&city, selected_place);
+            }
+        }
+    }
 }
 
 fn browse_results(
@@ -256,13 +343,14 @@ fn browse_results(
                         page: next_page,
                         ..current_query.clone()
                     };
-                    match italiaonline::search(&next_query) {
-                        Ok(next_response) => {
-                            current_query = next_query;
-                            current_response = next_response;
+                    match resolve_search_outcome(parent, language, next_query.clone()) {
+                        Ok(Some(resolved)) => {
+                            current_query = resolved.query;
+                            current_response = resolved.response;
                             current_selected_id = None;
                             continue;
                         }
+                        Ok(None) => continue,
                         Err(err) => {
                             show_error(parent, language, &err);
                             continue;

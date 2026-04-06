@@ -1065,6 +1065,7 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
 
         if all_edge {
             const WS_RETRY_MAX: usize = 10;
+            const EDGE_FRESH_CHUNK_RETRIES: usize = 6;
             let mut next_index = 0usize;
             let mut attempt = 1usize;
             loop {
@@ -1106,7 +1107,63 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                         if cancel_downloader.load(Ordering::SeqCst) {
                             return;
                         }
-                        let retry_forever = is_edge_connection_retry_error(&e);
+                        if is_edge_forbidden_error(&e) {
+                            crate::log_debug(
+                                "Edge WS reuse returned 403; switching to fresh Edge sessions for remaining chunks",
+                            );
+                            for (offset, chunk_obj) in chunks_downloader[next_index..].iter().enumerate() {
+                                if cancel_downloader.load(Ordering::SeqCst) {
+                                    return;
+                                }
+                                let (chunk_voice, chunk_rate, chunk_pitch, chunk_volume) =
+                                    if let Some(ov) = &chunk_obj.override_voice {
+                                        (
+                                            ov.voice.as_str(),
+                                            ov.rate.unwrap_or(0),
+                                            ov.pitch.unwrap_or(0),
+                                            ov.volume.unwrap_or(100),
+                                        )
+                                    } else {
+                                        (voice_downloader.as_str(), rate, pitch, volume)
+                                    };
+                                let options = EdgeStreamOptions {
+                                    voice: chunk_voice,
+                                    rate: chunk_rate,
+                                    pitch: chunk_pitch,
+                                    volume: chunk_volume,
+                                    language,
+                                    cancel: cancel_downloader.as_ref(),
+                                    progress_hwnd: hwnd_copy,
+                                    allow_http_fallback: true,
+                                };
+                                match download_edge_chunk_ws_with_retry(
+                                    chunk_obj,
+                                    &options,
+                                    next_index + offset,
+                                    EDGE_FRESH_CHUNK_RETRIES,
+                                )
+                                .await
+                                {
+                                    Ok(audio) => {
+                                        let len = chunk_obj.original_len;
+                                        if audio_tx.send(Ok((audio, len))).await.is_err() {
+                                            return;
+                                        }
+                                    }
+                                    Err(fresh_err) => {
+                                        if let Err(err) = audio_tx.send(Err(fresh_err)).await {
+                                            crate::log_debug(&format!(
+                                                "Failed to send audio error: {:?}",
+                                                err
+                                            ));
+                                        }
+                                        return;
+                                    }
+                                }
+                            }
+                            return;
+                        }
+                        let retry_forever = is_edge_retry_forever_error(&e);
                         crate::log_debug(&format!(
                             "Edge WS reuse failed (attempt {}/{}): {}",
                             attempt,
@@ -1360,9 +1417,17 @@ fn is_edge_connection_retry_error(err: &str) -> bool {
         || lower.contains("forcibly closed by the remote host")
 }
 
+fn is_edge_forbidden_error(err: &str) -> bool {
+    err.to_ascii_lowercase().contains("403 forbidden")
+}
+
+fn is_edge_retry_forever_error(err: &str) -> bool {
+    is_edge_connection_retry_error(err) || is_edge_forbidden_error(err)
+}
+
 fn edge_retry_delay_ms(err: &str, attempt: usize) -> u64 {
     let lower = err.to_ascii_lowercase();
-    let base_ms = if is_edge_connection_retry_error(err) || lower.contains("timeout") {
+    let base_ms = if is_edge_retry_forever_error(err) || lower.contains("timeout") {
         250
     } else {
         400
@@ -1428,7 +1493,7 @@ async fn download_audio_chunk_with_cancel(
         {
             Ok(data) => return Ok(data),
             Err(e) => {
-                let retry_forever = is_edge_connection_retry_error(&e);
+                let retry_forever = is_edge_retry_forever_error(&e);
                 let max_label = if retry_forever {
                     "inf".to_string()
                 } else {
@@ -2019,7 +2084,7 @@ async fn download_edge_chunk_ws_with_retry(
                 crate::log_debug(&format!(
                     "Edge WS: chunk download failed (attempt {}/{} chunk_index={}): {}",
                     attempt,
-                    if is_edge_connection_retry_error(err_str) {
+                    if is_edge_retry_forever_error(err_str) {
                         "inf".to_string()
                     } else {
                         max_retries.to_string()
@@ -2027,7 +2092,7 @@ async fn download_edge_chunk_ws_with_retry(
                     idx,
                     err_str
                 ));
-                let retry_forever = is_edge_connection_retry_error(err_str);
+                let retry_forever = is_edge_retry_forever_error(err_str);
                 if !retry_forever && attempt >= max_retries {
                     break err;
                 }
@@ -6601,7 +6666,7 @@ pub(crate) fn run_tts_audiobook_part(
                     let completed = current_global_progress.saturating_sub(base_progress);
                     next_index = (next_index + completed).min(edge_chunks.len());
                     let err_str = err.as_str();
-                    let retry_forever = is_edge_connection_retry_error(err_str);
+                    let retry_forever = is_edge_retry_forever_error(err_str);
                     crate::log_debug(&format!(
                         "Edge WS export failed (attempt {}/{}): {}",
                         attempt,

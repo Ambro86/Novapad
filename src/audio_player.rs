@@ -55,6 +55,7 @@ pub struct AudiobookPlayer {
     pub pitch: f32,
     pub subtitle_cancel: Arc<AtomicBool>,
     pub subtitle_hold: bool,
+    pub subtitle_seek_target_secs: Option<f64>,
     pub subtitle_speech_cancel: SubtitleSpeechCancel,
     pub subtitle_speech_command: SubtitleSpeechCommand,
     pub session_id: u64,
@@ -133,6 +134,7 @@ pub fn set_audiobook_subtitle_override(hwnd: HWND, subtitle_path: &Path) -> Resu
                     mix_export: false,
                     audio_track: None,
                     force_ffmpeg_stream: false,
+                    subtitle_seek_target_secs: None,
                 };
                 resume_info = Some((player.path.clone(), seconds, options));
                 current_media = Some(player.path.clone());
@@ -665,6 +667,7 @@ struct AudiobookPlaybackOptions {
     mix_export: bool,
     audio_track: Option<i32>,
     force_ffmpeg_stream: bool,
+    subtitle_seek_target_secs: Option<f64>,
 }
 
 const MAX_AUDIOBOOK_PLAYBACK_VOLUME: f32 = 3.0;
@@ -710,6 +713,7 @@ fn start_audiobook_at_with_options(
                             seconds,
                             AudiobookPlaybackOptions {
                                 mix_export: false,
+                                subtitle_seek_target_secs: Some(seconds as f64),
                                 ..opts
                             },
                         );
@@ -722,6 +726,7 @@ fn start_audiobook_at_with_options(
                             seconds,
                             AudiobookPlaybackOptions {
                                 mix_export: false,
+                                subtitle_seek_target_secs: Some(seconds as f64),
                                 ..opts
                             },
                         );
@@ -755,7 +760,7 @@ fn start_audiobook_at_with_options(
             .as_ref()
             .map(|entry| !entry.cues.is_empty())
             .unwrap_or(false);
-        let _subtitles_active =
+        let subtitles_active =
             effective_subtitle_mode != SubtitleReadMode::Off && subtitles_available;
         let effective_speed = requested_speed;
         log_mkv_probe_once(&path);
@@ -766,14 +771,17 @@ fn start_audiobook_at_with_options(
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
+        let prefer_precise_subtitle_backend = subtitles_active && final_path.is_file();
 
         let mut force_ffmpeg_stream = options.force_ffmpeg_stream;
-        if !force_ffmpeg_stream {
+        if prefer_precise_subtitle_backend {
+            force_ffmpeg_stream = false;
+        } else if !force_ffmpeg_stream {
             // Formats that are frequently problematic with direct BASS open:
             // prefer FFmpeg streaming path (already used for webm fallback).
             force_ffmpeg_stream = matches!(extension.as_str(), "m4a" | "aac" | "mp4");
         }
-        if !force_ffmpeg_stream {
+        if !force_ffmpeg_stream && !prefer_precise_subtitle_backend {
             force_ffmpeg_stream = {
                 with_state(hwnd_main, |state| {
                     state
@@ -849,59 +857,93 @@ fn start_audiobook_at_with_options(
                 Ok(output) => output,
                 Err(err) => {
                     log_debug(&format!("Audio player: BASS open failed: {}", err));
-                    // Try FFmpeg streaming first (instant playback)
-                    match BassOutput::start_with_ffmpeg(
-                        &final_path,
-                        seconds,
-                        effective_speed,
-                        options.pitch,
-                        initial_volume,
-                        effective_paused,
-                        options.audio_track,
-                    ) {
-                        Ok(output) => {
-                            {
-                                if with_state(hwnd_main, |state| {
-                                    state.audio_ffmpeg_retry_for = Some(path.clone());
-                                })
-                                .is_none()
-                                {
-                                    crate::log_debug("Failed to access audio player state");
+                    if prefer_precise_subtitle_backend {
+                        match decode_ffmpeg_to_wav(&final_path, options.audio_track) {
+                            Ok(wav_path) => match BassOutput::start(
+                                &wav_path,
+                                seconds,
+                                effective_speed,
+                                options.pitch,
+                                initial_volume,
+                                effective_paused,
+                            ) {
+                                Ok(output) => {
+                                    log_debug(
+                                        "Audio player: using WAV fallback for precise subtitle timing",
+                                    );
+                                    output
                                 }
+                                Err(wav_err) => {
+                                    log_debug(&format!(
+                                        "Audio player: WAV fallback failed: {}",
+                                        wav_err
+                                    ));
+                                    return;
+                                }
+                            },
+                            Err(decode_err) => {
+                                log_debug(&format!(
+                                    "Audio player: WAV decode for subtitle timing failed: {}",
+                                    decode_err
+                                ));
+                                return;
                             }
-                            log_debug("Audio player: using FFmpeg streaming");
-                            output
                         }
-                        Err(stream_err) => {
-                            log_debug(&format!(
-                                "Audio player: FFmpeg streaming failed: {}",
-                                stream_err
-                            ));
-                            // Fallback to WAV decode (slower but reliable)
-                            match decode_ffmpeg_to_wav(&final_path, options.audio_track) {
-                                Ok(wav_path) => match BassOutput::start(
-                                    &wav_path,
-                                    seconds,
-                                    effective_speed,
-                                    options.pitch,
-                                    initial_volume,
-                                    effective_paused,
-                                ) {
-                                    Ok(output) => output,
+                    } else {
+                        // Try FFmpeg streaming first (instant playback)
+                        match BassOutput::start_with_ffmpeg(
+                            &final_path,
+                            seconds,
+                            effective_speed,
+                            options.pitch,
+                            initial_volume,
+                            effective_paused,
+                            options.audio_track,
+                        ) {
+                            Ok(output) => {
+                                {
+                                    if with_state(hwnd_main, |state| {
+                                        state.audio_ffmpeg_retry_for = Some(path.clone());
+                                    })
+                                    .is_none()
+                                    {
+                                        crate::log_debug("Failed to access audio player state");
+                                    }
+                                }
+                                log_debug("Audio player: using FFmpeg streaming");
+                                output
+                            }
+                            Err(stream_err) => {
+                                log_debug(&format!(
+                                    "Audio player: FFmpeg streaming failed: {}",
+                                    stream_err
+                                ));
+                                // Fallback to WAV decode (slower but reliable)
+                                match decode_ffmpeg_to_wav(&final_path, options.audio_track) {
+                                    Ok(wav_path) => match BassOutput::start(
+                                        &wav_path,
+                                        seconds,
+                                        effective_speed,
+                                        options.pitch,
+                                        initial_volume,
+                                        effective_paused,
+                                    ) {
+                                        Ok(output) => output,
+                                        Err(err) => {
+                                            log_debug(&format!(
+                                                "Audio player: BASS fallback failed: {}",
+                                                err
+                                            ));
+                                            return;
+                                        }
+                                    },
                                     Err(err) => {
                                         log_debug(&format!(
-                                            "Audio player: BASS fallback failed: {}",
+                                            "Audio player: FFmpeg fallback failed: {}",
                                             err
                                         ));
                                         return;
                                     }
-                                },
-                                Err(err) => {
-                                    log_debug(&format!(
-                                        "Audio player: FFmpeg fallback failed: {}",
-                                        err
-                                    ));
-                                    return;
                                 }
                             }
                         }
@@ -944,6 +986,7 @@ fn start_audiobook_at_with_options(
             pitch: options.pitch,
             subtitle_cancel: subtitle_cancel.clone(),
             subtitle_hold,
+            subtitle_seek_target_secs: options.subtitle_seek_target_secs,
             subtitle_speech_cancel: subtitle_speech_cancel.clone(),
             subtitle_speech_command: subtitle_speech_command.clone(),
             session_id,
@@ -1076,6 +1119,7 @@ pub fn start_audiobook_playback(hwnd: HWND, path: &Path) {
                 mix_export,
                 audio_track: None,
                 force_ffmpeg_stream: false,
+                subtitle_seek_target_secs: None,
             },
         );
     }
@@ -1313,6 +1357,7 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
                             mix_export: false,
                             audio_track,
                             force_ffmpeg_stream: false,
+                            subtitle_seek_target_secs: None,
                         },
                     );
                 }
@@ -1344,7 +1389,10 @@ pub fn pause_audiobook_if_playing(hwnd: HWND) -> bool {
 
 pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
     enum SeekAction {
-        Direct,
+        Direct {
+            path: PathBuf,
+            subtitle_cancel: Arc<AtomicBool>,
+        },
         Restart {
             path: PathBuf,
             current_pos: u64,
@@ -1370,9 +1418,13 @@ pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
                 let new_pos = (current_pos as i64 + seconds).max(0);
                 if player.output.seek_to_seconds(new_pos as f64) {
                     let mut player = player;
+                    player.subtitle_cancel.store(true, Ordering::Relaxed);
+                    let fresh_subtitle_cancel = Arc::new(AtomicBool::new(false));
+                    player.subtitle_cancel = fresh_subtitle_cancel.clone();
                     player.accumulated_seconds = new_pos as u64;
                     player.start_instant = std::time::Instant::now();
                     player.is_paused = false;
+                    player.subtitle_seek_target_secs = Some(new_pos as f64);
                     if !player.play() || player.output.is_stopped() {
                         log_debug(
                             "Audio player: failed to resume after seek_audiobook direct seek",
@@ -1391,8 +1443,12 @@ pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
                             prev_volume: player.prev_volume,
                         });
                     }
+                    let path = player.path.clone();
                     state.active_audiobook = Some(player);
-                    return Some(SeekAction::Direct);
+                    return Some(SeekAction::Direct {
+                        path,
+                        subtitle_cancel: fresh_subtitle_cancel,
+                    });
                 }
                 player.subtitle_cancel.store(true, Ordering::Relaxed);
                 player.stop();
@@ -1418,7 +1474,12 @@ pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
             None => return,
         };
 
-        if matches!(action, SeekAction::Direct) {
+        if let SeekAction::Direct {
+            path,
+            subtitle_cancel,
+        } = action
+        {
+            restart_subtitle_reader_after_seek(hwnd, &path, subtitle_cancel);
             return;
         }
 
@@ -1459,6 +1520,7 @@ pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
                 mix_export: false,
                 audio_track,
                 force_ffmpeg_stream: false,
+                subtitle_seek_target_secs: Some(current_pos as f64),
             },
         );
     }
@@ -1466,7 +1528,10 @@ pub fn seek_audiobook(hwnd: HWND, seconds: i64) {
 
 pub fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
     enum SeekToAction {
-        Direct,
+        Direct {
+            path: PathBuf,
+            subtitle_cancel: Arc<AtomicBool>,
+        },
         Restart(PathBuf),
     }
     {
@@ -1478,9 +1543,13 @@ pub fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
                     "seek",
                 );
                 if player.output.seek_to_seconds(seconds as f64) {
+                    player.subtitle_cancel.store(true, Ordering::Relaxed);
+                    let fresh_subtitle_cancel = Arc::new(AtomicBool::new(false));
+                    player.subtitle_cancel = fresh_subtitle_cancel.clone();
                     player.accumulated_seconds = seconds;
                     player.start_instant = std::time::Instant::now();
                     player.is_paused = false;
+                    player.subtitle_seek_target_secs = Some(seconds as f64);
                     if !player.play() || player.output.is_stopped() {
                         log_debug(
                             "Audio player: failed to resume after seek_audiobook_to direct seek",
@@ -1489,7 +1558,10 @@ pub fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
                         player.stop();
                         return Some(SeekToAction::Restart(player.path.clone()));
                     }
-                    return Some(SeekToAction::Direct);
+                    return Some(SeekToAction::Direct {
+                        path: player.path.clone(),
+                        subtitle_cancel: fresh_subtitle_cancel,
+                    });
                 }
                 Some(SeekToAction::Restart(player.path.clone()))
             } else {
@@ -1499,7 +1571,12 @@ pub fn seek_audiobook_to(hwnd: HWND, seconds: u64) -> Result<(), String> {
         .flatten()
         .ok_or_else(|| "No active audiobook".to_string())?;
 
-        if matches!(action, SeekToAction::Direct) {
+        if let SeekToAction::Direct {
+            path,
+            subtitle_cancel,
+        } = action
+        {
+            restart_subtitle_reader_after_seek(hwnd, &path, subtitle_cancel);
             return Ok(());
         }
         let SeekToAction::Restart(path) = action else {
@@ -1620,6 +1697,7 @@ pub fn retry_current_with_ffmpeg_stream(hwnd: HWND) -> bool {
                 mix_export: false,
                 audio_track,
                 force_ffmpeg_stream: true,
+                subtitle_seek_target_secs: None,
             },
         );
         true
@@ -1688,6 +1766,7 @@ pub fn retry_current_after_unexpected_stop(hwnd: HWND) -> bool {
                 mix_export: false,
                 audio_track,
                 force_ffmpeg_stream: false,
+                subtitle_seek_target_secs: None,
             },
         );
         true
@@ -1737,6 +1816,7 @@ pub fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
                 mix_export: false,
                 audio_track,
                 force_ffmpeg_stream: false,
+                subtitle_seek_target_secs: None,
             },
         );
     }
@@ -1842,6 +1922,7 @@ pub fn change_audiobook_speed(hwnd: HWND, delta: f32) -> Option<f32> {
                 mix_export: false,
                 audio_track,
                 force_ffmpeg_stream: false,
+                subtitle_seek_target_secs: None,
             },
         );
 
@@ -1900,6 +1981,7 @@ pub fn change_audiobook_pitch(hwnd: HWND, delta: f32) -> Option<f32> {
                 mix_export: false,
                 audio_track,
                 force_ffmpeg_stream: false,
+                subtitle_seek_target_secs: None,
             },
         );
 
@@ -1957,6 +2039,7 @@ pub fn reset_audiobook_speed(hwnd: HWND) -> Option<f32> {
                 mix_export: false,
                 audio_track,
                 force_ffmpeg_stream: false,
+                subtitle_seek_target_secs: None,
             },
         );
 
@@ -2014,6 +2097,7 @@ pub fn reset_audiobook_pitch(hwnd: HWND) -> Option<f32> {
                 mix_export: false,
                 audio_track,
                 force_ffmpeg_stream: false,
+                subtitle_seek_target_secs: None,
             },
         );
 
@@ -2111,6 +2195,7 @@ pub fn switch_audio_track(hwnd: HWND, track_index: i32) {
                 mix_export: false,
                 audio_track: Some(track_index),
                 force_ffmpeg_stream: false,
+                subtitle_seek_target_secs: None,
             },
         );
 
@@ -2163,6 +2248,7 @@ pub fn switch_to_live_stream_url(hwnd: HWND, url: String, track_index: i32) {
             mix_export: false,
             audio_track: None,
             force_ffmpeg_stream: true,
+            subtitle_seek_target_secs: None,
         },
     );
 
@@ -2203,6 +2289,7 @@ pub fn toggle_audiobook_mute(hwnd: HWND) {
 struct SubtitlePlaybackState {
     paused: bool,
     position_secs: f64,
+    seek_target_secs: Option<f64>,
     session_id: u64,
 }
 
@@ -2258,7 +2345,7 @@ fn sleep_precise(timer: &WaitableTimer, duration: Duration) -> bool {
 static SUBTITLE_EDGE_CONFIRMED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 static SUBTITLE_CACHE: OnceLock<Mutex<HashMap<String, SubtitleCacheEntry>>> = OnceLock::new();
 const SUBTITLE_PRELOAD_MAX_BYTES: Option<usize> = None;
-const SUBTITLE_SCHEDULE_AHEAD_SECS: f64 = 10.0;
+const SUBTITLE_SCHEDULE_AHEAD_SECS: f64 = 0.25;
 
 #[derive(Clone)]
 struct SubtitleCacheEntry {
@@ -2359,6 +2446,16 @@ pub(crate) fn audiobook_position_secs(player: &AudiobookPlayer) -> f64 {
     )
 }
 
+fn subtitle_clock_position_secs(player: &AudiobookPlayer) -> f64 {
+    if let Some(pos) = player.position_secs() {
+        return pos.max(0.0);
+    }
+    if player.is_paused {
+        return player.accumulated_seconds as f64;
+    }
+    audiobook_position_secs(player)
+}
+
 fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackState> {
     {
         with_state(hwnd, |state| {
@@ -2368,12 +2465,41 @@ fn subtitle_playback_state(hwnd: HWND, path: &Path) -> Option<SubtitlePlaybackSt
             }
             Some(SubtitlePlaybackState {
                 paused: player.is_paused,
-                position_secs: audiobook_position_secs(player),
+                position_secs: subtitle_clock_position_secs(player),
+                seek_target_secs: player.subtitle_seek_target_secs,
                 session_id: player.session_id,
             })
         })
         .flatten()
     }
+}
+
+fn clear_subtitle_seek_target(hwnd: HWND, path: &Path, session_id: u64) -> bool {
+    with_state(hwnd, |state| {
+        let player = state.active_audiobook.as_mut()?;
+        if player.path.as_path() != path || player.session_id != session_id {
+            return Some(false);
+        }
+        player.subtitle_seek_target_secs = None;
+        Some(true)
+    })
+    .flatten()
+    .unwrap_or(false)
+}
+
+fn restart_subtitle_reader_after_seek(hwnd: HWND, path: &Path, cancel: Arc<AtomicBool>) {
+    let subtitle_mode = with_state(hwnd, |state| state.settings.subtitle_read_mode)
+        .unwrap_or(SubtitleReadMode::Off);
+    let effective_subtitle_mode = if subtitle_mode == SubtitleReadMode::Record {
+        SubtitleReadMode::Off
+    } else {
+        subtitle_mode
+    };
+    let cached_subtitles = get_or_load_subtitles(path, effective_subtitle_mode);
+    if cached_subtitles.is_none() {
+        return;
+    }
+    start_subtitle_reader(hwnd, path.to_path_buf(), cancel, cached_subtitles);
 }
 
 /// Get the main audio output for subtitle mixing.
@@ -3027,7 +3153,7 @@ fn start_subtitle_reader(
         let offset_secs = settings.subtitle_offset_ms as f64 / 1000.0;
         let (mut index, mut last_position, mut last_paused) =
             if let Some(state) = subtitle_playback_state(hwnd, &media_path) {
-                let raw_pos = state.position_secs;
+                let raw_pos = state.seek_target_secs.unwrap_or(state.position_secs);
                 let index = cues
                     .iter()
                     .position(|cue| cue.end.as_secs_f64() >= raw_pos)
@@ -3121,6 +3247,19 @@ fn start_subtitle_reader(
             }
 
             let mut raw_pos = state.position_secs;
+            if let Some(target_pos) = state.seek_target_secs {
+                if (raw_pos - target_pos).abs() <= 0.75 {
+                    if clear_subtitle_seek_target(hwnd, &media_path, session_id) {
+                        log_debug(&format!(
+                            "SubtitleSync: seek target converged at {:.3}s for {}",
+                            raw_pos,
+                            media_path.display()
+                        ));
+                    }
+                } else {
+                    raw_pos = target_pos;
+                }
+            }
             let seek_delta = raw_pos - last_position;
             if seek_delta.abs() > 1.0 {
                 log_debug(&format!(

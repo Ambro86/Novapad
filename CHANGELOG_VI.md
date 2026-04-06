@@ -1,6 +1,6 @@
 # Nhật ký thay đổi
 
-Phiên bản 0.6.8 – 2026-03-31
+Phiên bản 0.6.8 – 2026-04-07
 
 Có gì mới
 • Đã thêm một mục mới trong menu Phát để chép lời bất kỳ tệp âm thanh hoặc video nào bằng Whisper. Trong Tùy chọn có một phần mới tên là “AI và Chuyển lời”, nơi bạn có thể chọn mô hình, bật hỗ trợ CUDA tùy chọn cho card đồ họa NVIDIA, giữ nguyên ngôn ngữ gốc và bật hoặc tắt dấu thời gian.
@@ -55,6 +55,7 @@ Sửa lỗi
 • Đã sửa lỗi giọng hội thoại: các tham số tốc độ/cao độ/âm lượng của giọng hội thoại thứ nhất và thứ hai giờ được áp dụng đúng trong quá trình tổng hợp giọng nói.
 • Đã cải thiện nhận diện mã hóa cho tệp `.txt` tiếng Nhật: thêm fallback Shift_JIS/CP932 an toàn cho các trường hợp mojibake, đồng thời giữ nguyên hành vi hiện có với UTF/diacritics/tiếng Trung.
 • Tái cấu trúc an toàn nội bộ: chuyển sang triển khai safe ở những nơi có thể và giảm mạnh số dòng mã unsafe.
+
 Phiên bản 0.6.7 – 2026-03-02
 Cải tiến
 • Ora il programma riesce a gestire Sostituisci tutto in modo massivo su file grandi con un gran numero di sostituzioni.

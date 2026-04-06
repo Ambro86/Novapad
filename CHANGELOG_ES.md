@@ -1,6 +1,6 @@
 # Changelog
 
-Versión 0.6.8 – 2026-03-31
+Versión 0.6.8 – 2026-04-07
 
 Novedades
 • Añadido un nuevo elemento en el menú Reproducir que permite transcribir cualquier archivo de audio o vídeo con Whisper. En Opciones hay una nueva sección llamada «IA y transcripción», donde se puede elegir el modelo, habilitar la compatibilidad opcional con CUDA para tarjetas gráficas NVIDIA, mantener el idioma original y activar o desactivar las marcas de tiempo.
@@ -55,6 +55,7 @@ Correcciones
 • Corregido un error en las voces de diálogo: los parámetros de velocidad/tono/volumen de la primera y segunda voz de diálogo ahora se aplican correctamente durante la síntesis.
 • Mejorada la detección de codificación para archivos japoneses `.txt`: se añadió un fallback seguro Shift_JIS/CP932 en casos de mojibake, preservando el comportamiento existente para UTF/diacríticos/chino.
 • Refactorización interna de seguridad: conversión a implementaciones seguras donde fue posible y reducción drástica de líneas de código unsafe.
+
 Versión 0.6.7 – 2026-03-02
 Mejoras
 • Ora il programma riesce a gestire Sostituisci tutto in modo massivo su file grandi con un gran numero di sostituzioni.

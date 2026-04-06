@@ -1,13 +1,15 @@
 # Changelog
 
-Versione 0.6.8 – 2026-03-31
+Versione 0.6.8 – 2026-04-07
 
 Novità
 • Nuova voce nel menu Riproduci per trascrivere qualsiasi file audio o video con Whisper. Nelle Opzioni è disponibile una nuova sezione “AI e trascrizione”, con scelta del modello, supporto opzionale CUDA (schede video NVIDIA), opzione per mantenere la lingua originale e attivazione/disattivazione dei timestamp.
 • Aggiunta nel menu Riproduci la nuova azione `Trascrivi cartella corrente`, che trascrive tutti i file audio supportati presenti nella cartella del media aperto e li unisce in un unico documento, con finestra di avanzamento dedicata, indicazione del file corrente e possibilità di annullare. Si può richiamare anche con la scorciatoia `Alt+Shift+C`.
 • Aggiunta la possibilità di usare la dettatura vocale offline, con le stesse modalità della trascrizione audio. Per impostazione predefinita si preme `Ctrl+Shift+Spazio` per avviare la dettatura e si preme la stessa scorciatoia per terminarla; il tasto rapido è personalizzabile nelle Opzioni. Dalla seconda attivazione la dettatura risulta più veloce, perché il motore resta già pronto in memoria; su PC con meno di 4 GB di RAM questo precaricamento e riutilizzo vengono disattivati automaticamente.
 • Aggiunta nelle Opzioni dell'editor una nuova impostazione, disattivata per default, che fa chiudere la finestra dell'editor con `Esc`.
+• Aggiunta una nuova sezione per visualizzare e gestire tutti i video di RaiPlay, con gestione integrale di tutti i contenuti, comprese le dirette, i contenuti in evidenza e la ricerca in tutto il catalogo.
 • Aggiunta la gestione di RaiPlay Sound, con esplorazione del catalogo, ricerca globale dei contenuti e riproduzione di tutti i podcast disponibili, compresi i GR e il teatro.
+• Inserita una nuova sezione per ricercare tutti i nominativi in Pagine Bianche e Pagine Gialle, con possibilità di inserire nome, città e indirizzo (facoltativo).
 • La ricerca podcast ora usa di default `iTunes + Spreaker`, con filtro dei risultati duplicati quando lo stesso podcast è presente su entrambe le piattaforme.
 • Migliorata la ricerca e l'esplorazione dei podcast Apple: la ricerca podcast, la navigazione per categoria e i top podcast per categoria ora usano il paese selezionato per la directory podcast. In Opzioni > RSS / Podcast si può lasciare `Automatico` per usare il paese del sistema oppure scegliere manualmente un altro paese.
 • Aumentato il limite dei risultati per le categorie podcast Apple. Alla prima apertura vengono caricati i primi 50 risultati come sempre; se si sceglie `Carica altri risultati`, Sonarpad carica fino a 200 risultati totali (limite imposto da Apple) e permette di navigare nelle pagine successive mantenendo un'esperienza più fluida.
@@ -62,6 +64,7 @@ Correzioni
 • Corretto un bug nelle voci dialoghi: i parametri di velocità/tono/volume della prima e della seconda voce dialoghi ora vengono applicati correttamente durante la sintesi.
 • Migliorato il rilevamento codifica per file `.txt` giapponesi: aggiunto fallback sicuro Shift_JIS/CP932 nei casi di mojibake, preservando il comportamento esistente su UTF/diacritici/cinese.
 • Refactor interno sulla sicurezza: conversione a implementazioni safe dove possibile e riduzione drastica delle righe di codice unsafe.
+
 Versione 0.6.7 – 2026-03-02
 Miglioramenti
 • Aggiornata la traduzione polacca grazie a DJ Graco.

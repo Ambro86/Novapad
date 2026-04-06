@@ -195,11 +195,17 @@ const OPTIONS_TAB_RSS_PODCAST: i32 = 4;
 const OPTIONS_TAB_AI_TRANSCRIPTION: i32 = 5;
 const OPTIONS_TAB_SHORTCUTS: i32 = 6;
 const OPTIONS_TAB_COUNT: i32 = 7;
+const OPTIONS_DIALOG_WIDTH: i32 = 820;
+const OPTIONS_DIALOG_HEIGHT: i32 = 760;
+const OPTIONS_TABS_X: i32 = 16;
+const OPTIONS_TABS_Y: i32 = 10;
+const OPTIONS_TABS_WIDTH: i32 = 788;
+const OPTIONS_TABS_HEIGHT: i32 = 30;
 const OPTIONS_CONTENT_TOP: i32 = 50;
 const OPTIONS_MARGIN_X: i32 = 20;
-const OPTIONS_LABEL_WIDTH: i32 = 245;
+const OPTIONS_LABEL_WIDTH: i32 = 265;
 const OPTIONS_CONTROL_X: i32 = OPTIONS_MARGIN_X + OPTIONS_LABEL_WIDTH + 16;
-const OPTIONS_CONTROL_WIDTH: i32 = 350;
+const OPTIONS_CONTROL_WIDTH: i32 = 380;
 const OPTIONS_ROW_HEIGHT: i32 = 32;
 const OPTIONS_ROW_HEIGHT_COMPACT: i32 = 26;
 const OPTIONS_CHECKBOX_HEIGHT: i32 = 22;
@@ -2306,8 +2312,8 @@ pub fn open(parent: HWND) {
             WS_CAPTION | WS_SYSMENU | WS_VISIBLE | WS_VSCROLL,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            700,
-            760,
+            OPTIONS_DIALOG_WIDTH,
+            OPTIONS_DIALOG_HEIGHT,
             parent,
             None,
             hinstance,
@@ -2838,10 +2844,10 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     WC_TABCONTROLW,
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                    20,
-                    10,
-                    640,
-                    28,
+                    OPTIONS_TABS_X,
+                    OPTIONS_TABS_Y,
+                    OPTIONS_TABS_WIDTH,
+                    OPTIONS_TABS_HEIGHT,
                     hwnd,
                     HMENU(OPTIONS_ID_TABS as isize),
                     HINSTANCE(0),

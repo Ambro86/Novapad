@@ -3822,7 +3822,7 @@ fn should_route_player_command_to_mpv(hwnd: HWND) -> bool {
         match (current_doc_path, state.active_podcast_episode_url.as_ref()) {
             (Some(path), Some(active_url)) => path.to_string_lossy() == active_url.as_str(),
             (Some(_), None) => false,
-            (None, _) => true,
+            (None, _) => false,
         }
     })
     .unwrap_or(false)
@@ -6014,12 +6014,13 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
             with_state(hwnd, |state| {
                 // Audiobook keyboard controls (ONLY if no secondary window is open)
                 if msg.message == WM_KEYDOWN {
-                    let is_audiobook = state.active_mpv_session.is_some()
-                        || state
-                            .docs
-                            .get(state.current)
-                            .map(|d| matches!(d.format, FileFormat::Audiobook))
-                            .unwrap_or(false);
+                    let is_current_audiobook_doc = state
+                        .docs
+                        .get(state.current)
+                        .map(|d| matches!(d.format, FileFormat::Audiobook))
+                        .unwrap_or(false);
+                    let is_audiobook =
+                        is_current_audiobook_doc || should_route_player_command_to_mpv(hwnd);
                     let secondary_open = state.bookmarks_window.0 != 0
                         || state.options_dialog.0 != 0
                         || state.help_window.0 != 0

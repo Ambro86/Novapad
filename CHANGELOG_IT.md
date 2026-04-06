@@ -10,6 +10,7 @@ Novità
 • Aggiunta la gestione di RaiPlay Sound, con esplorazione del catalogo, ricerca globale dei contenuti e riproduzione di tutti i podcast disponibili, compresi i GR e il teatro.
 • La ricerca podcast ora usa di default `iTunes + Spreaker`, con filtro dei risultati duplicati quando lo stesso podcast è presente su entrambe le piattaforme.
 • Migliorata la ricerca e l'esplorazione dei podcast Apple: la ricerca podcast, la navigazione per categoria e i top podcast per categoria ora usano il paese selezionato per la directory podcast. In Opzioni > RSS / Podcast si può lasciare `Automatico` per usare il paese del sistema oppure scegliere manualmente un altro paese.
+• Aumentato il limite dei risultati per le categorie podcast Apple. Alla prima apertura vengono caricati i primi 50 risultati come sempre; se si sceglie `Carica altri risultati`, Sonarpad carica fino a 200 risultati totali (limite imposto da Apple) e permette di navigare nelle pagine successive mantenendo un'esperienza più fluida.
 • Sonarpad è disponibile anche su Mac, anche se con un set di funzioni parziale. Link al progetto: https://github.com/Ambro86/Sonarpad-Mac
 
 Miglioramenti

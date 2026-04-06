@@ -9,6 +9,7 @@ Nouveautés
 • Ajout dans les Options de l’éditeur d’un nouveau réglage, désactivé par défaut, qui permet à `Esc` de fermer la fenêtre de l’éditeur.
 • La recherche de podcasts utilise désormais `iTunes + Spreaker` par défaut, avec filtrage des doublons lorsque le même podcast est présent sur les deux plateformes.
 • Amélioration de la recherche et de l’exploration des podcasts Apple : la recherche de podcasts, la navigation par catégorie et les top podcasts par catégorie utilisent désormais le pays sélectionné pour le répertoire de podcasts. Dans Options > RSS / Podcast, vous pouvez laisser `Automatique` pour utiliser le pays du système ou choisir manuellement un autre pays.
+• La limite de résultats pour les catégories de podcasts Apple a été augmentée. À la première ouverture, Sonarpad charge toujours les 50 premiers résultats comme avant ; si vous choisissez `Charger plus de résultats`, Sonarpad charge jusqu'à 200 résultats au total (limite imposée par Apple) et permet de naviguer dans les pages suivantes tout en gardant une expérience fluide.
 • Sonarpad est désormais disponible aussi sur Mac, même avec un ensemble de fonctions partiel. Lien du projet : https://github.com/Ambro86/Sonarpad-Mac
 
 Améliorations

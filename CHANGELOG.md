@@ -9,6 +9,7 @@ What's New
 • Added a new Editor option, disabled by default, that makes `Esc` close the editor window.
 • Podcast search now uses `iTunes + Spreaker` by default, with duplicate filtering when the same podcast is found on both platforms.
 • Improved Apple podcast browsing and search: podcast search, category browsing, and top podcasts by category now use the selected podcast directory country. In Options > RSS / Podcast you can leave it on `Automatic` to use the system country, or choose a different country manually.
+• Increased the result limit for Apple podcast categories. The first opening still loads the first 50 results as before; if you choose `Load more results`, Sonarpad loads up to 200 total results (Apple's limit) and lets you navigate through the following pages while keeping the experience smooth.
 • Sonarpad is now also available on Mac with a subset of features. Project link: https://github.com/Ambro86/Sonarpad-Mac
 
 Improvements

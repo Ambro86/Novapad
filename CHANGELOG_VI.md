@@ -9,6 +9,7 @@ Có gì mới
 • Đã thêm một tùy chọn mới trong phần trình soạn thảo, mặc định tắt, cho phép `Esc` đóng cửa sổ trình soạn thảo.
 • Tìm kiếm podcast giờ mặc định dùng `iTunes + Spreaker`, với bộ lọc loại bỏ kết quả trùng lặp khi cùng một podcast xuất hiện trên cả hai nền tảng.
 • Đã cải thiện tìm kiếm và duyệt podcast Apple: tìm kiếm podcast, duyệt theo danh mục và top podcast theo danh mục giờ dùng quốc gia thư mục podcast đã chọn. Trong Tùy chọn > RSS / Podcast, có thể để `Tự động` để dùng quốc gia hệ thống hoặc tự chọn một quốc gia khác.
+• Đã tăng giới hạn kết quả cho các danh mục podcast Apple. Khi mở lần đầu, Sonarpad vẫn tải 50 kết quả đầu tiên như trước; nếu bạn chọn `Tải thêm kết quả`, Sonarpad sẽ tải tối đa 200 kết quả tổng cộng (giới hạn của Apple) và cho phép duyệt các trang tiếp theo trong khi vẫn giữ trải nghiệm mượt mà.
 • Sonarpad hiện cũng đã có bản cho Mac, dù hiện chỉ hỗ trợ một phần chức năng. Liên kết dự án: https://github.com/Ambro86/Sonarpad-Mac
 
 Cải tiến

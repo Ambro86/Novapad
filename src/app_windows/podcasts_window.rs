@@ -244,6 +244,8 @@ const CATEGORIES_TERM_EDIT_ID: usize = 14104;
 const CATEGORIES_OPEN_ID: usize = 14105;
 const CATEGORIES_CANCEL_ID: usize = 14106;
 const CATEGORIES_STATUS_ID: usize = 14107;
+const CATEGORY_RESULTS_PAGE_SIZE: usize = 50;
+const APPLE_MAX_LIMIT: u32 = 200;
 
 #[derive(Clone)]
 struct PodcastSearchResult {
@@ -295,6 +297,7 @@ struct PodcastWindowState {
     source_items: HashMap<isize, SourceItemsState>,
     pending_fetches: HashMap<String, isize>,
     search_results: Vec<PodcastSearchResult>,
+    category_results: Option<CategoryResultsState>,
     tree_proc: WNDPROC,
     search_proc: WNDPROC,
     reorder_dialog: HWND,
@@ -934,6 +937,34 @@ struct SearchResultMsg {
     results: Vec<PodcastSearchResult>,
     status: Option<String>,
     error: Option<String>,
+    category_results: Option<CategoryResultsMeta>,
+}
+
+#[derive(Clone)]
+struct CategoryResultsMeta {
+    source: Source,
+    mode: Mode,
+    category: Category,
+    search_term: String,
+    visible_start: usize,
+    can_load_more: bool,
+}
+
+struct CategoryResultsState {
+    source: Source,
+    mode: Mode,
+    category: Category,
+    search_term: String,
+    loaded_results: Vec<PodcastSearchResult>,
+    visible_start: usize,
+    can_load_more: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SearchResultsNavAction {
+    PreviousPage,
+    NextPage,
+    LoadMore,
 }
 
 struct PlayReadyMsg {
@@ -2827,18 +2858,19 @@ fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Option<usize
     .flatten()
 }
 
-fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>, status: Option<&str>) {
+fn render_search_results_list(
+    hwnd: HWND,
+    visible_results: &[PodcastSearchResult],
+    show_previous: bool,
+    trailing_action: Option<SearchResultsNavAction>,
+    announce_page: Option<String>,
+) {
     let hwnd_results = with_podcast_state(hwnd, |s| s.hwnd_results).unwrap_or(HWND(0));
     if hwnd_results.0 == 0 {
         return;
     }
     crate::send_message_w_safe(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    if let Some(status) = status
-        && !status.trim().is_empty()
-    {
-        announce_status(status);
-    }
-    if results.is_empty() {
+    if visible_results.is_empty() {
         let text = to_wide(&i18n::tr(
             with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
             "podcasts.search.no_results",
@@ -2856,7 +2888,19 @@ fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>, status: 
         }
         return;
     }
-    for item in &results {
+    if show_previous {
+        let previous = to_wide(&i18n::tr(
+            with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+            "podcasts.categories.previous_results",
+        ));
+        crate::send_message_w_safe(
+            hwnd_results,
+            LB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(previous.as_ptr() as isize),
+        );
+    }
+    for item in visible_results {
         let label = if item.artist.trim().is_empty() {
             item.title.clone()
         } else {
@@ -2870,11 +2914,94 @@ fn update_search_results(hwnd: HWND, results: Vec<PodcastSearchResult>, status: 
             LPARAM(wide.as_ptr() as isize),
         );
     }
-    with_podcast_state(hwnd, |s| s.search_results = results);
+    if let Some(action) = trailing_action {
+        let key = match action {
+            SearchResultsNavAction::NextPage => "podcasts.categories.next_results",
+            SearchResultsNavAction::LoadMore => "podcasts.categories.load_more_results",
+            SearchResultsNavAction::PreviousPage => "podcasts.categories.previous_results",
+        };
+        let trailing = to_wide(&i18n::tr(
+            with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+            key,
+        ));
+        crate::send_message_w_safe(
+            hwnd_results,
+            LB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(trailing.as_ptr() as isize),
+        );
+    }
+    with_podcast_state(hwnd, |s| s.search_results = visible_results.to_vec());
+    if let Some(page_label) = announce_page
+        && !page_label.trim().is_empty()
+    {
+        announce_status(&page_label);
+    }
     unsafe {
         SendMessageW(hwnd_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
         SetFocus(hwnd_results);
     }
+}
+
+fn update_search_results(
+    hwnd: HWND,
+    results: Vec<PodcastSearchResult>,
+    status: Option<&str>,
+    category_meta: Option<CategoryResultsMeta>,
+) {
+    if let Some(status) = status
+        && !status.trim().is_empty()
+    {
+        announce_status(status);
+    }
+    if let Some(meta) = category_meta {
+        let page_label = if results.len() > CATEGORY_RESULTS_PAGE_SIZE {
+            let total_pages = results.len().div_ceil(CATEGORY_RESULTS_PAGE_SIZE);
+            let current_page = (meta.visible_start / CATEGORY_RESULTS_PAGE_SIZE) + 1;
+            Some(i18n::tr_f(
+                with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
+                "podcasts.categories.results_page",
+                &[
+                    ("current", &current_page.to_string()),
+                    ("total", &total_pages.to_string()),
+                ],
+            ))
+        } else {
+            None
+        };
+        let show_previous = meta.visible_start > 0;
+        let trailing_action = if meta.visible_start + CATEGORY_RESULTS_PAGE_SIZE < results.len() {
+            Some(SearchResultsNavAction::NextPage)
+        } else if meta.can_load_more {
+            Some(SearchResultsNavAction::LoadMore)
+        } else {
+            None
+        };
+        let start = meta.visible_start.min(results.len());
+        let end = (start + CATEGORY_RESULTS_PAGE_SIZE).min(results.len());
+        let visible_results = results[start..end].to_vec();
+        with_podcast_state(hwnd, |s| {
+            s.category_results = Some(CategoryResultsState {
+                source: meta.source,
+                mode: meta.mode,
+                category: meta.category,
+                search_term: meta.search_term,
+                loaded_results: results,
+                visible_start: start,
+                can_load_more: meta.can_load_more,
+            });
+        });
+        render_search_results_list(
+            hwnd,
+            &visible_results,
+            show_previous,
+            trailing_action,
+            page_label,
+        );
+        return;
+    }
+    with_podcast_state(hwnd, |s| s.category_results = None);
+    render_search_results_list(hwnd, &results, false, None, None);
 }
 
 fn show_search_loading(hwnd: HWND) {
@@ -2883,6 +3010,10 @@ fn show_search_loading(hwnd: HWND) {
         return;
     }
     crate::send_message_w_safe(hwnd_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    with_podcast_state(hwnd, |s| {
+        s.search_results.clear();
+        s.category_results = None;
+    });
     let text = to_wide(&i18n::tr(
         with_podcast_state(hwnd, |s| s.language).unwrap_or_default(),
         "podcasts.loading",
@@ -3024,6 +3155,7 @@ fn perform_search(hwnd: HWND, query: &str) {
                         results,
                         status: None,
                         error: None,
+                        category_results: None,
                     });
                     if let Err(e) = crate::post_message_w_safe(
                         hwnd_copy,
@@ -3076,6 +3208,7 @@ fn perform_search(hwnd: HWND, query: &str) {
             results,
             status: None,
             error: None,
+            category_results: None,
         });
         if let Err(e) = crate::post_message_w_safe(
             hwnd_copy,
@@ -3340,8 +3473,11 @@ async fn load_by_category(
             let mut status = None;
             let results = match mode {
                 Mode::Top => {
-                    let url =
-                        apple_top_podcasts_by_genre(category.id, &env.apple_country, APPLE_LIMIT);
+                    let url = apple_top_podcasts_by_genre(
+                        category.id,
+                        &env.apple_country,
+                        env.apple_limit,
+                    );
                     log_debug(&format!(
                         "podcasts_categories apple top fetch ids start: category_id={} country={} url={}",
                         category.id, env.apple_country, url
@@ -3416,9 +3552,14 @@ async fn load_by_category(
                 return Ok((results, status));
             }
             let url = if matches!(mode, Mode::SearchInCategory) {
-                apple_search_in_category(search_term, category.id, &env.apple_country, APPLE_LIMIT)
+                apple_search_in_category(
+                    search_term,
+                    category.id,
+                    &env.apple_country,
+                    env.apple_limit,
+                )
             } else {
-                apple_search_by_category(category.id, &env.apple_country, APPLE_LIMIT)
+                apple_search_by_category(category.id, &env.apple_country, env.apple_limit)
             };
             log_debug(&format!(
                 "podcasts_categories apple search fetch start: mode={:?} category_id={} url={}",
@@ -3519,6 +3660,7 @@ async fn load_by_category(
 struct CategoryLoadEnv {
     language: Language,
     apple_country: String,
+    apple_limit: u32,
     fetch_config: rss::RssFetchConfig,
     podcastindex_auth: Option<(String, String)>,
 }
@@ -3622,14 +3764,28 @@ fn trigger_category_load(
     category: Category,
     search_term: String,
 ) {
+    trigger_category_load_with_limit(hwnd, source, mode, category, search_term, APPLE_LIMIT, 0);
+}
+
+fn trigger_category_load_with_limit(
+    hwnd: HWND,
+    source: Source,
+    mode: Mode,
+    category: Category,
+    search_term: String,
+    apple_limit: u32,
+    visible_start: usize,
+) {
     crate::log_debug(&format!(
-        "podcasts_categories trigger load: hwnd={:?} source={:?} mode={:?} category_id={} category_name={} term={}",
+        "podcasts_categories trigger load: hwnd={:?} source={:?} mode={:?} category_id={} category_name={} term={} apple_limit={} visible_start={}",
         hwnd,
         source,
         mode,
         category.id,
         category.name,
-        search_term.trim()
+        search_term.trim(),
+        apple_limit,
+        visible_start
     ));
     show_search_loading(hwnd);
     let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
@@ -3644,6 +3800,7 @@ fn trigger_category_load(
         } else {
             String::new()
         },
+        apple_limit,
         fetch_config: rss_fetch_config(parent),
         podcastindex_auth: if matches!(source, Source::PodcastIndex) {
             podcastindex_credentials_or_prompt(hwnd, parent)
@@ -3710,15 +3867,30 @@ fn trigger_category_load(
             result.is_ok()
         ));
         let msg = match result {
-            Ok((results, status)) => SearchResultMsg {
-                results,
-                status,
-                error: None,
-            },
+            Ok((results, status)) => {
+                let can_load_more =
+                    apple_limit < APPLE_MAX_LIMIT && results.len() >= apple_limit as usize;
+                SearchResultMsg {
+                    results,
+                    status,
+                    error: None,
+                    category_results: matches!(source, Source::Apple).then_some(
+                        CategoryResultsMeta {
+                            source,
+                            mode,
+                            category: category.clone(),
+                            search_term: search_term.clone(),
+                            visible_start,
+                            can_load_more,
+                        },
+                    ),
+                }
+            }
             Err(err) => SearchResultMsg {
                 results: Vec::new(),
                 status: None,
                 error: Some(err),
+                category_results: None,
             },
         };
         crate::log_debug(&format!(
@@ -4562,17 +4734,14 @@ fn category_list_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
 }
 
 fn subscribe_selected_result(hwnd: HWND) {
-    let (parent, results, idx) = with_podcast_state(hwnd, |s| {
-        let idx =
-            crate::send_message_w_safe(s.hwnd_results, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-        let results = s.search_results.clone();
-        (s.parent, results, idx)
-    })
-    .unwrap_or((HWND(0), Vec::new(), -1));
-    if idx < 0 || idx as usize >= results.len() {
+    if let Some(action) = selected_search_nav_action(hwnd) {
+        navigate_category_results_page(hwnd, action);
         return;
     }
-    let result = &results[idx as usize];
+    let parent = with_podcast_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+    let Some(result) = selected_search_result(hwnd) else {
+        return;
+    };
     let new_index = add_podcast_source(parent, &result.feed_url, &result.title);
     if let Some(index) = new_index {
         let language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
@@ -4985,16 +5154,119 @@ fn show_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
 }
 
 fn selected_search_result(hwnd: HWND) -> Option<PodcastSearchResult> {
-    let (results, idx) = with_podcast_state(hwnd, |s| {
+    let (results, idx, result_offset) = with_podcast_state(hwnd, |s| {
         let idx =
             crate::send_message_w_safe(s.hwnd_results, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-        (s.search_results.clone(), idx)
+        let result_offset = usize::from(
+            s.category_results
+                .as_ref()
+                .map(|pager| pager.visible_start > 0)
+                .unwrap_or(false),
+        );
+        (s.search_results.clone(), idx, result_offset)
     })
-    .unwrap_or((Vec::new(), -1));
-    if idx < 0 || idx as usize >= results.len() {
+    .unwrap_or((Vec::new(), -1, 0));
+    if idx < 0 {
         return None;
     }
-    Some(results[idx as usize].clone())
+    let idx = idx as usize;
+    if idx < result_offset {
+        return None;
+    }
+    let result_idx = idx - result_offset;
+    if result_idx >= results.len() {
+        return None;
+    }
+    Some(results[result_idx].clone())
+}
+
+fn selected_search_nav_action(hwnd: HWND) -> Option<SearchResultsNavAction> {
+    with_podcast_state(hwnd, |s| {
+        let pager = s.category_results.as_ref()?;
+        let idx =
+            crate::send_message_w_safe(s.hwnd_results, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+        if idx < 0 {
+            return None;
+        }
+        let idx = idx as usize;
+        let show_previous = pager.visible_start > 0;
+        if show_previous && idx == 0 {
+            return Some(SearchResultsNavAction::PreviousPage);
+        }
+        let visible_len = s.search_results.len();
+        let result_offset = usize::from(show_previous);
+        if idx < result_offset + visible_len {
+            return None;
+        }
+        if pager.visible_start + visible_len < pager.loaded_results.len() {
+            return Some(SearchResultsNavAction::NextPage);
+        }
+        if pager.can_load_more {
+            return Some(SearchResultsNavAction::LoadMore);
+        }
+        None
+    })
+    .flatten()
+}
+
+fn navigate_category_results_page(hwnd: HWND, action: SearchResultsNavAction) {
+    match action {
+        SearchResultsNavAction::LoadMore => {
+            let Some((source, mode, category, search_term)) = with_podcast_state(hwnd, |s| {
+                s.category_results.as_ref().map(|pager| {
+                    (
+                        pager.source,
+                        pager.mode,
+                        pager.category.clone(),
+                        pager.search_term.clone(),
+                    )
+                })
+            })
+            .flatten() else {
+                return;
+            };
+            trigger_category_load_with_limit(
+                hwnd,
+                source,
+                mode,
+                category,
+                search_term,
+                APPLE_MAX_LIMIT,
+                CATEGORY_RESULTS_PAGE_SIZE,
+            );
+        }
+        SearchResultsNavAction::PreviousPage | SearchResultsNavAction::NextPage => {
+            let Some((results, status, meta)) = with_podcast_state(hwnd, |s| {
+                let pager = s.category_results.as_ref()?;
+                let next_start = match action {
+                    SearchResultsNavAction::PreviousPage => pager
+                        .visible_start
+                        .saturating_sub(CATEGORY_RESULTS_PAGE_SIZE),
+                    SearchResultsNavAction::NextPage => {
+                        let candidate = pager.visible_start + CATEGORY_RESULTS_PAGE_SIZE;
+                        candidate.min(pager.loaded_results.len().saturating_sub(1))
+                    }
+                    SearchResultsNavAction::LoadMore => pager.visible_start,
+                };
+                Some((
+                    pager.loaded_results.clone(),
+                    None::<String>,
+                    CategoryResultsMeta {
+                        source: pager.source,
+                        mode: pager.mode,
+                        category: pager.category.clone(),
+                        search_term: pager.search_term.clone(),
+                        visible_start: next_start,
+                        can_load_more: pager.can_load_more,
+                    },
+                ))
+            })
+            .flatten() else {
+                return;
+            };
+            update_search_results(hwnd, results, status.as_deref(), Some(meta));
+        }
+    }
 }
 
 fn trigger_search_from_edit(hwnd: HWND) {
@@ -5053,18 +5325,7 @@ fn show_search_result_info(hwnd: HWND) {
 }
 
 fn show_selected_result_episodes(hwnd: HWND) {
-    let (_parent, result) = with_podcast_state(hwnd, |s| {
-        let idx =
-            crate::send_message_w_safe(s.hwnd_results, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
-        if idx >= 0 && (idx as usize) < s.search_results.len() {
-            (s.parent, Some(s.search_results[idx as usize].clone()))
-        } else {
-            (s.parent, None)
-        }
-    })
-    .unwrap_or((HWND(0), None));
-
-    if let Some(res) = result {
+    if let Some(res) = selected_search_result(hwnd) {
         let preview_idx = with_podcast_state(hwnd, |s| {
             s.preview_sources.push(crate::tools::rss::RssSource {
                 title: format!("{} [Preview]", res.title),
@@ -7802,6 +8063,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     source_items: HashMap::new(),
                     pending_fetches: HashMap::new(),
                     search_results: Vec::new(),
+                    category_results: None,
                     tree_proc: None,
                     search_proc: None,
                     reorder_dialog: HWND(0),
@@ -8458,7 +8720,12 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     );
                     announce_status(error);
                 }
-                update_search_results(hwnd, msg.results, msg.status.as_deref());
+                update_search_results(
+                    hwnd,
+                    msg.results,
+                    msg.status.as_deref(),
+                    msg.category_results,
+                );
                 LRESULT(0)
             }
             WM_PODCAST_PLAY_READY => {

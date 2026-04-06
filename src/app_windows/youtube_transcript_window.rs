@@ -2471,6 +2471,8 @@ fn open_youtube_comments_window_with_mode(
                 }
                 let (should_capture, handled) = with_youtube_comments_state(hwnd, |state| {
                     let search_edit_has_focus = focus == state.search_edit;
+                    let search_controls_have_focus =
+                        focus == state.search_edit || focus == state.search_button;
                     let keep_edit_navigation = search_edit_has_focus
                         && matches!(
                             msg.wParam.0 as u32,
@@ -2479,11 +2481,17 @@ fn open_youtube_comments_window_with_mode(
                                 || k == VK_LEFT.0 as u32
                                 || k == VK_RIGHT.0 as u32
                         );
+                    let keep_search_controls_navigation = search_controls_have_focus
+                        && matches!(
+                            msg.wParam.0 as u32,
+                            k if k == VK_UP.0 as u32 || k == VK_DOWN.0 as u32
+                        );
                     let should_capture = focus != state.close_button
                         && !keep_edit_navigation
+                        && !keep_search_controls_navigation
                         && is_youtube_comments_dialog_navigation_key(state, msg.wParam.0 as u32);
                     crate::log_debug(&format!(
-                        "YT comments loop state before route view={:?} proxy={:?} close={:?} rows={} selected_row={} scroll_offset={} content_height={} should_capture={} keep_edit_navigation={}",
+                        "YT comments loop state before route view={:?} proxy={:?} close={:?} rows={} selected_row={} scroll_offset={} content_height={} should_capture={} keep_edit_navigation={} keep_search_controls_navigation={}",
                         state.view,
                         state.accessibility_proxy,
                         state.close_button,
@@ -2492,7 +2500,8 @@ fn open_youtube_comments_window_with_mode(
                         state.scroll_offset,
                         state.content_height,
                         should_capture,
-                        keep_edit_navigation
+                        keep_edit_navigation,
+                        keep_search_controls_navigation
                     ));
                     if should_capture
                         && state.flat_list_mode
@@ -2867,12 +2876,19 @@ fn youtube_comments_dialog_wndproc_inner(
             }
             let handled = with_youtube_comments_state(hwnd, |state| {
                 let focus = unsafe { GetFocus() };
+                let keep_search_controls_navigation =
+                    (focus == state.search_edit || focus == state.search_button)
+                        && matches!(
+                            wparam.0 as u32,
+                            k if k == VK_UP.0 as u32 || k == VK_DOWN.0 as u32
+                        );
                 if focus == state.close_button
+                    || keep_search_controls_navigation
                     || !is_youtube_comments_dialog_navigation_key(state, wparam.0 as u32)
                 {
                     crate::log_debug(&format!(
-                        "YT comments dialog WM_KEYDOWN ignored key={} focus={:?} close_button={:?}",
-                        wparam.0, focus, state.close_button
+                        "YT comments dialog WM_KEYDOWN ignored key={} focus={:?} close_button={:?} keep_search_controls_navigation={}",
+                        wparam.0, focus, state.close_button, keep_search_controls_navigation
                     ));
                     return false;
                 }

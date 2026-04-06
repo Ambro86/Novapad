@@ -773,8 +773,8 @@ fn start_audiobook_at_with_options(
             .to_ascii_lowercase();
         let prefer_precise_subtitle_backend = subtitles_active && final_path.is_file();
 
-        let mut force_ffmpeg_stream = options.force_ffmpeg_stream;
-        if prefer_precise_subtitle_backend {
+        let mut force_ffmpeg_stream = options.force_ffmpeg_stream || options.audio_track.is_some();
+        if prefer_precise_subtitle_backend && options.audio_track.is_none() {
             force_ffmpeg_stream = false;
         } else if !force_ffmpeg_stream {
             // Formats that are frequently problematic with direct BASS open:

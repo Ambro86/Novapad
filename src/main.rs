@@ -8127,18 +8127,18 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     }
                     IDM_FILE_READ_START => {
                         log_debug("Menu: Start reading");
-                        let mut restart = None;
+                        let mut should_restart_tts = false;
                         with_state(hwnd, |state| {
                             state.tts_pending_start_pos = None;
                             if let Some(doc) = state.docs.get(state.current)
                                 && !matches!(doc.format, FileFormat::Audiobook)
                             {
-                                restart = Some(doc.hwnd_edit);
+                                should_restart_tts = true;
                             }
                         });
-                        if let Some(hwnd_edit) = restart {
+                        if should_restart_tts {
                             tts_engine::stop_tts_playback(hwnd);
-                            restart_tts_from_position(hwnd, hwnd_edit, 0);
+                            tts_engine::start_tts_from_caret(hwnd);
                         } else {
                             tts_engine::start_tts_from_caret(hwnd);
                         }

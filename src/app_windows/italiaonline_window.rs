@@ -19,7 +19,11 @@ pub fn open(parent: HWND) {
     if language != Language::Italian {
         return;
     }
-    if !crate::app_windows::rai_audiodescrizioni_window::ensure_rai_luce_access(parent, language) {
+    if !crate::app_windows::rai_audiodescrizioni_window::ensure_rai_luce_access_with_title(
+        parent,
+        language,
+        Some("Codice Sonarpad"),
+    ) {
         return;
     }
 
@@ -37,7 +41,11 @@ pub fn reopen_last(parent: HWND) {
     if language != Language::Italian {
         return;
     }
-    if !crate::app_windows::rai_audiodescrizioni_window::ensure_rai_luce_access(parent, language) {
+    if !crate::app_windows::rai_audiodescrizioni_window::ensure_rai_luce_access_with_title(
+        parent,
+        language,
+        Some("Codice Sonarpad"),
+    ) {
         return;
     }
     let Some((query, selected_id)) = with_state(parent, |state| {

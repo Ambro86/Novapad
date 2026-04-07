@@ -351,6 +351,15 @@ pub fn prompt_user_with_options(
         }
 
         windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
+        if parent.0 != 0 {
+            crate::bring_window_to_foreground(parent);
+            crate::log_if_err!(crate::post_message_w_safe(
+                parent,
+                crate::WM_FOCUS_EDITOR,
+                WPARAM(0),
+                LPARAM(0)
+            ));
+        }
 
         if data.confirmed {
             Some(data.value)
@@ -428,6 +437,15 @@ pub fn prompt_credentials(
         }
 
         windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
+        if parent.0 != 0 {
+            crate::bring_window_to_foreground(parent);
+            crate::log_if_err!(crate::post_message_w_safe(
+                parent,
+                crate::WM_FOCUS_EDITOR,
+                WPARAM(0),
+                LPARAM(0)
+            ));
+        }
 
         if data.confirmed {
             Some(PromptCredentialsResult {

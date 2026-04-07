@@ -56,6 +56,14 @@ pub fn open(parent: HWND) {
 }
 
 pub(crate) fn ensure_rai_luce_access(parent: HWND, language: Language) -> bool {
+    ensure_rai_luce_access_with_title(parent, language, None)
+}
+
+pub(crate) fn ensure_rai_luce_access_with_title(
+    parent: HWND,
+    language: Language,
+    title_override: Option<&str>,
+) -> bool {
     if crate::settings::load_saved_rai_luce_code().is_some() {
         return true;
     }
@@ -63,6 +71,7 @@ pub(crate) fn ensure_rai_luce_access(parent: HWND, language: Language) -> bool {
         parent,
         language,
         "Chiave Luce mancante: inserisci il codice nelle impostazioni RSS/Podcast.",
+        title_override,
     )
 }
 
@@ -74,7 +83,7 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
     let catalog = match rai_audiodescrizioni::load_catalog() {
         Ok(catalog) => catalog,
         Err(err) => {
-            if handle_missing_luce_key(parent, language, &err) {
+            if handle_missing_luce_key(parent, language, &err, None) {
                 return;
             }
             show_error(parent, language, &err);
@@ -191,7 +200,7 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
     let groups = match rai_audiodescrizioni::load_grouped_catalog() {
         Ok(groups) => groups,
         Err(err) => {
-            if handle_missing_luce_key(parent, language, &err) {
+            if handle_missing_luce_key(parent, language, &err, None) {
                 return;
             }
             show_error(parent, language, &err);
@@ -486,7 +495,12 @@ fn ensure_unique_label(
     }
 }
 
-fn handle_missing_luce_key(parent: HWND, language: Language, err: &str) -> bool {
+fn handle_missing_luce_key(
+    parent: HWND,
+    language: Language,
+    err: &str,
+    title_override: Option<&str>,
+) -> bool {
     if !rai_audiodescrizioni::is_luce_key_missing_error(err) {
         return false;
     }
@@ -503,10 +517,10 @@ fn handle_missing_luce_key(parent: HWND, language: Language, err: &str) -> bool 
             .as_ptr(),
         ),
         PCWSTR(
-            crate::to_wide(&crate::i18n::tr(
+            crate::to_wide(title_override.unwrap_or(&crate::i18n::tr(
                 language,
                 "rai_audiodescrizioni.missing_key_title",
-            ))
+            )))
             .as_ptr(),
         ),
         MB_YESNO | MB_ICONQUESTION,

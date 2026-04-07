@@ -2347,6 +2347,8 @@ pub fn refresh_voices(hwnd: HWND) {
             combo_dialogue_engine,
             combo_dialogue_secondary_engine,
             checkbox,
+            checkbox_use_dialogue_voice,
+            checkbox_dialogue_use_secondary_voice,
             checkbox_dialogue_multilingual,
             checkbox_dialogue_secondary_multilingual,
             label_tts_voice_language,
@@ -2366,6 +2368,8 @@ pub fn refresh_voices(hwnd: HWND) {
                 state.combo_dialogue_engine,
                 state.combo_dialogue_secondary_engine,
                 state.checkbox_multilingual,
+                state.checkbox_use_dialogue_voice,
+                state.checkbox_dialogue_use_secondary_voice,
                 state.checkbox_dialogue_multilingual,
                 state.checkbox_dialogue_secondary_multilingual,
                 state.label_tts_voice_language,
@@ -2463,6 +2467,22 @@ pub fn refresh_voices(hwnd: HWND) {
         )
         .0 as u32
             == BST_CHECKED.0;
+        let use_dialogue_voice = SendMessageW(
+            checkbox_use_dialogue_voice,
+            BM_GETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0 as u32
+            == BST_CHECKED.0;
+        let use_dialogue_secondary_voice = SendMessageW(
+            checkbox_dialogue_use_secondary_voice,
+            BM_GETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0 as u32
+            == BST_CHECKED.0;
 
         let filter_multilingual = engine == TtsEngine::Edge && only_multilingual;
         let dialogue_filter_multilingual =
@@ -2500,8 +2520,10 @@ pub fn refresh_voices(hwnd: HWND) {
         );
         EnableWindow(combo_tts_voice_language, show_language_combo);
 
-        let show_dialogue_language_combo =
-            voice_tab_active && dialogue_engine == TtsEngine::Edge && !dialogue_only_multilingual;
+        let show_dialogue_language_combo = voice_tab_active
+            && use_dialogue_voice
+            && dialogue_engine == TtsEngine::Edge
+            && !dialogue_only_multilingual;
         ShowWindow(
             label_dialogue_voice_language,
             if show_dialogue_language_combo {
@@ -2521,6 +2543,8 @@ pub fn refresh_voices(hwnd: HWND) {
         EnableWindow(combo_dialogue_voice_language, show_dialogue_language_combo);
 
         let show_dialogue_secondary_language_combo = voice_tab_active
+            && use_dialogue_voice
+            && use_dialogue_secondary_voice
             && dialogue_secondary_engine == TtsEngine::Edge
             && !dialogue_secondary_only_multilingual;
         ShowWindow(
@@ -6189,6 +6213,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     }
                     OPTIONS_ID_MULTILINGUAL => {
                         refresh_voices(hwnd);
+                        relayout_active_tab_content(hwnd);
                         LRESULT(0)
                     }
                     OPTIONS_ID_DIALOGUE_MULTILINGUAL
@@ -6200,6 +6225,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     OPTIONS_ID_TTS_VOICE_LANGUAGE => {
                         if code == CBN_SELCHANGE {
                             refresh_voices(hwnd);
+                            relayout_active_tab_content(hwnd);
                         }
                         LRESULT(0)
                     }
@@ -6262,6 +6288,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                             }
 
                             refresh_voices(hwnd);
+                            relayout_active_tab_content(hwnd);
                         }
                         LRESULT(0)
                     }

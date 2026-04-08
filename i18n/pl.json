@@ -645,7 +645,7 @@
   "options.shortcuts.duplicate_error": "Skrót {shortcut} jest już przypisany do: {action}.",
   "options.shortcuts.label_action": "Akcja:",
   "options.shortcuts.label_combination": "Kombinacja:",
-  "options.shortcuts.tab": "Skroty",
+  "options.shortcuts.tab": "Skróty",
   "options.spellcheck.lang.de": "Niemiecki (Niemcy)",
   "options.spellcheck.lang.en_gb": "Angielski (Wielka Brytania)",
   "options.spellcheck.lang.en_us": "Angielski (Stany Zjednoczone)",

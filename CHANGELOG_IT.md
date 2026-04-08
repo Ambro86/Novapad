@@ -3,7 +3,8 @@
 Versione 0.6.9 – 2026-04-08
 
 Correzioni
-• F5 avviava sempre la lettura dall'inizio. Ora è stato corretto e la lettura parte dal punto in cui si trova il cursore, preservando anche `Ctrl+F5` e `Shift+F5` per andare alla frase precedente o successiva.
+• Migliorata l'esperienza di Trova nei file: quando si apre Sfoglia cartella il focus viene subito posizionato sulla visualizzazione elenco; aprendo un risultato con Invio tutti i comandi da tastiera continuano a funzionare; premendo Esc si torna al risultato precedentemente selezionato; e tornando con Alt+Tab il focus viene portato al campo di ricerca oppure ai risultati, se questi erano aperti.
+• F5 avviava sempre la lettura dall'inizio. Ora è stato corretto e la lettura parte dal punto in cui si trova il cursore, preservando anche `Shift+F5` e `Ctrl+F5` per andare alla frase precedente o successiva.
 • Dopo essere andati a Vai alla riga, premendo Esc si usciva da Sonarpad. Ora il focus torna correttamente nell'editor.
 • L'opzione `A capo automatico` ora viene applicata subito anche ai documenti già aperti, senza dover riaprire il file.
 

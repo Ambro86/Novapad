@@ -3,7 +3,8 @@
 Version 0.6.9 – 2026-04-08
 
 Corrections
-• F5 lançait toujours la lecture depuis le début. Cela a été corrigé et la lecture démarre désormais à la position actuelle du curseur, tout en conservant `Ctrl+F5` et `Shift+F5` pour aller à la phrase précédente ou suivante.
+• L'expérience de Rechercher dans les fichiers a été améliorée : lors de l'ouverture de Parcourir le dossier, le focus va directement sur la liste des dossiers ; l'ouverture d'un résultat avec Entrée ne bloque plus les commandes clavier ; avec Échap, on revient au résultat précédemment sélectionné ; et en revenant avec Alt+Tab, le focus revient soit au champ de recherche, soit à la liste des résultats si elle était ouverte.
+• F5 lançait toujours la lecture depuis le début. Cela a été corrigé et la lecture démarre désormais à la position actuelle du curseur, tout en conservant `Shift+F5` et `Ctrl+F5` pour aller à la phrase précédente ou suivante.
 • Après avoir utilisé Aller à la ligne, appuyer sur Esc pouvait faire perdre le focus à Sonarpad. Le focus revient maintenant correctement dans l’éditeur.
 • L’option `Retour à la ligne automatique` s’applique désormais immédiatement aussi aux documents déjà ouverts, sans devoir rouvrir le fichier.
 

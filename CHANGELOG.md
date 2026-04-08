@@ -3,7 +3,8 @@
 Version 0.6.9 – 2026-04-08
 
 Fixes
-• F5 always started reading from the beginning. It has now been fixed and reading starts from the current caret position, while preserving `Ctrl+F5` and `Shift+F5` for previous and next sentence navigation.
+• Improved the Find in Files experience: when opening Browse Folder, focus now goes straight to the folder list; opening a result with Enter no longer breaks keyboard commands; pressing Esc returns to the previously selected result; and when returning with Alt+Tab, focus goes either to the search field or to the results list if results are open.
+• F5 always started reading from the beginning. It has now been fixed and reading starts from the current caret position, while preserving `Shift+F5` and `Ctrl+F5` for previous and next sentence navigation.
 • After using Go to Line, pressing Esc could move focus out of Sonarpad. It now correctly returns focus to the editor.
 • The `Word Wrap` option is now applied immediately to documents that are already open, instead of only taking effect after reopening the file.
 

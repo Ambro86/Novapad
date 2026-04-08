@@ -3,7 +3,8 @@
 Versão 0.6.9 – 2026-04-08
 
 Correções
-• O F5 iniciava sempre a leitura desde o início. Isso foi corrigido e a leitura passa agora a começar na posição atual do cursor, preservando também `Ctrl+F5` e `Shift+F5` para ir para a frase anterior ou seguinte.
+• A experiência de Localizar nos ficheiros foi melhorada: ao abrir Procurar pasta, o foco vai diretamente para a lista de pastas; ao abrir um resultado com Enter, todos os comandos de teclado continuam a funcionar; ao premir Esc, volta ao resultado anteriormente selecionado; e ao regressar com Alt+Tab, o foco vai para o campo de pesquisa ou para a lista de resultados, se esta estiver aberta.
+• O F5 iniciava sempre a leitura desde o início. Isso foi corrigido e a leitura passa agora a começar na posição atual do cursor, preservando também `Shift+F5` e `Ctrl+F5` para ir para a frase anterior ou seguinte.
 • Depois de usar Ir para a linha, ao premir Esc o foco podia sair do Sonarpad. Agora volta corretamente ao editor.
 • A opção `Quebra automática de linha` agora é aplicada imediatamente também aos documentos já abertos, sem precisar reabrir o ficheiro.
 

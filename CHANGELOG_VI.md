@@ -3,7 +3,7 @@
 Phiên bản 0.6.9 – 2026-04-08
 
 Bản sửa lỗi
-• F5 trước đây luôn bắt đầu đọc từ đầu tài liệu. Giờ lỗi này đã được sửa và việc đọc bắt đầu từ vị trí con trỏ hiện tại, đồng thời vẫn giữ `Ctrl+F5` và `Shift+F5` để chuyển đến câu trước hoặc câu tiếp theo.
+• F5 trước đây luôn bắt đầu đọc từ đầu tài liệu. Giờ lỗi này đã được sửa và việc đọc bắt đầu từ vị trí con trỏ hiện tại, đồng thời vẫn giữ `Shift+F5` và `Ctrl+F5` để chuyển đến câu trước hoặc câu tiếp theo.
 • Sau khi dùng Đi đến dòng, nhấn Esc có thể làm mất focus khỏi Sonarpad. Giờ focus sẽ quay lại trình soạn thảo đúng cách.
 • Tùy chọn `Tự động xuống dòng` nay được áp dụng ngay cả với tài liệu đang mở, không còn phải mở lại tệp mới thấy thay đổi.
 

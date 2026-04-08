@@ -5870,6 +5870,13 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     app_windows::italiaonline_window::reopen_last(hwnd);
                     continue;
                 }
+                if let Some(hwnd_edit) = get_active_edit(hwnd)
+                    && GetFocus() == hwnd_edit
+                    && editor_manager::current_document_is_from_find_in_files(hwnd)
+                {
+                    app_windows::find_in_files_window::reopen_results(hwnd);
+                    continue;
+                }
                 let save_hwnd =
                     with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
                 if save_hwnd.0 != 0 {
@@ -13764,6 +13771,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 current_save_text_encoding: None,
                 from_rss: false,
                 from_italiaonline: false,
+                from_find_in_files: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
             };
@@ -13999,6 +14007,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 current_save_text_encoding: None,
                 from_rss: false,
                 from_italiaonline: false,
+                from_find_in_files: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
             };
@@ -14040,6 +14049,9 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 pending.len_utf16,
             );
             with_state(hwnd, |state| {
+                if let Some(doc) = state.docs.get_mut(state.current) {
+                    doc.from_find_in_files = true;
+                }
                 state.pending_find_in_files = None;
             });
         }

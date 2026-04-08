@@ -10,7 +10,7 @@ use windows::Win32::UI::Controls::Dialogs::{FR_DOWN, FR_MATCHCASE};
 use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL, EM_FINDTEXTEXW, FINDTEXTEXW};
 use windows::Win32::UI::Controls::{
     NM_RETURN, NMHDR, NMTREEVIEWW, NMTVKEYDOWN, PBM_SETPOS, PBM_SETRANGE, PROGRESS_CLASSW,
-    TVE_EXPAND, TVGN_CARET, TVGN_CHILD, TVI_ROOT, TVIF_CHILDREN, TVIF_PARAM, TVIF_TEXT,
+    TVE_EXPAND, TVGN_CARET, TVGN_CHILD, TVGN_NEXT, TVI_ROOT, TVIF_CHILDREN, TVIF_PARAM, TVIF_TEXT,
     TVINSERTSTRUCTW, TVINSERTSTRUCTW_0, TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM, TVM_GETITEMW,
     TVM_GETNEXTITEM, TVM_INSERTITEMW, TVM_SELECTITEM, TVN_ITEMEXPANDINGW, TVN_KEYDOWN,
     TVN_SELCHANGEDW, TVS_HASBUTTONS, TVS_HASLINES, TVS_LINESATROOT, TVS_SHOWSELALWAYS, WC_BUTTON,
@@ -62,6 +62,7 @@ const WM_FIND_IN_FILES_FOCUS_RESULTS: u32 = WM_APP + 42;
 struct FindInFilesInit {
     parent: HWND,
     language: Language,
+    focus_results_on_open: bool,
 }
 
 struct FindInFilesState {
@@ -81,6 +82,7 @@ struct FindInFilesState {
     language: Language,
     searching: bool,
     cancel_flag: Option<Arc<AtomicBool>>,
+    preserve_editor_return: bool,
 }
 
 struct FindInFilesLabels {
@@ -111,6 +113,7 @@ pub(crate) struct FindInFilesCache {
     pub term: String,
     pub folder: String,
     pub results: Vec<SearchResult>,
+    pub selected_result: Option<usize>,
 }
 
 struct ResultsGroup {
@@ -134,7 +137,7 @@ fn labels(language: Language) -> FindInFilesLabels {
     }
 }
 
-pub fn open_find_in_files_dialog(parent: HWND) {
+fn open_find_in_files_dialog_internal(parent: HWND, focus_results_on_open: bool) {
     let class_name = to_wide(FIND_IN_FILES_CLASS_NAME);
     let existing = crate::find_window_w_safe(PCWSTR(class_name.as_ptr()), PCWSTR::null());
     if existing.0 != 0 {
@@ -158,7 +161,11 @@ pub fn open_find_in_files_dialog(parent: HWND) {
     };
     crate::register_class_w_safe(&wc);
 
-    let init = Box::new(FindInFilesInit { parent, language });
+    let init = Box::new(FindInFilesInit {
+        parent,
+        language,
+        focus_results_on_open,
+    });
     let labels = labels(language);
     let title = to_wide(&labels.title);
 
@@ -246,6 +253,10 @@ pub fn open_find_in_files_dialog(parent: HWND) {
     unsafe {
         SetForegroundWindow(parent);
     }
+}
+
+pub fn open_find_in_files_dialog(parent: HWND) {
+    open_find_in_files_dialog_internal(parent, false);
 }
 
 unsafe extern "system" fn find_in_files_wndproc(
@@ -531,6 +542,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 language: init.language,
                 searching: false,
                 cancel_flag: None,
+                preserve_editor_return: false,
             });
             crate::set_window_long_ptr_w_safe(
                 hwnd,
@@ -540,6 +552,14 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
 
             if with_find_state(hwnd, |state| {
                 apply_cache(state);
+                if init.focus_results_on_open && !state.results.is_empty() {
+                    crate::log_if_err!(crate::post_message_w_safe(
+                        hwnd,
+                        WM_FIND_IN_FILES_FOCUS_RESULTS,
+                        WPARAM(0),
+                        LPARAM(0),
+                    ));
+                }
             })
             .is_none()
             {
@@ -726,7 +746,11 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
         }
         WM_SETFOCUS => {
             if with_find_state(hwnd, |state| {
-                crate::set_focus_safe(state.term_edit);
+                if state.results.is_empty() {
+                    crate::set_focus_safe(state.term_edit);
+                } else {
+                    crate::set_focus_safe(state.results_tree);
+                }
             })
             .is_none()
             {
@@ -740,6 +764,16 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     flag.store(true, Ordering::SeqCst);
                 }
                 store_cache(state);
+                if !state.preserve_editor_return
+                    && with_state(state.parent, |main_state| {
+                        if let Some(doc) = main_state.docs.get_mut(main_state.current) {
+                            doc.from_find_in_files = false;
+                        }
+                    })
+                    .is_none()
+                {
+                    crate::log_debug("Failed to clear find-in-files return marker");
+                }
             })
             .is_none()
             {
@@ -815,6 +849,11 @@ fn apply_cache(state: &mut FindInFilesState) {
     let Some(cache) = load_cache(state.parent) else {
         return;
     };
+    crate::log_debug(&format!(
+        "find_in_files.apply_cache: results={} selected_result={:?}",
+        cache.results.len(),
+        cache.selected_result
+    ));
     if !cache.term.is_empty() {
         let wide = to_wide(&cache.term);
         unsafe {
@@ -833,6 +872,7 @@ fn apply_cache(state: &mut FindInFilesState) {
     }
     if !cache.results.is_empty() {
         state.results = cache.results;
+        state.selected_result = cache.selected_result;
         set_progress(state, 100);
         populate_results_tree(state);
     }
@@ -841,10 +881,19 @@ fn apply_cache(state: &mut FindInFilesState) {
 fn store_cache(state: &FindInFilesState) {
     let term = read_control_text(state.term_edit).trim().to_string();
     let folder = read_control_text(state.folder_edit).trim().to_string();
+    let selected_result = state
+        .selected_result
+        .or_else(|| selected_result_index(state.results_tree));
+    crate::log_debug(&format!(
+        "find_in_files.store_cache: results={} selected_result={:?}",
+        state.results.len(),
+        selected_result
+    ));
     let cache = FindInFilesCache {
         term,
         folder,
         results: state.results.clone(),
+        selected_result,
     };
     save_cache(state.parent, cache);
 }
@@ -972,6 +1021,10 @@ fn open_selected_result(state: &mut FindInFilesState) {
         if let Err(e) = PostMessageW(state.parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
             crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));
         }
+        state.preserve_editor_return = true;
+        if let Err(e) = PostMessageW(state.hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)) {
+            crate::log_debug(&format!("Failed to close Find in Files dialog: {}", e));
+        }
     }
 }
 
@@ -1038,6 +1091,7 @@ fn populate_results_tree(state: &mut FindInFilesState) {
         set_results_redraw(state.results_tree, true);
         return;
     }
+    let target_selected_result = state.selected_result;
 
     let mut grouped: BTreeMap<PathBuf, Vec<usize>> = BTreeMap::new();
     for (idx, result) in state.results.iter().enumerate() {
@@ -1075,7 +1129,115 @@ fn populate_results_tree(state: &mut FindInFilesState) {
             SetFocus(state.results_tree);
         }
     }
+    state.selected_result = target_selected_result;
+    restore_selected_result(state);
     set_results_redraw(state.results_tree, true);
+}
+
+fn restore_selected_result(state: &mut FindInFilesState) {
+    let Some(selected_idx) = state.selected_result else {
+        crate::log_debug("find_in_files.restore_selected_result: no selected_result");
+        return;
+    };
+    crate::log_debug(&format!(
+        "find_in_files.restore_selected_result: target={}",
+        selected_idx
+    ));
+    let Some((group_idx, child_idx)) =
+        state
+            .results_groups
+            .iter()
+            .enumerate()
+            .find_map(|(group_idx, group)| {
+                group
+                    .indices
+                    .iter()
+                    .position(|idx| *idx == selected_idx)
+                    .map(|child_idx| (group_idx, child_idx))
+            })
+    else {
+        crate::log_debug("find_in_files.restore_selected_result: target not found in groups");
+        return;
+    };
+
+    let mut parent_item = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            state.results_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CHILD as usize),
+            LPARAM(TVI_ROOT.0),
+        )
+        .0,
+    );
+    for _ in 0..group_idx {
+        if parent_item.0 == 0 {
+            crate::log_debug(
+                "find_in_files.restore_selected_result: parent_item missing during walk",
+            );
+            return;
+        }
+        parent_item = windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
+                state.results_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_NEXT as usize),
+                LPARAM(parent_item.0),
+            )
+            .0,
+        );
+    }
+    if parent_item.0 == 0 {
+        crate::log_debug("find_in_files.restore_selected_result: parent_item not found");
+        return;
+    }
+
+    ensure_children_loaded(state, parent_item);
+    let mut child_item = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            state.results_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CHILD as usize),
+            LPARAM(parent_item.0),
+        )
+        .0,
+    );
+    for _ in 0..child_idx {
+        if child_item.0 == 0 {
+            crate::log_debug(
+                "find_in_files.restore_selected_result: child_item missing during walk",
+            );
+            return;
+        }
+        child_item = windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
+                state.results_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_NEXT as usize),
+                LPARAM(child_item.0),
+            )
+            .0,
+        );
+    }
+    if child_item.0 == 0 {
+        crate::log_debug("find_in_files.restore_selected_result: child_item not found");
+        return;
+    }
+
+    crate::send_message_w_safe(
+        state.results_tree,
+        TVM_SELECTITEM,
+        WPARAM(TVGN_CARET as usize),
+        LPARAM(child_item.0),
+    );
+    crate::set_focus_safe(state.results_tree);
+    crate::log_debug(&format!(
+        "find_in_files.restore_selected_result: selected group={} child={} item={:?}",
+        group_idx, child_idx, child_item
+    ));
+}
+
+pub fn reopen_results(parent: HWND) {
+    open_find_in_files_dialog_internal(parent, true);
 }
 
 fn insert_tree_item(

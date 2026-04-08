@@ -3,7 +3,8 @@
 Wersja 0.6.9 – 2026-04-08
 
 Poprawki
-• F5 zawsze rozpoczynał czytanie od początku. Zostało to poprawione i czytanie zaczyna się teraz od bieżącej pozycji kursora, z zachowaniem `Ctrl+F5` i `Shift+F5` do przechodzenia do poprzedniego lub następnego zdania.
+• Ulepszono działanie funkcji Znajdź w plikach: po otwarciu Przeglądaj folder fokus od razu trafia na listę folderów; po otwarciu wyniku klawiszem Enter wszystkie skróty klawiaturowe nadal działają; klawisz Esc przywraca wcześniej wybrany wynik; a po powrocie przez Alt+Tab fokus trafia do pola wyszukiwania albo na listę wyników, jeśli była otwarta.
+• F5 zawsze rozpoczynał czytanie od początku. Zostało to poprawione i czytanie zaczyna się teraz od bieżącej pozycji kursora, z zachowaniem `Shift+F5` i `Ctrl+F5` do przechodzenia do poprzedniego lub następnego zdania.
 • Po użyciu Przejdź do wiersza naciśnięcie Esc mogło przenosić fokus poza Sonarpad. Teraz fokus poprawnie wraca do edytora.
 • Opcja `Zawijanie wierszy` jest teraz stosowana od razu także do już otwartych dokumentów, bez konieczności ponownego otwierania pliku.
 

@@ -3,6 +3,7 @@
 Versión 0.6.9 – 2026-04-08
 
 Correcciones
+• Se ha mejorado la experiencia de Buscar en archivos: al abrir Examinar carpeta, el foco va directamente a la lista de carpetas; al abrir un resultado con Intro, todos los comandos de teclado siguen funcionando; al pulsar Esc se vuelve al resultado seleccionado anteriormente; y al regresar con Alt+Tab, el foco vuelve al campo de búsqueda o a la lista de resultados si estaba abierta.
 • F5 siempre iniciaba la lectura desde el principio. Ahora se ha corregido y la lectura comienza desde la posición actual del cursor, manteniendo `Ctrl+F5` y `Shift+F5` para ir a la frase anterior o siguiente.
 • Después de usar Ir a la línea, al pulsar Esc el foco podía salir de Sonarpad. Ahora vuelve correctamente al editor.
 • La opción `Ajuste de línea` ahora se aplica inmediatamente también a los documentos ya abiertos, sin necesidad de reabrir el archivo.

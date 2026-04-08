@@ -1154,6 +1154,7 @@ pub struct Document {
     pub current_save_text_encoding: Option<TextEncoding>,
     pub from_rss: bool,
     pub from_italiaonline: bool,
+    pub from_find_in_files: bool,
     pub is_temporary: bool,
     pub prefer_title_for_save_suggestion: bool,
 }
@@ -1179,6 +1180,7 @@ impl Default for Document {
             current_save_text_encoding: None,
             from_rss: false,
             from_italiaonline: false,
+            from_find_in_files: false,
             is_temporary: false,
             prefer_title_for_save_suggestion: false,
         }
@@ -3067,6 +3069,7 @@ pub fn new_document(hwnd: HWND) {
                 current_save_text_encoding: None,
                 from_rss: false,
                 from_italiaonline: false,
+                from_find_in_files: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
             };
@@ -3109,6 +3112,7 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
                 current_save_text_encoding: None,
                 from_rss: false,
                 from_italiaonline: false,
+                from_find_in_files: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
             };
@@ -3444,6 +3448,19 @@ pub fn current_document_is_from_italiaonline(hwnd: HWND) -> bool {
     }
 }
 
+pub fn current_document_is_from_find_in_files(hwnd: HWND) -> bool {
+    {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| doc.from_find_in_files)
+                .unwrap_or(false)
+        })
+        .unwrap_or(false)
+    }
+}
+
 pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
     {
         let (index, hwnd_edit) = with_state(hwnd, |state| {
@@ -3472,6 +3489,7 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
                 current_save_text_encoding: None,
                 from_rss: true,
                 from_italiaonline: false,
+                from_find_in_files: false,
                 is_temporary: true,
                 prefer_title_for_save_suggestion: false,
             };

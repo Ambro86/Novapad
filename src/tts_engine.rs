@@ -468,6 +468,13 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     ));
 
     let (mut text, initial_caret_pos) = get_text_from_caret(hwnd_edit);
+    if with_state(hwnd, |state| {
+        state.tts_sentence_nav_anchor = Some((hwnd_edit, initial_caret_pos.max(0)));
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to update TTS sentence navigation anchor");
+    }
     let dialogue_settings =
         { with_state(hwnd, |state| state.settings.clone()) }.unwrap_or_default();
     text = crate::dialogue_voice::apply_dialogue_tags_from_settings(&text, &dialogue_settings);

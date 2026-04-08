@@ -5357,6 +5357,7 @@ pub(crate) struct AppState {
     tts_next_session_id: u64,
     tts_last_offset: i32,
     tts_pending_start_pos: Option<i32>,
+    tts_sentence_nav_anchor: Option<(HWND, i32)>,
     edge_voices: Vec<VoiceInfo>,
     sapi_voices: Vec<VoiceInfo>,
 
@@ -6818,6 +6819,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     tts_next_session_id: 1,
                     tts_last_offset: 0,
                     tts_pending_start_pos: None,
+                    tts_sentence_nav_anchor: None,
                     edge_voices: Vec::new(),
                     sapi_voices: Vec::new(),
 
@@ -7677,6 +7679,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         }
                         state.tts_last_offset = safe_offset;
                         state.tts_pending_start_pos = None;
+                        if let Some(doc) = state.docs.get(state.current) {
+                            let current_pos = (current.initial_caret_pos + safe_offset).max(0);
+                            state.tts_sentence_nav_anchor = Some((doc.hwnd_edit, current_pos));
+                        }
                         if state.settings.move_cursor_during_reading
                             && let Some(doc) = state.docs.get(state.current)
                         {
@@ -10755,7 +10761,17 @@ fn jump_tts_sentence(hwnd: HWND, direction: SentenceNavigationDirection) {
         if matches!(doc.format, FileFormat::Audiobook) {
             return;
         }
-        let current_pos = if let Some(pending) = state.tts_pending_start_pos {
+        let current_pos = if let Some((anchor_hwnd, anchor_pos)) = state.tts_sentence_nav_anchor {
+            if anchor_hwnd == doc.hwnd_edit {
+                anchor_pos.max(0)
+            } else if let Some(pending) = state.tts_pending_start_pos {
+                pending.max(0)
+            } else if let Some(session) = &state.tts_session {
+                (session.initial_caret_pos + state.tts_last_offset).max(0)
+            } else {
+                spellcheck_caret_char_index(doc.hwnd_edit).unwrap_or(0)
+            }
+        } else if let Some(pending) = state.tts_pending_start_pos {
             pending.max(0)
         } else if let Some(session) = &state.tts_session {
             (session.initial_caret_pos + state.tts_last_offset).max(0)
@@ -10769,6 +10785,9 @@ fn jump_tts_sentence(hwnd: HWND, direction: SentenceNavigationDirection) {
     };
     let text = editor_text_for_offsets(hwnd_edit);
     let Some(target_pos) = sentence_navigation_target(&text, current_pos, direction) else {
+        with_state(hwnd, |state| {
+            state.tts_sentence_nav_anchor = Some((hwnd_edit, current_pos));
+        });
         log_debug(&format!(
             "TTS sentence jump: no target direction={:?} current_pos={}",
             direction, current_pos
@@ -10781,7 +10800,9 @@ fn jump_tts_sentence(hwnd: HWND, direction: SentenceNavigationDirection) {
         sentence_preview_at_pos(&text, target_pos).unwrap_or_else(|| "(none)".to_string());
     tts_engine::stop_tts_playback(hwnd);
     with_state(hwnd, |state| {
+        state.tts_last_offset = 0;
         state.tts_pending_start_pos = Some(target_pos);
+        state.tts_sentence_nav_anchor = Some((hwnd_edit, target_pos));
     });
     log_debug(&format!(
         "TTS sentence jump: direction={:?} current_pos={} target_pos={} current_preview=\"{}\" target_preview=\"{}\"",

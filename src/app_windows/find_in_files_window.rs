@@ -20,15 +20,17 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, SetFocus, VK_ESCAPE, VK_RETURN,
 };
 use windows::Win32::UI::Shell::{
-    BIF_NEWDIALOGSTYLE, BIF_RETURNONLYFSDIRS, BROWSEINFOW, SHBrowseForFolderW, SHGetPathFromIDListW,
+    BFFM_INITIALIZED, BIF_NEWDIALOGSTYLE, BIF_RETURNONLYFSDIRS, BROWSEINFOW, SHBrowseForFolderW,
+    SHGetPathFromIDListW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CreateWindowExW, DefWindowProcW, DispatchMessageW, GetWindowTextLengthW,
     GetWindowTextW, HMENU, IDC_ARROW, IsDialogMessageW, LoadCursorW, MSG, PostMessageW,
     SendMessageW, SetForegroundWindow, SetWindowTextW, TranslateMessage, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NOTIFY, WM_SETFONT,
-    WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL,
+    WM_NOTIFY, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -715,6 +717,16 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
         WM_FIND_IN_FILES_FOCUS_RESULTS => {
             if with_find_state(hwnd, |state| unsafe {
                 SetFocus(state.results_tree);
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to access find state");
+            }
+            LRESULT(0)
+        }
+        WM_SETFOCUS => {
+            if with_find_state(hwnd, |state| {
+                crate::set_focus_safe(state.term_edit);
             })
             .is_none()
             {
@@ -1564,6 +1576,93 @@ fn set_caret_position(hwnd_edit: HWND, pos: i32) {
     }
 }
 
+fn describe_hwnd(hwnd: HWND) -> String {
+    if hwnd.0 == 0 {
+        return "HWND(0)".to_string();
+    }
+    let mut class_buf = [0u16; 128];
+    let class_len = crate::get_class_name_w_safe(hwnd, &mut class_buf);
+    let class_name = if class_len > 0 {
+        String::from_utf16_lossy(&class_buf[..class_len as usize])
+    } else {
+        String::new()
+    };
+    let text_len = crate::get_window_text_length_w_safe(hwnd);
+    let window_text = if text_len > 0 {
+        let mut text_buf = vec![0u16; text_len as usize + 1];
+        let read = crate::get_window_text_w_safe(hwnd, &mut text_buf);
+        String::from_utf16_lossy(&text_buf[..read.max(0) as usize])
+    } else {
+        String::new()
+    };
+    format!("{:?} class='{}' text='{}'", hwnd, class_name, window_text)
+}
+
+fn log_folder_picker_focus(tag: &str, hwnd: HWND) {
+    let foreground = crate::get_foreground_window_safe();
+    let focus = crate::get_focus_safe();
+    crate::log_debug(&format!(
+        "{}: dialog={} foreground={} focus={}",
+        tag,
+        describe_hwnd(hwnd),
+        describe_hwnd(foreground),
+        describe_hwnd(focus)
+    ));
+}
+
+fn folder_picker_focus_target(dialog: HWND) -> HWND {
+    let mut current = crate::get_next_dlg_tab_item_safe(dialog, HWND(0), false);
+    let mut first_non_static = HWND(0);
+    for _ in 0..16 {
+        if current.0 == 0 {
+            break;
+        }
+        let mut class_buf = [0u16; 128];
+        let class_len = crate::get_class_name_w_safe(current, &mut class_buf);
+        let class_name = if class_len > 0 {
+            String::from_utf16_lossy(&class_buf[..class_len as usize])
+        } else {
+            String::new()
+        };
+        if class_name == "SysTreeView32" {
+            return current;
+        }
+        if first_non_static.0 == 0 && class_name != "Static" {
+            first_non_static = current;
+        }
+        current = crate::get_next_dlg_tab_item_safe(dialog, current, false);
+    }
+    first_non_static
+}
+
+extern "system" fn browse_folder_focus_callback(
+    hwnd: HWND,
+    msg: u32,
+    _lparam: LPARAM,
+    _lpdata: LPARAM,
+) -> i32 {
+    if msg == BFFM_INITIALIZED {
+        log_folder_picker_focus("find_in_files.folder_picker.initialized.before", hwnd);
+        let dialog = hwnd;
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(120));
+            let target = folder_picker_focus_target(dialog);
+            if target.0 != 0 {
+                crate::send_message_w_safe(
+                    dialog,
+                    WM_NEXTDLGCTL,
+                    WPARAM(target.0 as usize),
+                    LPARAM(1),
+                );
+            } else {
+                crate::log_debug("find_in_files.folder_picker: no dialog focus target found");
+            }
+        });
+        log_folder_picker_focus("find_in_files.folder_picker.initialized.after", hwnd);
+    }
+    0
+}
+
 pub(crate) fn browse_for_folder(owner: HWND, language: Language) -> Option<PathBuf> {
     let labels = labels(language);
     let title = to_wide(&labels.folder_label);
@@ -1571,6 +1670,7 @@ pub(crate) fn browse_for_folder(owner: HWND, language: Language) -> Option<PathB
         hwndOwner: owner,
         lpszTitle: PCWSTR(title.as_ptr()),
         ulFlags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE,
+        lpfn: Some(browse_folder_focus_callback),
         ..Default::default()
     };
 

@@ -1,5 +1,11 @@
 # Changelog
 
+Versione 0.6.9 – 2026-04-08
+
+Correzioni
+• F5 avviava sempre la lettura dall'inizio. Ora è stato corretto e la lettura parte dal punto in cui si trova il cursore, preservando anche `Ctrl+F5` e `Shift+F5` per andare alla frase precedente o successiva.
+• Dopo essere andati a Vai alla riga, premendo Esc si usciva da Sonarpad. Ora il focus torna correttamente nell'editor.
+
 Versione 0.6.8 – 2026-04-07
 
 Novità

@@ -1721,9 +1721,12 @@ pub fn load_settings() -> AppSettings {
                                 }
                                 None => {
                                     crate::log_debug(&format!(
-                                        "Failed to decrypt stored yt-dlp credentials for site {}; clearing saved credentials",
+                                        "Failed to decrypt stored yt-dlp credentials for site {}; preserving stored entry",
                                         site
                                     ));
+                                    if !value.trim().is_empty() {
+                                        decrypted_credentials.insert(site, value);
+                                    }
                                 }
                             }
                         }
@@ -1837,7 +1840,15 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
         .into_iter()
         .filter_map(|(site, value)| {
             let site = normalize_ytdlp_site_key(&site)?;
-            let mut credentials = deserialize_ytdlp_site_credentials(&value)?;
+            let mut credentials = match parse_ytdlp_site_credentials_entry(&value) {
+                Some(credentials) => credentials,
+                None => {
+                    if value.trim().is_empty() {
+                        return None;
+                    }
+                    return Some((site, value));
+                }
+            };
             credentials.username = credentials.username.trim().to_string();
             credentials.password = credentials.password.trim().to_string();
             if credentials.username.is_empty() || credentials.password.is_empty() {
@@ -2187,6 +2198,11 @@ fn deserialize_ytdlp_site_credentials(value: &str) -> Option<SavedYtdlpSiteCrede
     serde_json::from_str(value).ok()
 }
 
+fn parse_ytdlp_site_credentials_entry(value: &str) -> Option<SavedYtdlpSiteCredentials> {
+    deserialize_ytdlp_site_credentials(value)
+        .or_else(|| decrypt_ytdlp_site_credentials_entry(value))
+}
+
 fn encrypt_ytdlp_site_credentials_entry(credentials: &SavedYtdlpSiteCredentials) -> String {
     let Some(serialized) = serialize_ytdlp_site_credentials(credentials) else {
         return String::new();
@@ -2218,7 +2234,7 @@ pub fn normalize_ytdlp_site_key(site: &str) -> Option<String> {
 pub fn get_ytdlp_site_credentials(settings: &AppSettings, site: &str) -> Option<(String, String)> {
     let site = normalize_ytdlp_site_key(site)?;
     let value = settings.ytdlp_site_credentials.get(&site)?;
-    let credentials = deserialize_ytdlp_site_credentials(value)?;
+    let credentials = parse_ytdlp_site_credentials_entry(value)?;
     Some((credentials.username, credentials.password))
 }
 
@@ -2452,7 +2468,19 @@ pub fn save_settings(settings: AppSettings) {
         .into_iter()
         .filter_map(|(site, value)| {
             let site = normalize_ytdlp_site_key(&site)?;
-            let mut credentials = deserialize_ytdlp_site_credentials(&value)?;
+            let mut credentials = match parse_ytdlp_site_credentials_entry(&value) {
+                Some(credentials) => credentials,
+                None => {
+                    if value.trim().is_empty() {
+                        return None;
+                    }
+                    crate::log_debug(&format!(
+                        "Failed to parse yt-dlp credentials for site {}; preserving stored entry",
+                        site
+                    ));
+                    return Some((site, value));
+                }
+            };
             credentials.username = credentials.username.trim().to_string();
             credentials.password = credentials.password.trim().to_string();
             if credentials.username.is_empty() || credentials.password.is_empty() {
@@ -2461,10 +2489,14 @@ pub fn save_settings(settings: AppSettings) {
             let encrypted = encrypt_ytdlp_site_credentials_entry(&credentials);
             if encrypted.is_empty() {
                 crate::log_debug(&format!(
-                    "Failed to encrypt yt-dlp credentials for site {}; clearing saved credentials",
+                    "Failed to encrypt yt-dlp credentials for site {}; preserving stored entry",
                     site
                 ));
-                None
+                if value.trim().is_empty() {
+                    None
+                } else {
+                    Some((site, value))
+                }
             } else {
                 Some((site, encrypted))
             }

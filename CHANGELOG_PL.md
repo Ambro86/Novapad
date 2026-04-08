@@ -5,6 +5,7 @@ Wersja 0.6.9 – 2026-04-08
 Poprawki
 • F5 zawsze rozpoczynał czytanie od początku. Zostało to poprawione i czytanie zaczyna się teraz od bieżącej pozycji kursora, z zachowaniem `Ctrl+F5` i `Shift+F5` do przechodzenia do poprzedniego lub następnego zdania.
 • Po użyciu Przejdź do wiersza naciśnięcie Esc mogło przenosić fokus poza Sonarpad. Teraz fokus poprawnie wraca do edytora.
+• Opcja `Zawijanie wierszy` jest teraz stosowana od razu także do już otwartych dokumentów, bez konieczności ponownego otwierania pliku.
 
 Wersja 0.6.8 – 2026-04-07
 

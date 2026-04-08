@@ -5,6 +5,7 @@ Version 0.6.9 – 2026-04-08
 Corrections
 • F5 lançait toujours la lecture depuis le début. Cela a été corrigé et la lecture démarre désormais à la position actuelle du curseur, tout en conservant `Ctrl+F5` et `Shift+F5` pour aller à la phrase précédente ou suivante.
 • Après avoir utilisé Aller à la ligne, appuyer sur Esc pouvait faire perdre le focus à Sonarpad. Le focus revient maintenant correctement dans l’éditeur.
+• L’option `Retour à la ligne automatique` s’applique désormais immédiatement aussi aux documents déjà ouverts, sans devoir rouvrir le fichier.
 
 Version 0.6.8 – 2026-04-07
 

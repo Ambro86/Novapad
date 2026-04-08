@@ -5,6 +5,7 @@ Version 0.6.9 – 2026-04-08
 Fixes
 • F5 always started reading from the beginning. It has now been fixed and reading starts from the current caret position, while preserving `Ctrl+F5` and `Shift+F5` for previous and next sentence navigation.
 • After using Go to Line, pressing Esc could move focus out of Sonarpad. It now correctly returns focus to the editor.
+• The `Word Wrap` option is now applied immediately to documents that are already open, instead of only taking effect after reopening the file.
 
 Version 0.6.8 – 2026-04-07
 

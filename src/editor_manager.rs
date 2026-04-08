@@ -43,6 +43,7 @@ const EM_STOPGROUPTYPING: u32 = 0x0477;
 const EM_SETTEXTEX: u32 = 0x0461;
 const EM_GETTEXTLENGTHEX: u32 = 0x045F;
 const EM_SETTABSTOPS: u32 = 0x00CB;
+const EM_SETTARGETDEVICE: u32 = 0x0448;
 const ST_KEEPUNDO: u32 = 0x0001;
 const ST_SELECTION: u32 = 0x0002;
 
@@ -1390,6 +1391,11 @@ pub fn apply_word_wrap_to_all_edits(hwnd: HWND, word_wrap: bool) {
             "Word wrap toggle for {:?}: {}",
             hwnd_edit, word_wrap
         ));
+        let line_width = if word_wrap { 0 } else { 1 };
+        crate::send_message_w_safe(hwnd_edit, EM_SETTARGETDEVICE, WPARAM(0), LPARAM(line_width));
+        unsafe {
+            InvalidateRect(hwnd_edit, None, true);
+        }
         apply_text_limit(hwnd_edit);
     }
 }

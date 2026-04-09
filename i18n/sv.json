@@ -1326,5 +1326,12 @@
   "youtube.ytdlp_path_update_prompt": "yt-dlp hittades i systemets PATH, men denna kopia hanteras inte av Sonarpad.\nHittad version: {current}\nSenaste tillgängliga version: {latest}\n\nVill du ladda ner en lokal kopia av yt-dlp som Sonarpad kan uppdatera automatiskt?",
   "youtube.ytdlp_prompt_download": "yt-dlp krävs för att använda den här funktionen. Vill du ladda ner nu?",
   "youtube.ytdlp_update_failed": "Uppdatering av yt-dlp misslyckades.",
-  "youtube.ytdlp_update_prompt": "En uppdatering av yt-dlp finns tillgänglig.\nInstallerad version: {current}\nSenaste version: {latest}\n\nVill du ladda ner uppdateringen?"
+  "youtube.ytdlp_update_prompt": "En uppdatering av yt-dlp finns tillgänglig.\nInstallerad version: {current}\nSenaste version: {latest}\n\nVill du ladda ner uppdateringen?",
+  "podcast.include_single_app": "Spela in en app",
+  "podcast.single_app": "App att spela in",
+  "podcast.single_app.default": "Välj en app",
+  "podcast.single_app.none_running": "Inga stödda appar körs just nu.",
+  "podcast.single_app.refresh": "Uppdatera applistan",
+  "podcast.error.single_app_required": "Välj en app att spela in.",
+  "podcast.error.single_app_unavailable": "Inspelning av en enskild apps ljud är inte tillgänglig för den valda appen."
 }

@@ -4,8 +4,9 @@ use crate::audio_monitor::{MonitorHandle, start_monitoring};
 use crate::log_debug;
 // VIDEO REMOVED: MonitorInfo and list_monitors imports removed
 use crate::podcast_recorder::{
-    AudioDevice, RecorderConfig, RecorderHandle, RecorderStatus, default_output_folder,
-    list_input_devices, list_output_devices, probe_device_with_name, start_recording,
+    AudioApp, AudioDevice, RecorderConfig, RecorderHandle, RecorderStatus, default_output_folder,
+    list_audio_apps, list_input_devices, list_output_devices, probe_device_with_name,
+    probe_process_loopback, start_recording,
 };
 use crate::settings::{
     AppSettings, Language, PODCAST_DEVICE_DEFAULT, PodcastFormat, confirm_title,
@@ -67,6 +68,9 @@ const PODCAST_ID_HINT: usize = 11019;
 const PODCAST_ID_SYSTEM_UNAVAILABLE: usize = 11020;
 const PODCAST_ID_SOURCE: usize = 11025;
 const PODCAST_ID_MONITOR_CHECK: usize = 11026;
+const PODCAST_ID_INCLUDE_SINGLE_APP: usize = 11027;
+const PODCAST_ID_SINGLE_APP: usize = 11028;
+const PODCAST_ID_REFRESH_SINGLE_APP: usize = 11029;
 const WM_PODCAST_SAVE_RESULT: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP + 74;
 
 struct PodcastSaveResult {
@@ -111,6 +115,9 @@ struct PodcastState {
     include_system: HWND,
     system_device: HWND,
     system_gain: HWND,
+    include_single_app: HWND,
+    single_app: HWND,
+    refresh_single_app: HWND,
     monitor_check: HWND,
     // VIDEO REMOVED: include_video, monitor_combo, video_unavailable_text removed
     format_combo: HWND,
@@ -131,6 +138,7 @@ struct PodcastState {
     // VIDEO REMOVED: video_unavailable_text removed
     mic_devices: Vec<AudioDevice>,
     system_devices: Vec<AudioDevice>,
+    single_apps: Vec<AudioApp>,
     // VIDEO REMOVED: monitors removed
     recorder: Option<RecorderHandle>,
     monitor_handle: Option<MonitorHandle>,
@@ -152,6 +160,11 @@ struct PodcastLabels {
     system_gain_label: String,
     include_system: String,
     system_device: String,
+    include_single_app: String,
+    single_app: String,
+    single_app_default: String,
+    single_app_none_running: String,
+    single_app_refresh: String,
     system_unavailable: String,
     // VIDEO REMOVED: include_video, monitor, video_unavailable removed
     format: String,
@@ -178,6 +191,8 @@ struct PodcastLabels {
     confirm_close_recording: String,
     error_system_audio: String,
     error_microphone: String,
+    error_single_app_required: String,
+    error_single_app_unavailable: String,
 }
 fn labels(language: Language) -> PodcastLabels {
     PodcastLabels {
@@ -193,6 +208,11 @@ fn labels(language: Language) -> PodcastLabels {
         system_gain_label: i18n::tr(language, "podcast.system_gain"),
         include_system: i18n::tr(language, "podcast.include_system"),
         system_device: i18n::tr(language, "podcast.system_device"),
+        include_single_app: i18n::tr(language, "podcast.include_single_app"),
+        single_app: i18n::tr(language, "podcast.single_app"),
+        single_app_default: i18n::tr(language, "podcast.single_app.default"),
+        single_app_none_running: i18n::tr(language, "podcast.single_app.none_running"),
+        single_app_refresh: i18n::tr(language, "podcast.single_app.refresh"),
         system_unavailable: i18n::tr(language, "podcast.system_unavailable"),
         // VIDEO REMOVED: include_video, monitor, video_unavailable removed
         format: i18n::tr(language, "podcast.format"),
@@ -219,6 +239,8 @@ fn labels(language: Language) -> PodcastLabels {
         confirm_close_recording: i18n::tr(language, "podcast.confirm_close_recording"),
         error_system_audio: i18n::tr(language, "podcast.error.system_audio"),
         error_microphone: i18n::tr(language, "podcast.error.microphone"),
+        error_single_app_required: i18n::tr(language, "podcast.error.single_app_required"),
+        error_single_app_unavailable: i18n::tr(language, "podcast.error.single_app_unavailable"),
     }
 }
 
@@ -259,7 +281,7 @@ pub fn open(parent: HWND) {
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             640,
-            620,
+            720,
             None,
             None,
             hinstance,
@@ -314,7 +336,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     10,
                     10,
                     600,
-                    285,
+                    350,
                     hwnd,
                     HMENU(0),
                     None,
@@ -492,11 +514,71 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.system_unavailable).as_ptr()),
                     WS_CHILD,
                     40,
-                    206,
+                    260,
                     540,
                     18,
                     hwnd,
                     HMENU(PODCAST_ID_SYSTEM_UNAVAILABLE as isize),
+                    None,
+                    None,
+                );
+
+                let include_single_app = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.include_single_app).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    40,
+                    208,
+                    240,
+                    22,
+                    hwnd,
+                    HMENU(PODCAST_ID_INCLUDE_SINGLE_APP as isize),
+                    None,
+                    None,
+                );
+
+                let label_single_app = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.single_app).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    60,
+                    235,
+                    160,
+                    18,
+                    hwnd,
+                    HMENU(0),
+                    None,
+                    None,
+                );
+
+                let single_app = CreateWindowExW(
+                    Default::default(),
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    230,
+                    231,
+                    240,
+                    240,
+                    hwnd,
+                    HMENU(PODCAST_ID_SINGLE_APP as isize),
+                    None,
+                    None,
+                );
+
+                let refresh_single_app = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.single_app_refresh).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    480,
+                    229,
+                    100,
+                    26,
+                    hwnd,
+                    HMENU(PODCAST_ID_REFRESH_SINGLE_APP as isize),
                     None,
                     None,
                 );
@@ -509,7 +591,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.output_group).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
                     10,
-                    300,
+                    365,
                     600,
                     170,
                     hwnd,
@@ -524,7 +606,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.format).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     20,
-                    290,
+                    355,
                     100,
                     18,
                     hwnd,
@@ -539,7 +621,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     140,
-                    286,
+                    351,
                     140,
                     200,
                     hwnd,
@@ -554,7 +636,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.bitrate).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     300,
-                    290,
+                    355,
                     100,
                     18,
                     hwnd,
@@ -569,7 +651,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     420,
-                    286,
+                    351,
                     140,
                     200,
                     hwnd,
@@ -584,7 +666,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.save_path).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     20,
-                    320,
+                    385,
                     220,
                     18,
                     hwnd,
@@ -599,7 +681,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     20,
-                    342,
+                    407,
                     430,
                     24,
                     hwnd,
@@ -614,7 +696,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.browse).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     460,
-                    340,
+                    405,
                     100,
                     26,
                     hwnd,
@@ -629,7 +711,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.filename).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     20,
-                    372,
+                    437,
                     220,
                     18,
                     hwnd,
@@ -644,7 +726,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE,
                     20,
-                    394,
+                    459,
                     540,
                     18,
                     hwnd,
@@ -659,7 +741,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.controls_group).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
                     10,
-                    440,
+                    505,
                     600,
                     100,
                     hwnd,
@@ -674,7 +756,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.start).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     20,
-                    465,
+                    530,
                     90,
                     28,
                     hwnd,
@@ -689,7 +771,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.pause).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     120,
-                    465,
+                    530,
                     90,
                     28,
                     hwnd,
@@ -704,7 +786,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.resume).as_ptr()),
                     WS_CHILD,
                     220,
-                    465,
+                    530,
                     90,
                     28,
                     hwnd,
@@ -719,7 +801,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.stop).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     320,
-                    465,
+                    530,
                     110,
                     28,
                     hwnd,
@@ -734,7 +816,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.close).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     440,
-                    465,
+                    530,
                     90,
                     28,
                     hwnd,
@@ -749,7 +831,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.status_group).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WINDOW_STYLE(BS_GROUPBOX as u32),
                     10,
-                    550,
+                    590,
                     600,
                     130,
                     hwnd,
@@ -764,7 +846,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.status_label).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     20,
-                    575,
+                    615,
                     80,
                     18,
                     hwnd,
@@ -779,7 +861,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.status_idle).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     110,
-                    575,
+                    615,
                     180,
                     18,
                     hwnd,
@@ -794,7 +876,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.hint_select_source).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     20,
-                    595,
+                    635,
                     560,
                     18,
                     hwnd,
@@ -809,7 +891,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.elapsed_label).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     300,
-                    575,
+                    615,
                     120,
                     18,
                     hwnd,
@@ -824,7 +906,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide("00:00:00").as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     430,
-                    575,
+                    615,
                     120,
                     18,
                     hwnd,
@@ -839,7 +921,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.level_mic).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     20,
-                    605,
+                    655,
                     150,
                     18,
                     hwnd,
@@ -854,7 +936,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide("0").as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     180,
-                    605,
+                    655,
                     80,
                     18,
                     hwnd,
@@ -869,7 +951,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.level_system).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     300,
-                    605,
+                    655,
                     150,
                     18,
                     hwnd,
@@ -884,7 +966,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide("0").as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     460,
-                    605,
+                    655,
                     80,
                     18,
                     hwnd,
@@ -899,7 +981,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.hint_select_source).as_ptr()),
                     WS_CHILD,
                     20,
-                    628,
+                    675,
                     540,
                     18,
                     hwnd,
@@ -921,6 +1003,10 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     system_device,
                     label_system_gain,
                     system_gain,
+                    include_single_app,
+                    label_single_app,
+                    single_app,
+                    refresh_single_app,
                     system_unavailable_text,
                     // VIDEO REMOVED: include_video, label_monitor, monitor_combo, video_unavailable_text removed
                     group_output,
@@ -977,6 +1063,9 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     include_system,
                     system_device,
                     system_gain,
+                    include_single_app,
+                    single_app,
+                    refresh_single_app,
                     monitor_check,
                     // VIDEO REMOVED: include_video, monitor_combo, video_unavailable_text removed
                     format_combo,
@@ -997,6 +1086,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     // VIDEO REMOVED: video_unavailable_text removed
                     mic_devices,
                     system_devices,
+                    single_apps: Vec::new(),
                     // VIDEO REMOVED: monitors removed
                     recorder: None,
                     monitor_handle: None,
@@ -1038,7 +1128,16 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 if with_podcast_state(hwnd, |state| match id {
                     PODCAST_ID_INCLUDE_MIC
                     | PODCAST_ID_INCLUDE_SYSTEM
+                    | PODCAST_ID_INCLUDE_SINGLE_APP
                     | PODCAST_ID_INCLUDE_VIDEO => {
+                        if id == PODCAST_ID_INCLUDE_SYSTEM && !is_checked(state.include_system) {
+                            SendMessageW(
+                                state.include_single_app,
+                                BM_SETCHECK,
+                                WPARAM(BST_UNCHECKED.0 as usize),
+                                LPARAM(0),
+                            );
+                        }
                         update_source_controls(state);
                         update_recording_controls(state);
                         persist_settings(state);
@@ -1100,6 +1199,17 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         if code == CBN_SELCHANGE as u16 {
                             persist_settings(state);
                         }
+                        handled = true;
+                    }
+                    PODCAST_ID_SINGLE_APP => {
+                        if code == CBN_SELCHANGE as u16 {
+                            persist_settings(state);
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_REFRESH_SINGLE_APP => {
+                        refresh_single_app_list(state, None);
+                        persist_settings(state);
                         handled = true;
                     }
                     PODCAST_ID_FORMAT => {
@@ -1459,6 +1569,22 @@ fn load_devices(language: Language) -> (Vec<AudioDevice>, Vec<AudioDevice>, bool
 
 // VIDEO REMOVED: load_monitors function removed
 
+fn load_single_apps(language: Language) -> Vec<AudioApp> {
+    let labels = labels(language);
+    let mut apps = vec![AudioApp {
+        pid: 0,
+        display_name: labels.single_app_default,
+    }];
+    match list_audio_apps() {
+        Ok(list) if !list.is_empty() => apps.extend(list),
+        Ok(_) | Err(_) => apps.push(AudioApp {
+            pid: 0,
+            display_name: labels.single_app_none_running,
+        }),
+    }
+    apps
+}
+
 fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
     unsafe {
         SendMessageW(
@@ -1475,6 +1601,16 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
             state.include_system,
             BM_SETCHECK,
             WPARAM(if settings.podcast_include_system_audio {
+                BST_CHECKED.0 as usize
+            } else {
+                BST_UNCHECKED.0 as usize
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            state.include_single_app,
+            BM_SETCHECK,
+            WPARAM(if settings.podcast_include_single_app {
                 BST_CHECKED.0 as usize
             } else {
                 BST_UNCHECKED.0 as usize
@@ -1533,6 +1669,7 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
             WPARAM(system_gain_index),
             LPARAM(0),
         );
+        refresh_single_app_list(state, Some(settings.podcast_single_app_pid));
 
         let format_index = match settings.podcast_output_format {
             PodcastFormat::Mp3 => 0,
@@ -1572,17 +1709,33 @@ fn update_source_controls(state: &PodcastState) {
     unsafe {
         let mic_checked = is_checked(state.include_mic);
         let system_checked = is_checked(state.include_system);
+        let single_app_checked = is_checked(state.include_single_app);
         // VIDEO REMOVED: video_checked removed
         EnableWindow(state.mic_device, mic_checked);
         EnableWindow(state.mic_gain, mic_checked);
         EnableWindow(state.monitor_check, mic_checked);
-        EnableWindow(state.system_device, system_checked);
+        EnableWindow(state.system_device, system_checked && !single_app_checked);
         EnableWindow(state.system_gain, system_checked);
+        EnableWindow(
+            state.include_single_app,
+            system_checked && state.system_available,
+        );
+        EnableWindow(
+            state.single_app,
+            system_checked && state.system_available && single_app_checked,
+        );
+        EnableWindow(
+            state.refresh_single_app,
+            system_checked && state.system_available && single_app_checked,
+        );
         // VIDEO REMOVED: monitor_combo removed
 
         if !state.system_available {
             EnableWindow(state.include_system, false);
             EnableWindow(state.system_device, false);
+            EnableWindow(state.include_single_app, false);
+            EnableWindow(state.single_app, false);
+            EnableWindow(state.refresh_single_app, false);
             ShowWindow(
                 state.system_unavailable_text,
                 windows::Win32::UI::WindowsAndMessaging::SW_SHOW,
@@ -1663,6 +1816,7 @@ fn update_source_info_text(
     state: &PodcastState,
     mic_name: Option<String>,
     system_name: Option<String>,
+    single_app_name: Option<String>,
 ) {
     let labels = labels(state.language);
     let mut parts = Vec::new();
@@ -1671,6 +1825,9 @@ fn update_source_info_text(
     }
     if let Some(system) = system_name {
         parts.push(format!("{}: {}", labels.system_device, system));
+    }
+    if let Some(single_app) = single_app_name {
+        parts.push(format!("{}: {}", labels.single_app, single_app));
     }
     let text = if parts.is_empty() {
         labels.hint_select_source
@@ -1776,6 +1933,7 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
     let labels = labels(state.language);
     let include_mic = is_checked(state.include_mic);
     let include_system = is_checked(state.include_system);
+    let include_single_app = include_system && is_checked(state.include_single_app);
     if !include_mic && !include_system {
         return;
     }
@@ -1795,6 +1953,15 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
     let system_device_id = selected_device_id(state, false);
     let mic_device_name = selected_device_name(state, true);
     let system_device_name = selected_device_name(state, false);
+    let selected_single_app = selected_single_app(state);
+    if include_single_app && selected_single_app.is_none() {
+        show_error(
+            state.parent,
+            state.language,
+            &labels.error_single_app_required,
+        );
+        return;
+    }
     log_debug(&format!(
         "Podcast record: mic device_id='{}' name='{}' gain={} system device_id='{}' name='{}' gain={}",
         mic_device_id,
@@ -1823,6 +1990,7 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
         }
     }
     if include_system
+        && !include_single_app
         && let Err(err) =
             probe_device_with_name(&system_device_id, &selected_device_name(state, false), true)
     {
@@ -1839,6 +2007,18 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
                 LPARAM(0),
             );
         }
+    }
+    if include_system
+        && include_single_app
+        && let Some(app) = selected_single_app.as_ref()
+        && let Err(err) = probe_process_loopback(app.pid)
+    {
+        show_error(
+            state.parent,
+            state.language,
+            &format!("{} {}", labels.error_single_app_unavailable, err),
+        );
+        return;
     }
 
     let include_system = is_checked(state.include_system);
@@ -1859,6 +2039,7 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
         system_device_id: selected_device_id(state, false),
         system_device_name: selected_device_name(state, false),
         system_gain: selected_system_gain(state),
+        single_app_process_id: selected_single_app.as_ref().map(|app| app.pid),
         output_format: selected_format(state),
         mp3_bitrate: selected_bitrate(state),
         save_folder: selected_save_folder(state),
@@ -1881,6 +2062,7 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
                 } else {
                     None
                 },
+                selected_single_app.map(|app| app.display_name),
             );
             update_recording_controls(state);
             update_status_text(state, RecorderStatus::Recording);
@@ -1988,6 +2170,8 @@ fn persist_settings(state: &PodcastState) {
     let mic_gain = selected_mic_gain(state);
     let system_device_id = selected_device_id(state, false);
     let system_gain = selected_system_gain(state);
+    let single_app_enabled = include_system && is_checked(state.include_single_app);
+    let single_app_pid = selected_single_app(state).map(|app| app.pid).unwrap_or(0);
     let output_format = selected_format(state);
     let bitrate = selected_bitrate(state);
     let save_folder = selected_save_folder(state).to_string_lossy().to_string();
@@ -1999,6 +2183,8 @@ fn persist_settings(state: &PodcastState) {
             app.settings.podcast_include_system_audio = include_system;
             app.settings.podcast_system_device_id = system_device_id;
             app.settings.podcast_system_gain = system_gain;
+            app.settings.podcast_include_single_app = single_app_enabled;
+            app.settings.podcast_single_app_pid = single_app_pid;
             app.settings.podcast_output_format = output_format;
             app.settings.podcast_mp3_bitrate = bitrate;
             app.settings.podcast_save_folder = save_folder;
@@ -2009,7 +2195,7 @@ fn persist_settings(state: &PodcastState) {
             crate::log_debug("Failed to access podcast state");
         }
     }
-    update_source_info_text(state, None, None);
+    update_source_info_text(state, None, None, None);
 }
 
 // VIDEO REMOVED: selected_monitor_id function removed
@@ -2114,6 +2300,43 @@ fn selected_device_name(state: &PodcastState, mic: bool) -> String {
         .find(|d| d.id == id)
         .map(|d| d.name.clone())
         .unwrap_or_default()
+}
+
+fn selected_single_app(state: &PodcastState) -> Option<AudioApp> {
+    let sel = crate::send_message_w_safe(state.single_app, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    let index = if sel < 0 { 0 } else { sel as usize };
+    let app = state.single_apps.get(index)?.clone();
+    if app.pid == 0 { None } else { Some(app) }
+}
+
+fn refresh_single_app_list(state: &mut PodcastState, preferred_pid: Option<u32>) {
+    unsafe {
+        SendMessageW(state.single_app, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    }
+    state.single_apps = load_single_apps(state.language);
+    let mut selected_index = 0usize;
+    for (index, app) in state.single_apps.iter().enumerate() {
+        let name = to_wide(&app.display_name);
+        unsafe {
+            SendMessageW(
+                state.single_app,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(name.as_ptr() as isize),
+            );
+        }
+        if Some(app.pid) == preferred_pid {
+            selected_index = index;
+        }
+    }
+    unsafe {
+        SendMessageW(
+            state.single_app,
+            CB_SETCURSEL,
+            WPARAM(selected_index),
+            LPARAM(0),
+        );
+    }
 }
 
 fn selected_save_folder(state: &PodcastState) -> PathBuf {

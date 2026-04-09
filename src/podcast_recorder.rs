@@ -5,25 +5,42 @@ use crate::settings;
 use crate::settings::{PODCAST_DEVICE_DEFAULT, PodcastFormat};
 use chrono::Local;
 use std::collections::VecDeque;
+use std::ffi::OsString;
+use std::mem::ManuallyDrop;
+use std::mem::size_of;
+use std::os::windows::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
+use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::Media::Audio::{
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
-    AUDCLNT_STREAMFLAGS_LOOPBACK, DEVICE_STATE_ACTIVE, EDataFlow, IAudioCaptureClient,
-    IAudioClient, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator, MMDeviceEnumerator,
-    WAVEFORMATEX, eCapture, eConsole, eRender,
+    AUDCLNT_STREAMFLAGS_LOOPBACK, AUDIOCLIENT_ACTIVATION_PARAMS, AUDIOCLIENT_ACTIVATION_PARAMS_0,
+    AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK, AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS,
+    ActivateAudioInterfaceAsync, DEVICE_STATE_ACTIVE, EDataFlow,
+    IActivateAudioInterfaceAsyncOperation, IActivateAudioInterfaceCompletionHandler,
+    IAudioCaptureClient, IAudioClient, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
+    MMDeviceEnumerator, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
+    VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, WAVEFORMATEX, eCapture, eConsole, eRender,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
 use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree, STGM_READ};
+use windows::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
+};
 use windows::Win32::System::Power::{ES_CONTINUOUS, ES_SYSTEM_REQUIRED, SetThreadExecutionState};
+use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
+use windows::Win32::System::Threading::{
+    OpenProcess, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+};
+use windows::Win32::System::Variant::VT_BLOB;
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
-use windows::core::PCWSTR;
+use windows::core::{HRESULT, Interface, PCWSTR, PROPVARIANT, PWSTR, implement};
 
 const TARGET_SAMPLE_RATE: u32 = 44100;
 const TARGET_CHANNELS: u16 = 2;
@@ -34,6 +51,12 @@ const MIX_CHUNK_FRAMES: usize = 512;
 pub struct AudioDevice {
     pub id: String,
     pub name: String,
+}
+
+#[derive(Clone)]
+pub struct AudioApp {
+    pub pid: u32,
+    pub display_name: String,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -64,6 +87,60 @@ pub fn list_input_devices() -> Result<Vec<AudioDevice>, String> {
 
 pub fn list_output_devices() -> Result<Vec<AudioDevice>, String> {
     list_devices(eRender)
+}
+
+pub fn list_audio_apps() -> Result<Vec<AudioApp>, String> {
+    let mut current_session = 0u32;
+    unsafe {
+        ProcessIdToSessionId(std::process::id(), &mut current_session)
+            .map_err(|e| format!("ProcessIdToSessionId failed: {e}"))?;
+    }
+
+    let snapshot = unsafe {
+        CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+            .map_err(|e| format!("CreateToolhelp32Snapshot failed: {e}"))?
+    };
+
+    let result = {
+        let mut entry = PROCESSENTRY32W {
+            dwSize: size_of::<PROCESSENTRY32W>() as u32,
+            ..Default::default()
+        };
+        let mut apps = Vec::new();
+        let mut found = unsafe { Process32FirstW(snapshot, &mut entry).is_ok() };
+        while found {
+            let pid = entry.th32ProcessID;
+            if pid != 0 && pid != std::process::id() {
+                let mut session_id = 0u32;
+                let same_session = unsafe {
+                    ProcessIdToSessionId(pid, &mut session_id).is_ok()
+                        && session_id == current_session
+                };
+                if same_session {
+                    let exe_name = utf16z_to_string(&entry.szExeFile);
+                    if !is_background_process_name(&exe_name) {
+                        let display_name = process_display_name(pid, &exe_name);
+                        if !display_name.is_empty() {
+                            apps.push(AudioApp { pid, display_name });
+                        }
+                    }
+                }
+            }
+            found = unsafe { Process32NextW(snapshot, &mut entry).is_ok() };
+        }
+        apps.sort_by(|a, b| {
+            a.display_name
+                .to_lowercase()
+                .cmp(&b.display_name.to_lowercase())
+        });
+        apps.dedup_by(|a, b| a.pid == b.pid);
+        Ok(apps)
+    };
+
+    unsafe {
+        crate::log_if_err!(CloseHandle(snapshot));
+    }
+    result
 }
 
 pub fn probe_device_with_name(
@@ -99,6 +176,36 @@ pub fn probe_device_with_name(
             )
             .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
         CoTaskMemFree(Some(mix_format as *const _));
+    }
+    Ok(())
+}
+
+pub fn probe_process_loopback(process_id: u32) -> Result<(), String> {
+    if process_id == 0 {
+        return Err("Invalid target process id.".to_string());
+    }
+    crate::log_debug(&format!(
+        "Process loopback probe: preparing audio client for PID {}",
+        process_id
+    ));
+    let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
+    let client = activate_process_loopback_client(process_id)?;
+    let wave_format = process_loopback_wave_format();
+    crate::log_debug(&format!(
+        "Process loopback probe: initializing shared client for PID {}",
+        process_id
+    ));
+    unsafe {
+        client
+            .Initialize(
+                AUDCLNT_SHAREMODE_SHARED,
+                AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+                0,
+                0,
+                &wave_format,
+                None,
+            )
+            .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
     }
     Ok(())
 }
@@ -172,6 +279,7 @@ pub struct RecorderConfig {
     pub system_device_id: String,
     pub system_device_name: String,
     pub system_gain: f32,
+    pub single_app_process_id: Option<u32>,
     pub output_format: PodcastFormat,
     pub mp3_bitrate: u32,
     pub save_folder: PathBuf,
@@ -287,6 +395,7 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
                 device_name,
                 loopback: false,
                 gain: mic_gain,
+                target_process_id: None,
                 buffer,
                 shared: shared_state.clone(),
                 stop: stop_flag.clone(),
@@ -317,6 +426,7 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
         let device_id = config.system_device_id.clone();
         let device_name = config.system_device_name.clone();
         let system_gain = config.system_gain;
+        let target_process_id = config.single_app_process_id;
         threads.push(thread::spawn(move || {
             crate::log_debug("System audio capture thread started");
             let result = capture_source(CaptureOptions {
@@ -325,6 +435,7 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
                 device_name,
                 loopback: true,
                 gain: system_gain,
+                target_process_id,
                 buffer,
                 shared: shared_state.clone(),
                 stop: stop_flag.clone(),
@@ -815,6 +926,7 @@ struct CaptureOptions {
     device_name: String,
     loopback: bool,
     gain: f32,
+    target_process_id: Option<u32>,
     buffer: Arc<MixBuffer>,
     shared: Arc<SharedState>,
     stop: Arc<AtomicBool>,
@@ -833,43 +945,69 @@ fn capture_source(options: CaptureOptions) -> Result<(), String> {
         options.device_name,
         options.loopback
     ));
-    let device =
-        resolve_device_with_name(&options.device_id, &options.device_name, options.loopback)?;
-    if matches!(options.kind, SourceKind::Microphone) {
-        crate::log_debug("Microphone capture: device resolved");
+    if let Some(target_process_id) = options.target_process_id {
+        crate::log_debug(&format!(
+            "capture_source: using process loopback for PID {}",
+            target_process_id
+        ));
     }
-    let client: IAudioClient = unsafe {
-        device
-            .Activate(CLSCTX_ALL, None)
-            .map_err(|e| format!("AudioClient activate failed: {e}"))?
+    let client: IAudioClient = if let Some(target_process_id) = options.target_process_id {
+        activate_process_loopback_client(target_process_id)?
+    } else {
+        let device =
+            resolve_device_with_name(&options.device_id, &options.device_name, options.loopback)?;
+        if matches!(options.kind, SourceKind::Microphone) {
+            crate::log_debug("Microphone capture: device resolved");
+        }
+        unsafe {
+            device
+                .Activate(CLSCTX_ALL, None)
+                .map_err(|e| format!("AudioClient activate failed: {e}"))?
+        }
     };
-
-    let mix_format = unsafe {
-        client
-            .GetMixFormat()
-            .map_err(|e| format!("GetMixFormat failed: {e}"))?
-    };
-    let (input_rate, input_channels, input_format) = parse_mix_format_ptr(mix_format)?;
 
     let mut stream_flags = 0;
     if options.loopback {
         stream_flags |= AUDCLNT_STREAMFLAGS_LOOPBACK;
     }
-    unsafe {
-        client
-            .Initialize(
-                AUDCLNT_SHAREMODE_SHARED,
-                stream_flags | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
-                10_000_000,
-                0,
-                mix_format,
-                None,
-            )
-            .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
-    }
-    unsafe {
-        CoTaskMemFree(Some(mix_format as *const _));
-    }
+    let (input_rate, input_channels, input_format) = if options.target_process_id.is_some() {
+        let wave_format = process_loopback_wave_format();
+        let parsed = parse_format(&wave_format);
+        unsafe {
+            client
+                .Initialize(
+                    AUDCLNT_SHAREMODE_SHARED,
+                    stream_flags | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+                    0,
+                    0,
+                    &wave_format,
+                    None,
+                )
+                .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
+        }
+        parsed
+    } else {
+        let mix_format = unsafe {
+            client
+                .GetMixFormat()
+                .map_err(|e| format!("GetMixFormat failed: {e}"))?
+        };
+        let parsed = parse_mix_format_ptr(mix_format)?;
+        unsafe {
+            client
+                .Initialize(
+                    AUDCLNT_SHAREMODE_SHARED,
+                    stream_flags | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+                    10_000_000,
+                    0,
+                    mix_format,
+                    None,
+                )
+                .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
+            CoTaskMemFree(Some(mix_format as *const _));
+        }
+        parsed
+    };
     if matches!(options.kind, SourceKind::Microphone) {
         crate::log_debug("Microphone capture: client initialized");
     }
@@ -1181,4 +1319,217 @@ impl LinearResampler {
 
 pub fn default_output_folder() -> PathBuf {
     PathBuf::from(settings::default_podcast_save_folder())
+}
+
+fn process_loopback_wave_format() -> WAVEFORMATEX {
+    let bits_per_sample = 16u16;
+    let block_align = TARGET_CHANNELS * (bits_per_sample / 8);
+    WAVEFORMATEX {
+        wFormatTag: 1,
+        nChannels: TARGET_CHANNELS,
+        nSamplesPerSec: TARGET_SAMPLE_RATE,
+        nAvgBytesPerSec: TARGET_SAMPLE_RATE * block_align as u32,
+        nBlockAlign: block_align,
+        wBitsPerSample: bits_per_sample,
+        cbSize: 0,
+    }
+}
+
+fn activate_process_loopback_client(process_id: u32) -> Result<IAudioClient, String> {
+    crate::log_debug(&format!(
+        "Process loopback activation: requesting async activation for PID {}",
+        process_id
+    ));
+    let params = AUDIOCLIENT_ACTIVATION_PARAMS {
+        ActivationType: AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK,
+        Anonymous: AUDIOCLIENT_ACTIVATION_PARAMS_0 {
+            ProcessLoopbackParams: AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS {
+                TargetProcessId: process_id,
+                ProcessLoopbackMode: PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
+            },
+        },
+    };
+
+    let mut raw: windows::core::imp::PROPVARIANT = unsafe { std::mem::zeroed() };
+    raw.Anonymous.Anonymous.vt = VT_BLOB.0;
+    raw.Anonymous.Anonymous.Anonymous.blob = windows::core::imp::BLOB {
+        cbSize: size_of::<AUDIOCLIENT_ACTIVATION_PARAMS>() as u32,
+        pBlobData: (&params as *const AUDIOCLIENT_ACTIVATION_PARAMS)
+            .cast_mut()
+            .cast(),
+    };
+    let prop_variant = ManuallyDrop::new(unsafe { PROPVARIANT::from_raw(raw) });
+
+    let state = Arc::new(ActivationState::default());
+    let handler: IActivateAudioInterfaceCompletionHandler =
+        ActivateAudioCompletionHandler::new(state.clone()).into();
+    let _operation = unsafe {
+        ActivateAudioInterfaceAsync(
+            VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK,
+            &IAudioClient::IID,
+            Some((&*prop_variant) as *const PROPVARIANT),
+            &handler,
+        )
+        .map_err(|e| format!("ActivateAudioInterfaceAsync failed: {e}"))?
+    };
+
+    let mut guard = state.result.lock().unwrap_or_else(|e| e.into_inner());
+    while guard.is_none() {
+        guard = state.condvar.wait(guard).unwrap_or_else(|e| e.into_inner());
+    }
+    let raw = guard
+        .take()
+        .ok_or_else(|| "Activation completed without result.".to_string())??;
+    crate::log_debug(&format!(
+        "Process loopback activation: async activation completed for PID {}",
+        process_id
+    ));
+    unsafe {
+        Ok(IAudioClient::from_raw(
+            (raw as *mut core::ffi::c_void).cast(),
+        ))
+    }
+}
+
+#[derive(Default)]
+struct ActivationState {
+    result: Mutex<Option<Result<usize, String>>>,
+    condvar: Condvar,
+}
+
+#[implement(IActivateAudioInterfaceCompletionHandler)]
+struct ActivateAudioCompletionHandler {
+    state: Arc<ActivationState>,
+}
+
+impl ActivateAudioCompletionHandler {
+    fn new(state: Arc<ActivationState>) -> Self {
+        Self { state }
+    }
+}
+
+impl windows::Win32::Media::Audio::IActivateAudioInterfaceCompletionHandler_Impl
+    for ActivateAudioCompletionHandler
+{
+    fn ActivateCompleted(
+        &self,
+        activateoperation: Option<&IActivateAudioInterfaceAsyncOperation>,
+    ) -> windows::core::Result<()> {
+        crate::log_debug("Process loopback activation: callback entered");
+        let result = match activateoperation {
+            Some(operation) => {
+                let mut activation_hr = HRESULT(0);
+                let mut activated = None;
+                unsafe {
+                    operation.GetActivateResult(&mut activation_hr, &mut activated)?;
+                }
+                if let Err(err) = activation_hr.ok() {
+                    crate::log_debug(&format!(
+                        "Process loopback activation: GetActivateResult returned error {}",
+                        err
+                    ));
+                    Err(format!("GetActivateResult failed: {err}"))
+                } else if let Some(activated) = activated {
+                    match activated.cast::<IAudioClient>() {
+                        Ok(client) => {
+                            crate::log_debug("Process loopback activation: received IAudioClient");
+                            Ok(client.into_raw() as usize)
+                        }
+                        Err(err) => {
+                            crate::log_debug(&format!(
+                                "Process loopback activation: IAudioClient cast failed {}",
+                                err
+                            ));
+                            Err(format!("IAudioClient cast failed: {err}"))
+                        }
+                    }
+                } else {
+                    crate::log_debug(
+                        "Process loopback activation: callback returned no activated interface",
+                    );
+                    Err("Activation returned no audio client.".to_string())
+                }
+            }
+            None => {
+                crate::log_debug("Process loopback activation: callback received no operation");
+                Err("Audio activation callback received no operation.".to_string())
+            }
+        };
+
+        let mut guard = self.state.result.lock().unwrap_or_else(|e| e.into_inner());
+        *guard = Some(result);
+        self.state.condvar.notify_one();
+        Ok(())
+    }
+}
+
+fn utf16z_to_string(buf: &[u16]) -> String {
+    let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+    String::from_utf16_lossy(&buf[..len]).trim().to_string()
+}
+
+fn process_display_name(process_id: u32, exe_name: &str) -> String {
+    let base_name = process_image_name(process_id)
+        .and_then(|path| {
+            PathBuf::from(path)
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().to_string())
+        })
+        .filter(|name| !name.trim().is_empty())
+        .or_else(|| {
+            PathBuf::from(exe_name)
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().to_string())
+        })
+        .unwrap_or_else(|| exe_name.to_string());
+    if let Some(window_title) = crate::find_process_window_title(process_id)
+        && !window_title.is_empty()
+    {
+        format!("{base_name} - {window_title} (PID {process_id})")
+    } else {
+        format!("{base_name} (PID {process_id})")
+    }
+}
+
+fn process_image_name(process_id: u32) -> Option<String> {
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id).ok()?;
+        let mut buffer = vec![0u16; 1024];
+        let mut len = buffer.len() as u32;
+        let result = QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_FORMAT(0),
+            PWSTR(buffer.as_mut_ptr()),
+            &mut len,
+        );
+        crate::log_if_err!(CloseHandle(handle));
+        if result.is_err() || len == 0 {
+            return None;
+        }
+        Some(
+            OsString::from_wide(&buffer[..len as usize])
+                .to_string_lossy()
+                .to_string(),
+        )
+    }
+}
+
+fn is_background_process_name(exe_name: &str) -> bool {
+    matches!(
+        exe_name.to_ascii_lowercase().as_str(),
+        "" | "idle"
+            | "system"
+            | "registry"
+            | "smss.exe"
+            | "csrss.exe"
+            | "wininit.exe"
+            | "services.exe"
+            | "lsass.exe"
+            | "svchost.exe"
+            | "fontdrvhost.exe"
+            | "dwm.exe"
+            | "sihost.exe"
+            | "taskhostw.exe"
+            | "conhost.exe"
+    )
 }

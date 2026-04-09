@@ -68,7 +68,7 @@ use std::mem::size_of;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, LazyLock, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use chrono::Local;
@@ -134,8 +134,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetMenu, GetMenuItemCount, GetMessageW, GetNextDlgTabItem, GetParent, GetSubMenu,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
     HCURSOR, HICON, HMENU, HWND_NOTOPMOST, HWND_TOPMOST, IDC_ARROW, IDI_APPLICATION, IDYES,
-    IsChild, IsDialogMessageW, IsIconic, IsWindow, KillTimer, LoadCursorW, LoadIconW,
-    MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO, MENU_ITEM_FLAGS,
+    IsChild, IsDialogMessageW, IsIconic, IsWindow, IsWindowVisible, KillTimer, LoadCursorW,
+    LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO, MENU_ITEM_FLAGS,
     MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED,
     MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW,
     OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
@@ -12965,34 +12965,113 @@ fn create_accelerators() -> HACCEL {
     }
 }
 
-unsafe extern "system" fn enum_close_other_windows(hwnd: HWND, lparam: LPARAM) -> BOOL {
+enum EnumWindowsRequest {
+    Idle,
+    CloseOthers { current: isize },
+    FindProcessTitle { pid: u32, best: Option<String> },
+}
+
+static ENUM_WINDOWS_REQUEST: LazyLock<Mutex<EnumWindowsRequest>> =
+    LazyLock::new(|| Mutex::new(EnumWindowsRequest::Idle));
+
+unsafe extern "system" fn enum_close_other_windows(hwnd: HWND, _lparam: LPARAM) -> BOOL {
     unsafe {
         crate::panic_guard::guard(
             "enum_close_other_windows",
             || BOOL(1),
             || {
-                let current = HWND(lparam.0);
-                if hwnd == current {
-                    return BOOL(1);
+                let mut request = ENUM_WINDOWS_REQUEST
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                match &mut *request {
+                    EnumWindowsRequest::Idle => BOOL(1),
+                    EnumWindowsRequest::CloseOthers { current } => {
+                        if hwnd == HWND(*current) {
+                            return BOOL(1);
+                        }
+                        let mut buf = [0u16; 64];
+                        let len = GetClassNameW(hwnd, &mut buf);
+                        if len == 0 {
+                            return BOOL(1);
+                        }
+                        let name = String::from_utf16_lossy(&buf[..len as usize]);
+                        if name == "SonarpadWin32" {
+                            crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                        }
+                        BOOL(1)
+                    }
+                    EnumWindowsRequest::FindProcessTitle { pid, best } => {
+                        if !IsWindowVisible(hwnd).as_bool() {
+                            return BOOL(1);
+                        }
+                        let mut window_pid = 0u32;
+                        let _thread = GetWindowThreadProcessId(hwnd, Some(&mut window_pid));
+                        if window_pid != *pid {
+                            return BOOL(1);
+                        }
+                        let text_len = get_window_text_length_w_safe(hwnd);
+                        if text_len <= 0 {
+                            return BOOL(1);
+                        }
+                        let mut text_buf = vec![0u16; text_len as usize + 1];
+                        let read = get_window_text_w_safe(hwnd, &mut text_buf);
+                        if read <= 0 {
+                            return BOOL(1);
+                        }
+                        let title = String::from_utf16_lossy(&text_buf[..read as usize])
+                            .trim()
+                            .to_string();
+                        if title.is_empty() {
+                            return BOOL(1);
+                        }
+                        let should_replace =
+                            best.as_ref().map(|current| title.len() > current.len()) != Some(false);
+                        if should_replace {
+                            *best = Some(title);
+                        }
+                        BOOL(1)
+                    }
                 }
-                let mut buf = [0u16; 64];
-                let len = GetClassNameW(hwnd, &mut buf);
-                if len == 0 {
-                    return BOOL(1);
-                }
-                let name = String::from_utf16_lossy(&buf[..len as usize]);
-                if name == "SonarpadWin32" {
-                    crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
-                }
-                BOOL(1)
             },
         )
     }
 }
 
 fn close_other_windows(hwnd: HWND) {
+    {
+        let mut request = ENUM_WINDOWS_REQUEST
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        *request = EnumWindowsRequest::CloseOthers { current: hwnd.0 };
+    }
     unsafe {
-        crate::log_if_err!(EnumWindows(Some(enum_close_other_windows), LPARAM(hwnd.0)));
+        crate::log_if_err!(EnumWindows(Some(enum_close_other_windows), LPARAM(0)));
+    }
+    let mut request = ENUM_WINDOWS_REQUEST
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    *request = EnumWindowsRequest::Idle;
+}
+
+pub(crate) fn find_process_window_title(process_id: u32) -> Option<String> {
+    {
+        let mut request = ENUM_WINDOWS_REQUEST
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        *request = EnumWindowsRequest::FindProcessTitle {
+            pid: process_id,
+            best: None,
+        };
+    }
+    unsafe {
+        crate::log_if_err!(EnumWindows(Some(enum_close_other_windows), LPARAM(0)));
+    }
+    let mut request = ENUM_WINDOWS_REQUEST
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    match std::mem::replace(&mut *request, EnumWindowsRequest::Idle) {
+        EnumWindowsRequest::FindProcessTitle { best, .. } => best,
+        _ => None,
     }
 }
 

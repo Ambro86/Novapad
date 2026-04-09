@@ -1326,5 +1326,12 @@
   "youtube.ytdlp_path_update_prompt": "yt-dlp знайдено у системному PATH, але ця копія не керується Sonarpad.\nЗнайдена версія: {current}\nОстання доступна версія: {latest}\n\nБажаєте завантажити локальну копію yt-dlp, яку Sonarpad зможе автоматично оновлювати?",
   "youtube.ytdlp_prompt_download": "Для завантаження тексту відео з YouTube потрібен yt-dlp. Встановити?",
   "youtube.ytdlp_update_failed": "Оновлення yt-dlp не вдалося.",
-  "youtube.ytdlp_update_prompt": "Доступне оновлення yt-dlp.\nВстановлена версія: {current}\nОстання версія: {latest}\n\nОновити?"
+  "youtube.ytdlp_update_prompt": "Доступне оновлення yt-dlp.\nВстановлена версія: {current}\nОстання версія: {latest}\n\nОновити?",
+  "podcast.include_single_app": "Записувати одну програму",
+  "podcast.single_app": "Програма для запису",
+  "podcast.single_app.default": "Виберіть програму",
+  "podcast.single_app.none_running": "Наразі немає запущених підтримуваних програм.",
+  "podcast.single_app.refresh": "Оновити список програм",
+  "podcast.error.single_app_required": "Виберіть програму для запису.",
+  "podcast.error.single_app_unavailable": "Запис аудіо однієї програми недоступний для вибраної програми."
 }

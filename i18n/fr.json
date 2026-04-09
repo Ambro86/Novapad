@@ -1326,5 +1326,12 @@
   "youtube.ytdlp_path_update_prompt": "yt-dlp a été trouvé dans le PATH du système, mais cette copie n'est pas gérée par Sonarpad.\nVersion détectée : {current}\nDernière version disponible : {latest}\n\nVoulez-vous télécharger une copie locale de yt-dlp que Sonarpad pourra mettre à jour automatiquement ?",
   "youtube.ytdlp_prompt_download": "yt-dlp est nécessaire pour utiliser cette fonctionnalité. Voulez-vous le télécharger maintenant ?",
   "youtube.ytdlp_update_failed": "Échec de la mise à jour de yt-dlp.",
-  "youtube.ytdlp_update_prompt": "Une mise à jour de yt-dlp est disponible.\nVersion installée : {current}\nNouvelle version : {latest}\n\nVoulez-vous télécharger la mise à jour ?"
+  "youtube.ytdlp_update_prompt": "Une mise à jour de yt-dlp est disponible.\nVersion installée : {current}\nNouvelle version : {latest}\n\nVoulez-vous télécharger la mise à jour ?",
+  "podcast.include_single_app": "Enregistrer une seule application",
+  "podcast.single_app": "Application à enregistrer",
+  "podcast.single_app.default": "Sélectionnez une application",
+  "podcast.single_app.none_running": "Aucune application prise en charge n’est en cours d’exécution.",
+  "podcast.single_app.refresh": "Actualiser la liste des applications",
+  "podcast.error.single_app_required": "Sélectionnez une application à enregistrer.",
+  "podcast.error.single_app_unavailable": "La capture audio d’une seule application n’est pas disponible pour l’application sélectionnée."
 }

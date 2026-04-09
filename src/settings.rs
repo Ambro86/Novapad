@@ -645,6 +645,10 @@ pub struct AppSettings {
     pub podcast_include_system_audio: bool,
     pub podcast_system_device_id: String,
     pub podcast_system_gain: f32,
+    #[serde(default)]
+    pub podcast_include_single_app: bool,
+    #[serde(default)]
+    pub podcast_single_app_pid: u32,
     pub podcast_output_format: PodcastFormat,
     pub podcast_mp3_bitrate: u32,
     pub podcast_save_folder: String,
@@ -1003,6 +1007,8 @@ impl Default for AppSettings {
             podcast_include_system_audio: true,
             podcast_system_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
             podcast_system_gain: 1.0,
+            podcast_include_single_app: false,
+            podcast_single_app_pid: 0,
             podcast_output_format: PodcastFormat::Mp3,
             podcast_mp3_bitrate: 128,
             podcast_save_folder: default_podcast_save_folder(),
@@ -1953,6 +1959,9 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
         settings.podcast_mp3_bitrate = 128;
     }
     settings.podcast_mp3_bitrate = settings.podcast_mp3_bitrate.clamp(64, 320);
+    if !settings.podcast_include_system_audio {
+        settings.podcast_include_single_app = false;
+    }
     if settings.audiobook_m4b_bitrate == 0 {
         settings.audiobook_m4b_bitrate = 128;
     }

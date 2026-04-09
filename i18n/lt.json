@@ -1326,5 +1326,12 @@
   "youtube.ytdlp_path_update_prompt": "yt-dlp buvo rastas sistemos PATH aplinkoje, tačiau ši kopija nėra valdoma Sonarpad.\nRasta versija: {current}\nNaujausia prieinama versija: {latest}\n\nAr norite atsisiųsti vietinę yt-dlp kopiją, kurią Sonarpad galės automatiškai atnaujinti?",
   "youtube.ytdlp_prompt_download": "Norint naudoti šią funkciją, reikalinga programa „yt-dlp“. Norite ją atsisiųsti dabar?",
   "youtube.ytdlp_update_failed": "yt-dlp atnaujinimas nepavyko.",
-  "youtube.ytdlp_update_prompt": "Yra nauja yt-dlp versija. Įdiegta versija: {current} Naujausia versija: {latest} Norite atsisiųsti naujinimą dabar?"
+  "youtube.ytdlp_update_prompt": "Yra nauja yt-dlp versija. Įdiegta versija: {current} Naujausia versija: {latest} Norite atsisiųsti naujinimą dabar?",
+  "podcast.include_single_app": "Įrašyti vieną programą",
+  "podcast.single_app": "Programa įrašymui",
+  "podcast.single_app.default": "Pasirinkite programą",
+  "podcast.single_app.none_running": "Šiuo metu neveikia jokios palaikomos programos.",
+  "podcast.single_app.refresh": "Atnaujinti programų sąrašą",
+  "podcast.error.single_app_required": "Pasirinkite programą įrašymui.",
+  "podcast.error.single_app_unavailable": "Vienos programos garso įrašymas nepasiekiamas pasirinktai programai."
 }

@@ -1326,5 +1326,12 @@
   "youtube.ytdlp_path_update_prompt": "yt-dlp đã được tìm thấy trong PATH hệ thống, nhưng bản này không được Sonarpad quản lý.\nPhiên bản tìm thấy: {current}\nPhiên bản mới nhất: {latest}\n\nBạn có muốn tải xuống bản yt-dlp cục bộ để Sonarpad có thể tự động cập nhật không?",
   "youtube.ytdlp_prompt_download": "Cần yt-dlp để sử dụng tính năng này. Bạn có muốn tải ngay không?",
   "youtube.ytdlp_update_failed": "Cập nhật yt-dlp thất bại.",
-  "youtube.ytdlp_update_prompt": "Có cập nhật yt-dlp.\nPhiên bản đã cài: {current}\nPhiên bản mới: {latest}\n\nBạn có muốn tải cập nhật không?"
+  "youtube.ytdlp_update_prompt": "Có cập nhật yt-dlp.\nPhiên bản đã cài: {current}\nPhiên bản mới: {latest}\n\nBạn có muốn tải cập nhật không?",
+  "podcast.include_single_app": "Ghi một ứng dụng",
+  "podcast.single_app": "Ứng dụng cần ghi",
+  "podcast.single_app.default": "Chọn một ứng dụng",
+  "podcast.single_app.none_running": "Hiện không có ứng dụng được hỗ trợ nào đang chạy.",
+  "podcast.single_app.refresh": "Làm mới danh sách ứng dụng",
+  "podcast.error.single_app_required": "Chọn ứng dụng để ghi.",
+  "podcast.error.single_app_unavailable": "Không thể ghi âm từ một ứng dụng cho ứng dụng đã chọn."
 }

@@ -1326,5 +1326,12 @@
   "youtube.ytdlp_path_update_prompt": "yt-dlp найден в системном PATH, но эта копия не управляется Sonarpad.\nНайденная версия: {current}\nПоследняя доступная версия: {latest}\n\nХотите скачать локальную копию yt-dlp, которую Sonarpad сможет автоматически обновлять?",
   "youtube.ytdlp_prompt_download": "Для использования этой функции требуется yt-dlp. Загрузить сейчас?",
   "youtube.ytdlp_update_failed": "Обновление yt-dlp не удалось.",
-  "youtube.ytdlp_update_prompt": "Доступно обновление для yt-dlp.\r\nУстановленная версия: {current}\r\nПоследняя версия: {latest}\r\n\r\nЗагрузить обновление сейчас?"
+  "youtube.ytdlp_update_prompt": "Доступно обновление для yt-dlp.\r\nУстановленная версия: {current}\r\nПоследняя версия: {latest}\r\n\r\nЗагрузить обновление сейчас?",
+  "podcast.include_single_app": "Записывать одно приложение",
+  "podcast.single_app": "Приложение для записи",
+  "podcast.single_app.default": "Выберите приложение",
+  "podcast.single_app.none_running": "В настоящее время нет запущенных поддерживаемых приложений.",
+  "podcast.single_app.refresh": "Обновить список приложений",
+  "podcast.error.single_app_required": "Выберите приложение для записи.",
+  "podcast.error.single_app_unavailable": "Запись звука одного приложения недоступна для выбранного приложения."
 }

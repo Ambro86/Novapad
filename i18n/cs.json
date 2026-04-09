@@ -1326,5 +1326,12 @@
   "youtube.ytdlp_path_update_prompt": "yt-dlp byl nalezen v systémové proměnné PATH, ale tato kopie není spravována programem Sonarpad.\nNalezená verze: {current}\nNejnovější dostupná verze: {latest}\n\nChcete stáhnout lokální kopii yt-dlp, kterou bude Sonarpad moci automaticky aktualizovat?",
   "youtube.ytdlp_prompt_download": "yt-dlp je potřeba pro použití této funkce. Chcete jej stáhnout nyní?",
   "youtube.ytdlp_update_failed": "Aktualizace yt-dlp selhala.",
-  "youtube.ytdlp_update_prompt": "Je dostupná aktualizace yt-dlp.\nNainstalovaná verze: {current}\nNová verze: {latest}\n\nChcete stáhnout aktualizaci?"
+  "youtube.ytdlp_update_prompt": "Je dostupná aktualizace yt-dlp.\nNainstalovaná verze: {current}\nNová verze: {latest}\n\nChcete stáhnout aktualizaci?",
+  "podcast.include_single_app": "Nahrávat jednu aplikaci",
+  "podcast.single_app": "Aplikace k nahrávání",
+  "podcast.single_app.default": "Vyberte aplikaci",
+  "podcast.single_app.none_running": "Momentálně neběží žádné podporované aplikace.",
+  "podcast.single_app.refresh": "Obnovit seznam aplikací",
+  "podcast.error.single_app_required": "Vyberte aplikaci k nahrávání.",
+  "podcast.error.single_app_unavailable": "Záznam zvuku jedné aplikace není pro vybranou aplikaci dostupný."
 }

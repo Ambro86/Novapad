@@ -1326,5 +1326,12 @@
   "youtube.ytdlp_path_update_prompt": "yt-dlp je pronađen u sistemskom PATH-u, ali ovom kopijom ne upravlja Sonarpad.\nPronađena verzija: {current}\nNajnovija dostupna verzija: {latest}\n\nDa li želite da preuzmete lokalnu kopiju yt-dlp koju Sonarpad može automatski ažurirati?",
   "youtube.ytdlp_prompt_download": "yt-dlp je neophodan za korišćenje ove funkcije. Preuzeti ga sada?",
   "youtube.ytdlp_update_failed": "Ažuriranje yt-dlp‑a nije uspelo.",
-  "youtube.ytdlp_update_prompt": "Ažuriranje za yt-dlp je dostupno.\nInstalirana verzija: {current}\nNajnovija verzija: {latest}\n\nPreuzeti ažuriranje sada?"
+  "youtube.ytdlp_update_prompt": "Ažuriranje za yt-dlp je dostupno.\nInstalirana verzija: {current}\nNajnovija verzija: {latest}\n\nPreuzeti ažuriranje sada?",
+  "podcast.include_single_app": "Snimi jednu aplikaciju",
+  "podcast.single_app": "Aplikacija za snimanje",
+  "podcast.single_app.default": "Izaberite aplikaciju",
+  "podcast.single_app.none_running": "Trenutno nema pokrenutih podržanih aplikacija.",
+  "podcast.single_app.refresh": "Osveži listu aplikacija",
+  "podcast.error.single_app_required": "Izaberite aplikaciju za snimanje.",
+  "podcast.error.single_app_unavailable": "Snimanje zvuka jedne aplikacije nije dostupno za izabranu aplikaciju."
 }

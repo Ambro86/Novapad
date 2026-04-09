@@ -1332,6 +1332,8 @@
   "podcast.single_app.default": "选择一个应用",
   "podcast.single_app.none_running": "当前没有正在运行的受支持应用",
   "podcast.single_app.refresh": "刷新应用列表",
+  "podcast.test_single_app_audio": "测试应用音频",
   "podcast.error.single_app_required": "请选择要录制的应用",
-  "podcast.error.single_app_unavailable": "所选应用不支持单应用音频录制"
+  "podcast.error.single_app_unavailable": "所选应用不支持单应用音频录制",
+  "podcast.single_app_audio_unavailable": "所选应用无法进行音频测试"
 }

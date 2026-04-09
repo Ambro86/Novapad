@@ -1332,6 +1332,8 @@
   "podcast.single_app.default": "Выберите приложение",
   "podcast.single_app.none_running": "В настоящее время нет запущенных поддерживаемых приложений.",
   "podcast.single_app.refresh": "Обновить список приложений",
+  "podcast.test_single_app_audio": "Тест звука приложения",
   "podcast.error.single_app_required": "Выберите приложение для записи.",
-  "podcast.error.single_app_unavailable": "Запись звука одного приложения недоступна для выбранного приложения."
+  "podcast.error.single_app_unavailable": "Запись звука одного приложения недоступна для выбранного приложения.",
+  "podcast.single_app_audio_unavailable": "Тест звука приложения недоступен для выбранного приложения."
 }

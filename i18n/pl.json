@@ -1332,6 +1332,8 @@
   "podcast.single_app.default": "Wybierz aplikację",
   "podcast.single_app.none_running": "Obecnie nie działają żadne obsługiwane aplikacje.",
   "podcast.single_app.refresh": "Odśwież listę aplikacji",
+  "podcast.test_single_app_audio": "Testuj dźwięk aplikacji",
   "podcast.error.single_app_required": "Wybierz aplikację do nagrywania.",
-  "podcast.error.single_app_unavailable": "Nagrywanie dźwięku z jednej aplikacji nie jest dostępne dla wybranej aplikacji."
+  "podcast.error.single_app_unavailable": "Nagrywanie dźwięku z jednej aplikacji nie jest dostępne dla wybranej aplikacji.",
+  "podcast.single_app_audio_unavailable": "Test dźwięku aplikacji nie jest dostępny dla wybranej aplikacji."
 }

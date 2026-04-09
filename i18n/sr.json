@@ -1332,6 +1332,8 @@
   "podcast.single_app.default": "Izaberite aplikaciju",
   "podcast.single_app.none_running": "Trenutno nema pokrenutih podržanih aplikacija.",
   "podcast.single_app.refresh": "Osveži listu aplikacija",
+  "podcast.test_single_app_audio": "Testiraj zvuk aplikacije",
   "podcast.error.single_app_required": "Izaberite aplikaciju za snimanje.",
-  "podcast.error.single_app_unavailable": "Snimanje zvuka jedne aplikacije nije dostupno za izabranu aplikaciju."
+  "podcast.error.single_app_unavailable": "Snimanje zvuka jedne aplikacije nije dostupno za izabranu aplikaciju.",
+  "podcast.single_app_audio_unavailable": "Test zvuka aplikacije nije dostupan za izabranu aplikaciju."
 }

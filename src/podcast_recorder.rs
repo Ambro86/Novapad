@@ -1321,7 +1321,7 @@ pub fn default_output_folder() -> PathBuf {
     PathBuf::from(settings::default_podcast_save_folder())
 }
 
-fn process_loopback_wave_format() -> WAVEFORMATEX {
+pub(crate) fn process_loopback_wave_format() -> WAVEFORMATEX {
     let bits_per_sample = 16u16;
     let block_align = TARGET_CHANNELS * (bits_per_sample / 8);
     WAVEFORMATEX {
@@ -1335,7 +1335,7 @@ fn process_loopback_wave_format() -> WAVEFORMATEX {
     }
 }
 
-fn activate_process_loopback_client(process_id: u32) -> Result<IAudioClient, String> {
+pub(crate) fn activate_process_loopback_client(process_id: u32) -> Result<IAudioClient, String> {
     crate::log_debug(&format!(
         "Process loopback activation: requesting async activation for PID {}",
         process_id

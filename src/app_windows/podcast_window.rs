@@ -1,6 +1,6 @@
 use crate::accessibility::{handle_accessibility, to_wide};
 use crate::app_windows::podcast_save_window;
-use crate::audio_monitor::{MonitorHandle, start_monitoring};
+use crate::audio_monitor::{MonitorHandle, start_monitoring, start_process_monitoring};
 use crate::log_debug;
 // VIDEO REMOVED: MonitorInfo and list_monitors imports removed
 use crate::podcast_recorder::{
@@ -71,7 +71,14 @@ const PODCAST_ID_MONITOR_CHECK: usize = 11026;
 const PODCAST_ID_INCLUDE_SINGLE_APP: usize = 11027;
 const PODCAST_ID_SINGLE_APP: usize = 11028;
 const PODCAST_ID_REFRESH_SINGLE_APP: usize = 11029;
+const PODCAST_ID_TEST_SINGLE_APP_AUDIO: usize = 11030;
 const WM_PODCAST_SAVE_RESULT: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP + 74;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ActiveMonitorKind {
+    Microphone,
+    SingleApp,
+}
 
 struct PodcastSaveResult {
     success: bool,
@@ -117,6 +124,7 @@ struct PodcastState {
     system_gain: HWND,
     include_single_app: HWND,
     single_app: HWND,
+    test_single_app_audio: HWND,
     refresh_single_app: HWND,
     monitor_check: HWND,
     // VIDEO REMOVED: include_video, monitor_combo, video_unavailable_text removed
@@ -142,6 +150,7 @@ struct PodcastState {
     // VIDEO REMOVED: monitors removed
     recorder: Option<RecorderHandle>,
     monitor_handle: Option<MonitorHandle>,
+    active_monitor: Option<ActiveMonitorKind>,
     system_available: bool,
     saving_dialog: HWND,
     save_cancel: Option<Arc<AtomicBool>>,
@@ -165,6 +174,7 @@ struct PodcastLabels {
     single_app_default: String,
     single_app_none_running: String,
     single_app_refresh: String,
+    test_single_app_audio: String,
     system_unavailable: String,
     // VIDEO REMOVED: include_video, monitor, video_unavailable removed
     format: String,
@@ -193,6 +203,7 @@ struct PodcastLabels {
     error_microphone: String,
     error_single_app_required: String,
     error_single_app_unavailable: String,
+    single_app_audio_unavailable: String,
 }
 fn labels(language: Language) -> PodcastLabels {
     PodcastLabels {
@@ -213,6 +224,7 @@ fn labels(language: Language) -> PodcastLabels {
         single_app_default: i18n::tr(language, "podcast.single_app.default"),
         single_app_none_running: i18n::tr(language, "podcast.single_app.none_running"),
         single_app_refresh: i18n::tr(language, "podcast.single_app.refresh"),
+        test_single_app_audio: i18n::tr(language, "podcast.test_single_app_audio"),
         system_unavailable: i18n::tr(language, "podcast.system_unavailable"),
         // VIDEO REMOVED: include_video, monitor, video_unavailable removed
         format: i18n::tr(language, "podcast.format"),
@@ -241,6 +253,7 @@ fn labels(language: Language) -> PodcastLabels {
         error_microphone: i18n::tr(language, "podcast.error.microphone"),
         error_single_app_required: i18n::tr(language, "podcast.error.single_app_required"),
         error_single_app_unavailable: i18n::tr(language, "podcast.error.single_app_unavailable"),
+        single_app_audio_unavailable: i18n::tr(language, "podcast.single_app_audio_unavailable"),
     }
 }
 
@@ -568,13 +581,28 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     None,
                 );
 
+                let test_single_app_audio = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.test_single_app_audio).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    230,
+                    261,
+                    240,
+                    22,
+                    hwnd,
+                    HMENU(PODCAST_ID_TEST_SINGLE_APP_AUDIO as isize),
+                    None,
+                    None,
+                );
+
                 let refresh_single_app = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
                     PCWSTR(to_wide(&labels.single_app_refresh).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     480,
-                    229,
+                    259,
                     100,
                     26,
                     hwnd,
@@ -1006,6 +1034,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     include_single_app,
                     label_single_app,
                     single_app,
+                    test_single_app_audio,
                     refresh_single_app,
                     system_unavailable_text,
                     // VIDEO REMOVED: include_video, label_monitor, monitor_combo, video_unavailable_text removed
@@ -1065,6 +1094,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     system_gain,
                     include_single_app,
                     single_app,
+                    test_single_app_audio,
                     refresh_single_app,
                     monitor_check,
                     // VIDEO REMOVED: include_video, monitor_combo, video_unavailable_text removed
@@ -1090,6 +1120,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     // VIDEO REMOVED: monitors removed
                     recorder: None,
                     monitor_handle: None,
+                    active_monitor: None,
                     system_available,
                     saving_dialog: HWND(0),
                     save_cancel: None,
@@ -1137,15 +1168,35 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                                 WPARAM(BST_UNCHECKED.0 as usize),
                                 LPARAM(0),
                             );
+                            SendMessageW(
+                                state.test_single_app_audio,
+                                BM_SETCHECK,
+                                WPARAM(BST_UNCHECKED.0 as usize),
+                                LPARAM(0),
+                            );
+                            if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
+                                stop_active_monitor(state);
+                            }
+                        }
+                        if id == PODCAST_ID_INCLUDE_SINGLE_APP
+                            && !is_checked(state.include_single_app)
+                        {
+                            stop_active_monitor(state);
+                            SendMessageW(
+                                state.test_single_app_audio,
+                                BM_SETCHECK,
+                                WPARAM(BST_UNCHECKED.0 as usize),
+                                LPARAM(0),
+                            );
                         }
                         update_source_controls(state);
                         update_recording_controls(state);
                         persist_settings(state);
                         // Stop monitor if mic is disabled
-                        if !is_checked(state.include_mic) && state.monitor_handle.is_some() {
-                            if let Some(handle) = state.monitor_handle.take() {
-                                handle.stop();
-                            }
+                        if !is_checked(state.include_mic)
+                            && state.active_monitor == Some(ActiveMonitorKind::Microphone)
+                        {
+                            stop_active_monitor(state);
                             SendMessageW(
                                 state.monitor_check,
                                 BM_SETCHECK,
@@ -1158,58 +1209,75 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PODCAST_ID_MONITOR_CHECK => {
                         let checked = is_checked(state.monitor_check);
                         if checked {
-                            if state.monitor_handle.is_none() {
-                                let device_id = selected_device_id(state, true);
-                                let device_name = selected_device_name(state, true);
-                                let gain = selected_mic_gain(state);
-                                match start_monitoring(device_id, device_name, gain) {
-                                    Ok(handle) => state.monitor_handle = Some(handle),
-                                    Err(e) => {
-                                        SendMessageW(
-                                            state.monitor_check,
-                                            BM_SETCHECK,
-                                            WPARAM(BST_UNCHECKED.0 as usize),
-                                            LPARAM(0),
-                                        );
-                                        show_error(state.parent, state.language, &e);
-                                    }
-                                }
-                            }
-                        } else if let Some(handle) = state.monitor_handle.take() {
-                            handle.stop();
+                            SendMessageW(
+                                state.test_single_app_audio,
+                                BM_SETCHECK,
+                                WPARAM(BST_UNCHECKED.0 as usize),
+                                LPARAM(0),
+                            );
+                            restart_mic_monitor(state);
+                        } else if state.active_monitor == Some(ActiveMonitorKind::Microphone) {
+                            stop_active_monitor(state);
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_TEST_SINGLE_APP_AUDIO => {
+                        let checked = is_checked(state.test_single_app_audio);
+                        if checked {
+                            SendMessageW(
+                                state.monitor_check,
+                                BM_SETCHECK,
+                                WPARAM(BST_UNCHECKED.0 as usize),
+                                LPARAM(0),
+                            );
+                            restart_single_app_monitor(state);
+                        } else if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
+                            stop_active_monitor(state);
                         }
                         handled = true;
                     }
                     PODCAST_ID_MIC_DEVICE => {
                         if code == CBN_SELCHANGE as u16 {
                             persist_settings(state);
-                            restart_mic_monitor(state);
+                            if state.active_monitor == Some(ActiveMonitorKind::Microphone) {
+                                restart_mic_monitor(state);
+                            }
                         }
                         handled = true;
                     }
                     PODCAST_ID_MIC_GAIN => {
                         if code == CBN_SELCHANGE as u16 {
                             persist_settings(state);
-                            // Restart monitor with new gain if active
-                            restart_mic_monitor(state);
+                            if state.active_monitor == Some(ActiveMonitorKind::Microphone) {
+                                restart_mic_monitor(state);
+                            }
                         }
                         handled = true;
                     }
                     PODCAST_ID_SYSTEM_DEVICE | PODCAST_ID_SYSTEM_GAIN | PODCAST_ID_MONITOR => {
                         if code == CBN_SELCHANGE as u16 {
                             persist_settings(state);
+                            if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
+                                restart_single_app_monitor(state);
+                            }
                         }
                         handled = true;
                     }
                     PODCAST_ID_SINGLE_APP => {
                         if code == CBN_SELCHANGE as u16 {
                             persist_settings(state);
+                            if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
+                                restart_single_app_monitor(state);
+                            }
                         }
                         handled = true;
                     }
                     PODCAST_ID_REFRESH_SINGLE_APP => {
                         refresh_single_app_list(state, None);
                         persist_settings(state);
+                        if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
+                            restart_single_app_monitor(state);
+                        }
                         handled = true;
                     }
                     PODCAST_ID_FORMAT => {
@@ -1404,9 +1472,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
             }
             WM_DESTROY => {
                 if with_podcast_state(hwnd, |state| {
-                    if let Some(handle) = state.monitor_handle.take() {
-                        handle.stop();
-                    }
+                    stop_active_monitor(state);
                     if let Some(recorder) = state.recorder.take()
                         && let Err(e) = recorder.stop()
                     {
@@ -1588,6 +1654,18 @@ fn load_single_apps(language: Language) -> Vec<AudioApp> {
 fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
     unsafe {
         SendMessageW(
+            state.monitor_check,
+            BM_SETCHECK,
+            WPARAM(BST_UNCHECKED.0 as usize),
+            LPARAM(0),
+        );
+        SendMessageW(
+            state.test_single_app_audio,
+            BM_SETCHECK,
+            WPARAM(BST_UNCHECKED.0 as usize),
+            LPARAM(0),
+        );
+        SendMessageW(
             state.include_mic,
             BM_SETCHECK,
             WPARAM(if settings.podcast_include_microphone {
@@ -1728,6 +1806,10 @@ fn update_source_controls(state: &PodcastState) {
             state.refresh_single_app,
             system_checked && state.system_available && single_app_checked,
         );
+        EnableWindow(
+            state.test_single_app_audio,
+            system_checked && state.system_available && single_app_checked,
+        );
         // VIDEO REMOVED: monitor_combo removed
 
         if !state.system_available {
@@ -1736,6 +1818,7 @@ fn update_source_controls(state: &PodcastState) {
             EnableWindow(state.include_single_app, false);
             EnableWindow(state.single_app, false);
             EnableWindow(state.refresh_single_app, false);
+            EnableWindow(state.test_single_app_audio, false);
             ShowWindow(
                 state.system_unavailable_text,
                 windows::Win32::UI::WindowsAndMessaging::SW_SHOW,
@@ -1896,16 +1979,13 @@ fn update_filename_preview(state: &PodcastState) {
 }
 
 fn restart_mic_monitor(state: &mut PodcastState) {
-    let checked = is_checked(state.monitor_check);
-    if !checked {
-        if let Some(handle) = state.monitor_handle.take() {
-            handle.stop();
+    if !is_checked(state.monitor_check) {
+        if state.active_monitor == Some(ActiveMonitorKind::Microphone) {
+            stop_active_monitor(state);
         }
         return;
     }
-    if let Some(handle) = state.monitor_handle.take() {
-        handle.stop();
-    }
+    stop_active_monitor(state);
     let device_id = selected_device_id(state, true);
     let device_name = selected_device_name(state, true);
     let gain = selected_mic_gain(state);
@@ -1914,7 +1994,10 @@ fn restart_mic_monitor(state: &mut PodcastState) {
         device_id, device_name, gain
     ));
     match start_monitoring(device_id, device_name, gain) {
-        Ok(handle) => state.monitor_handle = Some(handle),
+        Ok(handle) => {
+            state.monitor_handle = Some(handle);
+            state.active_monitor = Some(ActiveMonitorKind::Microphone);
+        }
         Err(e) => {
             crate::send_message_w_safe(
                 state.monitor_check,
@@ -1926,6 +2009,63 @@ fn restart_mic_monitor(state: &mut PodcastState) {
         }
     }
 }
+
+fn restart_single_app_monitor(state: &mut PodcastState) {
+    if !is_checked(state.test_single_app_audio) {
+        if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
+            stop_active_monitor(state);
+        }
+        return;
+    }
+    let labels = labels(state.language);
+    let Some(app) = selected_single_app(state) else {
+        crate::send_message_w_safe(
+            state.test_single_app_audio,
+            BM_SETCHECK,
+            WPARAM(BST_UNCHECKED.0 as usize),
+            LPARAM(0),
+        );
+        show_error(
+            state.parent,
+            state.language,
+            &labels.error_single_app_required,
+        );
+        return;
+    };
+    stop_active_monitor(state);
+    let gain = selected_system_gain(state);
+    log_debug(&format!(
+        "Podcast monitor: single app pid='{}' name='{}' gain={}",
+        app.pid, app.display_name, gain
+    ));
+    match start_process_monitoring(app.pid, gain) {
+        Ok(handle) => {
+            state.monitor_handle = Some(handle);
+            state.active_monitor = Some(ActiveMonitorKind::SingleApp);
+        }
+        Err(e) => {
+            crate::send_message_w_safe(
+                state.test_single_app_audio,
+                BM_SETCHECK,
+                WPARAM(BST_UNCHECKED.0 as usize),
+                LPARAM(0),
+            );
+            show_error(
+                state.parent,
+                state.language,
+                &format!("{} {}", labels.single_app_audio_unavailable, e),
+            );
+        }
+    }
+}
+
+fn stop_active_monitor(state: &mut PodcastState) {
+    if let Some(handle) = state.monitor_handle.take() {
+        handle.stop();
+    }
+    state.active_monitor = None;
+}
+
 fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
     if state.recorder.is_some() {
         return;
@@ -1939,15 +2079,19 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
     }
 
     // Stop microphone monitor if active to avoid conflicts
-    if let Some(handle) = state.monitor_handle.take() {
-        handle.stop();
-        crate::send_message_w_safe(
-            state.monitor_check,
-            BM_SETCHECK,
-            WPARAM(BST_UNCHECKED.0 as usize),
-            LPARAM(0),
-        );
-    }
+    stop_active_monitor(state);
+    crate::send_message_w_safe(
+        state.monitor_check,
+        BM_SETCHECK,
+        WPARAM(BST_UNCHECKED.0 as usize),
+        LPARAM(0),
+    );
+    crate::send_message_w_safe(
+        state.test_single_app_audio,
+        BM_SETCHECK,
+        WPARAM(BST_UNCHECKED.0 as usize),
+        LPARAM(0),
+    );
 
     let mic_device_id = selected_device_id(state, true);
     let system_device_id = selected_device_id(state, false);

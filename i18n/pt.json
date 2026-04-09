@@ -1332,6 +1332,8 @@
   "podcast.single_app.default": "Selecione um aplicativo",
   "podcast.single_app.none_running": "Nenhum aplicativo suportado está em execução.",
   "podcast.single_app.refresh": "Atualizar lista de aplicativos",
+  "podcast.test_single_app_audio": "Testar áudio do aplicativo",
   "podcast.error.single_app_required": "Selecione um aplicativo para gravar.",
-  "podcast.error.single_app_unavailable": "A captura de áudio de um único aplicativo não está disponível para o aplicativo selecionado."
+  "podcast.error.single_app_unavailable": "A captura de áudio de um único aplicativo não está disponível para o aplicativo selecionado.",
+  "podcast.single_app_audio_unavailable": "O teste de áudio do aplicativo não está disponível para o aplicativo selecionado."
 }

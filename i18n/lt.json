@@ -1332,6 +1332,8 @@
   "podcast.single_app.default": "Pasirinkite programą",
   "podcast.single_app.none_running": "Šiuo metu neveikia jokios palaikomos programos.",
   "podcast.single_app.refresh": "Atnaujinti programų sąrašą",
+  "podcast.test_single_app_audio": "Išbandyti programos garsą",
   "podcast.error.single_app_required": "Pasirinkite programą įrašymui.",
-  "podcast.error.single_app_unavailable": "Vienos programos garso įrašymas nepasiekiamas pasirinktai programai."
+  "podcast.error.single_app_unavailable": "Vienos programos garso įrašymas nepasiekiamas pasirinktai programai.",
+  "podcast.single_app_audio_unavailable": "Programos garso testas nepasiekiamas pasirinktai programai."
 }

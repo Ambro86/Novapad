@@ -1332,6 +1332,8 @@
   "podcast.single_app.default": "Vyberte aplikaci",
   "podcast.single_app.none_running": "Momentálně neběží žádné podporované aplikace.",
   "podcast.single_app.refresh": "Obnovit seznam aplikací",
+  "podcast.test_single_app_audio": "Otestovat zvuk aplikace",
   "podcast.error.single_app_required": "Vyberte aplikaci k nahrávání.",
-  "podcast.error.single_app_unavailable": "Záznam zvuku jedné aplikace není pro vybranou aplikaci dostupný."
+  "podcast.error.single_app_unavailable": "Záznam zvuku jedné aplikace není pro vybranou aplikaci dostupný.",
+  "podcast.single_app_audio_unavailable": "Test zvuku aplikace není pro vybranou aplikaci dostupný."
 }

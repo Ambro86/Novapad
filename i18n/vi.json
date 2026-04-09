@@ -1332,6 +1332,8 @@
   "podcast.single_app.default": "Chọn một ứng dụng",
   "podcast.single_app.none_running": "Hiện không có ứng dụng được hỗ trợ nào đang chạy.",
   "podcast.single_app.refresh": "Làm mới danh sách ứng dụng",
+  "podcast.test_single_app_audio": "Kiểm tra âm thanh ứng dụng",
   "podcast.error.single_app_required": "Chọn ứng dụng để ghi.",
-  "podcast.error.single_app_unavailable": "Không thể ghi âm từ một ứng dụng cho ứng dụng đã chọn."
+  "podcast.error.single_app_unavailable": "Không thể ghi âm từ một ứng dụng cho ứng dụng đã chọn.",
+  "podcast.single_app_audio_unavailable": "Kiểm tra âm thanh ứng dụng không khả dụng cho ứng dụng đã chọn."
 }

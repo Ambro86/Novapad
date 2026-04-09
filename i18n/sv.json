@@ -1332,6 +1332,8 @@
   "podcast.single_app.default": "Välj en app",
   "podcast.single_app.none_running": "Inga stödda appar körs just nu.",
   "podcast.single_app.refresh": "Uppdatera applistan",
+  "podcast.test_single_app_audio": "Testa appens ljud",
   "podcast.error.single_app_required": "Välj en app att spela in.",
-  "podcast.error.single_app_unavailable": "Inspelning av en enskild apps ljud är inte tillgänglig för den valda appen."
+  "podcast.error.single_app_unavailable": "Inspelning av en enskild apps ljud är inte tillgänglig för den valda appen.",
+  "podcast.single_app_audio_unavailable": "Test av appens ljud är inte tillgängligt för den valda appen."
 }

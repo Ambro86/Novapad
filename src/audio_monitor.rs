@@ -2,6 +2,7 @@
 //! This ensures device IDs match between the UI list and actual capture.
 
 use crate::com_guard::ComGuard;
+use crate::podcast_recorder::{activate_process_loopback_client, process_loopback_wave_format};
 use crate::settings::PODCAST_DEVICE_DEFAULT;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -11,9 +12,9 @@ use std::time::Duration;
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 use windows::Win32::Media::Audio::{
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
-    DEVICE_STATE_ACTIVE, IAudioCaptureClient, IAudioClient, IAudioRenderClient, IMMDevice,
-    IMMDeviceCollection, IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEX, eCapture, eConsole,
-    eRender,
+    AUDCLNT_STREAMFLAGS_LOOPBACK, DEVICE_STATE_ACTIVE, IAudioCaptureClient, IAudioClient,
+    IAudioRenderClient, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator, MMDeviceEnumerator,
+    WAVEFORMATEX, eCapture, eConsole, eRender,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
@@ -57,6 +58,20 @@ pub fn start_monitoring(
     _device_name: String,
     gain: f32,
 ) -> Result<MonitorHandle, String> {
+    start_monitoring_source(MonitorSource::InputDevice(device_id), gain)
+}
+
+pub fn start_process_monitoring(process_id: u32, gain: f32) -> Result<MonitorHandle, String> {
+    start_monitoring_source(MonitorSource::ProcessLoopback(process_id), gain)
+}
+
+#[derive(Clone)]
+enum MonitorSource {
+    InputDevice(String),
+    ProcessLoopback(u32),
+}
+
+fn start_monitoring_source(source: MonitorSource, gain: f32) -> Result<MonitorHandle, String> {
     let stop = Arc::new(AtomicBool::new(false));
 
     // Shared buffer between capture and playback threads (small for low latency)
@@ -65,9 +80,8 @@ pub fn start_monitoring(
     // Start capture thread
     let capture_stop = stop.clone();
     let capture_buffer = buffer.clone();
-    let capture_device_id = device_id.clone();
     let capture_thread = thread::spawn(move || {
-        if let Err(e) = capture_loop(capture_device_id, gain, capture_buffer, capture_stop) {
+        if let Err(e) = capture_loop(source, gain, capture_buffer, capture_stop) {
             crate::log_debug(&format!("Monitor capture error: {}", e));
         }
     });
@@ -253,46 +267,92 @@ fn to_mono_f32(samples: &[f32], channels: usize, gain: f32) -> Vec<f32> {
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
 
 fn capture_loop(
-    device_id: String,
+    source: MonitorSource,
     gain: f32,
     buffer: Arc<Mutex<VecDeque<f32>>>,
     stop: Arc<AtomicBool>,
 ) -> Result<(), String> {
-    crate::log_debug(&format!(
-        "Monitor capture_loop started for device_id='{}'",
-        device_id
-    ));
-    let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
-
-    let device = resolve_input_device(&device_id)?;
-
-    // Check Endpoint Volume
-    unsafe {
-        if let Ok(endpoint_volume) = device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
-            let level = endpoint_volume.GetMasterVolumeLevelScalar().unwrap_or(0.0);
-            let mute = endpoint_volume
-                .GetMute()
-                .unwrap_or(windows::Win32::Foundation::BOOL(0));
+    match &source {
+        MonitorSource::InputDevice(device_id) => {
             crate::log_debug(&format!(
-                "Monitor: Device System Volume: {:.0}% Muted: {:?}",
-                level * 100.0,
-                mute.as_bool()
+                "Monitor capture_loop started for device_id='{}'",
+                device_id
+            ));
+        }
+        MonitorSource::ProcessLoopback(process_id) => {
+            crate::log_debug(&format!(
+                "Monitor capture_loop started for process_id='{}'",
+                process_id
             ));
         }
     }
+    let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
+    let (client, input_rate, input_channels, input_format) = match &source {
+        MonitorSource::InputDevice(device_id) => {
+            let device = resolve_input_device(device_id)?;
 
-    let client: IAudioClient = unsafe {
-        device
-            .Activate(CLSCTX_ALL, None)
-            .map_err(|e| format!("AudioClient activate failed: {e}"))?
-    };
+            unsafe {
+                if let Ok(endpoint_volume) =
+                    device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)
+                {
+                    let level = endpoint_volume.GetMasterVolumeLevelScalar().unwrap_or(0.0);
+                    let mute = endpoint_volume
+                        .GetMute()
+                        .unwrap_or(windows::Win32::Foundation::BOOL(0));
+                    crate::log_debug(&format!(
+                        "Monitor: Device System Volume: {:.0}% Muted: {:?}",
+                        level * 100.0,
+                        mute.as_bool()
+                    ));
+                }
+            }
 
-    let mix_format = unsafe {
-        client
-            .GetMixFormat()
-            .map_err(|e| format!("GetMixFormat failed: {e}"))?
+            let client: IAudioClient = unsafe {
+                device
+                    .Activate(CLSCTX_ALL, None)
+                    .map_err(|e| format!("AudioClient activate failed: {e}"))?
+            };
+
+            let mix_format = unsafe {
+                client
+                    .GetMixFormat()
+                    .map_err(|e| format!("GetMixFormat failed: {e}"))?
+            };
+            let parsed = parse_mix_format_ptr(mix_format)?;
+            unsafe {
+                client
+                    .Initialize(
+                        AUDCLNT_SHAREMODE_SHARED,
+                        AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+                        1_000_000,
+                        0,
+                        mix_format,
+                        None,
+                    )
+                    .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
+                CoTaskMemFree(Some(mix_format as *const _));
+            }
+            (client, parsed.0, parsed.1, parsed.2)
+        }
+        MonitorSource::ProcessLoopback(process_id) => {
+            let client = activate_process_loopback_client(*process_id)?;
+            let wave_format = process_loopback_wave_format();
+            let parsed = parse_format(&wave_format);
+            unsafe {
+                client
+                    .Initialize(
+                        AUDCLNT_SHAREMODE_SHARED,
+                        AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+                        0,
+                        0,
+                        &wave_format,
+                        None,
+                    )
+                    .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
+            }
+            (client, parsed.0, parsed.1, parsed.2)
+        }
     };
-    let (input_rate, input_channels, input_format) = parse_mix_format_ptr(mix_format)?;
     crate::log_debug(&format!(
         "Monitor capture: rate={}, channels={}, format={:?}",
         input_rate,
@@ -302,20 +362,6 @@ fn capture_loop(
             SampleFormat::I16 => "I16",
         }
     ));
-
-    unsafe {
-        client
-            .Initialize(
-                AUDCLNT_SHAREMODE_SHARED,
-                AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
-                1_000_000, // 100ms buffer for better compatibility
-                0,
-                mix_format,
-                None,
-            )
-            .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
-        CoTaskMemFree(Some(mix_format as *const _));
-    }
 
     let capture: IAudioCaptureClient = unsafe {
         client

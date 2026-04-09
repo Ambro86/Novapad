@@ -1332,6 +1332,8 @@
   "podcast.single_app.default": "Виберіть програму",
   "podcast.single_app.none_running": "Наразі немає запущених підтримуваних програм.",
   "podcast.single_app.refresh": "Оновити список програм",
+  "podcast.test_single_app_audio": "Тест аудіо програми",
   "podcast.error.single_app_required": "Виберіть програму для запису.",
-  "podcast.error.single_app_unavailable": "Запис аудіо однієї програми недоступний для вибраної програми."
+  "podcast.error.single_app_unavailable": "Запис аудіо однієї програми недоступний для вибраної програми.",
+  "podcast.single_app_audio_unavailable": "Тест аудіо програми недоступний для вибраної програми."
 }

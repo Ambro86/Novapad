@@ -1333,5 +1333,7 @@
   "youtube.ytdlp_path_update_prompt": "yt-dlp was found in the system PATH, but this copy is not managed by Sonarpad.\nDetected version: {current}\nLatest available version: {latest}\n\nDo you want to download a local copy of yt-dlp that Sonarpad can update automatically?",
   "youtube.ytdlp_prompt_download": "yt-dlp is required to use this feature. Download it now?",
   "youtube.ytdlp_update_failed": "yt-dlp update failed.",
-  "youtube.ytdlp_update_prompt": "An update for yt-dlp is available.\nInstalled version: {current}\nLatest version: {latest}\n\nDownload the update now?"
+  "youtube.ytdlp_update_prompt": "An update for yt-dlp is available.\nInstalled version: {current}\nLatest version: {latest}\n\nDownload the update now?",
+  "podcast.test_single_app_audio": "Test app audio",
+  "podcast.single_app_audio_unavailable": "App audio test is unavailable for the selected app."
 }

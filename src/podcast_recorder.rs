@@ -20,21 +20,18 @@ use windows::Win32::Media::Audio::{
     AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
     AUDCLNT_STREAMFLAGS_LOOPBACK, AUDIOCLIENT_ACTIVATION_PARAMS, AUDIOCLIENT_ACTIVATION_PARAMS_0,
     AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK, AUDIOCLIENT_PROCESS_LOOPBACK_PARAMS,
-    ActivateAudioInterfaceAsync, DEVICE_STATE_ACTIVE, EDataFlow,
+    ActivateAudioInterfaceAsync, AudioSessionStateActive, DEVICE_STATE_ACTIVE, EDataFlow,
     IActivateAudioInterfaceAsyncOperation, IActivateAudioInterfaceCompletionHandler,
-    IAudioCaptureClient, IAudioClient, IMMDevice, IMMDeviceCollection, IMMDeviceEnumerator,
-    MMDeviceEnumerator, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
+    IAudioCaptureClient, IAudioClient, IAudioSessionControl, IAudioSessionControl2,
+    IAudioSessionEnumerator, IAudioSessionManager2, IMMDevice, IMMDeviceCollection,
+    IMMDeviceEnumerator, MMDeviceEnumerator, PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE,
     VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, WAVEFORMATEX, eCapture, eConsole, eRender,
 };
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
 use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree, STGM_READ};
-use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
-};
 use windows::Win32::System::Power::{ES_CONTINUOUS, ES_SYSTEM_REQUIRED, SetThreadExecutionState};
-use windows::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows::Win32::System::Threading::{
     OpenProcess, PROCESS_NAME_FORMAT, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
@@ -90,57 +87,70 @@ pub fn list_output_devices() -> Result<Vec<AudioDevice>, String> {
 }
 
 pub fn list_audio_apps() -> Result<Vec<AudioApp>, String> {
-    let mut current_session = 0u32;
-    unsafe {
-        ProcessIdToSessionId(std::process::id(), &mut current_session)
-            .map_err(|e| format!("ProcessIdToSessionId failed: {e}"))?;
-    }
-
-    let snapshot = unsafe {
-        CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-            .map_err(|e| format!("CreateToolhelp32Snapshot failed: {e}"))?
+    let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
+    let enumerator: IMMDeviceEnumerator = unsafe {
+        CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
+    };
+    let device = unsafe {
+        enumerator
+            .GetDefaultAudioEndpoint(eRender, eConsole)
+            .map_err(|e| format!("GetDefaultAudioEndpoint(render) failed: {e}"))?
+    };
+    let session_manager: IAudioSessionManager2 = unsafe {
+        device
+            .Activate(CLSCTX_ALL, None)
+            .map_err(|e| format!("IAudioSessionManager2 activate failed: {e}"))?
+    };
+    let sessions: IAudioSessionEnumerator = unsafe {
+        session_manager
+            .GetSessionEnumerator()
+            .map_err(|e| format!("GetSessionEnumerator failed: {e}"))?
+    };
+    let count = unsafe {
+        sessions
+            .GetCount()
+            .map_err(|e| format!("GetCount failed: {e}"))?
     };
 
-    let result = {
-        let mut entry = PROCESSENTRY32W {
-            dwSize: size_of::<PROCESSENTRY32W>() as u32,
-            ..Default::default()
+    let mut apps = Vec::new();
+    for index in 0..count {
+        let control: IAudioSessionControl = unsafe {
+            sessions
+                .GetSession(index)
+                .map_err(|e| format!("GetSession({index}) failed: {e}"))?
         };
-        let mut apps = Vec::new();
-        let mut found = unsafe { Process32FirstW(snapshot, &mut entry).is_ok() };
-        while found {
-            let pid = entry.th32ProcessID;
-            if pid != 0 && pid != std::process::id() {
-                let mut session_id = 0u32;
-                let same_session = unsafe {
-                    ProcessIdToSessionId(pid, &mut session_id).is_ok()
-                        && session_id == current_session
-                };
-                if same_session {
-                    let exe_name = utf16z_to_string(&entry.szExeFile);
-                    if !is_background_process_name(&exe_name) {
-                        let display_name = process_display_name(pid, &exe_name);
-                        if !display_name.is_empty() {
-                            apps.push(AudioApp { pid, display_name });
-                        }
-                    }
-                }
-            }
-            found = unsafe { Process32NextW(snapshot, &mut entry).is_ok() };
+        let state = unsafe {
+            control
+                .GetState()
+                .map_err(|e| format!("GetState({index}) failed: {e}"))?
+        };
+        if state != AudioSessionStateActive {
+            continue;
         }
-        apps.sort_by(|a, b| {
-            a.display_name
-                .to_lowercase()
-                .cmp(&b.display_name.to_lowercase())
-        });
-        apps.dedup_by(|a, b| a.pid == b.pid);
-        Ok(apps)
-    };
-
-    unsafe {
-        crate::log_if_err!(CloseHandle(snapshot));
+        let session_control2: IAudioSessionControl2 = control
+            .cast()
+            .map_err(|e| format!("IAudioSessionControl2 cast failed: {e}"))?;
+        let pid = unsafe {
+            session_control2
+                .GetProcessId()
+                .map_err(|e| format!("GetProcessId({index}) failed: {e}"))?
+        };
+        if pid == 0 || pid == std::process::id() {
+            continue;
+        }
+        let display_name = process_display_name(pid);
+        if !display_name.is_empty() {
+            apps.push(AudioApp { pid, display_name });
+        }
     }
-    result
+    apps.sort_by(|a, b| {
+        a.display_name
+            .to_lowercase()
+            .cmp(&b.display_name.to_lowercase())
+    });
+    apps.dedup_by(|a, b| a.pid == b.pid);
+    Ok(apps)
 }
 
 pub fn probe_device_with_name(
@@ -1463,12 +1473,7 @@ impl windows::Win32::Media::Audio::IActivateAudioInterfaceCompletionHandler_Impl
     }
 }
 
-fn utf16z_to_string(buf: &[u16]) -> String {
-    let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
-    String::from_utf16_lossy(&buf[..len]).trim().to_string()
-}
-
-fn process_display_name(process_id: u32, exe_name: &str) -> String {
+fn process_display_name(process_id: u32) -> String {
     let base_name = process_image_name(process_id)
         .and_then(|path| {
             PathBuf::from(path)
@@ -1476,12 +1481,7 @@ fn process_display_name(process_id: u32, exe_name: &str) -> String {
                 .map(|stem| stem.to_string_lossy().to_string())
         })
         .filter(|name| !name.trim().is_empty())
-        .or_else(|| {
-            PathBuf::from(exe_name)
-                .file_stem()
-                .map(|stem| stem.to_string_lossy().to_string())
-        })
-        .unwrap_or_else(|| exe_name.to_string());
+        .unwrap_or_else(|| format!("PID {process_id}"));
     if let Some(window_title) = crate::find_process_window_title(process_id)
         && !window_title.is_empty()
     {
@@ -1512,24 +1512,4 @@ fn process_image_name(process_id: u32) -> Option<String> {
                 .to_string(),
         )
     }
-}
-
-fn is_background_process_name(exe_name: &str) -> bool {
-    matches!(
-        exe_name.to_ascii_lowercase().as_str(),
-        "" | "idle"
-            | "system"
-            | "registry"
-            | "smss.exe"
-            | "csrss.exe"
-            | "wininit.exe"
-            | "services.exe"
-            | "lsass.exe"
-            | "svchost.exe"
-            | "fontdrvhost.exe"
-            | "dwm.exe"
-            | "sihost.exe"
-            | "taskhostw.exe"
-            | "conhost.exe"
-    )
 }

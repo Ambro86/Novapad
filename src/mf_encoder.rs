@@ -2,14 +2,15 @@ use crate::accessibility::to_wide;
 use std::path::Path;
 use std::sync::Once;
 use windows::Win32::Media::MediaFoundation::{
-    IMFMediaBuffer, IMFMediaType, IMFSample, IMFSinkWriter, IMFSourceReader,
+    IMFCollection, IMFMediaBuffer, IMFMediaType, IMFSample, IMFSinkWriter, IMFSourceReader,
     MF_MT_AUDIO_AVG_BYTES_PER_SECOND, MF_MT_AUDIO_BITS_PER_SAMPLE, MF_MT_AUDIO_BLOCK_ALIGNMENT,
     MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_FIXED_SIZE_SAMPLES,
     MF_MT_MAJOR_TYPE, MF_MT_SAMPLE_SIZE, MF_MT_SUBTYPE, MF_PD_DURATION, MF_VERSION,
     MFAudioFormat_MP3, MFAudioFormat_PCM, MFCreateMediaType, MFCreateMemoryBuffer, MFCreateSample,
     MFCreateSinkWriterFromURL, MFCreateSourceReaderFromURL, MFMediaType_Audio, MFStartup,
+    MFT_ENUM_FLAG_ALL, MFTranscodeGetAudioOutputAvailableTypes,
 };
-use windows::core::PCWSTR;
+use windows::core::{Interface, PCWSTR};
 
 static MF_STARTUP: Once = Once::new();
 
@@ -140,24 +141,7 @@ impl Mp3StreamWriter {
                 crate::log_debug(&format!("MF: set sample size failed: {}", e));
             }
 
-            let out_type: IMFMediaType = MFCreateMediaType()
-                .map_err(|e| format!("MFCreateMediaType (mp3) failed: {}", e))?;
-            out_type
-                .SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Audio)
-                .map_err(|e| format!("SetGUID major type (out) failed: {}", e))?;
-            out_type
-                .SetGUID(&MF_MT_SUBTYPE, &MFAudioFormat_MP3)
-                .map_err(|e| format!("SetGUID subtype MP3 failed: {}", e))?;
-            out_type
-                .SetUINT32(&MF_MT_AUDIO_NUM_CHANNELS, requested_channels)
-                .map_err(|e| format!("Set channels (out) failed: {}", e))?;
-            out_type
-                .SetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND, sample_rate)
-                .map_err(|e| format!("Set sample rate (out) failed: {}", e))?;
-            let mp3_avg_bytes = (bitrate_kbps * 1000) / 8;
-            out_type
-                .SetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND, mp3_avg_bytes)
-                .map_err(|e| format!("Set mp3 bitrate failed: {}", e))?;
+            let out_type = select_mp3_output_type(sample_rate, requested_channels, bitrate_kbps)?;
 
             let stream_index = writer
                 .AddStream(&out_type)
@@ -241,4 +225,102 @@ impl Mp3StreamWriter {
         }
         Ok(())
     }
+}
+
+fn select_mp3_output_type(
+    sample_rate: u32,
+    channels: u32,
+    bitrate_kbps: u32,
+) -> Result<IMFMediaType, String> {
+    unsafe {
+        let requested_avg_bytes = (bitrate_kbps * 1000) / 8;
+        let available_types: IMFCollection = MFTranscodeGetAudioOutputAvailableTypes(
+            &MFAudioFormat_MP3,
+            MFT_ENUM_FLAG_ALL.0 as u32,
+            None,
+        )
+        .map_err(|e| format!("MFTranscodeGetAudioOutputAvailableTypes failed: {}", e))?;
+        let count = available_types
+            .GetElementCount()
+            .map_err(|e| format!("IMFCollection::GetElementCount failed: {}", e))?;
+
+        let mut best_candidate: Option<(u32, IMFMediaType)> = None;
+        for index in 0..count {
+            let candidate: IMFMediaType = available_types
+                .GetElement(index)
+                .map_err(|e| format!("IMFCollection::GetElement failed: {}", e))?
+                .cast()
+                .map_err(|e| format!("IMFCollection element cast failed: {}", e))?;
+
+            let candidate_rate = candidate
+                .GetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND)
+                .map_err(|e| format!("MF_MT_AUDIO_SAMPLES_PER_SECOND missing: {}", e))?;
+            let candidate_channels = candidate
+                .GetUINT32(&MF_MT_AUDIO_NUM_CHANNELS)
+                .map_err(|e| format!("MF_MT_AUDIO_NUM_CHANNELS missing: {}", e))?;
+            let candidate_avg_bytes = candidate
+                .GetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND)
+                .map_err(|e| format!("MF_MT_AUDIO_AVG_BYTES_PER_SECOND missing: {}", e))?;
+
+            let score = mp3_output_type_score(
+                sample_rate,
+                channels,
+                requested_avg_bytes,
+                candidate_rate,
+                candidate_channels,
+                candidate_avg_bytes,
+            );
+
+            if best_candidate
+                .as_ref()
+                .map(|(best_score, _)| score < *best_score)
+                .unwrap_or(true)
+            {
+                best_candidate = Some((score, candidate));
+            }
+        }
+
+        let Some((_, selected)) = best_candidate else {
+            return Err("No Media Foundation MP3 output types available.".to_string());
+        };
+
+        let selected_rate = selected
+            .GetUINT32(&MF_MT_AUDIO_SAMPLES_PER_SECOND)
+            .map_err(|e| format!("Selected MP3 rate unavailable: {}", e))?;
+        let selected_channels = selected
+            .GetUINT32(&MF_MT_AUDIO_NUM_CHANNELS)
+            .map_err(|e| format!("Selected MP3 channels unavailable: {}", e))?;
+        let selected_avg_bytes = selected
+            .GetUINT32(&MF_MT_AUDIO_AVG_BYTES_PER_SECOND)
+            .map_err(|e| format!("Selected MP3 bitrate unavailable: {}", e))?;
+        crate::log_debug(&format!(
+            "MF: selected mp3 output type request={}kbps/{}Hz/{}ch actual={}kbps/{}Hz/{}ch",
+            bitrate_kbps,
+            sample_rate,
+            channels,
+            (selected_avg_bytes * 8) / 1000,
+            selected_rate,
+            selected_channels
+        ));
+
+        Ok(selected)
+    }
+}
+
+fn mp3_output_type_score(
+    requested_rate: u32,
+    requested_channels: u32,
+    requested_avg_bytes: u32,
+    candidate_rate: u32,
+    candidate_channels: u32,
+    candidate_avg_bytes: u32,
+) -> u32 {
+    let bitrate_delta = candidate_avg_bytes.abs_diff(requested_avg_bytes);
+    let rate_delta = candidate_rate.abs_diff(requested_rate);
+    let channel_delta = candidate_channels.abs_diff(requested_channels);
+
+    channel_delta
+        .saturating_mul(1_000_000)
+        .saturating_add(bitrate_delta.saturating_mul(100))
+        .saturating_add(rate_delta)
 }

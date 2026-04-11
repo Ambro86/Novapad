@@ -5933,19 +5933,28 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                 }
             }
             if msg.message == WM_SYSKEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F4.0) {
-                let (prompt_hwnd, prompt_open) = with_state(hwnd, |state| {
-                    (state.prompt_window, state.prompt_window.0 != 0)
+                let (prompt_hwnd, prompt_open, podcast_open) = with_state(hwnd, |state| {
+                    (
+                        state.prompt_window,
+                        state.prompt_window.0 != 0,
+                        state.podcast_window.0 != 0
+                            || state.podcast_save_window.0 != 0
+                            || state.replace_progress_window.0 != 0
+                            || state.update_progress_window.0 != 0
+                            || state.transcription_progress_window.0 != 0,
+                    )
                 })
-                .unwrap_or((HWND(0), false));
-                if prompt_open {
-                    let target = msg.hwnd;
-                    let target_parent = GetParent(target);
-                    let prompt_target = target == prompt_hwnd || target_parent == prompt_hwnd;
-                    let main_target = target == hwnd || target_parent == hwnd;
-                    if main_target && !prompt_target {
-                        editor_manager::close_current_document(hwnd);
-                        continue;
-                    }
+                .unwrap_or((HWND(0), false, false));
+                let target = msg.hwnd;
+                let target_parent = GetParent(target);
+                let prompt_target = target == prompt_hwnd || target_parent == prompt_hwnd;
+                let main_target = target == hwnd || target_parent == hwnd;
+                if main_target
+                    && !prompt_target
+                    && (prompt_open || podcast_open || has_other_main_windows(hwnd))
+                {
+                    editor_manager::close_current_document(hwnd);
+                    continue;
                 }
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == 'Z' as u32 {
@@ -6172,6 +6181,8 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                 }
 
                 if state.podcast_window.0 != 0
+                    && (msg.hwnd == state.podcast_window
+                        || crate::is_child_safe(state.podcast_window, msg.hwnd))
                     && app_windows::podcast_window::handle_navigation(state.podcast_window, &msg)
                 {
                     handled = true;
@@ -6179,6 +6190,8 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                 }
 
                 if state.podcast_save_window.0 != 0
+                    && (msg.hwnd == state.podcast_save_window
+                        || crate::is_child_safe(state.podcast_save_window, msg.hwnd))
                     && app_windows::podcast_save_window::handle_navigation(
                         state.podcast_save_window,
                         &msg,
@@ -6188,6 +6201,8 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     return;
                 }
                 if state.replace_progress_window.0 != 0
+                    && (msg.hwnd == state.replace_progress_window
+                        || crate::is_child_safe(state.replace_progress_window, msg.hwnd))
                     && app_windows::podcast_save_window::handle_navigation(
                         state.replace_progress_window,
                         &msg,
@@ -6197,6 +6212,8 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     return;
                 }
                 if state.update_progress_window.0 != 0
+                    && (msg.hwnd == state.update_progress_window
+                        || crate::is_child_safe(state.update_progress_window, msg.hwnd))
                     && app_windows::podcast_save_window::handle_navigation(
                         state.update_progress_window,
                         &msg,
@@ -6206,6 +6223,8 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     return;
                 }
                 if state.transcription_progress_window.0 != 0
+                    && (msg.hwnd == state.transcription_progress_window
+                        || crate::is_child_safe(state.transcription_progress_window, msg.hwnd))
                     && app_windows::podcast_save_window::handle_navigation(
                         state.transcription_progress_window,
                         &msg,
@@ -8855,7 +8874,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 LRESULT(0)
             }
             WM_DESTROY => {
-                PostQuitMessage(0);
+                if !has_other_main_windows(hwnd) {
+                    PostQuitMessage(0);
+                }
                 LRESULT(0)
             }
             WM_DROPFILES => {
@@ -12969,6 +12990,7 @@ enum EnumWindowsRequest {
     Idle,
     CloseOthers { current: isize },
     FindProcessTitle { pid: u32, best: Option<String> },
+    CountMainWindows { exclude: isize, count: usize },
 }
 
 static ENUM_WINDOWS_REQUEST: LazyLock<Mutex<EnumWindowsRequest>> =
@@ -13031,6 +13053,21 @@ unsafe extern "system" fn enum_close_other_windows(hwnd: HWND, _lparam: LPARAM) 
                         }
                         BOOL(1)
                     }
+                    EnumWindowsRequest::CountMainWindows { exclude, count } => {
+                        if hwnd == HWND(*exclude) || !IsWindowVisible(hwnd).as_bool() {
+                            return BOOL(1);
+                        }
+                        let mut buf = [0u16; 64];
+                        let len = GetClassNameW(hwnd, &mut buf);
+                        if len == 0 {
+                            return BOOL(1);
+                        }
+                        let name = String::from_utf16_lossy(&buf[..len as usize]);
+                        if name == "SonarpadWin32" {
+                            *count += 1;
+                        }
+                        BOOL(1)
+                    }
                 }
             },
         )
@@ -13072,6 +13109,28 @@ pub(crate) fn find_process_window_title(process_id: u32) -> Option<String> {
     match std::mem::replace(&mut *request, EnumWindowsRequest::Idle) {
         EnumWindowsRequest::FindProcessTitle { best, .. } => best,
         _ => None,
+    }
+}
+
+fn has_other_main_windows(current: HWND) -> bool {
+    {
+        let mut request = ENUM_WINDOWS_REQUEST
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        *request = EnumWindowsRequest::CountMainWindows {
+            exclude: current.0,
+            count: 0,
+        };
+    }
+    unsafe {
+        crate::log_if_err!(EnumWindows(Some(enum_close_other_windows), LPARAM(0)));
+    }
+    let mut request = ENUM_WINDOWS_REQUEST
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    match std::mem::replace(&mut *request, EnumWindowsRequest::Idle) {
+        EnumWindowsRequest::CountMainWindows { count, .. } => count > 0,
+        _ => false,
     }
 }
 

@@ -9,7 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SONARPAD_RELEASE_TAG: v0.6.9
+  SONARPAD_RELEASE_TAG: v0.7.0
 
 jobs:
   build-windows:

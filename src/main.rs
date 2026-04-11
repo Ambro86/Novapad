@@ -5988,7 +5988,9 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                 cycle_favorite_voice(hwnd, -1);
                 continue;
             }
-            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F10.0) {
+            if (msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN)
+                && msg.wParam.0 as u32 == u32::from(VK_F10.0)
+            {
                 // F10 is normally used for menu, so only use it for voice cycling during TTS
                 if is_tts_active(hwnd) {
                     cycle_favorite_voice(hwnd, 1);

@@ -1,5 +1,14 @@
 # Changelog
 
+Versione 0.7.0 – 2026-04-12
+
+Novità
+• Aggiunta la possibilità di registrare l'audio proveniente da una singola applicazione senza registrare anche quello delle altre. È molto utile, ad esempio, per registrare localmente una conferenza Zoom senza registrare anche tutto ciò che viene riprodotto dalle altre applicazioni. Questa scelta è integrata con la registrazione normale, quindi è comunque possibile attivare o disattivare il microfono separatamente.
+
+Correzioni
+• Corretto il tasto `F10`, che ora torna a passare alla voce preferita successiva durante la lettura del testo.
+• Quando è in corso una registrazione podcast, chiudendo un altro documento non viene più chiusa anche la registrazione attiva.
+
 Versione 0.6.9 – 2026-04-08
 
 Correzioni

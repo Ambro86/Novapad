@@ -1,5 +1,14 @@
 # Changelog
 
+Version 0.7.0 – 2026-04-12
+
+What's New
+• Added the ability to record audio from a single application without recording audio from the others. This is especially useful, for example, to record a Zoom conference locally without also recording everything played by other applications. This choice is integrated into normal recording, so the microphone can still be enabled or disabled separately.
+
+Fixes
+• Fixed `F10` so it once again switches to the next favorite voice during text reading.
+• When a podcast recording is in progress, closing another document no longer also closes the active recording.
+
 Version 0.6.9 – 2026-04-08
 
 Fixes

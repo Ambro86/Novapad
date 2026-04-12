@@ -5949,10 +5949,7 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                 let target_parent = GetParent(target);
                 let prompt_target = target == prompt_hwnd || target_parent == prompt_hwnd;
                 let main_target = target == hwnd || target_parent == hwnd;
-                if main_target
-                    && !prompt_target
-                    && (prompt_open || podcast_open || has_other_main_windows(hwnd))
-                {
+                if main_target && !prompt_target && (prompt_open || podcast_open) {
                     editor_manager::close_current_document(hwnd);
                     continue;
                 }

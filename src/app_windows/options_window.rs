@@ -10,8 +10,9 @@ use crate::settings::{
     ListTimeDisplayMode, ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode,
     RssDeleteConfirmMode, RssPodcastUnreadLabelPosition, ShortcutBinding, ShortcutSettings,
     SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo, VoiceProfile,
-    confirm_title, format_shortcut, save_settings_with_default_copy, sync_context_menu,
-    sync_start_menu_shortcuts, voice_profile_from_settings_fields,
+    apply_voice_profile_to_settings_fields, confirm_title, format_shortcut,
+    save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
+    voice_profile_from_settings_fields,
 };
 use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
 use reqwest::blocking::Client;
@@ -2037,6 +2038,14 @@ fn apply_selected_voice_profile(hwnd: HWND) {
     .is_none()
     {
         crate::log_debug("Failed to access options state when applying profile");
+    }
+
+    if with_state(parent, |state| {
+        apply_voice_profile_to_settings_fields(&mut state.settings, &profile);
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to sync selected voice profile into app state");
     }
 
     update_tts_manual_visibility(hwnd);
@@ -6367,11 +6376,13 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         LRESULT(0)
                     }
                     OPTIONS_ID_USE_DIALOGUE_VOICE => {
+                        refresh_voices(hwnd);
                         update_dialogue_voice_visibility(hwnd);
                         relayout_active_tab_content(hwnd);
                         LRESULT(0)
                     }
                     OPTIONS_ID_DIALOGUE_USE_SECONDARY_VOICE => {
+                        refresh_voices(hwnd);
                         update_dialogue_voice_visibility(hwnd);
                         relayout_active_tab_content(hwnd);
                         LRESULT(0)

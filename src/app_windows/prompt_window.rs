@@ -16,7 +16,9 @@ use windows::Win32::System::DataExchange::{
 };
 use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
+use windows::Win32::System::Memory::{
+    GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock,
+};
 use windows::Win32::System::Power::{
     ES_CONTINUOUS, ES_SYSTEM_REQUIRED, EXECUTION_STATE, SetThreadExecutionState,
 };
@@ -352,13 +354,25 @@ pub fn prompt_user_with_options(
 
         windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(parent, true);
         if parent.0 != 0 {
-            crate::bring_window_to_foreground(parent);
-            crate::log_if_err!(crate::post_message_w_safe(
-                parent,
-                crate::WM_FOCUS_EDITOR,
-                WPARAM(0),
-                LPARAM(0)
-            ));
+            let mut class_buf = [0u16; 64];
+            let class_len = crate::get_class_name_w_safe(parent, &mut class_buf);
+            let parent_class = if class_len > 0 {
+                String::from_utf16_lossy(&class_buf[..class_len as usize])
+            } else {
+                String::new()
+            };
+            if parent_class == "SonarpadWin32" {
+                crate::bring_window_to_foreground(parent);
+                crate::log_if_err!(crate::post_message_w_safe(
+                    parent,
+                    crate::WM_FOCUS_EDITOR,
+                    WPARAM(0),
+                    LPARAM(0)
+                ));
+            } else {
+                crate::set_foreground_window_safe(parent);
+                crate::set_focus_safe(parent);
+            }
         }
 
         if data.confirmed {
@@ -2331,9 +2345,16 @@ fn read_clipboard_text(hwnd_owner: HWND) -> Option<String> {
             if ptr.is_null() {
                 return None;
             }
-
+            let size_bytes = GlobalSize(hglobal);
+            if size_bytes < std::mem::size_of::<u16>() {
+                if let Err(e) = GlobalUnlock(hglobal) {
+                    crate::log_debug(&format!("GlobalUnlock failed: {}", e));
+                }
+                return None;
+            }
+            let max_len = size_bytes / std::mem::size_of::<u16>();
             let mut len = 0usize;
-            while *ptr.add(len) != 0 {
+            while len < max_len && *ptr.add(len) != 0 {
                 len += 1;
             }
             let text = String::from_utf16_lossy(std::slice::from_raw_parts(ptr, len));

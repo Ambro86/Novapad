@@ -14,7 +14,9 @@ use crate::settings::{
     save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
     voice_profile_from_settings_fields,
 };
-use crate::{i18n, rebuild_menus, refresh_voice_panel, tts_engine, with_state};
+use crate::{
+    i18n, rebuild_menus, refresh_voice_panel, tts_engine, update_voice_panel_menu_check, with_state,
+};
 use reqwest::blocking::Client;
 use reqwest::header::USER_AGENT;
 use std::process::Command;
@@ -11557,6 +11559,7 @@ fn apply_options_dialog(hwnd: HWND) {
         }
         if old_word_wrap != settings.word_wrap {
             apply_word_wrap_to_all_edits(parent, settings.word_wrap);
+            update_voice_panel_menu_check(parent);
         }
         if old_indent_mode != settings.indentation_mode
             || old_tab_width != settings.indent_tab_width

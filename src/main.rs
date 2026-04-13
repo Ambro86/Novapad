@@ -9418,7 +9418,7 @@ fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size: Optio
     update_voice_panel_menu_check(hwnd);
 }
 
-fn update_voice_panel_menu_check(hwnd: HWND) {
+pub(crate) fn update_voice_panel_menu_check(hwnd: HWND) {
     let (visible, favorites_visible, text_color, text_size, read_only, word_wrap) = {
         with_state(hwnd, |state| {
             (

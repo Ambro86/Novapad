@@ -824,6 +824,13 @@ fn is_known_js_noise_line(line: &str) -> bool {
         || lower.contains("datawrapper-height")
         || lower.contains("addeventlistener(\"message\"")
         || lower.contains("addeventlistener('message'")
+        || lower.contains("window.addeventlistener('load'")
+        || lower.contains("window.addeventlistener(\"load\"")
+        || lower.contains("window.datalayer.push({")
+        || lower.contains("event: 'show_paywall'")
+        || lower.contains("event: \"show_paywall\"")
+        || lower.contains("ifq-post__label-soft-registration")
+        || lower.contains("visualizzazione soft regwall")
         // Radioitalia pages can leak a raw nav JSON blob into extracted text.
         || (lower.starts_with("{\"type\":\"main\",\"entry\":[")
             && lower.contains("\"categoryname\":\"undefined\""))
@@ -885,6 +892,21 @@ mod tests {
         assert!(is_known_js_noise_line(noise));
         assert!(!is_known_js_noise_line(
             "Gigi D'Alessio racconta le storie dietro le canzoni."
+        ));
+    }
+
+    #[test]
+    fn known_js_noise_filters_fatto_regwall_script_lines() {
+        assert!(is_known_js_noise_line(
+            "window.addEventListener('load', function () {"
+        ));
+        assert!(is_known_js_noise_line(
+            "const softRegwall = document.querySelector('.ifq-post__label-soft-registration');"
+        ));
+        assert!(is_known_js_noise_line("window.dataLayer.push({"));
+        assert!(is_known_js_noise_line("event: 'show_paywall',"));
+        assert!(is_known_js_noise_line(
+            "label: 'Visualizzazione soft regwall - test'"
         ));
     }
 

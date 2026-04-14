@@ -1076,6 +1076,7 @@
   "stream_audio.url_label": "URL arba „YouTube“ paieškos užklausa:",
   "stream_audio.open_comments": "Atidaryti komentarus",
   "stream_audio.view_comments": "Peržiūrėti komentarus",
+  "stream_audio.load_all_comments": "Įkelti visus komentarus",
   "stream_audio.views_label": "Peržiūros",
   "stream_audio.views_suffix": "peržiūros",
   "stream_audio.ytdlp_progress_downloading": "Atsisiunčiama yt-dlp...",

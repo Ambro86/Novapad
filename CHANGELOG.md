@@ -8,6 +8,7 @@ What's New
 Fixes
 • Fixed `F10` so it once again switches to the next favorite voice during text reading.
 • When a podcast recording is in progress, closing another document no longer also closes the active recording.
+• In YouTube comments opened from "Play streaming audio...", Sonarpad now loads only the first 50 top-level comments at first, always including all replies for those comments, and adds a final item to load all comments on demand.
 
 Version 0.6.9 – 2026-04-08
 
@@ -279,7 +280,7 @@ Improvements
 • Improved support for Microsoft voices, which now use a dedicated playback method with a different user agent.
 • Added support for MP4 files.
 
-Version 0.6.0 – 2025-01-20
+Version 0.6.0 – 2026-01-20
 New features
 • Added spell checker. From the context menu, users can check whether the current word is correct and, if not, get spelling suggestions.
 • Added podcast import and export via OPML files.
@@ -320,7 +321,7 @@ Developer improvements
 • Hand-rolled byte parsing helpers were removed; all byte parsing now uses standard from_le_bytes / from_be_bytes on checked slices.
 These changes reduce unnecessary unsafe usage, eliminate potential undefined behavior, and make the codebase more idiomatic, robust, and maintainable.
 
-Version 0.5.9 - 2025-01-13
+Version 0.5.9 - 2026-01-13
 New features
 • Added RSS reordering from the context menu (up/down/to position) with invalid-position checks.
 • Added an article context menu with open original site and share via WhatsApp, Facebook, and X.
@@ -437,14 +438,3 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
-
-
-
-
-
-
-
-
-
-
-

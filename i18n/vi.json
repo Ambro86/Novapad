@@ -1076,6 +1076,7 @@
   "stream_audio.url_label": "URL hoặc tìm kiếm YouTube:",
   "stream_audio.open_comments": "Mở bình luận",
   "stream_audio.view_comments": "Xem bình luận",
+  "stream_audio.load_all_comments": "Tải tất cả bình luận",
   "stream_audio.views_label": "Lượt xem",
   "stream_audio.views_suffix": "lượt xem",
   "stream_audio.ytdlp_progress_downloading": "Đang tải yt-dlp...",

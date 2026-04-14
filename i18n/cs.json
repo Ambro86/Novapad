@@ -1076,6 +1076,7 @@
   "stream_audio.url_label": "URL nebo vyhledávací dotaz pro YouTube:",
   "stream_audio.open_comments": "Otevřít komentáře",
   "stream_audio.view_comments": "Zobrazit komentáře",
+  "stream_audio.load_all_comments": "Načíst všechny komentáře",
   "stream_audio.views_label": "Zhlédnutí",
   "stream_audio.views_suffix": "zhlédnutí",
   "stream_audio.ytdlp_progress_downloading": "Stahování yt-dlp...",

@@ -433,7 +433,7 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                         Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
                         Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
                         Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
-                        Language::Czech => include_str!("../../CHANGELOG.md").to_string(),
+                        Language::Czech => include_str!("../../CHANGELOG_CS.md").to_string(),
                         Language::Polish => include_str!("../../CHANGELOG_PL.md").to_string(),
                         Language::French => include_str!("../../CHANGELOG_FR.md").to_string(),
                         Language::Serbian => include_str!("../../CHANGELOG.md").to_string(),

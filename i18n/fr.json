@@ -1076,6 +1076,7 @@
   "stream_audio.url_label": "URL ou recherche YouTube :",
   "stream_audio.open_comments": "Ouvrir les commentaires",
   "stream_audio.view_comments": "Voir les commentaires",
+  "stream_audio.load_all_comments": "Charger tous les commentaires",
   "stream_audio.views_label": "Vues",
   "stream_audio.views_suffix": "vues",
   "stream_audio.ytdlp_progress_downloading": "Téléchargement de yt-dlp...",

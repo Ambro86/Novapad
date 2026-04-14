@@ -8,6 +8,7 @@ Novità
 Correzioni
 • Corretto il tasto `F10`, che ora torna a passare alla voce preferita successiva durante la lettura del testo.
 • Quando è in corso una registrazione podcast, chiudendo un altro documento non viene più chiusa anche la registrazione attiva.
+• Nei commenti YouTube aperti da "Riproduci audio da streaming...", Sonarpad ora carica inizialmente solo i primi 50 commenti principali, includendo sempre tutte le risposte di quei commenti, e aggiunge in fondo una voce per caricare tutti i commenti su richiesta.
 
 Versione 0.6.9 – 2026-04-08
 
@@ -287,7 +288,7 @@ Miglioramenti
 • Migliorato il supporto per le voci Microsoft, che ora vengono riprodotte utilizzando una modalità dedicata con un diverso user agent.
 • Aggiunto il supporto per i file MP4.
 
-Versione 0.6.0 – 2025-01-20
+Versione 0.6.0 – 2026-01-20
 Nuove funzionalità
 • Aggiunto il correttore ortografico. Dal menu contestuale è possibile verificare se la parola corrente è corretta e, in caso contrario, ottenere suggerimenti.
 • Aggiunta l’importazione ed esportazione dei podcast tramite file OPML.
@@ -328,7 +329,7 @@ Miglioramenti per sviluppatori
 • Rimossi gli helper artigianali per il parsing dei byte: ora tutto il parsing utilizza from_le_bytes / from_be_bytes su slice verificate.
 Queste modifiche riducono l’uso superfluo di unsafe, eliminano potenziali comportamenti indefiniti e rendono il codice più idiomatico, robusto e manutenibile.
 
-Versione 0.5.9 - 2025-01-13
+Versione 0.5.9 - 2026-01-13
 Nuove funzionalita
 • Aggiunta la possibilita di riordinare gli RSS dal menu contestuale (su/giu/posizione) con controlli per posizioni non valide.
 • Aggiunto il menu contestuale anche per gli articoli, con apertura del sito originale e condivisione via WhatsApp, Facebook e X.

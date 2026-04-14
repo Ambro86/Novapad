@@ -1,5 +1,10 @@
 # Journal des modifications
 
+Version 0.7.0 – 2026-04-12
+
+Corrections
+• Dans les commentaires YouTube ouverts depuis « Lire l'audio en streaming... », Sonarpad charge maintenant au départ seulement les 50 premiers commentaires principaux, en incluant toujours toutes les réponses à ces commentaires, et ajoute à la fin une entrée permettant de charger tous les commentaires à la demande.
+
 Version 0.6.9 – 2026-04-08
 
 Corrections
@@ -268,7 +273,7 @@ Améliorations
 • Amélioration de la prise en charge des voix Microsoft, qui utilisent désormais une méthode de lecture dédiée avec un agent utilisateur différent.
 • Ajout de la prise en charge des fichiers MP4.
 
-Version 0.6.0 – 2025-01-20
+Version 0.6.0 – 2026-01-20
 Nouvelles fonctionnalités
 • Ajout du correcteur orthographique. Depuis le menu contextuel, les utilisateurs peuvent vérifier si le mot actuel est correct et, sinon, obtenir des suggestions d'orthographe.
 • Ajout de l'importation et de l'exportation de podcasts via des fichiers OPML.
@@ -308,7 +313,7 @@ Améliorations développeur
 • La gestion des DLL a été nettoyée et consolidée autour de libloading.
 • Les aides d'analyse d'octets manuelles ont été supprimées au profit des méthodes standard.
 
-Version 0.5.9 - 2025-01-13
+Version 0.5.9 - 2026-01-13
 Nouvelles fonctionnalités
 • Ajout de la réorganisation RSS depuis le menu contextuel (monter/descendre/vers la position) avec vérification de position invalide.
 • Ajout d'un menu contextuel d'article avec ouverture du site d'origine et partage via WhatsApp, Facebook et X.

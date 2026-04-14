@@ -1,5 +1,10 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.7.0 – 2026-04-12
+
+Bản sửa lỗi
+• Trong phần bình luận YouTube mở từ "Phat am thanh tu streaming...", Sonarpad giờ chỉ tải trước 50 bình luận gốc đầu tiên, luôn kèm toàn bộ phản hồi của các bình luận đó, và thêm ở cuối một mục để tải tất cả bình luận khi cần.
+
 Phiên bản 0.6.9 – 2026-04-08
 
 Bản sửa lỗi
@@ -268,7 +273,7 @@ Cải tiến
 
 
 
-Phiên bản 0.6.0 – 2025-01-20
+Phiên bản 0.6.0 – 2026-01-20
 Tính năng mới
 • Thêm trình kiểm tra chính tả. Từ menu chuột phải, người dùng có thể kiểm tra xem từ hiện tại có đúng không và nếu không, sẽ nhận được các gợi ý sửa lỗi.
 • Thêm tính năng nhập và xuất podcast thông qua tệp OPML.
@@ -309,7 +314,7 @@ Cải tiến cho nhà phát triển
 • Các trình hỗ trợ phân tích cú pháp byte tự viết đã bị loại bỏ; tất cả việc phân tích byte hiện sử dụng `from_le_bytes` / `from_be_bytes` tiêu chuẩn trên các lát cắt (slices) đã được kiểm tra.
 Những thay đổi này giúp giảm việc sử dụng mã không an toàn (unsafe) không cần thiết, loại bỏ các hành vi không xác định tiềm ẩn và làm cho mã nguồn trở nên chuẩn mực, mạnh mẽ và dễ bảo trì hơn.
 
-Phiên bản 0.5.9 - 2025-01-13
+Phiên bản 0.5.9 - 2026-01-13
 Tính năng mới
 • Thêm tính năng sắp xếp lại RSS từ menu chuột phải (lên/xuống/đến vị trí) với kiểm tra vị trí hợp lệ.
 • Thêm menu ngữ cảnh cho bài viết với các tùy chọn mở trang web gốc và chia sẻ qua WhatsApp, Facebook và X.

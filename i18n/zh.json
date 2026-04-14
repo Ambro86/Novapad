@@ -1076,6 +1076,7 @@
   "stream_audio.url_label": "URL 或 YouTube 搜索：",
   "stream_audio.open_comments": "打开评论",
   "stream_audio.view_comments": "查看评论",
+  "stream_audio.load_all_comments": "加载所有评论",
   "stream_audio.views_label": "观看次数",
   "stream_audio.views_suffix": "观看次数",
   "stream_audio.ytdlp_progress_downloading": "正在下载 yt-dlp...",

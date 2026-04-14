@@ -1083,6 +1083,7 @@
   "stream_audio.url_label": "URL or YouTube search query:",
   "stream_audio.open_comments": "Open comments",
   "stream_audio.view_comments": "View comments",
+  "stream_audio.load_all_comments": "Load all comments",
   "stream_audio.views_label": "Views",
   "stream_audio.views_suffix": "views",
   "stream_audio.ytdlp_progress_downloading": "Downloading yt-dlp...",

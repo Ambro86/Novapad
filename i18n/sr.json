@@ -1076,6 +1076,7 @@
   "stream_audio.url_label": "URL ili YouTube pretraga:",
   "stream_audio.open_comments": "Otvori komentare",
   "stream_audio.view_comments": "Prikaži komentare",
+  "stream_audio.load_all_comments": "Učitaj sve komentare",
   "stream_audio.views_label": "Pregledi",
   "stream_audio.views_suffix": "pregledi",
   "stream_audio.ytdlp_progress_downloading": "Preuzimanje yt-dlp...",

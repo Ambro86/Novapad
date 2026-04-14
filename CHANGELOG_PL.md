@@ -1,5 +1,10 @@
 # Dziennik zmian
 
+Wersja 0.7.0 – 2026-04-12
+
+Poprawki
+• W komentarzach YouTube otwieranych z poziomu „Odtwarzaj dźwięk ze strumienia...” Sonarpad ładuje teraz na początku tylko pierwszych 50 komentarzy głównych, zawsze wraz ze wszystkimi odpowiedziami do tych komentarzy, i dodaje na końcu pozycję umożliwiającą wczytanie wszystkich komentarzy na żądanie.
+
 Wersja 0.6.9 – 2026-04-08
 
 Poprawki
@@ -263,7 +268,7 @@ Ulepszenia
 • Ulepszono obsługę głosów Microsoft, które teraz używają dedykowanej metody odtwarzania z innym user agentem.
 • Dodano obsługę plików MP4.
 
-Wersja 0.6.0 – 20.01.2025
+Wersja 0.6.0 – 20.01.2026
 Nowe funkcje
 • Dodano sprawdzanie pisowni. Z menu kontekstowego użytkownicy mogą sprawdzić, czy bieżące słowo jest poprawne, a jeśli nie, uzyskać sugestie pisowni.
 • Dodano import i eksport podcastów przez pliki OPML.
@@ -304,7 +309,7 @@ Ulepszenia deweloperskie
 • Usunięto ręcznie pisane pomocniki parsowania bajtów; całe parsowanie bajtów używa teraz standardowych from_le_bytes / from_be_bytes na sprawdzonych wycinkach.
 Te zmiany zmniejszają niepotrzebne użycie unsafe, eliminują potencjalne niezdefiniowane zachowanie i sprawiają, że baza kodu jest bardziej idiomatyczna, solidna i łatwa w utrzymaniu.
 
-Wersja 0.5.9 - 13.01.2025
+Wersja 0.5.9 - 13.01.2026
 Nowe funkcje
 • Dodano zmianę kolejności RSS z menu kontekstowego (góra/dół/do pozycji) ze sprawdzaniem nieprawidłowej pozycji.
 • Dodano menu kontekstowe artykułu z otwieraniem oryginalnej strony i udostępnianiem przez WhatsApp, Facebook i X.

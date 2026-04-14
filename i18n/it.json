@@ -1128,6 +1128,7 @@
   "stream_audio.url_label": "URL o stringa di ricerca per YouTube:",
   "stream_audio.open_comments": "Apri commenti",
   "stream_audio.view_comments": "Visualizza commenti",
+  "stream_audio.load_all_comments": "Carica tutti i commenti",
   "stream_audio.views_label": "Visualizzazioni",
   "stream_audio.views_suffix": "visualizzazioni",
   "stream_audio.ytdlp_progress_downloading": "Scaricamento yt-dlp in corso...",

@@ -6043,8 +6043,7 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                         || state.changelog_window.0 != 0
                         || state.donations_window.0 != 0
                         || state.feedback_window.0 != 0
-                        || state.dictionary_window.0 != 0
-                        || state.podcast_window.0 != 0;
+                        || state.dictionary_window.0 != 0;
                     let secondary_open = secondary_open
                         || state.dictionary_entry_dialog.0 != 0
                         || state.go_to_time_dialog.0 != 0

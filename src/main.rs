@@ -2226,6 +2226,8 @@ fn ensure_mpv_runtime_available(hwnd: HWND) -> Result<PathBuf, String> {
 fn clear_managed_mpv_state(hwnd: HWND) {
     if with_state(hwnd, |state| {
         state.active_mpv_session = None;
+        state.active_mpv_ipc = None;
+        state.next_mpv_request_id = 1;
         state.active_podcast_episode_url = None;
         state.active_podcast_episode_media_url = None;
         state.active_podcast_title = None;
@@ -2244,64 +2246,158 @@ fn clear_managed_mpv_state(hwnd: HWND) {
     menu::update_playback_menu(hwnd, false);
 }
 
-fn send_mpv_ipc_command(ipc_path: &Path, command_json: &str) -> Result<(), String> {
+fn open_mpv_ipc_pipe(ipc_path: &Path) -> Result<std::fs::File, String> {
+    std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(ipc_path)
+        .map_err(|err| format!("Impossibile aprire il canale IPC di mpv: {err}"))
+}
+
+fn next_mpv_request_id(hwnd: HWND) -> Result<u64, String> {
+    with_state(hwnd, |state| {
+        let request_id = state.next_mpv_request_id;
+        state.next_mpv_request_id = state.next_mpv_request_id.saturating_add(1);
+        request_id
+    })
+    .ok_or_else(|| "Stato interno di Sonarpad non disponibile.".to_string())
+}
+
+fn build_mpv_ipc_message(command_json: &str, request_id: u64) -> Result<String, String> {
+    let mut value: serde_json::Value = serde_json::from_str(command_json)
+        .map_err(|err| format!("Comando IPC di mpv non valido: {err}"))?;
+    let Some(object) = value.as_object_mut() else {
+        return Err("Comando IPC di mpv non valido.".to_string());
+    };
+    object.insert(
+        "request_id".to_string(),
+        serde_json::Value::Number(serde_json::Number::from(request_id)),
+    );
+    serde_json::to_string(&value).map_err(|err| format!("Comando IPC di mpv non valido: {err}"))
+}
+
+fn read_mpv_ipc_response_with_pipe(
+    ipc_path: &Path,
+    pipe: &mut std::fs::File,
+    request_id: u64,
+) -> Result<serde_json::Value, String> {
+    use std::io::{BufRead as _, BufReader};
+
+    loop {
+        let mut reader = BufReader::new(&mut *pipe);
+        let mut response = String::new();
+        reader
+            .read_line(&mut response)
+            .map_err(|err| format!("Impossibile leggere la risposta da mpv: {err}"))?;
+        let trimmed = response.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let parsed: serde_json::Value = serde_json::from_str(trimmed)
+            .map_err(|err| format!("Risposta IPC di mpv non valida: {err}"))?;
+        let received_request_id = parsed
+            .get("request_id")
+            .and_then(|value| value.as_u64())
+            .unwrap_or_default();
+        if received_request_id != request_id {
+            log_debug(&format!(
+                "Managed mpv IPC response skipped: pipe={} expected_request_id={} actual_request_id={} response={}",
+                ipc_path.display(),
+                request_id,
+                received_request_id,
+                trimmed
+            ));
+            continue;
+        }
+        return Ok(parsed);
+    }
+}
+
+fn send_mpv_ipc_command_with_pipe(
+    hwnd: HWND,
+    ipc_path: &Path,
+    pipe: &mut std::fs::File,
+    command_json: &str,
+) -> Result<(), String> {
+    let request_id = next_mpv_request_id(hwnd)?;
+    let message = build_mpv_ipc_message(command_json, request_id)?;
     log_debug(&format!(
         "Managed mpv IPC command send: pipe={} command={}",
         ipc_path.display(),
-        command_json
+        message
     ));
-    let mut pipe = std::fs::OpenOptions::new()
-        .write(true)
-        .open(ipc_path)
-        .map_err(|err| format!("Impossibile aprire il canale IPC di mpv: {err}"))?;
     use std::io::Write as _;
-    pipe.write_all(command_json.as_bytes())
+    pipe.write_all(message.as_bytes())
         .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
     pipe.write_all(b"\n")
         .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
     pipe.flush()
         .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+    let response = read_mpv_ipc_response_with_pipe(ipc_path, pipe, request_id)?;
     log_debug(&format!(
-        "Managed mpv IPC command ok: pipe={} command={}",
+        "Managed mpv IPC command ok: pipe={} command={} response={}",
         ipc_path.display(),
-        command_json
+        message,
+        response
     ));
     Ok(())
 }
 
-fn send_mpv_ipc_request(ipc_path: &Path, command_json: &str) -> Result<serde_json::Value, String> {
-    use std::io::{BufRead as _, BufReader, Write as _};
-
+fn send_mpv_ipc_command(ipc_path: &Path, command_json: &str) -> Result<(), String> {
+    let mut pipe = open_mpv_ipc_pipe(ipc_path)?;
+    let request_id = 1;
+    let message = build_mpv_ipc_message(command_json, request_id)?;
     log_debug(&format!(
-        "Managed mpv IPC request send: pipe={} command={}",
+        "Managed mpv IPC command send: pipe={} command={}",
         ipc_path.display(),
-        command_json
+        message
     ));
-    let mut pipe = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(ipc_path)
-        .map_err(|err| format!("Impossibile aprire il canale IPC di mpv: {err}"))?;
-    pipe.write_all(command_json.as_bytes())
+    use std::io::Write as _;
+    pipe.write_all(message.as_bytes())
         .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
     pipe.write_all(b"\n")
         .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
     pipe.flush()
         .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+    let response = read_mpv_ipc_response_with_pipe(ipc_path, &mut pipe, request_id)?;
+    log_debug(&format!(
+        "Managed mpv IPC command ok: pipe={} command={} response={}",
+        ipc_path.display(),
+        message,
+        response
+    ));
+    Ok(())
+}
 
-    let mut reader = BufReader::new(pipe);
-    let mut response = String::new();
-    reader
-        .read_line(&mut response)
-        .map_err(|err| format!("Impossibile leggere la risposta da mpv: {err}"))?;
-    let trimmed = response.trim();
+fn send_mpv_ipc_request_with_pipe(
+    hwnd: HWND,
+    ipc_path: &Path,
+    pipe: &mut std::fs::File,
+    command_json: &str,
+) -> Result<serde_json::Value, String> {
+    use std::io::Write as _;
+
+    let request_id = next_mpv_request_id(hwnd)?;
+    let message = build_mpv_ipc_message(command_json, request_id)?;
+    log_debug(&format!(
+        "Managed mpv IPC request send: pipe={} command={}",
+        ipc_path.display(),
+        message
+    ));
+    pipe.write_all(message.as_bytes())
+        .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+    pipe.write_all(b"\n")
+        .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+    pipe.flush()
+        .map_err(|err| format!("Impossibile inviare il comando a mpv: {err}"))?;
+    let response = read_mpv_ipc_response_with_pipe(ipc_path, pipe, request_id)?;
     log_debug(&format!(
         "Managed mpv IPC request response: pipe={} command={} response={}",
         ipc_path.display(),
-        command_json,
-        trimmed
+        message,
+        response
     ));
-    serde_json::from_str(trimmed).map_err(|err| format!("Risposta IPC di mpv non valida: {err}"))
+    Ok(response)
 }
 
 fn is_mpv_ipc_unavailable_error(err: &str) -> bool {
@@ -2333,11 +2429,38 @@ fn invalidate_managed_mpv_session(hwnd: HWND) {
     clear_managed_mpv_state(hwnd);
 }
 
+fn ensure_managed_mpv_ipc_connected(hwnd: HWND, ipc_path: &Path) -> Result<(), String> {
+    if with_state(hwnd, |state| state.active_mpv_ipc.is_some()).unwrap_or(false) {
+        return Ok(());
+    }
+    let pipe = open_mpv_ipc_pipe(ipc_path)?;
+    if with_state(hwnd, |state| {
+        state.active_mpv_ipc = Some(pipe);
+    })
+    .is_none()
+    {
+        return Err("Impossibile salvare la connessione IPC di mpv.".to_string());
+    }
+    Ok(())
+}
+
 fn try_send_command_to_managed_mpv(hwnd: HWND, command_json: &str) -> Result<(), String> {
     let session = with_state(hwnd, |state| state.active_mpv_session.clone())
         .flatten()
         .ok_or_else(|| "Nessuna riproduzione mpv attiva.".to_string())?;
-    match send_mpv_ipc_command(&session.ipc_path, command_json) {
+    let result = ensure_managed_mpv_ipc_connected(hwnd, &session.ipc_path).and_then(|()| {
+        with_state(hwnd, |state| {
+            state
+                .active_mpv_ipc
+                .as_mut()
+                .ok_or_else(|| "Connessione IPC di mpv non disponibile.".to_string())
+                .and_then(|pipe| {
+                    send_mpv_ipc_command_with_pipe(hwnd, &session.ipc_path, pipe, command_json)
+                })
+        })
+        .unwrap_or_else(|| Err("Stato interno di Sonarpad non disponibile.".to_string()))
+    });
+    match result {
         Ok(()) => Ok(()),
         Err(err) => {
             log_debug(&format!(
@@ -2359,7 +2482,18 @@ fn query_managed_mpv_property(hwnd: HWND, property: &str) -> Result<serde_json::
         .flatten()
         .ok_or_else(|| "Nessuna riproduzione mpv attiva.".to_string())?;
     let request = format!(r#"{{"command":["get_property","{}"]}}"#, property);
-    let response = match send_mpv_ipc_request(&session.ipc_path, &request) {
+    let response = match ensure_managed_mpv_ipc_connected(hwnd, &session.ipc_path).and_then(|()| {
+        with_state(hwnd, |state| {
+            state
+                .active_mpv_ipc
+                .as_mut()
+                .ok_or_else(|| "Connessione IPC di mpv non disponibile.".to_string())
+                .and_then(|pipe| {
+                    send_mpv_ipc_request_with_pipe(hwnd, &session.ipc_path, pipe, &request)
+                })
+        })
+        .unwrap_or_else(|| Err("Stato interno di Sonarpad non disponibile.".to_string()))
+    }) {
         Ok(response) => response,
         Err(err) => {
             log_debug(&format!(
@@ -2485,11 +2619,13 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
                 editor_manager::set_current_document_title(hwnd, &display_title);
             }
             editor_manager::mark_current_document_from_rss(hwnd, true);
+            let persistent_pipe = open_mpv_ipc_pipe(&ipc_path).ok();
             if with_state(hwnd, |state| {
                 state.active_mpv_session = Some(MpvPlaybackSession {
                     ipc_path: ipc_path.clone(),
                     process_id: child.id(),
                 });
+                state.active_mpv_ipc = persistent_pipe;
                 state.active_mpv_status = Some(MpvPlaybackStatus {
                     volume: 100.0,
                     speed: 1.0,
@@ -4888,7 +5024,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
                 r#"{"command":["seek",100,"absolute-percent"]}"#,
             ),
             PlayerCommand::Volume(delta) => {
-                let volume_delta = if delta > 0.0 { 5 } else { -5 };
+                let volume_delta = if delta > 0.0 { 10 } else { -10 };
                 let result = try_send_command_to_managed_mpv(
                     hwnd,
                     &format!(r#"{{"command":["add","volume",{}]}}"#, volume_delta),
@@ -5377,6 +5513,8 @@ pub(crate) struct AppState {
     active_podcast_episode_from_rai: RaiAudioOrigin,
     raiplay_live_audio_variants: Vec<RaiPlayLiveAudioVariant>,
     active_mpv_session: Option<MpvPlaybackSession>,
+    active_mpv_ipc: Option<std::fs::File>,
+    next_mpv_request_id: u64,
     active_mpv_status: Option<MpvPlaybackStatus>,
     last_stopped_mpv_url: Option<String>,
     last_stopped_mpv_position_secs: Option<u64>,
@@ -6856,6 +6994,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_podcast_episode_from_rai: RaiAudioOrigin::None,
                     raiplay_live_audio_variants: Vec::new(),
                     active_mpv_session: None,
+                    active_mpv_ipc: None,
+                    next_mpv_request_id: 1,
                     active_mpv_status: None,
                     last_stopped_mpv_url: None,
                     last_stopped_mpv_position_secs: None,

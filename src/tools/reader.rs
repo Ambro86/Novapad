@@ -803,8 +803,24 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
 
 fn strip_post_extraction_noise(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
+    let mut skip_fatto_regwall_block = false;
+    let mut fatto_regwall_brace_depth = 0i32;
+
     for line in input.lines() {
         let trimmed = line.trim();
+        if skip_fatto_regwall_block {
+            fatto_regwall_brace_depth += brace_delta(trimmed);
+            if fatto_regwall_brace_depth < 0 {
+                skip_fatto_regwall_block = false;
+                fatto_regwall_brace_depth = 0;
+            }
+            continue;
+        }
+        if starts_fatto_regwall_noise_block(trimmed) {
+            skip_fatto_regwall_block = true;
+            fatto_regwall_brace_depth = brace_delta(trimmed);
+            continue;
+        }
         if is_known_js_noise_line(trimmed) {
             continue;
         }
@@ -812,6 +828,21 @@ fn strip_post_extraction_noise(input: &str) -> String {
         out.push('\n');
     }
     out.trim_end_matches('\n').to_string()
+}
+
+fn brace_delta(line: &str) -> i32 {
+    line.chars().fold(0i32, |acc, c| match c {
+        '{' => acc + 1,
+        '}' => acc - 1,
+        _ => acc,
+    })
+}
+
+fn starts_fatto_regwall_noise_block(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    lower.contains("softregwall")
+        || lower.starts_with("if (softregwall")
+        || lower.contains("ifq-post__label-soft-registration")
 }
 
 fn is_known_js_noise_line(line: &str) -> bool {
@@ -829,6 +860,10 @@ fn is_known_js_noise_line(line: &str) -> bool {
         || lower.contains("window.datalayer.push({")
         || lower.contains("event: 'show_paywall'")
         || lower.contains("event: \"show_paywall\"")
+        || lower.contains("category: 'regwall'")
+        || lower.contains("category: \"regwall\"")
+        || lower.contains("action: 'overlay'")
+        || lower.contains("action: \"overlay\"")
         || lower.contains("ifq-post__label-soft-registration")
         || lower.contains("visualizzazione soft regwall")
         // Radioitalia pages can leak a raw nav JSON blob into extracted text.
@@ -840,7 +875,7 @@ fn is_known_js_noise_line(line: &str) -> bool {
 mod tests {
     use super::{
         author_prefix, clamp_to_char_boundary, extract_json_values_loose, is_known_js_noise_line,
-        pick_best_json_article_text,
+        pick_best_json_article_text, strip_post_extraction_noise,
     };
     use crate::settings::Language;
 
@@ -905,9 +940,31 @@ mod tests {
         ));
         assert!(is_known_js_noise_line("window.dataLayer.push({"));
         assert!(is_known_js_noise_line("event: 'show_paywall',"));
+        assert!(is_known_js_noise_line("category: 'regwall',"));
+        assert!(is_known_js_noise_line("action: 'overlay',"));
         assert!(is_known_js_noise_line(
             "label: 'Visualizzazione soft regwall - test'"
         ));
+    }
+
+    #[test]
+    fn strip_post_extraction_noise_removes_fatto_regwall_block() {
+        let input = concat!(
+            "Prima frase utile.\n",
+            "if (softRegwall && !softRegwall.classList.contains('hidden')) {\n",
+            "window.dataLayer = window.dataLayer || [];\n",
+            "category: 'regwall',\n",
+            "action: 'overlay',\n",
+            "});\n",
+            "}\n",
+            "Seconda frase utile.\n"
+        );
+        let cleaned = strip_post_extraction_noise(input);
+        assert!(cleaned.contains("Prima frase utile."));
+        assert!(cleaned.contains("Seconda frase utile."));
+        assert!(!cleaned.contains("softRegwall"));
+        assert!(!cleaned.contains("regwall"));
+        assert!(!cleaned.contains("overlay"));
     }
 
     #[test]

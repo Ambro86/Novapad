@@ -38,6 +38,7 @@ use windows::core::PCWSTR;
 type SubtitleSpeechCancel = Arc<Mutex<Option<Arc<AtomicBool>>>>;
 type SubtitleSpeechCommand = Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<TtsCommand>>>>;
 type SubtitleSpeechHandles = (SubtitleSpeechCancel, SubtitleSpeechCommand);
+const LARGE_MP4_FORCE_FFMPEG_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 
 #[inline]
 fn ignore_bool(_value: bool) {}
@@ -771,10 +772,22 @@ fn start_audiobook_at_with_options(
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
+        let large_mp4_force_ffmpeg = extension == "mp4"
+            && final_path.is_file()
+            && final_path
+                .metadata()
+                .map(|metadata| metadata.len() >= LARGE_MP4_FORCE_FFMPEG_BYTES)
+                .unwrap_or(false);
         let prefer_precise_subtitle_backend = subtitles_active && final_path.is_file();
 
         let mut force_ffmpeg_stream = options.force_ffmpeg_stream || options.audio_track.is_some();
-        if prefer_precise_subtitle_backend && options.audio_track.is_none() {
+        if large_mp4_force_ffmpeg {
+            log_debug(&format!(
+                "Audio player: forcing FFmpeg streaming for large MP4 (>= {} bytes)",
+                LARGE_MP4_FORCE_FFMPEG_BYTES
+            ));
+            force_ffmpeg_stream = true;
+        } else if prefer_precise_subtitle_backend && options.audio_track.is_none() {
             force_ffmpeg_stream = false;
         } else if !force_ffmpeg_stream {
             // Formats that are frequently problematic with direct BASS open:

@@ -1317,6 +1317,7 @@
   "youtube.network_error": "Tinklo klaida atsisiunčiant transkriptą.",
   "youtube.no_document": "Atidarykite arba sukurkite dokumentą, į kurį norite importuoti transkriptą.",
   "youtube.no_transcript": "Šio vaizdo įrašo transkripcija nėra prieinama.",
+  "youtube.rate_limited": "„YouTube“ laikinai riboja transkripcijų atsisiuntimą. Bandykite dar kartą vėliau.",
   "youtube.ok": "Gerai",
   "youtube.title": "Importuoti „YouTube“ transkriptą",
   "youtube.url": "„YouTube“ URL:",

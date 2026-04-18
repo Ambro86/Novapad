@@ -1317,6 +1317,7 @@
   "youtube.network_error": "Lỗi mạng khi tải bản phụ đề.",
   "youtube.no_document": "Vui lòng mở hoặc tạo một tài liệu để nhập bản phụ đề.",
   "youtube.no_transcript": "Không có bản phụ đề nào cho video này.",
+  "youtube.rate_limited": "YouTube đang tạm thời giới hạn việc tải xuống bản chép lời. Vui lòng thử lại sau.",
   "youtube.ok": "Đồng ý",
   "youtube.title": "Nhập bản phụ đề YouTube",
   "youtube.url": "URL YouTube:",

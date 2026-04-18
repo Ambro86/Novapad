@@ -1317,6 +1317,7 @@
   "youtube.network_error": "Erreur réseau lors du téléchargement de la transcription.",
   "youtube.no_document": "Ouvrez ou créez un document pour importer la transcription.",
   "youtube.no_transcript": "Aucune transcription disponible pour cette vidéo.",
+  "youtube.rate_limited": "YouTube limite temporairement le téléchargement des transcriptions. Veuillez réessayer plus tard.",
   "youtube.ok": "OK",
   "youtube.title": "Importer une transcription YouTube",
   "youtube.url": "URL YouTube :",

@@ -1317,6 +1317,7 @@
   "youtube.network_error": "Greška u mreži prilikom preuzimanja transkripta.",
   "youtube.no_document": "Otvori ili napravi dokument da uvezeš transkript.",
   "youtube.no_transcript": "Nema dostupnog transkripta za ovaj video.",
+  "youtube.rate_limited": "YouTube privremeno ograničava preuzimanje transkripata. Pokušajte ponovo kasnije.",
   "youtube.ok": "U redu",
   "youtube.title": "Uvezi YouTube transkript.",
   "youtube.url": "YouTube link:",

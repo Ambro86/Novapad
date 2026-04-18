@@ -1317,6 +1317,7 @@
   "youtube.network_error": "Сетевая ошибка при загрузке транскрипции.",
   "youtube.no_document": "Откройте или создайте документ для импорта транскрипции.",
   "youtube.no_transcript": "Для этого видео нет доступной транскрипции.",
+  "youtube.rate_limited": "YouTube временно ограничивает загрузку транскрипций. Попробуйте позже.",
   "youtube.ok": "ОК",
   "youtube.title": "Импорт транскрипции YouTube",
   "youtube.url": "URL YouTube:",

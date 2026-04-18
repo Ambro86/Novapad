@@ -1317,6 +1317,7 @@
   "youtube.network_error": "Nätverksfel vid nedladdning av transkriptering.",
   "youtube.no_document": "Öppna eller skapa ett dokument för att importera transkripteringen.",
   "youtube.no_transcript": "Ingen transkriptering tillgänglig för denna video.",
+  "youtube.rate_limited": "YouTube begränsar tillfälligt nedladdning av transkriptioner. Försök igen senare.",
   "youtube.ok": "OK",
   "youtube.title": "Importera YouTube-transkriptering",
   "youtube.url": "YouTube-URL:",

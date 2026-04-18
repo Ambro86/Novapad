@@ -1324,6 +1324,7 @@
   "youtube.network_error": "Network error while downloading the transcript.",
   "youtube.no_document": "Open or create a document to import the transcript.",
   "youtube.no_transcript": "No transcript available for this video.",
+  "youtube.rate_limited": "YouTube is temporarily limiting transcript downloads. Please try again later.",
   "youtube.ok": "OK",
   "youtube.title": "Import YouTube transcript",
   "youtube.url": "YouTube URL:",

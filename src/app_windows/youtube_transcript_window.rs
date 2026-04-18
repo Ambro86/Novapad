@@ -158,6 +158,7 @@ struct Labels {
     auto: String,
     invalid_url: String,
     no_transcript: String,
+    rate_limited: String,
     import_error: String,
     no_document: String,
     ytdlp_prompt_download: String,
@@ -176,6 +177,7 @@ struct YtSubtitleOption {
 }
 
 fn labels(language: Language) -> Labels {
+    let rate_limited = i18n::tr(language, "youtube.rate_limited");
     Labels {
         title: i18n::tr(language, "youtube.title"),
         url: i18n::tr(language, "youtube.url"),
@@ -189,6 +191,11 @@ fn labels(language: Language) -> Labels {
         auto: i18n::tr(language, "youtube.auto"),
         invalid_url: i18n::tr(language, "youtube.invalid_url"),
         no_transcript: i18n::tr(language, "youtube.no_transcript"),
+        rate_limited: if rate_limited == "youtube.rate_limited" {
+            i18n::tr(language, "youtube.import_error")
+        } else {
+            rate_limited
+        },
         import_error: i18n::tr(language, "youtube.import_error"),
         no_document: i18n::tr(language, "youtube.no_document"),
         ytdlp_prompt_download: i18n::tr(language, "youtube.ytdlp_prompt_download"),
@@ -997,6 +1004,7 @@ fn start_load_languages(hwnd: HWND) -> bool {
 
 fn finish_load_languages(hwnd: HWND, result: LoadResult) {
     let mut language = Language::English;
+    let mut parent = HWND(0);
     let mut edit = HWND(0);
     let mut ok_button = HWND(0);
     let mut load_button = HWND(0);
@@ -1005,6 +1013,7 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
     let mut status = HWND(0);
 
     let state_ok = with_import_state(hwnd, |state| {
+        parent = state.parent;
         edit = state.url_edit;
         ok_button = state.ok_button;
         load_button = state.load_button;
@@ -1036,7 +1045,9 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
     if let Some(err) = result.error {
         crate::log_debug(&format!("YouTube transcript error: {:?}", err));
         unsafe {
-            show_error(hwnd, language, &error_message(language, &err));
+            let owner = if parent.0 != 0 { parent } else { hwnd };
+            show_error(owner, language, &error_message(language, &err));
+            ShowWindow(hwnd, SW_SHOW);
             SetForegroundWindow(hwnd);
             if edit.0 != 0 {
                 SetFocus(edit);
@@ -1325,6 +1336,7 @@ fn start_load_transcript_text(
 
 fn finish_load_text(hwnd: HWND, result: TextLoadResult) {
     let mut language = Language::English;
+    let mut parent = HWND(0);
     let mut edit = HWND(0);
     let mut ok_button = HWND(0);
     let mut load_button = HWND(0);
@@ -1333,6 +1345,7 @@ fn finish_load_text(hwnd: HWND, result: TextLoadResult) {
     let mut status = HWND(0);
 
     let state_ok = with_import_state(hwnd, |state| {
+        parent = state.parent;
         edit = state.url_edit;
         ok_button = state.ok_button;
         load_button = state.load_button;
@@ -1364,8 +1377,15 @@ fn finish_load_text(hwnd: HWND, result: TextLoadResult) {
     if let Some(err) = result.error {
         crate::log_debug(&format!("YouTube transcript text error: {:?}", err));
         unsafe {
-            show_error(hwnd, language, &error_message(language, &err));
+            let owner = if parent.0 != 0 { parent } else { hwnd };
+            show_error(owner, language, &error_message(language, &err));
+            ShowWindow(hwnd, SW_SHOW);
             SetForegroundWindow(hwnd);
+            if edit.0 != 0 {
+                SetFocus(edit);
+            } else if combo.0 != 0 {
+                SetFocus(combo);
+            }
         }
         return;
     }
@@ -8845,6 +8865,7 @@ fn is_subtitle_format_token(token: &str) -> bool {
 enum ImportError {
     InvalidUrl,
     NoTranscript,
+    RateLimited,
     YtdlpUnavailable,
     Other(String),
 }
@@ -8932,6 +8953,13 @@ fn fetch_transcript_text_with_ytdlp(
             cleanup_ytdlp_temp_dir(&temp_dir);
             return Err(ImportError::NoTranscript);
         }
+        if combined.contains("HTTP Error 429")
+            || combined.contains("Too Many Requests")
+            || combined.contains("too many requests")
+        {
+            cleanup_ytdlp_temp_dir(&temp_dir);
+            return Err(ImportError::RateLimited);
+        }
         cleanup_ytdlp_temp_dir(&temp_dir);
         return Err(ImportError::Other(combined.trim().to_string()));
     }
@@ -8967,6 +8995,7 @@ fn error_message(language: Language, err: &ImportError) -> String {
     match err {
         ImportError::InvalidUrl => labels.invalid_url,
         ImportError::NoTranscript => labels.no_transcript,
+        ImportError::RateLimited => labels.rate_limited,
         ImportError::YtdlpUnavailable => labels.ytdlp_download_failed,
         ImportError::Other(msg) => {
             crate::log_debug(&format!("YouTube transcript import error: {}", msg));

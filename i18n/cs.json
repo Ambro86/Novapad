@@ -1317,6 +1317,7 @@
   "youtube.network_error": "Chyba sítě při stahování přepisu.",
   "youtube.no_document": "Otevřete nebo vytvořte dokument pro import přepisu.",
   "youtube.no_transcript": "Pro toto video není k dispozici žádný přepis.",
+  "youtube.rate_limited": "YouTube dočasně omezuje stahování přepisů. Zkuste to prosím znovu později.",
   "youtube.ok": "OK",
   "youtube.title": "Importovat přepis z YouTube",
   "youtube.url": "URL YouTube:",

@@ -1317,6 +1317,7 @@
   "youtube.network_error": "下载字幕文件时发生网络错误。",
   "youtube.no_document": "打开或创建文档以导入字幕文本。",
   "youtube.no_transcript": "本视频暂无字幕。",
+  "youtube.rate_limited": "YouTube 暂时限制字幕下载。请稍后重试。",
   "youtube.ok": "好的",
   "youtube.title": "导入YouTube字幕",
   "youtube.url": "YouTube 网址：",

@@ -1317,6 +1317,7 @@
   "youtube.network_error": "Błąd sieci podczas pobierania transkrypcji.",
   "youtube.no_document": "Otwórz lub utwórz dokument, aby zaimportować transkrypcję.",
   "youtube.no_transcript": "Brak dostępnej transkrypcji dla tego wideo.",
+  "youtube.rate_limited": "YouTube tymczasowo ogranicza pobieranie transkrypcji. Spróbuj ponownie później.",
   "youtube.ok": "OK",
   "youtube.title": "Importuj transkrypcję YouTube",
   "youtube.url": "URL YouTube:",

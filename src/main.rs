@@ -2592,6 +2592,9 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
     );
     let ipc_path = PathBuf::from(format!(r"\\.\pipe\{ipc_name}"));
 
+    if is_mpv_playback_active(hwnd) {
+        stop_managed_mpv_playback(hwnd);
+    }
     if with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false) {
         crate::audio_player::stop_audiobook_playback(hwnd);
     }
@@ -7234,7 +7237,6 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                             handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
                             prefetch_dictionary_for_selection(hwnd, hdr.hwndFrom);
                             trigger_spellcheck_highlight(hwnd, hdr.hwndFrom);
-                            update_main_status_bar(hwnd);
                         }
                     }
                     return LRESULT(0);

@@ -1317,6 +1317,7 @@
   "youtube.network_error": "Erro de rede ao transferir a transcrição.",
   "youtube.no_document": "Abra ou crie um documento para importar a transcrição.",
   "youtube.no_transcript": "Sem transcrição disponível para este vídeo.",
+  "youtube.rate_limited": "O YouTube está a limitar temporariamente o download de transcrições. Tenta novamente mais tarde.",
   "youtube.ok": "OK",
   "youtube.title": "Importar transcrição do YouTube",
   "youtube.url": "URL do YouTube:",

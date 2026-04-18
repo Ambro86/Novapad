@@ -1317,6 +1317,7 @@
   "youtube.network_error": "Помилка мережі під час завантаження тексту відео.",
   "youtube.no_document": "Відкрийте або створіть документ для імпорту тексту відео.",
   "youtube.no_transcript": "Текст відео недоступний.",
+  "youtube.rate_limited": "YouTube тимчасово обмежує завантаження транскрипцій. Спробуйте пізніше.",
   "youtube.ok": "OK",
   "youtube.title": "Імпорт тексту відео з YouTube",
   "youtube.url": "URL YouTube:",

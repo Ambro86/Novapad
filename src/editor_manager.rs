@@ -1157,6 +1157,7 @@ pub struct Document {
     pub from_find_in_files: bool,
     pub is_temporary: bool,
     pub prefer_title_for_save_suggestion: bool,
+    pub prefer_mpv_playback: bool,
 }
 
 #[derive(Clone)]
@@ -1183,6 +1184,7 @@ impl Default for Document {
             from_find_in_files: false,
             is_temporary: false,
             prefer_title_for_save_suggestion: false,
+            prefer_mpv_playback: false,
         }
     }
 }
@@ -3072,6 +3074,7 @@ pub fn new_document(hwnd: HWND) {
                 from_find_in_files: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
+                prefer_mpv_playback: false,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -3115,6 +3118,7 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
                 from_find_in_files: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
+                prefer_mpv_playback: false,
             };
             SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
             ShowWindow(hwnd_edit, SW_HIDE);
@@ -3393,6 +3397,19 @@ pub fn mark_current_document_from_italiaonline(hwnd: HWND, from_italiaonline: bo
     }
 }
 
+pub fn mark_current_document_prefer_mpv_playback(hwnd: HWND, prefer_mpv_playback: bool) {
+    let result = {
+        with_state(hwnd, |state| {
+            if let Some(doc) = state.docs.get_mut(state.current) {
+                doc.prefer_mpv_playback = prefer_mpv_playback;
+            }
+        })
+    };
+    if result.is_none() {
+        crate::log_debug("Failed to access editor state");
+    }
+}
+
 pub fn set_current_document_title(hwnd: HWND, title: &str) {
     let new_title = title.trim();
     if new_title.is_empty() {
@@ -3492,6 +3509,7 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
                 from_find_in_files: false,
                 is_temporary: true,
                 prefer_title_for_save_suggestion: false,
+                prefer_mpv_playback: false,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);

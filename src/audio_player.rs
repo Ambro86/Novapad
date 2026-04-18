@@ -1272,7 +1272,8 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
             }
             let path = doc.path.clone()?;
             let current_url = path.to_string_lossy().into_owned();
-            let should_resume_raiplay_in_mpv = crate::is_direct_stream_url_path(&path)
+            let should_resume_raiplay_in_mpv = doc.prefer_mpv_playback
+                && crate::is_direct_stream_url_path(&path)
                 && state.raiplay_live_audio_variants.is_empty()
                 && (state.active_podcast_episode_from_rai == crate::RaiAudioOrigin::RaiPlay
                     || state

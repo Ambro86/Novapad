@@ -2623,6 +2623,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
                 editor_manager::set_current_document_title(hwnd, &display_title);
             }
             editor_manager::mark_current_document_from_rss(hwnd, true);
+            editor_manager::mark_current_document_prefer_mpv_playback(hwnd, true);
             let persistent_pipe = open_mpv_ipc_pipe(&ipc_path).ok();
             if with_state(hwnd, |state| {
                 state.active_mpv_session = Some(MpvPlaybackSession {
@@ -14122,6 +14123,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 from_find_in_files: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
+                prefer_mpv_playback: false,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -14358,6 +14360,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 from_find_in_files: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
+                prefer_mpv_playback: false,
             };
             state.docs.push(doc);
             if large_file_no_wrap {

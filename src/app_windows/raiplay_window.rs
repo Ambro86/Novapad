@@ -309,7 +309,8 @@ fn open_media_item(
     } else {
         Some(title.to_string())
     };
-    let container_title = preferred_container_title(page, item);
+    let container_title =
+        dedupe_raiplay_container_title(preferred_container_title(page, item), title.as_deref());
     let playback_target = match raiplay::resolve_playback_target(media_url) {
         Ok(target) => target,
         Err(err) => {
@@ -375,6 +376,21 @@ fn open_media_item(
         }
     };
     true
+}
+
+fn dedupe_raiplay_container_title(
+    container_title: Option<String>,
+    item_title: Option<&str>,
+) -> Option<String> {
+    let container_title = container_title?;
+    let Some(item_title) = item_title.map(str::trim).filter(|title| !title.is_empty()) else {
+        return Some(container_title);
+    };
+    if container_title.trim().eq_ignore_ascii_case(item_title) {
+        None
+    } else {
+        Some(container_title)
+    }
 }
 
 fn preferred_container_title(page: &BrowsePage, item: &BrowseItem) -> Option<String> {

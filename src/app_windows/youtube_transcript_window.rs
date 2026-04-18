@@ -1056,6 +1056,19 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
         return;
     }
 
+    let ui_language_code = youtube_ui_language_code(language);
+    let default_selection = result
+        .transcripts
+        .iter()
+        .position(|transcript| transcript.code.ends_with("-orig"))
+        .or_else(|| {
+            result
+                .transcripts
+                .iter()
+                .position(|transcript| transcript.code == ui_language_code)
+        })
+        .unwrap_or(0);
+
     unsafe {
         SendMessageW(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         for transcript in result.transcripts.iter() {
@@ -1071,7 +1084,7 @@ fn finish_load_languages(hwnd: HWND, result: LoadResult) {
                 LPARAM(wide.as_ptr() as isize),
             );
         }
-        SendMessageW(combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(combo, CB_SETCURSEL, WPARAM(default_selection), LPARAM(0));
         SetFocus(combo);
     }
 

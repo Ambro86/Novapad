@@ -1020,6 +1020,9 @@ fn start_audiobook_at_with_options(
 
 pub fn start_audiobook_playback(hwnd: HWND, path: &Path) {
     {
+        if crate::is_mpv_playback_active(hwnd) {
+            crate::stop_managed_mpv_playback(hwnd);
+        }
         // Record telemetry
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("audio");
         crate::telemetry::record_action("audio_play", ext);

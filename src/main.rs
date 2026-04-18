@@ -2592,6 +2592,10 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
     );
     let ipc_path = PathBuf::from(format!(r"\\.\pipe\{ipc_name}"));
 
+    if with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false) {
+        crate::audio_player::stop_audiobook_playback(hwnd);
+    }
+
     let mut command = std::process::Command::new(&mpv_exe);
     command
         .current_dir(&mpv_dir)

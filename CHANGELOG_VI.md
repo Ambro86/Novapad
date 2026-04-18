@@ -4,6 +4,7 @@ Phiên bản 0.7.0 – 2026-04-12
 
 Bản sửa lỗi
 • Trong phần bình luận YouTube mở từ "Phat am thanh tu streaming...", Sonarpad giờ chỉ tải trước 50 bình luận gốc đầu tiên, luôn kèm toàn bộ phản hồi của các bình luận đó, và thêm ở cuối một mục để tải tất cả bình luận khi cần.
+• Dấu trang giờ được hiển thị và xử lý theo vị trí của chúng trong cả tài liệu văn bản lẫn tệp đa phương tiện, thay vì theo thứ tự tạo. Nếu đã có dấu trang ở cùng vị trí, nó sẽ không được thêm lại nữa.
 
 Phiên bản 0.6.9 – 2026-04-08
 

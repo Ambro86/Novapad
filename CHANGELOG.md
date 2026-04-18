@@ -9,6 +9,7 @@ Fixes
 • Fixed `F10` so it once again switches to the next favorite voice during text reading.
 • When a podcast recording is in progress, closing another document no longer also closes the active recording.
 • In YouTube comments opened from "Play streaming audio...", Sonarpad now loads only the first 50 top-level comments at first, always including all replies for those comments, and adds a final item to load all comments on demand.
+• Bookmarks are now shown and handled in position order for both text documents and media files, instead of following creation order. If a bookmark already exists at the same position, it is no longer added again.
 
 Version 0.6.9 – 2026-04-08
 

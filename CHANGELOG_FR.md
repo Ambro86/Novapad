@@ -4,6 +4,7 @@ Version 0.7.0 – 2026-04-12
 
 Corrections
 • Dans les commentaires YouTube ouverts depuis « Lire l'audio en streaming... », Sonarpad charge maintenant au départ seulement les 50 premiers commentaires principaux, en incluant toujours toutes les réponses à ces commentaires, et ajoute à la fin une entrée permettant de charger tous les commentaires à la demande.
+• Les signets sont désormais affichés et gérés selon leur position, aussi bien dans les documents texte que dans les fichiers multimédias, au lieu de suivre l'ordre de création. Si un signet existe déjà à la même position, il n'est plus ajouté une seconde fois.
 
 Version 0.6.9 – 2026-04-08
 

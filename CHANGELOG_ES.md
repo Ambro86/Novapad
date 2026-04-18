@@ -4,6 +4,7 @@ Versión 0.7.0 – 2026-04-12
 
 Correcciones
 • En los comentarios de YouTube abiertos desde "Reproducir audio en streaming...", Sonarpad ahora carga inicialmente solo los primeros 50 comentarios principales, incluyendo siempre todas las respuestas de esos comentarios, y añade al final una opción para cargar todos los comentarios bajo demanda.
+• Los marcadores ahora se muestran y se gestionan según su posición tanto en documentos de texto como en archivos multimedia, en lugar de seguir el orden de creación. Si ya existe un marcador en la misma posición, ya no se vuelve a añadir.
 
 Versión 0.6.9 – 2026-04-08
 

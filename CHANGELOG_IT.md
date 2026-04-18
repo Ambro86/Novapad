@@ -9,6 +9,7 @@ Correzioni
 • Corretto il tasto `F10`, che ora torna a passare alla voce preferita successiva durante la lettura del testo.
 • Quando è in corso una registrazione podcast, chiudendo un altro documento non viene più chiusa anche la registrazione attiva.
 • Nei commenti YouTube aperti da "Riproduci audio da streaming...", Sonarpad ora carica inizialmente solo i primi 50 commenti principali, includendo sempre tutte le risposte di quei commenti, e aggiunge in fondo una voce per caricare tutti i commenti su richiesta.
+• I segnalibri ora vengono mostrati e gestiti in ordine di posizione sia nei documenti di testo sia nei file multimediali, invece di seguire l'ordine di creazione. Se un segnalibro esiste già nella stessa posizione, non viene più aggiunto di nuovo.
 
 Versione 0.6.9 – 2026-04-08
 

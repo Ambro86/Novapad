@@ -14,6 +14,16 @@ pub struct BookmarkStore {
     pub files: HashMap<String, Vec<Bookmark>>,
 }
 
+pub fn sort_bookmarks(bookmarks: &mut [Bookmark]) {
+    bookmarks.sort_by_key(|bookmark| bookmark.position);
+}
+
+pub fn normalize_store(store: &mut BookmarkStore) {
+    for bookmarks in store.files.values_mut() {
+        sort_bookmarks(bookmarks);
+    }
+}
+
 fn bookmark_store_path() -> Option<PathBuf> {
     let mut path = crate::settings::settings_dir();
     path.push("bookmarks.json");
@@ -28,7 +38,9 @@ pub fn load_bookmarks() -> BookmarkStore {
     let Some(data) = data else {
         return BookmarkStore::default();
     };
-    serde_json::from_str(&data).unwrap_or_default()
+    let mut store = serde_json::from_str(&data).unwrap_or_default();
+    normalize_store(&mut store);
+    store
 }
 
 pub fn save_bookmarks(store: &BookmarkStore) {
@@ -38,7 +50,11 @@ pub fn save_bookmarks(store: &BookmarkStore) {
     if let Some(parent) = path.parent() {
         crate::log_if_err!(std::fs::create_dir_all(parent));
     }
-    if let Ok(json) = serde_json::to_string_pretty(store) {
+    let mut normalized = BookmarkStore {
+        files: store.files.clone(),
+    };
+    normalize_store(&mut normalized);
+    if let Ok(json) = serde_json::to_string_pretty(&normalized) {
         crate::log_if_err!(std::fs::write(path, json));
     }
 }

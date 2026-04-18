@@ -4,6 +4,7 @@ Wersja 0.7.0 – 2026-04-12
 
 Poprawki
 • W komentarzach YouTube otwieranych z poziomu „Odtwarzaj dźwięk ze strumienia...” Sonarpad ładuje teraz na początku tylko pierwszych 50 komentarzy głównych, zawsze wraz ze wszystkimi odpowiedziami do tych komentarzy, i dodaje na końcu pozycję umożliwiającą wczytanie wszystkich komentarzy na żądanie.
+• Zakładki są teraz wyświetlane i obsługiwane według pozycji zarówno w dokumentach tekstowych, jak i w plikach multimedialnych, zamiast według kolejności utworzenia. Jeśli zakładka już istnieje w tej samej pozycji, nie jest dodawana ponownie.
 
 Wersja 0.6.9 – 2026-04-08
 

@@ -13378,24 +13378,33 @@ fn insert_bookmark(hwnd: HWND) {
                 timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
             };
 
-            let bookmarks_window = with_state(hwnd, |state| {
+            let (bookmarks_window, inserted) = with_state(hwnd, |state| {
                 let list = state
                     .bookmarks
                     .files
                     .entry(storage_key.clone())
                     .or_default();
+                if list
+                    .iter()
+                    .any(|existing| existing.position == bookmark.position)
+                {
+                    return (state.bookmarks_window, false);
+                }
                 list.push(bookmark);
+                crate::bookmarks::sort_bookmarks(list);
                 if persist_to_disk {
                     save_bookmarks(&state.bookmarks);
                 }
-                state.bookmarks_window
+                (state.bookmarks_window, true)
             })
-            .unwrap_or(HWND(0));
+            .unwrap_or((HWND(0), false));
 
-            if bookmarks_window.0 != 0 {
+            if inserted && bookmarks_window.0 != 0 {
                 app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
             }
-            confirm_menu_action(hwnd, "insert.bookmark");
+            if inserted {
+                confirm_menu_action(hwnd, "insert.bookmark");
+            }
             return;
         }
 
@@ -13465,24 +13474,33 @@ fn insert_bookmark(hwnd: HWND) {
             timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         };
 
-        let bookmarks_window = with_state(hwnd, |state| {
+        let (bookmarks_window, inserted) = with_state(hwnd, |state| {
             let list = state
                 .bookmarks
                 .files
                 .entry(storage_key.clone())
                 .or_default();
+            if list
+                .iter()
+                .any(|existing| existing.position == bookmark.position)
+            {
+                return (state.bookmarks_window, false);
+            }
             list.push(bookmark);
+            crate::bookmarks::sort_bookmarks(list);
             if persist_to_disk {
                 save_bookmarks(&state.bookmarks);
             }
-            state.bookmarks_window
+            (state.bookmarks_window, true)
         })
-        .unwrap_or(HWND(0));
+        .unwrap_or((HWND(0), false));
 
-        if bookmarks_window.0 != 0 {
+        if inserted && bookmarks_window.0 != 0 {
             app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
         }
-        confirm_menu_action(hwnd, "insert.bookmark");
+        if inserted {
+            confirm_menu_action(hwnd, "insert.bookmark");
+        }
     }
 }
 

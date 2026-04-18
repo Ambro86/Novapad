@@ -9,6 +9,7 @@ Opravy
 • Opravena klávesa `F10`, takže při čtení textu znovu přepíná na další oblíbený hlas.
 • Když probíhá nahrávání podcastu, zavření jiného dokumentu už nezavře také aktivní nahrávání.
 • V komentářích YouTube otevřených z „Přehrát streamované audio...“ nyní Sonarpad nejprve načte pouze prvních 50 komentářů nejvyšší úrovně, vždy včetně všech odpovědí k těmto komentářům, a na konci přidá položku pro načtení všech komentářů podle potřeby.
+• Záložky se nyní zobrazují a zpracovávají podle své pozice jak v textových dokumentech, tak v multimediálních souborech, místo aby sledovaly pořadí vytvoření. Pokud už záložka na stejné pozici existuje, znovu se nepřidá.
 
 Verze 0.6.9 – 2026-04-08
 

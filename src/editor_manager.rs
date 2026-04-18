@@ -4275,9 +4275,12 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                 state
                     .bookmarks
                     .files
-                    .entry(new_bookmark_key)
+                    .entry(new_bookmark_key.clone())
                     .or_default()
                     .append(&mut moved);
+                if let Some(list) = state.bookmarks.files.get_mut(&new_bookmark_key) {
+                    crate::bookmarks::sort_bookmarks(list);
+                }
                 if new_bookmark_persist {
                     crate::bookmarks::save_bookmarks(&state.bookmarks);
                 }

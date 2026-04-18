@@ -2,6 +2,9 @@
 
 Version 0.7.0 – 2026-04-12
 
+Nouveautés
+• Ajout de la possibilité d’enregistrer l’audio provenant d’une seule application sans enregistrer aussi celui des autres. C’est très utile, par exemple, pour enregistrer localement une conférence Zoom sans enregistrer également tout ce qui est lu par les autres applications. Cette option est intégrée à l’enregistrement normal, il reste donc possible d’activer ou de désactiver le microphone séparément.
+
 Corrections
 • Dans les commentaires YouTube ouverts depuis « Lire l'audio en streaming... », Sonarpad charge maintenant au départ seulement les 50 premiers commentaires principaux, en incluant toujours toutes les réponses à ces commentaires, et ajoute à la fin une entrée permettant de charger tous les commentaires à la demande.
 • Les signets sont désormais affichés et gérés selon leur position, aussi bien dans les documents texte que dans les fichiers multimédias, au lieu de suivre l'ordre de création. Si un signet existe déjà à la même position, il n'est plus ajouté une seconde fois.

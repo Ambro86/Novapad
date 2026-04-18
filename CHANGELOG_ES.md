@@ -2,6 +2,9 @@
 
 Versión 0.7.0 – 2026-04-12
 
+Novedades
+• Añadida la posibilidad de grabar el audio procedente de una sola aplicación sin grabar también el de las demás. Es muy útil, por ejemplo, para grabar localmente una conferencia de Zoom sin grabar también todo lo que reproducen otras aplicaciones. Esta opción está integrada con la grabación normal, por lo que sigue siendo posible activar o desactivar el micrófono por separado.
+
 Correcciones
 • En los comentarios de YouTube abiertos desde "Reproducir audio en streaming...", Sonarpad ahora carga inicialmente solo los primeros 50 comentarios principales, incluyendo siempre todas las respuestas de esos comentarios, y añade al final una opción para cargar todos los comentarios bajo demanda.
 • Los marcadores ahora se muestran y se gestionan según su posición tanto en documentos de texto como en archivos multimedia, en lugar de seguir el orden de creación. Si ya existe un marcador en la misma posición, ya no se vuelve a añadir.

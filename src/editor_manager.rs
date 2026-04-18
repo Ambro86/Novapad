@@ -3547,6 +3547,7 @@ pub fn select_tab(hwnd: HWND, index: usize) {
         crate::menu::update_playback_menu(hwnd, is_audiobook);
         layout_children(hwnd);
         crate::update_main_status_bar(hwnd);
+        crate::restore_transcription_progress_focus_for_current_document(hwnd);
     }
 }
 

@@ -3844,6 +3844,46 @@ pub(crate) fn current_playback_media_path(hwnd: HWND) -> Option<PathBuf> {
     .flatten()
 }
 
+pub(crate) fn restore_transcription_progress_focus_for_current_document(hwnd: HWND) {
+    let (progress_hwnd, transcription_in_progress, transcription_media_path, current_doc_path) =
+        with_state(hwnd, |state| {
+            let current_doc_path = state.docs.get(state.current).and_then(|doc| {
+                if matches!(doc.format, FileFormat::Audiobook) {
+                    doc.path.clone()
+                } else {
+                    None
+                }
+            });
+            (
+                state.transcription_progress_window,
+                state.transcription_in_progress,
+                state.transcription_media_path.clone(),
+                current_doc_path,
+            )
+        })
+        .unwrap_or((HWND(0), false, None, None));
+
+    if !transcription_in_progress || progress_hwnd.0 == 0 || !is_window_handle_valid(progress_hwnd)
+    {
+        return;
+    }
+
+    let Some(transcription_media_path) = transcription_media_path else {
+        return;
+    };
+    let Some(current_doc_path) = current_doc_path else {
+        return;
+    };
+
+    if current_doc_path != transcription_media_path {
+        return;
+    }
+
+    show_window_safe(progress_hwnd, SW_SHOW);
+    set_foreground_window_safe(progress_hwnd);
+    app_windows::podcast_save_window::focus_cancel_button(progress_hwnd);
+}
+
 fn is_stream_cache_media(path: &Path) -> bool {
     let name = path
         .file_name()
@@ -4029,6 +4069,7 @@ fn cancel_whisper_transcription(hwnd: HWND) {
         if let Some(cancel) = state.transcription_cancel.as_ref() {
             cancel.store(true, Ordering::Relaxed);
         }
+        state.transcription_media_path = None;
         state.settings.language
     })
     .unwrap_or_default();
@@ -4058,12 +4099,13 @@ pub(crate) fn open_whisper_progress_window_with_labels(
     labels: app_windows::podcast_save_window::SaveDialogLabels,
     show_status_field: bool,
 ) {
-    let dialog = app_windows::podcast_save_window::open_with_labels_and_status_field(
+    let dialog = app_windows::podcast_save_window::open_with_labels_and_status_field_parent_mode(
         hwnd,
         language,
         labels,
         true,
         show_status_field,
+        false,
     );
     with_state(hwnd, |state| {
         state.transcription_progress_window = dialog;
@@ -4211,6 +4253,7 @@ fn start_whisper_transcription(hwnd: HWND) {
         }
         state.transcription_cancel = Some(cancel_flag.clone());
         state.transcription_in_progress = true;
+        state.transcription_media_path = Some(media_path.clone());
     });
     open_whisper_progress_window(hwnd, language);
     update_whisper_progress_window(hwnd, 0);
@@ -4448,6 +4491,7 @@ fn start_whisper_folder_transcription(hwnd: HWND) {
         }
         state.transcription_cancel = Some(cancel_flag.clone());
         state.transcription_in_progress = true;
+        state.transcription_media_path = Some(media_path.clone());
     });
 
     let labels = app_windows::podcast_save_window::SaveDialogLabels {
@@ -4612,6 +4656,7 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
     let language = with_state(hwnd, |state| {
         state.transcription_in_progress = false;
         state.transcription_cancel = None;
+        state.transcription_media_path = None;
         state.settings.language
     })
     .unwrap_or_default();
@@ -5542,6 +5587,7 @@ pub(crate) struct AppState {
     audio_unexpected_stop_retry_for: Option<PathBuf>,
     transcription_cancel: Option<Arc<AtomicBool>>,
     transcription_in_progress: bool,
+    transcription_media_path: Option<PathBuf>,
     dictation_recorder: Option<podcast_recorder::RecorderHandle>,
     dictation_target_edit: HWND,
     dictation_cancel: Option<Arc<AtomicBool>>,
@@ -7023,6 +7069,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     audio_unexpected_stop_retry_for: None,
                     transcription_cancel: None,
                     transcription_in_progress: false,
+                    transcription_media_path: None,
                     dictation_recorder: None,
                     dictation_target_edit: HWND(0),
                     dictation_cancel: None,

@@ -45,6 +45,7 @@ struct SaveCreateParams {
     labels: SaveDialogLabels,
     show_cancel: bool,
     show_status_field: bool,
+    disable_parent: bool,
 }
 
 struct SaveState {
@@ -62,6 +63,7 @@ struct SaveState {
     labels: SaveDialogLabels,
     show_cancel: bool,
     suppress_parent_restore: bool,
+    disable_parent: bool,
 }
 
 fn save_labels(language: Language) -> SaveDialogLabels {
@@ -182,6 +184,7 @@ pub fn open(parent: HWND) -> HWND {
             labels,
             show_cancel: true,
             show_status_field: false,
+            disable_parent: true,
         });
         let params_ptr = Box::into_raw(params);
         let window = CreateWindowExW(
@@ -248,6 +251,24 @@ pub fn open_with_labels_and_status_field(
     show_cancel: bool,
     show_status_field: bool,
 ) -> HWND {
+    open_with_labels_and_status_field_parent_mode(
+        parent,
+        language,
+        labels,
+        show_cancel,
+        show_status_field,
+        true,
+    )
+}
+
+pub fn open_with_labels_and_status_field_parent_mode(
+    parent: HWND,
+    language: Language,
+    labels: SaveDialogLabels,
+    show_cancel: bool,
+    show_status_field: bool,
+    disable_parent: bool,
+) -> HWND {
     unsafe {
         let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
         let class_name = to_wide(SAVE_CLASS_NAME);
@@ -269,6 +290,7 @@ pub fn open_with_labels_and_status_field(
             labels,
             show_cancel,
             show_status_field,
+            disable_parent,
         });
         let params_ptr = Box::into_raw(params);
         let window = CreateWindowExW(
@@ -290,7 +312,9 @@ pub fn open_with_labels_and_status_field(
             return window;
         }
 
-        EnableWindow(parent, false);
+        if disable_parent {
+            EnableWindow(parent, false);
+        }
         SetForegroundWindow(window);
 
         let mut rc_parent = RECT::default();
@@ -344,6 +368,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             let labels = params.labels;
             let show_cancel = params.show_cancel;
             let show_status_field = params.show_status_field;
+            let disable_parent = params.disable_parent;
             let main = crate::get_parent_safe(parent);
             let hfont = { with_state(main, |state| state.hfont) }.unwrap_or(HFONT(0));
             let label_text = format!("{} 0%", labels.in_progress);
@@ -471,6 +496,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 labels,
                 show_cancel,
                 suppress_parent_restore: false,
+                disable_parent,
             };
             unsafe {
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(Box::new(state)) as isize);
@@ -620,28 +646,30 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            let (parent, show_cancel, suppress_parent_restore) = with_save_state(hwnd, |state| {
-                (
-                    state.parent,
-                    state.show_cancel,
-                    state.suppress_parent_restore,
-                )
-            })
-            .unwrap_or((HWND(0), false, false));
+            let (parent, show_cancel, suppress_parent_restore, disable_parent) =
+                with_save_state(hwnd, |state| {
+                    (
+                        state.parent,
+                        state.show_cancel,
+                        state.suppress_parent_restore,
+                        state.disable_parent,
+                    )
+                })
+                .unwrap_or((HWND(0), false, false, false));
             crate::log_debug(&format!(
-                "podcast_save_window WM_NCDESTROY: hwnd={:?} parent={:?} show_cancel={} suppress_parent_restore={}",
-                hwnd, parent, show_cancel, suppress_parent_restore
+                "podcast_save_window WM_NCDESTROY: hwnd={:?} parent={:?} show_cancel={} suppress_parent_restore={} disable_parent={}",
+                hwnd, parent, show_cancel, suppress_parent_restore, disable_parent
             ));
             if let Err(e) = crate::kill_timer_safe(hwnd, SAVE_PROGRESS_TIMER_ID) {
                 crate::log_debug(&format!("Failed to kill SAVE_PROGRESS_TIMER: {}", e));
             }
             if parent.0 != 0 {
-                if !suppress_parent_restore {
+                if disable_parent && !suppress_parent_restore {
                     crate::enable_window_safe(parent, true);
                 }
                 // For transient probe/progress dialogs without cancel, avoid briefly
                 // bouncing focus back to the editor before the next modal opens.
-                if show_cancel && !suppress_parent_restore {
+                if disable_parent && show_cancel && !suppress_parent_restore {
                     crate::set_foreground_window_safe(parent);
                 }
                 if let Err(_e) = crate::post_message_w_safe(

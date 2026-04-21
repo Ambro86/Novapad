@@ -741,6 +741,8 @@
   "podcast.error.system_audio": "System audio capture is unavailable.",
   "podcast.error.single_app_required": "Select an app to record.",
   "podcast.error.single_app_unavailable": "Single-app audio capture is unavailable for the selected app.",
+  "podcast.error.selected_apps_required": "Select at least one app to record.",
+  "podcast.error.selected_apps_unavailable": "Audio capture for the selected apps is unavailable.",
   "podcast.filename_preview": "Filename preview:",
   "podcast.format": "Format:",
   "podcast.gain.double": "Double volume",
@@ -759,6 +761,10 @@
   "podcast.hint.select_source": "Select at least one input source.",
   "podcast.include_mic": "Include Microphone",
   "podcast.include_system": "Include System Audio",
+  "podcast.system_capture_mode": "System audio capture mode",
+  "podcast.system_capture_mode.all_system": "All system audio",
+  "podcast.system_capture_mode.single_app": "Single app",
+  "podcast.system_capture_mode.selected_apps": "Selected apps",
   "podcast.include_single_app": "Record single app",
   "podcast.level_mic": "Mic level:",
   "podcast.level_system": "System level:",
@@ -769,6 +775,9 @@
   "podcast.single_app.default": "Select an app",
   "podcast.single_app.none_running": "No supported apps are currently running.",
   "podcast.single_app.refresh": "Refresh app list",
+  "podcast.selected_apps": "Apps to record",
+  "podcast.selected_apps.none_running": "No supported apps are currently running.",
+  "podcast.selected_apps.refresh": "Refresh app list",
   "podcast.pause": "Pause",
   "podcast.resume": "Resume",
   "podcast.save_path": "Save path:",
@@ -1337,5 +1346,7 @@
   "youtube.ytdlp_update_failed": "yt-dlp update failed.",
   "youtube.ytdlp_update_prompt": "An update for yt-dlp is available.\nInstalled version: {current}\nLatest version: {latest}\n\nDownload the update now?",
   "podcast.test_single_app_audio": "Test app audio",
-  "podcast.single_app_audio_unavailable": "App audio test is unavailable for the selected app."
+  "podcast.test_selected_apps_audio": "Test audio for selected apps",
+  "podcast.single_app_audio_unavailable": "App audio test is unavailable for the selected app.",
+  "podcast.selected_apps_audio_unavailable": "Selected apps audio test is unavailable."
 }

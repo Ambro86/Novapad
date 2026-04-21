@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "Sélectionnez au moins une source d'entrée.",
   "podcast.include_mic": "Inclure le microphone",
   "podcast.include_system": "Inclure l'audio système",
+  "podcast.system_capture_mode": "Mode de capture audio du système",
+  "podcast.system_capture_mode.all_system": "Tout l’audio du système",
+  "podcast.system_capture_mode.single_app": "Une seule application",
+  "podcast.system_capture_mode.selected_apps": "Applications sélectionnées",
   "podcast.level_mic": "Niveau micro :",
   "podcast.level_system": "Niveau système :",
   "podcast.mic_device": "Périphérique micro :",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "Sélectionnez une application",
   "podcast.single_app.none_running": "Aucune application prise en charge n’est en cours d’exécution.",
   "podcast.single_app.refresh": "Actualiser la liste des applications",
+  "podcast.selected_apps": "Applications à enregistrer",
+  "podcast.selected_apps.none_running": "Aucune application prise en charge n’est en cours d’exécution.",
+  "podcast.selected_apps.refresh": "Actualiser la liste des applications",
   "podcast.test_single_app_audio": "Tester l’audio de l’application",
+  "podcast.test_selected_apps_audio": "Tester l’audio des applications sélectionnées",
   "podcast.error.single_app_required": "Sélectionnez une application à enregistrer.",
   "podcast.error.single_app_unavailable": "La capture audio d’une seule application n’est pas disponible pour l’application sélectionnée.",
-  "podcast.single_app_audio_unavailable": "Le test audio de l’application n’est pas disponible pour l’application sélectionnée."
+  "podcast.error.selected_apps_required": "Sélectionnez au moins une application à enregistrer.",
+  "podcast.error.selected_apps_unavailable": "La capture audio pour les applications sélectionnées n’est pas disponible.",
+  "podcast.single_app_audio_unavailable": "Le test audio de l’application n’est pas disponible pour l’application sélectionnée.",
+  "podcast.selected_apps_audio_unavailable": "Le test audio des applications sélectionnées n’est pas disponible."
 }

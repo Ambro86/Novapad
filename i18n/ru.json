@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "Выберите хотя бы один источник ввода.",
   "podcast.include_mic": "Включить микрофон",
   "podcast.include_system": "Включить системное аудио",
+  "podcast.system_capture_mode": "Режим захвата системного звука",
+  "podcast.system_capture_mode.all_system": "Весь системный звук",
+  "podcast.system_capture_mode.single_app": "Одно приложение",
+  "podcast.system_capture_mode.selected_apps": "Выбранные приложения",
   "podcast.level_mic": "Уровень микрофона:",
   "podcast.level_system": "Уровень системы:",
   "podcast.mic_device": "Устройство микрофона:",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "Выберите приложение",
   "podcast.single_app.none_running": "В настоящее время нет запущенных поддерживаемых приложений.",
   "podcast.single_app.refresh": "Обновить список приложений",
+  "podcast.selected_apps": "Приложения для записи",
+  "podcast.selected_apps.none_running": "Нет запущенных поддерживаемых приложений.",
+  "podcast.selected_apps.refresh": "Обновить список приложений",
   "podcast.test_single_app_audio": "Тест звука приложения",
+  "podcast.test_selected_apps_audio": "Проверка звука выбранных приложений",
   "podcast.error.single_app_required": "Выберите приложение для записи.",
   "podcast.error.single_app_unavailable": "Запись звука одного приложения недоступна для выбранного приложения.",
-  "podcast.single_app_audio_unavailable": "Тест звука приложения недоступен для выбранного приложения."
+  "podcast.error.selected_apps_required": "Выберите хотя бы одно приложение для записи.",
+  "podcast.error.selected_apps_unavailable": "Захват звука для выбранных приложений недоступен.",
+  "podcast.single_app_audio_unavailable": "Тест звука приложения недоступен для выбранного приложения.",
+  "podcast.selected_apps_audio_unavailable": "Тест звука выбранных приложений недоступен."
 }

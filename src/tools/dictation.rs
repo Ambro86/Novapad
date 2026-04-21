@@ -104,6 +104,7 @@ pub fn start_recording(config: &DictationRecordingConfig) -> Result<RecorderHand
         system_device_name: String::new(),
         system_gain: 0.0,
         single_app_process_id: None,
+        selected_app_process_ids: Vec::new(),
         output_format: PodcastFormat::Wav,
         mp3_bitrate: 64,
         save_folder: dictation_temp_dir(),

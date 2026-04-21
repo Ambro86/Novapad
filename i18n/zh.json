@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "请选择至少一个输入源。",
   "podcast.include_mic": "包含麦克风",
   "podcast.include_system": "包含系统音频",
+  "podcast.system_capture_mode": "系统音频捕获模式",
+  "podcast.system_capture_mode.all_system": "所有系统音频",
+  "podcast.system_capture_mode.single_app": "单个应用",
+  "podcast.system_capture_mode.selected_apps": "已选择的应用",
   "podcast.level_mic": "麦克风音量：",
   "podcast.level_system": "系统音量：",
   "podcast.mic_device": "麦克风设备：",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "选择一个应用",
   "podcast.single_app.none_running": "当前没有正在运行的受支持应用",
   "podcast.single_app.refresh": "刷新应用列表",
+  "podcast.selected_apps": "要录制的应用",
+  "podcast.selected_apps.none_running": "当前没有正在运行的受支持应用。",
+  "podcast.selected_apps.refresh": "刷新应用列表",
   "podcast.test_single_app_audio": "测试应用音频",
+  "podcast.test_selected_apps_audio": "测试所选应用音频",
   "podcast.error.single_app_required": "请选择要录制的应用",
   "podcast.error.single_app_unavailable": "所选应用不支持单应用音频录制",
-  "podcast.single_app_audio_unavailable": "所选应用无法进行音频测试"
+  "podcast.error.selected_apps_required": "请至少选择一个要录制的应用。",
+  "podcast.error.selected_apps_unavailable": "所选应用的音频捕获不可用。",
+  "podcast.single_app_audio_unavailable": "所选应用无法进行音频测试",
+  "podcast.selected_apps_audio_unavailable": "所选应用的音频测试不可用。"
 }

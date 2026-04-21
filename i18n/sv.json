@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "Välj minst en ingångskälla.",
   "podcast.include_mic": "Inkludera mikrofon",
   "podcast.include_system": "Inkludera systemljud",
+  "podcast.system_capture_mode": "Läge för inspelning av systemljud",
+  "podcast.system_capture_mode.all_system": "Allt systemljud",
+  "podcast.system_capture_mode.single_app": "En app",
+  "podcast.system_capture_mode.selected_apps": "Valda appar",
   "podcast.level_mic": "Mik-nivå:",
   "podcast.level_system": "Systemnivå:",
   "podcast.mic_device": "Mikrofonenhet:",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "Välj en app",
   "podcast.single_app.none_running": "Inga stödda appar körs just nu.",
   "podcast.single_app.refresh": "Uppdatera applistan",
+  "podcast.selected_apps": "Appar att spela in",
+  "podcast.selected_apps.none_running": "Inga stödda appar körs för närvarande.",
+  "podcast.selected_apps.refresh": "Uppdatera applistan",
   "podcast.test_single_app_audio": "Testa appens ljud",
+  "podcast.test_selected_apps_audio": "Testa ljud för valda appar",
   "podcast.error.single_app_required": "Välj en app att spela in.",
   "podcast.error.single_app_unavailable": "Inspelning av en enskild apps ljud är inte tillgänglig för den valda appen.",
-  "podcast.single_app_audio_unavailable": "Test av appens ljud är inte tillgängligt för den valda appen."
+  "podcast.error.selected_apps_required": "Välj minst en app att spela in.",
+  "podcast.error.selected_apps_unavailable": "Ljudinspelning för valda appar är inte tillgänglig.",
+  "podcast.single_app_audio_unavailable": "Test av appens ljud är inte tillgängligt för den valda appen.",
+  "podcast.selected_apps_audio_unavailable": "Ljudtest för valda appar är inte tillgängligt."
 }

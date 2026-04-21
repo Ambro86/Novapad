@@ -25,14 +25,14 @@ use windows::core::PCWSTR;
 
 pub struct MonitorHandle {
     stop: Arc<AtomicBool>,
-    capture_thread: Option<JoinHandle<()>>,
+    capture_threads: Vec<JoinHandle<()>>,
     playback_thread: Option<JoinHandle<()>>,
 }
 
 impl MonitorHandle {
     pub fn stop(mut self) {
         self.stop.store(true, Ordering::SeqCst);
-        if let Some(handle) = self.capture_thread.take() {
+        for handle in self.capture_threads.drain(..) {
             crate::log_if_err!(handle.join());
         }
         if let Some(handle) = self.playback_thread.take() {
@@ -65,6 +65,19 @@ pub fn start_process_monitoring(process_id: u32, gain: f32) -> Result<MonitorHan
     start_monitoring_source(MonitorSource::ProcessLoopback(process_id), gain)
 }
 
+pub fn start_processes_monitoring(process_ids: &[u32], gain: f32) -> Result<MonitorHandle, String> {
+    let mut sources = Vec::new();
+    for process_id in process_ids {
+        if *process_id != 0 {
+            sources.push(MonitorSource::ProcessLoopback(*process_id));
+        }
+    }
+    if sources.is_empty() {
+        return Err("No target processes selected.".to_string());
+    }
+    start_monitoring_sources(sources, gain)
+}
+
 #[derive(Clone)]
 enum MonitorSource {
     InputDevice(String),
@@ -72,19 +85,28 @@ enum MonitorSource {
 }
 
 fn start_monitoring_source(source: MonitorSource, gain: f32) -> Result<MonitorHandle, String> {
+    start_monitoring_sources(vec![source], gain)
+}
+
+fn start_monitoring_sources(
+    sources: Vec<MonitorSource>,
+    gain: f32,
+) -> Result<MonitorHandle, String> {
     let stop = Arc::new(AtomicBool::new(false));
 
     // Shared buffer between capture and playback threads (small for low latency)
     let buffer = Arc::new(Mutex::new(VecDeque::<f32>::with_capacity(24000)));
 
-    // Start capture thread
-    let capture_stop = stop.clone();
-    let capture_buffer = buffer.clone();
-    let capture_thread = thread::spawn(move || {
-        if let Err(e) = capture_loop(source, gain, capture_buffer, capture_stop) {
-            crate::log_debug(&format!("Monitor capture error: {}", e));
-        }
-    });
+    let mut capture_threads = Vec::new();
+    for source in sources {
+        let capture_stop = stop.clone();
+        let capture_buffer = buffer.clone();
+        capture_threads.push(thread::spawn(move || {
+            if let Err(e) = capture_loop(source, gain, capture_buffer, capture_stop) {
+                crate::log_debug(&format!("Monitor capture error: {}", e));
+            }
+        }));
+    }
 
     // Start playback thread
     let playback_stop = stop.clone();
@@ -99,7 +121,7 @@ fn start_monitoring_source(source: MonitorSource, gain: f32) -> Result<MonitorHa
 
     Ok(MonitorHandle {
         stop,
-        capture_thread: Some(capture_thread),
+        capture_threads,
         playback_thread: Some(playback_thread),
     })
 }

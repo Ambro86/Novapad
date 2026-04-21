@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "Hãy chọn ít nhất một nguồn đầu vào.",
   "podcast.include_mic": "Bao gồm mic",
   "podcast.include_system": "Bao gồm âm thanh hệ thống",
+  "podcast.system_capture_mode": "Chế độ ghi âm thanh hệ thống",
+  "podcast.system_capture_mode.all_system": "Toàn bộ âm thanh hệ thống",
+  "podcast.system_capture_mode.single_app": "Một ứng dụng",
+  "podcast.system_capture_mode.selected_apps": "Ứng dụng đã chọn",
   "podcast.level_mic": "Mức mic:",
   "podcast.level_system": "Mức hệ thống:",
   "podcast.mic_device": "Thiết bị mic:",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "Chọn một ứng dụng",
   "podcast.single_app.none_running": "Hiện không có ứng dụng được hỗ trợ nào đang chạy.",
   "podcast.single_app.refresh": "Làm mới danh sách ứng dụng",
+  "podcast.selected_apps": "Ứng dụng cần ghi",
+  "podcast.selected_apps.none_running": "Hiện không có ứng dụng được hỗ trợ nào đang chạy.",
+  "podcast.selected_apps.refresh": "Làm mới danh sách ứng dụng",
   "podcast.test_single_app_audio": "Kiểm tra âm thanh ứng dụng",
+  "podcast.test_selected_apps_audio": "Kiểm tra âm thanh ứng dụng đã chọn",
   "podcast.error.single_app_required": "Chọn ứng dụng để ghi.",
   "podcast.error.single_app_unavailable": "Không thể ghi âm từ một ứng dụng cho ứng dụng đã chọn.",
-  "podcast.single_app_audio_unavailable": "Kiểm tra âm thanh ứng dụng không khả dụng cho ứng dụng đã chọn."
+  "podcast.error.selected_apps_required": "Chọn ít nhất một ứng dụng để ghi.",
+  "podcast.error.selected_apps_unavailable": "Không thể ghi âm thanh cho các ứng dụng đã chọn.",
+  "podcast.single_app_audio_unavailable": "Kiểm tra âm thanh ứng dụng không khả dụng cho ứng dụng đã chọn.",
+  "podcast.selected_apps_audio_unavailable": "Kiểm tra âm thanh ứng dụng đã chọn không khả dụng."
 }

@@ -290,6 +290,7 @@ pub struct RecorderConfig {
     pub system_device_name: String,
     pub system_gain: f32,
     pub single_app_process_id: Option<u32>,
+    pub selected_app_process_ids: Vec<u32>,
     pub output_format: PodcastFormat,
     pub mp3_bitrate: u32,
     pub save_folder: PathBuf,
@@ -429,42 +430,59 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
 
     if config.include_system {
         crate::log_debug("Starting system audio capture thread");
-        let buffer = mix_buffer.clone();
-        let shared_state = shared.clone();
-        let stop_flag = stop.clone();
-        let paused_flag = paused.clone();
-        let device_id = config.system_device_id.clone();
-        let device_name = config.system_device_name.clone();
-        let system_gain = config.system_gain;
-        let target_process_id = config.single_app_process_id;
-        threads.push(thread::spawn(move || {
-            crate::log_debug("System audio capture thread started");
-            let result = capture_source(CaptureOptions {
-                kind: SourceKind::System,
-                device_id,
-                device_name,
-                loopback: true,
-                gain: system_gain,
-                target_process_id,
-                buffer,
-                shared: shared_state.clone(),
-                stop: stop_flag.clone(),
-                paused: paused_flag,
-            });
-            if let Err(err) = &result {
-                crate::log_debug(&format!("System audio capture error: {}", err));
-                if let Ok(mut error) = shared_state.last_error.lock() {
-                    *error = Some(err.clone());
-                }
-                if let Ok(mut status) = shared_state.status.lock() {
-                    *status = RecorderStatus::Error;
-                }
-                stop_flag.store(true, Ordering::SeqCst);
-            } else {
-                crate::log_debug("System audio capture thread stopped normally");
+        let mut target_process_ids = config.selected_app_process_ids.clone();
+        if target_process_ids.is_empty() {
+            if let Some(pid) = config.single_app_process_id {
+                target_process_ids.push(pid);
             }
-            result
-        }));
+        } else {
+            target_process_ids.sort_unstable();
+            target_process_ids.dedup();
+        }
+
+        let capture_targets = if target_process_ids.is_empty() {
+            vec![None]
+        } else {
+            target_process_ids.into_iter().map(Some).collect()
+        };
+
+        for target_process_id in capture_targets {
+            let buffer = mix_buffer.clone();
+            let shared_state = shared.clone();
+            let stop_flag = stop.clone();
+            let paused_flag = paused.clone();
+            let device_id = config.system_device_id.clone();
+            let device_name = config.system_device_name.clone();
+            let system_gain = config.system_gain;
+            threads.push(thread::spawn(move || {
+                crate::log_debug("System audio capture thread started");
+                let result = capture_source(CaptureOptions {
+                    kind: SourceKind::System,
+                    device_id,
+                    device_name,
+                    loopback: true,
+                    gain: system_gain,
+                    target_process_id,
+                    buffer,
+                    shared: shared_state.clone(),
+                    stop: stop_flag.clone(),
+                    paused: paused_flag,
+                });
+                if let Err(err) = &result {
+                    crate::log_debug(&format!("System audio capture error: {}", err));
+                    if let Ok(mut error) = shared_state.last_error.lock() {
+                        *error = Some(err.clone());
+                    }
+                    if let Ok(mut status) = shared_state.status.lock() {
+                        *status = RecorderStatus::Error;
+                    }
+                    stop_flag.store(true, Ordering::SeqCst);
+                } else {
+                    crate::log_debug("System audio capture thread stopped normally");
+                }
+                result
+            }));
+        }
     }
 
     let keep_awake_stop = stop.clone();

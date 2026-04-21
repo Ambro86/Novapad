@@ -274,6 +274,17 @@ pub enum PodcastFormat {
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum PodcastSystemCaptureMode {
+    #[serde(rename = "all_system")]
+    #[default]
+    AllSystem,
+    #[serde(rename = "single_app")]
+    SingleApp,
+    #[serde(rename = "selected_apps")]
+    SelectedApps,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum PodcastSearchProvider {
     #[serde(rename = "itunes")]
     #[default]
@@ -646,9 +657,13 @@ pub struct AppSettings {
     pub podcast_system_device_id: String,
     pub podcast_system_gain: f32,
     #[serde(default)]
+    pub podcast_system_capture_mode: PodcastSystemCaptureMode,
+    #[serde(default)]
     pub podcast_include_single_app: bool,
     #[serde(default)]
     pub podcast_single_app_pid: u32,
+    #[serde(default)]
+    pub podcast_selected_app_pids: Vec<u32>,
     pub podcast_output_format: PodcastFormat,
     pub podcast_mp3_bitrate: u32,
     pub podcast_save_folder: String,
@@ -1007,8 +1022,10 @@ impl Default for AppSettings {
             podcast_include_system_audio: true,
             podcast_system_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
             podcast_system_gain: 1.0,
+            podcast_system_capture_mode: PodcastSystemCaptureMode::AllSystem,
             podcast_include_single_app: false,
             podcast_single_app_pid: 0,
+            podcast_selected_app_pids: Vec::new(),
             podcast_output_format: PodcastFormat::Mp3,
             podcast_mp3_bitrate: 128,
             podcast_save_folder: default_podcast_save_folder(),
@@ -1959,7 +1976,30 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
         settings.podcast_mp3_bitrate = 128;
     }
     settings.podcast_mp3_bitrate = settings.podcast_mp3_bitrate.clamp(64, 320);
+    settings.podcast_selected_app_pids.retain(|pid| *pid != 0);
+    settings.podcast_selected_app_pids.sort_unstable();
+    settings.podcast_selected_app_pids.dedup();
+    if matches!(
+        settings.podcast_system_capture_mode,
+        PodcastSystemCaptureMode::AllSystem
+    ) && settings.podcast_include_single_app
+    {
+        settings.podcast_system_capture_mode = PodcastSystemCaptureMode::SingleApp;
+    }
+    if settings.podcast_single_app_pid != 0
+        && settings
+            .podcast_selected_app_pids
+            .iter()
+            .all(|pid| *pid != settings.podcast_single_app_pid)
+    {
+        settings
+            .podcast_selected_app_pids
+            .push(settings.podcast_single_app_pid);
+    }
+    settings.podcast_selected_app_pids.sort_unstable();
+    settings.podcast_selected_app_pids.dedup();
     if !settings.podcast_include_system_audio {
+        settings.podcast_system_capture_mode = PodcastSystemCaptureMode::AllSystem;
         settings.podcast_include_single_app = false;
     }
     if settings.audiobook_m4b_bitrate == 0 {

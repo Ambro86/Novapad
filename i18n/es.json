@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "Selecciona al menos una fuente de entrada.",
   "podcast.include_mic": "Incluir micrófono",
   "podcast.include_system": "Incluir audio del sistema",
+  "podcast.system_capture_mode": "Modo de captura de audio del sistema",
+  "podcast.system_capture_mode.all_system": "Todo el audio del sistema",
+  "podcast.system_capture_mode.single_app": "Una sola aplicación",
+  "podcast.system_capture_mode.selected_apps": "Aplicaciones seleccionadas",
   "podcast.level_mic": "Nivel de micrófono:",
   "podcast.level_system": "Nivel del sistema:",
   "podcast.mic_device": "Dispositivo Micrófono:",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "Selecciona una aplicación",
   "podcast.single_app.none_running": "No hay aplicaciones compatibles en ejecución.",
   "podcast.single_app.refresh": "Actualizar lista de aplicaciones",
+  "podcast.selected_apps": "Aplicaciones a grabar",
+  "podcast.selected_apps.none_running": "No hay aplicaciones compatibles en ejecución.",
+  "podcast.selected_apps.refresh": "Actualizar lista de aplicaciones",
   "podcast.test_single_app_audio": "Probar audio de la aplicación",
+  "podcast.test_selected_apps_audio": "Probar audio de aplicaciones seleccionadas",
   "podcast.error.single_app_required": "Selecciona una aplicación para grabar.",
   "podcast.error.single_app_unavailable": "La captura de audio de una sola aplicación no está disponible para la aplicación seleccionada.",
-  "podcast.single_app_audio_unavailable": "La prueba de audio de la aplicación no está disponible para la aplicación seleccionada."
+  "podcast.error.selected_apps_required": "Selecciona al menos una aplicación para grabar.",
+  "podcast.error.selected_apps_unavailable": "La captura de audio para las aplicaciones seleccionadas no está disponible.",
+  "podcast.single_app_audio_unavailable": "La prueba de audio de la aplicación no está disponible para la aplicación seleccionada.",
+  "podcast.selected_apps_audio_unavailable": "La prueba de audio de las aplicaciones seleccionadas no está disponible."
 }

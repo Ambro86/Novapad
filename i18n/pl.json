@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "Wybierz co najmniej jedno źródło wejściowe.",
   "podcast.include_mic": "Dołącz mikrofon",
   "podcast.include_system": "Dołącz dźwięk systemowy",
+  "podcast.system_capture_mode": "Tryb przechwytywania dźwięku systemowego",
+  "podcast.system_capture_mode.all_system": "Cały dźwięk systemowy",
+  "podcast.system_capture_mode.single_app": "Jedna aplikacja",
+  "podcast.system_capture_mode.selected_apps": "Wybrane aplikacje",
   "podcast.level_mic": "Poziom mikrofonu:",
   "podcast.level_system": "Poziom systemu:",
   "podcast.mic_device": "Urządzenie mikrofonowe:",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "Wybierz aplikację",
   "podcast.single_app.none_running": "Obecnie nie działają żadne obsługiwane aplikacje.",
   "podcast.single_app.refresh": "Odśwież listę aplikacji",
+  "podcast.selected_apps": "Aplikacje do nagrywania",
+  "podcast.selected_apps.none_running": "Brak uruchomionych obsługiwanych aplikacji.",
+  "podcast.selected_apps.refresh": "Odśwież listę aplikacji",
   "podcast.test_single_app_audio": "Testuj dźwięk aplikacji",
+  "podcast.test_selected_apps_audio": "Test dźwięku wybranych aplikacji",
   "podcast.error.single_app_required": "Wybierz aplikację do nagrywania.",
   "podcast.error.single_app_unavailable": "Nagrywanie dźwięku z jednej aplikacji nie jest dostępne dla wybranej aplikacji.",
-  "podcast.single_app_audio_unavailable": "Test dźwięku aplikacji nie jest dostępny dla wybranej aplikacji."
+  "podcast.error.selected_apps_required": "Wybierz co najmniej jedną aplikację do nagrywania.",
+  "podcast.error.selected_apps_unavailable": "Przechwytywanie dźwięku dla wybranych aplikacji jest niedostępne.",
+  "podcast.single_app_audio_unavailable": "Test dźwięku aplikacji nie jest dostępny dla wybranej aplikacji.",
+  "podcast.selected_apps_audio_unavailable": "Test dźwięku wybranych aplikacji jest niedostępny."
 }

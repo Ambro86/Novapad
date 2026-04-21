@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "Виберіть хоча б одне джерело введення.",
   "podcast.include_mic": "Використовувати мікрофон",
   "podcast.include_system": "Використовувати системне аудіо",
+  "podcast.system_capture_mode": "Режим запису системного звуку",
+  "podcast.system_capture_mode.all_system": "Увесь системний звук",
+  "podcast.system_capture_mode.single_app": "Одна програма",
+  "podcast.system_capture_mode.selected_apps": "Вибрані програми",
   "podcast.level_mic": "Рівень мікрофона:",
   "podcast.level_system": "Рівень системи:",
   "podcast.mic_device": "Пристрій мікрофона:",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "Виберіть програму",
   "podcast.single_app.none_running": "Наразі немає запущених підтримуваних програм.",
   "podcast.single_app.refresh": "Оновити список програм",
+  "podcast.selected_apps": "Програми для запису",
+  "podcast.selected_apps.none_running": "Жодна підтримувана програма наразі не запущена.",
+  "podcast.selected_apps.refresh": "Оновити список програм",
   "podcast.test_single_app_audio": "Тест аудіо програми",
+  "podcast.test_selected_apps_audio": "Тест звуку вибраних програм",
   "podcast.error.single_app_required": "Виберіть програму для запису.",
   "podcast.error.single_app_unavailable": "Запис аудіо однієї програми недоступний для вибраної програми.",
-  "podcast.single_app_audio_unavailable": "Тест аудіо програми недоступний для вибраної програми."
+  "podcast.error.selected_apps_required": "Виберіть принаймні одну програму для запису.",
+  "podcast.error.selected_apps_unavailable": "Захоплення звуку для вибраних програм недоступне.",
+  "podcast.single_app_audio_unavailable": "Тест аудіо програми недоступний для вибраної програми.",
+  "podcast.selected_apps_audio_unavailable": "Тест звуку вибраних програм недоступний."
 }

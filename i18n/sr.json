@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "Izaberi bar jedan ulazni izvor.",
   "podcast.include_mic": "Uključi mikrofon.",
   "podcast.include_system": "Uključi sistemski zvuk.",
+  "podcast.system_capture_mode": "Režim snimanja sistemskog zvuka",
+  "podcast.system_capture_mode.all_system": "Sav sistemski zvuk",
+  "podcast.system_capture_mode.single_app": "Jedna aplikacija",
+  "podcast.system_capture_mode.selected_apps": "Izabrane aplikacije",
   "podcast.level_mic": "Nivo mikrofona:",
   "podcast.level_system": "Nivo sistemskog zvuka:",
   "podcast.mic_device": "Uređaj za mikrofon:",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "Izaberite aplikaciju",
   "podcast.single_app.none_running": "Trenutno nema pokrenutih podržanih aplikacija.",
   "podcast.single_app.refresh": "Osveži listu aplikacija",
+  "podcast.selected_apps": "Aplikacije za snimanje",
+  "podcast.selected_apps.none_running": "Nijedna podržana aplikacija trenutno nije pokrenuta.",
+  "podcast.selected_apps.refresh": "Osveži listu aplikacija",
   "podcast.test_single_app_audio": "Testiraj zvuk aplikacije",
+  "podcast.test_selected_apps_audio": "Test zvuka izabranih aplikacija",
   "podcast.error.single_app_required": "Izaberite aplikaciju za snimanje.",
   "podcast.error.single_app_unavailable": "Snimanje zvuka jedne aplikacije nije dostupno za izabranu aplikaciju.",
-  "podcast.single_app_audio_unavailable": "Test zvuka aplikacije nije dostupan za izabranu aplikaciju."
+  "podcast.error.selected_apps_required": "Izaberite bar jednu aplikaciju za snimanje.",
+  "podcast.error.selected_apps_unavailable": "Snimanje zvuka za izabrane aplikacije nije dostupno.",
+  "podcast.single_app_audio_unavailable": "Test zvuka aplikacije nije dostupan za izabranu aplikaciju.",
+  "podcast.selected_apps_audio_unavailable": "Test zvuka izabranih aplikacija nije dostupan."
 }

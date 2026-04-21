@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "Pasirinkite bent vieną įvesties šaltinį.",
   "podcast.include_mic": "Įtraukti mikrofoną",
   "podcast.include_system": "Įtraukti sistemos garso įrašą",
+  "podcast.system_capture_mode": "Sistemos garso įrašymo režimas",
+  "podcast.system_capture_mode.all_system": "Visas sistemos garsas",
+  "podcast.system_capture_mode.single_app": "Viena programa",
+  "podcast.system_capture_mode.selected_apps": "Pasirinktos programos",
   "podcast.level_mic": "Mikrofono lygis:",
   "podcast.level_system": "Sistemos lygis:",
   "podcast.mic_device": "Mikrofono įrenginys:",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "Pasirinkite programą",
   "podcast.single_app.none_running": "Šiuo metu neveikia jokios palaikomos programos.",
   "podcast.single_app.refresh": "Atnaujinti programų sąrašą",
+  "podcast.selected_apps": "Programos įrašymui",
+  "podcast.selected_apps.none_running": "Šiuo metu neveikia nė viena palaikoma programa.",
+  "podcast.selected_apps.refresh": "Atnaujinti programų sąrašą",
   "podcast.test_single_app_audio": "Išbandyti programos garsą",
+  "podcast.test_selected_apps_audio": "Pasirinktų programų garso testas",
   "podcast.error.single_app_required": "Pasirinkite programą įrašymui.",
   "podcast.error.single_app_unavailable": "Vienos programos garso įrašymas nepasiekiamas pasirinktai programai.",
-  "podcast.single_app_audio_unavailable": "Programos garso testas nepasiekiamas pasirinktai programai."
+  "podcast.error.selected_apps_required": "Pasirinkite bent vieną programą įrašymui.",
+  "podcast.error.selected_apps_unavailable": "Pasirinktų programų garso įrašymas negalimas.",
+  "podcast.single_app_audio_unavailable": "Programos garso testas nepasiekiamas pasirinktai programai.",
+  "podcast.selected_apps_audio_unavailable": "Pasirinktų programų garso testas negalimas."
 }

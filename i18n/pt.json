@@ -757,6 +757,10 @@
   "podcast.hint.select_source": "Selecione pelo menos uma fonte de entrada.",
   "podcast.include_mic": "Incluir Microfone",
   "podcast.include_system": "Incluir áudio do sistema",
+  "podcast.system_capture_mode": "Modo de captura de áudio do sistema",
+  "podcast.system_capture_mode.all_system": "Todo o áudio do sistema",
+  "podcast.system_capture_mode.single_app": "Uma única aplicação",
+  "podcast.system_capture_mode.selected_apps": "Aplicações selecionadas",
   "podcast.level_mic": "Nível do microfone:",
   "podcast.level_system": "Nível do sistema:",
   "podcast.mic_device": "Dispositivo Microfone:",
@@ -1334,8 +1338,15 @@
   "podcast.single_app.default": "Selecione um aplicativo",
   "podcast.single_app.none_running": "Nenhum aplicativo suportado está em execução.",
   "podcast.single_app.refresh": "Atualizar lista de aplicativos",
+  "podcast.selected_apps": "Aplicações a gravar",
+  "podcast.selected_apps.none_running": "Nenhuma aplicação suportada está em execução.",
+  "podcast.selected_apps.refresh": "Atualizar lista de aplicações",
   "podcast.test_single_app_audio": "Testar áudio do aplicativo",
+  "podcast.test_selected_apps_audio": "Testar áudio das aplicações selecionadas",
   "podcast.error.single_app_required": "Selecione um aplicativo para gravar.",
   "podcast.error.single_app_unavailable": "A captura de áudio de um único aplicativo não está disponível para o aplicativo selecionado.",
-  "podcast.single_app_audio_unavailable": "O teste de áudio do aplicativo não está disponível para o aplicativo selecionado."
+  "podcast.error.selected_apps_required": "Selecione pelo menos uma aplicação para gravar.",
+  "podcast.error.selected_apps_unavailable": "A captura de áudio para as aplicações selecionadas não está disponível.",
+  "podcast.single_app_audio_unavailable": "O teste de áudio do aplicativo não está disponível para o aplicativo selecionado.",
+  "podcast.selected_apps_audio_unavailable": "O teste de áudio das aplicações selecionadas não está disponível."
 }

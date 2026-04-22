@@ -1341,6 +1341,7 @@
   "podcast.selected_apps": "Ứng dụng cần ghi",
   "podcast.selected_apps.none_running": "Hiện không có ứng dụng được hỗ trợ nào đang chạy.",
   "podcast.selected_apps.refresh": "Làm mới danh sách ứng dụng",
+  "podcast.show_inactive_apps": "Hiển thị cả ứng dụng không hoạt động",
   "podcast.test_single_app_audio": "Kiểm tra âm thanh ứng dụng",
   "podcast.test_selected_apps_audio": "Kiểm tra âm thanh ứng dụng đã chọn",
   "podcast.error.single_app_required": "Chọn ứng dụng để ghi.",

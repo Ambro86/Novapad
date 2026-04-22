@@ -1393,6 +1393,7 @@
   "podcast.selected_apps": "Applicazioni da registrare",
   "podcast.selected_apps.none_running": "Nessuna applicazione supportata è attualmente in esecuzione.",
   "podcast.selected_apps.refresh": "Aggiorna elenco applicazioni",
+  "podcast.show_inactive_apps": "Mostra anche le applicazioni inattive",
   "podcast.test_single_app_audio": "Test audio applicazione",
   "podcast.test_selected_apps_audio": "Test audio applicazioni selezionate",
   "podcast.error.single_app_required": "Seleziona un'applicazione da registrare.",

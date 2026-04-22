@@ -1341,6 +1341,7 @@
   "podcast.selected_apps": "Aplikace k záznamu",
   "podcast.selected_apps.none_running": "Žádná podporovaná aplikace momentálně neběží.",
   "podcast.selected_apps.refresh": "Obnovit seznam aplikací",
+  "podcast.show_inactive_apps": "Zobrazit i neaktivní aplikace",
   "podcast.test_single_app_audio": "Otestovat zvuk aplikace",
   "podcast.test_selected_apps_audio": "Test zvuku vybraných aplikací",
   "podcast.error.single_app_required": "Vyberte aplikaci k nahrávání.",

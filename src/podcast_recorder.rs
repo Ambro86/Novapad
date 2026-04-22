@@ -86,7 +86,7 @@ pub fn list_output_devices() -> Result<Vec<AudioDevice>, String> {
     list_devices(eRender)
 }
 
-pub fn list_audio_apps() -> Result<Vec<AudioApp>, String> {
+pub fn list_audio_apps(include_inactive: bool) -> Result<Vec<AudioApp>, String> {
     let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
     let enumerator: IMMDeviceEnumerator = unsafe {
         CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
@@ -125,7 +125,7 @@ pub fn list_audio_apps() -> Result<Vec<AudioApp>, String> {
                 .GetState()
                 .map_err(|e| format!("GetState({index}) failed: {e}"))?
         };
-        if state != AudioSessionStateActive {
+        if !include_inactive && state != AudioSessionStateActive {
             continue;
         }
         let session_control2: IAudioSessionControl2 = control
@@ -386,7 +386,21 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
     let stop = Arc::new(AtomicBool::new(false));
     let paused = Arc::new(AtomicBool::new(false));
 
-    let mix_buffer = Arc::new(MixBuffer::new());
+    let system_stream_count = if config.include_system {
+        let selected_count = config
+            .selected_app_process_ids
+            .iter()
+            .filter(|pid| **pid != 0)
+            .count();
+        if selected_count > 0 {
+            selected_count
+        } else {
+            1
+        }
+    } else {
+        0
+    };
+    let mix_buffer = Arc::new(MixBuffer::new(system_stream_count));
     let mut threads = Vec::new();
 
     if config.include_mic {
@@ -407,6 +421,7 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
                 loopback: false,
                 gain: mic_gain,
                 target_process_id: None,
+                system_stream_index: 0,
                 buffer,
                 shared: shared_state.clone(),
                 stop: stop_flag.clone(),
@@ -446,7 +461,7 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
             target_process_ids.into_iter().map(Some).collect()
         };
 
-        for target_process_id in capture_targets {
+        for (system_stream_index, target_process_id) in capture_targets.into_iter().enumerate() {
             let buffer = mix_buffer.clone();
             let shared_state = shared.clone();
             let stop_flag = stop.clone();
@@ -463,6 +478,7 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
                     loopback: true,
                     gain: system_gain,
                     target_process_id,
+                    system_stream_index,
                     buffer,
                     shared: shared_state.clone(),
                     stop: stop_flag.clone(),
@@ -732,25 +748,29 @@ struct MixBuffer {
 
 struct MixQueues {
     mic: VecDeque<f32>,
-    system: VecDeque<f32>,
+    system: Vec<VecDeque<f32>>,
 }
 
 impl MixBuffer {
-    fn new() -> Self {
+    fn new(system_stream_count: usize) -> Self {
         MixBuffer {
             inner: Mutex::new(MixQueues {
                 mic: VecDeque::new(),
-                system: VecDeque::new(),
+                system: (0..system_stream_count).map(|_| VecDeque::new()).collect(),
             }),
             condvar: Condvar::new(),
         }
     }
 
-    fn push(&self, source: SourceKind, samples: Vec<f32>) {
+    fn push(&self, source: SourceKind, system_stream_index: usize, samples: Vec<f32>) {
         let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         match source {
             SourceKind::Microphone => inner.mic.extend(samples),
-            SourceKind::System => inner.system.extend(samples),
+            SourceKind::System => {
+                if let Some(queue) = inner.system.get_mut(system_stream_index) {
+                    queue.extend(samples);
+                }
+            }
         }
         self.condvar.notify_one();
     }
@@ -807,7 +827,12 @@ fn write_mixed_audio_wav(
             let mut inner = buffer.inner.lock().unwrap_or_else(|e| e.into_inner());
             let (need_mic, need_sys) = (shared.include_mic, shared.include_system);
             let available_mic = inner.mic.len() / TARGET_CHANNELS as usize;
-            let available_sys = inner.system.len() / TARGET_CHANNELS as usize;
+            let available_sys = inner
+                .system
+                .iter()
+                .map(|queue| queue.len() / TARGET_CHANNELS as usize)
+                .min()
+                .unwrap_or(0);
             let can_mix = if need_mic && need_sys {
                 available_mic >= MIX_CHUNK_FRAMES && available_sys >= MIX_CHUNK_FRAMES
             } else if need_mic {
@@ -835,8 +860,15 @@ fn write_mixed_audio_wav(
                     right += inner.mic.pop_front().unwrap_or(0.0);
                 }
                 if need_sys {
-                    left += inner.system.pop_front().unwrap_or(0.0);
-                    right += inner.system.pop_front().unwrap_or(0.0);
+                    let system_streams = inner.system.len();
+                    for queue in &mut inner.system {
+                        left += queue.pop_front().unwrap_or(0.0);
+                        right += queue.pop_front().unwrap_or(0.0);
+                    }
+                    if system_streams > 1 {
+                        left /= system_streams as f32;
+                        right /= system_streams as f32;
+                    }
                 }
                 if need_mic && need_sys {
                     left *= 0.5;
@@ -890,7 +922,12 @@ fn write_mixed_audio_mp3(
             let mut inner = buffer.inner.lock().unwrap_or_else(|e| e.into_inner());
             let (need_mic, need_sys) = (shared.include_mic, shared.include_system);
             let available_mic = inner.mic.len() / TARGET_CHANNELS as usize;
-            let available_sys = inner.system.len() / TARGET_CHANNELS as usize;
+            let available_sys = inner
+                .system
+                .iter()
+                .map(|queue| queue.len() / TARGET_CHANNELS as usize)
+                .min()
+                .unwrap_or(0);
             let can_mix = if need_mic && need_sys {
                 available_mic >= MIX_CHUNK_FRAMES && available_sys >= MIX_CHUNK_FRAMES
             } else if need_mic {
@@ -918,8 +955,15 @@ fn write_mixed_audio_mp3(
                     right += inner.mic.pop_front().unwrap_or(0.0);
                 }
                 if need_sys {
-                    left += inner.system.pop_front().unwrap_or(0.0);
-                    right += inner.system.pop_front().unwrap_or(0.0);
+                    let system_streams = inner.system.len();
+                    for queue in &mut inner.system {
+                        left += queue.pop_front().unwrap_or(0.0);
+                        right += queue.pop_front().unwrap_or(0.0);
+                    }
+                    if system_streams > 1 {
+                        left /= system_streams as f32;
+                        right /= system_streams as f32;
+                    }
                 }
                 if need_mic && need_sys {
                     left *= 0.5;
@@ -955,6 +999,7 @@ struct CaptureOptions {
     loopback: bool,
     gain: f32,
     target_process_id: Option<u32>,
+    system_stream_index: usize,
     buffer: Arc<MixBuffer>,
     shared: Arc<SharedState>,
     stop: Arc<AtomicBool>,
@@ -1054,6 +1099,28 @@ fn capture_source(options: CaptureOptions) -> Result<(), String> {
 
     let mut resampler =
         LinearResampler::new(input_rate, TARGET_SAMPLE_RATE, input_channels as usize);
+    let input_format_name = match input_format {
+        SampleFormat::I16 => "i16",
+        SampleFormat::F32 => "f32",
+    };
+    crate::log_debug(&format!(
+        "capture_source format: kind={:?} pid={:?} stream_index={} input_rate={} input_channels={} input_format={} target_rate={} target_channels={}",
+        match options.kind {
+            SourceKind::Microphone => "Microphone",
+            SourceKind::System => "System",
+        },
+        options.target_process_id,
+        options.system_stream_index,
+        input_rate,
+        input_channels,
+        input_format_name,
+        TARGET_SAMPLE_RATE,
+        TARGET_CHANNELS
+    ));
+    let mut packet_counter: u64 = 0;
+    let mut total_input_frames: u64 = 0;
+    let mut total_output_frames: u64 = 0;
+    let mut last_packet_log = Instant::now();
 
     loop {
         if options.stop.load(Ordering::SeqCst) {
@@ -1092,6 +1159,30 @@ fn capture_source(options: CaptureOptions) -> Result<(), String> {
             update_peak(&options.shared, &options.kind, &samples);
             let resampled = resampler.push(&samples);
             let mut stereo = to_stereo(&resampled, input_channels as usize);
+            packet_counter += 1;
+            total_input_frames += frames as u64;
+            total_output_frames += (stereo.len() / TARGET_CHANNELS as usize) as u64;
+            if options.target_process_id.is_some()
+                && (packet_counter == 1
+                    || packet_counter.is_multiple_of(200)
+                    || last_packet_log.elapsed() >= Duration::from_secs(5))
+            {
+                let output_frames = stereo.len() / TARGET_CHANNELS as usize;
+                crate::log_debug(&format!(
+                    "capture_source packet: pid={:?} stream_index={} packet={} frames_in={} samples_in={} frames_out={} flags=0x{:X} total_in_frames={} total_out_frames={} elapsed_ms={}",
+                    options.target_process_id,
+                    options.system_stream_index,
+                    packet_counter,
+                    frames,
+                    samples.len(),
+                    output_frames,
+                    flags,
+                    total_input_frames,
+                    total_output_frames,
+                    last_packet_log.elapsed().as_millis()
+                ));
+                last_packet_log = Instant::now();
+            }
 
             // Apply gain
             if options.gain != 1.0 {
@@ -1100,7 +1191,9 @@ fn capture_source(options: CaptureOptions) -> Result<(), String> {
                 }
             }
 
-            options.buffer.push(options.kind, stereo);
+            options
+                .buffer
+                .push(options.kind, options.system_stream_index, stereo);
             packet_len = unsafe {
                 capture
                     .GetNextPacketSize()

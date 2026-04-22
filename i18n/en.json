@@ -778,6 +778,7 @@
   "podcast.selected_apps": "Apps to record",
   "podcast.selected_apps.none_running": "No supported apps are currently running.",
   "podcast.selected_apps.refresh": "Refresh app list",
+  "podcast.show_inactive_apps": "Show inactive apps",
   "podcast.pause": "Pause",
   "podcast.resume": "Resume",
   "podcast.save_path": "Save path:",

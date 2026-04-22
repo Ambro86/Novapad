@@ -1341,6 +1341,7 @@
   "podcast.selected_apps": "要录制的应用",
   "podcast.selected_apps.none_running": "当前没有正在运行的受支持应用。",
   "podcast.selected_apps.refresh": "刷新应用列表",
+  "podcast.show_inactive_apps": "显示未活动的应用",
   "podcast.test_single_app_audio": "测试应用音频",
   "podcast.test_selected_apps_audio": "测试所选应用音频",
   "podcast.error.single_app_required": "请选择要录制的应用",

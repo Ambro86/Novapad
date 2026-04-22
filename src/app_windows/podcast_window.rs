@@ -76,6 +76,7 @@ const PODCAST_ID_SINGLE_APP: usize = 11028;
 const PODCAST_ID_REFRESH_SINGLE_APP: usize = 11029;
 const PODCAST_ID_TEST_SINGLE_APP_AUDIO: usize = 11030;
 const PODCAST_ID_SELECTED_APPS: usize = 11031;
+const PODCAST_ID_SHOW_INACTIVE_APPS: usize = 11032;
 const WM_PODCAST_SAVE_RESULT: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP + 74;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -131,6 +132,7 @@ struct PodcastState {
     single_app: HWND,
     label_selected_apps: HWND,
     selected_apps: HWND,
+    show_inactive_apps: HWND,
     test_single_app_audio: HWND,
     refresh_single_app: HWND,
     monitor_check: HWND,
@@ -184,6 +186,7 @@ struct PodcastLabels {
     single_app_default: String,
     single_app_none_running: String,
     selected_apps: String,
+    show_inactive_apps: String,
     selected_apps_refresh: String,
     single_app_refresh: String,
     test_single_app_audio: String,
@@ -252,6 +255,7 @@ fn labels(language: Language) -> PodcastLabels {
         single_app_default: i18n::tr(language, "podcast.single_app.default"),
         single_app_none_running: i18n::tr(language, "podcast.single_app.none_running"),
         selected_apps: i18n::tr(language, "podcast.selected_apps"),
+        show_inactive_apps: i18n::tr(language, "podcast.show_inactive_apps"),
         selected_apps_refresh: i18n::tr(language, "podcast.selected_apps.refresh"),
         single_app_refresh: i18n::tr(language, "podcast.single_app.refresh"),
         test_single_app_audio: i18n::tr(language, "podcast.test_single_app_audio"),
@@ -671,13 +675,28 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     None,
                 );
 
+                let show_inactive_apps = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.show_inactive_apps).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    230,
+                    315,
+                    240,
+                    22,
+                    hwnd,
+                    HMENU(PODCAST_ID_SHOW_INACTIVE_APPS as isize),
+                    None,
+                    None,
+                );
+
                 let test_single_app_audio = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
                     PCWSTR(to_wide(&labels.test_single_app_audio).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
                     230,
-                    315,
+                    341,
                     240,
                     22,
                     hwnd,
@@ -692,7 +711,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PCWSTR(to_wide(&labels.single_app_refresh).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     480,
-                    313,
+                    339,
                     100,
                     26,
                     hwnd,
@@ -1127,6 +1146,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     single_app,
                     label_selected_apps,
                     selected_apps,
+                    show_inactive_apps,
                     test_single_app_audio,
                     refresh_single_app,
                     system_unavailable_text,
@@ -1189,6 +1209,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     single_app,
                     label_selected_apps,
                     selected_apps,
+                    show_inactive_apps,
                     test_single_app_audio,
                     refresh_single_app,
                     monitor_check,
@@ -1369,6 +1390,16 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                             if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
                                 restart_single_app_monitor(state);
                             }
+                        }
+                        handled = true;
+                    }
+                    PODCAST_ID_SHOW_INACTIVE_APPS => {
+                        let preferred_pid = selected_single_app(state).map(|app| app.pid);
+                        let preferred_selected_pids = selected_app_pids(state);
+                        refresh_single_app_list(state, preferred_pid, &preferred_selected_pids);
+                        persist_settings(state);
+                        if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
+                            restart_single_app_monitor(state);
                         }
                         handled = true;
                     }
@@ -1780,13 +1811,13 @@ fn load_devices(language: Language) -> (Vec<AudioDevice>, Vec<AudioDevice>, bool
 
 // VIDEO REMOVED: load_monitors function removed
 
-fn load_single_apps(language: Language) -> Vec<AudioApp> {
+fn load_single_apps(language: Language, include_inactive: bool) -> Vec<AudioApp> {
     let labels = labels(language);
     let mut apps = vec![AudioApp {
         pid: 0,
         display_name: labels.single_app_default,
     }];
-    match list_audio_apps() {
+    match list_audio_apps(include_inactive) {
         Ok(list) if !list.is_empty() => apps.extend(list),
         Ok(_) | Err(_) => apps.push(AudioApp {
             pid: 0,
@@ -1824,6 +1855,16 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
             state.include_system,
             BM_SETCHECK,
             WPARAM(if settings.podcast_include_system_audio {
+                BST_CHECKED.0 as usize
+            } else {
+                BST_UNCHECKED.0 as usize
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            state.show_inactive_apps,
+            BM_SETCHECK,
+            WPARAM(if settings.podcast_show_inactive_apps {
                 BST_CHECKED.0 as usize
             } else {
                 BST_UNCHECKED.0 as usize
@@ -1966,6 +2007,12 @@ fn update_source_controls(state: &PodcastState) {
                 && !matches!(capture_mode, PodcastSystemCaptureMode::AllSystem),
         );
         EnableWindow(
+            state.show_inactive_apps,
+            system_checked
+                && state.system_available
+                && !matches!(capture_mode, PodcastSystemCaptureMode::AllSystem),
+        );
+        EnableWindow(
             state.selected_apps,
             system_checked && state.system_available && selected_apps_mode,
         );
@@ -1998,6 +2045,14 @@ fn update_source_controls(state: &PodcastState) {
         ShowWindow(
             state.selected_apps,
             if system_checked && selected_apps_mode {
+                windows::Win32::UI::WindowsAndMessaging::SW_SHOW
+            } else {
+                windows::Win32::UI::WindowsAndMessaging::SW_HIDE
+            },
+        );
+        ShowWindow(
+            state.show_inactive_apps,
+            if system_checked && !matches!(capture_mode, PodcastSystemCaptureMode::AllSystem) {
                 windows::Win32::UI::WindowsAndMessaging::SW_SHOW
             } else {
                 windows::Win32::UI::WindowsAndMessaging::SW_HIDE
@@ -2046,6 +2101,7 @@ fn update_source_controls(state: &PodcastState) {
             EnableWindow(state.system_capture_mode, false);
             EnableWindow(state.single_app, false);
             EnableWindow(state.selected_apps, false);
+            EnableWindow(state.show_inactive_apps, false);
             EnableWindow(state.refresh_single_app, false);
             EnableWindow(state.test_single_app_audio, false);
             ShowWindow(
@@ -2630,6 +2686,7 @@ fn persist_settings(state: &PodcastState) {
     } else {
         PodcastSystemCaptureMode::AllSystem
     };
+    let show_inactive_apps = is_checked(state.show_inactive_apps);
     let single_app_pid = selected_single_app(state).map(|app| app.pid).unwrap_or(0);
     let selected_app_pids = selected_app_pids(state);
     let output_format = selected_format(state);
@@ -2648,6 +2705,7 @@ fn persist_settings(state: &PodcastState) {
                 && matches!(system_capture_mode, PodcastSystemCaptureMode::SingleApp);
             app.settings.podcast_single_app_pid = single_app_pid;
             app.settings.podcast_selected_app_pids = selected_app_pids;
+            app.settings.podcast_show_inactive_apps = show_inactive_apps;
             app.settings.podcast_output_format = output_format;
             app.settings.podcast_mp3_bitrate = bitrate;
             app.settings.podcast_save_folder = save_folder;
@@ -2825,7 +2883,7 @@ fn refresh_single_app_list(
         SendMessageW(state.single_app, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
         SendMessageW(state.selected_apps, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
     }
-    state.single_apps = load_single_apps(state.language);
+    state.single_apps = load_single_apps(state.language, is_checked(state.show_inactive_apps));
     let mut selected_index = 0usize;
     for (index, app) in state.single_apps.iter().enumerate() {
         let name = to_wide(&app.display_name);

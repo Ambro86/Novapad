@@ -1341,6 +1341,7 @@
   "podcast.selected_apps": "Aplikacije za snimanje",
   "podcast.selected_apps.none_running": "Nijedna podržana aplikacija trenutno nije pokrenuta.",
   "podcast.selected_apps.refresh": "Osveži listu aplikacija",
+  "podcast.show_inactive_apps": "Prikaži i neaktivne aplikacije",
   "podcast.test_single_app_audio": "Testiraj zvuk aplikacije",
   "podcast.test_selected_apps_audio": "Test zvuka izabranih aplikacija",
   "podcast.error.single_app_required": "Izaberite aplikaciju za snimanje.",

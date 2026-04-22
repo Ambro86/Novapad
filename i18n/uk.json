@@ -1341,6 +1341,7 @@
   "podcast.selected_apps": "Програми для запису",
   "podcast.selected_apps.none_running": "Жодна підтримувана програма наразі не запущена.",
   "podcast.selected_apps.refresh": "Оновити список програм",
+  "podcast.show_inactive_apps": "Показувати також неактивні програми",
   "podcast.test_single_app_audio": "Тест аудіо програми",
   "podcast.test_selected_apps_audio": "Тест звуку вибраних програм",
   "podcast.error.single_app_required": "Виберіть програму для запису.",

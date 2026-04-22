@@ -1341,6 +1341,7 @@
   "podcast.selected_apps": "Aplicaciones a grabar",
   "podcast.selected_apps.none_running": "No hay aplicaciones compatibles en ejecución.",
   "podcast.selected_apps.refresh": "Actualizar lista de aplicaciones",
+  "podcast.show_inactive_apps": "Mostrar aplicaciones inactivas",
   "podcast.test_single_app_audio": "Probar audio de la aplicación",
   "podcast.test_selected_apps_audio": "Probar audio de aplicaciones seleccionadas",
   "podcast.error.single_app_required": "Selecciona una aplicación para grabar.",

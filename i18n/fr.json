@@ -1341,6 +1341,7 @@
   "podcast.selected_apps": "Applications à enregistrer",
   "podcast.selected_apps.none_running": "Aucune application prise en charge n’est en cours d’exécution.",
   "podcast.selected_apps.refresh": "Actualiser la liste des applications",
+  "podcast.show_inactive_apps": "Afficher les applications inactives",
   "podcast.test_single_app_audio": "Tester l’audio de l’application",
   "podcast.test_selected_apps_audio": "Tester l’audio des applications sélectionnées",
   "podcast.error.single_app_required": "Sélectionnez une application à enregistrer.",

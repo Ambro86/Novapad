@@ -664,6 +664,8 @@ pub struct AppSettings {
     pub podcast_single_app_pid: u32,
     #[serde(default)]
     pub podcast_selected_app_pids: Vec<u32>,
+    #[serde(default)]
+    pub podcast_show_inactive_apps: bool,
     pub podcast_output_format: PodcastFormat,
     pub podcast_mp3_bitrate: u32,
     pub podcast_save_folder: String,
@@ -1026,6 +1028,7 @@ impl Default for AppSettings {
             podcast_include_single_app: false,
             podcast_single_app_pid: 0,
             podcast_selected_app_pids: Vec::new(),
+            podcast_show_inactive_apps: false,
             podcast_output_format: PodcastFormat::Mp3,
             podcast_mp3_bitrate: 128,
             podcast_save_folder: default_podcast_save_folder(),

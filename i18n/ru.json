@@ -1341,6 +1341,7 @@
   "podcast.selected_apps": "Приложения для записи",
   "podcast.selected_apps.none_running": "Нет запущенных поддерживаемых приложений.",
   "podcast.selected_apps.refresh": "Обновить список приложений",
+  "podcast.show_inactive_apps": "Показывать также неактивные приложения",
   "podcast.test_single_app_audio": "Тест звука приложения",
   "podcast.test_selected_apps_audio": "Проверка звука выбранных приложений",
   "podcast.error.single_app_required": "Выберите приложение для записи.",

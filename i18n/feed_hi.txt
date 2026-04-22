@@ -1,0 +1,30 @@
+BBC Hindi | https://feeds.bbci.co.uk/hindi/rss.xml
+Aaj Tak – Top Stories | https://www.aajtak.in/rssfeeds/?id=home
+NDTV India – Top News | https://feeds.feedburner.com/ndtvkhabar
+Zee News Hindi – Top News | https://zeenews.india.com/hindi/rss/news.xml
+Amar Ujala – Top News | https://www.amarujala.com/rss/news.xml
+Dainik Jagran – National | https://www.jagran.com/rss/news/national.xml
+Navbharat Times – Top News | https://navbharattimes.indiatimes.com/rssfeedsdefault.cms
+Live Hindustan – Top News | https://www.livehindustan.com/rss
+Patrika – News | https://www.patrika.com/rss-feed/
+Punjab Kesari – News | https://www.punjabkesari.in/rss
+Prabhat Khabar – News | https://www.prabhatkhabar.com/rss
+Webdunia Hindi – News | https://hindi.webdunia.com/rss
+News18 Hindi – Top News | https://hindi.news18.com/rss/khabar.xml
+ABP News Hindi – Top News | https://www.abplive.com/rss
+India TV Hindi – News | https://www.indiatvnews.com/rssnews/topstory.xml
+TV9 Bharatvarsh – News | https://www.tv9hindi.com/rss
+OneIndia Hindi | https://hindi.oneindia.com/rss
+News Track Hindi | https://www.newstracklive.com/rss
+Catch Hindi | https://hindi.catchnews.com/rss
+Tez News | https://teznews.com/feed/
+JanSatta | https://www.jansatta.com/feed/
+Lokmat News Hindi | https://www.lokmatnews.in/rss/
+Rajasthan Patrika – National | https://www.patrika.com/national-news/rss/
+Economic Times Hindi | https://economictimes.indiatimes.com/rssfeedsdefault.cms
+Business Standard | https://www.business-standard.com/rss/home_page_top_stories.rss
+Down To Earth | https://www.downtoearth.org.in/rss
+India Today | https://www.indiatoday.in/rss
+Gadgets 360 | https://feeds.feedburner.com/gadgets360-latest
+Digit India | https://www.digit.in/rss/news.xml
+Firstpost | https://www.firstpost.com/rss/world.xml

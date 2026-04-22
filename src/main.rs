@@ -3852,44 +3852,57 @@ pub(crate) fn current_playback_media_path(hwnd: HWND) -> Option<PathBuf> {
     .flatten()
 }
 
-pub(crate) fn restore_transcription_progress_focus_for_current_document(hwnd: HWND) {
-    let (progress_hwnd, transcription_in_progress, transcription_media_path, current_doc_path) =
-        with_state(hwnd, |state| {
-            let current_doc_path = state.docs.get(state.current).and_then(|doc| {
-                if matches!(doc.format, FileFormat::Audiobook) {
-                    doc.path.clone()
-                } else {
-                    None
-                }
-            });
-            (
-                state.transcription_progress_window,
-                state.transcription_in_progress,
-                state.transcription_media_path.clone(),
-                current_doc_path,
-            )
-        })
-        .unwrap_or((HWND(0), false, None, None));
+pub(crate) fn restore_transcription_progress_focus_for_current_document(hwnd: HWND) -> bool {
+    let (
+        progress_hwnd,
+        transcription_in_progress,
+        transcription_media_path,
+        current_doc_path,
+        tab_hwnd,
+        focused_hwnd,
+    ) = with_state(hwnd, |state| {
+        let current_doc_path = state.docs.get(state.current).and_then(|doc| {
+            if matches!(doc.format, FileFormat::Audiobook) {
+                doc.path.clone()
+            } else {
+                None
+            }
+        });
+        (
+            state.transcription_progress_window,
+            state.transcription_in_progress,
+            state.transcription_media_path.clone(),
+            current_doc_path,
+            state.hwnd_tab,
+            crate::get_focus_safe(),
+        )
+    })
+    .unwrap_or((HWND(0), false, None, None, HWND(0), HWND(0)));
 
     if !transcription_in_progress || progress_hwnd.0 == 0 || !is_window_handle_valid(progress_hwnd)
     {
-        return;
+        return false;
+    }
+
+    if focused_hwnd != hwnd && focused_hwnd != tab_hwnd {
+        return false;
     }
 
     let Some(transcription_media_path) = transcription_media_path else {
-        return;
+        return false;
     };
     let Some(current_doc_path) = current_doc_path else {
-        return;
+        return false;
     };
 
     if current_doc_path != transcription_media_path {
-        return;
+        return false;
     }
 
     show_window_safe(progress_hwnd, SW_SHOW);
     set_foreground_window_safe(progress_hwnd);
     app_windows::podcast_save_window::focus_cancel_button(progress_hwnd);
+    true
 }
 
 fn is_stream_cache_media(path: &Path) -> bool {
@@ -5371,6 +5384,10 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
     unsafe {
         let foreground = GetForegroundWindow();
         with_state(hwnd, |state| {
+            let current_doc_path = state
+                .docs
+                .get(state.current)
+                .and_then(|doc| doc.path.clone());
             let is_reader_mode = state
                 .docs
                 .get(state.current)
@@ -5379,9 +5396,13 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
             let blocking_modal_open = state.blocking_modal.active.is_some();
             let audiobook_progress_in_foreground =
                 state.audiobook_progress.0 != 0 && foreground == state.audiobook_progress;
+            let transcription_blocks_focus = state.transcription_progress_window.0 != 0
+                && state.transcription_in_progress
+                && state.transcription_media_path.is_some()
+                && state.transcription_media_path == current_doc_path;
             !blocking_modal_open
                 && state.update_progress_window.0 == 0
-                && state.transcription_progress_window.0 == 0
+                && !transcription_blocks_focus
                 && state.bdciechi_window.0 == 0
                 && state.replace_progress_window.0 == 0
                 && !audiobook_progress_in_foreground
@@ -7182,6 +7203,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 LRESULT(0)
             }
             WM_SETFOCUS => {
+                if restore_transcription_progress_focus_for_current_document(hwnd) {
+                    return LRESULT(0);
+                }
                 force_active_editor_focus(hwnd);
                 LRESULT(0)
             }
@@ -7192,6 +7216,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         return LRESULT(0);
                     }
                     if reactivate_bdciechi_window(hwnd) {
+                        return LRESULT(0);
+                    }
+                    if restore_transcription_progress_focus_for_current_document(hwnd) {
                         return LRESULT(0);
                     }
                     if should_force_editor_focus_on_foreground(hwnd) {
@@ -8004,6 +8031,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     has_secondary_window_open(hwnd)
                 ));
                 log_foreground_snapshot("wm_focus_editor.before");
+                if restore_transcription_progress_focus_for_current_document(hwnd) {
+                    log_foreground_snapshot("wm_focus_editor.after_transcription_restore");
+                    return LRESULT(0);
+                }
                 if should_force_editor_focus_on_foreground(hwnd) {
                     force_active_editor_focus(hwnd);
                     schedule_editor_focus_retry(hwnd);

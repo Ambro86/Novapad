@@ -84,6 +84,101 @@ enum MonitorSource {
     ProcessLoopback(u32),
 }
 
+struct MonitorBuffer {
+    queues: Vec<Mutex<VecDeque<f32>>>,
+}
+
+impl MonitorBuffer {
+    fn new(source_count: usize) -> Self {
+        let mut queues = Vec::with_capacity(source_count);
+        for _ in 0..source_count {
+            queues.push(Mutex::new(VecDeque::with_capacity(24000)));
+        }
+        Self { queues }
+    }
+
+    fn push(&self, source_index: usize, mono: Vec<f32>) {
+        let Some(queue) = self.queues.get(source_index) else {
+            return;
+        };
+        if let Ok(mut q) = queue.lock() {
+            if q.len() > 24000 {
+                q.clear();
+            }
+            q.extend(mono);
+        }
+    }
+
+    fn pop_mixed(
+        &self,
+        frames_to_write: usize,
+        process_loopback_only: bool,
+        output_rate: u32,
+    ) -> Vec<f32> {
+        if self.queues.is_empty() {
+            return Vec::new();
+        }
+
+        if self.queues.len() == 1 {
+            let frames_to_pop = if process_loopback_only {
+                let ratio = 44_100f32 / output_rate as f32;
+                ((frames_to_write as f32 * ratio).ceil() as usize).max(1)
+            } else {
+                frames_to_write
+            };
+            if let Ok(mut q) = self.queues[0].lock() {
+                let mut mono = Vec::with_capacity(frames_to_pop);
+                while mono.len() < frames_to_pop && !q.is_empty() {
+                    mono.push(q.pop_front().unwrap_or(0.0));
+                }
+                return mono;
+            }
+            return Vec::new();
+        }
+
+        let mut locked = Vec::with_capacity(self.queues.len());
+        for queue in &self.queues {
+            let Ok(guard) = queue.lock() else {
+                return Vec::new();
+            };
+            locked.push(guard);
+        }
+
+        let target_frames = if process_loopback_only {
+            let ratio = 44_100f32 / output_rate as f32;
+            ((frames_to_write as f32 * ratio).ceil() as usize).max(1)
+        } else {
+            frames_to_write
+        };
+
+        let Some(frames_available) = locked.iter().map(|q| q.len()).max() else {
+            return Vec::new();
+        };
+        let frames_to_mix = frames_available.min(target_frames);
+        if frames_to_mix == 0 {
+            return Vec::new();
+        }
+
+        let mut mono = Vec::with_capacity(frames_to_mix);
+        for _ in 0..frames_to_mix {
+            let mut sum = 0.0f32;
+            let mut contributors = 0usize;
+            for queue in &mut locked {
+                if let Some(sample) = queue.pop_front() {
+                    sum += sample;
+                    contributors += 1;
+                }
+            }
+            if contributors == 0 {
+                mono.push(0.0);
+            } else {
+                mono.push((sum / contributors as f32).clamp(-1.0, 1.0));
+            }
+        }
+        mono
+    }
+}
+
 fn start_monitoring_source(source: MonitorSource, gain: f32) -> Result<MonitorHandle, String> {
     start_monitoring_sources(vec![source], gain)
 }
@@ -93,16 +188,19 @@ fn start_monitoring_sources(
     gain: f32,
 ) -> Result<MonitorHandle, String> {
     let stop = Arc::new(AtomicBool::new(false));
+    let process_loopback_only = sources
+        .iter()
+        .all(|source| matches!(source, MonitorSource::ProcessLoopback(_)));
 
-    // Shared buffer between capture and playback threads (small for low latency)
-    let buffer = Arc::new(Mutex::new(VecDeque::<f32>::with_capacity(24000)));
+    // Keep one queue per source; playback mixes them in sync.
+    let buffer = Arc::new(MonitorBuffer::new(sources.len()));
 
     let mut capture_threads = Vec::new();
-    for source in sources {
+    for (source_index, source) in sources.into_iter().enumerate() {
         let capture_stop = stop.clone();
         let capture_buffer = buffer.clone();
         capture_threads.push(thread::spawn(move || {
-            if let Err(e) = capture_loop(source, gain, capture_buffer, capture_stop) {
+            if let Err(e) = capture_loop(source, source_index, gain, capture_buffer, capture_stop) {
                 crate::log_debug(&format!("Monitor capture error: {}", e));
             }
         }));
@@ -114,7 +212,12 @@ fn start_monitoring_sources(
     // Don't prefer any specific device, use system default
     let playback_name = String::new();
     let playback_thread = thread::spawn(move || {
-        if let Err(e) = playback_loop(playback_buffer, playback_stop, playback_name) {
+        if let Err(e) = playback_loop(
+            playback_buffer,
+            playback_stop,
+            playback_name,
+            process_loopback_only,
+        ) {
             crate::log_debug(&format!("Monitor playback error: {}", e));
         }
     });
@@ -286,12 +389,61 @@ fn to_mono_f32(samples: &[f32], channels: usize, gain: f32) -> Vec<f32> {
     out
 }
 
+struct LinearResampler {
+    input_rate: u32,
+    output_rate: u32,
+    channels: usize,
+    pos: f64,
+    buffer: Vec<f32>,
+}
+
+impl LinearResampler {
+    fn new(input_rate: u32, output_rate: u32, channels: usize) -> Self {
+        Self {
+            input_rate,
+            output_rate,
+            channels,
+            pos: 0.0,
+            buffer: Vec::new(),
+        }
+    }
+
+    fn push(&mut self, samples: &[f32]) -> Vec<f32> {
+        self.buffer.extend_from_slice(samples);
+        if self.input_rate == 0 || self.output_rate == 0 || self.channels == 0 {
+            return Vec::new();
+        }
+        let step = self.input_rate as f64 / self.output_rate as f64;
+        let frames_available = self.buffer.len() / self.channels;
+        let mut out = Vec::new();
+        while self.pos + 1.0 < frames_available as f64 {
+            let i0 = self.pos.floor() as usize;
+            let i1 = i0 + 1;
+            let frac = self.pos - i0 as f64;
+            for ch in 0..self.channels {
+                let s0 = self.buffer[i0 * self.channels + ch];
+                let s1 = self.buffer[i1 * self.channels + ch];
+                out.push((1.0 - frac as f32) * s0 + (frac as f32) * s1);
+            }
+            self.pos += step;
+        }
+        let drop_frames = self.pos.floor() as usize;
+        if drop_frames > 0 {
+            let drop_samples = drop_frames * self.channels;
+            self.buffer.drain(0..drop_samples);
+            self.pos -= drop_frames as f64;
+        }
+        out
+    }
+}
+
 use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
 
 fn capture_loop(
     source: MonitorSource,
+    source_index: usize,
     gain: f32,
-    buffer: Arc<Mutex<VecDeque<f32>>>,
+    buffer: Arc<MonitorBuffer>,
     stop: Arc<AtomicBool>,
 ) -> Result<(), String> {
     match &source {
@@ -433,14 +585,7 @@ fn capture_loop(
         // Convert to mono and apply gain
         let mono = to_mono_f32(&samples, input_channels as usize, gain);
 
-        // Push to shared buffer
-        if let Ok(mut q) = buffer.lock() {
-            // Prevent buffer from growing too large (keep latency low)
-            if q.len() > 24000 {
-                q.clear(); // Drop all old samples to reset latency
-            }
-            q.extend(mono);
-        }
+        buffer.push(source_index, mono);
     }
 
     unsafe {
@@ -450,9 +595,10 @@ fn capture_loop(
 }
 
 fn playback_loop(
-    buffer: Arc<Mutex<VecDeque<f32>>>,
+    buffer: Arc<MonitorBuffer>,
     stop: Arc<AtomicBool>,
     preferred_output_name: String,
+    process_loopback_only: bool,
 ) -> Result<(), String> {
     let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
 
@@ -470,14 +616,21 @@ fn playback_loop(
     };
     let (output_rate, output_channels, output_format) = parse_mix_format_ptr(mix_format)?;
     crate::log_debug(&format!(
-        "Monitor playback: rate={}, channels={}, format={:?}",
+        "Monitor playback: rate={}, channels={}, format={:?}, process_loopback_only={}",
         output_rate,
         output_channels,
         match output_format {
             SampleFormat::F32 => "F32",
             SampleFormat::I16 => "I16",
-        }
+        },
+        process_loopback_only
     ));
+
+    let mut process_resampler = if process_loopback_only && output_rate != 44_100 {
+        Some(LinearResampler::new(44_100, output_rate, 1))
+    } else {
+        None
+    };
 
     let buffer_size = unsafe {
         client
@@ -528,17 +681,22 @@ fn playback_loop(
         };
 
         // Get samples from shared buffer
-        let mut samples_needed = frames_to_write as usize * output_channels as usize;
-        let mut output_samples = Vec::with_capacity(samples_needed);
+        let mut output_samples =
+            Vec::with_capacity(frames_to_write as usize * output_channels as usize);
 
-        if let Ok(mut q) = buffer.lock() {
-            while samples_needed > 0 && !q.is_empty() {
-                let mono = q.pop_front().unwrap_or(0.0);
-                // Expand mono to all output channels
-                for _ in 0..output_channels {
-                    output_samples.push(mono);
-                    samples_needed = samples_needed.saturating_sub(1);
-                }
+        let mono_samples =
+            buffer.pop_mixed(frames_to_write as usize, process_loopback_only, output_rate);
+
+        let playback_mono = if let Some(resampler) = process_resampler.as_mut() {
+            resampler.push(&mono_samples)
+        } else {
+            mono_samples
+        };
+
+        let mono_frames_to_write = playback_mono.len().min(frames_to_write as usize);
+        for mono in playback_mono.into_iter().take(mono_frames_to_write) {
+            for _ in 0..output_channels {
+                output_samples.push(mono);
             }
         }
 

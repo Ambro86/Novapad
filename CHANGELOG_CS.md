@@ -4,6 +4,7 @@ Verze 0.7.0 – 2026-04-12
 
 Co je nového
 • Vylepšeno nahrávání podcastů systémového zvuku: nyní si můžete zvolit, zda chcete nahrávat veškerý systémový zvuk, jednu aplikaci nebo více aplikací současně. Tato volba je integrována do běžného nahrávání, takže mikrofon lze stále samostatně zapnout nebo vypnout.
+• Přidána možnost v kartě Editor, která při použití šipek nahoru a dolů vždy přesune kurzor na začátek řádku.
 
 Opravy
 • Opravena klávesa `F10`, takže při čtení textu znovu přepíná na další oblíbený hlas.

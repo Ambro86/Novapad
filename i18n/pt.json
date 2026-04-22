@@ -466,6 +466,7 @@
   "options.label.wikipedia_language": "Idioma da Wikipédia:",
   "options.label.word_wrap": "Quebra automática no editor",
   "options.label.editor_escape_closes_window": "Escape fecha a janela do editor",
+  "options.label.editor_up_down_moves_to_line_start": "As setas para cima/baixo movem o cursor para o início da linha",
   "options.label.wrap_width": "Largura da linha (caracteres):",
   "options.lang.cs": "Tcheco",
   "options.lang.en": "Inglês",

@@ -518,6 +518,7 @@
   "options.label.wikipedia_language": "Lingua di Wikipedia:",
   "options.label.word_wrap": "A capo automatico nella finestra",
   "options.label.editor_escape_closes_window": "Esc chiude la finestra dell'editor",
+  "options.label.editor_up_down_moves_to_line_start": "Le frecce su/giù spostano il cursore all'inizio della riga",
   "options.label.wrap_width": "Larghezza riga (caratteri):",
   "options.lang.cs": "Ceco",
   "options.lang.en": "Inglese",

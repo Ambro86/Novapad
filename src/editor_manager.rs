@@ -135,6 +135,24 @@ unsafe extern "system" fn edit_subclass_proc(
 
 fn edit_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     unsafe {
+        let call_prev = || {
+            let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+            if prev != 0 {
+                CallWindowProcW(
+                    Some(std::mem::transmute::<
+                        isize,
+                        unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
+                    >(prev)),
+                    hwnd,
+                    msg,
+                    wparam,
+                    lparam,
+                )
+            } else {
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+        };
+
         if msg == WM_KEYDOWN && wparam.0 as u32 == VK_TAB.0 as u32 {
             let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
             let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
@@ -156,6 +174,9 @@ fn edit_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
         }
         if msg == WM_KEYDOWN {
             let vk = wparam.0 as u32;
+            let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+            let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+            let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
             if vk == VK_ESCAPE.0 as u32 {
                 let parent = GetParent(hwnd);
                 if with_state(parent, |state| state.settings.editor_escape_closes_window)
@@ -163,6 +184,57 @@ fn edit_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 {
                     try_close_app(parent);
                     return LRESULT(0);
+                }
+            }
+            if !ctrl_down
+                && !shift_down
+                && !alt_down
+                && (vk == VK_UP.0 as u32 || vk == VK_DOWN.0 as u32)
+            {
+                let parent = GetParent(hwnd);
+                let move_to_line_start = with_state(parent, |state| {
+                    state.settings.editor_up_down_moves_to_line_start
+                })
+                .unwrap_or(false);
+                if move_to_line_start {
+                    if with_state(parent, |state| {
+                        state.spellcheck_typing_in_progress = false;
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access editor state");
+                    }
+                    let result = call_prev();
+                    let mut caret_pos: u32 = 0;
+                    SendMessageW(
+                        hwnd,
+                        EM_GETSEL,
+                        WPARAM(&mut caret_pos as *mut u32 as usize),
+                        LPARAM(0),
+                    );
+                    let line = crate::send_message_w_safe(
+                        hwnd,
+                        EM_LINEFROMCHAR,
+                        WPARAM(caret_pos as usize),
+                        LPARAM(0),
+                    )
+                    .0 as i32;
+                    let line_start = crate::send_message_w_safe(
+                        hwnd,
+                        EM_LINEINDEX,
+                        WPARAM(line as usize),
+                        LPARAM(0),
+                    )
+                    .0 as i32;
+                    if line_start >= 0 {
+                        SendMessageW(
+                            hwnd,
+                            EM_SETSEL,
+                            WPARAM(line_start as usize),
+                            LPARAM(line_start as isize),
+                        );
+                    }
+                    return result;
                 }
             }
             if matches!(
@@ -257,21 +329,7 @@ fn edit_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             return LRESULT(0);
         }
 
-        let prev = GetWindowLongPtrW(hwnd, GWLP_USERDATA);
-        if prev != 0 {
-            CallWindowProcW(
-                Some(std::mem::transmute::<
-                    isize,
-                    unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT,
-                >(prev)),
-                hwnd,
-                msg,
-                wparam,
-                lparam,
-            )
-        } else {
-            DefWindowProcW(hwnd, msg, wparam, lparam)
-        }
+        call_prev()
     }
 }
 

@@ -71,6 +71,7 @@ const OPTIONS_ID_MULTILINGUAL: usize = 6004;
 const OPTIONS_ID_SPLIT_ON_NEWLINE: usize = 6007;
 const OPTIONS_ID_WORD_WRAP: usize = 6008;
 const OPTIONS_ID_EDITOR_ESCAPE_CLOSES_WINDOW: usize = 6132;
+const OPTIONS_ID_EDITOR_UP_DOWN_MOVES_TO_LINE_START: usize = 6133;
 const OPTIONS_ID_SMART_QUOTES: usize = 6025;
 const OPTIONS_ID_STRIP_MARKDOWN_KEEP_BULLETS: usize = 6039;
 const OPTIONS_ID_CONTEXT_MENU: usize = 6026;
@@ -985,6 +986,7 @@ struct OptionsDialogState {
     checkbox_split_on_newline: HWND,
     checkbox_word_wrap: HWND,
     checkbox_editor_escape_closes_window: HWND,
+    checkbox_editor_up_down_moves_to_line_start: HWND,
     checkbox_smart_quotes: HWND,
     checkbox_strip_markdown_keep_bullets: HWND,
     checkbox_spellcheck: HWND,
@@ -1102,6 +1104,7 @@ struct OptionsLabels {
     label_split_on_newline: String,
     label_word_wrap: String,
     label_editor_escape_closes_window: String,
+    label_editor_up_down_moves_to_line_start: String,
     label_smart_quotes: String,
     label_strip_markdown_keep_bullets: String,
     label_spellcheck: String,
@@ -1316,6 +1319,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_editor_escape_closes_window: i18n::tr(
             language,
             "options.label.editor_escape_closes_window",
+        ),
+        label_editor_up_down_moves_to_line_start: i18n::tr(
+            language,
+            "options.label.editor_up_down_moves_to_line_start",
         ),
         label_smart_quotes: i18n::tr(language, "options.label.smart_quotes"),
         label_strip_markdown_keep_bullets: i18n::tr(
@@ -5068,6 +5075,22 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 24;
 
+                let checkbox_editor_up_down_moves_to_line_start = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_editor_up_down_moves_to_line_start).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    420,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_EDITOR_UP_DOWN_MOVES_TO_LINE_START as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 24;
+
                 let checkbox_smart_quotes = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -5928,6 +5951,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_split_on_newline,
                     checkbox_word_wrap,
                     checkbox_editor_escape_closes_window,
+                    checkbox_editor_up_down_moves_to_line_start,
                     checkbox_smart_quotes,
                     checkbox_strip_markdown_keep_bullets,
                     checkbox_spellcheck,
@@ -6126,6 +6150,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_split_on_newline,
                     checkbox_word_wrap,
                     checkbox_editor_escape_closes_window,
+                    checkbox_editor_up_down_moves_to_line_start,
                     checkbox_smart_quotes,
                     checkbox_strip_markdown_keep_bullets,
                     checkbox_spellcheck,
@@ -6764,6 +6789,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             checkbox_split_on_newline,
             checkbox_word_wrap,
             checkbox_editor_escape_closes_window,
+            checkbox_editor_up_down_moves_to_line_start,
             checkbox_smart_quotes,
             checkbox_strip_markdown_keep_bullets,
             checkbox_spellcheck,
@@ -6902,6 +6928,7 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.checkbox_split_on_newline,
                 state.checkbox_word_wrap,
                 state.checkbox_editor_escape_closes_window,
+                state.checkbox_editor_up_down_moves_to_line_start,
                 state.checkbox_smart_quotes,
                 state.checkbox_strip_markdown_keep_bullets,
                 state.checkbox_spellcheck,
@@ -7631,6 +7658,16 @@ fn initialize_options_dialog(hwnd: HWND) {
             checkbox_editor_escape_closes_window,
             BM_SETCHECK,
             WPARAM(if settings.editor_escape_closes_window {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_editor_up_down_moves_to_line_start,
+            BM_SETCHECK,
+            WPARAM(if settings.editor_up_down_moves_to_line_start {
                 BST_CHECKED.0 as usize
             } else {
                 0
@@ -10312,6 +10349,7 @@ fn apply_options_dialog(hwnd: HWND) {
             checkbox_split_on_newline,
             checkbox_word_wrap,
             checkbox_editor_escape_closes_window,
+            checkbox_editor_up_down_moves_to_line_start,
             checkbox_smart_quotes,
             checkbox_strip_markdown_keep_bullets,
             checkbox_spellcheck,
@@ -10407,6 +10445,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.checkbox_split_on_newline,
                 state.checkbox_word_wrap,
                 state.checkbox_editor_escape_closes_window,
+                state.checkbox_editor_up_down_moves_to_line_start,
                 state.checkbox_smart_quotes,
                 state.checkbox_strip_markdown_keep_bullets,
                 state.checkbox_spellcheck,
@@ -10666,6 +10705,14 @@ fn apply_options_dialog(hwnd: HWND) {
             == BST_CHECKED.0;
         settings.editor_escape_closes_window = SendMessageW(
             checkbox_editor_escape_closes_window,
+            BM_GETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0 as u32
+            == BST_CHECKED.0;
+        settings.editor_up_down_moves_to_line_start = SendMessageW(
+            checkbox_editor_up_down_moves_to_line_start,
             BM_GETCHECK,
             WPARAM(0),
             LPARAM(0),
@@ -12396,6 +12443,11 @@ fn layout_editor_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
         state.checkbox_editor_escape_closes_window,
         y,
     );
+    y = layout_checkbox(
+        "checkbox_editor_up_down_moves_to_line_start",
+        state.checkbox_editor_up_down_moves_to_line_start,
+        y,
+    );
     y = layout_checkbox("checkbox_smart_quotes", state.checkbox_smart_quotes, y);
     y = layout_checkbox(
         "checkbox_strip_markdown_keep_bullets",
@@ -13163,6 +13215,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
         for control in [
             state.checkbox_word_wrap,
             state.checkbox_editor_escape_closes_window,
+            state.checkbox_editor_up_down_moves_to_line_start,
             state.checkbox_smart_quotes,
             state.checkbox_strip_markdown_keep_bullets,
             state.checkbox_spellcheck,

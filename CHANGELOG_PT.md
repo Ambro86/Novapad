@@ -4,6 +4,7 @@ Versão 0.7.0 – 2026-04-12
 
 Novidades
 • Melhorada a gravação de podcasts do áudio do sistema: agora é possível escolher entre gravar todo o áudio do sistema, uma única aplicação ou várias aplicações ao mesmo tempo. Esta opção está integrada com a gravação normal, pelo que continua a ser possível ativar ou desativar o microfone separadamente.
+• Adicionada uma opção na aba Editor para mover sempre o cursor para o início da linha ao usar as setas para cima e para baixo.
 
 Correções
 • Nos comentários do YouTube abertos a partir de "Reproduzir áudio por streaming...", o Sonarpad passa agora a carregar inicialmente apenas os primeiros 50 comentários principais, incluindo sempre todas as respostas desses comentários, e adiciona no fim uma opção para carregar todos os comentários a pedido.

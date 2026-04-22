@@ -466,6 +466,7 @@
   "options.label.wikipedia_language": "Jazyk Wikipedie:",
   "options.label.word_wrap": "Zalamování řádků v editoru",
   "options.label.editor_escape_closes_window": "Escape zavře okno editoru",
+  "options.label.editor_up_down_moves_to_line_start": "Šipky nahoru/dolů přesouvají kurzor na začátek řádku",
   "options.label.wrap_width": "Šířka zalomení (znaky):",
   "options.lang.cs": "Čeština",
   "options.lang.en": "Angličtina",

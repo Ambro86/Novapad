@@ -466,6 +466,7 @@
   "options.label.wikipedia_language": "Jezik za Vikipediju:",
   "options.label.word_wrap": "Prelamanje teksta u uređivaču",
   "options.label.editor_escape_closes_window": "Escape zatvara prozor editora",
+  "options.label.editor_up_down_moves_to_line_start": "Strelice gore/dole pomeraju kursor na početak reda",
   "options.label.wrap_width": "Širina prelamanja (u znakovima):",
   "options.lang.cs": "Češki",
   "options.lang.en": "Engleski",

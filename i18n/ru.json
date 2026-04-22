@@ -466,6 +466,7 @@
   "options.label.wikipedia_language": "Язык Википедии:",
   "options.label.word_wrap": "Перенос по словам в редакторе",
   "options.label.editor_escape_closes_window": "Escape закрывает окно редактора",
+  "options.label.editor_up_down_moves_to_line_start": "Стрелки вверх/вниз перемещают курсор в начало строки",
   "options.label.wrap_width": "Ширина переноса (символов):",
   "options.lang.cs": "Чешский",
   "options.lang.en": "Английский",

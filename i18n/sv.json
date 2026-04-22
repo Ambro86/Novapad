@@ -466,6 +466,7 @@
   "options.label.wikipedia_language": "Wikipedia-språk:",
   "options.label.word_wrap": "Radbrytning i redigeraren",
   "options.label.editor_escape_closes_window": "Escape stänger redigerarfönstret",
+  "options.label.editor_up_down_moves_to_line_start": "Upp-/nedpilar flyttar markören till början av raden",
   "options.label.wrap_width": "Radbrytningsbredd (tecken):",
   "options.lang.cs": "Tjeckiska",
   "options.lang.en": "Engelska",

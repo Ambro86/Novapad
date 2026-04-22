@@ -466,6 +466,7 @@
   "options.label.wikipedia_language": "Мова Вікіпедії:",
   "options.label.word_wrap": "Перенесення слів",
   "options.label.editor_escape_closes_window": "Escape закриває вікно редактора",
+  "options.label.editor_up_down_moves_to_line_start": "Стрілки вгору/вниз переміщують курсор на початок рядка",
   "options.label.wrap_width": "Ширина рядка (симв.):",
   "options.lang.cs": "Чеська",
   "options.lang.en": "Англійська",

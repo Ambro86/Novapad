@@ -466,6 +466,7 @@
   "options.label.wikipedia_language": "Wikipedia भाषा:",
   "options.label.word_wrap": "एडिटर में वर्ड रैप",
   "options.label.editor_escape_closes_window": "Escape एडिटर विंडो बंद करे",
+  "options.label.editor_up_down_moves_to_line_start": "ऊपर/नीचे तीर कर्सर को पंक्ति की शुरुआत पर ले जाते हैं",
   "options.label.wrap_width": "रैप चौड़ाई (अक्षर):",
   "options.lang.cs": "चेक",
   "options.lang.en": "अंग्रेज़ी",

@@ -4,6 +4,7 @@ Versione 0.7.0 – 2026-04-12
 
 Novità
 • Migliorata la registrazione podcast dell'audio di sistema: ora è possibile scegliere se registrare tutto l'audio di sistema, una singola applicazione oppure più applicazioni contemporaneamente. Questa scelta è integrata con la registrazione normale, quindi è comunque possibile attivare o disattivare il microfono separatamente.
+• Aggiunta un'opzione nella scheda Editor per spostare il cursore sempre all'inizio della riga usando le frecce su e giù.
 
 Correzioni
 • Corretto il tasto `F10`, che ora torna a passare alla voce preferita successiva durante la lettura del testo.

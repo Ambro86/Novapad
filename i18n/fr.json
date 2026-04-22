@@ -466,6 +466,7 @@
   "options.label.wikipedia_language": "Langue de Wikipédia :",
   "options.label.word_wrap": "Retour à la ligne automatique",
   "options.label.editor_escape_closes_window": "Échap ferme la fenêtre de l’éditeur",
+  "options.label.editor_up_down_moves_to_line_start": "Les flèches haut/bas déplacent le curseur au début de la ligne",
   "options.label.wrap_width": "Largeur de ligne (caractères) :",
   "options.lang.cs": "Tchèque",
   "options.lang.en": "Anglais",

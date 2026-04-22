@@ -466,6 +466,7 @@
   "options.label.wikipedia_language": "Ngôn ngữ Wikipedia:",
   "options.label.word_wrap": "Tự động xuống dòng trong trình soạn thảo",
   "options.label.editor_escape_closes_window": "Phím Escape đóng cửa sổ trình soạn thảo",
+  "options.label.editor_up_down_moves_to_line_start": "Phím mũi tên lên/xuống đưa con trỏ về đầu dòng",
   "options.label.wrap_width": "Độ rộng ngắt dòng (ký tự):",
   "options.lang.cs": "Tiếng Séc",
   "options.lang.en": "Tiếng Anh",

@@ -1343,6 +1343,7 @@
   "podcast.selected_apps.refresh": "Làm mới danh sách ứng dụng",
   "podcast.show_inactive_apps": "Hiển thị cả ứng dụng không hoạt động",
   "podcast.test_single_app_audio": "Kiểm tra âm thanh ứng dụng",
+  "podcast.test_system_audio": "Kiểm tra âm thanh hệ thống (300 ms)",
   "podcast.test_selected_apps_audio": "Kiểm tra âm thanh ứng dụng đã chọn",
   "podcast.error.single_app_required": "Chọn ứng dụng để ghi.",
   "podcast.error.single_app_unavailable": "Không thể ghi âm từ một ứng dụng cho ứng dụng đã chọn.",

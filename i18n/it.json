@@ -1395,6 +1395,7 @@
   "podcast.selected_apps.refresh": "Aggiorna elenco applicazioni",
   "podcast.show_inactive_apps": "Mostra anche le applicazioni inattive",
   "podcast.test_single_app_audio": "Test audio applicazione",
+  "podcast.test_system_audio": "Test audio di sistema (300 ms)",
   "podcast.test_selected_apps_audio": "Test audio applicazioni selezionate",
   "podcast.error.single_app_required": "Seleziona un'applicazione da registrare.",
   "podcast.error.single_app_unavailable": "La registrazione audio di una singola applicazione non è disponibile per l'app selezionata.",

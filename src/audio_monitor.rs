@@ -61,6 +61,14 @@ pub fn start_monitoring(
     start_monitoring_source(MonitorSource::InputDevice(device_id), gain)
 }
 
+pub fn start_system_monitoring(
+    device_id: String,
+    device_name: String,
+    gain: f32,
+) -> Result<MonitorHandle, String> {
+    start_monitoring_source(MonitorSource::SystemLoopback(device_id, device_name), gain)
+}
+
 pub fn start_process_monitoring(process_id: u32, gain: f32) -> Result<MonitorHandle, String> {
     start_monitoring_source(MonitorSource::ProcessLoopback(process_id), gain)
 }
@@ -81,6 +89,7 @@ pub fn start_processes_monitoring(process_ids: &[u32], gain: f32) -> Result<Moni
 #[derive(Clone)]
 enum MonitorSource {
     InputDevice(String),
+    SystemLoopback(String, String),
     ProcessLoopback(u32),
 }
 
@@ -255,6 +264,72 @@ fn resolve_input_device(device_id: &str) -> Result<IMMDevice, String> {
         crate::log_debug("Monitor: input device found successfully");
     }
     result
+}
+
+fn resolve_output_loopback_device(device_id: &str, device_name: &str) -> Result<IMMDevice, String> {
+    let enumerator: IMMDeviceEnumerator = unsafe {
+        CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
+    };
+
+    if device_id.is_empty() || device_id == PODCAST_DEVICE_DEFAULT {
+        crate::log_debug("Monitor: using default output device for loopback");
+        return unsafe {
+            enumerator
+                .GetDefaultAudioEndpoint(eRender, eConsole)
+                .map_err(|e| format!("GetDefaultAudioEndpoint(render) failed: {e}"))
+        };
+    }
+
+    crate::log_debug(&format!(
+        "Monitor: looking for output device_id='{}' for loopback",
+        device_id
+    ));
+    let wide = crate::accessibility::to_wide(device_id);
+    let by_id = unsafe {
+        enumerator
+            .GetDevice(PCWSTR(wide.as_ptr()))
+            .map_err(|e| format!("GetDevice({}) failed: {e}", device_id))
+    };
+    if by_id.is_ok() {
+        crate::log_debug("Monitor: output loopback device found successfully by id");
+        return by_id;
+    }
+
+    let needle = device_name.trim().to_lowercase();
+    if needle.is_empty() {
+        return by_id;
+    }
+
+    let collection: IMMDeviceCollection = unsafe {
+        enumerator
+            .EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)
+            .map_err(|e| format!("EnumAudioEndpoints(render) failed: {e}"))?
+    };
+    let count = unsafe {
+        collection
+            .GetCount()
+            .map_err(|e| format!("GetCount(render) failed: {e}"))?
+    };
+    for index in 0..count {
+        let device: IMMDevice = unsafe {
+            collection
+                .Item(index)
+                .map_err(|e| format!("Device Item(render) failed: {e}"))?
+        };
+        if let Some(render_name) = device_friendly_name(&device)
+            && (render_name.to_lowercase().contains(&needle)
+                || needle.contains(&render_name.to_lowercase()))
+        {
+            crate::log_debug(&format!(
+                "Monitor: matched output loopback device by name '{}'",
+                render_name
+            ));
+            return Ok(device);
+        }
+    }
+
+    by_id
 }
 
 fn device_friendly_name(device: &IMMDevice) -> Option<String> {
@@ -453,6 +528,12 @@ fn capture_loop(
                 device_id
             ));
         }
+        MonitorSource::SystemLoopback(device_id, device_name) => {
+            crate::log_debug(&format!(
+                "Monitor capture_loop started for system loopback device_id='{}' name='{}'",
+                device_id, device_name
+            ));
+        }
         MonitorSource::ProcessLoopback(process_id) => {
             crate::log_debug(&format!(
                 "Monitor capture_loop started for process_id='{}'",
@@ -498,6 +579,35 @@ fn capture_loop(
                     .Initialize(
                         AUDCLNT_SHAREMODE_SHARED,
                         AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
+                        1_000_000,
+                        0,
+                        mix_format,
+                        None,
+                    )
+                    .map_err(|e| format!("AudioClient initialize failed: {e}"))?;
+                CoTaskMemFree(Some(mix_format as *const _));
+            }
+            (client, parsed.0, parsed.1, parsed.2)
+        }
+        MonitorSource::SystemLoopback(device_id, device_name) => {
+            let device = resolve_output_loopback_device(device_id, device_name)?;
+            let client: IAudioClient = unsafe {
+                device
+                    .Activate(CLSCTX_ALL, None)
+                    .map_err(|e| format!("AudioClient activate failed: {e}"))?
+            };
+
+            let mix_format = unsafe {
+                client
+                    .GetMixFormat()
+                    .map_err(|e| format!("GetMixFormat failed: {e}"))?
+            };
+            let parsed = parse_mix_format_ptr(mix_format)?;
+            unsafe {
+                client
+                    .Initialize(
+                        AUDCLNT_SHAREMODE_SHARED,
+                        AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,
                         1_000_000,
                         0,
                         mix_format,

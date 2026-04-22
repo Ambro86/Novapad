@@ -1343,6 +1343,7 @@
   "podcast.selected_apps.refresh": "刷新应用列表",
   "podcast.show_inactive_apps": "显示未活动的应用",
   "podcast.test_single_app_audio": "测试应用音频",
+  "podcast.test_system_audio": "测试系统音频（300 毫秒）",
   "podcast.test_selected_apps_audio": "测试所选应用音频",
   "podcast.error.single_app_required": "请选择要录制的应用",
   "podcast.error.single_app_unavailable": "所选应用不支持单应用音频录制",

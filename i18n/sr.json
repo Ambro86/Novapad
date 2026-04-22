@@ -1343,6 +1343,7 @@
   "podcast.selected_apps.refresh": "Osveži listu aplikacija",
   "podcast.show_inactive_apps": "Prikaži i neaktivne aplikacije",
   "podcast.test_single_app_audio": "Testiraj zvuk aplikacije",
+  "podcast.test_system_audio": "Test sistemskog zvuka (300 ms)",
   "podcast.test_selected_apps_audio": "Test zvuka izabranih aplikacija",
   "podcast.error.single_app_required": "Izaberite aplikaciju za snimanje.",
   "podcast.error.single_app_unavailable": "Snimanje zvuka jedne aplikacije nije dostupno za izabranu aplikaciju.",

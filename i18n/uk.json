@@ -1343,6 +1343,7 @@
   "podcast.selected_apps.refresh": "Оновити список програм",
   "podcast.show_inactive_apps": "Показувати також неактивні програми",
   "podcast.test_single_app_audio": "Тест аудіо програми",
+  "podcast.test_system_audio": "Тест системного звуку (300 ms)",
   "podcast.test_selected_apps_audio": "Тест звуку вибраних програм",
   "podcast.error.single_app_required": "Виберіть програму для запису.",
   "podcast.error.single_app_unavailable": "Запис аудіо однієї програми недоступний для вибраної програми.",

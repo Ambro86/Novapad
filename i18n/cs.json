@@ -1343,6 +1343,7 @@
   "podcast.selected_apps.refresh": "Obnovit seznam aplikací",
   "podcast.show_inactive_apps": "Zobrazit i neaktivní aplikace",
   "podcast.test_single_app_audio": "Otestovat zvuk aplikace",
+  "podcast.test_system_audio": "Test systémového zvuku (300 ms)",
   "podcast.test_selected_apps_audio": "Test zvuku vybraných aplikací",
   "podcast.error.single_app_required": "Vyberte aplikaci k nahrávání.",
   "podcast.error.single_app_unavailable": "Záznam zvuku jedné aplikace není pro vybranou aplikaci dostupný.",

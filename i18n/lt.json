@@ -1343,6 +1343,7 @@
   "podcast.selected_apps.refresh": "Atnaujinti programų sąrašą",
   "podcast.show_inactive_apps": "Rodyti ir neaktyvias programas",
   "podcast.test_single_app_audio": "Išbandyti programos garsą",
+  "podcast.test_system_audio": "Sistemos garso testas (300 ms)",
   "podcast.test_selected_apps_audio": "Pasirinktų programų garso testas",
   "podcast.error.single_app_required": "Pasirinkite programą įrašymui.",
   "podcast.error.single_app_unavailable": "Vienos programos garso įrašymas nepasiekiamas pasirinktai programai.",

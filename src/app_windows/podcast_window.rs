@@ -2,6 +2,7 @@ use crate::accessibility::{handle_accessibility, to_wide};
 use crate::app_windows::podcast_save_window;
 use crate::audio_monitor::{
     MonitorHandle, start_monitoring, start_process_monitoring, start_processes_monitoring,
+    start_system_monitoring,
 };
 use crate::log_debug;
 // VIDEO REMOVED: MonitorInfo and list_monitors imports removed
@@ -31,7 +32,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST,
     CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow, EN_CHANGE,
     GWLP_USERDATA, GetDlgItem, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
-    IDC_ARROW, IDOK, LB_ADDSTRING, LB_GETCOUNT, LB_GETSEL, LB_RESETCONTENT, LB_SETSEL,
+    IDC_ARROW, IDOK, KillTimer, LB_ADDSTRING, LB_GETCOUNT, LB_GETSEL, LB_RESETCONTENT, LB_SETSEL,
     LBN_SELCHANGE, LBS_MULTIPLESEL, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MB_ICONERROR,
     MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MSG, MessageBoxW, PostMessageW,
     RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
@@ -43,6 +44,8 @@ use windows::core::PCWSTR;
 
 const PODCAST_CLASS_NAME: &str = "SonarpadPodcast";
 const PODCAST_TIMER_ID: usize = 1;
+const PODCAST_SYSTEM_TEST_TIMER_ID: usize = 2;
+const PODCAST_SYSTEM_TEST_DURATION_MS: u32 = 300;
 const PODCAST_MP3_BITRATES: &[u32] = &[64, 96, 128, 160, 192, 224, 256, 320];
 
 const PODCAST_ID_INCLUDE_MIC: usize = 11001;
@@ -83,6 +86,7 @@ const WM_PODCAST_SAVE_RESULT: u32 = windows::Win32::UI::WindowsAndMessaging::WM_
 enum ActiveMonitorKind {
     Microphone,
     SingleApp,
+    SystemAudioTest,
 }
 
 struct PodcastSaveResult {
@@ -189,6 +193,7 @@ struct PodcastLabels {
     show_inactive_apps: String,
     selected_apps_refresh: String,
     single_app_refresh: String,
+    test_system_audio: String,
     test_single_app_audio: String,
     test_selected_apps_audio: String,
     system_unavailable: String,
@@ -258,6 +263,7 @@ fn labels(language: Language) -> PodcastLabels {
         show_inactive_apps: i18n::tr(language, "podcast.show_inactive_apps"),
         selected_apps_refresh: i18n::tr(language, "podcast.selected_apps.refresh"),
         single_app_refresh: i18n::tr(language, "podcast.single_app.refresh"),
+        test_system_audio: i18n::tr(language, "podcast.test_system_audio"),
         test_single_app_audio: i18n::tr(language, "podcast.test_single_app_audio"),
         test_selected_apps_audio: i18n::tr(language, "podcast.test_selected_apps_audio"),
         system_unavailable: i18n::tr(language, "podcast.system_unavailable"),
@@ -1277,13 +1283,20 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     | PODCAST_ID_INCLUDE_SYSTEM
                     | PODCAST_ID_INCLUDE_VIDEO => {
                         if id == PODCAST_ID_INCLUDE_SYSTEM && !is_checked(state.include_system) {
+                            crate::log_if_err!(KillTimer(hwnd, PODCAST_SYSTEM_TEST_TIMER_ID));
                             SendMessageW(
                                 state.test_single_app_audio,
                                 BM_SETCHECK,
                                 WPARAM(BST_UNCHECKED.0 as usize),
                                 LPARAM(0),
                             );
-                            if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
+                            if matches!(
+                                state.active_monitor,
+                                Some(
+                                    ActiveMonitorKind::SingleApp
+                                        | ActiveMonitorKind::SystemAudioTest
+                                )
+                            ) {
                                 stop_active_monitor(state);
                             }
                         }
@@ -1306,6 +1319,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     }
                     PODCAST_ID_SYSTEM_CAPTURE_MODE => {
                         if code == CBN_SELCHANGE as u16 {
+                            crate::log_if_err!(KillTimer(hwnd, PODCAST_SYSTEM_TEST_TIMER_ID));
                             stop_active_monitor(state);
                             SendMessageW(
                                 state.test_single_app_audio,
@@ -1336,6 +1350,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PODCAST_ID_TEST_SINGLE_APP_AUDIO => {
                         let checked = is_checked(state.test_single_app_audio);
                         if checked {
+                            crate::log_if_err!(KillTimer(hwnd, PODCAST_SYSTEM_TEST_TIMER_ID));
                             SendMessageW(
                                 state.monitor_check,
                                 BM_SETCHECK,
@@ -1343,7 +1358,21 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                                 LPARAM(0),
                             );
                             restart_single_app_monitor(state);
-                        } else if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
+                            if state.active_monitor == Some(ActiveMonitorKind::SystemAudioTest)
+                                && SetTimer(
+                                    hwnd,
+                                    PODCAST_SYSTEM_TEST_TIMER_ID,
+                                    PODCAST_SYSTEM_TEST_DURATION_MS,
+                                    None,
+                                ) == 0
+                            {
+                                crate::log_debug("Failed to set PODCAST_SYSTEM_TEST_TIMER");
+                            }
+                        } else if matches!(
+                            state.active_monitor,
+                            Some(ActiveMonitorKind::SingleApp | ActiveMonitorKind::SystemAudioTest)
+                        ) {
+                            crate::log_if_err!(KillTimer(hwnd, PODCAST_SYSTEM_TEST_TIMER_ID));
                             stop_active_monitor(state);
                         }
                         handled = true;
@@ -1369,7 +1398,13 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     PODCAST_ID_SYSTEM_DEVICE | PODCAST_ID_SYSTEM_GAIN | PODCAST_ID_MONITOR => {
                         if code == CBN_SELCHANGE as u16 {
                             persist_settings(state);
-                            if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
+                            if matches!(
+                                state.active_monitor,
+                                Some(
+                                    ActiveMonitorKind::SingleApp
+                                        | ActiveMonitorKind::SystemAudioTest
+                                )
+                            ) {
                                 restart_single_app_monitor(state);
                             }
                         }
@@ -1503,6 +1538,25 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     }
                     return LRESULT(0);
                 }
+                if wparam.0 == PODCAST_SYSTEM_TEST_TIMER_ID {
+                    crate::log_if_err!(KillTimer(hwnd, PODCAST_SYSTEM_TEST_TIMER_ID));
+                    if with_podcast_state(hwnd, |state| {
+                        crate::send_message_w_safe(
+                            state.test_single_app_audio,
+                            BM_SETCHECK,
+                            WPARAM(BST_UNCHECKED.0 as usize),
+                            LPARAM(0),
+                        );
+                        if state.active_monitor == Some(ActiveMonitorKind::SystemAudioTest) {
+                            stop_active_monitor(state);
+                        }
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to access podcast state");
+                    }
+                    return LRESULT(0);
+                }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             podcast_save_window::WM_PODCAST_SAVE_CLOSED => {
@@ -1605,6 +1659,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
             }
             WM_DESTROY => {
                 if with_podcast_state(hwnd, |state| {
+                    crate::log_if_err!(KillTimer(hwnd, PODCAST_SYSTEM_TEST_TIMER_ID));
                     stop_active_monitor(state);
                     if let Some(recorder) = state.recorder.take()
                         && let Err(e) = recorder.stop()
@@ -2002,9 +2057,7 @@ fn update_source_controls(state: &PodcastState) {
         );
         EnableWindow(
             state.test_single_app_audio,
-            system_checked
-                && state.system_available
-                && !matches!(capture_mode, PodcastSystemCaptureMode::AllSystem),
+            system_checked && state.system_available,
         );
         EnableWindow(
             state.show_inactive_apps,
@@ -2060,7 +2113,7 @@ fn update_source_controls(state: &PodcastState) {
         );
         ShowWindow(
             state.test_single_app_audio,
-            if system_checked && !matches!(capture_mode, PodcastSystemCaptureMode::AllSystem) {
+            if system_checked {
                 windows::Win32::UI::WindowsAndMessaging::SW_SHOW
             } else {
                 windows::Win32::UI::WindowsAndMessaging::SW_HIDE
@@ -2074,7 +2127,9 @@ fn update_source_controls(state: &PodcastState) {
                 windows::Win32::UI::WindowsAndMessaging::SW_HIDE
             },
         );
-        let test_label = if selected_apps_mode {
+        let test_label = if matches!(capture_mode, PodcastSystemCaptureMode::AllSystem) {
+            &labels.test_system_audio
+        } else if selected_apps_mode {
             &labels.test_selected_apps_audio
         } else {
             &labels.test_single_app_audio
@@ -2364,19 +2419,23 @@ fn restart_single_app_monitor(state: &mut PodcastState) {
                 .map_err(|e| format!("{} {}", labels.selected_apps_audio_unavailable, e))
         }
         PodcastSystemCaptureMode::AllSystem => {
-            crate::send_message_w_safe(
-                state.test_single_app_audio,
-                BM_SETCHECK,
-                WPARAM(BST_UNCHECKED.0 as usize),
-                LPARAM(0),
-            );
-            return;
+            let device_id = selected_device_id(state, false);
+            let device_name = selected_device_name(state, false);
+            log_debug(&format!(
+                "Podcast monitor: system loopback device_id='{}' name='{}' gain={}",
+                device_id, device_name, gain
+            ));
+            start_system_monitoring(device_id, device_name, gain)
+                .map_err(|e| format!("{} {}", labels.error_system_audio, e))
         }
     };
     match monitor_result {
         Ok(handle) => {
             state.monitor_handle = Some(handle);
-            state.active_monitor = Some(ActiveMonitorKind::SingleApp);
+            state.active_monitor = Some(match capture_mode {
+                PodcastSystemCaptureMode::AllSystem => ActiveMonitorKind::SystemAudioTest,
+                _ => ActiveMonitorKind::SingleApp,
+            });
         }
         Err(e) => {
             crate::send_message_w_safe(

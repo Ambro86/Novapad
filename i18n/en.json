@@ -1347,6 +1347,7 @@
   "youtube.ytdlp_update_failed": "yt-dlp update failed.",
   "youtube.ytdlp_update_prompt": "An update for yt-dlp is available.\nInstalled version: {current}\nLatest version: {latest}\n\nDownload the update now?",
   "podcast.test_single_app_audio": "Test app audio",
+  "podcast.test_system_audio": "Test system audio (300 ms)",
   "podcast.test_selected_apps_audio": "Test audio for selected apps",
   "podcast.single_app_audio_unavailable": "App audio test is unavailable for the selected app.",
   "podcast.selected_apps_audio_unavailable": "Selected apps audio test is unavailable."

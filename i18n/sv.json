@@ -1343,6 +1343,7 @@
   "podcast.selected_apps.refresh": "Uppdatera applistan",
   "podcast.show_inactive_apps": "Visa även inaktiva appar",
   "podcast.test_single_app_audio": "Testa appens ljud",
+  "podcast.test_system_audio": "Testa systemljud (300 ms)",
   "podcast.test_selected_apps_audio": "Testa ljud för valda appar",
   "podcast.error.single_app_required": "Välj en app att spela in.",
   "podcast.error.single_app_unavailable": "Inspelning av en enskild apps ljud är inte tillgänglig för den valda appen.",

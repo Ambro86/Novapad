@@ -3,7 +3,7 @@
 Version 0.7.0 – 2026-04-12
 
 What's New
-• Added the ability to record audio from a single application without recording audio from the others. This is especially useful, for example, to record a Zoom conference locally without also recording everything played by other applications. This choice is integrated into normal recording, so the microphone can still be enabled or disabled separately.
+• Improved podcast recording for system audio: you can now choose whether to record all system audio, a single application, or multiple applications at the same time. This choice is integrated into normal recording, so the microphone can still be enabled or disabled separately.
 
 Fixes
 • Fixed `F10` so it once again switches to the next favorite voice during text reading.

@@ -3,7 +3,7 @@
 Verze 0.7.0 – 2026-04-12
 
 Co je nového
-• Přidána možnost nahrávat zvuk pouze z jedné aplikace, aniž by se nahrával zvuk z ostatních aplikací. To je užitečné například při místním nahrávání konference v Zoomu bez toho, aby se zároveň nahrávalo vše, co přehrávají ostatní aplikace. Tato volba je integrována do běžného nahrávání, takže mikrofon lze stále samostatně zapnout nebo vypnout.
+• Vylepšeno nahrávání podcastů systémového zvuku: nyní si můžete zvolit, zda chcete nahrávat veškerý systémový zvuk, jednu aplikaci nebo více aplikací současně. Tato volba je integrována do běžného nahrávání, takže mikrofon lze stále samostatně zapnout nebo vypnout.
 
 Opravy
 • Opravena klávesa `F10`, takže při čtení textu znovu přepíná na další oblíbený hlas.
@@ -76,7 +76,7 @@ Opravy
 • Přidán výslovný ukazatel průběhu finalizace pro všechny režimy vytváření audioknih: po fázi vytváření nyní Sonarpad oznamuje a zobrazuje zvláštní fázi finalizace s viditelným průběhem.
 • Opraveno ladění hlasů dialogů: nastavení rychlosti/výšky/hlasitosti se nyní správně používá pro první i druhý hlas dialogu během syntézy.
 • Vylepšena detekce kódování textu pro japonské soubory .txt: přidána bezpečná záložní volba Shift_JIS/CP932 pro případy zkomoleného textu, při zachování stávajícího chování pro UTF/diakritiku/čínštinu.
-• Interní bezpečnostní refaktor: funkce byly tam, kde to bylo možné, převedeny na bezpečné implementace a počet řádků s unsafe kódem byl výrazně snížen.
+• Interní bezpečnostní refaktor: funkce byly tam, kde to bylo možné, převedeny na bezpečné implementace a počet řádků s nebezpečným kódem byl výrazně snížen.
 
 Verze 0.6.7 – 2026-03-02
 
@@ -86,7 +86,7 @@ Vylepšení
 • Přidán litevský překlad.
 • Přidán čínský překlad.
 • Od této chvíle budou v sekci vydání projektu pravidelně zveřejňovány časté beta verze, aby uživatelé mohli testovat nové změny před další stabilní verzí.
-• Přidána zkratka Ctrl+. pro vložení znaku výpustky (…).
+• Přidána zkratka Ctrl+tečka pro vložení znaku výpustky (…).
 • Vylepšena podpora kapitol podcastů: navigace mezi kapitolami nyní funguje spolehlivěji, včetně přímých/streamovaných epizod, kde kapitoly nejsou vložené v souboru MP3, díky použití záložních metadat kapitol z feedu/URL, pokud jsou k dispozici. Přidány zkratky pro navigaci mezi kapitolami Ctrl+Alt+PageUp (předchozí kapitola) a Ctrl+Alt+PageDown (další kapitola).
 • Přeskupeny výstupní složky Sonarpad do Documents\Sonarpad: soubory jsou nyní ukládány do vyhrazených podsložek audiobooks, documents, recordings a media, s automatickou migrací ze starších cest.
 • Vylepšena podpora velmi velkých textových souborů (včetně 60 MB): plynulejší otevírání a navigace po řádcích, zejména se čtečkami obrazovky.

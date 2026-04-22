@@ -3,7 +3,7 @@
 Versão 0.7.0 – 2026-04-12
 
 Novidades
-• Adicionada a possibilidade de gravar o áudio proveniente de uma única aplicação sem gravar também o das restantes. Isto é muito útil, por exemplo, para gravar localmente uma conferência no Zoom sem gravar também tudo o que é reproduzido por outras aplicações. Esta opção está integrada com a gravação normal, pelo que continua a ser possível ativar ou desativar o microfone separadamente.
+• Melhorada a gravação de podcasts do áudio do sistema: agora é possível escolher entre gravar todo o áudio do sistema, uma única aplicação ou várias aplicações ao mesmo tempo. Esta opção está integrada com a gravação normal, pelo que continua a ser possível ativar ou desativar o microfone separadamente.
 
 Correções
 • Nos comentários do YouTube abertos a partir de "Reproduzir áudio por streaming...", o Sonarpad passa agora a carregar inicialmente apenas os primeiros 50 comentários principais, incluindo sempre todas as respostas desses comentários, e adiciona no fim uma opção para carregar todos os comentários a pedido.

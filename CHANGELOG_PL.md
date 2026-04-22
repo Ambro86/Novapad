@@ -3,7 +3,7 @@
 Wersja 0.7.0 – 2026-04-12
 
 Nowości
-• Dodano możliwość nagrywania dźwięku pochodzącego tylko z jednej aplikacji bez nagrywania także dźwięku z pozostałych. Jest to bardzo przydatne na przykład do lokalnego nagrywania konferencji Zoom bez rejestrowania również wszystkiego, co odtwarzają inne aplikacje. Ta opcja jest zintegrowana ze zwykłym nagrywaniem, więc nadal można osobno włączać lub wyłączać mikrofon.
+• Ulepszono nagrywanie podcastów z dźwięku systemowego: teraz można wybrać nagrywanie całego dźwięku systemowego, jednej aplikacji albo wielu aplikacji jednocześnie. Ta opcja jest zintegrowana ze zwykłym nagrywaniem, więc nadal można osobno włączać lub wyłączać mikrofon.
 
 Poprawki
 • W komentarzach YouTube otwieranych z poziomu „Odtwarzaj dźwięk ze strumienia...” Sonarpad ładuje teraz na początku tylko pierwszych 50 komentarzy głównych, zawsze wraz ze wszystkimi odpowiedziami do tych komentarzy, i dodaje na końcu pozycję umożliwiającą wczytanie wszystkich komentarzy na żądanie.

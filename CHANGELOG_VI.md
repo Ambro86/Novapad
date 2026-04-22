@@ -3,7 +3,7 @@
 Phiên bản 0.7.0 – 2026-04-12
 
 Bản mới
-• Đã thêm khả năng ghi âm thanh chỉ từ một ứng dụng mà không ghi cả âm thanh từ các ứng dụng khác. Điều này đặc biệt hữu ích, chẳng hạn để ghi cục bộ một cuộc họp Zoom mà không ghi luôn mọi thứ đang được phát bởi các ứng dụng khác. Tùy chọn này được tích hợp vào chế độ ghi bình thường, vì vậy vẫn có thể bật hoặc tắt micro riêng biệt.
+• Đã cải thiện tính năng ghi podcast từ âm thanh hệ thống: giờ đây bạn có thể chọn ghi toàn bộ âm thanh hệ thống, một ứng dụng hoặc nhiều ứng dụng cùng lúc. Tùy chọn này được tích hợp vào chế độ ghi bình thường, vì vậy vẫn có thể bật hoặc tắt micro riêng biệt.
 
 Bản sửa lỗi
 • Trong phần bình luận YouTube mở từ "Phat am thanh tu streaming...", Sonarpad giờ chỉ tải trước 50 bình luận gốc đầu tiên, luôn kèm toàn bộ phản hồi của các bình luận đó, và thêm ở cuối một mục để tải tất cả bình luận khi cần.

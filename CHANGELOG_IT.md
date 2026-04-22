@@ -3,7 +3,7 @@
 Versione 0.7.0 – 2026-04-12
 
 Novità
-• Aggiunta la possibilità di registrare l'audio proveniente da una singola applicazione senza registrare anche quello delle altre. È molto utile, ad esempio, per registrare localmente una conferenza Zoom senza registrare anche tutto ciò che viene riprodotto dalle altre applicazioni. Questa scelta è integrata con la registrazione normale, quindi è comunque possibile attivare o disattivare il microfono separatamente.
+• Migliorata la registrazione podcast dell'audio di sistema: ora è possibile scegliere se registrare tutto l'audio di sistema, una singola applicazione oppure più applicazioni contemporaneamente. Questa scelta è integrata con la registrazione normale, quindi è comunque possibile attivare o disattivare il microfono separatamente.
 
 Correzioni
 • Corretto il tasto `F10`, che ora torna a passare alla voce preferita successiva durante la lettura del testo.

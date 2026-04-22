@@ -4,7 +4,9 @@ Phiên bản 0.7.0 – 2026-04-12
 
 Bản mới
 • Đã cải thiện tính năng ghi podcast từ âm thanh hệ thống: giờ đây bạn có thể chọn ghi toàn bộ âm thanh hệ thống, một ứng dụng hoặc nhiều ứng dụng cùng lúc. Tùy chọn này được tích hợp vào chế độ ghi bình thường, vì vậy vẫn có thể bật hoặc tắt micro riêng biệt.
+• Đã thêm ngôn ngữ Hindi. Giao diện đã được dịch, bổ sung RSS, nhật ký thay đổi và hướng dẫn Sonarpad.
 • Đã thêm tùy chọn trong tab Trình soạn thảo để luôn đưa con trỏ về đầu dòng khi dùng phím mũi tên lên và xuống.
+• Đã thêm tùy chọn trong menu "Chuyển đổi âm thanh" để chuyển đổi âm thanh sang M4B.
 
 Bản sửa lỗi
 • Trong phần bình luận YouTube mở từ "Phat am thanh tu streaming...", Sonarpad giờ chỉ tải trước 50 bình luận gốc đầu tiên, luôn kèm toàn bộ phản hồi của các bình luận đó, và thêm ở cuối một mục để tải tất cả bình luận khi cần.

@@ -4,7 +4,9 @@ Version 0.7.0 – 2026-04-12
 
 What's New
 • Improved podcast recording for system audio: you can now choose whether to record all system audio, a single application, or multiple applications at the same time. This choice is integrated into normal recording, so the microphone can still be enabled or disabled separately.
+• Added Hindi language. Translated the interface and added RSS feeds, changelog, and Sonarpad guide.
 • Added an option in the Editor tab to always move the cursor to the start of the line when using the Up and Down arrow keys.
+• Added an option in the "Convert Audio" menu to convert audio to M4B.
 
 Fixes
 • Fixed `F10` so it once again switches to the next favorite voice during text reading.

@@ -2417,6 +2417,7 @@ fn invalidate_managed_mpv_session(hwnd: HWND) {
     {
         log_debug("Failed to persist last stopped mpv url");
     }
+    prevent_sleep(false);
     if let Some(session) = session
         && let Err(err) = std::process::Command::new("taskkill")
             .args(["/PID", &session.process_id.to_string(), "/T", "/F"])
@@ -2519,6 +2520,15 @@ pub(crate) fn is_mpv_playback_active(hwnd: HWND) -> bool {
     with_state(hwnd, |state| state.active_mpv_session.is_some()).unwrap_or(false)
 }
 
+fn sync_mpv_sleep_prevention(hwnd: HWND) {
+    let paused = query_managed_mpv_property(hwnd, "pause")
+        .ok()
+        .and_then(|value| value.as_bool());
+    if let Some(paused) = paused {
+        prevent_sleep(!paused);
+    }
+}
+
 pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
     let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
     let active_url = with_state(hwnd, |state| state.active_podcast_episode_url.clone()).flatten();
@@ -2541,6 +2551,7 @@ pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
     {
         log_debug("Failed to persist last stopped mpv position");
     }
+    prevent_sleep(false);
     if let Some(session) = session {
         if let Err(err) = send_mpv_ipc_command(&session.ipc_path, r#"{"command":["quit"]}"#) {
             log_debug(&format!("Managed mpv quit command failed: {}", err));
@@ -2659,6 +2670,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
                 title.map(ToOwned::to_owned),
                 None,
             );
+            prevent_sleep(true);
             menu::update_playback_menu(hwnd, true);
             return Ok(());
         }
@@ -5074,7 +5086,12 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
         let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         let result = match command {
             PlayerCommand::TogglePause => {
-                try_send_command_to_managed_mpv(hwnd, r#"{"command":["cycle","pause"]}"#)
+                let result =
+                    try_send_command_to_managed_mpv(hwnd, r#"{"command":["cycle","pause"]}"#);
+                if result.is_ok() {
+                    sync_mpv_sleep_prevention(hwnd);
+                }
+                result
             }
             PlayerCommand::Stop | PlayerCommand::StopOnly => {
                 stop_managed_mpv_playback(hwnd);

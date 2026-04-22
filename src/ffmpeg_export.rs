@@ -2338,7 +2338,7 @@ fn convert_audio_file_with_stream_index(
         }
     });
     let out_sample_rate = match settings.format {
-        ConvertAudioFormat::Aac => 48_000,
+        ConvertAudioFormat::Aac => in_sample_rate,
         ConvertAudioFormat::Opus => 48_000,
         ConvertAudioFormat::Mp3 => {
             let requested_bitrate = match settings.quality {
@@ -2651,6 +2651,7 @@ fn convert_audio_file_with_stream_index(
         if input_frame.is_empty() {
             break;
         }
+        let input_samples = (input_frame.len() / in_channel_count) as i32;
         processed_frames =
             processed_frames.saturating_add((input_frame.len() / in_channel_count) as u64);
         if let (Some(total_us), Some(cb)) = (total_duration_us, progress.as_mut())
@@ -2681,7 +2682,7 @@ fn convert_audio_file_with_stream_index(
         }
 
         let needed_out =
-            crate::ffmpeg_source::swr_get_out_samples_safe(api, swr_ctx, in_frame_size as i32);
+            crate::ffmpeg_source::swr_get_out_samples_safe(api, swr_ctx, input_samples);
         if !encoder_has_fixed_frame_size && needed_out > 0 {
             let current_cap = crate::ffmpeg_source::av_frame_nb_samples_safe(frame);
             if needed_out > current_cap {
@@ -2718,7 +2719,7 @@ fn convert_audio_file_with_stream_index(
             crate::ffmpeg_source::av_frame_data_mut_ptr_safe(frame),
             out_count,
             in_ptrs,
-            in_frame_size as i32,
+            input_samples,
         );
         if converted < 0 {
             unsafe {

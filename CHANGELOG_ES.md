@@ -4,7 +4,9 @@ Versión 0.7.0 – 2026-04-12
 
 Novedades
 • Mejorada la grabación de podcasts del audio del sistema: ahora es posible elegir si se quiere grabar todo el audio del sistema, una sola aplicación o varias aplicaciones al mismo tiempo. Esta opción está integrada con la grabación normal, por lo que sigue siendo posible activar o desactivar el micrófono por separado.
+• Se añadió el idioma hindi. Interfaz traducida y añadidos RSS, registro de cambios y guía de Sonarpad.
 • Se añadió una opción en la pestaña Editor para mover siempre el cursor al inicio de la línea al usar las flechas arriba y abajo.
+• Se añadió una opción en el menú "Convertir audio" para convertir audio a M4B.
 
 Correcciones
 • En los comentarios de YouTube abiertos desde "Reproducir audio en streaming...", Sonarpad ahora carga inicialmente solo los primeros 50 comentarios principales, incluyendo siempre todas las respuestas de esos comentarios, y añade al final una opción para cargar todos los comentarios bajo demanda.

@@ -51,6 +51,7 @@ const WM_CONVERT_DONE: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP + 1
 enum AudioFormat {
     Mp3,
     Aac,
+    M4b,
     Opus,
     Ogg,
     Flac,
@@ -66,6 +67,7 @@ struct ConvertLabels {
     format: String,
     format_mp3: String,
     format_aac: String,
+    format_m4b: String,
     format_opus: String,
     format_ogg: String,
     format_flac: String,
@@ -116,6 +118,7 @@ fn labels(language: Language) -> ConvertLabels {
         format: i18n::tr(language, "convert_audio.format"),
         format_mp3: i18n::tr(language, "convert_audio.format.mp3"),
         format_aac: i18n::tr(language, "convert_audio.format.aac"),
+        format_m4b: i18n::tr(language, "convert_audio.format.m4b"),
         format_opus: i18n::tr(language, "convert_audio.format.opus"),
         format_ogg: i18n::tr(language, "convert_audio.format.ogg"),
         format_flac: i18n::tr(language, "convert_audio.format.flac"),
@@ -369,6 +372,12 @@ fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     CB_ADDSTRING,
                     WPARAM(0),
                     LPARAM(to_wide(&labels.format_aac).as_ptr() as isize),
+                );
+                SendMessageW(
+                    format_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.format_m4b).as_ptr() as isize),
                 );
                 SendMessageW(
                     format_combo,
@@ -849,11 +858,12 @@ fn current_format(combo: HWND) -> AudioFormat {
     let sel = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     match sel {
         1 => AudioFormat::Aac,
-        2 => AudioFormat::Opus,
-        3 => AudioFormat::Ogg,
-        4 => AudioFormat::Flac,
-        5 => AudioFormat::Wav,
-        6 => AudioFormat::Aiff,
+        2 => AudioFormat::M4b,
+        3 => AudioFormat::Opus,
+        4 => AudioFormat::Ogg,
+        5 => AudioFormat::Flac,
+        6 => AudioFormat::Wav,
+        7 => AudioFormat::Aiff,
         _ => AudioFormat::Mp3,
     }
 }
@@ -861,7 +871,7 @@ fn current_format(combo: HWND) -> AudioFormat {
 fn map_format(format: AudioFormat) -> ConvertAudioFormat {
     match format {
         AudioFormat::Mp3 => ConvertAudioFormat::Mp3,
-        AudioFormat::Aac => ConvertAudioFormat::Aac,
+        AudioFormat::Aac | AudioFormat::M4b => ConvertAudioFormat::Aac,
         AudioFormat::Opus => ConvertAudioFormat::Opus,
         AudioFormat::Ogg => ConvertAudioFormat::Ogg,
         AudioFormat::Flac => ConvertAudioFormat::Flac,
@@ -891,6 +901,7 @@ fn extension_for_format(format: AudioFormat) -> &'static str {
     match format {
         AudioFormat::Mp3 => "mp3",
         AudioFormat::Aac => "m4a",
+        AudioFormat::M4b => "m4b",
         AudioFormat::Opus => "opus",
         AudioFormat::Ogg => "ogg",
         AudioFormat::Flac => "flac",
@@ -925,7 +936,7 @@ fn read_quality(
                 .map(ConvertAudioQuality::BitrateKbps)
                 .map_err(|_| labels.error_invalid_bitrate.clone())
         }
-        AudioFormat::Aac | AudioFormat::Opus => {
+        AudioFormat::Aac | AudioFormat::M4b | AudioFormat::Opus => {
             let text = get_combo_text(state.quality_combo);
             let value = text
                 .trim()
@@ -979,7 +990,9 @@ fn update_quality_controls(
 ) {
     let (label_text, show_edit, show_combo) = match format {
         AudioFormat::Mp3 => (&labels.quality_bitrate, true, false),
-        AudioFormat::Aac | AudioFormat::Opus => (&labels.quality_bitrate, false, true),
+        AudioFormat::Aac | AudioFormat::M4b | AudioFormat::Opus => {
+            (&labels.quality_bitrate, false, true)
+        }
         AudioFormat::Ogg => (&labels.quality_ogg, false, true),
         AudioFormat::Flac => (&labels.quality_flac, false, true),
         AudioFormat::Wav | AudioFormat::Aiff => (&labels.quality_bitrate, false, false),
@@ -1031,7 +1044,7 @@ fn update_quality_controls(
     }
     if show_combo {
         let items: Vec<&str> = match format {
-            AudioFormat::Aac => vec![
+            AudioFormat::Aac | AudioFormat::M4b => vec![
                 "64", "80", "96", "112", "128", "160", "192", "224", "256", "320",
             ],
             AudioFormat::Opus => vec!["64", "96", "128", "160"],
@@ -1041,7 +1054,7 @@ fn update_quality_controls(
         };
         set_combo_items(state.quality_combo, &items);
         let default_index = match format {
-            AudioFormat::Aac => 4,
+            AudioFormat::Aac | AudioFormat::M4b => 4,
             AudioFormat::Opus => 2,
             AudioFormat::Ogg => 2,
             AudioFormat::Flac => 5,

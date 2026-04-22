@@ -4,7 +4,9 @@ Verze 0.7.0 – 2026-04-12
 
 Co je nového
 • Vylepšeno nahrávání podcastů systémového zvuku: nyní si můžete zvolit, zda chcete nahrávat veškerý systémový zvuk, jednu aplikaci nebo více aplikací současně. Tato volba je integrována do běžného nahrávání, takže mikrofon lze stále samostatně zapnout nebo vypnout.
+• Přidán jazyk hindština. Rozhraní přeloženo, přidány RSS, seznam změn a příručka Sonarpad.
 • Přidána možnost v kartě Editor, která při použití šipek nahoru a dolů vždy přesune kurzor na začátek řádku.
+• Přidána možnost v nabídce "Převést audio" pro převod zvuku do formátu M4B.
 
 Opravy
 • Opravena klávesa `F10`, takže při čtení textu znovu přepíná na další oblíbený hlas.

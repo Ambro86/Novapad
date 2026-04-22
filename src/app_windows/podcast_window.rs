@@ -32,13 +32,14 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST,
     CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow, EN_CHANGE,
     GWLP_USERDATA, GetDlgItem, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
-    IDC_ARROW, IDOK, KillTimer, LB_ADDSTRING, LB_GETCOUNT, LB_GETSEL, LB_RESETCONTENT, LB_SETSEL,
-    LBN_SELCHANGE, LBS_MULTIPLESEL, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MB_ICONERROR,
-    MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MSG, MessageBoxW, PostMessageW,
-    RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW,
-    ShowWindow, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    IDC_ARROW, IDOK, KillTimer, LB_ADDSTRING, LB_GETCARETINDEX, LB_GETCOUNT, LB_GETSEL,
+    LB_RESETCONTENT, LB_SETSEL, LBN_SELCHANGE, LBS_MULTIPLESEL, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY,
+    LoadCursorW, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MSG,
+    MessageBoxW, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer,
+    SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION,
+    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::PCWSTR;
 
@@ -96,6 +97,43 @@ struct PodcastSaveResult {
 
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == WM_KEYDOWN {
+        if with_podcast_state(hwnd, |state| {
+            if msg.hwnd == state.selected_apps {
+                let key = msg.wParam.0 as u32;
+                if key == windows::Win32::UI::Input::KeyboardAndMouse::VK_UP.0 as u32
+                    || key == windows::Win32::UI::Input::KeyboardAndMouse::VK_DOWN.0 as u32
+                {
+                    let count = crate::send_message_w_safe(
+                        state.selected_apps,
+                        LB_GETCOUNT,
+                        WPARAM(0),
+                        LPARAM(0),
+                    )
+                    .0;
+                    let caret = crate::send_message_w_safe(
+                        state.selected_apps,
+                        LB_GETCARETINDEX,
+                        WPARAM(0),
+                        LPARAM(0),
+                    )
+                    .0;
+                    if count > 0
+                        && ((key == windows::Win32::UI::Input::KeyboardAndMouse::VK_UP.0 as u32
+                            && caret <= 0)
+                            || (key
+                                == windows::Win32::UI::Input::KeyboardAndMouse::VK_DOWN.0 as u32
+                                && caret >= count - 1))
+                    {
+                        return true;
+                    }
+                }
+            }
+            false
+        })
+        .unwrap_or(false)
+        {
+            return true;
+        }
         let ctrl = (crate::get_key_state_safe(VK_CONTROL.0 as i32) as u16 & 0x8000) != 0;
         let shift = (crate::get_key_state_safe(VK_SHIFT.0 as i32) as u16 & 0x8000) != 0;
         let key = msg.wParam.0 as u32;
@@ -160,6 +198,7 @@ struct PodcastState {
     mic_devices: Vec<AudioDevice>,
     system_devices: Vec<AudioDevice>,
     single_apps: Vec<AudioApp>,
+    selected_apps_items: Vec<AudioApp>,
     // VIDEO REMOVED: monitors removed
     recorder: Option<RecorderHandle>,
     monitor_handle: Option<MonitorHandle>,
@@ -1239,6 +1278,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     mic_devices,
                     system_devices,
                     single_apps: Vec::new(),
+                    selected_apps_items: Vec::new(),
                     // VIDEO REMOVED: monitors removed
                     recorder: None,
                     monitor_handle: None,
@@ -2902,7 +2942,7 @@ fn selected_app_pids(state: &PodcastState) -> Vec<u32> {
         )
         .0;
         if is_selected > 0
-            && let Some(app) = state.single_apps.get(idx as usize)
+            && let Some(app) = state.selected_apps_items.get(idx as usize)
             && app.pid != 0
         {
             process_ids.push(app.pid);
@@ -2924,7 +2964,7 @@ fn selected_apps_display_names(state: &PodcastState) -> Vec<String> {
         )
         .0;
         if is_selected > 0
-            && let Some(app) = state.single_apps.get(idx as usize)
+            && let Some(app) = state.selected_apps_items.get(idx as usize)
             && app.pid != 0
         {
             names.push(app.display_name.clone());
@@ -2943,6 +2983,12 @@ fn refresh_single_app_list(
         SendMessageW(state.selected_apps, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
     }
     state.single_apps = load_single_apps(state.language, is_checked(state.show_inactive_apps));
+    state.selected_apps_items = state
+        .single_apps
+        .iter()
+        .filter(|app| app.pid != 0)
+        .cloned()
+        .collect();
     let mut selected_index = 0usize;
     for (index, app) in state.single_apps.iter().enumerate() {
         let name = to_wide(&app.display_name);
@@ -2953,13 +2999,21 @@ fn refresh_single_app_list(
                 WPARAM(0),
                 LPARAM(name.as_ptr() as isize),
             );
+        }
+        if Some(app.pid) == preferred_pid {
+            selected_index = index;
+        }
+    }
+    for (index, app) in state.selected_apps_items.iter().enumerate() {
+        let name = to_wide(&app.display_name);
+        unsafe {
             SendMessageW(
                 state.selected_apps,
                 LB_ADDSTRING,
                 WPARAM(0),
                 LPARAM(name.as_ptr() as isize),
             );
-            if app.pid != 0 && preferred_selected_pids.contains(&app.pid) {
+            if preferred_selected_pids.contains(&app.pid) {
                 SendMessageW(
                     state.selected_apps,
                     LB_SETSEL,
@@ -2967,9 +3021,6 @@ fn refresh_single_app_list(
                     LPARAM(index as isize),
                 );
             }
-        }
-        if Some(app.pid) == preferred_pid {
-            selected_index = index;
         }
     }
     unsafe {

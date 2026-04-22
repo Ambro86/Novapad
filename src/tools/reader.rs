@@ -478,6 +478,7 @@ fn author_prefix(language: Language) -> &'static str {
         Language::Lithuanian => "Autorius",
         Language::Russian => "Автор",
         Language::Chinese => "作者",
+        Language::Hindi => "द्वारा",
     }
 }
 

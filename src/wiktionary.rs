@@ -1036,6 +1036,7 @@ fn language_to_code(language: Language) -> &'static str {
         Language::Serbian => "sr",
         Language::Russian => "ru",
         Language::Chinese => "zh",
+        Language::Hindi => "hi",
     }
 }
 

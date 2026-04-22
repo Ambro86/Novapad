@@ -117,6 +117,7 @@ const FEED_PL_DATA: &str = include_str!("../../i18n/feed_pl.txt");
 const FEED_FR_DATA: &str = include_str!("../../i18n/feed_fr.txt");
 const FEED_SR_DATA: &str = include_str!("../../i18n/feed_sr HR.txt");
 const FEED_RU_DATA: &str = include_str!("../../i18n/feed_ru.txt");
+const FEED_HI_DATA: &str = include_str!("../../i18n/feed_hi.txt");
 const EM_SETSEL: u32 = 0x00B1;
 const EM_LIMITTEXT: u32 = 0x00C5;
 const INITIAL_LOAD_COUNT: usize = 5;
@@ -435,6 +436,7 @@ fn format_timestamp_for_list(
         crate::settings::Language::Serbian => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::Ukrainian => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::Russian => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Hindi => ("%d/%m/%Y", "%H:%M"),
     };
     let show_date = matches!(date_mode, ListDateDisplayMode::Always);
     let show_time = match time_mode {
@@ -487,6 +489,7 @@ fn format_timestamp_for_language(
         crate::settings::Language::Serbian => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::Ukrainian => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::Russian => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Hindi => ("%d/%m/%Y", "%H:%M"),
     };
     let now = Local::now().date_naive();
     let item_day = dt.date_naive();
@@ -724,6 +727,7 @@ fn google_news_params(
         crate::settings::Language::French => ("fr", "FR", "FR:fr"),
         crate::settings::Language::Serbian => ("sr", "RS", "RS:sr"),
         crate::settings::Language::Russian => ("ru", "RU", "RU:ru"),
+        crate::settings::Language::Hindi => ("hi", "IN", "IN:hi"),
         crate::settings::Language::Ukrainian
         | crate::settings::Language::English
         | crate::settings::Language::Lithuanian
@@ -1453,6 +1457,7 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
         crate::settings::Language::French => "feed_fr.txt",
         crate::settings::Language::Serbian => "feed_sr HR.txt",
         crate::settings::Language::Russian => "feed_ru.txt",
+        crate::settings::Language::Hindi => "feed_hi.txt",
     };
     let exe_dir = std::env::current_exe()
         .ok()
@@ -1483,6 +1488,7 @@ fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
         crate::settings::Language::French => FEED_FR_DATA,
         crate::settings::Language::Serbian => FEED_SR_DATA,
         crate::settings::Language::Russian => FEED_RU_DATA,
+        crate::settings::Language::Hindi => FEED_HI_DATA,
     }
 }
 
@@ -1556,6 +1562,10 @@ fn is_default_key(
             .any(|k| normalize_rss_url_key(k) == key),
         crate::settings::Language::Serbian => settings
             .rss_default_sr_keys
+            .iter()
+            .any(|k| normalize_rss_url_key(k) == key),
+        crate::settings::Language::Hindi => settings
+            .rss_default_hi_keys
             .iter()
             .any(|k| normalize_rss_url_key(k) == key),
     }
@@ -1767,6 +1777,12 @@ fn ensure_default_sources(parent: HWND) {
                     &mut s.settings.rss_default_sr_keys,
                     &defaults,
                 ),
+                crate::settings::Language::Hindi => apply_default_sources(
+                    &mut s.settings.rss_sources,
+                    &s.settings.rss_removed_default_hi,
+                    &mut s.settings.rss_default_hi_keys,
+                    &defaults,
+                ),
             };
             if changed {
                 crate::settings::save_settings(s.settings.clone());
@@ -1846,6 +1862,12 @@ pub(crate) fn sync_default_sources_for_settings(
             &mut settings.rss_sources,
             &settings.rss_removed_default_sr,
             &mut settings.rss_default_sr_keys,
+            &defaults,
+        ),
+        crate::settings::Language::Hindi => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_hi,
+            &mut settings.rss_default_hi_keys,
             &defaults,
         ),
     }
@@ -5148,6 +5170,9 @@ fn handle_delete(hwnd: HWND) {
                                     crate::settings::Language::Serbian => {
                                         &mut ps.settings.rss_removed_default_sr
                                     }
+                                    crate::settings::Language::Hindi => {
+                                        &mut ps.settings.rss_removed_default_hi
+                                    }
                                 };
                                 let already =
                                     removed_list.iter().any(|u| normalize_rss_url_key(u) == key);
@@ -5394,6 +5419,9 @@ fn undo_last_delete(hwnd: HWND) {
                             }
                             crate::settings::Language::Serbian => {
                                 &mut ps.settings.rss_removed_default_sr
+                            }
+                            crate::settings::Language::Hindi => {
+                                &mut ps.settings.rss_removed_default_hi
                             }
                         };
                         removed_list.retain(|u| normalize_rss_url_key(u) != key);

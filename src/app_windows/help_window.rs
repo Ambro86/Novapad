@@ -423,12 +423,14 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                         Language::Lithuanian => include_str!("../../guida_lt.txt").to_string(),
                         Language::Russian => include_str!("../../guida_ru.txt").to_string(),
                         Language::Chinese => include_str!("../../guida_zh.txt").to_string(),
+                        Language::Hindi => include_str!("../../guida_hi.txt").to_string(),
                     },
                     HelpWindowKind::Changelog => match init.language {
                         Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
                         Language::Ukrainian | Language::English => {
                             include_str!("../../CHANGELOG.md").to_string()
                         }
+                        Language::Hindi => include_str!("../../CHANGELOG-HI.txt").to_string(),
                         Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
                         Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
                         Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
@@ -589,6 +591,7 @@ fn donations_content(language: Language) -> String {
         Language::Lithuanian => DONATIONS_LT.to_string(),
         Language::Russian => DONATIONS_RU.to_string(),
         Language::Chinese => DONATIONS_ZH.to_string(),
+        Language::Hindi => DONATIONS_EN.to_string(),
     }
 }
 

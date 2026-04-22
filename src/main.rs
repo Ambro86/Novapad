@@ -1243,6 +1243,7 @@ fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
         Language::Lithuanian => "lt",
         Language::Russian => "ru",
         Language::Chinese => "zh",
+        Language::Hindi => "hi",
     };
     format!(
         "{}|{}|{}",
@@ -4828,6 +4829,7 @@ fn dictation_language_name(language: Language) -> &'static str {
         Language::Lithuanian => "lt",
         Language::Russian => "ru",
         Language::Chinese => "zh",
+        Language::Hindi => "hi",
     }
 }
 

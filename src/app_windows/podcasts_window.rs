@@ -569,6 +569,7 @@ fn format_timestamp_for_list(
         crate::settings::Language::Serbian => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::Ukrainian => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::Russian => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Hindi => ("%d/%m/%Y", "%H:%M"),
     };
     let show_date = matches!(date_mode, ListDateDisplayMode::Always);
     let show_time = match time_mode {
@@ -621,6 +622,7 @@ fn format_timestamp_for_language(
         crate::settings::Language::Serbian => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::Ukrainian => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::Russian => ("%d.%m.%Y", "%H:%M"),
+        crate::settings::Language::Hindi => ("%d/%m/%Y", "%H:%M"),
     };
     let now = Local::now().date_naive();
     let item_day = dt.date_naive();
@@ -8966,6 +8968,7 @@ fn podcastindex_language_code(language: Language) -> &'static str {
         | Language::Russian
         | Language::Chinese
         | Language::English => "en",
+        Language::Hindi => "hi",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
         Language::Swedish => "sv",
@@ -9026,7 +9029,8 @@ fn apple_categories(language: Language) -> Vec<Category> {
         | Language::Lithuanian
         | Language::Russian
         | Language::Chinese
-        | Language::English => (
+        | Language::English
+        | Language::Hindi => (
             "Arts",
             "Business",
             "Comedy",
@@ -9414,7 +9418,8 @@ fn apple_subcategories(language: Language) -> Vec<Category> {
         | Language::Lithuanian
         | Language::Russian
         | Language::Chinese
-        | Language::English => &[
+        | Language::English
+        | Language::Hindi => &[
             // Arts
             (1482, "Books"),
             (1402, "Design"),
@@ -10518,7 +10523,8 @@ fn podcastindex_categories(language: Language) -> Vec<Category> {
         | Language::Lithuanian
         | Language::Russian
         | Language::Chinese
-        | Language::English => &[
+        | Language::English
+        | Language::Hindi => &[
             (1, "Arts"),
             (2, "Books"),
             (3, "Design"),

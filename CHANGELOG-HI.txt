@@ -1,0 +1,479 @@
+# परिवर्तन सूची
+
+Version 0.7.0 – 2026-04-12
+
+नया क्या है
+• सिस्टम ऑडियो के लिए पॉडकास्ट रिकॉर्डिंग में सुधार किया गया है: अब आप चुन सकते हैं कि पूरा सिस्टम ऑडियो रिकॉर्ड करना है, केवल एक एप्लिकेशन रिकॉर्ड करना है, या एक ही समय में कई एप्लिकेशन रिकॉर्ड करने हैं। यह विकल्प सामान्य रिकॉर्डिंग में एकीकृत है, इसलिए माइक्रोफ़ोन को अब भी अलग से सक्षम या अक्षम किया जा सकता है।
+
+बग सुधार
+• `F10` को ठीक किया गया है, ताकि यह टेक्स्ट पढ़ते समय फिर से अगली पसंदीदा वॉइस पर स्विच करे।
+• अब यदि पॉडकास्ट रिकॉर्डिंग चल रही हो, तो किसी दूसरे दस्तावेज़ को बंद करने से सक्रिय रिकॉर्डिंग बंद नहीं होती।
+• "Play streaming audio..." से खोली गई YouTube टिप्पणियों में, Sonarpad अब शुरुआत में केवल पहली 50 शीर्ष-स्तरीय टिप्पणियाँ लोड करता है, और उन टिप्पणियों के सभी उत्तर हमेशा शामिल करता है। साथ ही, आवश्यकता होने पर सभी टिप्पणियाँ लोड करने के लिए अंत में एक अतिरिक्त आइटम जोड़ा गया है।
+• अब बुकमार्क टेक्स्ट दस्तावेज़ों और मीडिया फ़ाइलों दोनों में निर्माण क्रम के बजाय स्थिति क्रम में दिखाए और संभाले जाते हैं। यदि उसी स्थिति पर पहले से कोई बुकमार्क मौजूद है, तो उसे दोबारा नहीं जोड़ा जाता।
+
+Version 0.6.9 – 2026-04-08
+
+बग सुधार
+• Find in Files अनुभव को बेहतर बनाया गया है: Browse Folder खोलने पर फ़ोकस अब सीधे फ़ोल्डर सूची पर जाता है; Enter से परिणाम खोलने पर कीबोर्ड कमांड अब बाधित नहीं होते; Esc दबाने पर पहले चयनित परिणाम पर वापस लौटा जाता है; और Alt+Tab से लौटने पर फ़ोकस या तो खोज फ़ील्ड पर जाता है या, यदि परिणाम खुले हों, तो परिणाम सूची पर जाता है।
+• पहले F5 हमेशा शुरुआत से पढ़ना शुरू करता था। अब इसे ठीक कर दिया गया है, और पढ़ना वर्तमान caret स्थिति से शुरू होता है, जबकि `Shift+F5` और `Ctrl+F5` क्रमशः पिछले और अगले वाक्य पर जाने के लिए सुरक्षित रखे गए हैं।
+• Go to Line का उपयोग करने के बाद Esc दबाने पर फ़ोकस Sonarpad से बाहर जा सकता था। अब यह सही ढंग से एडिटर पर वापस लौटता है।
+• `Word Wrap` विकल्प अब पहले से खुले दस्तावेज़ों पर तुरंत लागू होता है; इसके लिए फ़ाइल दोबारा खोलने की आवश्यकता नहीं है।
+
+Version 0.6.8 – 2026-04-07
+
+नया क्या है
+• Play मेनू में एक नया आइटम जोड़ा गया है, जिससे आप Whisper के साथ किसी भी ऑडियो या वीडियो फ़ाइल का ट्रांसक्रिप्शन कर सकते हैं। Options में अब एक नई “AI and Transcription” सेक्शन उपलब्ध है, जहाँ आप मॉडल चुन सकते हैं, NVIDIA graphics cards के लिए वैकल्पिक CUDA समर्थन सक्षम कर सकते हैं, मूल भाषा सुरक्षित रख सकते हैं, और timestamps को सक्षम या अक्षम कर सकते हैं।
+• Play मेनू में नई क्रिया `Transcribe current folder` जोड़ी गई है, जो वर्तमान में खुले मीडिया के फ़ोल्डर में मौजूद सभी समर्थित ऑडियो फ़ाइलों को एक संयुक्त दस्तावेज़ में ट्रांसक्राइब करती है। इसमें समर्पित प्रगति, वर्तमान फ़ाइल की स्थिति और रद्द करने का समर्थन शामिल है। इसे `Alt+Shift+C` से भी शुरू किया जा सकता है।
+• ऑफ़लाइन वॉइस डिक्टेशन जोड़ा गया है, जो ऑडियो ट्रांसक्रिप्शन वाले ही कार्यप्रवाह का उपयोग करता है। डिफ़ॉल्ट रूप से, डिक्टेशन शुरू करने के लिए `Ctrl+Shift+Space` दबाएँ और रोकने के लिए वही शॉर्टकट फिर से दबाएँ; इस शॉर्टकट को Options में बदला जा सकता है। दूसरी बार से डिक्टेशन तेज़ हो जाता है, क्योंकि इंजन मेमरी में तैयार रहता है। 4 GB से कम RAM वाले PCs पर यह preloading और reuse स्वतः अक्षम हो जाते हैं।
+• एक नया Editor विकल्प जोड़ा गया है, जो डिफ़ॉल्ट रूप से अक्षम है और `Esc` दबाने पर एडिटर विंडो बंद कर देता है।
+• पॉडकास्ट खोज अब डिफ़ॉल्ट रूप से `iTunes + Spreaker` का उपयोग करती है, और यदि वही पॉडकास्ट दोनों प्लेटफ़ॉर्म पर मिले, तो डुप्लिकेट को फ़िल्टर किया जाता है।
+• Apple पॉडकास्ट ब्राउज़िंग और खोज में सुधार किया गया है: पॉडकास्ट खोज, श्रेणी ब्राउज़िंग, और श्रेणी अनुसार शीर्ष पॉडकास्ट अब चयनित पॉडकास्ट निर्देशिका देश का उपयोग करते हैं। Options > RSS / Podcast में आप इसे `Automatic` पर छोड़ सकते हैं ताकि सिस्टम देश का उपयोग हो, या कोई दूसरा देश मैन्युअल रूप से चुन सकते हैं।
+• Apple पॉडकास्ट श्रेणियों के लिए परिणाम सीमा बढ़ा दी गई है। पहली बार खोलने पर पहले की तरह केवल शुरुआती 50 परिणाम लोड होते हैं; यदि आप `Load more results` चुनते हैं, तो Sonarpad कुल 200 परिणाम (Apple की सीमा) तक लोड करता है और अनुभव को सहज रखते हुए आगे के पृष्ठों पर नेविगेट करने देता है।
+• Sonarpad अब Mac पर भी सीमित सुविधाओं के साथ उपलब्ध है। Project link: https://github.com/Ambro86/Sonarpad-Mac
+
+सुधार
+• पॉडकास्ट निर्देशिका के लिए 50 से अधिक चयन योग्य देश जोड़े गए हैं, ताकि उपयोगकर्ता अधिक व्यापक राष्ट्रीय कैटलॉग में से चुन सकें।
+• "Play streaming audio..." अब किसी भी टेक्स्ट क्वेरी से YouTube खोज सकता है, या YouTube channel या playlist link स्वीकार कर सकता है और उसके परिणाम दिखा सकता है।
+• "Play streaming audio..." में परिणामों की प्रस्तुति बेहतर की गई है: YouTube प्रविष्टियों में अब शीर्षक, अवधि, चैनल और view count अधिक स्पष्ट रूप में शामिल हैं।
+• "Play streaming audio..." अब YouTube टिप्पणियों का भी समर्थन करता है: आप उन्हें context menu से खोल सकते हैं, उत्तर पढ़ सकते हैं, और Right Arrow key से comment threads विस्तृत कर सकते हैं।
+• "Play streaming audio..." में channels और playlists के लिए YouTube favorites जोड़े गए हैं: इन्हें context menu से परिणामों से जोड़ा जा सकता है, YouTube URL/query field के ठीक बाद Tab से पहुँची जा सकने वाली Favorites सूची से सीधे खोला जा सकता है, और बाद में उसी सूची से context menu का उपयोग करके हटाया जा सकता है। YouTube search results में context menu केवल channels और playlists के लिए उपलब्ध है।
+• "Play streaming audio..." अब तब credentials माँग सकता है जब किसी streaming site को login की आवश्यकता हो। उपयोगकर्ता उन्हें दर्ज कर सकते हैं, उस site के लिए सहेज सकते हैं, और बाद में Options > Audio में saved credentials प्रबंधित कर सकते हैं।
+• "Play streaming audio..." के दौरान focus handling बेहतर की गई है, ताकि download और conversion के दौरान progress window अधिक स्थिर रहे।
+• Voice menu में पढ़ने के लिए दो नई navigation actions जोड़ी गई हैं: `Previous sentence` और `Next sentence`, जिनके shortcuts कॉन्फ़िगर किए जा सकते हैं।
+• `Execute file with interpreter` के लिए डिफ़ॉल्ट shortcut अब `Ctrl+Shift+F5` है, ताकि `Shift+F5` को डिफ़ॉल्ट रूप से `Previous sentence` के लिए उपयोग किया जा सके।
+• Options > Voice में voice profiles जोड़े गए हैं: profiles जोड़ी, नाम बदली और हटाई जा सकती हैं।
+• Options > Audio में playback rewind interval के विकल्प 1 second से 2 hours तक के अतिरिक्त मानों के साथ बढ़ाए गए हैं।
+• Dmitriy के धन्यवाद सहित रूसी अनुवाद जोड़ा गया।
+• Options > Audio में audiobook part naming format चुनने के लिए नया विकल्प जोड़ा गया है: `Title + number`, `Number only`, या `Number + title`।
+• RSS favorite articles जोड़े गए हैं: article context menu से items को एक समर्पित Favorites feed में जोड़ा जा सकता है।
+• Favorites RSS feed हटाई जा सकती है, और जब कोई नया लेख favorites में जोड़ा जाता है तो यह स्वतः फिर से बनाई जाती है।
+• RSS feeds को ऊपर/नीचे ले जाने के लिए keyboard shortcuts जोड़ी गई हैं: `Ctrl+Shift+Up Arrow` और `Ctrl+Shift+Down Arrow`।
+• RSS विंडो में built-in article preview जोड़ी गई है, ताकि लेख का पाठ सीधे वहीं देखा जा सके और पूरे लेख को editor में खोलने से पहले Tab से जल्दी पहुँचा जा सके।
+• feeds के अंत में “Load more news” नाम की एक स्पष्ट RSS प्रविष्टि जोड़ी गई है; Enter दबाने पर अगला batch लोड होता है और फ़ोकस पहली नई लोड की गई article पर चला जाता है।
+• voice dictionary में replacement जोड़ते या संपादित करते समय अब “Match Case” checkbox उपलब्ध है, जिससे प्रत्येक substitution letter casing का पालन कर सकती है या उसे अनदेखा कर सकती है।
+
+बग सुधार
+• "Play streaming audio..." अब Options में पहले से सेट podcast cache limit का पालन करता है, और वही सीमा अब audio descriptions playback पर भी लागू होती है।
+• Wikipedia import को ठीक किया गया है, ताकि पृष्ठों में मौजूद quote blocks अब सही ढंग से आयात हों।
+• WordPress पृष्ठों के लिए web page parser बेहतर किया गया है, जहाँ list items और कुछ section headings छूट सकते थे।
+• "Go to line" अब वर्तमान पंक्ति से फ़ील्ड पहले से भरता है।
+• podcasts और RSS के लिए OPML export ठीक किया गया है, ताकि export की गई फ़ाइलें अब iTunes द्वारा स्वीकार की जाएँ।
+• RSS feeds और podcasts के सही OPML import/export के लिए localized confirmation messages जोड़ी गई हैं।
+• एक बग ठीक किया गया है, जिसमें "Play streaming audio..." में search string टाइप करने और परिणामों से YouTube channel चुनने पर, उस channel के videos खोलने के बजाय program अटका हुआ प्रतीत हो सकता था।
+• एक बग ठीक किया गया है, जिसमें open files की सूची Window menu के बजाय Help menu में दिखाई जाती थी।
+• एक streaming edge case ठीक किया गया है, जहाँ playback शुरू हो सकती थी, लेकिन “Downloading stream” dialog खुला रहता था यदि downloaded file पहले से target format से मेल खाती थी।
+• MP3 streaming conversion behavior ठीक किया गया है: यदि stream पहले से MP3 हो और उपयोगकर्ता स्पष्ट MP3 bitrate चुने (उदाहरण के लिए 128 kbps), तो Sonarpad अब conversion छोड़ने के बजाय चुने गए bitrate पर फिर से encode करता है।
+• media transcription documents ठीक किए गए हैं, ताकि अब उन्हें बंद करने पर save करने के लिए पूछा जाए, और सुझाया गया file name अब पाठ की पहली पंक्ति के बजाय transcribed media file name का पुनः उपयोग करे।
+• `Alt+Shift+L` shortcut ठीक किया गया है: अब यह playback के दौरान chapter list सही ढंग से खोलता है।
+• `Alt+Shift+T` shortcut ठीक किया गया है: अब यह Tools menu खोलने के बजाय “Transcribe current audio” सही ढंग से शुरू करता है।
+• Play menu में playback stop handling ठीक की गई है: `.` दबाने पर अब यह Stop की तरह व्यवहार करता है और केवल वर्तमान track को रोकता है, player/episode से बाहर नहीं निकलता।
+• Recent Files से खोले गए media के लिए Play menu की save entry ठीक की गई है: जब फ़ाइल local Sonarpad cache से आती है, तो localized save action अब वहाँ भी सही ढंग से दिखाई देती है।
+• जब transcription शुरू होती है जबकि audio पहले से चल रही हो, Sonarpad अब transcription शुरू करने से पहले उस audio को स्वतः pause कर देता है।
+• एक बग ठीक किया गया है, जिसमें Wikipedia से article import सफल हो सकती थी, लेकिन article text स्क्रीन पर नहीं दिखता था।
+• local media files से embedded podcast chapters का समर्थन जोड़ा गया है (उदाहरण के लिए MP3 chapter metadata): जब feed/URL chapters उपलब्ध न हों, तो Sonarpad अब background में downloaded file से chapters लोड करता है, ताकि playback तुरंत शुरू हो और chapter data तैयार होते ही लागू हो जाए।
+• downloaded podcast episodes को सामान्य local media files के रूप में खोलने पर chapter loading ठीक की गई है: embedded chapters अब वहाँ भी उपलब्ध हैं, केवल Podcasts window से playback शुरू होने पर ही नहीं।
+• SAPI4 और SAPI5 के लिए MP3 audiobook finalization ठीक की गई है: लंबे export के बाद incomplete या fragile files से बचने के लिए final output अब सही ढंग से finalize होती है।
+• सभी audiobook creation modes के लिए एक स्पष्ट finalization progress bar जोड़ी गई है: creation phase के बाद Sonarpad अब visible progress के साथ एक समर्पित finalization phase की घोषणा और प्रदर्शन करता है।
+• dialogue voice tuning ठीक की गई है: synthesis के दौरान अब speed/pitch/volume settings पहली और दूसरी dialogue voices दोनों पर सही ढंग से लागू होती हैं।
+• Japanese `.txt` files के लिए text encoding detection बेहतर की गई है: mojibake के मामलों के लिए सुरक्षित Shift_JIS/CP932 fallback जोड़ा गया है, जबकि मौजूदा UTF/diacritics/Chinese behavior सुरक्षित रखा गया है।
+• Internal safety refactor: जहाँ संभव था वहाँ functions को safe implementations में बदला गया है और unsafe code lines को काफ़ी कम किया गया है।
+
+Version 0.6.7 – 2026-03-02
+
+सुधार
+• अब प्रोग्राम बड़ी फ़ाइलों में बहुत अधिक replacements के साथ “Replace all” को बड़े पैमाने पर संभाल सकता है।
+• DJ Graco के धन्यवाद सहित पोलिश अनुवाद अपडेट किया गया।
+• लिथुआनियाई अनुवाद जोड़ा गया।
+• चीनी अनुवाद जोड़ा गया।
+• अब से परियोजना की Releases section में नियमित beta builds प्रकाशित की जाएँगी, ताकि उपयोगकर्ता अगली stable release से पहले नए परिवर्तनों का परीक्षण कर सकें।
+• ellipsis character (…) डालने के लिए `Ctrl+.` shortcut जोड़ी गई है।
+• podcast chapter support बेहतर किया गया है: chapter navigation अब अधिक विश्वसनीय रूप से काम करती है, इसमें direct/streamed episodes भी शामिल हैं जहाँ chapters MP3 फ़ाइल में embedded नहीं होते। उपलब्ध होने पर feed/URL fallbacks से chapter metadata का उपयोग किया जाता है। chapter navigation shortcuts `Ctrl+Alt+PageUp` (previous chapter) और `Ctrl+Alt+PageDown` (next chapter) जोड़ी गई हैं।
+• Sonarpad output folders को `Documents\\Sonarpad` के अंतर्गत पुनर्गठित किया गया है: अब फ़ाइलें समर्पित subfolders `audiobooks`, `documents`, `recordings`, और `media` में सहेजी जाती हैं, और legacy paths से automatic migration भी होती है।
+• बहुत बड़ी text files (60 MB सहित) के लिए support बेहतर किया गया है: विशेष रूप से screen readers के साथ opening और line-by-line navigation अधिक smooth है।
+• सभी भाषाओं के लिए guides अपडेट किए गए हैं और पूरे app में localization resources ताज़ा की गई हैं, जिनमें donations texts और NSIS setup translations शामिल हैं (नई Simplified Chinese और Lithuanian installer strings, साथ ही पूरी की गई Ukrainian setup translation)।
+• online features के लिए global network proxy support (HTTP/HTTPS और SOCKS5/SOCKS5H) जोड़ा गया है, और Options save करते समय proxy validation शामिल की गई है: invalid proxies पर चेतावनी दी जाती है और उन्हें स्वतः हटा दिया जाता है।
+• एक नई Tools action जोड़ी गई है: "Play streaming audio...", जो उपयोगकर्ताओं को URL (YouTube या direct media link) paste करने, output format और quality/bitrate profile चुनने (MP3 और MP4 के लिए original quality/bitrate सहित), और इसे सीधे Sonarpad के audio player में चलाने देती है।
+• system media Play/Pause key (headsets/keyboards) के लिए support जोड़ा गया है: अब यह media playback और text reading pause/resume दोनों को नियंत्रित करती है (यदि दोनों सक्रिय हों, तो media playback को प्राथमिकता दी जाती है)।
+• File > Recent Files में एक नई entry जोड़ी गई है: "Clear recent files", जिससे recent documents list को तुरंत साफ़ किया जा सकता है।
+• Convert Audio और podcast recording settings में audio bitrate options बढ़ाए गए हैं: कम मान (64/96 kbps) जोड़े गए हैं और MP3 को 320 kbps तक बढ़ाया गया है, साथ ही validation और encoder handling को भी समन्वित किया गया है।
+• audiobook split-by-time options को 60 मिनट तक विस्तृत किया गया है।
+• audiobook split-by-parts बेहतर किया गया है: अब उपयोगकर्ता parts की संख्या मैन्युअल रूप से दर्ज कर सकते हैं, 1 से 100 तक validation के साथ।
+• View > Read-only mode जोड़ा गया है, जिससे accidental edits से editor text लॉक किया जा सकता है, जबकि documents पूरी तरह पढ़ने योग्य और navigable बने रहते हैं।
+• program updates के दौरान एक accessible progress bar जोड़ी गई है, ताकि screen readers real time में download progress को track कर सकें।
+• मुख्य विंडो में एक नई quiet status bar जोड़ी गई है, जो characters, words और line/column दिखाती है (उदाहरण: "Characters (with spaces): 11. | Words: 2. | Ln 1, Col 12"), बिना NVDA focus को बाधित किए।
+• View menu में Word wrap के लिए नया toggle जोड़ा गया है, ताकि line wrapping को Options खोले बिना जल्दी बदला जा सके।
+• Edit > Text में indent/outdent के लिए नई actions जोड़ी गई हैं, shortcuts Ctrl+Shift+. (indent) और Ctrl+Shift+, (outdent) के साथ, क्योंकि “Show voices in editor” सक्षम होने पर Tab key voice-panel navigation के लिए सुरक्षित रहती है।
+• RSS articles और podcast episodes में localized date/time जोड़ी गई है, जिसका formatting वर्तमान interface language के अनुसार अनुकूलित है।
+• RSS context menu में selected article को email द्वारा share करने के लिए नई action जोड़ी गई है।
+• Options > RSS and podcast में granular delete-confirmation options जोड़ी गई हैं: RSS के लिए (feed/article/both/none) और Podcasts के लिए (podcast/episode/both/none)।
+• Ctrl+C के साथ configurable quick RSS copy जोड़ी गई है (Options > RSS and podcast): title, URL, article content, या सब कुछ संयुक्त रूप में कॉपी किया जा सकता है।
+• RSS source creation को एकीकृत किया गया है: “Add source” अब direct feed URLs और keyword input दोनों स्वीकार करता है (Google News RSS स्वतः बनाते हुए), जिससे अलग keyword-search action की आवश्यकता समाप्त हो गई है।
+• Ctrl+A दबाने पर अब completion की घोषणा होती है, जिससे screen-reader feedback अधिक स्पष्ट होता है।
+• Edit menu में F3 "Find next" के साथ पूरक के रूप में "Find previous" के लिए Shift+F3 जोड़ा गया है।
+• replace feedback messages को बेहतर किया गया है, जिसमें उचित singular/plural forms शामिल हैं (जैसे “1 replacement made” बनाम “2 replacements made”)।
+• dictionary window में dictionary lookup language selection जोड़ी गई है, जिसमें default Auto (interface language) और वैकल्पिक manual override शामिल है।
+• Options में एक नया Shortcuts tab जोड़ा गया है, जिससे key bindings को customize किया जा सकता है, और conflict detection उपयोगकर्ता को चेतावनी देती है जब कोई shortcut पहले से किसी अन्य action को assigned हो।
+• प्रारंभिक command-line switch support जोड़ी गई है: `-h`/`--help` अब usage information दिखाते हैं और `--version` program version प्रिंट करता है।
+• manual speed और pitch tuning की स्पष्टता बेहतर की गई है: manual fields अब 100-centered scale का उपयोग करते हैं, जहाँ 100 सामान्य मान के बराबर है।
+• Microsoft voices selection को Options > Voice और in-editor Voice panel दोनों में बेहतर किया गया है: voices को language से filter करने के लिए localized language combo जोड़ा गया है, जबकि multilingual-only mode को single ungrouped voice list के रूप में रखा गया है (सक्षम होने पर language combo छिप जाता है)।
+• Options > Voice में dialogue-voice configuration जोड़ी गई है, जिसमें पूर्ण Tab navigation और main UI के समान voice model उपयोग होता है (engine, Edge language filter, voice, और labeled speed/pitch/volume); साथ ही alternating dialogues के लिए optional secondary dialogue voice जोड़ी गई है, जिसमें वही controls उपलब्ध हैं; dialogue voice rules configuration `.ini` में सहेजी जाती हैं, इसलिए document text संशोधित नहीं होता।
+• Undo labeling बेहतर किया गया है: Edit > Undo entry अब दिखाती है कि कौन-सी action पूर्ववत की जाएगी (उदाहरण के लिए text edits, quote/unquote lines, या voice-tag insertion), और जब undo उपलब्ध न हो तब यह अक्षम रहती है।
+
+बग सुधार
+• RTF फ़ाइल खोलना ठीक किया गया है: `.rtf` documents अब raw RTF markup (जैसे `{\\rtf1...}`) के बजाय plain readable text के रूप में parse और प्रदर्शित होते हैं।
+• GB18030/GBK encoded Chinese text files खोलना ठीक किया गया है: Sonarpad अब इन फ़ाइलों को सही ढंग से detect और decode करता है, जिससे mojibake output से बचा जा सके।
+• M4B audiobook creation को chapter metadata और chapter markers के साथ बेहतर किया गया है; generated M4B files में chipmunk playback issue (बहुत ऊँची pitch/speed) भी ठीक किया गया है।
+• audiobook save dialog bitrate UI ठीक की गई है: hardcoded Italian labels हटाए गए हैं और selectable bitrate options में 64 kbps जोड़ा गया है।
+• Save All (Ctrl+Shift+S) ठीक किया गया है: अब सभी खुले modified documents विश्वसनीय रूप से detect होते हैं (unsaved/new tabs सहित), और Save All प्रत्येक को सही ढंग से save करता है या आवश्यक होने पर Save As खोलता है।
+• Google News RSS item ordering ठीक की गई है: अब उपलब्ध होने पर articles descending publish date (नवीनतम पहले) में दिखाई जाते हैं।
+• dictionary window में NVDA label association ठीक की गई है: search field और language combo अब सही labels घोषित करते हैं।
+• RSS/Podcast Properties window की keyboard handling ठीक की गई है: Tab/Shift+Tab अब OK button तक पहुँचते हैं, Enter OK को सक्रिय करता है, Esc सुरक्षित रूप से बंद करता है, और focus सही ढंग से RSS/Podcast list पर लौटता है।
+• RSS/Podcast undo history ठीक की गई है: Ctrl+Z अब केवल अंतिम action ही नहीं, बल्कि removals (articles/episodes और sources) के लिए multi-level undo का समर्थन करता है।
+• RSS/Podcast removal feedback बेहतर किया गया है, जिसमें स्पष्ट status announcements शामिल हैं (RSS removed, RSS article removed, podcast episode removed)।
+• delete/undo के बाद RSS/Podcast focus behavior बेहतर किया गया है: अब RSS आवश्यकता होने पर विश्वसनीय रूप से पहली feed पर focus करता है और delayed reselection के दौरान repeated screen-reader announcements से बचता है।
+
+Version 0.6.6 – 2026-02-13
+
+सुधार
+• Edit menu में "Auto format for TTS" जोड़ा गया है, जिससे text को speech के लिए जल्दी तैयार किया जा सके (markdown/quotes हटाता है और wrapped lines को व्यवस्थित करता है)।
+• voice-tag insertion बेहतर की गई है: जब text चयनित हो, तो tags अब single-line और multi-line selections दोनों पर सही ढंग से लागू होते हैं।
+• Audio settings में default audiobook save folder विकल्प जोड़ा गया है (default: Documents\\Sonarpad Audiobooks)।
+• audiobook save dialog में, split mode सक्षम होने पर, split parts के लिए dedicated subfolder बनाने का नया विकल्प जोड़ा गया है, जो default रूप से सक्षम है (साफ़ output organization के लिए)।
+• audiobook export अब Edge, SAPI5, और SAPI4 voices के लिए user-selected bitrate के साथ stereo MP3 के रूप में save होती है।
+• bridge के माध्यम से 32-bit SAPI5 voices के लिए support जोड़ी गई है, ताकि वे voices जो केवल 32-bit engines में उपलब्ध हैं, Sonarpad में भी उपयोग की जा सकें।
+• voice features को एक समर्पित "Voice and audio" menu में पुनर्गठित किया गया है, और "Convert Audio" जोड़ा/स्पष्ट किया गया है, जो किसी भी supported media file को MP3, AAC, OGG, Opus, FLAC, WAV, और AIFF में बदलने के लिए उपयोगी है।
+• individual RSS articles और podcast episodes हटाने के लिए support जोड़ी गई है (Delete key + confirmation वाले context menu के साथ), बिना पूरे RSS/podcast source को हटाए; साथ ही अंतिम removal के लिए undo भी जोड़ी गई है (single article/episode या पूरा RSS/podcast source)।
+• RSS window में RSS feed export to OPML जोड़ा गया है, ताकि current RSS sources को save और बाद में आसानी से re-import किया जा सके।
+• RSS window में "Search RSS by keyword" जोड़ा गया है: keyword दर्ज करने पर अब Google News RSS URL स्वतः बनती है और add-source dialog prefilled रूप में खुलता है, जिससे keyword feeds एक ही चरण में बनाई जा सकें।
+• Mila Kuran के धन्यवाद सहित Serbian translation जोड़ी गई।
+• Ivan Shtefuriak के धन्यवाद सहित Ukrainian translation जोड़ी गई।
+• multi-file media opening जोड़ी गई है: कई media files चुनने/खोलने पर अब current file replace होने के बजाय playback queue बनती है।
+• playback के दौरान variable seek shortcuts जोड़ी गई हैं: 1-minute base skip के साथ Left/Right 60s seek करते हैं, Shift+Left/Right 20s seek करते हैं, और Ctrl+Left/Right 3 minutes seek करते हैं।
+• player में previous/next track navigation shortcuts जोड़ी गई हैं: Ctrl+PageUp और Ctrl+PageDown।
+• "Reset volume" जोड़ा गया है और reset actions को Playback में एक dedicated "Reset" submenu में समूहित किया गया है, "Reset speed" और "Reset pitch" के साथ।
+• installer improvements: setup.exe अब उपयोगकर्ताओं को सभी supported file types associate करने या extensions को मैन्युअल रूप से चुनने का विकल्प देता है; MSI अब feature tree में per-extension file-association choices दिखाता है (default रूप से सभी enabled रहते हैं)।
+• "Open documents..." के साथ एक नया "Window" menu जोड़ा गया है, जिससे किसी भी खुले फ़ाइल पर जल्दी स्विच किया जा सके।
+• View > Font अपडेट किया गया है: पुराने chooser को common fonts (Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman, Georgia) वाले quick submenu से बदला गया है, जबकि वर्तमान text size सुरक्षित रहती है।
+• RSS/Podcast announcements को dual status model के साथ बेहतर किया गया है: source nodes अब "new items" घोषित करते हैं जब feed/podcast में updates हों, जबकि individual RSS articles और podcast episodes "unread"/"unplayed" घोषित करते हैं; यह behavior Options से अक्षम किया जा सकता है।
+
+बग सुधार
+• EPUB text extraction को ठीक किया गया है उन पुस्तकों के लिए जिनमें inline HTML comments (<!-- ... -->) होते हैं: chapter text अब सही ढंग से parse होता है, आंशिक या पूर्ण रूप से skipped नहीं होता।
+• Spanish Wiktionary lookups और dictionary cache handling ठीक की गई है: "agua" जैसी Spanish entries अब सही ढंग से लोड होती हैं, और पुराने "Word not found" cache entries अब पुनः उपयोग नहीं की जातीं।
+• कुछ Spanish sources (जैसे El Mundo) के लिए RSS article import character encoding ठीक की गई है: accented letters और "ñ" अब temporary editor में सही ढंग से संरक्षित रहते हैं।
+• Central European files (जैसे Czech/Polish) के लिए ANSI text decoding ठीक की गई है: Sonarpad अब UTF-8 और ANSI को बेहतर ढंग से अलग करता है और सही code page (Windows-1250 सहित) चुनता है, ताकि garbled diacritics से बचा जा सके।
+• URL query parameters वाली feeds (जैसे `rss.aspx?c=...`) के लिए RSS source persistence ठीक की गई है: restart के बाद अब ये feeds सही ढंग से save और restore होती हैं।
+• Explorer context menu से Google Drive pointer files (`.gdoc`, `.gsheet`, `.gslides`) खोलना ठीक किया गया है: जब direct read “Incorrect function (os error 1)” से विफल हो, Sonarpad अब shell-open fallback उपयोग करता है, ताकि document फिर भी सही ढंग से खुले।
+• legacy Excel 2010 `.xls` reading ठीक की गई है: पुरानी binary Excel files अब सही ढंग से detect और decode होती हैं, और garbled text (जैसे `ÐÏ_à¡±...`) नहीं दिखातीं।
+• spellcheck announcement flow ठीक किया गया है: बाद में text की समीक्षा करते समय misspellings फिर से घोषित होती हैं, और यदि वही गलती हटाकर दोबारा लिखी जाए, तो वह फिर से report होती है।
+• line-based text actions (जैसे Ctrl+Q / Ctrl+Shift+Q, sort/reverse/unique/join lines) ठीक की गई हैं: Shift+Down से single line चुनने पर अब adjacent lines merge या truncate नहीं होतीं।
+• line-based text actions के multi-line behavior को ठीक किया गया है (Ctrl+Q / Ctrl+Shift+Q और संबंधित line tools): CR-only separators वाली RichEdit selections अब सही ढंग से normalize होती हैं, जिससे सभी चयनित पंक्तियाँ बिना पहले अक्षर कटे संसाधित होती हैं।
+• visible whitespace symbols (␠/U+2420, ␣/U+2423, ␉/U+2409, ␊/U+240A, ␍/U+240D, ␤/U+2424) के लिए TTS input normalization बढ़ाई गई है, ताकि multilingual voices के साथ repeated paragraph playback से बचा जा सके।
+• Edge TTS text sanitization को single validation pipeline के साथ refine किया गया है: weird/invisible spaces normalize की जाती हैं, लंबे punctuation runs (जैसे "...", "!!!", "???") compact किए जाते हैं, और punctuation-only chunks को छोड़ दिया जाता है, ताकि playback loops से बचा जा सके।
+• MP3/podcast streams के लिए playback time announcement (Ctrl+I) ठीक की गई है: current time अब track duration तक clamp होती है, और यदि position अंत से आगे निकल जाए तो playback स्वतः रुक जाती है।
+• installer localization coverage बेहतर की गई है: setup.exe अब अतिरिक्त installer languages (Czech, Polish, French, Serbian) शामिल करता है, जबकि MSI को single en-US package के रूप में रखा गया है ताकि release confusion से बचा जा सके।
+• context menu entries के uninstall cleanup को ठीक किया गया है: "Open with Sonarpad" अब विश्वसनीय रूप से हटाया जाता है, legacy registry scenarios सहित।
+• SAPI5 pause/resume reliability ठीक की गई है: F4 pause अब सही ढंग से काम करता है और resume अपेक्षित स्थिति पर लौटती है, शुरुआत से फिर शुरू नहीं होती।
+• media playback के लिए pause + seek + resume flow ठीक की गई है: pause करने और Left/Right से seek करने के बाद, Space अब वर्तमान position से विश्वसनीय रूप से resume करता है, रुकता नहीं और शुरुआत से restart नहीं करता।
+
+Version 0.6.5 – 2026-02-07
+
+सुधार
+• Arturo Fernandez Rivas के धन्यवाद सहित स्पेनिश अनुवाद बेहतर किया गया है।
+• EPUB audiobooks को chapters के अनुसार विभाजित करने का विकल्प जोड़ा गया।
+• RSS imports अब एक समर्पित temporary tab (localized title के साथ) का उपयोग करती हैं; Save As इसे normal document में बदलता है।
+• screen reader messages अब उपलब्ध होने पर JAWS को भी भेजी जाती हैं।
+
+बग सुधार
+• caret से पढ़ना (F5) अब ठीक कर्सर की स्थिति से शुरू होता है। पहले यह कुछ पंक्तियाँ ऊपर से शुरू हो सकता था, क्योंकि caret offset CRLF/UTF-16 positions से मेल नहीं खाता था।
+• redraw issue ठीक की गई है, जहाँ selection पर टाइप करने से पहले का text अस्थायी रूप से गायब हो सकता था, जब तक selection न बदल जाए।
+• EPUB chapter parsing ठीक की गई है, ताकि cover या image-only pages अब spoken CSS (जैसे "padding") या "Sconosciuto" titles उत्पन्न न करें।
+• Edge TTS के साथ EPUBs से audiobook time-splitting ठीक की गई है, जो empty/oversized chunks ("Edge audio not sent") पर विफल हो सकती थी।
+• RSS articles अब HTML entities (जैसे &quot;, &amp;, &lt;, &gt;) decode करती हैं।
+• Save/Save As अब non-overwritable formats (जैसे EPUB) को save करते समय पहली पंक्ति के बजाय मौजूदा file name सुझाते हैं।
+• एक बग ठीक किया गया है, जिसमें नए episodes वाले podcasts को unplayed घोषित नहीं किया जाता था, और अधिक पेशेवर label के लिए "Unheard" का नाम बदलकर "Unplayed" किया गया है।
+
+Version 0.6.4 – 2026-02-05
+
+सुधार
+• sound और audio को मुख्य फ़ोकस के रूप में स्पष्ट करने के लिए प्रोग्राम का नाम बदलकर Sonarpad कर दिया गया है।
+• Playback menu में multi-track media files (जैसे कई भाषाओं वाले MKV files) के लिए audio track selection जोड़ी गई है।
+• पॉडकास्ट अब अनसुने episodes को नाम से पहले "Unheard" prefix के साथ स्पष्ट रूप से दिखाते हैं।
+• text में नए tag-based voice switching का समर्थन जोड़ा गया है। उदाहरण:
+  - Microsoft voices (Edge): <voice edge it-IT-IsabellaNeural>Hello</voice>
+  - SAPI5 voices: <voice sapi5 Microsoft Helena Desktop>Hello</voice>
+  - SAPI4 voices: <voice sapi4 #1>Hello</voice>
+  - speed/pitch/volume के साथ: <voice edge it-IT-ElsaNeural speed=-20 pitch=-5 volume=-10>Hello</voice>
+• podcast categories को समृद्ध किया गया है।
+• automatic fallback to PDFium के साथ PDF reading बेहतर की गई है।
+• article parser को उन मामलों के लिए बेहतर किया गया है, जहाँ content पूरी तरह नहीं पढ़ी जाती थी।
+• Playback menu में pitch reset जोड़ा गया है।
+• selected text से audiobook बनाने के लिए context menu option जोड़ी गई है।
+• audiobook splitting by duration जोड़ी गई है, साथ ही पहले file name को चुनने की सुविधा भी।
+• article reading में author label को localized किया गया है (उदाहरण: "by", "di", "par")।
+• indentation options (tabs/spaces with width) और selected lines पर Tab/Shift+Tab indent/outdent जोड़ा गया है।
+• Markdown cleanup ठीक की गई है, ताकि जब bullet preservation disabled हो तो '*' list bullets भी सही ढंग से संभाले जाएँ।
+• window title और Start Menu shortcuts में पुराना "Novapad" नाम उपयोग करने का विकल्प जोड़ा गया है।
+
+बग सुधार
+• एक बग ठीक किया गया है, जिसमें SAPI4 audiobooks अपेक्षा से भिन्न रूप में बनाई जा सकती थीं।
+• एक बग ठीक किया गया है, जिसमें media file के अंत से आगे seek करने पर playback शुरुआत से फिर शुरू हो जाती थी।
+• Find in Files window: अब परिणाम पर Enter दबाने से सही snippet position पर खुलता है, और Esc परिणामों पर वापस लौटता है।
+• Options window: General, Voice, Editor, और Audio tabs में visual layout बेहतर की गई है, ताकि controls गायब या कटे हुए न दिखें।
+• playback speed बदलने पर bookmark issue ठीक की गई है।
+• Podcast Index categories के गलत प्रदर्शन को ठीक किया गया है।
+• apostrophes के कारण reading टूटने की समस्या ठीक की गई है; अलग dialogue reading हटाई गई है और voice tags का उपयोग किया गया है।
+
+Version 0.6.3 – 2026-01-30
+
+सुधार
+• माइक्रोफ़ोन detection बेहतर की गई है।
+• सभी formats के लिए instant playback support जोड़ी गई है।
+
+बग सुधार
+• podcast categories window में crash ठीक किया गया है।
+
+Version 0.6.2 – 2026-01-30
+
+नई सुविधाएँ
+• file execution support जोड़ी गई है (Shift+F5)। उपयोगकर्ता Options में interpreter (उदाहरण: python) चुन सकते हैं, उसे कंप्यूटर पर खोज सकते हैं, और Shift+F5 दबाने पर current script चलती है। HTML files browser में खुलती हैं।
+• Google Docs pointer files (.gdoc, .gsheet, .gslides) के लिए support जोड़ी गई है, जो default browser में स्वतः खुलती हैं।
+• M4B audiobook format (Apple/AAC) के लिए support जोड़ी गई है।
+• podcast search results context menu में "Show episodes" option जोड़ी गई है, जिससे बिना subscribe किए episodes browse और play किए जा सकते हैं।
+• "Go to Line" सुविधा जोड़ी गई है (Edit menu या Ctrl+J), जिससे किसी specific line number पर जल्दी पहुँचा जा सकता है।
+• RSS feeds और podcasts को क्रमबद्ध करने के लिए context menu options जोड़ी गई हैं (alphabetically या date के अनुसार)।
+• Vietnamese default RSS feeds जोड़ी गई हैं।
+• recording dialog में levels जाँचने के लिए microphone test box जोड़ा गया है।
+• context menu में podcast episodes के लिए "Show description" जोड़ा गया है।
+• FFmpeg के माध्यम से extended audio/video formats के लिए support जोड़ी गई है: mkv, avi, mov, m4v, webm, mpg, ts, wmv, flv, vob, 3gp, flac, ogg, wma, aiff।
+• synchronized subtitle reading support जोड़ी गई है (srt, vtt, ass, sub, sbv, lrc, smi), NVDA या selected voice के साथ। program media file के समान नाम वाली subtitle file खोजता है। अलग नाम वाली फ़ाइलों के लिए Playback menu में "Import subtitles" और "Remove subtitles" विकल्प जोड़े गए हैं।
+• "Open with Sonarpad" context menu में सभी नई supported audio/video formats के लिए file associations जोड़ी गई हैं।
+• किसी भी file के लिए pitch adjustment setting जोड़ी गई है।
+• General settings में anonymous error reports सक्षम या अक्षम करने का विकल्प जोड़ा गया है। Help में diagnostic ZIP file बनाने के लिए menu item भी जोड़ा गया है।
+• live reading और audiobook creation दोनों के लिए dialogues के लिए अलग voice उपयोग करने का विकल्प जोड़ा गया है।
+• business, art, sport आदि जैसी श्रेणियों के अनुसार podcasts explore करने के लिए podcast categories browser जोड़ा गया है।
+
+सुधार
+• Explorer से audio/video file खोलने पर अब text editor के बजाय player view सीधे खुलती है।
+• inaccessible PDFs के लिए OCR prompt हटा दिया गया है; अब user experience और speed बेहतर करने के लिए OCR स्वतः किया जाता है।
+• Accessible Terminal बेहतर किया गया है: NVDA reading अब बेहतर continuity के लिए आखिरी पढ़ी गई पंक्ति को याद रखती है।
+• SAPI 4: Audiobook creation अब पूरी तरह parallelized है और लगभग तुरंत हो जाती है। concurrent processes की संख्या चुनने के लिए prompt जोड़ा गया है।
+• SAPI 4: synthesis के दौरान chunks को parallel में convert करके WAV-to-MP3 bottleneck समाप्त किया गया है।
+• SAPI 4: error handling और temporary files की automatic cleanup बेहतर की गई है।
+• Find dialog: स्पष्टता के लिए "Regex" का नाम बदलकर "Regular expression" किया गया है और search options के लिए missing translations जोड़ी गई हैं।
+• M4B Audiobooks: बेहतर output handling; parts/markers द्वारा splitting अब proper metadata chapters के साथ single M4B file बनाती है, जिसमें title और author शामिल होते हैं।
+• Player: playback speed 1.0x न होने पर bookmark और time announcement precision ठीक की गई है।
+• Options में Ctrl+Tab और Ctrl+Shift+Tab navigation बहाल की गई है।
+• Playback menu में speed को तुरंत Normal (1.0x) पर reset करने का विकल्प जोड़ा गया है।
+• बेहतर performance और stability के लिए सभी dependencies को latest versions पर update किया गया है।
+• startup को block किए बिना compatibility सुनिश्चित करने के लिए dynamic DLL loading के साथ FFmpeg integrated किया गया है।
+• podcast download filters को नए audio/video formats शामिल करने के लिए update किया गया है।
+• audio/video files के corruption से बचने के लिए Ctrl+S से save करना रोका गया है।
+• YouTube transcript import को अधिक robust और resilient बनाया गया है।
+• audiobook part splitting की robustness बेहतर की गई है, ताकि कोई text lost न हो।
+• installer अब पूरी तरह multilingual है और Italian, English, Spanish, Portuguese, Swedish, और Vietnamese का समर्थन करता है, user के system language के आधार पर। unsupported systems के लिए English default रहती है।
+• podcast categories: अब category पर Enter दबाना selection confirm करता है (OK button के बराबर)।
+• hang detection system बेहतर किया गया है, ताकि modal dialogs (error messages, "text not found") खुले होने पर false positives से बचा जा सके।
+
+बग सुधार
+• एक बग ठीक किया गया है, जिसमें changelog startup पर नहीं खुलती थी।
+• एक बग ठीक किया गया है, जिसमें Explorer से खोली गई inaccessible PDFs के लिए OCR prompt दिखाई नहीं देती थी।
+• startup bug ठीक की गई है, जो फ़ोकस खोने या विंडो खुलते ही बंद होने का कारण बन सकती थी।
+• regex search में एक critical bug ठीक की गई है, जो text ढूँढ़ने से रोकती थी, जिसमें "Wrap around" search और Windows line endings के साथ "Dot matches newline" option से जुड़ी समस्याएँ भी शामिल थीं।
+
+स्थानीयकरण
+• पोलिश अनुवाद जोड़ा गया।
+• फ़्रेंच अनुवाद जोड़ा गया।
+• Czech translation जोड़ी गई (Radek Žalud और Jiri Holzinger के धन्यवाद सहित)।
+
+Version 0.6.1 – 2026-01-20
+
+बग सुधार
+• एक बग ठीक किया गया है, जिसमें “Show voices in the editor” सक्षम करने पर podcast playback रुक जाती थी।
+• एक समस्या ठीक की गई है, जिसमें कुछ podcasts URL के माध्यम से जोड़े नहीं जा सकते थे क्योंकि URL कट रही थी।
+• एक बग ठीक किया गया है, जिसमें RSS feed feature में सामान्य URLs अब जोड़ी नहीं जा सकती थीं।
+• एक समस्या ठीक की गई है, जिसमें Wikipedia language option अलग-अलग settings tabs में कई बार दिखाई देती थी।
+• release mode में भी गलती से बनने वाली debug files का निर्माण हटा दिया गया है।
+
+सुधार
+• Microsoft voices के लिए support बेहतर की गई है, जो अब अलग user agent के साथ dedicated playback method का उपयोग करती हैं।
+• MP4 files के लिए support जोड़ी गई है।
+
+Version 0.6.0 – 2026-01-20
+
+नई सुविधाएँ
+• spell checker जोड़ा गया है। context menu से उपयोगकर्ता जाँच सकते हैं कि वर्तमान शब्द सही है या नहीं, और यदि नहीं, तो spelling suggestions प्राप्त कर सकते हैं।
+• OPML files के माध्यम से podcast import और export जोड़ी गई है।
+• iTunes के अतिरिक्त Podcast Index search support जोड़ी गई है। उपयोगकर्ता अपनी मुफ्त API key और secret दर्ज कर सकते हैं (जो केवल email address का उपयोग करके बनाई जा सकती है)।
+• real-time reading और audiobook creation दोनों के लिए SAPI4 voices का समर्थन जोड़ा गया है।
+• non-accessible PDFs के लिए automatic OCR fallback जोड़ी गई है: जब extractable text न मिले, तो document OCR के माध्यम से पहचान लिया जाता है।
+• Wiktionary का उपयोग करते हुए dictionary support जोड़ी गई है। Applications key दबाने पर definitions दिखाई जाती हैं, और उपलब्ध होने पर synonyms तथा अन्य भाषाओं में translations भी।
+• search, result selection, और direct import into editor के साथ Wikipedia article import जोड़ी गई है।
+• RSS module में article को original website में सीधे खोलने के लिए Shift+Enter shortcut जोड़ी गई है।
+
+सुधार
+• application अब हमेशा microphone selection का पालन करती है।
+• podcast window में, episode पर Enter दबाने पर अब action की पुष्टि के लिए NVDA तुरंत “loading” घोषित करता है।
+• podcast search results में Enter दबाने पर अब selected podcast subscribe हो जाती है।
+• Ctrl+Shift+O और Podcast Ctrl+Shift+P shortcuts के labels ठीक और बेहतर किए गए हैं।
+• playback speed और volume अब settings में save होती हैं और सभी audio files में बनी रहती हैं।
+• podcast episodes के लिए dedicated cache folder जोड़ी गई है। उपयोगकर्ता Playback menu में “Keep podcast” के माध्यम से episodes रख सकते हैं। cache user-defined size से अधिक होने पर स्वतः साफ़ हो जाती है (Options → Audio)।
+• Chrome और iPhone profiles के साथ libcurl impersonation का उपयोग करते हुए RSS article fetching काफ़ी बेहतर की गई है, जिससे लगभग 99% sites के साथ compatibility सुनिश्चित होती है।
+• RSS articles के लिए read / unread state जोड़ी गई है, RSS list में स्पष्ट indication के साथ।
+• Replace All अब किए गए replacements की संख्या बताती है।
+• Tab navigation के दौरान podcast library में Delete Podcast button जोड़ा गया है।
+
+बग सुधार
+• Help menu से redundant “pending update” entry हटा दी गई है (updates पहले से स्वतः संभाली जाती हैं)।
+• एक बग ठीक किया गया है, जिसमें खुले MP3 file पर Ctrl+S दबाने से file save होकर corrupt हो जाती थी।
+• एक UI issue ठीक की गई है, जिसमें “Batch Audiobooks” को “(B)… Ctrl+Shift+B” के रूप में दिखाया जाता था (redundant label हटा दिया गया है)।
+• smart quotes ठीक की गई हैं: सक्षम होने पर सामान्य quotes अब सही ढंग से smart quotes से बदलती हैं।
+• एक बग ठीक किया गया है, जिसमें “Go to bookmark” उपयोग करने पर playback speed 1.0 पर reset हो जाती थी।
+• एक समस्या ठीक की गई है, जिसमें पहले से डाउनलोड किए गए podcast episodes को cached version उपयोग करने के बजाय फिर से डाउनलोड किया जाता था।
+
+कीबोर्ड शॉर्टकट
+• F1 अब Help guide खोलता है।
+• F2 अब updates जाँचता है।
+• F7 / F8 अब पिछले या अगले spelling error पर जाते हैं।
+• F9 / F10 अब जल्दी से favorite voices के बीच switch करते हैं।
+
+डेवलपर सुधार
+• errors अब silently drop नहीं होते: सभी let _ = patterns हटा दिए गए हैं, और errors को अब स्पष्ट रूप से handle किया जाता है (जहाँ उपयुक्त हो वहाँ propagate, log, या fallback के साथ handle किया जाता है)।
+• यदि warnings हों तो project अब compile नहीं होता: cargo check और cargo clippy दोनों को clean pass करना आवश्यक है, lints को कड़ा किया गया है और जहाँ संभव हो allow हटाया गया है।
+• strlen / wcslen-style helpers जैसी custom implementations हटा दी गई हैं। string और UTF-16 buffer lengths अब memory scan करने के बजाय Rust-owned data से प्राप्त की जाती हैं।
+• DLL handling को साफ़ और libloading के आसपास एकीकृत किया गया है, जिससे custom loader logic और PE parsing से बचा जा सके।
+• hand-rolled byte parsing helpers हटा दिए गए हैं; अब सभी byte parsing checked slices पर standard from_le_bytes / from_be_bytes का उपयोग करती है।
+• ये परिवर्तन अनावश्यक unsafe usage को कम करते हैं, संभावित undefined behavior को समाप्त करते हैं, और codebase को अधिक idiomatic, robust और maintainable बनाते हैं।
+
+Version 0.5.9 - 2026-01-13
+
+नई सुविधाएँ
+• context menu से RSS reordering जोड़ी गई है (up/down/to position), invalid-position checks के साथ।
+• article context menu जोड़ा गया है, जिसमें original site खोलना और WhatsApp, Facebook, और X के माध्यम से share करना शामिल है।
+• imported articles से RSS list पर लौटने के लिए Esc shortcut जोड़ी गई है।
+• podcast mode जोड़ा गया है: search, subscribe, listen; subscriptions को reorder करना; Esc playback रोकता है और list पर लौटाता है; episode पर Enter playback शुरू करता है।
+• podcasts और MP3 files के लिए playback speed control जोड़ा गया है।
+• specific time पर जाने के लिए Ctrl+T जोड़ा गया है।
+• volume combo के बाद voice preview button जोड़ा गया है।
+• regex find and replace (Notepad++ style) जोड़ी गई है।
+• OPML और TXT files से RSS import जोड़ी गई है।
+• File Explorer में "Open with Sonarpad" सक्षम करने का विकल्प जोड़ा गया है, portable builds सहित।
+
+सुधार
+• voice speed/pitch/volume selection बेहतर की गई है, TTS max limits का पालन करते हुए।
+• updates के दौरान NVDA focus हिलाए बिना सभी articles download करने के लिए विभिन्न RSS सुधार किए गए हैं।
+• dedicated menu, Ctrl+I time announce, और 300% तक volume के साथ audio playback बेहतर की गई है।
+• कुछ functions के लिए missing shortcuts जोड़ी गई हैं।
+• Edit menu को text cleanup submenu के साथ पुनर्गठित किया गया है।
+• Options को tabs में पुनर्गठित किया गया है, Ctrl+Tab और Ctrl+Shift+Tab navigation के साथ।
+• RSS reader अब browser view के अनुरूप पूरा article content download करती है।
+
+बग सुधार
+• Markdown cleanup द्वारा lines की शुरुआत में numbers हटाने की समस्या ठीक की गई है।
+• AltGr+Z द्वारा undo trigger होने की समस्या ठीक की गई है।
+• audiobook recording cancellation ठीक की गई है, ताकि यह जल्दी रुक सके।
+
+स्थानीयकरण
+• Vietnamese translation जोड़ी गई (Anh Đức Nguyễn के धन्यवाद सहित)।
+
+Version 0.5.8 - 2026-01-10
+
+नई सुविधाएँ
+• podcasts रिकॉर्ड करते समय microphone और system audio के लिए volume control जोड़ी गई है।
+• websites या RSS feeds से articles import करने की नई सुविधा जोड़ी गई है, जिसमें प्रत्येक भाषा के लिए सबसे महत्वपूर्ण feeds शामिल हैं।
+• current file के लिए सभी bookmarks हटाने की सुविधा जोड़ी गई है।
+• duplicate lines और duplicate consecutive lines हटाने की सुविधा जोड़ी गई है।
+• current tab/window को छोड़कर सभी tabs या windows बंद करने की सुविधा जोड़ी गई है।
+• सभी भाषाओं के लिए Help menu में Donations entry जोड़ी गई है।
+
+सुधार
+• accessible terminal को बेहतर किया गया है, ताकि कुछ crashes रोके जा सकें।
+• पूरे app में access keys और keyboard shortcuts बेहतर और ठीक की गई हैं।
+• एक समस्या ठीक की गई है, जिसमें audio playback window बंद करने पर playback बंद नहीं होती थी।
+• महत्वपूर्ण actions (जैसे duplicate lines हटाना, end-of-line hyphens हटाना, current file में सभी bookmarks हटाना) के लिए confirmation dialogs जोड़ी गई हैं। जब action लागू नहीं होती, तब कोई dialog नहीं दिखाई जाती।
+• RSS feeds/sites को चुनकर Delete दबाकर library से हटाने की सुविधा जोड़ी गई है।
+• RSS window में RSS feeds/sites संपादित या हटाने के लिए context menu जोड़ी गई है।
+• current folder में settings स्थानांतरित करने वाली setting हटा दी गई है; अब app location के आधार पर इसे स्वतः संभालती है (यदि exe folder का नाम "sonarpad portable" हो या exe removable drive पर हो, तो settings exe folder के `config` में जाती हैं; अन्यथा `%APPDATA%\\Sonarpad` में; और यदि preferred folder writable न हो तो fallback के रूप में exe `config` में)।
+
+Version 0.5.7 - 2026-01-05
+
+नई सुविधाएँ
+• एक साथ कई files/folders को convert करने के लिए Batch Audiobooks सुविधा जोड़ी गई है।
+• Markdown files (.md) के लिए support जोड़ी गई है।
+• text files खोलते समय file encoding selection जोड़ी गई है।
+• accessible terminal में NVDA के साथ नई lines घोषित करने का विकल्प जोड़ा गया है।
+
+सुधार
+• audiobook recording अब चयन करने पर native रूप से MP3 में save होती है।
+• user अब window title में "unsaved changes" asterisk (*) की स्थिति चुन सकता है।
+• update system की robustness अलग-अलग scenarios में बेहतर की गई है।
+• OCR line-endings ठीक करने के लिए Edit menu में "Remove Hyphens" जोड़ा गया है।
+
+Version 0.5.6 - 2026-01-04
+
+बग सुधार
+• Find in Files बेहतर किया गया है, ताकि Enter दबाने पर file selected snippet पर ठीक उसी स्थान पर खुले।
+
+सुधार
+• PPT/PPTX support जोड़ी गई है (text के रूप में खोलें)।
+• non-text formats खोलने पर अब formatting corruption से बचने के लिए .txt के रूप में save किया जाता है (PDF/DOC/DOCX/EPUB/HTML/PPT/PPTX)।
+• microphone और system audio से podcast recording जोड़ी गई है (File menu, Ctrl+Shift+R)।
+
+Version 0.5.5 – 2026-01-03
+
+नई सुविधाएँ
+• बड़े output और screen readers के लिए optimized accessible terminal जोड़ी गई है (Ctrl+Shift+P)।
+• current folder में user settings save करने की setting जोड़ी गई है (portable mode)।
+
+बग सुधार
+• Find in Files snippets बेहतर की गई हैं, ताकि preview match के साथ aligned रहे।
+
+Version 0.5.4 – 2026-01-03
+
+सुधार
+• Normalize Whitespace (Ctrl+Shift+Enter) ठीक किया गया।
+• HTML/HTM support जोड़ी गई (text के रूप में खोलें)।
+
+Version 0.5.3 – 2026-01-02
+
+नई सुविधाएँ
+• Find in Files जोड़ा गया।
+• नए text tools जोड़े गए: Normalize Whitespace, Hard Line Break, और Strip Markdown।
+• Text Statistics (Alt+Y) जोड़ी गई।
+• Edit menu में नए list commands जोड़े गए:
+• Order Items (Alt+Shift+O)
+• Keep Unique Items (Alt+Shift+K)
+• Reverse Items (Alt+Shift+Z)
+• Quote / Unquote Lines (Ctrl+Q / Ctrl+Shift+Q) जोड़ी गई।
+
+स्थानीयकरण
+• Spanish localization जोड़ी गई।
+• Portuguese localization जोड़ी गई।
+
+सुधार
+• जब EPUB file खुली हो, Save अब स्वतः Save As में बदल जाता है और EPUB corruption से बचने के लिए content को .txt file के रूप में export करता है।
+
+## 0.5.2 - 2026-01-01
+- changelog जोड़ी गई।
+- installation के दौरान open-with-Sonarpad options और supported files के लिए file associations जोड़ी गईं।
+- message localization बेहतर की गई (errors, dialogs, audiobook export)।
+- "Split audiobook based on text" उपयोग करते समय part selection जोड़ी गई, साथ ही "Require the marker at line start" विकल्प।
+- YouTube transcript import जोड़ी गई, language selection, timestamp option, और बेहतर focus handling के साथ।
+
+## 0.5.1 - 2025-12-31
+- confirmation, बेहतर error handling और notifications के साथ automatic updates।
+- audiobook export improvements (text-based split, SAPI5/Media Foundation, advanced controls)।
+- TTS improvements (pause/resume, replacement dictionary, favorites)।
+- View menu और voice/favorites panels, text color और size।
+- system locale से default language और localization improvements।
+- CI और Windows packaging (artifacts, MSI/NSIS, cache)।
+
+## 0.5.0 - 2025-12-27
+- modular refactor (editor, file handler, menu, search)।
+- Windows build/packaging workflow और README/license updates।
+- Help window में TAB navigation ठीक की गई।
+
+## 0.5 - 2025-12-27
+- प्रारंभिक version bump।
+
+## 0.1.0 - 2025-12-25
+- प्रारंभिक रिलीज़: project structure और README।

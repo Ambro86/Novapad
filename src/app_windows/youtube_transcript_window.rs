@@ -1837,6 +1837,7 @@ struct ResolvedStreamSelection {
 const STREAM_SELECTION_PAGE_SIZE: usize = 20;
 const STREAM_SELECTION_LOAD_MORE_KEY: &str = "stream_audio.load_more_videos";
 const STREAM_SELECTION_PREVIOUS_KEY: &str = "stream_audio.previous_results";
+const YOUTUBE_MPV_STREAM_FORMAT: &str = "best[height<=360][ext=mp4]/18/best[height<=480]/best";
 
 fn stream_entry_url(entry: &serde_json::Value) -> Option<String> {
     entry
@@ -4734,6 +4735,7 @@ fn choose_youtube_collection_entry(
             restore_stream_parent_after_selection_cancel(parent);
             return Ok(None);
         };
+        restore_stream_parent_after_selection(parent);
         if selected == i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY) {
             crate::log_debug(&format!(
                 "stream transition [collection_probe.load_more]: current_page={} next_page={}",
@@ -4859,6 +4861,7 @@ fn choose_youtube_search_entry(
             restore_stream_parent_after_selection_cancel(parent);
             return Ok(None);
         };
+        restore_stream_parent_after_selection(parent);
         if selected == i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY) {
             page += 1;
             continue;
@@ -5080,6 +5083,25 @@ fn looks_like_valid_stream_url(input: &str) -> bool {
         || host_lc.contains('.')
         || host_lc.chars().all(|c| c.is_ascii_digit() || c == '.')
         || (host_lc.starts_with('[') && host_lc.ends_with(']'))
+}
+
+fn is_youtube_stream_url(input: &str) -> bool {
+    let Some(normalized) = normalize_youtube_input_for_download(input) else {
+        return false;
+    };
+    let Ok(url) = Url::parse(&normalized) else {
+        return false;
+    };
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    host.eq_ignore_ascii_case("youtu.be")
+        || host.eq_ignore_ascii_case("youtube.com")
+        || host.ends_with(".youtube.com")
+}
+
+fn should_play_streaming_audio_with_mpv() -> bool {
+    true
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -6152,7 +6174,7 @@ fn restore_stream_parent_focus(hwnd: HWND) {
     crate::set_foreground_window_safe(hwnd);
 }
 
-fn restore_stream_parent_after_selection_cancel(hwnd: HWND) {
+fn restore_stream_parent_after_selection(hwnd: HWND) {
     if hwnd.0 == 0 {
         return;
     }
@@ -6160,6 +6182,10 @@ fn restore_stream_parent_after_selection_cancel(hwnd: HWND) {
         EnableWindow(hwnd, true);
     }
     restore_stream_parent_focus(hwnd);
+}
+
+fn restore_stream_parent_after_selection_cancel(hwnd: HWND) {
+    restore_stream_parent_after_selection(hwnd);
 }
 
 fn log_stream_transition(tag: &str, parent: HWND) {
@@ -7750,7 +7776,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     let should_reopen_selection =
         needs_ytdlp_selection || collection_url.is_some() || collection_page.is_some();
 
-    if dialog_data.direct_play {
+    if dialog_data.direct_play && !should_play_streaming_audio_with_mpv() {
         let stream_path = PathBuf::from(&url);
         crate::queue_audio_files_and_play(parent, vec![stream_path.clone()]);
         crate::editor_manager::mark_current_document_from_rss(parent, true);
@@ -7799,6 +7825,66 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             }
         },
     };
+    if should_play_streaming_audio_with_mpv() {
+        let is_youtube = is_youtube_stream_url(&url);
+        let selected_audio_format = if is_youtube {
+            None
+        } else {
+            let track_probe =
+                probe_stream_audio_tracks_responsive(parent, language, &ytdlp_path, &url);
+            restore_stream_parent_after_selection(parent);
+            match track_probe {
+                Ok(tracks) if tracks.len() > 1 => {
+                    match choose_stream_audio_track(parent, language, tracks) {
+                        Some(chosen) => chosen,
+                        None => {
+                            post_focus_editor(parent);
+                            return;
+                        }
+                    }
+                }
+                Ok(_) => None,
+                Err(err) => {
+                    crate::log_debug(&format!("Stream audio track probe failed: {}", err));
+                    None
+                }
+            }
+        };
+        reclaim_stream_modal_parent_foreground(parent, "play_streaming_audio.before_mpv_title");
+        let stream_title = probe_stream_media_title(&ytdlp_path, &url);
+        let ytdl_format = if is_youtube {
+            Some(YOUTUBE_MPV_STREAM_FORMAT)
+        } else {
+            selected_audio_format.as_deref()
+        };
+        match crate::launch_stream_url_in_mpv(
+            parent,
+            &url,
+            stream_title.as_deref(),
+            Some(&ytdlp_path),
+            ytdl_format,
+        ) {
+            Ok(()) => {
+                if should_reopen_selection {
+                    update_youtube_return_context_from_selection(
+                        parent,
+                        &input,
+                        collection_url.as_deref(),
+                        collection_page,
+                        selected_label.as_deref(),
+                    );
+                } else {
+                    crate::set_active_youtube_return_context(parent, None, None);
+                }
+            }
+            Err(err) => {
+                let message =
+                    i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
+                show_error(parent, language, &message);
+            }
+        }
+        return;
+    }
     'select_video: loop {
         let selected_audio_format =
             match probe_stream_audio_tracks_responsive(parent, language, &ytdlp_path, &url) {

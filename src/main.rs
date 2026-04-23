@@ -2710,6 +2710,112 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
     Err("Impossibile inizializzare il controllo di mpv.".to_string())
 }
 
+pub(crate) fn launch_stream_url_in_mpv(
+    hwnd: HWND,
+    url: &str,
+    title: Option<&str>,
+    ytdlp_path: Option<&Path>,
+    ytdl_format: Option<&str>,
+) -> Result<(), String> {
+    let mpv_exe = ensure_mpv_runtime_available(hwnd)?;
+    let mpv_dir = mpv_exe
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| "Cartella di mpv non valida.".to_string())?;
+    let ipc_name = format!(
+        "sonarpad-mpv-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    );
+    let ipc_path = PathBuf::from(format!(r"\\.\pipe\{ipc_name}"));
+
+    if is_mpv_playback_active(hwnd) {
+        stop_managed_mpv_playback(hwnd);
+    }
+    if with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false) {
+        crate::audio_player::stop_audiobook_playback(hwnd);
+    }
+    focus_editor(hwnd);
+
+    let mut command = std::process::Command::new(&mpv_exe);
+    command
+        .current_dir(&mpv_dir)
+        .arg(url)
+        .arg("--no-video")
+        .arg("--force-window=no")
+        .arg("--no-terminal")
+        .arg("--volume-max=300")
+        .arg(format!("--input-ipc-server={}", ipc_path.display()));
+    if let Some(ytdlp_path) = ytdlp_path {
+        command.arg(format!(
+            "--script-opts=ytdl_hook-ytdl_path={}",
+            ytdlp_path.to_string_lossy()
+        ));
+    }
+    if let Some(ytdl_format) = ytdl_format.filter(|value| !value.trim().is_empty()) {
+        command.arg(format!("--ytdl-format={ytdl_format}"));
+    }
+    if let Some(title) = title.filter(|value| !value.trim().is_empty()) {
+        command.arg(format!("--title={title}"));
+    }
+    command.creation_flags(CREATE_NO_WINDOW_FLAGS);
+
+    let child = command
+        .spawn()
+        .map_err(|err| format!("Impossibile avviare mpv: {err}"))?;
+    for _ in 0..40 {
+        if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
+            let playback_path = PathBuf::from(url);
+            if let Some(index) = editor_manager::ensure_audio_document_tab(hwnd, &playback_path) {
+                editor_manager::select_tab(hwnd, index);
+            }
+            if let Some(title) = title {
+                editor_manager::set_current_document_title(hwnd, title);
+            }
+            editor_manager::mark_current_document_from_rss(hwnd, true);
+            editor_manager::mark_current_document_prefer_mpv_playback(hwnd, true);
+            let persistent_pipe = open_mpv_ipc_pipe(&ipc_path).ok();
+            if with_state(hwnd, |state| {
+                state.active_mpv_session = Some(MpvPlaybackSession {
+                    ipc_path: ipc_path.clone(),
+                    process_id: child.id(),
+                });
+                state.active_mpv_ipc = persistent_pipe;
+                state.active_mpv_status = Some(MpvPlaybackStatus {
+                    volume: 100.0,
+                    speed: 1.0,
+                    pitch: 0.0,
+                });
+                state.active_podcast_episode_url = Some(url.to_string());
+                state.active_podcast_episode_media_url = Some(url.to_string());
+                state.active_podcast_title = None;
+                state.active_podcast_episode_title = title.map(ToOwned::to_owned);
+                state.active_podcast_episode_cache = None;
+                state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
+                state.raiplay_live_audio_variants.clear();
+                state.available_audio_tracks.clear();
+                state.selected_audio_track = None;
+                state.last_stopped_mpv_url = None;
+                state.last_stopped_mpv_position_secs = None;
+            })
+            .is_none()
+            {
+                log_debug("Failed to persist stream mpv state");
+            }
+            prevent_sleep(true);
+            menu::update_playback_menu(hwnd, true);
+            focus_editor(hwnd);
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    Err("Impossibile inizializzare il controllo di mpv.".to_string())
+}
+
 pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), String> {
     let mpv_exe = ensure_mpv_runtime_available(hwnd)?;
     let mpv_dir = mpv_exe

@@ -146,6 +146,30 @@ pub fn is_audio_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+pub fn is_video_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|s| s.to_str())
+        .map(|s| {
+            s.eq_ignore_ascii_case("mp4")
+                || s.eq_ignore_ascii_case("mkv")
+                || s.eq_ignore_ascii_case("avi")
+                || s.eq_ignore_ascii_case("mov")
+                || s.eq_ignore_ascii_case("m4v")
+                || s.eq_ignore_ascii_case("webm")
+                || s.eq_ignore_ascii_case("mpg")
+                || s.eq_ignore_ascii_case("mpeg")
+                || s.eq_ignore_ascii_case("ts")
+                || s.eq_ignore_ascii_case("m2ts")
+                || s.eq_ignore_ascii_case("mts")
+                || s.eq_ignore_ascii_case("wmv")
+                || s.eq_ignore_ascii_case("asf")
+                || s.eq_ignore_ascii_case("flv")
+                || s.eq_ignore_ascii_case("vob")
+                || s.eq_ignore_ascii_case("3gp")
+        })
+        .unwrap_or(false)
+}
+
 // --- Text Encoding / Decoding ---
 
 fn decode_ansi_with_acp(bytes: &[u8]) -> Option<String> {

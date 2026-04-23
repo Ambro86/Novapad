@@ -2228,6 +2228,7 @@ fn clear_managed_mpv_state(hwnd: HWND) {
     if with_state(hwnd, |state| {
         state.active_mpv_session = None;
         state.active_mpv_ipc = None;
+        state.active_mpv_subtitle_generation = state.active_mpv_subtitle_generation.wrapping_add(1);
         state.next_mpv_request_id = 1;
         state.active_podcast_episode_url = None;
         state.active_podcast_episode_media_url = None;
@@ -2520,6 +2521,16 @@ pub(crate) fn is_mpv_playback_active(hwnd: HWND) -> bool {
     with_state(hwnd, |state| state.active_mpv_session.is_some()).unwrap_or(false)
 }
 
+fn active_local_mpv_media(hwnd: HWND) -> Option<(PathBuf, u32)> {
+    with_state(hwnd, |state| {
+        let session = state.active_mpv_session.as_ref()?;
+        let active_url = state.active_podcast_episode_url.as_ref()?;
+        let path = PathBuf::from(active_url);
+        path.is_file().then_some((path, session.process_id))
+    })
+    .flatten()
+}
+
 fn sync_mpv_sleep_prevention(hwnd: HWND) {
     let paused = query_managed_mpv_property(hwnd, "pause")
         .ok()
@@ -2677,6 +2688,241 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
     Err("Impossibile inizializzare il controllo di mpv.".to_string())
+}
+
+pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), String> {
+    let mpv_exe = ensure_mpv_runtime_available(hwnd)?;
+    let mpv_dir = mpv_exe
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| "Cartella di mpv non valida.".to_string())?;
+    let ipc_name = format!(
+        "sonarpad-mpv-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    );
+    let ipc_path = PathBuf::from(format!(r"\\.\pipe\{ipc_name}"));
+
+    if is_mpv_playback_active(hwnd) {
+        stop_managed_mpv_playback(hwnd);
+    }
+    if with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false) {
+        crate::audio_player::stop_audiobook_playback(hwnd);
+    }
+
+    let title = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("Video");
+    let mut command = std::process::Command::new(&mpv_exe);
+    command
+        .current_dir(&mpv_dir)
+        .arg(path)
+        .arg("--no-video")
+        .arg("--no-terminal")
+        .arg("--volume-max=300")
+        .arg(format!("--input-ipc-server={}", ipc_path.display()))
+        .arg(format!("--title={title}"));
+
+    let child = command
+        .spawn()
+        .map_err(|err| format!("Impossibile avviare mpv: {err}"))?;
+    for _ in 0..40 {
+        if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
+            if let Some(index) = editor_manager::ensure_audio_document_tab(hwnd, path) {
+                editor_manager::select_tab(hwnd, index);
+            }
+            editor_manager::mark_current_document_prefer_mpv_playback(hwnd, true);
+            let path_text = path.to_string_lossy().to_string();
+            let persistent_pipe = open_mpv_ipc_pipe(&ipc_path).ok();
+            if with_state(hwnd, |state| {
+                state.active_mpv_session = Some(MpvPlaybackSession {
+                    ipc_path: ipc_path.clone(),
+                    process_id: child.id(),
+                });
+                state.active_mpv_ipc = persistent_pipe;
+                state.active_mpv_status = Some(MpvPlaybackStatus {
+                    volume: 100.0,
+                    speed: 1.0,
+                    pitch: 0.0,
+                });
+                state.active_podcast_episode_url = Some(path_text.clone());
+                state.active_podcast_episode_media_url = Some(path_text);
+                state.active_podcast_title = None;
+                state.active_podcast_episode_title = Some(title.to_string());
+                state.active_podcast_episode_cache = None;
+                state.active_podcast_episode_from_rai = RaiAudioOrigin::None;
+                state.raiplay_live_audio_variants.clear();
+                state.available_audio_tracks.clear();
+                state.selected_audio_track = None;
+                state.last_stopped_mpv_url = None;
+                state.last_stopped_mpv_position_secs = None;
+            })
+            .is_none()
+            {
+                log_debug("Failed to persist local mpv state");
+            }
+            prevent_sleep(true);
+            menu::update_playback_menu(hwnd, true);
+            if let Err(err) = apply_local_mpv_subtitle_offset(hwnd) {
+                log_debug(&format!("Local mpv subtitle offset failed: {}", err));
+            }
+            if let Some(subtitle_path) = crate::subtitles::find_subtitle_for_media(path) {
+                log_debug(&format!(
+                    "Local mpv subtitle auto-load: {}",
+                    subtitle_path.display()
+                ));
+                if let Err(err) = send_local_mpv_subtitle_file(hwnd, &subtitle_path) {
+                    log_debug(&format!("Local mpv subtitle auto-load failed: {}", err));
+                }
+            }
+            start_local_mpv_subtitle_reader(hwnd, path.to_path_buf(), child.id());
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    Err("Impossibile inizializzare il controllo di mpv.".to_string())
+}
+
+fn normalize_mpv_subtitle_text(text: &str) -> String {
+    text.replace("\\N", "\n")
+        .replace('\u{2028}', "\n")
+        .trim()
+        .to_string()
+}
+
+fn speak_mpv_subtitle_text(hwnd: HWND, text: String) {
+    let mode = with_state(hwnd, |state| state.settings.subtitle_read_mode)
+        .unwrap_or(SubtitleReadMode::Off);
+    match mode {
+        SubtitleReadMode::Off | SubtitleReadMode::Record => {}
+        SubtitleReadMode::Nvda => {
+            if !nvda_speak(&text) {
+                log_debug("mpv subtitle: NVDA speak failed");
+            }
+        }
+        SubtitleReadMode::User
+        | SubtitleReadMode::Sapi5
+        | SubtitleReadMode::Sapi4
+        | SubtitleReadMode::Edge => {
+            tts_engine::speak_text_once(hwnd, text);
+        }
+    }
+}
+
+fn apply_local_mpv_subtitle_offset(hwnd: HWND) -> Result<(), String> {
+    let offset_secs = with_state(hwnd, |state| state.settings.subtitle_offset_ms)
+        .unwrap_or_default() as f64
+        / 1000.0;
+    let command = serde_json::json!({
+        "command": [
+            "set_property",
+            "sub-delay",
+            offset_secs
+        ]
+    })
+    .to_string();
+    try_send_command_to_managed_mpv(hwnd, &command)
+}
+
+fn send_local_mpv_subtitle_file(hwnd: HWND, subtitle_path: &Path) -> Result<(), String> {
+    let command = serde_json::json!({
+        "command": [
+            "sub-add",
+            subtitle_path.to_string_lossy().to_string(),
+            "select"
+        ]
+    })
+    .to_string();
+    try_send_command_to_managed_mpv(hwnd, &command)
+}
+
+pub(crate) fn set_local_mpv_subtitle_override(
+    hwnd: HWND,
+    subtitle_path: &Path,
+) -> Result<(), String> {
+    let (media_path, process_id) =
+        active_local_mpv_media(hwnd).ok_or_else(|| "no_media".to_string())?;
+    crate::subtitles::set_subtitle_override(&media_path, subtitle_path.to_path_buf());
+    apply_local_mpv_subtitle_offset(hwnd)?;
+    send_local_mpv_subtitle_file(hwnd, subtitle_path)?;
+    start_local_mpv_subtitle_reader(hwnd, media_path, process_id);
+    Ok(())
+}
+
+pub(crate) fn clear_local_mpv_subtitle_override(hwnd: HWND) -> Result<(), String> {
+    let (media_path, _) = active_local_mpv_media(hwnd).ok_or_else(|| "no_media".to_string())?;
+    crate::subtitles::clear_subtitle_override(&media_path);
+    try_send_command_to_managed_mpv(hwnd, r#"{"command":["set_property","sid","no"]}"#)?;
+    if with_state(hwnd, |state| {
+        state.active_mpv_subtitle_generation = state.active_mpv_subtitle_generation.wrapping_add(1);
+    })
+    .is_none()
+    {
+        log_debug("Failed to stop local mpv subtitle reader");
+    }
+    Ok(())
+}
+
+fn start_local_mpv_subtitle_reader(hwnd: HWND, path: PathBuf, process_id: u32) {
+    let mode = with_state(hwnd, |state| state.settings.subtitle_read_mode)
+        .unwrap_or(SubtitleReadMode::Off);
+    if mode == SubtitleReadMode::Off || mode == SubtitleReadMode::Record {
+        return;
+    }
+    let generation = with_state(hwnd, |state| {
+        state.active_mpv_subtitle_generation = state.active_mpv_subtitle_generation.wrapping_add(1);
+        state.active_mpv_subtitle_generation
+    })
+    .unwrap_or_default();
+
+    std::thread::spawn(move || {
+        let path_text = path.to_string_lossy().to_string();
+        let mut last_text = String::new();
+        loop {
+            let active = with_state(hwnd, |state| {
+                state
+                    .active_mpv_session
+                    .as_ref()
+                    .is_some_and(|session| session.process_id == process_id)
+                    && state.active_mpv_subtitle_generation == generation
+                    && state
+                        .active_podcast_episode_url
+                        .as_ref()
+                        .is_some_and(|active_url| active_url == &path_text)
+            })
+            .unwrap_or(false);
+            if !active {
+                break;
+            }
+
+            let paused = query_managed_mpv_property(hwnd, "pause")
+                .ok()
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            if paused {
+                std::thread::sleep(Duration::from_millis(500));
+                continue;
+            }
+
+            let text = query_managed_mpv_property(hwnd, "sub-text")
+                .ok()
+                .and_then(|value| value.as_str().map(normalize_mpv_subtitle_text))
+                .unwrap_or_default();
+            if text.is_empty() {
+                last_text.clear();
+            } else if text != last_text {
+                log_debug(&format!("mpv subtitle: {}", text.replace('\n', " ")));
+                speak_mpv_subtitle_text(hwnd, text.clone());
+                last_text = text;
+            }
+            std::thread::sleep(Duration::from_millis(60));
+        }
+    });
 }
 
 fn open_podcast_play_progress_window(hwnd: HWND, language: Language) {
@@ -5607,6 +5853,7 @@ pub(crate) struct AppState {
     raiplay_live_audio_variants: Vec<RaiPlayLiveAudioVariant>,
     active_mpv_session: Option<MpvPlaybackSession>,
     active_mpv_ipc: Option<std::fs::File>,
+    active_mpv_subtitle_generation: u64,
     next_mpv_request_id: u64,
     active_mpv_status: Option<MpvPlaybackStatus>,
     last_stopped_mpv_url: Option<String>,
@@ -7089,6 +7336,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     raiplay_live_audio_variants: Vec::new(),
                     active_mpv_session: None,
                     active_mpv_ipc: None,
+                    active_mpv_subtitle_generation: 0,
                     next_mpv_request_id: 1,
                     active_mpv_status: None,
                     last_stopped_mpv_url: None,
@@ -8785,7 +9033,14 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         if let Some(path) = open_subtitle_file_dialog(hwnd) {
                             let language = with_state(hwnd, |state| state.settings.language)
                                 .unwrap_or_default();
-                            match audio_player::set_audiobook_subtitle_override(hwnd, &path) {
+                            let result = audio_player::set_audiobook_subtitle_override(hwnd, &path)
+                                .and_then(|()| {
+                                    if is_mpv_playback_active(hwnd) {
+                                        set_local_mpv_subtitle_override(hwnd, &path)?;
+                                    }
+                                    Ok(())
+                                });
+                            match result {
                                 Ok(()) => {}
                                 Err(code) => {
                                     let key = match code.as_str() {
@@ -8803,7 +9058,14 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_PLAYBACK_REMOVE_SUBTITLES => {
                         let language =
                             with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-                        match audio_player::clear_audiobook_subtitle_override(hwnd) {
+                        let result = audio_player::clear_audiobook_subtitle_override(hwnd)
+                            .and_then(|()| {
+                                if is_mpv_playback_active(hwnd) {
+                                    clear_local_mpv_subtitle_override(hwnd)?;
+                                }
+                                Ok(())
+                            });
+                        match result {
                             Ok(()) => {}
                             Err(code) => {
                                 let key = match code.as_str() {
@@ -13929,6 +14191,16 @@ fn play_audio_playlist_item(hwnd: HWND, index: usize) {
     let tab_index = editor_manager::ensure_audio_document_tab(hwnd, &path);
     if let Some(tab_index) = tab_index {
         editor_manager::select_tab(hwnd, tab_index);
+    }
+    if is_video_path(&path) {
+        if let Err(err) = launch_local_video_in_mpv(hwnd, &path) {
+            log_debug(&format!(
+                "Audio player: failed to launch local video in mpv: {}",
+                err
+            ));
+            screen_reader_speak(&err);
+        }
+        return;
     }
     let mpv_was_active = is_mpv_playback_active(hwnd);
     if mpv_was_active {

@@ -590,6 +590,115 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     }
 }
 
+pub fn speak_text_once(hwnd: HWND, text: String) {
+    let text = text.trim().to_string();
+    if text.is_empty() {
+        return;
+    }
+    let (split_on_newline, tts_engine, dictionary, voice, tts_rate, tts_pitch, tts_volume) =
+        with_state(hwnd, |state| {
+            (
+                state.settings.split_on_newline,
+                state.settings.tts_engine,
+                state.settings.dictionary.clone(),
+                state.settings.tts_voice.clone(),
+                state.settings.tts_rate,
+                state.settings.tts_pitch,
+                state.settings.tts_volume,
+            )
+        })
+        .unwrap_or((
+            true,
+            TtsEngine::Edge,
+            Vec::new(),
+            "it-IT-IsabellaNeural".to_string(),
+            0,
+            0,
+            100,
+        ));
+
+    let initial_caret_pos = 0;
+    match tts_engine {
+        TtsEngine::Edge => queue_tts_playback_from_text(TtsQueuedPlayback {
+            hwnd,
+            engine: tts_engine,
+            text,
+            voice,
+            split_on_newline,
+            dictionary,
+            initial_caret_pos,
+            rate: tts_rate,
+            pitch: tts_pitch,
+            volume: tts_volume,
+        }),
+        TtsEngine::Sapi4 => {
+            stop_tts_playback(hwnd);
+            let voice_idx = if let Some(hash_pos) = voice.find("#") {
+                let rest = &voice[hash_pos + 1..];
+                if let Some(pipe_pos) = rest.find("|") {
+                    rest[..pipe_pos].parse::<i32>().unwrap_or(1)
+                } else {
+                    rest.parse::<i32>().unwrap_or(1)
+                }
+            } else {
+                1
+            };
+            let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
+            if with_state(hwnd, |state| {
+                state.tts_session = Some(TtsSession {
+                    id: state.tts_next_session_id,
+                    command_tx,
+                    cancel: cancel.clone(),
+                    paused: false,
+                    initial_caret_pos,
+                });
+                state.tts_next_session_id += 1;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to update subtitle TTS session state");
+            }
+            crate::sapi4_engine::play_sapi4(
+                voice_idx, text, tts_rate, tts_pitch, tts_volume, cancel, command_rx,
+            );
+        }
+        TtsEngine::Sapi5 => {
+            stop_tts_playback(hwnd);
+            let cancel = Arc::new(AtomicBool::new(false));
+            let (command_tx, command_rx) = mpsc::unbounded_channel();
+            if with_state(hwnd, |state| {
+                state.tts_session = Some(TtsSession {
+                    id: state.tts_next_session_id,
+                    command_tx,
+                    cancel: cancel.clone(),
+                    paused: false,
+                    initial_caret_pos,
+                });
+                state.tts_next_session_id += 1;
+            })
+            .is_none()
+            {
+                crate::log_debug("Failed to update subtitle TTS session state");
+            }
+
+            let chunks = split_into_tts_chunks(&text, split_on_newline, &dictionary, tts_engine);
+            let chunk_strings: Vec<String> = chunks.into_iter().map(|c| c.text_to_read).collect();
+            if let Err(e) = crate::sapi5_engine::play_sapi(
+                chunk_strings,
+                voice,
+                tts_rate,
+                tts_pitch,
+                tts_volume,
+                cancel,
+                command_rx,
+            ) {
+                crate::log_debug(&format!("SAPI5 subtitle playback error: {}", e));
+            }
+        }
+    }
+}
+
 fn queue_tts_playback_from_text(options: TtsQueuedPlayback) {
     std::thread::spawn(move || {
         let chunks = split_into_tts_chunks(

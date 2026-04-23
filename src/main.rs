@@ -2564,6 +2564,30 @@ fn query_managed_mpv_property(hwnd: HWND, property: &str) -> Result<serde_json::
         .unwrap_or(serde_json::Value::Null))
 }
 
+fn query_managed_mpv_property_transient(
+    hwnd: HWND,
+    property: &str,
+) -> Result<serde_json::Value, String> {
+    let session = with_state(hwnd, |state| state.active_mpv_session.clone())
+        .flatten()
+        .ok_or_else(|| "Nessuna riproduzione mpv attiva.".to_string())?;
+    let request = format!(r#"{{"command":["get_property","{}"]}}"#, property);
+    let mut pipe = open_mpv_ipc_pipe(&session.ipc_path)?;
+    let response = send_mpv_ipc_request_with_pipe(hwnd, &session.ipc_path, &mut pipe, &request)?;
+    Ok(response
+        .get("data")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null))
+}
+
+fn try_send_command_to_managed_mpv_transient(hwnd: HWND, command_json: &str) -> Result<(), String> {
+    let session = with_state(hwnd, |state| state.active_mpv_session.clone())
+        .flatten()
+        .ok_or_else(|| "Nessuna riproduzione mpv attiva.".to_string())?;
+    let mut pipe = open_mpv_ipc_pipe(&session.ipc_path)?;
+    send_mpv_ipc_command_with_pipe(hwnd, &session.ipc_path, &mut pipe, command_json)
+}
+
 pub(crate) fn is_mpv_playback_active(hwnd: HWND) -> bool {
     with_state(hwnd, |state| state.active_mpv_session.is_some()).unwrap_or(false)
 }
@@ -2580,6 +2604,41 @@ fn active_local_mpv_media(hwnd: HWND) -> Option<(PathBuf, u32)> {
 
 fn is_local_mpv_playback_active(hwnd: HWND) -> bool {
     active_local_mpv_media(hwnd).is_some()
+}
+
+fn local_mpv_position_secs_for_path(hwnd: HWND, path: &Path) -> Option<f64> {
+    let (active_path, _) = active_local_mpv_media(hwnd)?;
+    if active_path != path {
+        return None;
+    }
+    query_managed_mpv_property_transient(hwnd, "time-pos")
+        .ok()
+        .and_then(|value| value.as_f64())
+        .filter(|value| value.is_finite())
+}
+
+fn seek_local_mpv_to_seconds(hwnd: HWND, path: &Path, seconds: u64) -> Result<(), String> {
+    let (active_path, _) = active_local_mpv_media(hwnd).ok_or_else(|| "no_media".to_string())?;
+    if active_path != path {
+        return Err("no_media".to_string());
+    }
+    try_send_command_to_managed_mpv_transient(
+        hwnd,
+        &format!(r#"{{"command":["seek",{},"absolute"]}}"#, seconds),
+    )
+}
+
+fn saved_audio_bookmark_position_secs(hwnd: HWND, path: &Path) -> u64 {
+    with_state(hwnd, |state| {
+        state
+            .bookmarks
+            .files
+            .get(&path.to_string_lossy().to_string())
+            .and_then(|list| list.last())
+            .map(|bookmark| bookmark.position.max(0) as u64)
+            .unwrap_or(0)
+    })
+    .unwrap_or(0)
 }
 
 fn sync_mpv_sleep_prevention(hwnd: HWND) {
@@ -2883,6 +2942,7 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("Video");
+    let bookmark_start_secs = saved_audio_bookmark_position_secs(hwnd, path);
     let mut command = std::process::Command::new(&mpv_exe);
     command
         .current_dir(&mpv_dir)
@@ -2892,6 +2952,9 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
         .arg("--volume-max=300")
         .arg(format!("--input-ipc-server={}", ipc_path.display()))
         .arg(format!("--title={title}"));
+    if bookmark_start_secs > 0 {
+        command.arg(format!("--start={bookmark_start_secs}"));
+    }
 
     let child = command
         .spawn()
@@ -13985,8 +14048,13 @@ fn insert_bookmark(hwnd: HWND) {
         let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
 
         if matches!(format, FileFormat::Audiobook) {
+            let mpv_position_secs = path
+                .as_deref()
+                .and_then(|path| local_mpv_position_secs_for_path(hwnd, path));
             let (pos, snippet) = with_state(hwnd, |state| {
-                if let Some(player) = &mut state.active_audiobook {
+                if let Some(position_secs) = mpv_position_secs {
+                    audio_bookmark_position_and_snippet(position_secs)
+                } else if let Some(player) = &mut state.active_audiobook {
                     let position_secs = crate::audio_player::audiobook_position_secs(player);
                     audio_bookmark_position_and_snippet(position_secs)
                 } else {
@@ -14027,6 +14095,10 @@ fn insert_bookmark(hwnd: HWND) {
             }
             if inserted {
                 confirm_menu_action(hwnd, "insert.bookmark");
+            } else {
+                crate::accessibility::screen_reader_speak(
+                    "Segnalibro già presente in questa posizione.",
+                );
             }
             return;
         }
@@ -14123,6 +14195,10 @@ fn insert_bookmark(hwnd: HWND) {
         }
         if inserted {
             confirm_menu_action(hwnd, "insert.bookmark");
+        } else {
+            crate::accessibility::screen_reader_speak(
+                "Segnalibro già presente in questa posizione.",
+            );
         }
     }
 }
@@ -14166,10 +14242,16 @@ fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
     }
 
     let current_pos = if matches!(format, FileFormat::Audiobook) {
+        let mpv_position_secs = path
+            .as_deref()
+            .and_then(|path| local_mpv_position_secs_for_path(hwnd, path));
         {
             with_state(hwnd, |state| {
-                let active = state.active_audiobook.as_ref()?;
+                if let Some(position_secs) = mpv_position_secs {
+                    return Some(position_secs.floor() as i32);
+                }
                 let current_path = path.as_ref()?;
+                let active = state.active_audiobook.as_ref()?;
                 if active.path != *current_path {
                     return Some(0);
                 }
@@ -14206,7 +14288,12 @@ fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
         let Some(path) = path.as_ref() else {
             return false;
         };
-        crate::audio_player::start_audiobook_at(hwnd, path, target_position.max(0) as u64);
+        let target_seconds = target_position.max(0) as u64;
+        if seek_local_mpv_to_seconds(hwnd, path, target_seconds).is_err() {
+            crate::audio_player::start_audiobook_at(hwnd, path, target_seconds);
+        } else {
+            stop_mpv_subtitle_speech(hwnd, "bookmark_seek");
+        }
         if !target_snippet.is_empty() {
             crate::accessibility::screen_reader_speak(&target_snippet);
         }

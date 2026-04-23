@@ -65,6 +65,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::CStr;
 use std::io::{Read, Write};
 use std::mem::size_of;
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -214,6 +215,12 @@ const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID1: usize = 12;
 const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID2: usize = 13;
 const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID3: usize = 14;
 const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID4: usize = 15;
+const MPV_ESC_FOCUS_DEBUG_TIMER_ID1: usize = 16;
+const MPV_ESC_FOCUS_DEBUG_TIMER_ID2: usize = 17;
+const MPV_ESC_FOCUS_DEBUG_TIMER_ID3: usize = 18;
+const MPV_ESC_FOCUS_DEBUG_TIMER_ID4: usize = 19;
+const MPV_ESC_FOCUS_DEBUG_TIMER_ID5: usize = 20;
+const MPV_ESC_FOCUS_DEBUG_TIMER_ID6: usize = 21;
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
 const AUDIO_PLAYLIST_TIMER_ID: usize = 7;
@@ -239,6 +246,7 @@ const WINDOW_MENU_INDEX: i32 = 6;
 const WINDOW_DOC_MENU_BASE: usize = 11_000;
 const WINDOW_DOC_MENU_MAX: usize = 200;
 const WINDOW_DOC_MENU_SEPARATOR_ID: usize = 10_999;
+const CREATE_NO_WINDOW_FLAGS: u32 = 0x0800_0000;
 
 pub(crate) fn bring_window_to_foreground(hwnd: HWND) {
     unsafe {
@@ -832,6 +840,19 @@ fn log_foreground_snapshot(tag: &str) {
         "{}: foreground={:?} class='{}' text='{}' focus={:?} focus_class='{}' focus_text='{}'",
         tag, foreground, foreground_class, foreground_text, focus, focus_class, focus_text
     ));
+}
+
+fn log_mpv_focus_snapshot(hwnd: HWND, tag: &str) {
+    let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
+    if let Some(session) = session {
+        log_debug(&format!(
+            "{}: active_mpv_pid={} active_url={:?}",
+            tag,
+            session.process_id,
+            with_state(hwnd, |state| state.active_podcast_episode_url.clone()).flatten()
+        ));
+        log_foreground_snapshot(tag);
+    }
 }
 
 pub(crate) fn get_key_state_safe(vkey: i32) -> i16 {
@@ -2408,6 +2429,16 @@ fn is_mpv_ipc_unavailable_error(err: &str) -> bool {
         || err.contains("Tutte le istanze della pipe sono impegnate. (os error 231)")
 }
 
+fn taskkill_mpv_process(process_id: u32, context: &str) {
+    if let Err(err) = std::process::Command::new("taskkill")
+        .args(["/PID", &process_id.to_string(), "/T", "/F"])
+        .creation_flags(CREATE_NO_WINDOW_FLAGS)
+        .spawn()
+    {
+        log_debug(&format!("Managed mpv taskkill {} failed: {}", context, err));
+    }
+}
+
 fn invalidate_managed_mpv_session(hwnd: HWND) {
     let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
     let active_url = with_state(hwnd, |state| state.active_podcast_episode_url.clone()).flatten();
@@ -2419,15 +2450,8 @@ fn invalidate_managed_mpv_session(hwnd: HWND) {
         log_debug("Failed to persist last stopped mpv url");
     }
     prevent_sleep(false);
-    if let Some(session) = session
-        && let Err(err) = std::process::Command::new("taskkill")
-            .args(["/PID", &session.process_id.to_string(), "/T", "/F"])
-            .spawn()
-    {
-        log_debug(&format!(
-            "Managed mpv taskkill after IPC failure failed: {}",
-            err
-        ));
+    if let Some(session) = session {
+        taskkill_mpv_process(session.process_id, "after IPC failure");
     }
     clear_managed_mpv_state(hwnd);
 }
@@ -2549,6 +2573,7 @@ pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
         unsafe { GetFocus() },
         session.is_some()
     ));
+    stop_mpv_subtitle_speech(hwnd, "stop");
     let resume_position_secs = query_managed_mpv_property(hwnd, "time-pos")
         .ok()
         .and_then(|value| value.as_f64())
@@ -2563,16 +2588,11 @@ pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
         log_debug("Failed to persist last stopped mpv position");
     }
     prevent_sleep(false);
-    if let Some(session) = session {
-        if let Err(err) = send_mpv_ipc_command(&session.ipc_path, r#"{"command":["quit"]}"#) {
-            log_debug(&format!("Managed mpv quit command failed: {}", err));
-        }
-        if let Err(err) = std::process::Command::new("taskkill")
-            .args(["/PID", &session.process_id.to_string(), "/T", "/F"])
-            .spawn()
-        {
-            log_debug(&format!("Managed mpv taskkill failed: {}", err));
-        }
+    if let Some(session) = session
+        && let Err(err) = send_mpv_ipc_command(&session.ipc_path, r#"{"command":["quit"]}"#)
+    {
+        log_debug(&format!("Managed mpv quit command failed: {}", err));
+        taskkill_mpv_process(session.process_id, "after quit failure");
     }
     clear_managed_mpv_state(hwnd);
     log_debug(&format!(
@@ -2811,6 +2831,27 @@ fn speak_mpv_subtitle_text(hwnd: HWND, text: String) {
         | SubtitleReadMode::Edge => {
             tts_engine::speak_text_once(hwnd, text);
         }
+    }
+}
+
+fn stop_mpv_subtitle_speech(hwnd: HWND, reason: &str) {
+    let mode = with_state(hwnd, |state| state.settings.subtitle_read_mode)
+        .unwrap_or(SubtitleReadMode::Off);
+    match mode {
+        SubtitleReadMode::User
+        | SubtitleReadMode::Sapi5
+        | SubtitleReadMode::Sapi4
+        | SubtitleReadMode::Edge => {
+            log_debug(&format!("mpv subtitle speech stop: {}", reason));
+            tts_engine::stop_tts_playback(hwnd);
+        }
+        SubtitleReadMode::Nvda => {
+            log_debug(&format!(
+                "mpv subtitle speech stop skipped for NVDA mode: {}",
+                reason
+            ));
+        }
+        SubtitleReadMode::Off | SubtitleReadMode::Record => {}
     }
 }
 
@@ -5335,6 +5376,7 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
                 let result =
                     try_send_command_to_managed_mpv(hwnd, r#"{"command":["cycle","pause"]}"#);
                 if result.is_ok() {
+                    stop_mpv_subtitle_speech(hwnd, "pause_toggle");
                     sync_mpv_sleep_prevention(hwnd);
                 }
                 result
@@ -5343,17 +5385,34 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
                 stop_managed_mpv_playback(hwnd);
                 return;
             }
-            PlayerCommand::Seek(amount) => try_send_command_to_managed_mpv(
-                hwnd,
-                &format!(r#"{{"command":["seek",{},"relative"]}}"#, amount),
-            ),
-            PlayerCommand::SeekToStart => {
-                try_send_command_to_managed_mpv(hwnd, r#"{"command":["seek",0,"absolute"]}"#)
+            PlayerCommand::Seek(amount) => {
+                let result = try_send_command_to_managed_mpv(
+                    hwnd,
+                    &format!(r#"{{"command":["seek",{},"relative"]}}"#, amount),
+                );
+                if result.is_ok() {
+                    stop_mpv_subtitle_speech(hwnd, "seek_relative");
+                }
+                result
             }
-            PlayerCommand::SeekToEnd => try_send_command_to_managed_mpv(
-                hwnd,
-                r#"{"command":["seek",100,"absolute-percent"]}"#,
-            ),
+            PlayerCommand::SeekToStart => {
+                let result =
+                    try_send_command_to_managed_mpv(hwnd, r#"{"command":["seek",0,"absolute"]}"#);
+                if result.is_ok() {
+                    stop_mpv_subtitle_speech(hwnd, "seek_start");
+                }
+                result
+            }
+            PlayerCommand::SeekToEnd => {
+                let result = try_send_command_to_managed_mpv(
+                    hwnd,
+                    r#"{"command":["seek",100,"absolute-percent"]}"#,
+                );
+                if result.is_ok() {
+                    stop_mpv_subtitle_speech(hwnd, "seek_end");
+                }
+                result
+            }
             PlayerCommand::Volume(delta) => {
                 let volume_delta = if delta > 0.0 { 10 } else { -10 };
                 let result = try_send_command_to_managed_mpv(
@@ -5732,6 +5791,29 @@ pub(crate) fn schedule_mpv_bass_focus_debug_snapshots(hwnd: HWND) {
         }
         if SetTimer(hwnd, MPV_BASS_FOCUS_DEBUG_TIMER_ID4, 1200, None) == 0 {
             crate::log_debug("Failed to set MPV_BASS_FOCUS_DEBUG_TIMER_ID4");
+        }
+    }
+}
+
+fn schedule_mpv_esc_focus_debug_snapshots(hwnd: HWND) {
+    unsafe {
+        if SetTimer(hwnd, MPV_ESC_FOCUS_DEBUG_TIMER_ID1, 10, None) == 0 {
+            crate::log_debug("Failed to set MPV_ESC_FOCUS_DEBUG_TIMER_ID1");
+        }
+        if SetTimer(hwnd, MPV_ESC_FOCUS_DEBUG_TIMER_ID2, 25, None) == 0 {
+            crate::log_debug("Failed to set MPV_ESC_FOCUS_DEBUG_TIMER_ID2");
+        }
+        if SetTimer(hwnd, MPV_ESC_FOCUS_DEBUG_TIMER_ID3, 50, None) == 0 {
+            crate::log_debug("Failed to set MPV_ESC_FOCUS_DEBUG_TIMER_ID3");
+        }
+        if SetTimer(hwnd, MPV_ESC_FOCUS_DEBUG_TIMER_ID4, 100, None) == 0 {
+            crate::log_debug("Failed to set MPV_ESC_FOCUS_DEBUG_TIMER_ID4");
+        }
+        if SetTimer(hwnd, MPV_ESC_FOCUS_DEBUG_TIMER_ID5, 200, None) == 0 {
+            crate::log_debug("Failed to set MPV_ESC_FOCUS_DEBUG_TIMER_ID5");
+        }
+        if SetTimer(hwnd, MPV_ESC_FOCUS_DEBUG_TIMER_ID6, 500, None) == 0 {
+            crate::log_debug("Failed to set MPV_ESC_FOCUS_DEBUG_TIMER_ID6");
         }
     }
 }
@@ -6334,6 +6416,10 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
             if (msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN)
                 && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32
             {
+                log_mpv_focus_snapshot(hwnd, "mpv_escape.pretranslate");
+                if is_mpv_playback_active(hwnd) {
+                    schedule_mpv_esc_focus_debug_snapshots(hwnd);
+                }
                 let rss_hwnd = with_state(hwnd, |state| state.rss_window).unwrap_or(HWND(0));
                 if rss_hwnd.0 != 0
                     && let Some(hwnd_edit) = get_active_edit(hwnd)
@@ -6553,8 +6639,12 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                                 // close_current_document() already stops audiobook playback
                                 // for audiobook tabs, so avoid duplicate stop work here.
                                 if is_mpv {
+                                    log_mpv_focus_snapshot(hwnd, "mpv_stop.before_stop");
                                     stop_managed_mpv_playback(hwnd);
+                                    log_mpv_focus_snapshot(hwnd, "mpv_stop.after_stop");
                                     editor_manager::close_current_document(hwnd);
+                                    log_foreground_snapshot("mpv_stop.after_close_document");
+                                    schedule_mpv_esc_focus_debug_snapshots(hwnd);
                                 } else {
                                     editor_manager::close_current_document(hwnd);
                                 }
@@ -7470,14 +7560,21 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 LRESULT(0)
             }
             WM_SETFOCUS => {
+                log_mpv_focus_snapshot(hwnd, "mpv_wm_setfocus.before");
                 if restore_transcription_progress_focus_for_current_document(hwnd) {
                     return LRESULT(0);
                 }
                 force_active_editor_focus(hwnd);
+                log_mpv_focus_snapshot(hwnd, "mpv_wm_setfocus.after");
                 LRESULT(0)
             }
             WM_ACTIVATE => {
                 let is_activating = (wparam.0 & 0xFFFF) != 0;
+                if is_activating {
+                    log_mpv_focus_snapshot(hwnd, "mpv_wm_activate.activate.before");
+                } else {
+                    log_mpv_focus_snapshot(hwnd, "mpv_wm_activate.deactivate");
+                }
                 if is_activating {
                     if reactivate_batch_audiobooks_window(hwnd) {
                         return LRESULT(0);
@@ -7492,6 +7589,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         force_active_editor_focus(hwnd);
                         schedule_editor_focus_retry(hwnd);
                     }
+                    log_mpv_focus_snapshot(hwnd, "mpv_wm_activate.activate.after");
                 }
                 LRESULT(0)
             }
@@ -7568,6 +7666,17 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                             wparam.0
                         ));
                     }
+                    return LRESULT(0);
+                }
+                if wparam.0 == MPV_ESC_FOCUS_DEBUG_TIMER_ID1
+                    || wparam.0 == MPV_ESC_FOCUS_DEBUG_TIMER_ID2
+                    || wparam.0 == MPV_ESC_FOCUS_DEBUG_TIMER_ID3
+                    || wparam.0 == MPV_ESC_FOCUS_DEBUG_TIMER_ID4
+                    || wparam.0 == MPV_ESC_FOCUS_DEBUG_TIMER_ID5
+                    || wparam.0 == MPV_ESC_FOCUS_DEBUG_TIMER_ID6
+                {
+                    log_foreground_snapshot(&format!("mpv_esc_focus_debug.{}", wparam.0));
+                    kill_timer_best_effort(hwnd, wparam.0, "KillTimer MPV_ESC_FOCUS_DEBUG");
                     return LRESULT(0);
                 }
                 if wparam.0 == ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID1
@@ -8470,6 +8579,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
             WM_COMMAND => {
                 let cmd_id = wparam.0 & 0xffff;
                 let notification = (wparam.0 >> 16) as u16;
+                if u32::from(notification) == EN_KILLFOCUS {
+                    log_mpv_focus_snapshot(hwnd, &format!("mpv_en_killfocus.cmd_{}", cmd_id));
+                }
                 if u32::from(notification) == EN_CHANGE {
                     if is_voice_panel_tuning_edit(hwnd, HWND(lparam.0)) {
                         return LRESULT(0);

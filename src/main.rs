@@ -2578,6 +2578,10 @@ fn active_local_mpv_media(hwnd: HWND) -> Option<(PathBuf, u32)> {
     .flatten()
 }
 
+fn is_local_mpv_playback_active(hwnd: HWND) -> bool {
+    active_local_mpv_media(hwnd).is_some()
+}
+
 fn sync_mpv_sleep_prevention(hwnd: HWND) {
     let paused = query_managed_mpv_property(hwnd, "pause")
         .ok()
@@ -6789,6 +6793,25 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                         let command =
                             handle_player_keyboard(&msg, state.settings.audiobook_skip_seconds);
                         if !matches!(command, PlayerCommand::None) {
+                            if is_local_mpv_playback_active(hwnd)
+                                && matches!(
+                                    command,
+                                    PlayerCommand::TrackPrev | PlayerCommand::TrackNext
+                                )
+                            {
+                                let delta = if matches!(command, PlayerCommand::TrackPrev) {
+                                    -1
+                                } else {
+                                    1
+                                };
+                                if !switch_audio_playlist_relative(hwnd, delta) {
+                                    log_debug(
+                                        "Audio player: no adjacent track available in playlist",
+                                    );
+                                }
+                                handled = true;
+                                return;
+                            }
                             if matches!(command, PlayerCommand::BlockNavigation) {
                                 handled = true;
                                 return;
@@ -9262,12 +9285,24 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         LRESULT(0)
                     }
                     IDM_PLAYBACK_TRACK_PREV => {
-                        handle_player_command(hwnd, PlayerCommand::TrackPrev);
-                        LRESULT(0)
+                        if is_local_mpv_playback_active(hwnd)
+                            && switch_audio_playlist_relative(hwnd, -1)
+                        {
+                            LRESULT(0)
+                        } else {
+                            handle_player_command(hwnd, PlayerCommand::TrackPrev);
+                            LRESULT(0)
+                        }
                     }
                     IDM_PLAYBACK_TRACK_NEXT => {
-                        handle_player_command(hwnd, PlayerCommand::TrackNext);
-                        LRESULT(0)
+                        if is_local_mpv_playback_active(hwnd)
+                            && switch_audio_playlist_relative(hwnd, 1)
+                        {
+                            LRESULT(0)
+                        } else {
+                            handle_player_command(hwnd, PlayerCommand::TrackNext);
+                            LRESULT(0)
+                        }
                     }
                     IDM_PLAYBACK_CHAPTER_PREV => {
                         handle_chapter_navigation(hwnd, -1);
@@ -15162,6 +15197,10 @@ fn handle_drop_files(hwnd: HWND, hdrop: HDROP) {
 }
 
 fn next_tab_with_prompt(hwnd: HWND) {
+    select_relative_tab_with_prompt(hwnd, 1);
+}
+
+fn select_relative_tab_with_prompt(hwnd: HWND, delta: isize) {
     let (current, count) = match with_state(hwnd, |state| {
         if state.docs.is_empty() {
             return None;
@@ -15175,7 +15214,11 @@ fn next_tab_with_prompt(hwnd: HWND) {
     if count <= 1 {
         return;
     }
-    let next = (current + 1) % count;
+    let next = if delta < 0 {
+        if current == 0 { count - 1 } else { current - 1 }
+    } else {
+        (current + 1) % count
+    };
     select_tab(hwnd, next);
 }
 

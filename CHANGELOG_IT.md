@@ -10,6 +10,7 @@ Novità
 • Aggiunta nella voce di menu "Converti audio" l'opzione per convertire un audio in M4B.
 
 Correzioni
+• Corretta la lettura degli articoli dal Corriere della Sera aggiornando la fonte RSS. Da ora gli articoli saranno di nuovo sempre aggiornati.
 • Corretto il tasto `F10`, che ora torna a passare alla voce preferita successiva durante la lettura del testo.
 • Quando è in corso una registrazione podcast, chiudendo un altro documento non viene più chiusa anche la registrazione attiva.
 • Nei commenti YouTube aperti da "Riproduci audio da streaming...", Sonarpad ora carica inizialmente solo i primi 50 commenti principali, includendo sempre tutte le risposte di quei commenti, e aggiunge in fondo una voce per caricare tutti i commenti su richiesta.

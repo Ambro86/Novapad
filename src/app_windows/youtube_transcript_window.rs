@@ -110,6 +110,7 @@ const STREAM_POST_100_GRACE_SECS: u64 = 25;
 const STREAM_RETRY_TIMEOUT_SECS: u64 = 120;
 static YTDLP_UPDATE_CHECKED: AtomicBool = AtomicBool::new(false);
 static PENDING_STREAM_REOPEN_CONTEXT: Mutex<Option<crate::YouTubeReturnContext>> = Mutex::new(None);
+static ACTIVE_STREAM_SAVE_CONTEXT: Mutex<Option<StreamSaveContext>> = Mutex::new(None);
 
 // YouTube InnerTube API constants
 const INNERTUBE_API_URL: &str = "https://www.youtube.com/youtubei/v1/player";
@@ -5104,6 +5105,20 @@ fn should_play_streaming_audio_with_mpv() -> bool {
     true
 }
 
+fn set_active_stream_save_context(context: StreamSaveContext) {
+    let mut guard = ACTIVE_STREAM_SAVE_CONTEXT
+        .lock()
+        .unwrap_or_else(|err| err.into_inner());
+    *guard = Some(context);
+}
+
+fn active_stream_save_context_for_url(url: &str) -> Option<StreamSaveContext> {
+    let guard = ACTIVE_STREAM_SAVE_CONTEXT
+        .lock()
+        .unwrap_or_else(|err| err.into_inner());
+    guard.as_ref().filter(|context| context.url == url).cloned()
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum StreamOutputFormat {
     Auto,
@@ -5166,6 +5181,16 @@ struct YtdlpDownloadRequest<'a> {
     selected_audio_format: Option<&'a str>,
     ytdlp_debug: bool,
     credentials: Option<&'a YtdlpAuthCredentials>,
+}
+
+#[derive(Clone)]
+struct StreamSaveContext {
+    url: String,
+    title: Option<String>,
+    dialog_data: StreamDialogResult,
+    selected_audio_format: Option<String>,
+    ytdlp_path: PathBuf,
+    credentials: Option<YtdlpAuthCredentials>,
 }
 
 struct StreamDialogInit {
@@ -6557,8 +6582,9 @@ fn configure_ytdlp_stream_download_command(
     if let Some(format_id) = selected_audio_format {
         match dialog_data.format {
             StreamOutputFormat::Mp4 => {
+                cmd.arg("--merge-output-format").arg("mp4");
                 cmd.arg("-f").arg(format!(
-                    "bestvideo[ext=mp4]+{id}/bestvideo+{id}/best[ext=mp4]/best",
+                    "bestvideo[ext=mp4]+{id}/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
                     id = format_id
                 ));
             }
@@ -6575,9 +6601,10 @@ fn configure_ytdlp_stream_download_command(
     } else {
         match dialog_data.format {
             StreamOutputFormat::Mp4 => {
+                cmd.arg("--merge-output-format").arg("mp4");
                 let mp4_profile = match dialog_data.quality {
                     StreamQualitySelection::Mp4High => {
-                        "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best"
+                        "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
                     }
                     StreamQualitySelection::Mp4Medium => {
                         "best[ext=mp4][height<=720]/best[height<=720]/best"
@@ -7192,12 +7219,26 @@ fn unique_stream_named_path(dir: &Path, title: &str, ext: &str) -> PathBuf {
 fn probe_stream_audio_tracks(
     ytdlp_path: &Path,
     url: &str,
+    credentials: Option<&YtdlpAuthCredentials>,
 ) -> Result<Vec<StreamAudioTrack>, String> {
-    let output = ytdlp_command(ytdlp_path)
+    let mut command = ytdlp_command(ytdlp_path);
+    command
         .arg("--dump-single-json")
         .arg("--no-playlist")
         .arg("--no-warnings")
-        .arg("--force-ipv4")
+        .arg("--force-ipv4");
+    if let Some(credentials) = credentials {
+        crate::log_debug(&format!(
+            "yt-dlp track probe auth args enabled username={} password_arg=true",
+            credentials.username
+        ));
+        command
+            .arg("--username")
+            .arg(&credentials.username)
+            .arg("--password")
+            .arg(&credentials.password);
+    }
+    let output = command
         .arg("--")
         .arg(url)
         .stdout(Stdio::piped())
@@ -7279,6 +7320,7 @@ fn probe_stream_audio_tracks_responsive(
     language: Language,
     ytdlp_path: &Path,
     url: &str,
+    credentials: Option<&YtdlpAuthCredentials>,
 ) -> Result<Vec<StreamAudioTrack>, String> {
     let progress = open_progress_dialog(
         parent,
@@ -7289,7 +7331,9 @@ fn probe_stream_audio_tracks_responsive(
     );
     let ytdlp = ytdlp_path.to_path_buf();
     let url = url.to_string();
-    let worker = std::thread::spawn(move || probe_stream_audio_tracks(&ytdlp, &url));
+    let credentials = credentials.cloned();
+    let worker =
+        std::thread::spawn(move || probe_stream_audio_tracks(&ytdlp, &url, credentials.as_ref()));
     let mut last_focus_keepalive = std::time::Instant::now();
     while !worker.is_finished() {
         ignore_bool(pump_messages_detect_stream_cancel(parent, progress));
@@ -7634,6 +7678,466 @@ fn choose_stream_audio_track(
     }
 }
 
+fn ensure_stream_save_extension(mut path: PathBuf, ext: &str) -> PathBuf {
+    let has_extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false);
+    if !has_extension {
+        path.set_extension(ext);
+    }
+    path
+}
+
+fn suggested_stream_save_name(context: &StreamSaveContext) -> String {
+    context
+        .title
+        .as_deref()
+        .map(crate::sanitize_filename)
+        .filter(|title| !title.trim().is_empty())
+        .unwrap_or_else(|| "stream_media".to_string())
+}
+
+fn stream_save_target_ext(format: StreamOutputFormat) -> &'static str {
+    format.extension().unwrap_or("webm")
+}
+
+fn stream_save_final_target_path(
+    mut target: PathBuf,
+    downloaded_path: &Path,
+    format: StreamOutputFormat,
+) -> PathBuf {
+    if format == StreamOutputFormat::Auto
+        && let Some(ext) = downloaded_path
+            .extension()
+            .and_then(|value| value.to_str())
+            .filter(|value| !value.trim().is_empty())
+    {
+        target.set_extension(ext);
+    }
+    target
+}
+
+pub(crate) fn download_active_streaming_audio_media(
+    parent: HWND,
+    active_url: &str,
+    language: Language,
+) -> bool {
+    let Some(context) = active_stream_save_context_for_url(active_url) else {
+        return false;
+    };
+    let target_ext = stream_save_target_ext(context.dialog_data.format);
+    let suggested_full = format!("{}.{}", suggested_stream_save_name(&context), target_ext);
+    let Some(target) = crate::save_podcast_episode_dialog(parent, language, &suggested_full) else {
+        return true;
+    };
+    let target = ensure_stream_save_extension(target, target_ext);
+    let cache_dir = settings_dir().join("podcast cache");
+    if let Err(err) = std::fs::create_dir_all(&cache_dir) {
+        show_error(
+            parent,
+            language,
+            &i18n::tr_f(
+                language,
+                "stream_audio.download_failed",
+                &[("err", &err.to_string())],
+            ),
+        );
+        return true;
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    let prefix = format!("stream_save_{}_{}", std::process::id(), stamp);
+    let output_template = cache_dir.join(format!("{prefix}.%(ext)s"));
+    let mut progress = open_progress_dialog(
+        parent,
+        language,
+        "stream_audio.progress_title",
+        "stream_audio.progress_downloading",
+        true,
+    );
+    report_progress_status(
+        progress,
+        &i18n::tr(language, "stream_audio.progress_downloading"),
+    );
+    let mut active_credentials = context.credentials.clone();
+    let mut attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
+        parent,
+        progress,
+        language,
+        ytdlp_path: &context.ytdlp_path,
+        url: &context.url,
+        cache_dir: &cache_dir,
+        prefix: &prefix,
+        output_template: &output_template,
+        dialog_data: &context.dialog_data,
+        selected_audio_format: context.selected_audio_format.as_deref(),
+        ytdlp_debug: ytdlp_debug_enabled(),
+        credentials: active_credentials.as_ref(),
+    }) {
+        Ok(attempt) => attempt,
+        Err(message) => {
+            if !message.is_empty() {
+                close_progress_dialog(progress);
+                show_error(parent, language, &message);
+            }
+            return true;
+        }
+    };
+    let mut downloaded_path = attempt.primary_path.take();
+    if downloaded_path.is_none() {
+        let err = if attempt.stderr_capture.trim().is_empty() {
+            "yt-dlp failed".to_string()
+        } else {
+            attempt.stderr_capture.trim().to_string()
+        };
+        if is_login_required_stream_error(&err) {
+            close_progress_dialog(progress);
+            let site_key = stream_auth_site_key(&context.url);
+            let saved_credentials_failed = active_credentials.is_some();
+            let saved_username = active_credentials
+                .as_ref()
+                .map(|credentials| credentials.username.clone())
+                .unwrap_or_default();
+            if let Some(site) = site_key.as_deref()
+                && saved_credentials_failed
+            {
+                clear_stream_site_credentials(parent, site);
+            }
+            let Some(prompted) = prompt_ytdlp_credentials(
+                parent,
+                language,
+                &saved_username,
+                site_key.is_some(),
+                saved_credentials_failed,
+            ) else {
+                return true;
+            };
+            if let Some(site) = site_key.as_ref() {
+                if prompted.save_credentials {
+                    save_stream_site_credentials(parent, site, &prompted.credentials);
+                } else {
+                    clear_stream_site_credentials(parent, site);
+                }
+            }
+            active_credentials = Some(prompted.credentials);
+            progress = open_progress_dialog(
+                parent,
+                language,
+                "stream_audio.progress_title",
+                "stream_audio.progress_downloading",
+                true,
+            );
+            attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
+                parent,
+                progress,
+                language,
+                ytdlp_path: &context.ytdlp_path,
+                url: &context.url,
+                cache_dir: &cache_dir,
+                prefix: &prefix,
+                output_template: &output_template,
+                dialog_data: &context.dialog_data,
+                selected_audio_format: context.selected_audio_format.as_deref(),
+                ytdlp_debug: ytdlp_debug_enabled(),
+                credentials: active_credentials.as_ref(),
+            }) {
+                Ok(attempt) => attempt,
+                Err(message) => {
+                    if !message.is_empty() {
+                        close_progress_dialog(progress);
+                        show_error(parent, language, &message);
+                    }
+                    return true;
+                }
+            };
+            downloaded_path = attempt.primary_path.take();
+        } else {
+            close_progress_dialog(progress);
+            show_error(
+                parent,
+                language,
+                &i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]),
+            );
+            return true;
+        }
+    }
+    let Some(downloaded_path) = downloaded_path else {
+        close_progress_dialog(progress);
+        show_error(
+            parent,
+            language,
+            &i18n::tr(language, "stream_audio.no_output"),
+        );
+        return true;
+    };
+    let target =
+        stream_save_final_target_path(target, &downloaded_path, context.dialog_data.format);
+    if let Some(convert_settings) = context
+        .dialog_data
+        .format
+        .as_audio_convert_settings(context.dialog_data.quality)
+    {
+        let target_ext = context.dialog_data.format.extension().unwrap_or("mp3");
+        let same_extension = downloaded_path
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(|value| value.eq_ignore_ascii_case(target_ext))
+            .unwrap_or(false);
+        let must_reencode_mp3 = matches!(
+            (context.dialog_data.format, context.dialog_data.quality),
+            (
+                StreamOutputFormat::Mp3,
+                StreamQualitySelection::BitrateKbps(_)
+            )
+        );
+        if same_extension && !must_reencode_mp3 {
+            let result = std::fs::copy(&downloaded_path, &target)
+                .map(|_| ())
+                .map_err(|err| err.to_string());
+            crate::log_if_err!(std::fs::remove_file(&downloaded_path));
+            close_progress_dialog(progress);
+            crate::post_media_save_result(parent, language, target, result.err());
+        } else {
+            report_progress_status(
+                progress,
+                &i18n::tr(language, "stream_audio.progress_converting"),
+            );
+            let cancel = Arc::new(AtomicBool::new(false));
+            let mut progress_cb = |pct: u32| report_progress(progress, (pct / 100).min(100));
+            match crate::ffmpeg_export::convert_audio_file(
+                &downloaded_path,
+                &target,
+                &convert_settings,
+                Some(cancel),
+                Some(&mut progress_cb),
+            ) {
+                Ok(()) => {
+                    crate::log_if_err!(std::fs::remove_file(&downloaded_path));
+                    close_progress_dialog(progress);
+                    crate::post_media_save_result(parent, language, target, None);
+                }
+                Err(err) => {
+                    close_progress_dialog(progress);
+                    crate::post_media_save_result(parent, language, target, Some(err));
+                }
+            }
+        }
+    } else {
+        let result = std::fs::copy(&downloaded_path, &target)
+            .map(|_| ())
+            .map_err(|err| err.to_string());
+        crate::log_if_err!(std::fs::remove_file(&downloaded_path));
+        close_progress_dialog(progress);
+        crate::post_media_save_result(parent, language, target, result.err());
+    }
+    true
+}
+
+pub(crate) fn download_active_streaming_audio_media_for_transcription(
+    parent: HWND,
+    active_url: &str,
+    language: Language,
+) -> Option<PathBuf> {
+    let context = active_stream_save_context_for_url(active_url)?;
+    let cache_dir = settings_dir().join("podcast cache");
+    if let Err(err) = std::fs::create_dir_all(&cache_dir) {
+        show_error(
+            parent,
+            language,
+            &i18n::tr_f(
+                language,
+                "stream_audio.download_failed",
+                &[("err", &err.to_string())],
+            ),
+        );
+        return None;
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    let prefix = format!("stream_transcribe_{}_{}", std::process::id(), stamp);
+    let output_template = cache_dir.join(format!("{prefix}.%(ext)s"));
+    let mut progress = open_progress_dialog(
+        parent,
+        language,
+        "stream_audio.progress_title",
+        "stream_audio.progress_downloading",
+        true,
+    );
+    report_progress_status(
+        progress,
+        &i18n::tr(language, "stream_audio.progress_downloading"),
+    );
+    let mut active_credentials = context.credentials.clone();
+    let mut attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
+        parent,
+        progress,
+        language,
+        ytdlp_path: &context.ytdlp_path,
+        url: &context.url,
+        cache_dir: &cache_dir,
+        prefix: &prefix,
+        output_template: &output_template,
+        dialog_data: &context.dialog_data,
+        selected_audio_format: context.selected_audio_format.as_deref(),
+        ytdlp_debug: ytdlp_debug_enabled(),
+        credentials: active_credentials.as_ref(),
+    }) {
+        Ok(attempt) => attempt,
+        Err(message) => {
+            if !message.is_empty() {
+                close_progress_dialog(progress);
+                show_error(parent, language, &message);
+            }
+            return None;
+        }
+    };
+    let mut downloaded_path = attempt.primary_path.take();
+    if downloaded_path.is_none() {
+        let err = if attempt.stderr_capture.trim().is_empty() {
+            "yt-dlp failed".to_string()
+        } else {
+            attempt.stderr_capture.trim().to_string()
+        };
+        if !is_login_required_stream_error(&err) {
+            close_progress_dialog(progress);
+            show_error(
+                parent,
+                language,
+                &i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]),
+            );
+            return None;
+        }
+        close_progress_dialog(progress);
+        let site_key = stream_auth_site_key(&context.url);
+        let saved_credentials_failed = active_credentials.is_some();
+        let saved_username = active_credentials
+            .as_ref()
+            .map(|credentials| credentials.username.clone())
+            .unwrap_or_default();
+        if let Some(site) = site_key.as_deref()
+            && saved_credentials_failed
+        {
+            clear_stream_site_credentials(parent, site);
+        }
+        let prompted = prompt_ytdlp_credentials(
+            parent,
+            language,
+            &saved_username,
+            site_key.is_some(),
+            saved_credentials_failed,
+        )?;
+        if let Some(site) = site_key.as_ref() {
+            if prompted.save_credentials {
+                save_stream_site_credentials(parent, site, &prompted.credentials);
+            } else {
+                clear_stream_site_credentials(parent, site);
+            }
+        }
+        active_credentials = Some(prompted.credentials);
+        progress = open_progress_dialog(
+            parent,
+            language,
+            "stream_audio.progress_title",
+            "stream_audio.progress_downloading",
+            true,
+        );
+        attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
+            parent,
+            progress,
+            language,
+            ytdlp_path: &context.ytdlp_path,
+            url: &context.url,
+            cache_dir: &cache_dir,
+            prefix: &prefix,
+            output_template: &output_template,
+            dialog_data: &context.dialog_data,
+            selected_audio_format: context.selected_audio_format.as_deref(),
+            ytdlp_debug: ytdlp_debug_enabled(),
+            credentials: active_credentials.as_ref(),
+        }) {
+            Ok(attempt) => attempt,
+            Err(message) => {
+                if !message.is_empty() {
+                    close_progress_dialog(progress);
+                    show_error(parent, language, &message);
+                }
+                return None;
+            }
+        };
+        downloaded_path = attempt.primary_path.take();
+    }
+    let Some(downloaded_path) = downloaded_path else {
+        close_progress_dialog(progress);
+        show_error(
+            parent,
+            language,
+            &i18n::tr(language, "stream_audio.no_output"),
+        );
+        return None;
+    };
+    if let Some(convert_settings) = context
+        .dialog_data
+        .format
+        .as_audio_convert_settings(context.dialog_data.quality)
+    {
+        let target_ext = context.dialog_data.format.extension().unwrap_or("mp3");
+        let same_extension = downloaded_path
+            .extension()
+            .and_then(|value| value.to_str())
+            .map(|value| value.eq_ignore_ascii_case(target_ext))
+            .unwrap_or(false);
+        let must_reencode_mp3 = matches!(
+            (context.dialog_data.format, context.dialog_data.quality),
+            (
+                StreamOutputFormat::Mp3,
+                StreamQualitySelection::BitrateKbps(_)
+            )
+        );
+        if same_extension && !must_reencode_mp3 {
+            close_progress_dialog(progress);
+            return Some(downloaded_path);
+        }
+        report_progress_status(
+            progress,
+            &i18n::tr(language, "stream_audio.progress_converting"),
+        );
+        let converted_path = cache_dir.join(format!("{prefix}_converted.{target_ext}"));
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut progress_cb = |pct: u32| report_progress(progress, (pct / 100).min(100));
+        match crate::ffmpeg_export::convert_audio_file(
+            &downloaded_path,
+            &converted_path,
+            &convert_settings,
+            Some(cancel),
+            Some(&mut progress_cb),
+        ) {
+            Ok(()) => {
+                crate::log_if_err!(std::fs::remove_file(&downloaded_path));
+                close_progress_dialog(progress);
+                Some(converted_path)
+            }
+            Err(err) => {
+                close_progress_dialog(progress);
+                show_error(
+                    parent,
+                    language,
+                    &i18n::tr_f(language, "stream_audio.convert_failed", &[("err", &err)]),
+                );
+                None
+            }
+        }
+    } else {
+        close_progress_dialog(progress);
+        Some(downloaded_path)
+    }
+}
+
 pub fn play_streaming_audio_from_url(parent: HWND) {
     log_stream_transition("play_streaming_audio.start", parent);
     let (language, default_format) = {
@@ -7827,12 +8331,77 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     };
     if should_play_streaming_audio_with_mpv() {
         let is_youtube = is_youtube_stream_url(&url);
+        let site_key = stream_auth_site_key(&url);
+        let mut active_credentials = site_key
+            .as_deref()
+            .and_then(|site| load_saved_stream_site_credentials(parent, site));
+        if FORCE_YTDLP_AUTH_PROMPT_FOR_TESTING && active_credentials.is_none() {
+            let Some(prompted) =
+                prompt_ytdlp_credentials(parent, language, "", site_key.is_some(), false)
+            else {
+                post_focus_editor(parent);
+                return;
+            };
+            if let Some(site) = site_key.as_ref() {
+                if prompted.save_credentials {
+                    save_stream_site_credentials(parent, site, &prompted.credentials);
+                } else {
+                    clear_stream_site_credentials(parent, site);
+                }
+            }
+            active_credentials = Some(prompted.credentials);
+        }
         let selected_audio_format = if is_youtube {
             None
         } else {
-            let track_probe =
-                probe_stream_audio_tracks_responsive(parent, language, &ytdlp_path, &url);
+            let mut track_probe = probe_stream_audio_tracks_responsive(
+                parent,
+                language,
+                &ytdlp_path,
+                &url,
+                active_credentials.as_ref(),
+            );
             restore_stream_parent_after_selection(parent);
+            if let Err(err) = &track_probe
+                && is_login_required_stream_error(err)
+            {
+                let saved_credentials_failed = active_credentials.is_some();
+                let saved_username = active_credentials
+                    .as_ref()
+                    .map(|credentials| credentials.username.clone())
+                    .unwrap_or_default();
+                if let Some(site) = site_key.as_deref()
+                    && saved_credentials_failed
+                {
+                    clear_stream_site_credentials(parent, site);
+                }
+                let Some(prompted) = prompt_ytdlp_credentials(
+                    parent,
+                    language,
+                    &saved_username,
+                    site_key.is_some(),
+                    saved_credentials_failed,
+                ) else {
+                    post_focus_editor(parent);
+                    return;
+                };
+                if let Some(site) = site_key.as_ref() {
+                    if prompted.save_credentials {
+                        save_stream_site_credentials(parent, site, &prompted.credentials);
+                    } else {
+                        clear_stream_site_credentials(parent, site);
+                    }
+                }
+                active_credentials = Some(prompted.credentials);
+                track_probe = probe_stream_audio_tracks_responsive(
+                    parent,
+                    language,
+                    &ytdlp_path,
+                    &url,
+                    active_credentials.as_ref(),
+                );
+                restore_stream_parent_after_selection(parent);
+            }
             match track_probe {
                 Ok(tracks) if tracks.len() > 1 => {
                     match choose_stream_audio_track(parent, language, tracks) {
@@ -7863,8 +8432,19 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             stream_title.as_deref(),
             Some(&ytdlp_path),
             ytdl_format,
+            active_credentials
+                .as_ref()
+                .map(|credentials| (credentials.username.as_str(), credentials.password.as_str())),
         ) {
             Ok(()) => {
+                set_active_stream_save_context(StreamSaveContext {
+                    url: url.clone(),
+                    title: stream_title.clone(),
+                    dialog_data: dialog_data.clone(),
+                    selected_audio_format: selected_audio_format.clone(),
+                    ytdlp_path: ytdlp_path.clone(),
+                    credentials: active_credentials.clone(),
+                });
                 if should_reopen_selection {
                     update_youtube_return_context_from_selection(
                         parent,
@@ -7887,7 +8467,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     }
     'select_video: loop {
         let selected_audio_format =
-            match probe_stream_audio_tracks_responsive(parent, language, &ytdlp_path, &url) {
+            match probe_stream_audio_tracks_responsive(parent, language, &ytdlp_path, &url, None) {
                 Ok(tracks) if tracks.len() > 1 => {
                     match choose_stream_audio_track(parent, language, tracks) {
                         Some(chosen) => chosen,

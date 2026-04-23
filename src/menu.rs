@@ -680,6 +680,8 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     IDM_PLAYBACK_TRANSCRIBE_CURRENT,
                     &transcribe_current,
                 );
+            }
+            if !hls_m3u8_playback && !direct_stream_playback {
                 append_menu_string(
                     playback_menu,
                     MF_STRING,

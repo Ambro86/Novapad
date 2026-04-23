@@ -1752,6 +1752,13 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
         })
         .unwrap_or((None, None, None, None, None, Language::default(), false))
     };
+    if let Some(active_url) = url.as_deref()
+        && app_windows::youtube_transcript_window::download_active_streaming_audio_media(
+            hwnd, active_url, language,
+        )
+    {
+        return;
+    }
     let fallback_cache_path =
         current_playback_media_path(hwnd).filter(|path| is_local_cached_media_path(path));
     if is_raiplay_on_demand {
@@ -1913,6 +1920,22 @@ fn post_podcast_episode_save_result(hwnd: HWND, payload: PodcastEpisodeSaveResul
             let _drop_payload = Box::from_raw(ptr);
         }
     }
+}
+
+pub(crate) fn post_media_save_result(
+    hwnd: HWND,
+    language: Language,
+    target_path: PathBuf,
+    error: Option<String>,
+) {
+    post_podcast_episode_save_result(
+        hwnd,
+        PodcastEpisodeSaveResult {
+            language,
+            target_path,
+            error,
+        },
+    );
 }
 
 fn post_podcast_episode_play_ready(hwnd: HWND, payload: PodcastEpisodePlayReady) {
@@ -2716,6 +2739,7 @@ pub(crate) fn launch_stream_url_in_mpv(
     title: Option<&str>,
     ytdlp_path: Option<&Path>,
     ytdl_format: Option<&str>,
+    ytdlp_credentials: Option<(&str, &str)>,
 ) -> Result<(), String> {
     let mpv_exe = ensure_mpv_runtime_available(hwnd)?;
     let mpv_dir = mpv_exe
@@ -2757,6 +2781,18 @@ pub(crate) fn launch_stream_url_in_mpv(
     }
     if let Some(ytdl_format) = ytdl_format.filter(|value| !value.trim().is_empty()) {
         command.arg(format!("--ytdl-format={ytdl_format}"));
+    }
+    if let Some((username, password)) = ytdlp_credentials
+        .filter(|(username, password)| !username.trim().is_empty() && !password.trim().is_empty())
+    {
+        log_debug(&format!(
+            "Managed mpv yt-dlp auth args enabled username={} password_arg=true",
+            username
+        ));
+        command.arg(format!(
+            "--ytdl-raw-options=username={},password={}",
+            username, password
+        ));
     }
     if let Some(title) = title.filter(|value| !value.trim().is_empty()) {
         command.arg(format!("--title={title}"));
@@ -3613,7 +3649,7 @@ pub(crate) fn podcast_episode_display_title(
     }
 }
 
-fn save_podcast_episode_dialog(
+pub(crate) fn save_podcast_episode_dialog(
     hwnd: HWND,
     language: Language,
     suggested_name: &str,
@@ -4650,27 +4686,49 @@ fn start_whisper_transcription(hwnd: HWND) {
         return;
     };
     let media_info = with_state(hwnd, |state| {
-        let player = state.active_audiobook.as_ref()?;
-        let path = player.path.clone();
-        let stream_index = state.selected_audio_track;
-        Some((path, stream_index))
+        if let Some(player) = state.active_audiobook.as_ref() {
+            return Some((player.path.clone(), state.selected_audio_track));
+        }
+        state.docs.get(state.current).and_then(|doc| {
+            if matches!(doc.format, FileFormat::Audiobook) {
+                doc.path
+                    .as_ref()
+                    .map(|path| (path.clone(), state.selected_audio_track))
+            } else {
+                None
+            }
+        })
     })
     .flatten();
 
-    let Some((media_path, stream_index)) = media_info else {
+    let Some((mut media_path, mut stream_index)) = media_info else {
         screen_reader_speak(&i18n::tr(language, "whisper.error.no_active_media"));
         return;
     };
 
     if is_direct_stream_url_path(&media_path) {
-        screen_reader_speak(&i18n::tr(
+        let active_url = media_path.to_string_lossy().to_string();
+        let Some(downloaded_path) = app_windows::youtube_transcript_window::download_active_streaming_audio_media_for_transcription(
+            hwnd,
+            &active_url,
             language,
-            "whisper.error.direct_stream_not_supported",
-        ));
-        return;
+        ) else {
+            return;
+        };
+        media_path = downloaded_path;
+        stream_index = None;
     }
 
-    crate::audio_player::pause_audiobook_if_playing(hwnd);
+    if should_route_player_command_to_mpv(hwnd) {
+        if try_send_command_to_managed_mpv(hwnd, r#"{"command":["set_property","pause",true]}"#)
+            .is_ok()
+        {
+            stop_mpv_subtitle_speech(hwnd, "transcription_start");
+            sync_mpv_sleep_prevention(hwnd);
+        }
+    } else {
+        crate::audio_player::pause_audiobook_if_playing(hwnd);
+    }
     prevent_sleep(true);
 
     let cancel_flag = Arc::new(AtomicBool::new(false));

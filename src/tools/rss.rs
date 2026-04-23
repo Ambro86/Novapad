@@ -338,7 +338,10 @@ fn canonicalize_url(u: &str) -> String {
     s
 }
 
-fn is_corriere_home_aggregate_url(url: &str) -> bool {
+const CORRIERE_HOME_FEED_URL: &str =
+    "https://xml2.corriereobjects.it/feed-hp/homepage-restyle-2025.xml";
+
+fn is_corriere_home_feed_url(url: &str) -> bool {
     let Ok(parsed) = Url::parse(url) else {
         return false;
     };
@@ -349,21 +352,11 @@ fn is_corriere_home_aggregate_url(url: &str) -> bool {
         "corriere.it" | "www.corriere.it" => {
             path.is_empty() || path == "/rss" || path == "/rss/homepage.xml"
         }
-        "xml2.corriereobjects.it" => path == "/feed-hp/homepage.xml",
+        "xml2.corriereobjects.it" => {
+            path == "/feed-hp/homepage.xml" || path == "/feed-hp/homepage-restyle-2025.xml"
+        }
         _ => false,
     }
-}
-
-fn corriere_dynamic_feed_urls() -> &'static [&'static str] {
-    &[
-        "https://www.corriere.it/dynamic-feed/rss/section/Cronache.xml",
-        "https://www.corriere.it/dynamic-feed/rss/section/Politica.xml",
-        "https://www.corriere.it/dynamic-feed/rss/section/Esteri.xml",
-        "https://www.corriere.it/dynamic-feed/rss/section/Economia.xml",
-        "https://www.corriere.it/dynamic-feed/rss/section/Sport.xml",
-        "https://www.corriere.it/dynamic-feed/rss/section/Cultura-Opinioni.xml",
-        "https://www.corriere.it/dynamic-feed/rss/section/Scienze.xml",
-    ]
 }
 
 fn format_error_chain(e: &HttpError) -> String {
@@ -1053,18 +1046,6 @@ fn dedup_items(items: Vec<RssItem>, max_items: usize) -> Vec<RssItem> {
     out
 }
 
-fn sort_items_by_pub_date_desc(items: &mut [RssItem]) {
-    let mut indexed: Vec<(usize, RssItem)> = items.iter().cloned().enumerate().collect();
-    indexed.sort_by(|(ia, a), (ib, b)| {
-        let at = a.pub_date.unwrap_or(i64::MIN);
-        let bt = b.pub_date.unwrap_or(i64::MIN);
-        bt.cmp(&at).then_with(|| ia.cmp(ib))
-    });
-    for (dst, (_, item)) in indexed.into_iter().enumerate() {
-        items[dst] = item;
-    }
-}
-
 fn dedup_podcast_items(items: Vec<PodcastEpisode>, max_items: usize) -> Vec<PodcastEpisode> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
@@ -1220,89 +1201,21 @@ pub async fn fetch_and_parse(
     _override_cooldown: bool,
     language: Language,
 ) -> Result<RssFetchOutcome, FeedFetchError> {
-    let url = normalize_url(url);
+    let mut url = normalize_url(url);
     let http = shared_http().map_err(|e| FeedFetchError::Network {
         message: e,
         cache: cache.clone(),
     })?;
     let mut cache = cache;
 
-    if is_corriere_home_aggregate_url(&url) {
+    if is_corriere_home_feed_url(&url) && url != CORRIERE_HOME_FEED_URL {
         crate::log_debug(&format!(
-            "rss_corriere_aggregate using dynamic feeds for {}",
-            url
+            "rss_corriere_home_feed_override from=\"{}\" to=\"{}\"",
+            url, CORRIERE_HOME_FEED_URL
         ));
-        let mut merged_items = Vec::new();
-        let mut success_count = 0usize;
-        let mut last_error = None;
-
-        for feed_url in corriere_dynamic_feed_urls() {
-            let feed_bytes = match fetch_bytes_with_retries(http, feed_url, true, language, None)
-                .await
-            {
-                Ok(out) => out.bytes,
-                Err(primary_err) => match fetch_url_bytes(feed_url, fetch_config).await {
-                    Ok(bytes) => bytes,
-                    Err(fallback_err) => {
-                        let primary_message = match primary_err {
-                            FeedFetchError::HttpStatus { status, .. } => format!("HTTP {}", status),
-                            FeedFetchError::Network { message, .. } => message,
-                        };
-                        let fallback_message = match fallback_err {
-                            FeedFetchError::HttpStatus { status, .. } => format!("HTTP {}", status),
-                            FeedFetchError::Network { message, .. } => message,
-                        };
-                        crate::log_debug(&format!(
-                            "rss_corriere_aggregate feed_failed url=\"{}\" primary=\"{}\" fallback=\"{}\"",
-                            feed_url, primary_message, fallback_message
-                        ));
-                        last_error = Some(fallback_message);
-                        continue;
-                    }
-                },
-            };
-
-            if let Some((_title, mut items)) = parse_feed_bytes(
-                feed_bytes,
-                feed_url,
-                fetch_config.max_excerpt_chars,
-                language,
-            ) {
-                success_count += 1;
-                merged_items.append(&mut items);
-            } else {
-                crate::log_debug(&format!(
-                    "rss_corriere_aggregate parse_failed url=\"{}\"",
-                    feed_url
-                ));
-            }
-        }
-
-        if success_count == 0 {
-            return Err(FeedFetchError::Network {
-                message: last_error.unwrap_or_else(|| "Parsing failed".to_string()),
-                cache,
-            });
-        }
-
-        sort_items_by_pub_date_desc(&mut merged_items);
-        let items = dedup_items(merged_items, fetch_config.max_items_per_feed);
-        cache.feed_url = Some("corriere:dynamic-feed-aggregate".to_string());
+        url = CORRIERE_HOME_FEED_URL.to_string();
         cache.etag = None;
         cache.last_modified = None;
-        cache.last_fetch = Some(now_unix());
-        cache.last_status = Some(200);
-        cache.consecutive_failures = 0;
-        cache.blocked_until_epoch_secs = None;
-        cache.last_error_kind = None;
-
-        return Ok(RssFetchOutcome {
-            kind: RssSourceType::Feed,
-            title: "Corriere.it".to_string(),
-            items,
-            cache,
-            not_modified: false,
-        });
     }
 
     let out_result = fetch_bytes_with_retries(http, &url, true, language, Some(&mut cache)).await;
@@ -1658,18 +1571,19 @@ mod tests {
     }
 
     #[test]
-    fn corriere_home_aggregate_detection_only_matches_home_variants() {
-        assert!(is_corriere_home_aggregate_url("https://www.corriere.it/"));
-        assert!(is_corriere_home_aggregate_url(
+    fn corriere_home_feed_detection_only_matches_home_variants() {
+        assert!(is_corriere_home_feed_url("https://www.corriere.it/"));
+        assert!(is_corriere_home_feed_url(
             "https://www.corriere.it/rss/homepage.xml"
         ));
-        assert!(is_corriere_home_aggregate_url(
+        assert!(is_corriere_home_feed_url(
             "https://xml2.corriereobjects.it/feed-hp/homepage.xml"
         ));
-        assert!(!is_corriere_home_aggregate_url(
+        assert!(is_corriere_home_feed_url(CORRIERE_HOME_FEED_URL));
+        assert!(!is_corriere_home_feed_url(
             "https://www.corriere.it/dynamic-feed/rss/section/Politica.xml"
         ));
-        assert!(!is_corriere_home_aggregate_url(
+        assert!(!is_corriere_home_feed_url(
             "https://www.corriere.it/cronache/"
         ));
     }

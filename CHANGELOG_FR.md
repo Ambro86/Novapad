@@ -3,6 +3,7 @@
 Version 0.7.0 – 2026-04-12
 
 Nouveautés
+• Ajout de la prise en charge du lecteur mpv pour la lecture en streaming. Les vidéos provenant de YouTube et des sites compatibles sont désormais lues immédiatement ; si l'utilisateur choisit de les conserver, elles sont téléchargées comme auparavant. Lors de la transcription d'un contenu en streaming, celui-ci est d'abord téléchargé puis transcrit. Le lecteur mpv est également utilisé pour ouvrir des vidéos locales et gérer les sous-titres, garantissant une meilleure compatibilité avec de nombreux formats auparavant mal pris en charge.
 • Amélioration de l’enregistrement de podcasts pour l’audio du système : il est désormais possible de choisir entre l’enregistrement de tout l’audio du système, d’une seule application ou de plusieurs applications en même temps. Cette option est intégrée à l’enregistrement normal, il reste donc possible d’activer ou de désactiver le microphone séparément.
 • Ajout de la langue hindi. Interface traduite et ajout des flux RSS, du journal des modifications et du guide Sonarpad.
 • Ajout d'une option dans l'onglet Éditeur pour déplacer toujours le curseur au début de la ligne avec les flèches haut et bas.

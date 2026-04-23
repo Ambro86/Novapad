@@ -3,6 +3,7 @@
 Wersja 0.7.0 – 2026-04-12
 
 Nowości
+• Dodano obsługę odtwarzacza mpv do odtwarzania strumieniowego. Filmy z YouTube i obsługiwanych stron są teraz odtwarzane natychmiast; jeśli użytkownik zdecyduje się je zachować, są pobierane jak wcześniej. W przypadku transkrypcji treści strumieniowych są one najpierw pobierane, a następnie transkrybowane. Odtwarzacz mpv jest również używany do otwierania lokalnych plików wideo oraz obsługi napisów, co zapewnia lepszą kompatybilność z wieloma formatami.
 • Ulepszono nagrywanie podcastów z dźwięku systemowego: teraz można wybrać nagrywanie całego dźwięku systemowego, jednej aplikacji albo wielu aplikacji jednocześnie. Ta opcja jest zintegrowana ze zwykłym nagrywaniem, więc nadal można osobno włączać lub wyłączać mikrofon.
 • Dodano język hindi. Przetłumaczono interfejs oraz dodano RSS, dziennik zmian i przewodnik Sonarpad.
 • Dodano opcję w zakładce Edytor, która zawsze przenosi kursor na początek wiersza przy użyciu strzałek w górę i w dół.

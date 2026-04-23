@@ -3,6 +3,7 @@
 Verze 0.7.0 – 2026-04-12
 
 Co je nového
+• Přidána podpora přehrávače mpv pro streamované přehrávání. Videa z YouTube a podporovaných webů se nyní přehrávají okamžitě; pokud si je uživatel chce uložit, stáhnou se jako dříve. Při přepisu streamovaného obsahu se nejprve stáhne a poté přepíše. Přehrávač mpv se také používá pro otevírání lokálních videí a práci s titulky, což zajišťuje lepší kompatibilitu s mnoha formáty.
 • Vylepšeno nahrávání podcastů systémového zvuku: nyní si můžete zvolit, zda chcete nahrávat veškerý systémový zvuk, jednu aplikaci nebo více aplikací současně. Tato volba je integrována do běžného nahrávání, takže mikrofon lze stále samostatně zapnout nebo vypnout.
 • Přidán jazyk hindština. Rozhraní přeloženo, přidány RSS, seznam změn a příručka Sonarpad.
 • Přidána možnost v kartě Editor, která při použití šipek nahoru a dolů vždy přesune kurzor na začátek řádku.

@@ -3,6 +3,7 @@
 Phiên bản 0.7.0 – 2026-04-12
 
 Bản mới
+• Đã thêm hỗ trợ trình phát mpv cho phát trực tuyến. Video từ YouTube và các trang được hỗ trợ giờ phát ngay lập tức; nếu người dùng muốn lưu lại, chúng sẽ được tải xuống như trước. Khi phiên âm nội dung streaming, nội dung sẽ được tải xuống trước rồi mới xử lý. Trình phát mpv cũng được dùng để mở video cục bộ và xử lý phụ đề, giúp cải thiện khả năng tương thích với nhiều định dạng.
 • Đã cải thiện tính năng ghi podcast từ âm thanh hệ thống: giờ đây bạn có thể chọn ghi toàn bộ âm thanh hệ thống, một ứng dụng hoặc nhiều ứng dụng cùng lúc. Tùy chọn này được tích hợp vào chế độ ghi bình thường, vì vậy vẫn có thể bật hoặc tắt micro riêng biệt.
 • Đã thêm ngôn ngữ Hindi. Giao diện đã được dịch, bổ sung RSS, nhật ký thay đổi và hướng dẫn Sonarpad.
 • Đã thêm tùy chọn trong tab Trình soạn thảo để luôn đưa con trỏ về đầu dòng khi dùng phím mũi tên lên và xuống.

@@ -3,6 +3,7 @@
 Version 0.7.0 – 2026-04-12
 
 What's New
+• Added support for the mpv player for streaming playback. Videos from YouTube and supported sites are now played instantly; if the user chooses to keep them, they are downloaded as before. When transcribing streaming content, it is first downloaded and then transcribed. The mpv player is also used to open local videos and handle subtitles, ensuring improved compatibility with many formats that were previously not fully supported.
 • Improved podcast recording for system audio: you can now choose whether to record all system audio, a single application, or multiple applications at the same time. This choice is integrated into normal recording, so the microphone can still be enabled or disabled separately.
 • Added Hindi language. Translated the interface and added RSS feeds, changelog, and Sonarpad guide.
 • Added an option in the Editor tab to always move the cursor to the start of the line when using the Up and Down arrow keys.

@@ -228,6 +228,11 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
         )),
     }
 
+    let film_items = groups
+        .iter()
+        .find(|group| is_film_group(&group.title))
+        .map(|group| group.items.clone())
+        .unwrap_or_default();
     let grouped_items = build_grouped_items(&groups);
     let item_by_id: std::collections::HashMap<String, CatalogItem> = groups
         .iter()
@@ -237,45 +242,95 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
     let item_by_id_for_enabled = item_by_id.clone();
     let item_by_id_for_handler = item_by_id.clone();
     let filter_label = crate::i18n::tr(language, "wikipedia.search_label");
-    let Some(selected_value) = interpreter_select_window::select_grouped_interpreter_with_context_action_without_parent_restore_on_accept(
-        parent,
-        grouped_items,
-        language,
-        crate::i18n::tr(language, "rai_audiodescrizioni.window.full_title"),
-        Some(filter_label),
-        initial_item_id,
-        InterpreterContextAction {
-            label: format!(
-                "{} (Ctrl+C)",
-                crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
-            ),
-            ctrl_c_shortcut: true,
-            enabled: Arc::new(move |selected_value: &str| {
-                item_by_id_for_enabled
-                    .get(selected_value)
-                    .map(|item| !item.audio_url.trim().is_empty())
-                    .unwrap_or(false)
-            }),
-            handler: Arc::new(move |selected_value: String| {
-                if let Some(item) = item_by_id_for_handler.get(&selected_value) {
-                    copy_text_to_clipboard(
-                        parent,
-                        &format_resolved_audio_url_clipboard_text(
-                            language,
-                            &item.title,
-                            &item.audio_url,
-                        ),
-                    );
-                }
-            }),
-        },
-    )
-    else {
+    let selection = if film_items.is_empty() {
+        interpreter_select_window::select_grouped_interpreter_with_context_action_without_parent_restore_on_accept(
+            parent,
+            grouped_items,
+            language,
+            crate::i18n::tr(language, "rai_audiodescrizioni.window.full_title"),
+            Some(filter_label),
+            initial_item_id,
+            InterpreterContextAction {
+                label: format!(
+                    "{} (Ctrl+C)",
+                    crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
+                ),
+                ctrl_c_shortcut: true,
+                enabled: Arc::new(move |selected_value: &str| {
+                    item_by_id_for_enabled
+                        .get(selected_value)
+                        .map(|item| !item.audio_url.trim().is_empty())
+                        .unwrap_or(false)
+                }),
+                handler: Arc::new(move |selected_value: String| {
+                    if let Some(item) = item_by_id_for_handler.get(&selected_value) {
+                        copy_text_to_clipboard(
+                            parent,
+                            &format_resolved_audio_url_clipboard_text(
+                                language,
+                                &item.title,
+                                &item.audio_url,
+                            ),
+                        );
+                    }
+                }),
+            },
+        )
+        .map(InterpreterSelectionResult::Item)
+    } else {
+        interpreter_select_window::select_grouped_interpreter_with_secondary_action_and_context_action_without_parent_restore_on_accept(
+            parent,
+            grouped_items,
+            language,
+            crate::i18n::tr(language, "rai_audiodescrizioni.window.full_title"),
+            InterpreterSecondaryActionOptions {
+                label: "Film".to_string(),
+                filter_label: Some(filter_label),
+            },
+            initial_item_id,
+            InterpreterContextAction {
+                label: format!(
+                    "{} (Ctrl+C)",
+                    crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
+                ),
+                ctrl_c_shortcut: true,
+                enabled: Arc::new(move |selected_value: &str| {
+                    item_by_id_for_enabled
+                        .get(selected_value)
+                        .map(|item| !item.audio_url.trim().is_empty())
+                        .unwrap_or(false)
+                }),
+                handler: Arc::new(move |selected_value: String| {
+                    if let Some(item) = item_by_id_for_handler.get(&selected_value) {
+                        copy_text_to_clipboard(
+                            parent,
+                            &format_resolved_audio_url_clipboard_text(
+                                language,
+                                &item.title,
+                                &item.audio_url,
+                            ),
+                        );
+                    }
+                }),
+            },
+        )
+    };
+    let Some(selected_value) = selection else {
         let recent_item_id =
             with_state(parent, |state| state.last_rai_recent_item_id.clone()).unwrap_or(None);
         crate::set_foreground_window_safe(parent);
         crate::set_focus_safe(parent);
         open_recent_catalog(parent, language, recent_item_id);
+        return;
+    };
+
+    if matches!(selected_value, InterpreterSelectionResult::SecondaryAction) {
+        crate::set_foreground_window_safe(parent);
+        open_film_catalog(parent, language, &film_items);
+        return;
+    }
+
+    let InterpreterSelectionResult::Item(selected_value) = selected_value else {
         return;
     };
 
@@ -414,8 +469,83 @@ fn build_grouped_items(groups: &[CatalogGroup]) -> Vec<GroupedSelectGroup> {
                     value: item.item_id.clone(),
                 })
                 .collect(),
+            hidden_in_tree: is_film_group(&group.title),
         })
         .collect()
+}
+
+fn is_film_group(title: &str) -> bool {
+    title.trim().eq_ignore_ascii_case("Film")
+}
+
+fn open_film_catalog(parent: HWND, language: Language, items: &[CatalogItem]) {
+    if items.is_empty() {
+        return;
+    }
+    let (display_items, labels) = build_display_items(items, language);
+    let display_items_for_enabled = display_items.clone();
+    let display_items_for_handler = display_items.clone();
+    let selection =
+        interpreter_select_window::select_interpreter_with_context_actions_without_parent_restore_on_accept(
+            parent,
+            labels,
+            language,
+            "Film".to_string(),
+            None,
+            vec![InterpreterContextAction {
+                label: format!(
+                    "{} (Ctrl+C)",
+                    crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
+                ),
+                ctrl_c_shortcut: true,
+                enabled: Arc::new(move |selected_label: &str| {
+                    display_items_for_enabled
+                        .iter()
+                        .find(|(label, _)| label == selected_label)
+                        .map(|(_, item)| !item.audio_url.trim().is_empty())
+                        .unwrap_or(false)
+                }),
+                handler: Arc::new(move |selected_label: String| {
+                    if let Some((_, item)) = display_items_for_handler
+                        .iter()
+                        .find(|(label, _)| label == &selected_label)
+                    {
+                        copy_text_to_clipboard(
+                            parent,
+                            &format_resolved_audio_url_clipboard_text(
+                                language,
+                                &item.title,
+                                &item.audio_url,
+                            ),
+                        );
+                    }
+                }),
+            }],
+        );
+    let Some(selected_label) = selection else {
+        let initial_item_id =
+            with_state(parent, |state| state.last_rai_grouped_item_id.clone()).unwrap_or(None);
+        crate::set_foreground_window_safe(parent);
+        crate::set_focus_safe(parent);
+        open_grouped_catalog(parent, language, initial_item_id);
+        return;
+    };
+    let Some((_, selected_item)) = display_items
+        .into_iter()
+        .find(|(label, _)| label == &selected_label)
+    else {
+        show_error(
+            parent,
+            language,
+            &crate::i18n::tr(language, "rai_audiodescrizioni.error.open_selected"),
+        );
+        return;
+    };
+    with_state(parent, |state| {
+        state.last_rai_grouped_item_id = Some(selected_item.item_id.clone());
+    });
+    crate::set_foreground_window_safe(parent);
+    open_item(parent, language, &selected_item, RaiAudioOrigin::Tutte);
 }
 
 fn build_display_items(

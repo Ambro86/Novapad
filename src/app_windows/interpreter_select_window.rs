@@ -54,6 +54,7 @@ pub(crate) struct GroupedSelectItem {
 pub(crate) struct GroupedSelectGroup {
     pub(crate) label: String,
     pub(crate) items: Vec<GroupedSelectItem>,
+    pub(crate) hidden_in_tree: bool,
 }
 
 #[derive(Clone)]
@@ -105,10 +106,16 @@ struct InterpreterSelectState {
     initial_list_value: Option<String>,
     filter_edit: Option<HWND>,
     flat_list: Option<HWND>,
-    flat_list_values: Vec<String>,
+    flat_list_values: Vec<FlatListValue>,
     tree_values: Vec<String>,
     context_actions: Vec<InterpreterContextAction>,
     result: Arc<Mutex<Option<InterpreterSelectionResult>>>,
+}
+
+#[derive(Clone)]
+enum FlatListValue {
+    Group(String),
+    Item(String),
 }
 
 #[derive(Clone)]
@@ -261,6 +268,34 @@ pub fn select_grouped_interpreter_with_context_actions_without_parent_restore_on
         Some(InterpreterSelectionResult::Item(value)) => Some(value),
         _ => None,
     }
+}
+
+pub fn select_grouped_interpreter_with_secondary_action_and_context_action_without_parent_restore_on_accept(
+    parent: HWND,
+    groups: Vec<GroupedSelectGroup>,
+    language: Language,
+    title: String,
+    secondary_action: InterpreterSecondaryActionOptions,
+    initial_value: Option<String>,
+    context_action: InterpreterContextAction,
+) -> Option<InterpreterSelectionResult> {
+    select_interpreter_internal(
+        parent,
+        InterpreterDialogInitMode::Tree(groups),
+        language,
+        title,
+        InterpreterSelectOptions {
+            filter_label: secondary_action.filter_label,
+            secondary_action_label: Some(secondary_action.label),
+            suppress_parent_restore_on_accept: true,
+            suppress_parent_restore_on_secondary: true,
+            suppress_parent_restore_on_cancel: true,
+            pin_topmost: true,
+            initial_tree_value: initial_value,
+            context_actions: vec![context_action],
+            ..Default::default()
+        },
+    )
 }
 
 fn select_interpreter_internal(
@@ -616,6 +651,9 @@ fn interpreter_select_wndproc_inner(
                     let mut first_group = HTREEITEM(0);
                     let mut initial_selection = HTREEITEM(0);
                     for group in groups {
+                        if group.hidden_in_tree {
+                            continue;
+                        }
                         let parent_item = insert_tree_item(tree, HTREEITEM(0), &group.label, -1);
                         if parent_item.0 == 0 {
                             continue;
@@ -936,7 +974,7 @@ fn interpreter_select_wndproc_inner(
                         if let ControlKind::Tree(tree) = &state.control
                             && is_tree_filter_active(state)
                         {
-                            return activate_filtered_tree_group_selection(state, *tree);
+                            return activate_filtered_tree_group_selection(hwnd, state, *tree);
                         }
                         false
                     })
@@ -1164,7 +1202,7 @@ fn repopulate_list(
 fn repopulate_group_filter_list(
     tree: HWND,
     flat_list: Option<HWND>,
-    flat_list_values: &mut Vec<String>,
+    flat_list_values: &mut Vec<FlatListValue>,
     groups: &[GroupedSelectGroup],
     filter_text: &str,
 ) -> usize {
@@ -1191,17 +1229,34 @@ fn repopulate_group_filter_list(
 
     let mut inserted_count = 0usize;
     for group in groups {
-        if !matches_filter(&group.label, filter_text) {
-            continue;
+        if !group.hidden_in_tree && matches_filter(&group.label, filter_text) {
+            crate::send_message_w_safe(
+                flat_list,
+                LB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&group.label).as_ptr() as isize),
+            );
+            flat_list_values.push(FlatListValue::Group(group.label.clone()));
+            inserted_count += 1;
         }
-        crate::send_message_w_safe(
-            flat_list,
-            LB_ADDSTRING,
-            WPARAM(0),
-            LPARAM(to_wide(&group.label).as_ptr() as isize),
-        );
-        flat_list_values.push(group.label.clone());
-        inserted_count += 1;
+        for item in &group.items {
+            if !matches_filter(&item.label, filter_text) {
+                continue;
+            }
+            let display = if group.hidden_in_tree {
+                format!("{} [{}]", item.label, group.label)
+            } else {
+                item.label.clone()
+            };
+            crate::send_message_w_safe(
+                flat_list,
+                LB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&display).as_ptr() as isize),
+            );
+            flat_list_values.push(FlatListValue::Item(item.value.clone()));
+            inserted_count += 1;
+        }
     }
     if inserted_count > 0 {
         crate::send_message_w_safe(flat_list, LB_SETCURSEL, WPARAM(0), LPARAM(0));
@@ -1217,43 +1272,60 @@ fn is_tree_filter_active(state: &InterpreterSelectState) -> bool {
         .is_some_and(|text| !text.trim().is_empty())
 }
 
-fn activate_filtered_tree_group_selection(state: &mut InterpreterSelectState, tree: HWND) -> bool {
+fn activate_filtered_tree_group_selection(
+    hwnd: HWND,
+    state: &mut InterpreterSelectState,
+    tree: HWND,
+) -> bool {
     let Some(flat_list) = state.flat_list else {
         return false;
     };
-    let selected_group = selected_flat_group_value(flat_list, &state.flat_list_values);
-    let Some(selected_group) = selected_group else {
+    let selected_value = selected_flat_group_value(flat_list, &state.flat_list_values);
+    let Some(selected_value) = selected_value else {
         return false;
     };
-    let Some(group_item) = find_tree_group_by_label(tree, &selected_group) else {
-        return false;
-    };
+    match selected_value {
+        FlatListValue::Group(selected_group) => {
+            let Some(group_item) = find_tree_group_by_label(tree, &selected_group) else {
+                return false;
+            };
 
-    if let Some(edit) = state.filter_edit {
-        crate::log_if_err!(unsafe { SetWindowTextW(edit, PCWSTR::null()) });
+            if let Some(edit) = state.filter_edit {
+                crate::log_if_err!(unsafe { SetWindowTextW(edit, PCWSTR::null()) });
+            }
+            unsafe {
+                ShowWindow(flat_list, SW_HIDE);
+                ShowWindow(tree, SW_SHOW);
+                SetFocus(tree);
+            }
+            crate::send_message_w_safe(
+                tree,
+                TVM_SELECTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(group_item.0),
+            );
+            crate::send_message_w_safe(
+                tree,
+                TVM_EXPAND,
+                WPARAM(TVE_EXPAND.0 as usize),
+                LPARAM(group_item.0),
+            );
+            crate::send_message_w_safe(tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(group_item.0));
+            true
+        }
+        FlatListValue::Item(selected_item) => {
+            *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
+                Some(InterpreterSelectionResult::Item(selected_item));
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
+            true
+        }
     }
-    unsafe {
-        ShowWindow(flat_list, SW_HIDE);
-        ShowWindow(tree, SW_SHOW);
-        SetFocus(tree);
-    }
-    crate::send_message_w_safe(
-        tree,
-        TVM_SELECTITEM,
-        WPARAM(TVGN_CARET as usize),
-        LPARAM(group_item.0),
-    );
-    crate::send_message_w_safe(
-        tree,
-        TVM_EXPAND,
-        WPARAM(TVE_EXPAND.0 as usize),
-        LPARAM(group_item.0),
-    );
-    crate::send_message_w_safe(tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(group_item.0));
-    true
 }
 
-fn selected_flat_group_value(flat_list: HWND, flat_list_values: &[String]) -> Option<String> {
+fn selected_flat_group_value(
+    flat_list: HWND,
+    flat_list_values: &[FlatListValue],
+) -> Option<FlatListValue> {
     let sel = crate::send_message_w_safe(flat_list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if sel < 0 {
         return None;

@@ -2840,6 +2840,28 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
         crate::audio_player::stop_audiobook_playback(hwnd);
     }
 
+    let show_video =
+        with_state(hwnd, |state| state.settings.show_video_during_playback).unwrap_or(false);
+    let (playback_url, playback_media_url, render_video) =
+        match crate::tools::raiplay::resolve_playback_target(url)? {
+            crate::tools::raiplay::PlaybackTarget::DirectStream {
+                url: audio_only_url,
+                media_url,
+                is_live,
+                ..
+            } => {
+                let render_video = show_video && !is_live;
+                let playback_url = if render_video {
+                    media_url.clone()
+                } else {
+                    audio_only_url
+                };
+                (playback_url, media_url, render_video)
+            }
+            crate::tools::raiplay::PlaybackTarget::Download(resolved_url) => {
+                (resolved_url.clone(), resolved_url, show_video)
+            }
+        };
     let bookmark_start_secs = saved_audio_bookmark_position_secs(
         hwnd,
         &PathBuf::from(url),
@@ -2848,24 +2870,45 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
     let start_seconds = resume_seconds
         .filter(|value| *value > 0)
         .or((bookmark_start_secs > 0).then_some(bookmark_start_secs));
+    let hwnd_video = with_state(hwnd, |state| {
+        if render_video {
+            state.local_mpv_video_hwnd
+        } else {
+            HWND(0)
+        }
+    })
+    .unwrap_or(HWND(0));
+    if hwnd_video.0 != 0 {
+        set_local_mpv_video_mode(hwnd, true);
+    }
 
     let mut command = std::process::Command::new(&mpv_exe);
     command
         .current_dir(&mpv_dir)
-        .arg(url)
-        .arg("--no-video")
         .arg("--no-terminal")
         .arg("--volume-max=300")
+        .arg(&playback_url)
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
+    if hwnd_video.0 != 0 {
+        command
+            .arg(format!("--wid={}", hwnd_video.0))
+            .arg("--force-window=yes")
+            .arg("--vid=auto")
+            .arg("--vo=gpu")
+            .arg("--gpu-context=win");
+    } else {
+        command.arg("--no-video");
+    }
     if let Some(start_seconds) = start_seconds {
         command.arg(format!("--start={start_seconds}"));
     }
     if let Some(title) = title.filter(|value| !value.trim().is_empty()) {
         command.arg(format!("--title={title}"));
     }
-    let child = command
-        .spawn()
-        .map_err(|err| format!("Impossibile avviare mpv: {err}"))?;
+    let child = command.spawn().map_err(|err| {
+        set_local_mpv_video_mode(hwnd, false);
+        format!("Impossibile avviare mpv: {err}")
+    })?;
     for _ in 0..40 {
         if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
             let playback_path = PathBuf::from(url);
@@ -2903,7 +2946,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
             set_active_podcast_episode_info(
                 hwnd,
                 Some(url.to_string()),
-                Some(url.to_string()),
+                Some(playback_media_url),
                 podcast_title.map(ToOwned::to_owned),
                 title.map(ToOwned::to_owned),
                 None,
@@ -2914,6 +2957,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
+    set_local_mpv_video_mode(hwnd, false);
     Err("Impossibile inizializzare il controllo di mpv.".to_string())
 }
 
@@ -2949,16 +2993,35 @@ pub(crate) fn launch_stream_url_in_mpv(
     focus_editor(hwnd);
 
     let bookmark_start_secs = saved_audio_bookmark_position_secs(hwnd, &PathBuf::from(url), title);
+    let hwnd_video = with_state(hwnd, |state| {
+        if state.settings.show_video_during_playback {
+            state.local_mpv_video_hwnd
+        } else {
+            HWND(0)
+        }
+    })
+    .unwrap_or(HWND(0));
+    if hwnd_video.0 != 0 {
+        set_local_mpv_video_mode(hwnd, true);
+    }
 
     let mut command = std::process::Command::new(&mpv_exe);
     command
         .current_dir(&mpv_dir)
         .arg(url)
-        .arg("--no-video")
-        .arg("--force-window=no")
         .arg("--no-terminal")
         .arg("--volume-max=300")
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
+    if hwnd_video.0 != 0 {
+        command
+            .arg(format!("--wid={}", hwnd_video.0))
+            .arg("--force-window=yes")
+            .arg("--vid=auto")
+            .arg("--vo=gpu")
+            .arg("--gpu-context=win");
+    } else {
+        command.arg("--no-video").arg("--force-window=no");
+    }
     if bookmark_start_secs > 0 {
         command.arg(format!("--start={bookmark_start_secs}"));
     }
@@ -2988,9 +3051,10 @@ pub(crate) fn launch_stream_url_in_mpv(
     }
     command.creation_flags(CREATE_NO_WINDOW_FLAGS);
 
-    let child = command
-        .spawn()
-        .map_err(|err| format!("Impossibile avviare mpv: {err}"))?;
+    let child = command.spawn().map_err(|err| {
+        set_local_mpv_video_mode(hwnd, false);
+        format!("Impossibile avviare mpv: {err}")
+    })?;
     for _ in 0..40 {
         if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
             let playback_path = PathBuf::from(url);
@@ -3038,6 +3102,7 @@ pub(crate) fn launch_stream_url_in_mpv(
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
+    set_local_mpv_video_mode(hwnd, false);
     Err("Impossibile inizializzare il controllo di mpv.".to_string())
 }
 

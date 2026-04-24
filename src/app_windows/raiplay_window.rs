@@ -358,7 +358,7 @@ fn open_media_item(
                 );
             } else if let Err(err) = crate::launch_raiplay_in_mpv(
                 parent,
-                &url,
+                media_url.as_str(),
                 container_title.as_deref(),
                 title.as_deref(),
                 RaiAudioOrigin::RaiPlay,

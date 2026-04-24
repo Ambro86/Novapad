@@ -422,7 +422,16 @@ fn label_with_shortcut(label: &str, binding: ShortcutBinding) -> String {
 
 pub fn update_playback_menu(hwnd: HWND, show: bool) {
     unsafe {
-        let hmenu = GetMenu(hwnd);
+        let hmenu = {
+            let attached = GetMenu(hwnd);
+            if attached.0 != 0 {
+                attached
+            } else if with_state(hwnd, |state| state.local_mpv_video_mode_active).unwrap_or(false) {
+                with_state(hwnd, |state| state.local_mpv_hidden_menu).unwrap_or(HMENU(0))
+            } else {
+                HMENU(0)
+            }
+        };
         if hmenu.0 == 0 {
             return;
         }

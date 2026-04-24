@@ -1787,6 +1787,12 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
     );
 }
 
+enum RaiPlaySaveMode {
+    Mp3,
+    Mp4,
+    Mp4Described,
+}
+
 fn download_podcast_episode_with_progress(
     hwnd: HWND,
     url: Option<String>,
@@ -1808,19 +1814,36 @@ fn download_podcast_episode_with_progress(
                     .map(|s| s.to_string())
             })
             .unwrap_or_else(|| "podcast_episode".to_string());
-    let Some(ext) = choose_raiplay_episode_save_extension(hwnd, language) else {
+    let described_audio_url = url.as_deref().and_then(|value| {
+        crate::tools::raiplay::resolve_playback_target(value)
+            .ok()
+            .and_then(|target| match target {
+                crate::tools::raiplay::PlaybackTarget::DirectStream {
+                    url: audio_only_url,
+                    media_url,
+                    ..
+                } => (audio_only_url != media_url).then_some(audio_only_url),
+                crate::tools::raiplay::PlaybackTarget::Download(_) => None,
+            })
+    });
+    let Some(save_mode) =
+        choose_raiplay_episode_save_mode(hwnd, language, described_audio_url.is_some())
+    else {
         return;
+    };
+    let ext = match save_mode {
+        RaiPlaySaveMode::Mp3 => "mp3",
+        RaiPlaySaveMode::Mp4 | RaiPlaySaveMode::Mp4Described => "mp4",
     };
     let suggested_full = format!("{}.{}", suggested_name, ext);
     let target = save_podcast_episode_dialog(hwnd, language, &suggested_full);
     let Some(target) = target else {
         return;
     };
-    let target = replace_path_extension(target, &ext);
-    let stream_source_url = if ext.eq_ignore_ascii_case("mp4") {
-        media_url.or(url.clone())
-    } else {
-        url.clone()
+    let target = replace_path_extension(target, ext);
+    let stream_source_url = match save_mode {
+        RaiPlaySaveMode::Mp3 => url.clone(),
+        RaiPlaySaveMode::Mp4 | RaiPlaySaveMode::Mp4Described => media_url.or(url.clone()),
     };
     let Some(stream_url) = stream_source_url
         .as_deref()
@@ -1859,32 +1882,49 @@ fn download_podcast_episode_with_progress(
         let mut progress_callback = |pct: u32| {
             update_podcast_save_progress_window(hwnd_copy, normalize_ffmpeg_progress_pct(pct));
         };
-        let is_mp4_video_save = target
-            .extension()
-            .and_then(|value| value.to_str())
-            .map(|value| value.eq_ignore_ascii_case("mp4"))
-            .unwrap_or(false);
-        let result = if is_mp4_video_save {
-            crate::ffmpeg_export::remux_media_file_to_mp4_with_preferred_audio_stream(
-                &input_path,
-                &target,
-                selected_audio_track,
-                Some(cancel_flag.clone()),
-                Some(&mut progress_callback),
-            )
-        } else {
-            crate::ffmpeg_export::convert_audio_file_with_preferred_stream(
+        let result = match save_mode {
+            RaiPlaySaveMode::Mp4 => {
+                crate::ffmpeg_export::remux_media_file_to_mp4_with_preferred_audio_stream(
+                    &input_path,
+                    &target,
+                    selected_audio_track,
+                    Some(cancel_flag.clone()),
+                    Some(&mut progress_callback),
+                )
+            }
+            RaiPlaySaveMode::Mp4Described => {
+                if let Some(audio_url) = described_audio_url {
+                    log_debug(&format!(
+                        "RaiPlay save: muxing MP4 with described audio video={} audio={}",
+                        input_path.display(),
+                        audio_url
+                    ));
+                    crate::ffmpeg_export::remux_media_file_to_mp4_with_external_audio_stream(
+                        &input_path,
+                        &PathBuf::from(audio_url),
+                        &target,
+                        Some(cancel_flag.clone()),
+                        Some(&mut progress_callback),
+                    )
+                } else {
+                    Err("RaiPlay described audio stream not available.".to_string())
+                }
+            }
+            RaiPlaySaveMode::Mp3 => crate::ffmpeg_export::convert_audio_file_with_preferred_stream(
                 &input_path,
                 &target,
                 &convert_settings,
                 Some(cancel_flag.clone()),
                 Some(&mut progress_callback),
                 selected_audio_track,
-            )
+            ),
         };
         match result {
             Ok(()) => {
-                if is_mp4_video_save {
+                if matches!(
+                    save_mode,
+                    RaiPlaySaveMode::Mp4 | RaiPlaySaveMode::Mp4Described
+                ) {
                     update_podcast_save_progress_window(hwnd_copy, 100);
                 }
                 post_podcast_episode_save_result(
@@ -3957,12 +3997,25 @@ fn replace_path_extension(mut path: PathBuf, desired_ext: &str) -> PathBuf {
     path
 }
 
-fn choose_raiplay_episode_save_extension(hwnd: HWND, language: Language) -> Option<String> {
+fn choose_raiplay_episode_save_mode(
+    hwnd: HWND,
+    language: Language,
+    has_described_audio: bool,
+) -> Option<RaiPlaySaveMode> {
     let (title, label) = match language {
         Language::Italian => ("Formato salvataggio RaiPlay", "Seleziona il formato"),
         _ => ("RaiPlay Save Format", "Select format"),
     };
-    let options = vec!["MP3".to_string(), "MP4".to_string()];
+    let mut options = match language {
+        Language::Italian => vec!["MP3".to_string(), "MP4".to_string()],
+        _ => vec!["MP3".to_string(), "MP4".to_string()],
+    };
+    if has_described_audio {
+        options.push(match language {
+            Language::Italian => "MP4 con audiodescrizione".to_string(),
+            _ => "MP4 with described audio".to_string(),
+        });
+    }
     let selected = app_windows::youtube_transcript_window::choose_combo_option_dialog(
         hwnd,
         language,
@@ -3972,8 +4025,9 @@ fn choose_raiplay_episode_save_extension(hwnd: HWND, language: Language) -> Opti
         0,
     )?;
     match selected {
-        0 => Some("mp3".to_string()),
-        1 => Some("mp4".to_string()),
+        0 => Some(RaiPlaySaveMode::Mp3),
+        1 => Some(RaiPlaySaveMode::Mp4),
+        2 if has_described_audio => Some(RaiPlaySaveMode::Mp4Described),
         _ => None,
     }
 }
@@ -4031,42 +4085,69 @@ pub(crate) fn save_podcast_episode_dialog(
     language: Language,
     suggested_name: &str,
 ) -> Option<PathBuf> {
-    let raw_filter = i18n::tr(language, "podcasts.download_filter");
-    let filter = to_wide(&raw_filter.replace("\\0", "\0"));
-    let mut buffer = vec![0u16; 4096];
-    let wide_name = to_wide(suggested_name);
-    for (i, ch) in wide_name
-        .iter()
-        .enumerate()
-        .take(buffer.len().saturating_sub(1))
-    {
-        buffer[i] = *ch;
-    }
     let initial_dir = with_state(hwnd, |state| state.settings.media_save_folder.clone())
         .map(|path| path.trim().to_string())
         .filter(|path| !path.is_empty())
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(settings::default_media_save_folder()));
     crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
-    let initial_dir_wide = to_wide(&initial_dir.to_string_lossy());
-    let mut ofn = OPENFILENAMEW {
-        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
-        hwndOwner: hwnd,
-        lpstrFilter: PCWSTR(filter.as_ptr()),
-        lpstrInitialDir: PCWSTR(initial_dir_wide.as_ptr()),
-        lpstrFile: PWSTR(buffer.as_mut_ptr()),
-        nMaxFile: buffer.len() as u32,
-        Flags: OFN_EXPLORER | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT,
-        ..Default::default()
-    };
-    if !crate::get_save_file_name_w_safe(&mut ofn).as_bool() {
-        return None;
+    unsafe {
+        let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
+
+        let filter_raw = i18n::tr(language, "podcasts.download_filter");
+        let parts: Vec<&str> = filter_raw.split("\\0").collect();
+        let mut spec = Vec::new();
+        let mut pattern_wides = Vec::new();
+        let mut name_wides = Vec::new();
+        for i in (0..parts.len().saturating_sub(1)).step_by(2) {
+            if parts[i].is_empty() {
+                break;
+            }
+            name_wides.push(to_wide(parts[i]));
+            pattern_wides.push(to_wide(parts[i + 1]));
+        }
+        for i in 0..name_wides.len() {
+            spec.push(COMDLG_FILTERSPEC {
+                pszName: PCWSTR(name_wides[i].as_ptr()),
+                pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
+            });
+        }
+        pfd.SetFileTypes(&spec).ok()?;
+        pfd.SetFileTypeIndex(1).ok()?;
+
+        if let Some(default_ext) = Path::new(suggested_name)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .filter(|ext| !ext.trim().is_empty())
+        {
+            let default_ext_wide = to_wide(default_ext);
+            pfd.SetDefaultExtension(PCWSTR(default_ext_wide.as_ptr()))
+                .ok()?;
+        }
+
+        let initial_dir_wide = to_wide(&initial_dir.to_string_lossy());
+        if let Ok(shell_folder) =
+            SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(initial_dir_wide.as_ptr()), None)
+        {
+            let _unused = pfd.SetDefaultFolder(&shell_folder);
+            let _unused = pfd.SetFolder(&shell_folder);
+        }
+
+        let default_name = Path::new(suggested_name)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or(suggested_name);
+        pfd.SetFileName(PCWSTR(to_wide(default_name).as_ptr()))
+            .ok()?;
+
+        pfd.Show(hwnd).ok()?;
+        let result = pfd.GetResult().ok()?;
+        let path = result
+            .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
+            .ok()?;
+        Some(PathBuf::from(path.to_string().ok()?))
     }
-    let end = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
-    if end == 0 {
-        return None;
-    }
-    Some(PathBuf::from(String::from_utf16_lossy(&buffer[..end])))
 }
 pub(crate) fn prefetch_podcast_chapters(hwnd: HWND, key: String, url: String) {
     let should_fetch = {

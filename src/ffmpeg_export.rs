@@ -2259,6 +2259,25 @@ pub fn remux_media_file_to_mp4_with_preferred_audio_stream(
     )
 }
 
+pub fn remux_media_file_to_mp4_with_external_audio_stream(
+    video_path: &Path,
+    audio_path: &Path,
+    output_path: &Path,
+    cancel: Option<Arc<AtomicBool>>,
+    progress: Option<&mut dyn FnMut(u32)>,
+) -> Result<(), String> {
+    let api = ffmpeg_api()?;
+    mux_video_with_audio(
+        api,
+        video_path,
+        audio_path,
+        output_path,
+        None,
+        cancel,
+        progress,
+    )
+}
+
 pub fn convert_audio_file_with_channels(
     input_path: &Path,
     output_path: &Path,

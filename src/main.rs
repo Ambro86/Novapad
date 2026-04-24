@@ -2584,6 +2584,75 @@ fn query_managed_mpv_property_transient(
         .unwrap_or(serde_json::Value::Null))
 }
 
+fn is_raiplay_audiodescription_track(language: Option<&str>, title: Option<&str>) -> bool {
+    language
+        .map(|value| value.eq_ignore_ascii_case("des"))
+        .unwrap_or(false)
+        || title
+            .map(|value| value.eq_ignore_ascii_case("Audiodescrizione"))
+            .unwrap_or(false)
+}
+
+fn preferred_mpv_audio_track_id(track_list: &serde_json::Value) -> Option<i64> {
+    let tracks = track_list.as_array()?;
+
+    let find_track_id = |predicate: &dyn Fn(Option<&str>, Option<&str>) -> bool| {
+        tracks.iter().find_map(|track| {
+            let is_audio = track
+                .get("type")
+                .and_then(serde_json::Value::as_str)
+                .map(|value| value.eq_ignore_ascii_case("audio"))
+                .unwrap_or(false);
+            if !is_audio {
+                return None;
+            }
+            let language = track.get("lang").and_then(serde_json::Value::as_str);
+            let title = track.get("title").and_then(serde_json::Value::as_str);
+            predicate(language, title)
+                .then(|| track.get("id").and_then(serde_json::Value::as_i64))
+                .flatten()
+        })
+    };
+
+    find_track_id(&|language, title| is_raiplay_audiodescription_track(language, title)).or_else(
+        || {
+            find_track_id(&|language, _| {
+                language
+                    .map(|value| value.eq_ignore_ascii_case("ita"))
+                    .unwrap_or(false)
+            })
+        },
+    )
+}
+
+fn select_raiplay_mpv_audio_track(hwnd: HWND) {
+    for _ in 0..10 {
+        let Ok(track_list) = query_managed_mpv_property_transient(hwnd, "track-list") else {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            continue;
+        };
+        let Some(track_id) = preferred_mpv_audio_track_id(&track_list) else {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            continue;
+        };
+        let command = format!(r#"{{"command":["set_property","aid",{}]}}"#, track_id);
+        if let Err(err) = try_send_command_to_managed_mpv_transient(hwnd, &command) {
+            log_debug(&format!(
+                "Managed mpv: failed to select RaiPlay audio track {}: {}",
+                track_id, err
+            ));
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            continue;
+        }
+        log_debug(&format!(
+            "Managed mpv: selected RaiPlay preferred audio track {}",
+            track_id
+        ));
+        return;
+    }
+    log_debug("Managed mpv: preferred RaiPlay audio track not available");
+}
+
 fn try_send_command_to_managed_mpv_transient(hwnd: HWND, command_json: &str) -> Result<(), String> {
     let session = with_state(hwnd, |state| state.active_mpv_session.clone())
         .flatten()
@@ -2842,26 +2911,41 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
 
     let show_video =
         with_state(hwnd, |state| state.settings.show_video_during_playback).unwrap_or(false);
-    let (playback_url, playback_media_url, render_video) =
-        match crate::tools::raiplay::resolve_playback_target(url)? {
-            crate::tools::raiplay::PlaybackTarget::DirectStream {
-                url: audio_only_url,
+    let (
+        playback_url,
+        playback_media_url,
+        render_video,
+        select_raiplay_audio_track,
+        external_audio_url,
+    ) = match crate::tools::raiplay::resolve_playback_target(url)? {
+        crate::tools::raiplay::PlaybackTarget::DirectStream {
+            url: audio_only_url,
+            media_url,
+            is_live,
+            ..
+        } => {
+            let render_video = show_video && !is_live;
+            let has_external_audio = audio_only_url != media_url;
+            let external_audio_url =
+                (render_video && rai_origin == RaiAudioOrigin::RaiPlay && has_external_audio)
+                    .then(|| audio_only_url.clone());
+            let playback_url = if render_video {
+                media_url.clone()
+            } else {
+                audio_only_url
+            };
+            (
+                playback_url,
                 media_url,
-                is_live,
-                ..
-            } => {
-                let render_video = show_video && !is_live;
-                let playback_url = if render_video {
-                    media_url.clone()
-                } else {
-                    audio_only_url
-                };
-                (playback_url, media_url, render_video)
-            }
-            crate::tools::raiplay::PlaybackTarget::Download(resolved_url) => {
-                (resolved_url.clone(), resolved_url, show_video)
-            }
-        };
+                render_video,
+                render_video && rai_origin == RaiAudioOrigin::RaiPlay,
+                external_audio_url,
+            )
+        }
+        crate::tools::raiplay::PlaybackTarget::Download(resolved_url) => {
+            (resolved_url.clone(), resolved_url, show_video, false, None)
+        }
+    };
     let bookmark_start_secs = saved_audio_bookmark_position_secs(
         hwnd,
         &PathBuf::from(url),
@@ -2889,6 +2973,13 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
         .arg("--volume-max=300")
         .arg(&playback_url)
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
+    if let Some(audio_url) = external_audio_url.as_deref() {
+        log_debug(&format!(
+            "Managed mpv: attaching RaiPlay external audio track {}",
+            audio_url
+        ));
+        command.arg(format!("--audio-file={audio_url}"));
+    }
     if hwnd_video.0 != 0 {
         command
             .arg(format!("--wid={}", hwnd_video.0))
@@ -2942,6 +3033,9 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
             .is_none()
             {
                 log_debug("Failed to persist managed mpv state");
+            }
+            if select_raiplay_audio_track {
+                select_raiplay_mpv_audio_track(hwnd);
             }
             set_active_podcast_episode_info(
                 hwnd,
@@ -5855,10 +5949,26 @@ fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
                 result
             }
             PlayerCommand::SeekToEnd => {
-                let result = try_send_command_to_managed_mpv(
-                    hwnd,
-                    r#"{"command":["seek",100,"absolute-percent"]}"#,
-                );
+                let result = query_managed_mpv_property(hwnd, "duration")
+                    .ok()
+                    .and_then(|value| value.as_f64())
+                    .filter(|value| value.is_finite() && *value > 0.0)
+                    .map(|value| value.floor().max(1.0) as u64)
+                    .map(|duration| duration.saturating_sub(2))
+                    .map_or_else(
+                        || {
+                            try_send_command_to_managed_mpv(
+                                hwnd,
+                                r#"{"command":["seek",100,"absolute-percent"]}"#,
+                            )
+                        },
+                        |target| {
+                            try_send_command_to_managed_mpv(
+                                hwnd,
+                                &format!(r#"{{"command":["seek",{},"absolute"]}}"#, target),
+                            )
+                        },
+                    );
                 if result.is_ok() {
                     stop_mpv_subtitle_speech(hwnd, "seek_end");
                 }

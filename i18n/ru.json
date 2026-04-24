@@ -1184,6 +1184,7 @@
   "view.text_size.xlarge": "&Очень крупный",
   "view.text_size.xxlarge": "О&громный",
   "view.word_wrap": "Перенос по &словам",
+  "view.show_video_during_playback": "Показывать видео во время воспроизведения",
   "voice_panel.add_favorite": "Добавить в избранное",
   "voice_panel.engine_edge": "Голоса Microsoft",
   "voice_panel.engine_sapi": "SAPI 5",

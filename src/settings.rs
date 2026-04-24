@@ -611,6 +611,8 @@ pub struct AppSettings {
     pub tts_manual_tuning: bool,
     pub split_on_newline: bool,
     pub word_wrap: bool,
+    #[serde(default = "default_true")]
+    pub show_video_during_playback: bool,
     pub wrap_width: u32,
     pub smart_quotes: bool,
     #[serde(default)]
@@ -999,6 +1001,7 @@ impl Default for AppSettings {
             tts_manual_tuning: false,
             split_on_newline: false,
             word_wrap: true,
+            show_video_during_playback: true,
             wrap_width: 80,
             smart_quotes: false,
             strip_markdown_keep_bullets: false,

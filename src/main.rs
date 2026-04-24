@@ -109,7 +109,8 @@ use windows::Win32::UI::Controls::RichEdit::{
 use windows::Win32::UI::Controls::{
     BST_CHECKED, EM_GETMODIFY, EM_SETMODIFY, ICC_BAR_CLASSES, ICC_TAB_CLASSES,
     INITCOMMONCONTROLSEX, InitCommonControlsEx, NMHDR, SB_SETTEXTW, STATUSCLASSNAMEW,
-    TCM_GETCURSEL, TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC, WC_TABCONTROLW,
+    TCM_ADJUSTRECT, TCM_GETCURSEL, TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC,
+    WC_TABCONTROLW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
@@ -139,16 +140,17 @@ use windows::Win32::UI::WindowsAndMessaging::{
     LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO, MENU_ITEM_FLAGS,
     MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED,
     MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW,
-    OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
-    SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
-    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW,
-    ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
-    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CLOSE, WM_COMMAND,
-    WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
-    WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
-    WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN,
-    WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
-    WS_TABSTOP, WS_VISIBLE,
+    MoveWindow, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
+    RegisterWindowMessageW, SC_KEYMENU, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
+    SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
+    SetMenu, SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_RETURNCMD,
+    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE,
+    WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CANCELMODE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
+    WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_GETTEXTLENGTH,
+    WM_INITMENUPOPUP, WM_KEYDOWN, WM_MOUSEMOVE, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
+    WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSCOMMAND,
+    WM_SYSKEYDOWN, WM_SYSKEYUP, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
+    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
@@ -203,6 +205,8 @@ const WM_WHISPER_TRANSCRIPTION_STATUS_TEXT: u32 = WM_APP + 39;
 const WM_DICTATION_DONE: u32 = WM_APP + 36;
 const WM_PODCAST_EPISODE_PLAY_READY: u32 = WM_APP + 37;
 const WM_PODCAST_EPISODE_PLAY_FAILED: u32 = WM_APP + 38;
+const WM_LOCAL_MPV_VIDEO_MODE: u32 = WM_APP + 40;
+const WM_LOCAL_MPV_MENU_VISIBLE: u32 = WM_APP + 41;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
@@ -2606,6 +2610,55 @@ fn is_local_mpv_playback_active(hwnd: HWND) -> bool {
     active_local_mpv_media(hwnd).is_some()
 }
 
+fn set_local_mpv_video_mode(hwnd: HWND, active: bool) {
+    if with_state(hwnd, |state| {
+        state.local_mpv_video_mode_active = active;
+    })
+    .is_none()
+    {
+        log_debug("Failed to update local mpv video mode state");
+    }
+    crate::send_message_w_safe(
+        hwnd,
+        WM_LOCAL_MPV_VIDEO_MODE,
+        WPARAM(if active { 1 } else { 0 }),
+        LPARAM(0),
+    );
+}
+
+fn set_local_mpv_video_menu_visible(hwnd: HWND, visible: bool) {
+    let should_post = with_state(hwnd, |state| {
+        if !state.local_mpv_video_mode_active || state.local_mpv_hidden_menu.0 == 0 {
+            return false;
+        }
+        if state.local_mpv_menu_visible == visible {
+            return false;
+        }
+        state.local_mpv_menu_visible = visible;
+        true
+    })
+    .unwrap_or(false);
+    log_debug(&format!(
+        "local_mpv_menu_visible request: visible={} should_apply={} attached_menu={:?} hidden_menu={:?}",
+        visible,
+        should_post,
+        crate::get_menu_safe(hwnd),
+        with_state(hwnd, |state| state.local_mpv_hidden_menu).unwrap_or(HMENU(0))
+    ));
+    if should_post {
+        if visible {
+            crate::set_foreground_window_safe(hwnd);
+            crate::set_focus_safe(hwnd);
+        }
+        crate::send_message_w_safe(
+            hwnd,
+            WM_LOCAL_MPV_MENU_VISIBLE,
+            WPARAM(if visible { 1 } else { 0 }),
+            LPARAM(0),
+        );
+    }
+}
+
 fn local_mpv_position_secs_for_path(hwnd: HWND, path: &Path) -> Option<f64> {
     let (active_path, _) = active_local_mpv_media(hwnd)?;
     if active_path != path {
@@ -2651,6 +2704,7 @@ fn sync_mpv_sleep_prevention(hwnd: HWND) {
 }
 
 pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
+    set_local_mpv_video_mode(hwnd, false);
     let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
     let active_url = with_state(hwnd, |state| state.active_podcast_episode_url.clone()).flatten();
     log_debug(&format!(
@@ -2943,22 +2997,46 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
         .and_then(|name| name.to_str())
         .unwrap_or("Video");
     let bookmark_start_secs = saved_audio_bookmark_position_secs(hwnd, path);
+    let hwnd_video = with_state(hwnd, |state| {
+        if state.settings.show_video_during_playback {
+            state.local_mpv_video_hwnd
+        } else {
+            HWND(0)
+        }
+    })
+    .unwrap_or(HWND(0));
+    if hwnd_video.0 != 0 {
+        set_local_mpv_video_mode(hwnd, true);
+    }
     let mut command = std::process::Command::new(&mpv_exe);
     command
         .current_dir(&mpv_dir)
         .arg(path)
-        .arg("--no-video")
         .arg("--no-terminal")
         .arg("--volume-max=300")
         .arg(format!("--input-ipc-server={}", ipc_path.display()))
         .arg(format!("--title={title}"));
+    if hwnd_video.0 != 0 {
+        command
+            .arg(format!("--wid={}", hwnd_video.0))
+            .arg("--force-window=yes")
+            .arg("--vid=auto")
+            .arg("--vo=gpu")
+            .arg("--gpu-context=win");
+    } else {
+        command.arg("--no-video");
+    }
     if bookmark_start_secs > 0 {
         command.arg(format!("--start={bookmark_start_secs}"));
     }
 
-    let child = command
-        .spawn()
-        .map_err(|err| format!("Impossibile avviare mpv: {err}"))?;
+    let child = match command.spawn() {
+        Ok(child) => child,
+        Err(err) => {
+            set_local_mpv_video_mode(hwnd, false);
+            return Err(format!("Impossibile avviare mpv: {err}"));
+        }
+    };
     for _ in 0..40 {
         if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
             if let Some(index) = editor_manager::ensure_audio_document_tab(hwnd, path) {
@@ -3014,6 +3092,7 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
+    set_local_mpv_video_mode(hwnd, false);
     Err("Impossibile inizializzare il controllo di mpv.".to_string())
 }
 
@@ -6080,6 +6159,11 @@ pub(crate) fn restore_editor_focus(hwnd: HWND) {
 pub(crate) struct AppState {
     hwnd_tab: HWND,
     hwnd_status: HWND,
+    local_mpv_video_hwnd: HWND,
+    local_mpv_hidden_menu: HMENU,
+    local_mpv_video_mode_active: bool,
+    local_mpv_alt_menu_pending: bool,
+    local_mpv_menu_visible: bool,
     docs: Vec<Document>,
     current: usize,
     untitled_count: usize,
@@ -6604,6 +6688,29 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
             }
             if msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN {
                 let key = msg.wParam.0 as u32;
+                if msg.message == WM_SYSKEYDOWN && key == u32::from(VK_MENU.0) {
+                    let alt_down =
+                        (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+                    let should_show_menu = with_state(hwnd, |state| {
+                        state.local_mpv_alt_menu_pending = false;
+                        alt_down
+                            && state.local_mpv_video_mode_active
+                            && state.local_mpv_hidden_menu.0 != 0
+                    })
+                    .unwrap_or(false);
+                    log_debug(&format!(
+                        "local_mpv_alt_down: alt_down={} should_show_menu={} video_mode={} attached_menu={:?} hidden_menu={:?}",
+                        alt_down,
+                        should_show_menu,
+                        with_state(hwnd, |state| state.local_mpv_video_mode_active)
+                            .unwrap_or(false),
+                        crate::get_menu_safe(hwnd),
+                        with_state(hwnd, |state| state.local_mpv_hidden_menu).unwrap_or(HMENU(0))
+                    ));
+                    if should_show_menu {
+                        set_local_mpv_video_menu_visible(hwnd, true);
+                    }
+                }
                 let is_context_key = key == u32::from(VK_APPS.0)
                     || (key == u32::from(VK_F10.0) && GetKeyState(VK_SHIFT.0 as i32) < 0);
                 if is_context_key {
@@ -6641,6 +6748,23 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                         if podcasts_target {
                             continue;
                         }
+                    }
+                }
+            }
+            if msg.message == WM_SYSKEYUP && msg.wParam.0 as u32 == u32::from(VK_MENU.0) {
+                with_state(hwnd, |state| {
+                    state.local_mpv_alt_menu_pending = false;
+                });
+            }
+            if msg.message == WM_MOUSEMOVE {
+                let video_hwnd =
+                    with_state(hwnd, |state| state.local_mpv_video_hwnd).unwrap_or(HWND(0));
+                if msg.hwnd == hwnd || msg.hwnd == video_hwnd {
+                    let mouse_y = ((msg.lParam.0 >> 16) & 0xFFFF) as i16 as i32;
+                    let should_show_menu = mouse_y <= 32;
+                    if with_state(hwnd, |state| state.local_mpv_video_mode_active).unwrap_or(false)
+                    {
+                        set_local_mpv_video_menu_visible(hwnd, should_show_menu);
                     }
                 }
             }
@@ -7269,6 +7393,20 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     HINSTANCE(0),
                     None,
                 );
+                let local_mpv_video_hwnd = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_CLIPCHILDREN,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
 
                 let find_msg = RegisterWindowMessageW(w!("commdlg_FindReplace"));
                 let settings = load_settings();
@@ -7589,6 +7727,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 let state = Box::new(AppState {
                     hwnd_tab,
                     hwnd_status,
+                    local_mpv_video_hwnd,
+                    local_mpv_hidden_menu: HMENU(0),
+                    local_mpv_video_mode_active: false,
+                    local_mpv_alt_menu_pending: false,
+                    local_mpv_menu_visible: false,
                     docs: Vec::new(),
                     current: 0,
                     untitled_count: 0,
@@ -7806,11 +7949,181 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 LRESULT(0)
             }
             WM_SIZE => {
-                editor_manager::layout_children(hwnd);
+                let (video_active, video_hwnd, hwnd_tab, chrome_visible) =
+                    with_state(hwnd, |state| {
+                        (
+                            state.local_mpv_video_mode_active,
+                            state.local_mpv_video_hwnd,
+                            state.hwnd_tab,
+                            state.local_mpv_menu_visible,
+                        )
+                    })
+                    .unwrap_or((false, HWND(0), HWND(0), false));
+                if video_active && video_hwnd.0 != 0 {
+                    let mut rc = RECT::default();
+                    if get_client_rect_safe(hwnd, &mut rc).is_ok() {
+                        let mut video_top = 0;
+                        if chrome_visible && hwnd_tab.0 != 0 {
+                            let width = rc.right - rc.left;
+                            let height = rc.bottom - rc.top;
+                            crate::log_if_err!(MoveWindow(
+                                hwnd_tab,
+                                0,
+                                0,
+                                width,
+                                height.max(0),
+                                true
+                            ));
+                            let mut tab_rc = rc;
+                            crate::send_message_w_safe(
+                                hwnd_tab,
+                                TCM_ADJUSTRECT,
+                                WPARAM(0),
+                                LPARAM(&mut tab_rc as *mut _ as isize),
+                            );
+                            video_top = tab_rc.top.max(0);
+                        }
+                        crate::log_if_err!(MoveWindow(
+                            video_hwnd,
+                            0,
+                            video_top,
+                            rc.right - rc.left,
+                            (rc.bottom - rc.top - video_top).max(0),
+                            true
+                        ));
+                    }
+                } else {
+                    editor_manager::layout_children(hwnd);
+                }
+                LRESULT(0)
+            }
+            WM_LOCAL_MPV_MENU_VISIBLE => {
+                let show_menu = wparam.0 != 0;
+                let (video_hwnd, hidden_menu, hwnd_tab) = with_state(hwnd, |state| {
+                    (
+                        state.local_mpv_video_hwnd,
+                        state.local_mpv_hidden_menu,
+                        state.hwnd_tab,
+                    )
+                })
+                .unwrap_or((HWND(0), HMENU(0), HWND(0)));
+                log_debug(&format!(
+                    "local_mpv_menu_visible apply: show_menu={} attached_before={:?} hidden_menu={:?}",
+                    show_menu,
+                    GetMenu(hwnd),
+                    hidden_menu
+                ));
+                if hidden_menu.0 != 0 {
+                    crate::log_if_err!(SetMenu(
+                        hwnd,
+                        if show_menu { hidden_menu } else { HMENU(0) }
+                    ));
+                    show_window_safe(hwnd_tab, if show_menu { SW_SHOW } else { SW_HIDE });
+                    crate::log_if_err!(DrawMenuBar(hwnd));
+                    let mut rc = RECT::default();
+                    if video_hwnd.0 != 0 && get_client_rect_safe(hwnd, &mut rc).is_ok() {
+                        let mut video_top = 0;
+                        if show_menu && hwnd_tab.0 != 0 {
+                            let width = rc.right - rc.left;
+                            let height = rc.bottom - rc.top;
+                            crate::log_if_err!(MoveWindow(
+                                hwnd_tab,
+                                0,
+                                0,
+                                width,
+                                height.max(0),
+                                true
+                            ));
+                            let mut tab_rc = rc;
+                            crate::send_message_w_safe(
+                                hwnd_tab,
+                                TCM_ADJUSTRECT,
+                                WPARAM(0),
+                                LPARAM(&mut tab_rc as *mut _ as isize),
+                            );
+                            video_top = tab_rc.top.max(0);
+                        }
+                        crate::log_if_err!(MoveWindow(
+                            video_hwnd,
+                            0,
+                            video_top,
+                            rc.right - rc.left,
+                            (rc.bottom - rc.top - video_top).max(0),
+                            true
+                        ));
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_LOCAL_MPV_VIDEO_MODE => {
+                let entering = wparam.0 != 0;
+                let (hwnd_tab, hwnd_status, video_hwnd, hidden_menu) = with_state(hwnd, |state| {
+                    (
+                        state.hwnd_tab,
+                        state.hwnd_status,
+                        state.local_mpv_video_hwnd,
+                        state.local_mpv_hidden_menu,
+                    )
+                })
+                .unwrap_or((HWND(0), HWND(0), HWND(0), HMENU(0)));
+                if entering {
+                    with_state(hwnd, |state| {
+                        state.local_mpv_alt_menu_pending = false;
+                        state.local_mpv_menu_visible = false;
+                    });
+                    show_window_safe(hwnd_tab, SW_HIDE);
+                    show_window_safe(hwnd_status, SW_HIDE);
+                    show_window_safe(video_hwnd, SW_SHOW);
+                    if hidden_menu.0 == 0 {
+                        let current_menu = GetMenu(hwnd);
+                        if current_menu.0 != 0 {
+                            crate::log_if_err!(SetMenu(hwnd, HMENU(0)));
+                            with_state(hwnd, |state| {
+                                state.local_mpv_hidden_menu = current_menu;
+                                state.local_mpv_menu_visible = false;
+                            });
+                        }
+                    }
+                    let mut rc = RECT::default();
+                    if video_hwnd.0 != 0 && get_client_rect_safe(hwnd, &mut rc).is_ok() {
+                        crate::log_if_err!(MoveWindow(
+                            video_hwnd,
+                            0,
+                            0,
+                            rc.right - rc.left,
+                            rc.bottom - rc.top,
+                            true
+                        ));
+                    }
+                    crate::log_if_err!(DrawMenuBar(hwnd));
+                } else {
+                    crate::send_message_w_safe(hwnd, WM_CANCELMODE, WPARAM(0), LPARAM(0));
+                    with_state(hwnd, |state| {
+                        state.local_mpv_alt_menu_pending = false;
+                        state.local_mpv_menu_visible = false;
+                    });
+                    if hidden_menu.0 != 0 {
+                        crate::log_if_err!(SetMenu(hwnd, hidden_menu));
+                        with_state(hwnd, |state| {
+                            state.local_mpv_hidden_menu = HMENU(0);
+                        });
+                    }
+                    show_window_safe(video_hwnd, SW_HIDE);
+                    show_window_safe(hwnd_tab, SW_SHOW);
+                    show_window_safe(hwnd_status, SW_SHOW);
+                    editor_manager::layout_children(hwnd);
+                    update_main_status_bar(hwnd);
+                    crate::log_if_err!(DrawMenuBar(hwnd));
+                    crate::log_if_err!(PostMessageW(hwnd, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)));
+                }
                 LRESULT(0)
             }
             WM_SETFOCUS => {
                 log_mpv_focus_snapshot(hwnd, "mpv_wm_setfocus.before");
+                if with_state(hwnd, |state| state.local_mpv_video_mode_active).unwrap_or(false) {
+                    log_mpv_focus_snapshot(hwnd, "mpv_wm_setfocus.video_mode");
+                    return LRESULT(0);
+                }
                 if restore_transcription_progress_focus_for_current_document(hwnd) {
                     return LRESULT(0);
                 }
@@ -7833,6 +8146,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         return LRESULT(0);
                     }
                     if restore_transcription_progress_focus_for_current_document(hwnd) {
+                        return LRESULT(0);
+                    }
+                    if with_state(hwnd, |state| state.local_mpv_video_mode_active).unwrap_or(false)
+                    {
+                        log_mpv_focus_snapshot(hwnd, "mpv_wm_activate.video_mode");
                         return LRESULT(0);
                     }
                     if should_force_editor_focus_on_foreground(hwnd) {
@@ -8687,9 +9005,32 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
+            WM_SYSCOMMAND => {
+                let command = (wparam.0 & 0xFFF0) as u32;
+                if command == SC_KEYMENU
+                    && with_state(hwnd, |state| state.local_mpv_video_mode_active).unwrap_or(false)
+                {
+                    log_debug(&format!(
+                        "WM_SYSCOMMAND SC_KEYMENU intercepted: attached_menu_before={:?} hidden_menu={:?}",
+                        GetMenu(hwnd),
+                        with_state(hwnd, |state| state.local_mpv_hidden_menu).unwrap_or(HMENU(0))
+                    ));
+                    set_local_mpv_video_menu_visible(hwnd, true);
+                    return DefWindowProcW(hwnd, msg, wparam, lparam);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
             WM_INITMENUPOPUP => {
                 let hmenu = HMENU(wparam.0 as isize);
                 let main_menu = GetMenu(hwnd);
+                log_debug(&format!(
+                    "WM_INITMENUPOPUP: popup={:?} main_menu={:?} video_mode={} menu_visible={} hidden_menu={:?}",
+                    hmenu,
+                    main_menu,
+                    with_state(hwnd, |state| state.local_mpv_video_mode_active).unwrap_or(false),
+                    with_state(hwnd, |state| state.local_mpv_menu_visible).unwrap_or(false),
+                    with_state(hwnd, |state| state.local_mpv_hidden_menu).unwrap_or(HMENU(0))
+                ));
                 if main_menu.0 != 0 {
                     let edit_menu = GetSubMenu(main_menu, 1);
                     if edit_menu == hmenu {
@@ -9559,6 +9900,31 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         update_voice_panel_menu_check(hwnd);
                         LRESULT(0)
                     }
+                    IDM_VIEW_SHOW_VIDEO_DURING_PLAYBACK => {
+                        let show_video = with_state(hwnd, |state| {
+                            state.settings.show_video_during_playback =
+                                !state.settings.show_video_during_playback;
+                            state.settings.show_video_during_playback
+                        })
+                        .unwrap_or(true);
+                        if !show_video
+                            && with_state(hwnd, |state| state.local_mpv_video_mode_active)
+                                .unwrap_or(false)
+                        {
+                            if let Err(err) = try_send_command_to_managed_mpv(
+                                hwnd,
+                                r#"{"command":["set_property","vid","no"]}"#,
+                            ) {
+                                log_debug(&format!("Local mpv video disable failed: {}", err));
+                            }
+                            set_local_mpv_video_mode(hwnd, false);
+                        }
+                        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+                            save_settings(settings);
+                        }
+                        update_voice_panel_menu_check(hwnd);
+                        LRESULT(0)
+                    }
                     cmd_id if font_face_from_menu_id(cmd_id).is_some() => {
                         let face = font_face_from_menu_id(cmd_id).unwrap_or("Segoe UI");
                         apply_ui_font(hwnd, face.to_string());
@@ -10298,7 +10664,7 @@ fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size: Optio
 }
 
 pub(crate) fn update_voice_panel_menu_check(hwnd: HWND) {
-    let (visible, favorites_visible, text_color, text_size, read_only, word_wrap) = {
+    let (visible, favorites_visible, text_color, text_size, read_only, word_wrap, show_video) = {
         with_state(hwnd, |state| {
             (
                 state.voice_panel_visible,
@@ -10307,10 +10673,11 @@ pub(crate) fn update_voice_panel_menu_check(hwnd: HWND) {
                 state.settings.text_size,
                 state.settings.editor_read_only,
                 state.settings.word_wrap,
+                state.settings.show_video_during_playback,
             )
         })
     }
-    .unwrap_or((false, false, 0x000000, 12, false, true));
+    .unwrap_or((false, false, 0x000000, 12, false, true, true));
     let hmenu = crate::get_menu_safe(hwnd);
     if hmenu.0 == 0 {
         return;
@@ -10348,6 +10715,15 @@ pub(crate) fn update_voice_panel_menu_check(hwnd: HWND) {
             IDM_VIEW_WORD_WRAP as u32,
             (MF_BYCOMMAND | wrap_flags).0,
         );
+    }
+    let video_flags = if show_video { MF_CHECKED } else { MF_UNCHECKED };
+    if crate::check_menu_item_safe(
+        hmenu,
+        IDM_VIEW_SHOW_VIDEO_DURING_PLAYBACK as u32,
+        (MF_BYCOMMAND | video_flags).0,
+    ) == 0xFFFFFFFF
+    {
+        crate::log_debug("CheckMenuItem failed for IDM_VIEW_SHOW_VIDEO_DURING_PLAYBACK");
     }
 
     let color_items = [

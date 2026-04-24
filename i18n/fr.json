@@ -1184,6 +1184,7 @@
   "view.text_size.xlarge": "&Très grand",
   "view.text_size.xxlarge": "E&xtra grand",
   "view.word_wrap": "Re&tour à la ligne",
+  "view.show_video_during_playback": "Afficher la vidéo pendant la lecture",
   "voice_panel.add_favorite": "Ajouter aux favoris",
   "voice_panel.engine_edge": "Voix Microsoft Edge",
   "voice_panel.engine_sapi": "SAPI5",

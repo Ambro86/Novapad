@@ -1184,6 +1184,7 @@
   "view.text_size.xlarge": "&Дуже великий",
   "view.text_size.xxlarge": "Н&адзвичайно великий",
   "view.word_wrap": "Автоматичний &перенос рядків",
+  "view.show_video_during_playback": "Показувати відео під час відтворення",
   "voice_panel.add_favorite": "Додати в обране",
   "voice_panel.engine_edge": "Голоси Microsoft",
   "voice_panel.engine_sapi": "SAPI5",

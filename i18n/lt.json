@@ -865,7 +865,7 @@
   "podcasts.save_confirm_body": "Išsaugota į:\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Atidaryti aplanką",
-  "podcasts.save_confirm_title": "Epizodas išsaugotas",
+  "podcasts.save_confirm_title": "Medija išsaugota",
   "podcasts.save_error_body": "Nepavyko išsaugoti epizodo.\nKlaida: {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Išsaugoti nepavyko",

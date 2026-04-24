@@ -865,7 +865,7 @@
   "podcasts.save_confirm_body": "Guardado en:\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Abrir carpeta",
-  "podcasts.save_confirm_title": "Episodio guardado",
+  "podcasts.save_confirm_title": "Medio guardado",
   "podcasts.save_error_body": "No se pudo guardar el episodio.\nError: {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Error al guardar",

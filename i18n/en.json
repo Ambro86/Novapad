@@ -878,7 +878,7 @@
   "podcasts.save_confirm_body": "Saved in:\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Open folder",
-  "podcasts.save_confirm_title": "Episode saved",
+  "podcasts.save_confirm_title": "Media saved",
   "podcasts.save_error_body": "Unable to save the episode.\nError: {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Save failed",

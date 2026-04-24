@@ -865,7 +865,7 @@
   "podcasts.save_confirm_body": "Sparat i:\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Öppna mapp",
-  "podcasts.save_confirm_title": "Avsnitt sparat",
+  "podcasts.save_confirm_title": "Media sparad",
   "podcasts.save_error_body": "Det gick inte att spara avsnittet.\nFel: {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Misslyckades att spara",

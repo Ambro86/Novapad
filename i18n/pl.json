@@ -865,7 +865,7 @@
   "podcasts.save_confirm_body": "Zapisano w:\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Otwórz folder",
-  "podcasts.save_confirm_title": "Odcinek zapisany",
+  "podcasts.save_confirm_title": "Media zapisane",
   "podcasts.save_error_body": "Nie można zapisać odcinka.\nBłąd: {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Zapisywanie nie powiodło się",

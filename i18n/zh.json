@@ -865,7 +865,7 @@
   "podcasts.save_confirm_body": "已保存到：\n{path}",
   "podcasts.save_confirm_ok": "确定",
   "podcasts.save_confirm_open_folder": "打开文件夹",
-  "podcasts.save_confirm_title": "剧集已保存",
+  "podcasts.save_confirm_title": "媒体已保存",
   "podcasts.save_error_body": "无法保存该剧集。\n错误：{err}",
   "podcasts.save_error_ok": "确定",
   "podcasts.save_error_title": "保存失败",

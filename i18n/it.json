@@ -913,7 +913,7 @@
   "podcasts.save_confirm_body": "Salvato in:\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Apri cartella",
-  "podcasts.save_confirm_title": "Episodio salvato",
+  "podcasts.save_confirm_title": "Media salvato",
   "podcasts.save_error_body": "Impossibile salvare l'episodio.\nErrore: {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Salvataggio non riuscito",

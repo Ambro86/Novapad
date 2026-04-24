@@ -865,7 +865,7 @@
   "podcasts.save_confirm_body": "Đã lưu tại:\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Mở thư mục",
-  "podcasts.save_confirm_title": "Đã lưu tập",
+  "podcasts.save_confirm_title": "Đã lưu phương tiện",
   "podcasts.save_error_body": "Không thể lưu tập.\nLỗi: {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Lưu không thành công",

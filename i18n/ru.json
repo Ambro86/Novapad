@@ -865,7 +865,7 @@
   "podcasts.save_confirm_body": "Сохранено в:\r\n{path}",
   "podcasts.save_confirm_ok": "ОК",
   "podcasts.save_confirm_open_folder": "Открыть папку",
-  "podcasts.save_confirm_title": "Эпизод сохранен",
+  "podcasts.save_confirm_title": "Медиа сохранено",
   "podcasts.save_error_body": "Не удалось сохранить эпизод.\r\nОшибка: {err}",
   "podcasts.save_error_ok": "ОК",
   "podcasts.save_error_title": "Ошибка сохранения",

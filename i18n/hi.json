@@ -878,7 +878,7 @@
   "podcasts.save_confirm_body": "यहाँ सहेजा गया:\n{path}",
   "podcasts.save_confirm_ok": "ठीक है",
   "podcasts.save_confirm_open_folder": "फ़ोल्डर खोलें",
-  "podcasts.save_confirm_title": "एपिसोड सहेजा गया",
+  "podcasts.save_confirm_title": "मीडिया सहेजा गया",
   "podcasts.save_error_body": "एपिसोड सहेजा नहीं जा सका।\nत्रुटि: {err}",
   "podcasts.save_error_ok": "ठीक है",
   "podcasts.save_error_title": "सहेजना विफल",

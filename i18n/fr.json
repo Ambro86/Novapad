@@ -865,7 +865,7 @@
   "podcasts.save_confirm_body": "Enregistré dans :\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Ouvrir le dossier",
-  "podcasts.save_confirm_title": "Épisode enregistré",
+  "podcasts.save_confirm_title": "Média enregistré",
   "podcasts.save_error_body": "Impossible d’enregistrer l’épisode.\nErreur : {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Échec de l’enregistrement",

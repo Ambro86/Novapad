@@ -861,7 +861,7 @@
   "podcasts.save_confirm_body": "Uloženo do:\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Otevřít složku",
-  "podcasts.save_confirm_title": "Epizoda uložena",
+  "podcasts.save_confirm_title": "Médium uloženo",
   "podcasts.save_error_body": "Epizodu se nepodařilo uložit.\nChyba: {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Uložení se nezdařilo",

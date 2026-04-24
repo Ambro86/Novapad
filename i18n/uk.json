@@ -865,7 +865,7 @@
   "podcasts.save_confirm_body": "Збережено в:\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Відкрити папку",
-  "podcasts.save_confirm_title": "Епізод збережено",
+  "podcasts.save_confirm_title": "Медіа збережено",
   "podcasts.save_error_body": "Не вдалося зберегти епізод.\nПомилка: {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Не вдалося зберегти",

@@ -865,7 +865,7 @@
   "podcasts.save_confirm_body": "Sačuvano u:\n{path}",
   "podcasts.save_confirm_ok": "OK",
   "podcasts.save_confirm_open_folder": "Otvori fasciklu",
-  "podcasts.save_confirm_title": "Epizoda sačuvana",
+  "podcasts.save_confirm_title": "Medij sačuvan",
   "podcasts.save_error_body": "Nije moguće sačuvati epizodu.\nGreška: {err}",
   "podcasts.save_error_ok": "OK",
   "podcasts.save_error_title": "Čuvanje nije uspelo",

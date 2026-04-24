@@ -1,5 +1,5 @@
 use crate::settings;
-use std::sync::OnceLock;
+use std::sync::{OnceLock, mpsc};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Com::{
     CLSCTX_ALL, CLSIDFromProgID, COINIT_APARTMENTTHREADED, CoUninitialize, DISPATCH_METHOD,
@@ -178,8 +178,10 @@ pub enum PlayerCommand {
 
 static NVDA_LIB: OnceLock<libloading::Library> = OnceLock::new();
 static NVDA_SPEAK: OnceLock<Option<unsafe extern "C" fn(*const u16) -> i32>> = OnceLock::new();
+static NVDA_BRAILLE: OnceLock<Option<unsafe extern "C" fn(*const u16) -> i32>> = OnceLock::new();
 static NVDA_TEST: OnceLock<Option<unsafe extern "C" fn() -> i32>> = OnceLock::new();
 static JAWS_PROBE_LOGGED: OnceLock<()> = OnceLock::new();
+static BRAILLE_WORKER: OnceLock<mpsc::Sender<String>> = OnceLock::new();
 
 fn nvda_init() -> bool {
     NVDA_SPEAK
@@ -196,12 +198,20 @@ fn nvda_init() -> bool {
                     lib.get(b"nvdaController_speakText\0").ok()?;
                 *symbol
             };
+            let braille = unsafe {
+                lib.get(b"nvdaController_brailleMessage\0").ok().map(
+                    |symbol: libloading::Symbol<unsafe extern "C" fn(*const u16) -> i32>| *symbol,
+                )
+            };
             let test = unsafe {
                 let symbol: libloading::Symbol<unsafe extern "C" fn() -> i32> =
                     lib.get(b"nvdaController_testIfRunning\0").ok()?;
                 *symbol
             };
             if NVDA_TEST.set(Some(test)).is_err() {
+                return None;
+            }
+            if NVDA_BRAILLE.set(braille).is_err() {
                 return None;
             }
             if NVDA_LIB.set(lib).is_err() {
@@ -226,6 +236,44 @@ fn nvda_speak_raw(text: &str) -> bool {
         speak(wide.as_ptr());
     }
     true
+}
+
+fn nvda_braille_raw(text: &str) -> bool {
+    if !nvda_init() {
+        return false;
+    }
+    let braille = match NVDA_BRAILLE.get() {
+        Some(Some(func)) => *func,
+        _ => return false,
+    };
+
+    let wide = to_wide(text);
+    unsafe {
+        braille(wide.as_ptr());
+    }
+    true
+}
+
+fn braille_worker_sender() -> &'static mpsc::Sender<String> {
+    BRAILLE_WORKER.get_or_init(|| {
+        let (tx, rx) = mpsc::channel::<String>();
+        std::thread::spawn(move || {
+            while let Ok(text) = rx.recv() {
+                if nvda_is_active() {
+                    nvda_braille_raw(&text);
+                }
+                jaws_braille(&text);
+            }
+        });
+        tx
+    })
+}
+
+fn enqueue_braille(text: &str) {
+    let send_res = braille_worker_sender().send(text.to_owned());
+    if let Err(e) = send_res {
+        crate::log_debug(&format!("Braille worker send failed: {e}"));
+    }
 }
 
 fn nvda_is_active() -> bool {
@@ -326,6 +374,97 @@ fn jaws_invoke_saystring(
     result
 }
 
+fn jaws_escape_function_string_arg(text: &str) -> String {
+    text.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace("\r\n", " ")
+        .replace(['\r', '\n'], " ")
+}
+
+fn jaws_invoke_braille_message(text: &str, log_failures: bool) -> windows::core::Result<()> {
+    let init_res = crate::com_guard::co_initialize_ex_safe(None, COINIT_APARTMENTTHREADED);
+    if let Err(e) = init_res.ok() {
+        if log_failures {
+            crate::log_debug(&format!("JAWS CoInitializeEx failed: {e}"));
+        }
+        return Err(e);
+    }
+    let should_uninit = init_res.is_ok();
+
+    let result = (|| {
+        let prog_id = to_wide("FreedomSci.JawsApi");
+        let clsid = match unsafe { CLSIDFromProgID(PCWSTR(prog_id.as_ptr())) } {
+            Ok(id) => id,
+            Err(e) => {
+                if log_failures {
+                    crate::log_debug(&format!("JAWS CLSIDFromProgID failed: {e}"));
+                }
+                return Err(e);
+            }
+        };
+
+        let disp: IDispatch = match crate::co_create_instance_safe(&clsid, None, CLSCTX_ALL) {
+            Ok(obj) => obj,
+            Err(e) => {
+                if log_failures {
+                    crate::log_debug(&format!("JAWS CoCreateInstance failed: {e}"));
+                }
+                return Err(e);
+            }
+        };
+
+        let mut dispid: i32 = 0;
+        let name = to_wide("RunFunction");
+        let names = [PCWSTR(name.as_ptr())];
+        let getid_res =
+            unsafe { disp.GetIDsOfNames(&GUID::default(), names.as_ptr(), 1, 0, &mut dispid) };
+        if let Err(e) = getid_res {
+            if log_failures {
+                crate::log_debug(&format!("JAWS GetIDsOfNames failed: {e}"));
+            }
+            return Err(e);
+        }
+
+        let function_call = format!(
+            "BrailleMessage(\"{}\")",
+            jaws_escape_function_string_arg(text)
+        );
+        let mut args = [VARIANT::from(BSTR::from(function_call))];
+        let disp_params = DISPPARAMS {
+            rgvarg: args.as_mut_ptr(),
+            rgdispidNamedArgs: std::ptr::null_mut(),
+            cArgs: args.len() as u32,
+            cNamedArgs: 0,
+        };
+        let mut excep = EXCEPINFO::default();
+        let mut arg_err: u32 = 0;
+        let invoke_res = unsafe {
+            disp.Invoke(
+                dispid,
+                &GUID::default(),
+                0,
+                DISPATCH_METHOD,
+                &disp_params,
+                None,
+                Some(&mut excep),
+                Some(&mut arg_err),
+            )
+        };
+        if log_failures && let Err(ref e) = invoke_res {
+            crate::log_debug(&format!("JAWS Invoke failed: {e} (arg err: {arg_err})"));
+        }
+        invoke_res.map(|_| ())
+    })();
+
+    unsafe {
+        if should_uninit {
+            CoUninitialize();
+        }
+    }
+
+    result
+}
+
 fn jaws_is_active() -> bool {
     match jaws_invoke_saystring("", false, false) {
         Ok(()) => true,
@@ -348,6 +487,14 @@ fn jaws_speak(text: &str, interrupt: bool) -> bool {
     jaws_invoke_saystring(text, interrupt, true).is_ok()
 }
 
+fn jaws_braille(text: &str) -> bool {
+    if !jaws_is_active() {
+        return false;
+    }
+
+    jaws_invoke_braille_message(text, true).is_ok()
+}
+
 /// Speaks text through available screen readers (NVDA and JAWS).
 /// Returns true if any screen reader accepted the message.
 pub fn screen_reader_speak(text: &str) -> bool {
@@ -356,6 +503,7 @@ pub fn screen_reader_speak(text: &str) -> bool {
         ok |= nvda_speak_raw(text);
     }
     ok |= jaws_speak(text, false);
+    enqueue_braille(text);
     ok
 }
 

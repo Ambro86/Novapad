@@ -2600,8 +2600,7 @@ fn active_local_mpv_media(hwnd: HWND) -> Option<(PathBuf, u32)> {
     with_state(hwnd, |state| {
         let session = state.active_mpv_session.as_ref()?;
         let active_url = state.active_podcast_episode_url.as_ref()?;
-        let path = PathBuf::from(active_url);
-        path.is_file().then_some((path, session.process_id))
+        Some((PathBuf::from(active_url), session.process_id))
     })
     .flatten()
 }
@@ -2670,7 +2669,11 @@ fn local_mpv_position_secs_for_path(hwnd: HWND, path: &Path) -> Option<f64> {
         .filter(|value| value.is_finite())
 }
 
-fn seek_local_mpv_to_seconds(hwnd: HWND, path: &Path, seconds: u64) -> Result<(), String> {
+pub(crate) fn seek_local_mpv_to_seconds(
+    hwnd: HWND,
+    path: &Path,
+    seconds: u64,
+) -> Result<(), String> {
     let (active_path, _) = active_local_mpv_media(hwnd).ok_or_else(|| "no_media".to_string())?;
     if active_path != path {
         return Err("no_media".to_string());
@@ -2681,14 +2684,68 @@ fn seek_local_mpv_to_seconds(hwnd: HWND, path: &Path, seconds: u64) -> Result<()
     )
 }
 
-fn saved_audio_bookmark_position_secs(hwnd: HWND, path: &Path) -> u64 {
+fn set_active_audiobook_bookmark(hwnd: HWND, path: &Path, position: i32) {
+    let key = path.to_string_lossy().to_string();
+    if with_state(hwnd, |state| {
+        state.active_audiobook_bookmark = Some((key, position));
+    })
+    .is_none()
+    {
+        log_debug("Failed to persist active audiobook bookmark");
+    }
+}
+
+fn clear_active_audiobook_bookmark(hwnd: HWND) {
+    if with_state(hwnd, |state| {
+        state.active_audiobook_bookmark = None;
+    })
+    .is_none()
+    {
+        log_debug("Failed to clear active audiobook bookmark");
+    }
+}
+
+pub(crate) fn jump_audiobook_to_position(hwnd: HWND, path: &Path, seconds: u64) {
+    set_active_audiobook_bookmark(hwnd, path, seconds as i32);
+    if seek_local_mpv_to_seconds(hwnd, path, seconds).is_err() {
+        crate::audio_player::start_audiobook_at(hwnd, path, seconds);
+        set_active_audiobook_bookmark(hwnd, path, seconds as i32);
+    } else {
+        stop_mpv_subtitle_speech(hwnd, "bookmark_seek");
+    }
+}
+
+fn saved_audio_bookmark_position_secs(hwnd: HWND, path: &Path, title: Option<&str>) -> u64 {
     with_state(hwnd, |state| {
+        let path_key = path.to_string_lossy().to_string();
+        let title_key = title
+            .map(str::trim)
+            .filter(|title| !title.is_empty())
+            .map(|title| format!("{STREAM_BOOKMARK_PREFIX}{title}"));
         state
-            .bookmarks
-            .files
-            .get(&path.to_string_lossy().to_string())
-            .and_then(|list| list.last())
-            .map(|bookmark| bookmark.position.max(0) as u64)
+            .active_audiobook_bookmark
+            .as_ref()
+            .and_then(|(stored_key, position)| {
+                (stored_key == &path_key).then_some((*position).max(0) as u64)
+            })
+            .or_else(|| {
+                title_key.as_ref().and_then(|title_key| {
+                    state
+                        .bookmarks
+                        .files
+                        .get(title_key)
+                        .and_then(|list| list.first())
+                        .map(|bookmark| bookmark.position.max(0) as u64)
+                })
+            })
+            .or_else(|| {
+                state
+                    .bookmarks
+                    .files
+                    .get(&path_key)
+                    .and_then(|list| list.first())
+                    .map(|bookmark| bookmark.position.max(0) as u64)
+            })
             .unwrap_or(0)
     })
     .unwrap_or(0)
@@ -2704,6 +2761,7 @@ fn sync_mpv_sleep_prevention(hwnd: HWND) {
 }
 
 pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
+    clear_active_audiobook_bookmark(hwnd);
     set_local_mpv_video_mode(hwnd, false);
     let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
     let active_url = with_state(hwnd, |state| state.active_podcast_episode_url.clone()).flatten();
@@ -2782,6 +2840,15 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
         crate::audio_player::stop_audiobook_playback(hwnd);
     }
 
+    let bookmark_start_secs = saved_audio_bookmark_position_secs(
+        hwnd,
+        &PathBuf::from(url),
+        podcast_episode_display_title(podcast_title, title).as_deref(),
+    );
+    let start_seconds = resume_seconds
+        .filter(|value| *value > 0)
+        .or((bookmark_start_secs > 0).then_some(bookmark_start_secs));
+
     let mut command = std::process::Command::new(&mpv_exe);
     command
         .current_dir(&mpv_dir)
@@ -2790,8 +2857,8 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
         .arg("--no-terminal")
         .arg("--volume-max=300")
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
-    if let Some(resume_seconds) = resume_seconds.filter(|value| *value > 0) {
-        command.arg(format!("--start={resume_seconds}"));
+    if let Some(start_seconds) = start_seconds {
+        command.arg(format!("--start={start_seconds}"));
     }
     if let Some(title) = title.filter(|value| !value.trim().is_empty()) {
         command.arg(format!("--title={title}"));
@@ -2881,6 +2948,8 @@ pub(crate) fn launch_stream_url_in_mpv(
     }
     focus_editor(hwnd);
 
+    let bookmark_start_secs = saved_audio_bookmark_position_secs(hwnd, &PathBuf::from(url), title);
+
     let mut command = std::process::Command::new(&mpv_exe);
     command
         .current_dir(&mpv_dir)
@@ -2890,6 +2959,9 @@ pub(crate) fn launch_stream_url_in_mpv(
         .arg("--no-terminal")
         .arg("--volume-max=300")
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
+    if bookmark_start_secs > 0 {
+        command.arg(format!("--start={bookmark_start_secs}"));
+    }
     if let Some(ytdlp_path) = ytdlp_path {
         command.arg(format!(
             "--script-opts=ytdl_hook-ytdl_path={}",
@@ -2996,7 +3068,7 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("Video");
-    let bookmark_start_secs = saved_audio_bookmark_position_secs(hwnd, path);
+    let bookmark_start_secs = saved_audio_bookmark_position_secs(hwnd, path, None);
     let hwnd_video = with_state(hwnd, |state| {
         if state.settings.show_video_during_playback {
             state.local_mpv_video_hwnd
@@ -4472,7 +4544,11 @@ pub(crate) fn restore_transcription_progress_focus_for_current_document(hwnd: HW
         return false;
     }
 
-    if focused_hwnd != hwnd && focused_hwnd != tab_hwnd {
+    if focused_hwnd.0 != 0
+        && is_window_handle_valid(focused_hwnd)
+        && focused_hwnd != hwnd
+        && focused_hwnd != tab_hwnd
+    {
         return false;
     }
 
@@ -6237,6 +6313,7 @@ pub(crate) struct AppState {
     audiobook_cancel: Option<Arc<AtomicBool>>,
     blocking_modal: BlockingModalState,
     active_audiobook: Option<AudiobookPlayer>,
+    active_audiobook_bookmark: Option<(String, i32)>,
     audiobook_session_id: u64,
     last_stopped_audiobook: Option<std::path::PathBuf>,
     last_stopped_audiobook_position_secs: Option<u64>,
@@ -7806,6 +7883,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     audiobook_cancel: None,
                     blocking_modal: BlockingModalState::default(),
                     active_audiobook: None,
+                    active_audiobook_bookmark: None,
                     audiobook_session_id: 0,
                     last_stopped_audiobook: None,
                     last_stopped_audiobook_position_secs: None,
@@ -14398,6 +14476,7 @@ pub(crate) fn get_active_edit(hwnd: HWND) -> Option<HWND> {
 }
 
 const UNSAVED_BOOKMARK_PREFIX: &str = "__unsaved__:";
+const STREAM_BOOKMARK_PREFIX: &str = "__stream_title__:";
 
 fn bookmark_storage_key(path: Option<&Path>, hwnd_edit: HWND) -> (String, bool) {
     if let Some(path) = path {
@@ -14407,21 +14486,46 @@ fn bookmark_storage_key(path: Option<&Path>, hwnd_edit: HWND) -> (String, bool) 
     }
 }
 
+pub(crate) fn runtime_bookmark_storage_key(
+    path: Option<&Path>,
+    hwnd_edit: HWND,
+    title: &str,
+    format: FileFormat,
+) -> (String, bool) {
+    if matches!(format, FileFormat::Audiobook)
+        && let Some(path) = path
+        && !path.is_file()
+        && !title.trim().is_empty()
+    {
+        return (format!("{STREAM_BOOKMARK_PREFIX}{}", title.trim()), true);
+    }
+    bookmark_storage_key(path, hwnd_edit)
+}
+
 fn insert_bookmark(hwnd: HWND) {
     unsafe {
-        let (hwnd_edit, path, format): (HWND, Option<std::path::PathBuf>, FileFormat) =
-            with_state(hwnd, |state| {
-                state
-                    .docs
-                    .get(state.current)
-                    .map(|doc| (doc.hwnd_edit, doc.path.clone(), doc.format))
+        let (hwnd_edit, path, format, title): (
+            HWND,
+            Option<std::path::PathBuf>,
+            FileFormat,
+            String,
+        ) = with_state(hwnd, |state| {
+            state.docs.get(state.current).map(|doc| {
+                (
+                    doc.hwnd_edit,
+                    doc.path.clone(),
+                    doc.format,
+                    doc.title.clone(),
+                )
             })
-            .flatten()
-            .unwrap_or((HWND(0), None, FileFormat::default()));
+        })
+        .flatten()
+        .unwrap_or((HWND(0), None, FileFormat::default(), String::new()));
         if hwnd_edit.0 == 0 {
             return;
         }
-        let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
+        let (storage_key, persist_to_disk) =
+            runtime_bookmark_storage_key(path.as_deref(), hwnd_edit, &title, format);
 
         if matches!(format, FileFormat::Audiobook) {
             let mpv_position_secs = path
@@ -14589,22 +14693,56 @@ fn audio_bookmark_position_and_snippet(position_secs: f64) -> (i32, String) {
     )
 }
 
-fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
-    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) = {
-        with_state(hwnd, |state| {
-            state
-                .docs
-                .get(state.current)
-                .map(|doc| (doc.path.clone(), doc.hwnd_edit, doc.format))
-        })
+fn relative_audiobook_bookmark(
+    bookmarks: &[Bookmark],
+    anchor_position: Option<i32>,
+    current_position_secs: f64,
+    forward: bool,
+) -> Option<&Bookmark> {
+    if bookmarks.is_empty() {
+        return None;
     }
-    .flatten()
-    .unwrap_or((None, HWND(0), FileFormat::default()));
+    let current_index = anchor_position
+        .and_then(|position| {
+            bookmarks
+                .iter()
+                .position(|bookmark| bookmark.position == position)
+        })
+        .or_else(|| {
+            let threshold = current_position_secs.floor() as i32;
+            bookmarks
+                .iter()
+                .rposition(|bookmark| bookmark.position <= threshold)
+        });
+    match (current_index, forward) {
+        (Some(index), true) => bookmarks.get(index + 1),
+        (Some(index), false) => index.checked_sub(1).and_then(|prev| bookmarks.get(prev)),
+        (None, true) => bookmarks.first(),
+        (None, false) => None,
+    }
+}
+
+fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
+    let (path, hwnd_edit, format, title): (Option<std::path::PathBuf>, HWND, FileFormat, String) =
+        {
+            with_state(hwnd, |state| {
+                state.docs.get(state.current).map(|doc| {
+                    (
+                        doc.path.clone(),
+                        doc.hwnd_edit,
+                        doc.format,
+                        doc.title.clone(),
+                    )
+                })
+            })
+        }
+        .flatten()
+        .unwrap_or((None, HWND(0), FileFormat::default(), String::new()));
     if hwnd_edit.0 == 0 {
         return false;
     }
 
-    let (storage_key, _) = bookmark_storage_key(path.as_deref(), hwnd_edit);
+    let (storage_key, _) = runtime_bookmark_storage_key(path.as_deref(), hwnd_edit, &title, format);
     let Some(bookmarks) = {
         with_state(hwnd, |state| {
             state.bookmarks.files.get(&storage_key).cloned()
@@ -14617,25 +14755,36 @@ fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
         return false;
     }
 
-    let current_pos = if matches!(format, FileFormat::Audiobook) {
+    let target = if matches!(format, FileFormat::Audiobook) {
         let mpv_position_secs = path
             .as_deref()
             .and_then(|path| local_mpv_position_secs_for_path(hwnd, path));
-        {
+        let anchor_position = path.as_deref().and_then(|path| {
+            let key = path.to_string_lossy().to_string();
+            with_state(hwnd, |state| {
+                state
+                    .active_audiobook_bookmark
+                    .as_ref()
+                    .and_then(|(stored_key, position)| (stored_key == &key).then_some(*position))
+            })
+            .flatten()
+        });
+        let current_position_secs = {
             with_state(hwnd, |state| {
                 if let Some(position_secs) = mpv_position_secs {
-                    return Some(position_secs.floor() as i32);
+                    return Some(position_secs);
                 }
                 let current_path = path.as_ref()?;
                 let active = state.active_audiobook.as_ref()?;
                 if active.path != *current_path {
-                    return Some(0);
+                    return Some(0.0);
                 }
-                Some(crate::audio_player::audiobook_position_secs(active).floor() as i32)
+                Some(crate::audio_player::audiobook_position_secs(active))
             })
         }
         .flatten()
-        .unwrap_or(0)
+        .unwrap_or(0.0);
+        relative_audiobook_bookmark(&bookmarks, anchor_position, current_position_secs, forward)
     } else {
         let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
         unsafe {
@@ -14646,13 +14795,12 @@ fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
                 LPARAM(&mut cr as *mut _ as isize),
             );
         }
-        if forward { cr.cpMax } else { cr.cpMin }
-    };
-
-    let target = if forward {
-        bookmarks.iter().find(|bm| bm.position > current_pos)
-    } else {
-        bookmarks.iter().rev().find(|bm| bm.position < current_pos)
+        let current_pos = if forward { cr.cpMax } else { cr.cpMin };
+        if forward {
+            bookmarks.iter().find(|bm| bm.position > current_pos)
+        } else {
+            bookmarks.iter().rev().find(|bm| bm.position < current_pos)
+        }
     };
     let Some(target) = target else {
         return false;
@@ -14665,11 +14813,7 @@ fn goto_relative_bookmark(hwnd: HWND, forward: bool) -> bool {
             return false;
         };
         let target_seconds = target_position.max(0) as u64;
-        if seek_local_mpv_to_seconds(hwnd, path, target_seconds).is_err() {
-            crate::audio_player::start_audiobook_at(hwnd, path, target_seconds);
-        } else {
-            stop_mpv_subtitle_speech(hwnd, "bookmark_seek");
-        }
+        jump_audiobook_to_position(hwnd, path, target_seconds);
         if !target_snippet.is_empty() {
             crate::accessibility::screen_reader_speak(&target_snippet);
         }
@@ -14759,20 +14903,25 @@ fn announce_bookmark_target_line(hwnd_edit: HWND, position: i32, fallback: &str)
 }
 
 fn clear_current_bookmarks(hwnd: HWND) -> bool {
-    let (path, hwnd_edit) = {
+    let (path, hwnd_edit, format, title) = {
         with_state(hwnd, |state| {
-            state
-                .docs
-                .get(state.current)
-                .map(|doc| (doc.path.clone(), doc.hwnd_edit))
+            state.docs.get(state.current).map(|doc| {
+                (
+                    doc.path.clone(),
+                    doc.hwnd_edit,
+                    doc.format,
+                    doc.title.clone(),
+                )
+            })
         })
     }
     .flatten()
-    .unwrap_or((None, HWND(0)));
+    .unwrap_or((None, HWND(0), FileFormat::default(), String::new()));
     if hwnd_edit.0 == 0 {
         return false;
     }
-    let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
+    let (storage_key, persist_to_disk) =
+        runtime_bookmark_storage_key(path.as_deref(), hwnd_edit, &title, format);
 
     let (removed, bookmarks_window) = {
         with_state(hwnd, |state| {
@@ -14878,8 +15027,9 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
 mod tests {
     use super::{
         SentenceNavigationDirection, audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
-        sentence_navigation_target, sentence_start_offsets_utf16,
+        relative_audiobook_bookmark, sentence_navigation_target, sentence_start_offsets_utf16,
     };
+    use crate::bookmarks::Bookmark;
 
     #[test]
     fn audio_bookmark_position_rounds_down_and_formats() {
@@ -14934,6 +15084,78 @@ mod tests {
             sentence_navigation_target(text, 15, SentenceNavigationDirection::Previous),
             Some(0)
         );
+    }
+
+    #[test]
+    fn audiobook_previous_skips_current_bookmark_after_seek() {
+        let bookmarks = vec![
+            Bookmark {
+                position: 2,
+                snippet: String::new(),
+                timestamp: String::new(),
+            },
+            Bookmark {
+                position: 4,
+                snippet: String::new(),
+                timestamp: String::new(),
+            },
+            Bookmark {
+                position: 5,
+                snippet: String::new(),
+                timestamp: String::new(),
+            },
+        ];
+        let target = relative_audiobook_bookmark(&bookmarks, None, 5.1, false)
+            .map(|bookmark| bookmark.position);
+        assert_eq!(target, Some(4));
+    }
+
+    #[test]
+    fn audiobook_next_advances_from_current_bookmark() {
+        let bookmarks = vec![
+            Bookmark {
+                position: 2,
+                snippet: String::new(),
+                timestamp: String::new(),
+            },
+            Bookmark {
+                position: 4,
+                snippet: String::new(),
+                timestamp: String::new(),
+            },
+            Bookmark {
+                position: 5,
+                snippet: String::new(),
+                timestamp: String::new(),
+            },
+        ];
+        let target = relative_audiobook_bookmark(&bookmarks, None, 4.1, true)
+            .map(|bookmark| bookmark.position);
+        assert_eq!(target, Some(5));
+    }
+
+    #[test]
+    fn audiobook_previous_uses_anchor_not_playback_drift() {
+        let bookmarks = vec![
+            Bookmark {
+                position: 2,
+                snippet: String::new(),
+                timestamp: String::new(),
+            },
+            Bookmark {
+                position: 4,
+                snippet: String::new(),
+                timestamp: String::new(),
+            },
+            Bookmark {
+                position: 5,
+                snippet: String::new(),
+                timestamp: String::new(),
+            },
+        ];
+        let target = relative_audiobook_bookmark(&bookmarks, Some(4), 4.9, false)
+            .map(|bookmark| bookmark.position);
+        assert_eq!(target, Some(2));
     }
 }
 

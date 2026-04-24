@@ -1,5 +1,4 @@
 use crate::accessibility::{EM_SCROLLCARET, handle_accessibility, to_wide};
-use crate::audio_player::start_audiobook_at;
 use crate::i18n;
 use crate::settings::FileFormat;
 use crate::with_state;
@@ -26,14 +25,13 @@ const BOOKMARKS_ID_LIST: usize = 9001;
 const BOOKMARKS_ID_DELETE: usize = 9002;
 const BOOKMARKS_ID_GOTO: usize = 9003;
 const BOOKMARKS_ID_OK: usize = 9004;
-const UNSAVED_BOOKMARK_PREFIX: &str = "__unsaved__:";
-
-fn bookmark_storage_key(path: Option<&std::path::Path>, hwnd_edit: HWND) -> (String, bool) {
-    if let Some(path) = path {
-        (path.to_string_lossy().to_string(), true)
-    } else {
-        (format!("{UNSAVED_BOOKMARK_PREFIX}{}", hwnd_edit.0), false)
-    }
+fn runtime_bookmark_storage_key(
+    path: Option<&std::path::Path>,
+    hwnd_edit: HWND,
+    title: &str,
+    format: FileFormat,
+) -> (String, bool) {
+    crate::runtime_bookmark_storage_key(path, hwnd_edit, title, format)
 }
 
 fn force_focus_editor_on_parent(parent: HWND) {
@@ -340,20 +338,24 @@ pub fn refresh_bookmarks_list(hwnd: HWND) {
         None => return,
     };
 
-    let (path, hwnd_edit) = {
+    let (path, hwnd_edit, format, title) = {
         with_state(parent, |state| {
-            state
-                .docs
-                .get(state.current)
-                .map(|doc| (doc.path.clone(), doc.hwnd_edit))
+            state.docs.get(state.current).map(|doc| {
+                (
+                    doc.path.clone(),
+                    doc.hwnd_edit,
+                    doc.format,
+                    doc.title.clone(),
+                )
+            })
         })
     }
     .flatten()
-    .unwrap_or((None, HWND(0)));
+    .unwrap_or((None, HWND(0), FileFormat::default(), String::new()));
     if hwnd_edit.0 == 0 {
         return;
     }
-    let (storage_key, _) = bookmark_storage_key(path.as_deref(), hwnd_edit);
+    let (storage_key, _) = runtime_bookmark_storage_key(path.as_deref(), hwnd_edit, &title, format);
 
     crate::send_message_w_safe(hwnd_list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
 
@@ -397,20 +399,25 @@ pub fn goto_selected(hwnd: HWND) {
         return;
     }
 
-    let (path, hwnd_edit, format): (Option<std::path::PathBuf>, HWND, FileFormat) = {
-        with_state(parent, |state| {
-            state
-                .docs
-                .get(state.current)
-                .map(|doc| (doc.path.clone(), doc.hwnd_edit, doc.format))
-        })
-    }
-    .flatten()
-    .unwrap_or((None, HWND(0), FileFormat::default()));
+    let (path, hwnd_edit, format, title): (Option<std::path::PathBuf>, HWND, FileFormat, String) =
+        {
+            with_state(parent, |state| {
+                state.docs.get(state.current).map(|doc| {
+                    (
+                        doc.path.clone(),
+                        doc.hwnd_edit,
+                        doc.format,
+                        doc.title.clone(),
+                    )
+                })
+            })
+        }
+        .flatten()
+        .unwrap_or((None, HWND(0), FileFormat::default(), String::new()));
     if hwnd_edit.0 == 0 {
         return;
     }
-    let (storage_key, _) = bookmark_storage_key(path.as_deref(), hwnd_edit);
+    let (storage_key, _) = runtime_bookmark_storage_key(path.as_deref(), hwnd_edit, &title, format);
 
     if unsafe {
         with_state(parent, |state| {
@@ -419,7 +426,7 @@ pub fn goto_selected(hwnd: HWND) {
             {
                 if matches!(format, FileFormat::Audiobook) {
                     if let Some(path) = path.as_ref() {
-                        start_audiobook_at(parent, path, bm.position as u64);
+                        crate::jump_audiobook_to_position(parent, path, bm.position as u64);
                     }
                 } else {
                     let mut cr = CHARRANGE {
@@ -456,20 +463,25 @@ pub fn delete_selected(hwnd: HWND) {
         return;
     }
 
-    let (path, hwnd_edit) = {
+    let (path, hwnd_edit, format, title) = {
         with_state(parent, |state| {
-            state
-                .docs
-                .get(state.current)
-                .map(|doc| (doc.path.clone(), doc.hwnd_edit))
+            state.docs.get(state.current).map(|doc| {
+                (
+                    doc.path.clone(),
+                    doc.hwnd_edit,
+                    doc.format,
+                    doc.title.clone(),
+                )
+            })
         })
     }
     .flatten()
-    .unwrap_or((None, HWND(0)));
+    .unwrap_or((None, HWND(0), FileFormat::default(), String::new()));
     if hwnd_edit.0 == 0 {
         return;
     }
-    let (storage_key, persist_to_disk) = bookmark_storage_key(path.as_deref(), hwnd_edit);
+    let (storage_key, persist_to_disk) =
+        runtime_bookmark_storage_key(path.as_deref(), hwnd_edit, &title, format);
 
     if {
         with_state(parent, |state| {

@@ -1623,6 +1623,7 @@ pub fn stop_audiobook_playback(hwnd: HWND) {
             caller.line()
         ));
         if with_state(hwnd, |state| {
+            state.active_audiobook_bookmark = None;
             if let Some(player) = state.active_audiobook.take() {
                 crate::log_debug(&format!(
                     "Audio player: Stopping and removing player for {}",

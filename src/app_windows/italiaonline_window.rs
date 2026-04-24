@@ -78,7 +78,7 @@ pub fn reopen_last(parent: HWND) {
         &resolved.response,
         selected_id,
     ) {
-        BrowseResultsOutcome::OpenedDetail => {}
+        BrowseResultsOutcome::OpenedDocument => {}
         BrowseResultsOutcome::NewSearch => {
             editor_manager::mark_current_document_from_italiaonline(parent, false);
             run_search_flow(parent, language, resolved.query);
@@ -109,7 +109,7 @@ fn run_search_flow(parent: HWND, language: Language, mut initial_query: SearchQu
             continue;
         }
         match browse_results(parent, language, &resolved.query, &resolved.response, None) {
-            BrowseResultsOutcome::OpenedDetail => return,
+            BrowseResultsOutcome::OpenedDocument => return,
             BrowseResultsOutcome::NewSearch => continue,
             BrowseResultsOutcome::Closed => return,
         }
@@ -118,7 +118,7 @@ fn run_search_flow(parent: HWND, language: Language, mut initial_query: SearchQu
 
 enum BrowseResultsOutcome {
     Closed,
-    OpenedDetail,
+    OpenedDocument,
     NewSearch,
 }
 
@@ -334,6 +334,7 @@ fn browse_results(
                 initial_query: String::new(),
                 search_button_label: "Nuova ricerca".to_string(),
                 show_search_edit: false,
+                secondary_action_label: Some("Apri tutto".to_string()),
                 context_action: None,
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: false,
@@ -373,7 +374,23 @@ fn browse_results(
                             state.last_italiaonline_result_id = Some(id.clone());
                         });
                         open_detail_document(parent, detail);
-                        return BrowseResultsOutcome::OpenedDetail;
+                        return BrowseResultsOutcome::OpenedDocument;
+                    }
+                    Err(err) => {
+                        show_error(parent, language, &err);
+                        continue;
+                    }
+                }
+            }
+            MultilineSelectionResult::SecondaryAction => {
+                crate::screen_reader_speak("Caricamento dettagli");
+                match open_results_document(parent, &current_query, &current_response) {
+                    Ok(()) => {
+                        with_state(parent, |state| {
+                            state.last_italiaonline_query = Some(current_query.clone());
+                            state.last_italiaonline_result_id = None;
+                        });
+                        return BrowseResultsOutcome::OpenedDocument;
                     }
                     Err(err) => {
                         show_error(parent, language, &err);
@@ -465,4 +482,40 @@ fn open_detail_document(parent: HWND, detail: DetailResponse) {
     {
         crate::log_debug("Failed to populate Italiaonline detail document");
     }
+}
+
+fn open_results_document(
+    parent: HWND,
+    query: &SearchQuery,
+    response: &SearchResponse,
+) -> Result<(), String> {
+    let title = results_title(query, response);
+    let mut entries = Vec::new();
+    for result in &response.results {
+        let detail = italiaonline::load_detail(query, &result.id).map_err(|err| {
+            format!(
+                "Impossibile caricare il dettaglio di {}: {err}",
+                result.name
+            )
+        })?;
+        entries.push(detail.body);
+    }
+    let body = entries.join("\r\n\r\n");
+
+    editor_manager::new_document(parent);
+    editor_manager::set_current_document_title(parent, &title);
+    editor_manager::mark_current_document_from_italiaonline(parent, true);
+    if with_state(parent, |state| {
+        state
+            .docs
+            .get(state.current)
+            .map(|doc| editor_manager::set_edit_text(doc.hwnd_edit, &body))
+    })
+    .flatten()
+    .is_none()
+    {
+        crate::log_debug("Failed to populate Italiaonline results document");
+        return Err("Impossibile creare il documento con tutti i risultati.".to_string());
+    }
+    Ok(())
 }

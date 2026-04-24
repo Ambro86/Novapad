@@ -193,6 +193,7 @@ fn browse_page(
                 initial_query: current_search_query.clone(),
                 search_button_label: "Cerca".to_string(),
                 show_search_edit: true,
+                secondary_action_label: None,
                 context_action: Some(context_action),
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
@@ -219,6 +220,9 @@ fn browse_page(
                         continue;
                     }
                 }
+            }
+            MultilineSelectionResult::SecondaryAction => {
+                continue;
             }
             MultilineSelectionResult::Cancelled => {
                 if let Some((previous_page_path, previous_selected_id)) = history.pop() {

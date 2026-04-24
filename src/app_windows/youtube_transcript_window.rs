@@ -88,6 +88,7 @@ const YOUTUBE_COMMENTS_ID_ACCESSIBILITY_PROXY: usize = 9332;
 const YOUTUBE_COMMENTS_ID_CLOSE: usize = 9333;
 const YOUTUBE_COMMENTS_ID_SEARCH_EDIT: usize = 9334;
 const YOUTUBE_COMMENTS_ID_SEARCH_BUTTON: usize = 9335;
+const YOUTUBE_COMMENTS_ID_SECONDARY_BUTTON: usize = 9336;
 const YOUTUBE_COMMENTS_ID_SEARCH_LABEL: usize = 9336;
 const WM_YT_LOAD_COMPLETE: u32 = WM_APP + 40;
 const WM_YT_TEXT_COMPLETE: u32 = WM_APP + 41;
@@ -1723,6 +1724,7 @@ struct YoutubeCommentsDialogInit {
     action_result: Arc<Mutex<YoutubeCommentsDialogAction>>,
     flat_selection: Option<YoutubeFlatSelectionInit>,
     flat_search: Option<YoutubeFlatSearchInit>,
+    flat_secondary_action: Option<YoutubeFlatSecondaryActionInit>,
     flat_close_button_label: Option<String>,
     flat_context_action:
         Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
@@ -1735,6 +1737,7 @@ struct YoutubeCommentsDialogMode {
     show_load_all_action: bool,
     flat_selection: Option<YoutubeFlatSelectionInit>,
     flat_search: Option<YoutubeFlatSearchInit>,
+    flat_secondary_action: Option<YoutubeFlatSecondaryActionInit>,
     flat_close_button_label: Option<String>,
     flat_context_action:
         Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
@@ -1773,6 +1776,7 @@ struct YoutubeCommentsDialogState {
     close_button: HWND,
     search_edit: HWND,
     search_button: HWND,
+    secondary_button: HWND,
     font: HFONT,
     comments: Vec<YoutubeComment>,
     root_indices: Vec<usize>,
@@ -1787,6 +1791,7 @@ struct YoutubeCommentsDialogState {
     flat_list_mode: bool,
     flat_selection_result: Option<Arc<Mutex<Option<String>>>>,
     flat_search_result: Option<Arc<Mutex<Option<String>>>>,
+    flat_secondary_action_result: Option<Arc<Mutex<bool>>>,
     flat_context_action:
         Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     right_arrow_accepts_selection: bool,
@@ -1804,6 +1809,7 @@ pub(crate) struct MultilineSearchOptions {
     pub(crate) initial_query: String,
     pub(crate) search_button_label: String,
     pub(crate) show_search_edit: bool,
+    pub(crate) secondary_action_label: Option<String>,
     pub(crate) context_action:
         Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     pub(crate) right_arrow_accepts_selection: bool,
@@ -1822,10 +1828,17 @@ struct YoutubeFlatSearchInit {
     show_edit: bool,
 }
 
+#[derive(Clone)]
+struct YoutubeFlatSecondaryActionInit {
+    button_label: String,
+    result: Arc<Mutex<bool>>,
+}
+
 pub(crate) enum MultilineSelectionResult {
     Cancelled,
     Selected(String),
     Search(String),
+    SecondaryAction,
 }
 
 struct ResolvedStreamSelection {
@@ -2253,6 +2266,7 @@ pub(crate) fn select_multiline_items_with_search(
         .collect::<Vec<_>>();
     let selection_result = Arc::new(Mutex::new(None));
     let search_result = Arc::new(Mutex::new(None));
+    let secondary_action_result = Arc::new(Mutex::new(false));
     open_youtube_comments_window_with_mode(
         parent,
         language,
@@ -2269,6 +2283,12 @@ pub(crate) fn select_multiline_items_with_search(
                 button_label: search_options.search_button_label,
                 result: Arc::clone(&search_result),
                 show_edit: search_options.show_search_edit,
+            }),
+            flat_secondary_action: search_options.secondary_action_label.map(|label| {
+                YoutubeFlatSecondaryActionInit {
+                    button_label: label,
+                    result: Arc::clone(&secondary_action_result),
+                }
             }),
             flat_close_button_label: None,
             flat_context_action: search_options.context_action,
@@ -2288,6 +2308,11 @@ pub(crate) fn select_multiline_items_with_search(
         .clone()
     {
         MultilineSelectionResult::Search(value)
+    } else if *secondary_action_result
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+    {
+        MultilineSelectionResult::SecondaryAction
     } else {
         MultilineSelectionResult::Cancelled
     }
@@ -2411,6 +2436,7 @@ fn open_youtube_comments_window_with_mode(
         action_result: Arc::clone(&action_result),
         flat_selection: mode.flat_selection,
         flat_search: mode.flat_search,
+        flat_secondary_action: mode.flat_secondary_action,
         flat_close_button_label: mode.flat_close_button_label,
         flat_context_action: mode.flat_context_action,
         right_arrow_accepts_selection: mode.right_arrow_accepts_selection,
@@ -2739,7 +2765,7 @@ fn youtube_comments_dialog_wndproc_inner(
                     None,
                 )
             };
-            let (search_label, search_edit, search_button) =
+            let (search_label, search_edit, search_button, secondary_button) =
                 if let Some(search) = init.flat_search.as_ref() {
                     let search_label = if search.show_edit {
                         unsafe {
@@ -2800,6 +2826,27 @@ fn youtube_comments_dialog_wndproc_inner(
                             None,
                         )
                     };
+                    let secondary_button =
+                        if let Some(secondary) = init.flat_secondary_action.as_ref() {
+                            unsafe {
+                                CreateWindowExW(
+                                    Default::default(),
+                                    WC_BUTTON,
+                                    PCWSTR(to_wide(&secondary.button_label).as_ptr()),
+                                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                                    600,
+                                    40,
+                                    90,
+                                    26,
+                                    hwnd,
+                                    HMENU(YOUTUBE_COMMENTS_ID_SECONDARY_BUTTON as isize),
+                                    HINSTANCE(0),
+                                    None,
+                                )
+                            }
+                        } else {
+                            HWND(0)
+                        };
                     if search.show_edit {
                         let search_text = to_wide(&search.initial_query);
                         crate::log_if_err!(crate::set_window_text_w_safe(
@@ -2807,9 +2854,27 @@ fn youtube_comments_dialog_wndproc_inner(
                             PCWSTR(search_text.as_ptr())
                         ));
                     }
-                    (search_label, search_edit, search_button)
+                    (search_label, search_edit, search_button, secondary_button)
+                } else if let Some(secondary) = init.flat_secondary_action.as_ref() {
+                    let secondary_button = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_BUTTON,
+                            PCWSTR(to_wide(&secondary.button_label).as_ptr()),
+                            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                            600,
+                            40,
+                            90,
+                            26,
+                            hwnd,
+                            HMENU(YOUTUBE_COMMENTS_ID_SECONDARY_BUTTON as isize),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    (HWND(0), HWND(0), HWND(0), secondary_button)
                 } else {
-                    (HWND(0), HWND(0), HWND(0))
+                    (HWND(0), HWND(0), HWND(0), HWND(0))
                 };
             let close_button = unsafe {
                 CreateWindowExW(
@@ -2845,6 +2910,7 @@ fn youtube_comments_dialog_wndproc_inner(
                         close_button,
                         search_edit,
                         search_button,
+                        secondary_button,
                     ] {
                         if control.0 == 0 {
                             continue;
@@ -2873,6 +2939,7 @@ fn youtube_comments_dialog_wndproc_inner(
                 close_button,
                 search_edit,
                 search_button,
+                secondary_button,
                 font: hfont,
                 comments: init.comments,
                 root_indices,
@@ -2892,6 +2959,10 @@ fn youtube_comments_dialog_wndproc_inner(
                     .flat_search
                     .as_ref()
                     .map(|search| Arc::clone(&search.result)),
+                flat_secondary_action_result: init
+                    .flat_secondary_action
+                    .as_ref()
+                    .map(|secondary| Arc::clone(&secondary.result)),
                 flat_context_action: init.flat_context_action,
                 right_arrow_accepts_selection: init.right_arrow_accepts_selection,
                 left_arrow_closes: init.left_arrow_closes,
@@ -2968,6 +3039,7 @@ fn youtube_comments_dialog_wndproc_inner(
                             k if k == VK_UP.0 as u32 || k == VK_DOWN.0 as u32
                         );
                 if focus == state.close_button
+                    || focus == state.secondary_button
                     || keep_search_controls_navigation
                     || !is_youtube_comments_dialog_navigation_key(state, wparam.0 as u32)
                 {
@@ -3052,6 +3124,11 @@ fn youtube_comments_dialog_wndproc_inner(
             if (cmd_id == YOUTUBE_COMMENTS_ID_SEARCH_BUTTON
                 || (cmd_id == YOUTUBE_COMMENTS_ID_SEARCH_EDIT && notify == 0))
                 && trigger_youtube_comments_search(hwnd)
+            {
+                return LRESULT(0);
+            }
+            if cmd_id == YOUTUBE_COMMENTS_ID_SECONDARY_BUTTON
+                && trigger_youtube_comments_secondary_action(hwnd)
             {
                 return LRESULT(0);
             }
@@ -3172,6 +3249,21 @@ fn trigger_youtube_comments_search(hwnd: HWND) -> bool {
         return true;
     }
     false
+}
+
+fn trigger_youtube_comments_secondary_action(hwnd: HWND) -> bool {
+    let triggered = with_youtube_comments_state(hwnd, |state| {
+        let Some(result) = &state.flat_secondary_action_result else {
+            return false;
+        };
+        *result.lock().unwrap_or_else(|e| e.into_inner()) = true;
+        true
+    })
+    .unwrap_or(false);
+    if triggered {
+        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+    }
+    triggered
 }
 
 fn build_youtube_comment_threads(

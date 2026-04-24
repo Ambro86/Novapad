@@ -3606,6 +3606,12 @@ pub fn select_tab(hwnd: HWND, index: usize) {
             return;
         };
 
+        if !is_audiobook
+            && with_state(hwnd, |state| state.local_mpv_video_mode_active).unwrap_or(false)
+        {
+            crate::set_local_mpv_video_mode(hwnd, false);
+        }
+
         if let Some(hwnd_edit) = prev_edit {
             ShowWindow(hwnd_edit, SW_HIDE);
         }

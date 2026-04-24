@@ -2610,7 +2610,7 @@ fn is_local_mpv_playback_active(hwnd: HWND) -> bool {
     active_local_mpv_media(hwnd).is_some()
 }
 
-fn set_local_mpv_video_mode(hwnd: HWND, active: bool) {
+pub(crate) fn set_local_mpv_video_mode(hwnd: HWND, active: bool) {
     if with_state(hwnd, |state| {
         state.local_mpv_video_mode_active = active;
     })

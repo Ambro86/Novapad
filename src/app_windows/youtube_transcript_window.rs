@@ -255,6 +255,7 @@ fn post_focus_editor(parent: HWND) {
         crate::get_foreground_window_safe(),
         crate::get_focus_safe()
     ));
+    crate::clear_active_youtube_return_context(parent);
     unsafe {
         if let Err(e) = PostMessageW(parent, WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0)) {
             crate::log_debug(&format!("Failed to post WM_FOCUS_EDITOR: {}", e));

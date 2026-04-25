@@ -73,7 +73,8 @@ pub struct TtsChunk {
     pub override_voice: Option<VoiceOverride>,
 }
 
-type EdgeAudioTx<'a> = Option<&'a mpsc::Sender<Result<(Vec<u8>, usize), String>>>;
+type TtsAudioPacket = (Vec<u8>, usize, String);
+type EdgeAudioTx<'a> = Option<&'a mpsc::Sender<Result<TtsAudioPacket, String>>>;
 
 #[derive(Clone)]
 pub struct VoiceOverride {
@@ -1103,6 +1104,28 @@ struct TtsPlaybackRequest {
     rx: mpsc::UnboundedReceiver<TtsCommand>,
 }
 
+fn tts_progress_char_weight(ch: char) -> u64 {
+    match ch {
+        ',' => 35,
+        ';' | ':' => 45,
+        '.' | '!' | '?' => 70,
+        '—' | '–' => 35,
+        '\n' | '\r' => 75,
+        _ => 10,
+    }
+}
+
+fn build_tts_progress_weight_prefix(text: &str) -> Vec<u64> {
+    let mut prefix = Vec::with_capacity(text.len().saturating_add(1));
+    let mut total = 0u64;
+    prefix.push(total);
+    for ch in text.chars() {
+        total = total.saturating_add(tts_progress_char_weight(ch));
+        prefix.push(total);
+    }
+    prefix
+}
+
 struct TtsPlaybackProgressSource<S> {
     inner: S,
     hwnd: HWND,
@@ -1115,6 +1138,8 @@ struct TtsPlaybackProgressSource<S> {
     report_interval_samples: u64,
     last_reported_offset: Option<usize>,
     reported_end: bool,
+    progress_weight_prefix: Vec<u64>,
+    progress_weight_total: u64,
 }
 
 impl<S> TtsPlaybackProgressSource<S>
@@ -1127,6 +1152,7 @@ where
         session_id: u64,
         chunk_start_offset: usize,
         chunk_len: usize,
+        progress_text: String,
     ) -> Self {
         let channels = u64::from(inner.channels()).max(1);
         let sample_rate = u64::from(inner.sample_rate()).max(1);
@@ -1134,6 +1160,8 @@ where
             (duration.as_secs_f64() * sample_rate as f64 * channels as f64).round() as u64
         });
         let report_interval_samples = (sample_rate * channels / 5).max(1);
+        let progress_weight_prefix = build_tts_progress_weight_prefix(&progress_text);
+        let progress_weight_total = progress_weight_prefix.last().copied().unwrap_or(0);
 
         Self {
             inner,
@@ -1147,6 +1175,8 @@ where
             report_interval_samples,
             last_reported_offset: None,
             reported_end: false,
+            progress_weight_prefix,
+            progress_weight_total,
         }
     }
 
@@ -1172,14 +1202,36 @@ where
             return;
         }
         let current = self.emitted_samples.min(total_samples);
-        let offset_in_chunk = ((current as u128 * self.chunk_len as u128) / total_samples as u128)
-            .min(self.chunk_len as u128) as usize;
+        let offset_in_chunk = self.weighted_offset_in_chunk(current, total_samples);
         self.report_absolute_offset(self.chunk_start_offset.saturating_add(offset_in_chunk));
         while self.next_report_sample <= self.emitted_samples {
             self.next_report_sample = self
                 .next_report_sample
                 .saturating_add(self.report_interval_samples);
         }
+    }
+
+    fn weighted_offset_in_chunk(&self, current_samples: u64, total_samples: u64) -> usize {
+        if self.chunk_len == 0 {
+            return 0;
+        }
+        if total_samples == 0 || self.progress_weight_total == 0 {
+            return self.chunk_len;
+        }
+        let weighted_target = ((current_samples as u128 * self.progress_weight_total as u128)
+            / total_samples as u128)
+            .min(self.progress_weight_total as u128) as u64;
+        let consumed_chars = self
+            .progress_weight_prefix
+            .partition_point(|weight| *weight <= weighted_target)
+            .saturating_sub(1);
+        let total_chars = self.progress_weight_prefix.len().saturating_sub(1);
+        if total_chars == 0 {
+            return ((current_samples as u128 * self.chunk_len as u128) / total_samples as u128)
+                .min(self.chunk_len as u128) as usize;
+        }
+        ((consumed_chars as u128 * self.chunk_len as u128) / total_chars as u128)
+            .min(self.chunk_len as u128) as usize
     }
 
     fn report_end(&mut self) {
@@ -1303,7 +1355,7 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
         }
     };
 
-    let (audio_tx, mut audio_rx) = mpsc::channel::<Result<(Vec<u8>, usize), String>>(10);
+    let (audio_tx, mut audio_rx) = mpsc::channel::<Result<TtsAudioPacket, String>>(10);
     let cancel_downloader = cancel_flag.clone();
     let chunks_downloader = chunks.clone();
     let voice_downloader = voice.clone();
@@ -1404,7 +1456,11 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                                 {
                                     Ok(audio) => {
                                         let len = chunk_obj.original_len;
-                                        if audio_tx.send(Ok((audio, len))).await.is_err() {
+                                        if audio_tx
+                                            .send(Ok((audio, len, chunk_obj.text_to_read.clone())))
+                                            .await
+                                            .is_err()
+                                        {
                                             return;
                                         }
                                     }
@@ -1477,7 +1533,11 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
             match result {
                 Ok(data) => {
                     if audio_tx
-                        .send(Ok((data, chunk_obj.original_len)))
+                        .send(Ok((
+                            data,
+                            chunk_obj.original_len,
+                            chunk_obj.text_to_read.clone(),
+                        )))
                         .await
                         .is_err()
                     {
@@ -1543,7 +1603,7 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
             }
             break;
         };
-        let (audio, orig_len) = match res {
+        let (audio, orig_len, progress_text) = match res {
             Ok(data) => data,
             Err(e) => {
                 post_tts_error(hwnd_copy, session_id, e);
@@ -1576,8 +1636,14 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                 break;
             }
         };
-        let progress_source =
-            TtsPlaybackProgressSource::new(source, hwnd_copy, session_id, current_offset, orig_len);
+        let progress_source = TtsPlaybackProgressSource::new(
+            source,
+            hwnd_copy,
+            session_id,
+            current_offset,
+            orig_len,
+            progress_text,
+        );
 
         sink.append(progress_source);
         appended_any = true;
@@ -2145,7 +2211,11 @@ async fn download_edge_chunks_ws(
         }
         if let Some(tx) = audio_tx {
             let len = chunk.original_len;
-            if tx.send(Ok((audio, len))).await.is_err() {
+            if tx
+                .send(Ok((audio, len, chunk.text_to_read.clone())))
+                .await
+                .is_err()
+            {
                 return Ok(processed_count);
             }
             sent_count = sent_count.saturating_add(1);

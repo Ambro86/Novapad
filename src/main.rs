@@ -1740,6 +1740,17 @@ pub(crate) fn set_active_youtube_return_context(
     }
 }
 
+pub(crate) fn clear_active_youtube_return_context(hwnd: HWND) {
+    crate::log_debug("clear_active_youtube_return_context");
+    if with_state(hwnd, |state| {
+        state.active_youtube_return_context = YouTubeReturnContext::default();
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to clear active YouTube return context");
+    }
+}
+
 pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
     let (url, media_url, podcast_title, title, cache_path, language, is_raiplay_on_demand) = {
         with_state(hwnd, |state| {
@@ -14882,24 +14893,24 @@ fn current_text_bookmark_position(hwnd: HWND, doc_index: usize, hwnd_edit: HWND)
             && let Some(doc) = state.docs.get(doc_index)
             && doc.hwnd_edit == hwnd_edit
         {
+            let (storage_key, _) = runtime_bookmark_storage_key(
+                doc.path.as_deref(),
+                doc.hwnd_edit,
+                &doc.title,
+                doc.format,
+            );
+            if let Some((bookmark_hwnd, bookmark_key, bookmark_pos)) =
+                &state.tts_automatic_bookmark_position
+                && *bookmark_hwnd == hwnd_edit
+                && *bookmark_key == storage_key
+            {
+                return (*bookmark_pos).max(0);
+            }
             if let Some(pending) = state.tts_pending_start_pos {
                 return pending.max(0);
             }
             if let Some(session) = &state.tts_session {
                 return (session.initial_caret_pos + state.tts_last_offset).max(0);
-            }
-            if let Some((bookmark_hwnd, bookmark_key, bookmark_pos)) =
-                &state.tts_automatic_bookmark_position
-            {
-                let (storage_key, _) = runtime_bookmark_storage_key(
-                    doc.path.as_deref(),
-                    doc.hwnd_edit,
-                    &doc.title,
-                    doc.format,
-                );
-                if *bookmark_hwnd == hwnd_edit && *bookmark_key == storage_key {
-                    return (*bookmark_pos).max(0);
-                }
             }
         }
         spellcheck_caret_char_index(hwnd_edit)
@@ -14947,6 +14958,14 @@ pub(crate) fn save_automatic_bookmark_for_document(hwnd: HWND, doc_index: usize)
             {
                 let position_secs = crate::audio_player::audiobook_position_secs(player);
                 return Some(audio_bookmark_position_and_snippet(position_secs));
+            }
+            if let Some(bookmark_path) = path.as_ref() {
+                let path_key = bookmark_path.to_string_lossy();
+                if state.last_stopped_mpv_url.as_deref() == Some(path_key.as_ref())
+                    && let Some(position_secs) = state.last_stopped_mpv_position_secs
+                {
+                    return Some(audio_bookmark_position_and_snippet(position_secs as f64));
+                }
             }
             state
                 .active_audiobook_bookmark

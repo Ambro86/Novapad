@@ -425,6 +425,22 @@ pub fn prevent_sleep(enable: bool) {
     }
 }
 
+fn post_tts_chunk_offset(hwnd: HWND, session_id: u64, offset: usize) {
+    if hwnd.0 == 0 {
+        return;
+    }
+    unsafe {
+        if let Err(e) = PostMessageW(
+            hwnd,
+            WM_TTS_CHUNK_START,
+            WPARAM(session_id as usize),
+            LPARAM(offset as isize),
+        ) {
+            crate::log_debug(&format!("Failed to post WM_TTS_CHUNK_START: {}", e));
+        }
+    }
+}
+
 pub fn post_tts_error(hwnd: HWND, session_id: u64, message: String) {
     log_debug(&format!("TTS error: {message}"));
     let payload = Box::new(message);
@@ -1087,6 +1103,132 @@ struct TtsPlaybackRequest {
     rx: mpsc::UnboundedReceiver<TtsCommand>,
 }
 
+struct TtsPlaybackProgressSource<S> {
+    inner: S,
+    hwnd: HWND,
+    session_id: u64,
+    chunk_start_offset: usize,
+    chunk_len: usize,
+    total_samples: Option<u64>,
+    emitted_samples: u64,
+    next_report_sample: u64,
+    report_interval_samples: u64,
+    last_reported_offset: Option<usize>,
+    reported_end: bool,
+}
+
+impl<S> TtsPlaybackProgressSource<S>
+where
+    S: Source<Item = f32>,
+{
+    fn new(
+        inner: S,
+        hwnd: HWND,
+        session_id: u64,
+        chunk_start_offset: usize,
+        chunk_len: usize,
+    ) -> Self {
+        let channels = u64::from(inner.channels()).max(1);
+        let sample_rate = u64::from(inner.sample_rate()).max(1);
+        let total_samples = inner.total_duration().map(|duration| {
+            (duration.as_secs_f64() * sample_rate as f64 * channels as f64).round() as u64
+        });
+        let report_interval_samples = (sample_rate * channels / 5).max(1);
+
+        Self {
+            inner,
+            hwnd,
+            session_id,
+            chunk_start_offset,
+            chunk_len,
+            total_samples: total_samples.filter(|samples| *samples > 0),
+            emitted_samples: 0,
+            next_report_sample: report_interval_samples,
+            report_interval_samples,
+            last_reported_offset: None,
+            reported_end: false,
+        }
+    }
+
+    fn report_absolute_offset(&mut self, absolute_offset: usize) {
+        let clamped = self
+            .chunk_start_offset
+            .saturating_add(self.chunk_len)
+            .min(absolute_offset);
+        if self.last_reported_offset != Some(clamped) {
+            post_tts_chunk_offset(self.hwnd, self.session_id, clamped);
+            self.last_reported_offset = Some(clamped);
+        }
+    }
+
+    fn report_progress(&mut self) {
+        if self.last_reported_offset.is_none() {
+            self.report_absolute_offset(self.chunk_start_offset);
+        }
+        let Some(total_samples) = self.total_samples else {
+            return;
+        };
+        if self.chunk_len == 0 || self.emitted_samples < self.next_report_sample {
+            return;
+        }
+        let current = self.emitted_samples.min(total_samples);
+        let offset_in_chunk = ((current as u128 * self.chunk_len as u128) / total_samples as u128)
+            .min(self.chunk_len as u128) as usize;
+        self.report_absolute_offset(self.chunk_start_offset.saturating_add(offset_in_chunk));
+        while self.next_report_sample <= self.emitted_samples {
+            self.next_report_sample = self
+                .next_report_sample
+                .saturating_add(self.report_interval_samples);
+        }
+    }
+
+    fn report_end(&mut self) {
+        if !self.reported_end {
+            self.report_absolute_offset(self.chunk_start_offset.saturating_add(self.chunk_len));
+            self.reported_end = true;
+        }
+    }
+}
+
+impl<S> Iterator for TtsPlaybackProgressSource<S>
+where
+    S: Source<Item = f32>,
+{
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let sample = self.inner.next();
+        if sample.is_some() {
+            self.emitted_samples = self.emitted_samples.saturating_add(1);
+            self.report_progress();
+        } else {
+            self.report_end();
+        }
+        sample
+    }
+}
+
+impl<S> Source for TtsPlaybackProgressSource<S>
+where
+    S: Source<Item = f32>,
+{
+    fn current_span_len(&self) -> Option<usize> {
+        self.inner.current_span_len()
+    }
+
+    fn channels(&self) -> u16 {
+        self.inner.channels()
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.inner.sample_rate()
+    }
+
+    fn total_duration(&self) -> Option<Duration> {
+        self.inner.total_duration()
+    }
+}
+
 fn tts_playback_inner(req: TtsPlaybackRequest) {
     let TtsPlaybackRequest {
         hwnd_copy,
@@ -1425,17 +1567,6 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
             log_debug(&format!("TTS first audio: elapsed_ms={}", first_ms));
         }
 
-        unsafe {
-            if let Err(e) = PostMessageW(
-                hwnd_copy,
-                WM_TTS_CHUNK_START,
-                WPARAM(session_id as usize),
-                LPARAM(current_offset as isize),
-            ) {
-                crate::log_debug(&format!("Failed to post WM_TTS_CHUNK_START: {}", e));
-            }
-        }
-
         let cursor = std::io::Cursor::new(audio);
         let source = match Decoder::new(cursor) {
             Ok(source) => source,
@@ -1445,8 +1576,10 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                 break;
             }
         };
+        let progress_source =
+            TtsPlaybackProgressSource::new(source, hwnd_copy, session_id, current_offset, orig_len);
 
-        sink.append(source);
+        sink.append(progress_source);
         appended_any = true;
         while !sink.empty() {
             if cancel_flag.load(Ordering::SeqCst) {

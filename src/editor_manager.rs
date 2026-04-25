@@ -4452,6 +4452,7 @@ pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
         if !confirm_save_if_dirty_entry(hwnd, index, &title) {
             return false;
         }
+        crate::save_automatic_bookmark_for_document(hwnd, index);
 
         let mut closing_hwnd_edit = HWND(0);
         let mut new_hwnd_edit = None;
@@ -4609,10 +4610,13 @@ pub fn try_close_app(hwnd: HWND) -> bool {
     }
 
     if let Some(entries) = result {
-        for (index, title) in entries {
-            if !confirm_save_if_dirty_entry(hwnd, index, &title) {
+        for (index, title) in &entries {
+            if !confirm_save_if_dirty_entry(hwnd, *index, title) {
                 return false;
             }
+        }
+        for (index, _) in entries {
+            crate::save_automatic_bookmark_for_document(hwnd, index);
         }
     }
     let has_active_audiobook = with_state(hwnd, |state| {

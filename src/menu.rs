@@ -100,6 +100,7 @@ pub const IDM_MANAGE_BOOKMARKS: usize = 2102;
 pub const IDM_INSERT_CLEAR_BOOKMARKS: usize = 2103;
 pub const IDM_GOTO_NEXT_BOOKMARK: usize = 2104;
 pub const IDM_GOTO_PREV_BOOKMARK: usize = 2105;
+pub const IDM_AUTOMATIC_BOOKMARK: usize = 2106;
 pub const IDM_NEXT_TAB: usize = 3001;
 pub const IDM_WINDOW_OPEN_DOCUMENTS: usize = 3002;
 pub const IDM_WINDOW_CLOSE_ALL: usize = 3003;
@@ -250,6 +251,7 @@ pub struct MenuLabels {
     pub edit_remove_duplicate_lines: String,
     pub edit_remove_duplicate_consecutive_lines: String,
     pub insert_bookmark: String,
+    pub automatic_bookmark: String,
     pub insert_goto_next_bookmark: String,
     pub insert_goto_prev_bookmark: String,
     pub insert_clear_bookmarks: String,
@@ -386,6 +388,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
             "edit.remove_duplicate_consecutive_lines",
         ),
         insert_bookmark: i18n::tr(language, "insert.bookmark"),
+        automatic_bookmark: i18n::tr(language, "bookmarks.automatic_bookmark"),
         insert_goto_next_bookmark: i18n::tr(language, "insert.goto_next_bookmark"),
         insert_goto_prev_bookmark: i18n::tr(language, "insert.goto_prev_bookmark"),
         insert_clear_bookmarks: i18n::tr(language, "insert.clear_bookmarks"),
@@ -1276,6 +1279,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             MF_STRING,
             IDM_INSERT_BOOKMARK,
             &labels.insert_bookmark,
+        );
+        append_menu_string(
+            insert_menu,
+            MF_STRING,
+            IDM_AUTOMATIC_BOOKMARK,
+            &labels.automatic_bookmark,
         );
         append_menu_string(
             insert_menu,

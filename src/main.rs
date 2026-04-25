@@ -6561,6 +6561,7 @@ pub(crate) struct AppState {
     tts_next_session_id: u64,
     tts_last_offset: i32,
     tts_pending_start_pos: Option<i32>,
+    tts_automatic_bookmark_position: Option<(HWND, String, i32)>,
     tts_sentence_nav_anchor: Option<(HWND, i32)>,
     edge_voices: Vec<VoiceInfo>,
     sapi_voices: Vec<VoiceInfo>,
@@ -8131,6 +8132,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     tts_next_session_id: 1,
                     tts_last_offset: 0,
                     tts_pending_start_pos: None,
+                    tts_automatic_bookmark_position: None,
                     tts_sentence_nav_anchor: None,
                     edge_voices: Vec::new(),
                     sapi_voices: Vec::new(),
@@ -9197,7 +9199,19 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         state.tts_pending_start_pos = None;
                         if let Some(doc) = state.docs.get(state.current) {
                             let current_pos = (current.initial_caret_pos + safe_offset).max(0);
-                            state.tts_sentence_nav_anchor = Some((doc.hwnd_edit, current_pos));
+                            let hwnd_edit = doc.hwnd_edit;
+                            let title = doc.title.clone();
+                            let path = doc.path.clone();
+                            let format = doc.format;
+                            let (storage_key, _) = runtime_bookmark_storage_key(
+                                path.as_deref(),
+                                hwnd_edit,
+                                &title,
+                                format,
+                            );
+                            state.tts_automatic_bookmark_position =
+                                Some((hwnd_edit, storage_key, current_pos));
+                            state.tts_sentence_nav_anchor = Some((hwnd_edit, current_pos));
                         }
                         if state.settings.move_cursor_during_reading
                             && let Some(doc) = state.docs.get(state.current)
@@ -10279,6 +10293,16 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         insert_bookmark(hwnd);
                         LRESULT(0)
                     }
+                    IDM_AUTOMATIC_BOOKMARK => {
+                        with_state(hwnd, |state| {
+                            state.settings.automatic_bookmark = !state.settings.automatic_bookmark;
+                        });
+                        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+                            save_settings(settings);
+                        }
+                        update_voice_panel_menu_check(hwnd);
+                        LRESULT(0)
+                    }
                     IDM_GOTO_NEXT_BOOKMARK => {
                         log_debug("Menu: Go to next bookmark");
                         goto_relative_bookmark(hwnd, true);
@@ -10998,7 +11022,16 @@ fn update_text_preferences(hwnd: HWND, text_color: Option<u32>, text_size: Optio
 }
 
 pub(crate) fn update_voice_panel_menu_check(hwnd: HWND) {
-    let (visible, favorites_visible, text_color, text_size, read_only, word_wrap, show_video) = {
+    let (
+        visible,
+        favorites_visible,
+        text_color,
+        text_size,
+        read_only,
+        word_wrap,
+        show_video,
+        automatic_bookmark,
+    ) = {
         with_state(hwnd, |state| {
             (
                 state.voice_panel_visible,
@@ -11008,10 +11041,11 @@ pub(crate) fn update_voice_panel_menu_check(hwnd: HWND) {
                 state.settings.editor_read_only,
                 state.settings.word_wrap,
                 state.settings.show_video_during_playback,
+                state.settings.automatic_bookmark,
             )
         })
     }
-    .unwrap_or((false, false, 0x000000, 12, false, true, true));
+    .unwrap_or((false, false, 0x000000, 12, false, true, true, false));
     let hmenu = crate::get_menu_safe(hwnd);
     if hmenu.0 == 0 {
         return;
@@ -11058,6 +11092,19 @@ pub(crate) fn update_voice_panel_menu_check(hwnd: HWND) {
     ) == 0xFFFFFFFF
     {
         crate::log_debug("CheckMenuItem failed for IDM_VIEW_SHOW_VIDEO_DURING_PLAYBACK");
+    }
+    let automatic_bookmark_flags = if automatic_bookmark {
+        MF_CHECKED
+    } else {
+        MF_UNCHECKED
+    };
+    if crate::check_menu_item_safe(
+        hmenu,
+        IDM_AUTOMATIC_BOOKMARK as u32,
+        (MF_BYCOMMAND | automatic_bookmark_flags).0,
+    ) == 0xFFFFFFFF
+    {
+        crate::log_debug("CheckMenuItem failed for IDM_AUTOMATIC_BOOKMARK");
     }
 
     let color_items = [
@@ -14758,14 +14805,197 @@ pub(crate) fn runtime_bookmark_storage_key(
     bookmark_storage_key(path, hwnd_edit)
 }
 
-fn insert_bookmark(hwnd: HWND) {
+fn current_edit_caret_position(hwnd_edit: HWND) -> i32 {
+    let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
     unsafe {
-        let (hwnd_edit, path, format, title): (
-            HWND,
-            Option<std::path::PathBuf>,
-            FileFormat,
-            String,
-        ) = with_state(hwnd, |state| {
+        SendMessageW(
+            hwnd_edit,
+            EM_EXGETSEL,
+            WPARAM(0),
+            LPARAM(&mut cr as *mut _ as isize),
+        );
+    }
+    cr.cpMax.max(0)
+}
+
+fn text_bookmark_snippet(hwnd_edit: HWND, pos: i32) -> String {
+    let mut buffer = vec![0u16; 62];
+    let mut tr = TEXTRANGEW {
+        chrg: CHARRANGE {
+            cpMin: pos,
+            cpMax: pos + 60,
+        },
+        lpstrText: PWSTR(buffer.as_mut_ptr()),
+    };
+    let copied = unsafe {
+        SendMessageW(
+            hwnd_edit,
+            EM_GETTEXTRANGE,
+            WPARAM(0),
+            LPARAM(&mut tr as *mut _ as isize),
+        )
+        .0 as usize
+    };
+    let mut snippet = String::from_utf16_lossy(&buffer[..copied]);
+    if let Some(idx) = snippet.find(['\r', '\n']) {
+        snippet.truncate(idx);
+    }
+    if snippet.trim().is_empty() && pos > 0 {
+        let start_pre = (pos - 60).max(0);
+        let mut buffer_pre = vec![0u16; 62];
+        let mut tr_pre = TEXTRANGEW {
+            chrg: CHARRANGE {
+                cpMin: start_pre,
+                cpMax: pos,
+            },
+            lpstrText: PWSTR(buffer_pre.as_mut_ptr()),
+        };
+        let copied_pre = unsafe {
+            SendMessageW(
+                hwnd_edit,
+                EM_GETTEXTRANGE,
+                WPARAM(0),
+                LPARAM(&mut tr_pre as *mut _ as isize),
+            )
+            .0 as usize
+        };
+        let mut snippet_pre = String::from_utf16_lossy(&buffer_pre[..copied_pre]);
+        if let Some(idx) = snippet_pre.rfind(['\r', '\n']) {
+            snippet_pre = snippet_pre[idx + 1..].to_string();
+        }
+        snippet = snippet_pre;
+    }
+    snippet.trim().to_string()
+}
+
+fn text_bookmark_at_position(hwnd_edit: HWND, pos: i32) -> Bookmark {
+    Bookmark {
+        position: pos.max(0),
+        snippet: text_bookmark_snippet(hwnd_edit, pos.max(0)),
+        timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+    }
+}
+
+fn current_text_bookmark_position(hwnd: HWND, doc_index: usize, hwnd_edit: HWND) -> i32 {
+    with_state(hwnd, |state| {
+        if state.current == doc_index
+            && let Some(doc) = state.docs.get(doc_index)
+            && doc.hwnd_edit == hwnd_edit
+        {
+            if let Some(pending) = state.tts_pending_start_pos {
+                return pending.max(0);
+            }
+            if let Some(session) = &state.tts_session {
+                return (session.initial_caret_pos + state.tts_last_offset).max(0);
+            }
+            if let Some((bookmark_hwnd, bookmark_key, bookmark_pos)) =
+                &state.tts_automatic_bookmark_position
+            {
+                let (storage_key, _) = runtime_bookmark_storage_key(
+                    doc.path.as_deref(),
+                    doc.hwnd_edit,
+                    &doc.title,
+                    doc.format,
+                );
+                if *bookmark_hwnd == hwnd_edit && *bookmark_key == storage_key {
+                    return (*bookmark_pos).max(0);
+                }
+            }
+        }
+        spellcheck_caret_char_index(hwnd_edit)
+            .unwrap_or_else(|| current_edit_caret_position(hwnd_edit))
+    })
+    .unwrap_or_else(|| current_edit_caret_position(hwnd_edit))
+}
+
+pub(crate) fn save_automatic_bookmark_for_document(hwnd: HWND, doc_index: usize) -> bool {
+    let Some((hwnd_edit, path, format, title, automatic_enabled)) = with_state(hwnd, |state| {
+        state.docs.get(doc_index).map(|doc| {
+            (
+                doc.hwnd_edit,
+                doc.path.clone(),
+                doc.format,
+                doc.title.clone(),
+                state.settings.automatic_bookmark,
+            )
+        })
+    })
+    .flatten() else {
+        return false;
+    };
+    if !automatic_enabled || hwnd_edit.0 == 0 {
+        return false;
+    }
+
+    let (storage_key, persist_to_disk) =
+        runtime_bookmark_storage_key(path.as_deref(), hwnd_edit, &title, format);
+    if !persist_to_disk {
+        return false;
+    }
+
+    let bookmark = if matches!(format, FileFormat::Audiobook) {
+        let mpv_position_secs = path
+            .as_deref()
+            .and_then(|bookmark_path| local_mpv_position_secs_for_path(hwnd, bookmark_path));
+        let Some((pos, snippet)) = with_state(hwnd, |state| {
+            if let Some(position_secs) = mpv_position_secs {
+                return Some(audio_bookmark_position_and_snippet(position_secs));
+            }
+            if let (Some(player), Some(bookmark_path)) =
+                (&mut state.active_audiobook, path.as_ref())
+                && player.path == *bookmark_path
+            {
+                let position_secs = crate::audio_player::audiobook_position_secs(player);
+                return Some(audio_bookmark_position_and_snippet(position_secs));
+            }
+            state
+                .active_audiobook_bookmark
+                .as_ref()
+                .and_then(|(stored_key, position)| {
+                    (stored_key == &storage_key)
+                        .then(|| audio_bookmark_position_and_snippet(*position as f64))
+                })
+        })
+        .flatten() else {
+            return false;
+        };
+        Bookmark {
+            position: pos,
+            snippet,
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        }
+    } else {
+        let pos = current_text_bookmark_position(hwnd, doc_index, hwnd_edit);
+        text_bookmark_at_position(hwnd_edit, pos)
+    };
+
+    let bookmarks_window = with_state(hwnd, |state| {
+        state
+            .bookmarks
+            .files
+            .insert(storage_key.clone(), vec![bookmark]);
+        save_bookmarks(&state.bookmarks);
+        let should_clear_tts_bookmark = state.tts_automatic_bookmark_position.as_ref().is_some_and(
+            |(bookmark_hwnd, bookmark_key, _)| {
+                *bookmark_hwnd == hwnd_edit && bookmark_key == &storage_key
+            },
+        );
+        if should_clear_tts_bookmark {
+            state.tts_automatic_bookmark_position = None;
+        }
+        state.bookmarks_window
+    })
+    .unwrap_or(HWND(0));
+
+    if bookmarks_window.0 != 0 {
+        app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
+    }
+    true
+}
+
+fn insert_bookmark(hwnd: HWND) {
+    let (hwnd_edit, path, format, title): (HWND, Option<std::path::PathBuf>, FileFormat, String) =
+        with_state(hwnd, |state| {
             state.docs.get(state.current).map(|doc| {
                 (
                     doc.hwnd_edit,
@@ -14777,131 +15007,31 @@ fn insert_bookmark(hwnd: HWND) {
         })
         .flatten()
         .unwrap_or((HWND(0), None, FileFormat::default(), String::new()));
-        if hwnd_edit.0 == 0 {
-            return;
-        }
-        let (storage_key, persist_to_disk) =
-            runtime_bookmark_storage_key(path.as_deref(), hwnd_edit, &title, format);
+    if hwnd_edit.0 == 0 {
+        return;
+    }
+    let (storage_key, persist_to_disk) =
+        runtime_bookmark_storage_key(path.as_deref(), hwnd_edit, &title, format);
 
-        if matches!(format, FileFormat::Audiobook) {
-            let mpv_position_secs = path
-                .as_deref()
-                .and_then(|path| local_mpv_position_secs_for_path(hwnd, path));
-            let (pos, snippet) = with_state(hwnd, |state| {
-                if let Some(position_secs) = mpv_position_secs {
-                    audio_bookmark_position_and_snippet(position_secs)
-                } else if let Some(player) = &mut state.active_audiobook {
-                    let position_secs = crate::audio_player::audiobook_position_secs(player);
-                    audio_bookmark_position_and_snippet(position_secs)
-                } else {
-                    (0, "Audio non in riproduzione".to_string())
-                }
-            })
-            .unwrap_or((0, String::new()));
-
-            let bookmark = Bookmark {
-                position: pos,
-                snippet,
-                timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-            };
-
-            let (bookmarks_window, inserted) = with_state(hwnd, |state| {
-                let list = state
-                    .bookmarks
-                    .files
-                    .entry(storage_key.clone())
-                    .or_default();
-                if list
-                    .iter()
-                    .any(|existing| existing.position == bookmark.position)
-                {
-                    return (state.bookmarks_window, false);
-                }
-                list.push(bookmark);
-                crate::bookmarks::sort_bookmarks(list);
-                if persist_to_disk {
-                    save_bookmarks(&state.bookmarks);
-                }
-                (state.bookmarks_window, true)
-            })
-            .unwrap_or((HWND(0), false));
-
-            if inserted && bookmarks_window.0 != 0 {
-                app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
-            }
-            if inserted {
-                confirm_menu_action(hwnd, "insert.bookmark");
+    if matches!(format, FileFormat::Audiobook) {
+        let mpv_position_secs = path
+            .as_deref()
+            .and_then(|path| local_mpv_position_secs_for_path(hwnd, path));
+        let (pos, snippet) = with_state(hwnd, |state| {
+            if let Some(position_secs) = mpv_position_secs {
+                audio_bookmark_position_and_snippet(position_secs)
+            } else if let Some(player) = &mut state.active_audiobook {
+                let position_secs = crate::audio_player::audiobook_position_secs(player);
+                audio_bookmark_position_and_snippet(position_secs)
             } else {
-                crate::accessibility::screen_reader_speak(
-                    "Segnalibro già presente in questa posizione.",
-                );
+                (0, "Audio non in riproduzione".to_string())
             }
-            return;
-        }
-
-        let mut cr = CHARRANGE { cpMin: 0, cpMax: 0 };
-        SendMessageW(
-            hwnd_edit,
-            EM_EXGETSEL,
-            WPARAM(0),
-            LPARAM(&mut cr as *mut _ as isize),
-        );
-
-        let pos = cr.cpMax;
-
-        // 1. Try to get up to 60 characters AFTER the cursor
-        let mut buffer = vec![0u16; 62];
-        let mut tr = TEXTRANGEW {
-            chrg: CHARRANGE {
-                cpMin: pos,
-                cpMax: pos + 60,
-            },
-            lpstrText: PWSTR(buffer.as_mut_ptr()),
-        };
-        let copied = SendMessageW(
-            hwnd_edit,
-            EM_GETTEXTRANGE,
-            WPARAM(0),
-            LPARAM(&mut tr as *mut _ as isize),
-        )
-        .0 as usize;
-        let mut snippet = String::from_utf16_lossy(&buffer[..copied]);
-
-        // Stop at the first newline
-        if let Some(idx) = snippet.find(['\r', '\n']) {
-            snippet.truncate(idx);
-        }
-
-        // 2. If the resulting snippet is empty (e.g. cursor at end of line), take text BEFORE the cursor
-        if snippet.trim().is_empty() && pos > 0 {
-            let start_pre = (pos - 60).max(0);
-            let mut buffer_pre = vec![0u16; 62];
-            let mut tr_pre = TEXTRANGEW {
-                chrg: CHARRANGE {
-                    cpMin: start_pre,
-                    cpMax: pos,
-                },
-                lpstrText: PWSTR(buffer_pre.as_mut_ptr()),
-            };
-            let copied_pre = SendMessageW(
-                hwnd_edit,
-                EM_GETTEXTRANGE,
-                WPARAM(0),
-                LPARAM(&mut tr_pre as *mut _ as isize),
-            )
-            .0 as usize;
-            let mut snippet_pre = String::from_utf16_lossy(&buffer_pre[..copied_pre]);
-
-            // Take text after the last newline in this prefix
-            if let Some(idx) = snippet_pre.rfind(['\r', '\n']) {
-                snippet_pre = snippet_pre[idx + 1..].to_string();
-            }
-            snippet = snippet_pre;
-        }
+        })
+        .unwrap_or((0, String::new()));
 
         let bookmark = Bookmark {
             position: pos,
-            snippet: snippet.trim().to_string(),
+            snippet,
             timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         };
 
@@ -14936,6 +15066,40 @@ fn insert_bookmark(hwnd: HWND) {
                 "Segnalibro già presente in questa posizione.",
             );
         }
+        return;
+    }
+
+    let pos = current_edit_caret_position(hwnd_edit);
+    let bookmark = text_bookmark_at_position(hwnd_edit, pos);
+
+    let (bookmarks_window, inserted) = with_state(hwnd, |state| {
+        let list = state
+            .bookmarks
+            .files
+            .entry(storage_key.clone())
+            .or_default();
+        if list
+            .iter()
+            .any(|existing| existing.position == bookmark.position)
+        {
+            return (state.bookmarks_window, false);
+        }
+        list.push(bookmark);
+        crate::bookmarks::sort_bookmarks(list);
+        if persist_to_disk {
+            save_bookmarks(&state.bookmarks);
+        }
+        (state.bookmarks_window, true)
+    })
+    .unwrap_or((HWND(0), false));
+
+    if inserted && bookmarks_window.0 != 0 {
+        app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
+    }
+    if inserted {
+        confirm_menu_action(hwnd, "insert.bookmark");
+    } else {
+        crate::accessibility::screen_reader_speak("Segnalibro già presente in questa posizione.");
     }
 }
 

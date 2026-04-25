@@ -19,6 +19,7 @@ Correzioni
 • In Pagine Bianche è stato aggiunto un pulsante, raggiungibile con Tab, per esplorare tutti i risultati della pagina corrente.
 • In RaiPlay, durante il salvataggio, è disponibile una nuova opzione `MP4 con audiodescrizione`, che forza il salvataggio in formato MP4 usando la traccia audiodescritta.
 • Aggiunta un'opzione nel menu Segnalibri che, se attivata, permette una gestione automatica dei segnalibri. Quando si riproduce un file locale o in streaming e lo si chiude, Sonarpad imposta automaticamente un segnalibro in base alla posizione raggiunta e, alla riapertura, riprende da quel punto. La stessa cosa avviene per i file di testo: se si apre un testo e si sposta il cursore, alla chiusura Sonarpad ricorderà quella posizione; se invece si avvia la lettura, verrà registrata l'ultima frase letta e la lettura ripartirà esattamente da lì.
+• Aggiunta nel menu Visualizza la voce per mostrare il rendering video per i file locali o in streaming. Il contenuto video viene mostrato in una finestra ingrandita, dove tutti i comandi sono nascosti, tranne quando si preme il tasto Alt o si porta il mouse verso la parte superiore della finestra. In questo modo gli utenti ipovedenti dovrebbero avere un contenuto più grande e più fruibile.
 
 Versione 0.6.9 – 2026-04-08
 

@@ -13,6 +13,7 @@ Bản sửa lỗi
 • Trong phần bình luận YouTube mở từ "Phat am thanh tu streaming...", Sonarpad giờ chỉ tải trước 50 bình luận gốc đầu tiên, luôn kèm toàn bộ phản hồi của các bình luận đó, và thêm ở cuối một mục để tải tất cả bình luận khi cần.
 • Dấu trang giờ được hiển thị và xử lý theo vị trí của chúng trong cả tài liệu văn bản lẫn tệp đa phương tiện, thay vì theo thứ tự tạo. Nếu đã có dấu trang ở cùng vị trí, nó sẽ không được thêm lại nữa.
 • Đã thêm một tùy chọn trong menu Dấu trang, khi được bật, cho phép quản lý dấu trang tự động. Khi phát một tệp cục bộ hoặc tệp phát trực tuyến rồi đóng lại, Sonarpad sẽ tự động đặt dấu trang dựa trên vị trí đã phát tới và khi mở lại tệp, chương trình sẽ tiếp tục từ vị trí đó. Điều tương tự cũng áp dụng cho các tệp văn bản: nếu mở một văn bản và di chuyển con trỏ, Sonarpad sẽ ghi nhớ vị trí đó khi đóng tệp; nếu bắt đầu đọc, câu cuối cùng đã đọc sẽ được lưu lại và việc đọc sẽ tiếp tục chính xác từ điểm đó.
+• Đã thêm một mục trong menu Xem để hiển thị phần kết xuất video cho các tệp cục bộ hoặc tệp phát trực tuyến. Nội dung video được hiển thị trong một cửa sổ phóng to, trong đó tất cả các điều khiển đều được ẩn, trừ khi nhấn phím Alt hoặc di chuyển chuột lên phía trên của cửa sổ. Bằng cách này, người dùng khiếm thị một phần sẽ có nội dung lớn hơn và dễ sử dụng hơn.
 
 Phiên bản 0.6.9 – 2026-04-08
 

@@ -13,6 +13,7 @@ Correcciones
 • En los comentarios de YouTube abiertos desde "Reproducir audio en streaming...", Sonarpad ahora carga inicialmente solo los primeros 50 comentarios principales, incluyendo siempre todas las respuestas de esos comentarios, y añade al final una opción para cargar todos los comentarios bajo demanda.
 • Los marcadores ahora se muestran y se gestionan según su posición tanto en documentos de texto como en archivos multimedia, en lugar de seguir el orden de creación. Si ya existe un marcador en la misma posición, ya no se vuelve a añadir.
 • Se ha añadido una opción en el menú Marcadores que, si se activa, permite gestionar los marcadores automáticamente. Al reproducir un archivo local o en streaming y cerrarlo, Sonarpad establece automáticamente un marcador según la posición alcanzada y, al volver a abrir el archivo, reanuda desde ese punto. Lo mismo ocurre con los archivos de texto: si se abre un texto y se mueve el cursor, Sonarpad recordará esa posición al cerrarlo; si se inicia la lectura, se guardará la última frase leída y la lectura continuará exactamente desde ahí.
+• Se ha añadido al menú Ver una opción para mostrar el renderizado de vídeo para archivos locales o en streaming. El contenido de vídeo se muestra en una ventana ampliada, donde todos los controles permanecen ocultos salvo que se pulse la tecla Alt o se mueva el ratón hacia la parte superior de la ventana. De este modo, los usuarios con baja visión deberían disponer de un contenido más grande y más fácil de utilizar.
 
 Versión 0.6.9 – 2026-04-08
 

@@ -15,6 +15,7 @@ Fixes
 • In YouTube comments opened from "Play streaming audio...", Sonarpad now loads only the first 50 top-level comments at first, always including all replies for those comments, and adds a final item to load all comments on demand.
 • Bookmarks are now shown and handled in position order for both text documents and media files, instead of following creation order. If a bookmark already exists at the same position, it is no longer added again.
 • Added an option in the Bookmarks menu that, when enabled, allows automatic bookmark management. When playing a local or streaming file and closing it, Sonarpad automatically sets a bookmark based on the reached position and resumes from that point when the file is opened again. The same applies to text files: if a text is opened and the cursor is moved, Sonarpad will remember that position when the file is closed; if reading is started, the last sentence read will be saved and reading will resume exactly from there.
+• Added an item to the View menu to show video rendering for local or streaming files. The video content is shown in an enlarged window, where all controls are hidden unless the Alt key is pressed or the mouse is moved toward the top of the window. This should make the content larger and more usable for partially sighted users.
 
 Version 0.6.9 – 2026-04-08
 

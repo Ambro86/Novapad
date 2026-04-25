@@ -8539,6 +8539,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 if hdr.code == EN_SELCHANGE {
                     // Only process if editor has focus to avoid focus issues during file open etc.
                     if GetFocus() == hdr.hwndFrom {
+                        clear_stale_tts_automatic_bookmark_for_edit(hwnd, hdr.hwndFrom);
                         let is_large_editor = is_large_text_editor(hwnd, hdr.hwndFrom);
                         if !is_large_editor {
                             handle_spellcheck_selection_change(hwnd, hdr.hwndFrom);
@@ -14917,6 +14918,23 @@ fn current_text_bookmark_position(hwnd: HWND, doc_index: usize, hwnd_edit: HWND)
             .unwrap_or_else(|| current_edit_caret_position(hwnd_edit))
     })
     .unwrap_or_else(|| current_edit_caret_position(hwnd_edit))
+}
+
+fn clear_stale_tts_automatic_bookmark_for_edit(hwnd: HWND, hwnd_edit: HWND) {
+    let caret_pos = spellcheck_caret_char_index(hwnd_edit)
+        .unwrap_or_else(|| current_edit_caret_position(hwnd_edit));
+    with_state(hwnd, |state| {
+        let should_clear = state.tts_session.is_none()
+            && state.tts_pending_start_pos.is_none()
+            && state.tts_automatic_bookmark_position.as_ref().is_some_and(
+                |(bookmark_hwnd, _, bookmark_pos)| {
+                    *bookmark_hwnd == hwnd_edit && caret_pos != (*bookmark_pos).max(0)
+                },
+            );
+        if should_clear {
+            state.tts_automatic_bookmark_position = None;
+        }
+    });
 }
 
 pub(crate) fn save_automatic_bookmark_for_document(hwnd: HWND, doc_index: usize) -> bool {

@@ -4460,6 +4460,8 @@ pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
         let mut was_empty = false;
         let mut update_title = false;
         let mut was_audiobook = false;
+        let mut should_stop_tts = false;
+        let mut should_clear_tts_automatic_bookmark = false;
         let mut removed_path: Option<PathBuf> = None;
         let mut removed_from_rss = false;
 
@@ -4471,6 +4473,13 @@ pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
             closing_hwnd_edit = doc.hwnd_edit;
             state.large_text_editors.remove(&closing_hwnd_edit.0);
             was_audiobook = matches!(doc.format, FileFormat::Audiobook);
+            should_stop_tts = !was_audiobook
+                && was_current
+                && (state.tts_session.is_some() || state.tts_pending_start_pos.is_some());
+            should_clear_tts_automatic_bookmark = state
+                .tts_automatic_bookmark_position
+                .as_ref()
+                .is_some_and(|(bookmark_hwnd, _, _)| *bookmark_hwnd == closing_hwnd_edit);
             SendMessageW(
                 hwnd_tab,
                 windows::Win32::UI::Controls::TCM_DELETEITEM,
@@ -4504,6 +4513,13 @@ pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
 
         if closing_hwnd_edit.0 != 0 {
             crate::log_if_err!(crate::destroy_window_safe(closing_hwnd_edit));
+        }
+        if should_stop_tts {
+            crate::tts_engine::stop_tts_playback(hwnd);
+        } else if should_clear_tts_automatic_bookmark {
+            with_state(hwnd, |state| {
+                state.tts_automatic_bookmark_position = None;
+            });
         }
         if was_audiobook {
             crate::audio_player::stop_audiobook_playback(hwnd);

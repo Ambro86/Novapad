@@ -1,6 +1,6 @@
 # Nhật ký thay đổi
 
-Phiên bản 0.7.0 – 2026-04-12
+Phiên bản 0.7.0 – 2026-04-25
 
 Bản mới
 • Đã thêm hỗ trợ trình phát mpv cho phát trực tuyến. Video từ YouTube và các trang được hỗ trợ giờ phát ngay lập tức; nếu người dùng muốn lưu lại, chúng sẽ được tải xuống như trước. Khi phiên âm nội dung streaming, nội dung sẽ được tải xuống trước rồi mới xử lý. Trình phát mpv cũng được dùng để mở video cục bộ và xử lý phụ đề, giúp cải thiện khả năng tương thích với nhiều định dạng.
@@ -12,6 +12,7 @@ Bản mới
 Bản sửa lỗi
 • Trong phần bình luận YouTube mở từ "Phat am thanh tu streaming...", Sonarpad giờ chỉ tải trước 50 bình luận gốc đầu tiên, luôn kèm toàn bộ phản hồi của các bình luận đó, và thêm ở cuối một mục để tải tất cả bình luận khi cần.
 • Dấu trang giờ được hiển thị và xử lý theo vị trí của chúng trong cả tài liệu văn bản lẫn tệp đa phương tiện, thay vì theo thứ tự tạo. Nếu đã có dấu trang ở cùng vị trí, nó sẽ không được thêm lại nữa.
+• Đã thêm một tùy chọn trong menu Dấu trang, khi được bật, cho phép quản lý dấu trang tự động. Khi phát một tệp cục bộ hoặc tệp phát trực tuyến rồi đóng lại, Sonarpad sẽ tự động đặt dấu trang dựa trên vị trí đã phát tới và khi mở lại tệp, chương trình sẽ tiếp tục từ vị trí đó. Điều tương tự cũng áp dụng cho các tệp văn bản: nếu mở một văn bản và di chuyển con trỏ, Sonarpad sẽ ghi nhớ vị trí đó khi đóng tệp; nếu bắt đầu đọc, câu cuối cùng đã đọc sẽ được lưu lại và việc đọc sẽ tiếp tục chính xác từ điểm đó.
 
 Phiên bản 0.6.9 – 2026-04-08
 

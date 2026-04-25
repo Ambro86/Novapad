@@ -1,6 +1,6 @@
 # Journal des modifications
 
-Version 0.7.0 – 2026-04-12
+Version 0.7.0 – 2026-04-25
 
 Nouveautés
 • Ajout de la prise en charge du lecteur mpv pour la lecture en streaming. Les vidéos provenant de YouTube et des sites compatibles sont désormais lues immédiatement ; si l'utilisateur choisit de les conserver, elles sont téléchargées comme auparavant. Lors de la transcription d'un contenu en streaming, celui-ci est d'abord téléchargé puis transcrit. Le lecteur mpv est également utilisé pour ouvrir des vidéos locales et gérer les sous-titres, garantissant une meilleure compatibilité avec de nombreux formats auparavant mal pris en charge.
@@ -12,6 +12,7 @@ Nouveautés
 Corrections
 • Dans les commentaires YouTube ouverts depuis « Lire l'audio en streaming... », Sonarpad charge maintenant au départ seulement les 50 premiers commentaires principaux, en incluant toujours toutes les réponses à ces commentaires, et ajoute à la fin une entrée permettant de charger tous les commentaires à la demande.
 • Les signets sont désormais affichés et gérés selon leur position, aussi bien dans les documents texte que dans les fichiers multimédias, au lieu de suivre l'ordre de création. Si un signet existe déjà à la même position, il n'est plus ajouté une seconde fois.
+• Ajout d'une option dans le menu Signets qui, lorsqu'elle est activée, permet une gestion automatique des signets. Lorsqu'un fichier local ou en streaming est lu puis fermé, Sonarpad crée automatiquement un signet en fonction de la position atteinte et, à la réouverture du fichier, reprend à partir de ce point. Il en va de même pour les fichiers texte : si un texte est ouvert et que le curseur est déplacé, Sonarpad mémorisera cette position à la fermeture ; si la lecture est lancée, la dernière phrase lue sera enregistrée et la lecture reprendra exactement à cet endroit.
 
 Version 0.6.9 – 2026-04-08
 

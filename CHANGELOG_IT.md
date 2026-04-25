@@ -1,6 +1,6 @@
 # Changelog
 
-Versione 0.7.0 – 2026-04-12
+Versione 0.7.0 – 2026-04-25
 
 Novità
 • Aggiunto il supporto al player mpv per la riproduzione streaming. I video da YouTube e da siti supportati vengono ora riprodotti immediatamente; se l'utente sceglie di conservarli, vengono scaricati come in precedenza. Se si avvia la trascrizione di un contenuto streaming, questo viene prima scaricato e poi trascritto. Il player mpv è ora utilizzato anche per aprire video locali e per la gestione dei sottotitoli, garantendo una maggiore compatibilità con numerosi formati che prima non erano gestiti al meglio.
@@ -15,6 +15,10 @@ Correzioni
 • Quando è in corso una registrazione podcast, chiudendo un altro documento non viene più chiusa anche la registrazione attiva.
 • Nei commenti YouTube aperti da "Riproduci audio da streaming...", Sonarpad ora carica inizialmente solo i primi 50 commenti principali, includendo sempre tutte le risposte di quei commenti, e aggiunge in fondo una voce per caricare tutti i commenti su richiesta.
 • I segnalibri ora vengono mostrati e gestiti in ordine di posizione sia nei documenti di testo sia nei file multimediali, invece di seguire l'ordine di creazione. Se un segnalibro esiste già nella stessa posizione, non viene più aggiunto di nuovo.
+• Migliorata la gestione in "Tutte le audiodescrizioni": ora i film sono separati dalle fiction tramite un pulsante `Film` raggiungibile con Tab, che raccoglie tutti i film audiodescritti. La ricerca trova ora risultati sia nelle fiction sia nei film.
+• In Pagine Bianche è stato aggiunto un pulsante, raggiungibile con Tab, per esplorare tutti i risultati della pagina corrente.
+• In RaiPlay, durante il salvataggio, è disponibile una nuova opzione `MP4 con audiodescrizione`, che forza il salvataggio in formato MP4 usando la traccia audiodescritta.
+• Aggiunta un'opzione nel menu Segnalibri che, se attivata, permette una gestione automatica dei segnalibri. Quando si riproduce un file locale o in streaming e lo si chiude, Sonarpad imposta automaticamente un segnalibro in base alla posizione raggiunta e, alla riapertura, riprende da quel punto. La stessa cosa avviene per i file di testo: se si apre un testo e si sposta il cursore, alla chiusura Sonarpad ricorderà quella posizione; se invece si avvia la lettura, verrà registrata l'ultima frase letta e la lettura ripartirà esattamente da lì.
 
 Versione 0.6.9 – 2026-04-08
 

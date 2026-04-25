@@ -1,6 +1,6 @@
 # Přehled změn
 
-Verze 0.7.0 – 2026-04-12
+Verze 0.7.0 – 2026-04-25
 
 Co je nového
 • Přidána podpora přehrávače mpv pro streamované přehrávání. Videa z YouTube a podporovaných webů se nyní přehrávají okamžitě; pokud si je uživatel chce uložit, stáhnou se jako dříve. Při přepisu streamovaného obsahu se nejprve stáhne a poté přepíše. Přehrávač mpv se také používá pro otevírání lokálních videí a práci s titulky, což zajišťuje lepší kompatibilitu s mnoha formáty.
@@ -14,6 +14,7 @@ Opravy
 • Když probíhá nahrávání podcastu, zavření jiného dokumentu už nezavře také aktivní nahrávání.
 • V komentářích YouTube otevřených z „Přehrát streamované audio...“ nyní Sonarpad nejprve načte pouze prvních 50 komentářů nejvyšší úrovně, vždy včetně všech odpovědí k těmto komentářům, a na konci přidá položku pro načtení všech komentářů podle potřeby.
 • Záložky se nyní zobrazují a zpracovávají podle své pozice jak v textových dokumentech, tak v multimediálních souborech, místo aby sledovaly pořadí vytvoření. Pokud už záložka na stejné pozici existuje, znovu se nepřidá.
+• Do nabídky Záložky byla přidána volba, která po zapnutí umožňuje automatickou správu záložek. Při přehrávání místního nebo streamovaného souboru a jeho zavření Sonarpad automaticky nastaví záložku podle dosažené pozice a při opětovném otevření souboru bude pokračovat od tohoto místa. Totéž platí pro textové soubory: pokud otevřete text a přesunete kurzor, Sonarpad si po zavření tuto pozici zapamatuje; pokud spustíte čtení, uloží se poslední přečtená věta a čtení bude pokračovat přesně odtud.
 
 Verze 0.6.9 – 2026-04-08
 

@@ -1,6 +1,6 @@
 # Changelog
 
-Versión 0.7.0 – 2026-04-12
+Versión 0.7.0 – 2026-04-25
 
 Novedades
 • Se añadió compatibilidad con el reproductor mpv para la reproducción en streaming. Los vídeos de YouTube y de sitios compatibles ahora se reproducen al instante; si el usuario decide conservarlos, se descargan como antes. Si se inicia la transcripción de contenido en streaming, primero se descarga y luego se transcribe. El reproductor mpv también se utiliza para abrir vídeos locales y gestionar subtítulos, garantizando una mayor compatibilidad con numerosos formatos que antes no se gestionaban correctamente.
@@ -12,6 +12,7 @@ Novedades
 Correcciones
 • En los comentarios de YouTube abiertos desde "Reproducir audio en streaming...", Sonarpad ahora carga inicialmente solo los primeros 50 comentarios principales, incluyendo siempre todas las respuestas de esos comentarios, y añade al final una opción para cargar todos los comentarios bajo demanda.
 • Los marcadores ahora se muestran y se gestionan según su posición tanto en documentos de texto como en archivos multimedia, en lugar de seguir el orden de creación. Si ya existe un marcador en la misma posición, ya no se vuelve a añadir.
+• Se ha añadido una opción en el menú Marcadores que, si se activa, permite gestionar los marcadores automáticamente. Al reproducir un archivo local o en streaming y cerrarlo, Sonarpad establece automáticamente un marcador según la posición alcanzada y, al volver a abrir el archivo, reanuda desde ese punto. Lo mismo ocurre con los archivos de texto: si se abre un texto y se mueve el cursor, Sonarpad recordará esa posición al cerrarlo; si se inicia la lectura, se guardará la última frase leída y la lectura continuará exactamente desde ahí.
 
 Versión 0.6.9 – 2026-04-08
 

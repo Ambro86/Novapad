@@ -1,6 +1,6 @@
 # Dziennik zmian
 
-Wersja 0.7.0 – 2026-04-12
+Wersja 0.7.0 – 2026-04-25
 
 Nowości
 • Dodano obsługę odtwarzacza mpv do odtwarzania strumieniowego. Filmy z YouTube i obsługiwanych stron są teraz odtwarzane natychmiast; jeśli użytkownik zdecyduje się je zachować, są pobierane jak wcześniej. W przypadku transkrypcji treści strumieniowych są one najpierw pobierane, a następnie transkrybowane. Odtwarzacz mpv jest również używany do otwierania lokalnych plików wideo oraz obsługi napisów, co zapewnia lepszą kompatybilność z wieloma formatami.
@@ -12,6 +12,7 @@ Nowości
 Poprawki
 • W komentarzach YouTube otwieranych z poziomu „Odtwarzaj dźwięk ze strumienia...” Sonarpad ładuje teraz na początku tylko pierwszych 50 komentarzy głównych, zawsze wraz ze wszystkimi odpowiedziami do tych komentarzy, i dodaje na końcu pozycję umożliwiającą wczytanie wszystkich komentarzy na żądanie.
 • Zakładki są teraz wyświetlane i obsługiwane według pozycji zarówno w dokumentach tekstowych, jak i w plikach multimedialnych, zamiast według kolejności utworzenia. Jeśli zakładka już istnieje w tej samej pozycji, nie jest dodawana ponownie.
+• Dodano opcję w menu Zakładki, która po włączeniu umożliwia automatyczne zarządzanie zakładkami. Podczas odtwarzania pliku lokalnego lub strumieniowego i jego zamknięcia Sonarpad automatycznie ustawi zakładkę na podstawie osiągniętej pozycji, a po ponownym otwarciu pliku wznowi odtwarzanie od tego miejsca. To samo dotyczy plików tekstowych: jeśli tekst zostanie otwarty i kursor zostanie przesunięty, Sonarpad zapamięta tę pozycję po zamknięciu; jeśli rozpocznie się czytanie, zostanie zapisana ostatnio przeczytana fraza, a czytanie zostanie wznowione dokładnie od tego miejsca.
 
 Wersja 0.6.9 – 2026-04-08
 

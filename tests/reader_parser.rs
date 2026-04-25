@@ -18,6 +18,7 @@ mod settings {
         Lithuanian,
         Russian,
         Chinese,
+        Hindi,
     }
 }
 
@@ -39,6 +40,7 @@ mod i18n {
                 Language::Lithuanian => "Be pavadinimo".to_string(),
                 Language::Russian => "Без названия".to_string(),
                 Language::Chinese => "无标题".to_string(),
+                Language::Hindi => "कोई शीर्षक नहीं".to_string(),
                 Language::Ukrainian | Language::English => "No Title".to_string(),
             },
             "reader.external_link" => match language {
@@ -54,6 +56,7 @@ mod i18n {
                 Language::Lithuanian => "Išorinė nuoroda:\n{url}".to_string(),
                 Language::Russian => "Внешняя ссылка:\n{url}".to_string(),
                 Language::Chinese => "外部链接：\n{url}".to_string(),
+                Language::Hindi => "बाहरी लिंक:\n{url}".to_string(),
                 Language::Ukrainian | Language::English => "External link:\n{url}".to_string(),
             },
             _ => key.to_string(),

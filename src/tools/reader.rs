@@ -896,6 +896,7 @@ mod tests {
             Language::Lithuanian,
             Language::Russian,
             Language::Chinese,
+            Language::Hindi,
         ];
 
         for language in languages {
@@ -914,6 +915,7 @@ mod tests {
                 Language::Lithuanian => "Lithuanian",
                 Language::Russian => "Russian",
                 Language::Chinese => "Chinese",
+                Language::Hindi => "Hindi",
             };
             assert!(
                 !prefix.trim().is_empty(),

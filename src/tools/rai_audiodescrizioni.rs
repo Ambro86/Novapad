@@ -394,7 +394,7 @@ fn normalize_grouped_catalog(groups: Vec<CatalogGroup>) -> Vec<CatalogGroup> {
         merged
             .entry(normalized_title)
             .or_default()
-            .extend(group.items.into_iter());
+            .extend(group.items);
     }
 
     let mut normalized_groups = merged

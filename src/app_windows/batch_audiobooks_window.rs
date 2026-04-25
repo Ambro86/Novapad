@@ -3109,11 +3109,7 @@ fn convert_wav_to_mp3_ffmpeg_with_timeout(
 ) -> Result<(), String> {
     let data_size = crate::audio_utils::get_wav_data_size(wav_path).unwrap_or(0) as u64;
     let bytes_per_sec = 44_100u64 * 2u64;
-    let duration_secs = if bytes_per_sec == 0 {
-        0
-    } else {
-        (data_size / bytes_per_sec) as u64
-    };
+    let duration_secs = data_size.checked_div(bytes_per_sec).unwrap_or(0);
     let timeout_secs = (duration_secs.saturating_mul(10))
         .saturating_add(10)
         .max(30);

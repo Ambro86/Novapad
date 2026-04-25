@@ -1084,16 +1084,16 @@ fn extract_pptx_slide_text(xml: &str) -> String {
     let mut paragraph_has_text = false;
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                if e.name().as_ref() == b"a:p" {
-                    paragraph_has_text = false;
-                }
+            Ok(Event::Start(e)) if e.name().as_ref() == b"a:p" => {
+                paragraph_has_text = false;
             }
-            Ok(Event::End(e)) => {
-                if e.name().as_ref() == b"a:p" && paragraph_has_text && !out.ends_with('\n') {
-                    out.push('\n');
-                }
+            Ok(Event::Start(_)) => {}
+            Ok(Event::End(e))
+                if e.name().as_ref() == b"a:p" && paragraph_has_text && !out.ends_with('\n') =>
+            {
+                out.push('\n');
             }
+            Ok(Event::End(_)) => {}
             Ok(Event::Empty(e)) => {
                 let name = e.name();
                 if name.as_ref() == b"a:br" {
@@ -1896,27 +1896,26 @@ pub fn extract_rtf_text(bytes: &[u8]) -> String {
                         }
                         i += 1;
                     }
-                    b'\'' => {
-                        if i + 2 < bytes.len() {
-                            let h1 = bytes[i + 1];
-                            let h2 = bytes[i + 2];
-                            if let (Some(n1), Some(n2)) = (hex_val(h1), hex_val(h2)) {
-                                let byte = (n1 << 4) | n2;
-                                let buf = [byte];
-                                let (decoded, _, _) = encoding.decode(&buf);
-                                emit_str(
-                                    &mut out,
-                                    &mut skip_output,
-                                    *group_stack.last().unwrap_or(&false),
-                                    &decoded,
-                                );
-                                i += 3;
-                            } else {
-                                i += 1;
-                            }
+                    b'\'' if i + 2 < bytes.len() => {
+                        let h1 = bytes[i + 1];
+                        let h2 = bytes[i + 2];
+                        if let (Some(n1), Some(n2)) = (hex_val(h1), hex_val(h2)) {
+                            let byte = (n1 << 4) | n2;
+                            let buf = [byte];
+                            let (decoded, _, _) = encoding.decode(&buf);
+                            emit_str(
+                                &mut out,
+                                &mut skip_output,
+                                *group_stack.last().unwrap_or(&false),
+                                &decoded,
+                            );
+                            i += 3;
                         } else {
                             i += 1;
                         }
+                    }
+                    b'\'' => {
+                        i += 1;
                     }
                     b if b.is_ascii_alphabetic() => {
                         let start = i;
@@ -2515,7 +2514,7 @@ fn average_pdf_line_len(text: &str) -> usize {
         total += line.len();
         count += 1;
     }
-    if count == 0 { 0 } else { total / count }
+    total.checked_div(count).unwrap_or(0)
 }
 
 // Error message helpers (copied from main.rs)

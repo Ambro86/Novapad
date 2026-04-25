@@ -2582,7 +2582,7 @@ fn order_lines_block(text: &str, line_ending: &str, has_trailing_newline: bool) 
         nonblank_lines.sort_by_key(|(line, idx)| (line.to_ascii_lowercase(), *idx));
     }
 
-    for (slot, (line, _)) in nonblank_indices.into_iter().zip(nonblank_lines.into_iter()) {
+    for (slot, (line, _)) in nonblank_indices.into_iter().zip(nonblank_lines) {
         lines[slot] = line;
     }
 
@@ -2633,7 +2633,7 @@ fn reverse_lines_block(text: &str, line_ending: &str, has_trailing_newline: bool
         nonblank_lines.reverse();
     }
 
-    for (slot, line) in nonblank_indices.into_iter().zip(nonblank_lines.into_iter()) {
+    for (slot, line) in nonblank_indices.into_iter().zip(nonblank_lines) {
         lines[slot] = line;
     }
 

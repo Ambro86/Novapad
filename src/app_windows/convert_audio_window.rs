@@ -624,18 +624,20 @@ fn convert_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                             SetFocus(state.output_edit);
                         }
                     }
-                    CONVERT_ID_FORMAT => {
-                        if notify as u32 == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE {
-                            let format = current_format(state.format_combo);
-                            update_quality_controls(state, format, &labels);
-                            let current_output = get_edit_text(state.output_edit);
-                            if !current_output.is_empty() {
-                                let mut path = PathBuf::from(current_output);
-                                path.set_extension(extension_for_format(format));
-                                set_edit_text(state.output_edit, &path);
-                            }
+                    CONVERT_ID_FORMAT
+                        if notify as u32
+                            == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE =>
+                    {
+                        let format = current_format(state.format_combo);
+                        update_quality_controls(state, format, &labels);
+                        let current_output = get_edit_text(state.output_edit);
+                        if !current_output.is_empty() {
+                            let mut path = PathBuf::from(current_output);
+                            path.set_extension(extension_for_format(format));
+                            set_edit_text(state.output_edit, &path);
                         }
                     }
+                    CONVERT_ID_FORMAT => {}
                     CONVERT_ID_CONVERT => {
                         if state.running {
                             return LRESULT(0);

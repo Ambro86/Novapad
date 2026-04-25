@@ -1924,11 +1924,10 @@ async fn download_audio_chunk_attempt(
     while let Some(msg) = read.next().await {
         let msg: Message = msg.map_err(|e: tungstenite::Error| e.to_string())?;
         match msg {
-            Message::Text(text) => {
-                if text.contains("Path:turn.end") {
-                    break;
-                }
+            Message::Text(text) if text.contains("Path:turn.end") => {
+                break;
             }
+            Message::Text(_) => {}
             Message::Binary(data) => match parse_edge_binary_audio_payload(&data) {
                 Ok(Some(audio)) => {
                     audio_data.extend_from_slice(&audio);
@@ -1957,11 +1956,10 @@ async fn read_edge_audio_turn(
     while let Some(msg) = read.next().await {
         let msg: Message = msg.map_err(|e: tungstenite::Error| e.to_string())?;
         match msg {
-            Message::Text(text) => {
-                if text.contains("Path:turn.end") {
-                    break;
-                }
+            Message::Text(text) if text.contains("Path:turn.end") => {
+                break;
             }
+            Message::Text(_) => {}
             Message::Binary(data) => match parse_edge_binary_audio_payload(&data) {
                 Ok(Some(audio)) => {
                     audio_data.extend_from_slice(&audio);
@@ -1991,11 +1989,10 @@ async fn read_edge_audio_turn_to_writer(
     while let Some(msg) = read.next().await {
         let msg: Message = msg.map_err(|e: tungstenite::Error| e.to_string())?;
         match msg {
-            Message::Text(text) => {
-                if text.contains("Path:turn.end") {
-                    break;
-                }
+            Message::Text(text) if text.contains("Path:turn.end") => {
+                break;
             }
+            Message::Text(_) => {}
             Message::Binary(data) => match parse_edge_binary_audio_payload(&data) {
                 Ok(Some(audio)) => {
                     buffer.extend_from_slice(&audio);

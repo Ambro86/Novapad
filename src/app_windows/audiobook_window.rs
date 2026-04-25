@@ -274,8 +274,8 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
                 }
 
                 crate::send_message_w_safe(state.hwnd_pb, PBM_SETPOS, WPARAM(current), LPARAM(0));
-                if state.total > 0 {
-                    let pct = ((current * 100) / state.total).min(100);
+                if let Some(pct) = (current * 100).checked_div(state.total) {
+                    let pct = pct.min(100);
                     let text = progress_text(state.language, state.phase, pct);
                     let wide = to_wide(&text);
                     if let Err(e) =
@@ -329,11 +329,9 @@ fn progress_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
             };
             if with_progress_state(hwnd, |state| {
                 state.phase = phase;
-                let pct = if state.total > 0 {
-                    ((state.current * 100) / state.total).min(100)
-                } else {
-                    0
-                };
+                let pct = (state.current * 100)
+                    .checked_div(state.total)
+                    .map_or(0, |pct| pct.min(100));
                 let text = progress_text(state.language, state.phase, pct);
                 let wide = to_wide(&text);
                 if let Err(e) =

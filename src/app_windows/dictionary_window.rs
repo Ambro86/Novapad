@@ -475,8 +475,8 @@ fn selected_dictionary_index(hwnd: HWND) -> Option<usize> {
     if sel < 0 {
         return None;
     }
-    let idx = crate::send_message_w_safe(hwnd_list, LB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0))
-        .0 as isize;
+    let idx =
+        crate::send_message_w_safe(hwnd_list, LB_GETITEMDATA, WPARAM(sel as usize), LPARAM(0)).0;
     if idx < 0 {
         return None;
     }

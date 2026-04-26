@@ -100,6 +100,26 @@ fn handle_bridge_line(
     }
 }
 
+fn json_line_ascii(value: &serde_json::Value) -> String {
+    let json = value.to_string();
+    if json.is_ascii() {
+        return json;
+    }
+
+    let mut escaped = String::with_capacity(json.len());
+    for ch in json.chars() {
+        if ch.is_ascii() {
+            escaped.push(ch);
+        } else {
+            let mut units = [0u16; 2];
+            for unit in ch.encode_utf16(&mut units).iter() {
+                escaped.push_str(&format!(r#"\u{:04x}"#, *unit));
+            }
+        }
+    }
+    escaped
+}
+
 fn worker_stderr_message(stderr_log: &Arc<Mutex<String>>) -> String {
     match stderr_log.lock() {
         Ok(text) => text.trim().to_string(),
@@ -164,7 +184,8 @@ fn bridge_start_io_threads(
 fn close_dictation_worker(worker: &mut DictationBridgeWorker, reason: &str) {
     crate::log_debug(&format!("Dictation bridge worker: closing ({reason})"));
     let shutdown = serde_json::json!({ "command": "shutdown" });
-    if let Err(err) = writeln!(worker.stdin, "{shutdown}") {
+    let shutdown_line = json_line_ascii(&shutdown);
+    if let Err(err) = writeln!(worker.stdin, "{shutdown_line}") {
         crate::log_debug(&format!(
             "Dictation bridge worker shutdown write failed: {err}"
         ));
@@ -1284,7 +1305,12 @@ pub fn transcribe_wav_with_shared_worker(
         "language": language.map(language_code).unwrap_or(""),
         "timestamps": include_timestamps,
     });
-    if let Err(err) = writeln!(worker.stdin, "{request}") {
+    let request_line = json_line_ascii(&request);
+    crate::log_debug(&format!(
+        "Dictation bridge worker request: {}",
+        request_line
+    ));
+    if let Err(err) = writeln!(worker.stdin, "{request_line}") {
         crate::log_debug(&format!(
             "Dictation bridge worker write failed, falling back to one-shot bridge: {}",
             err

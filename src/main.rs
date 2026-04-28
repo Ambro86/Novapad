@@ -8261,6 +8261,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 if settings.show_favorite_panel {
                     set_favorites_panel_visible_internal(hwnd, true, false);
                 }
+                update_voice_panel_menu_check(hwnd);
 
                 let create_struct = lparam.0 as *const CREATESTRUCTW;
                 let lp_create_params = (*create_struct).lpCreateParams as *const Vec<String>;
@@ -9392,6 +9393,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     with_state(hwnd, |state| state.local_mpv_hidden_menu).unwrap_or(HMENU(0))
                 ));
                 if main_menu.0 != 0 {
+                    update_voice_panel_menu_check(hwnd);
                     let edit_menu = GetSubMenu(main_menu, 1);
                     if edit_menu == hmenu {
                         let can_undo = can_undo_now(hwnd);

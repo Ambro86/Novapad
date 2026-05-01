@@ -299,6 +299,40 @@ fn preview_for_log(text: &str, max_chars: usize) -> String {
     out
 }
 
+fn voice_tag_ranges(text: &str) -> Vec<(usize, usize)> {
+    let lower = text.to_ascii_lowercase();
+    let mut ranges = Vec::new();
+    let mut cursor = 0usize;
+    while let Some(rel_start) = lower[cursor..].find("<voice") {
+        let start = cursor + rel_start;
+        let Some(open_end_rel) = lower[start..].find('>') else {
+            ranges.push((start, text.len()));
+            break;
+        };
+        let open_end = start + open_end_rel + 1;
+        let end = lower[open_end..]
+            .find("</voice>")
+            .map(|rel_end| open_end + rel_end + "</voice>".len())
+            .unwrap_or(open_end);
+        ranges.push((start, end));
+        cursor = end;
+    }
+    ranges
+}
+
+fn containing_range(ranges: &[(usize, usize)], pos: usize) -> Option<(usize, usize)> {
+    ranges
+        .iter()
+        .copied()
+        .find(|(start, end)| *start <= pos && pos < *end)
+}
+
+fn intersects_range(ranges: &[(usize, usize)], start: usize, end: usize) -> bool {
+    ranges
+        .iter()
+        .any(|(range_start, range_end)| start < *range_end && *range_start < end)
+}
+
 pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
     if text.is_empty() || cfg.voice.trim().is_empty() {
         crate::log_debug("Dialogue tagging: skipped (empty text or empty primary voice)");
@@ -314,10 +348,7 @@ pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
         crate::log_debug("Dialogue tagging: skipped (no valid opening/closing quote delimiters)");
         return text.to_string();
     }
-    if text.to_ascii_lowercase().contains("<voice") {
-        crate::log_debug("Dialogue tagging: skipped because text already contains <voice> tags");
-        return text.to_string();
-    }
+    let explicit_voice_ranges = voice_tag_ranges(text);
     crate::log_debug(&format!(
         "Dialogue tagging: start open_quote=[{}] close_quote=[{}] allow_multiline={} primary_engine={} primary_voice={:?} secondary_enabled={} secondary_engine={} secondary_voice={:?}",
         quote_delimiters_log(&opening_quotes),
@@ -355,6 +386,11 @@ pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
             out.push_str(&text[cursor..]);
             break;
         };
+        if let Some((_, range_end)) = containing_range(&explicit_voice_ranges, open_pos) {
+            out.push_str(&text[cursor..range_end]);
+            cursor = range_end;
+            continue;
+        }
         out.push_str(&text[cursor..open_pos]);
         let search_from = open_pos + open_len;
         let Some((close_pos, close_len)) =
@@ -369,6 +405,15 @@ pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
             break;
         };
         let end = close_pos + close_len;
+        if intersects_range(&explicit_voice_ranges, open_pos, end) {
+            crate::log_debug(&format!(
+                "Dialogue tagging: skipped segment={} range=[{}..{}] because it overlaps explicit <voice> tag",
+                dialogue_idx, open_pos, end
+            ));
+            out.push_str(&text[open_pos..end]);
+            cursor = end;
+            continue;
+        }
         let before_toggle = use_secondary_next;
         let (engine, selected_voice, rate, pitch, volume) = if use_secondary && use_secondary_next {
             (
@@ -528,5 +573,21 @@ mod tests {
         assert!(out.contains("\"Ciao mondo”"));
         assert!(out.contains("Prima. "));
         assert!(out.contains(" Dopo."));
+    }
+
+    #[test]
+    fn dialogue_tags_keep_explicit_voice_tag_and_tag_later_dialogue() {
+        let text = r#"<voice engine="edge" voice="it-IT-DiegoNeural">"tag"</voice> poi "dialogo""#;
+        let out = apply_dialogue_tags(text, &cfg("\"", "\"", false));
+        assert!(out.contains(r#"<voice engine="edge" voice="it-IT-DiegoNeural">"tag"</voice>"#));
+        assert!(out.contains(r#"<voice engine="edge" voice="it-IT-ElsaNeural""#));
+        assert!(out.contains(r#">"dialogo"</voice>"#));
+    }
+
+    #[test]
+    fn dialogue_tags_do_not_wrap_quote_that_overlaps_explicit_voice_tag() {
+        let text = r#""prima <voice engine="edge" voice="it-IT-DiegoNeural">tag</voice> dopo""#;
+        let out = apply_dialogue_tags(text, &cfg("\"", "\"", false));
+        assert_eq!(out, text);
     }
 }

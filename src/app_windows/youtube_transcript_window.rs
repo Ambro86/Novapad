@@ -1847,6 +1847,9 @@ struct ResolvedStreamSelection {
     collection_url: Option<String>,
     collection_page: Option<usize>,
     selected_label: Option<String>,
+    previous_input: Option<String>,
+    previous_collection_page: Option<usize>,
+    previous_selected_label: Option<String>,
 }
 
 const STREAM_SELECTION_PAGE_SIZE: usize = 20;
@@ -4758,6 +4761,9 @@ fn choose_youtube_collection_entry(
             collection_url: None,
             collection_page: None,
             selected_label: None,
+            previous_input: None,
+            previous_collection_page: None,
+            previous_selected_label: None,
         }));
     }
 
@@ -4858,7 +4864,7 @@ fn choose_youtube_collection_entry(
                     "stream transition [collection_probe.selected_collection]: url={}",
                     selected_url
                 ));
-                return choose_youtube_collection_entry(
+                match choose_youtube_collection_entry(
                     parent,
                     language,
                     ytdlp_path,
@@ -4866,7 +4872,15 @@ fn choose_youtube_collection_entry(
                     None,
                     None,
                     None,
-                );
+                )? {
+                    Some(mut selection) => {
+                        selection.previous_input = Some(url.to_string());
+                        selection.previous_collection_page = Some(page);
+                        selection.previous_selected_label = Some(selected);
+                        return Ok(Some(selection));
+                    }
+                    None => continue,
+                }
             }
             crate::log_debug(&format!(
                 "stream transition [collection_probe.selected_video]: page={} url={}",
@@ -4877,6 +4891,9 @@ fn choose_youtube_collection_entry(
                 collection_url: Some(url.to_string()),
                 collection_page: Some(page),
                 selected_label: Some(selected),
+                previous_input: None,
+                previous_collection_page: None,
+                previous_selected_label: None,
             }));
         }
         return Ok(None);
@@ -4974,7 +4991,7 @@ fn choose_youtube_search_entry(
                     "stream transition [search_probe.selected_collection]: url={}",
                     selected_url
                 ));
-                return choose_youtube_collection_entry(
+                match choose_youtube_collection_entry(
                     parent,
                     language,
                     ytdlp_path,
@@ -4982,13 +4999,24 @@ fn choose_youtube_search_entry(
                     None,
                     None,
                     None,
-                );
+                )? {
+                    Some(mut selection) => {
+                        selection.previous_input = Some(query.to_string());
+                        selection.previous_collection_page = None;
+                        selection.previous_selected_label = Some(selected);
+                        return Ok(Some(selection));
+                    }
+                    None => continue,
+                }
             }
             return Ok(Some(ResolvedStreamSelection {
                 url: selected_url,
                 collection_url: None,
                 collection_page: None,
                 selected_label: Some(selected),
+                previous_input: None,
+                previous_collection_page: None,
+                previous_selected_label: None,
             }));
         }
         return Ok(None);
@@ -5241,6 +5269,9 @@ struct StreamDialogResult {
     direct_play: bool,
     reopen_collection_page: Option<usize>,
     reopen_selected_label: Option<String>,
+    previous_input: Option<String>,
+    previous_collection_page: Option<usize>,
+    previous_selected_label: Option<String>,
 }
 
 #[derive(Clone)]
@@ -6019,6 +6050,9 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                                 direct_play,
                                 reopen_collection_page: None,
                                 reopen_selected_label: None,
+                                previous_input: None,
+                                previous_collection_page: None,
+                                previous_selected_label: None,
                             });
                     })
                     .is_none()
@@ -6121,6 +6155,9 @@ fn show_stream_dialog(
             direct_play: false,
             reopen_collection_page: context.collection_page,
             reopen_selected_label: context.selected_label,
+            previous_input: context.previous_input,
+            previous_collection_page: context.previous_collection_page,
+            previous_selected_label: context.previous_selected_label,
         });
     }
     let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
@@ -6217,26 +6254,41 @@ fn take_pending_stream_reopen_context() -> Option<crate::YouTubeReturnContext> {
     pending.take()
 }
 
+struct StreamReturnContextUpdate<'a> {
+    original_input: &'a str,
+    collection_url: Option<&'a str>,
+    collection_page: Option<usize>,
+    selected_label: Option<&'a str>,
+    previous_input: Option<&'a str>,
+    previous_collection_page: Option<usize>,
+    previous_selected_label: Option<&'a str>,
+}
+
 fn update_youtube_return_context_from_selection(
     parent: HWND,
-    original_input: &str,
-    collection_url: Option<&str>,
-    collection_page: Option<usize>,
-    selected_label: Option<&str>,
+    update: StreamReturnContextUpdate<'_>,
 ) {
-    let return_input = collection_url
+    let return_input = update
+        .collection_url
         .map(ToOwned::to_owned)
-        .unwrap_or_else(|| original_input.to_string());
+        .unwrap_or_else(|| update.original_input.to_string());
     crate::log_debug(&format!(
         "stream transition [update_return_context_from_selection]: input={} collection_page={:?} selected_label={}",
         return_input,
-        collection_page,
-        selected_label.unwrap_or("")
+        update.collection_page,
+        update.selected_label.unwrap_or("")
     ));
     if crate::with_state(parent, |state| {
         state.active_youtube_return_context.input = Some(return_input);
-        state.active_youtube_return_context.collection_page = collection_page;
-        state.active_youtube_return_context.selected_label = selected_label.map(ToOwned::to_owned);
+        state.active_youtube_return_context.collection_page = update.collection_page;
+        state.active_youtube_return_context.selected_label =
+            update.selected_label.map(ToOwned::to_owned);
+        state.active_youtube_return_context.previous_input =
+            update.previous_input.map(ToOwned::to_owned);
+        state.active_youtube_return_context.previous_collection_page =
+            update.previous_collection_page;
+        state.active_youtube_return_context.previous_selected_label =
+            update.previous_selected_label.map(ToOwned::to_owned);
     })
     .is_none()
     {
@@ -7266,6 +7318,28 @@ fn probe_stream_media_title(ytdlp_path: &Path, url: &str) -> Option<String> {
     }
 }
 
+fn probe_youtube_stream_playable(ytdlp_path: &Path, url: &str) -> Result<(), String> {
+    let output = ytdlp_command(ytdlp_path)
+        .arg("--no-playlist")
+        .arg("--no-warnings")
+        .arg("--skip-download")
+        .arg("--print")
+        .arg("id")
+        .arg("--")
+        .arg(url)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|err| err.to_string())?;
+    if output.status.success() {
+        return Ok(());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let error = format!("{stderr}\n{stdout}");
+    Err(error.trim().to_string())
+}
+
 fn repair_stream_title_mojibake(text: &str) -> String {
     let repaired = text
         .replace("â€™", "’")
@@ -8287,6 +8361,9 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     let mut collection_url: Option<String> = None;
     let mut collection_page: Option<usize> = None;
     let mut selected_label = dialog_data.reopen_selected_label.clone();
+    let mut previous_input = dialog_data.previous_input.clone();
+    let mut previous_collection_page = dialog_data.previous_collection_page;
+    let mut previous_selected_label = dialog_data.previous_selected_label.clone();
     let mut ytdlp_path = None;
     if needs_ytdlp_selection {
         let bootstrap_progress = open_progress_dialog(
@@ -8325,6 +8402,18 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         ) {
             Ok(Some(selection)) => selection,
             Ok(None) => {
+                if let Some(previous_input) = dialog_data.previous_input.clone() {
+                    set_pending_stream_reopen_context(Some(crate::YouTubeReturnContext {
+                        input: Some(previous_input),
+                        collection_page: dialog_data.previous_collection_page,
+                        selected_label: dialog_data.previous_selected_label.clone(),
+                        previous_input: None,
+                        previous_collection_page: None,
+                        previous_selected_label: None,
+                    }));
+                    play_streaming_audio_from_url(parent);
+                    return;
+                }
                 post_focus_editor(parent);
                 return;
             }
@@ -8339,6 +8428,9 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         collection_url = resolved.collection_url;
         collection_page = resolved.collection_page;
         selected_label = resolved.selected_label;
+        previous_input = resolved.previous_input;
+        previous_collection_page = resolved.previous_collection_page;
+        previous_selected_label = resolved.previous_selected_label;
         crate::log_debug(&format!(
             "stream transition [resolved_selection]: url={} collection_url={} collection_page={:?}",
             url,
@@ -8347,10 +8439,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         ));
         update_youtube_return_context_from_selection(
             parent,
-            &input,
-            collection_url.as_deref(),
-            collection_page,
-            selected_label.as_deref(),
+            StreamReturnContextUpdate {
+                original_input: &input,
+                collection_url: collection_url.as_deref(),
+                collection_page,
+                selected_label: selected_label.as_deref(),
+                previous_input: previous_input.as_deref(),
+                previous_collection_page,
+                previous_selected_label: previous_selected_label.as_deref(),
+            },
         );
         ytdlp_path = Some(path);
     }
@@ -8364,10 +8461,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         collection_page = Some(initial_page);
         update_youtube_return_context_from_selection(
             parent,
-            &input,
-            collection_url.as_deref(),
-            collection_page,
-            selected_label.as_deref(),
+            StreamReturnContextUpdate {
+                original_input: &input,
+                collection_url: collection_url.as_deref(),
+                collection_page,
+                selected_label: selected_label.as_deref(),
+                previous_input: previous_input.as_deref(),
+                previous_collection_page,
+                previous_selected_label: previous_selected_label.as_deref(),
+            },
         );
     }
     let should_reopen_selection =
@@ -8394,10 +8496,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         if should_reopen_selection {
             update_youtube_return_context_from_selection(
                 parent,
-                &input,
-                collection_url.as_deref(),
-                collection_page,
-                selected_label.as_deref(),
+                StreamReturnContextUpdate {
+                    original_input: &input,
+                    collection_url: collection_url.as_deref(),
+                    collection_page,
+                    selected_label: selected_label.as_deref(),
+                    previous_input: previous_input.as_deref(),
+                    previous_collection_page,
+                    previous_selected_label: previous_selected_label.as_deref(),
+                },
             );
         } else {
             crate::set_active_youtube_return_context(parent, None, None);
@@ -8513,6 +8620,26 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             }
         };
         reclaim_stream_modal_parent_foreground(parent, "play_streaming_audio.before_mpv_title");
+        if is_youtube && let Err(err) = probe_youtube_stream_playable(&ytdlp_path, &url) {
+            if is_members_only_stream_error(&err) {
+                show_error(parent, language, &members_only_stream_message(language));
+                if collection_url.is_some() || collection_page.is_some() {
+                    set_pending_stream_reopen_context(Some(crate::YouTubeReturnContext {
+                        input: collection_url.clone().or_else(|| Some(input.clone())),
+                        collection_page,
+                        selected_label,
+                        previous_input,
+                        previous_collection_page,
+                        previous_selected_label,
+                    }));
+                    play_streaming_audio_from_url(parent);
+                } else {
+                    post_focus_editor(parent);
+                }
+                return;
+            }
+            crate::log_debug(&format!("YouTube stream preflight failed: {}", err));
+        }
         let stream_title = probe_stream_media_title(&ytdlp_path, &url);
         let ytdl_format = if is_youtube {
             Some(YOUTUBE_MPV_STREAM_FORMAT)
@@ -8541,10 +8668,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 if should_reopen_selection {
                     update_youtube_return_context_from_selection(
                         parent,
-                        &input,
-                        collection_url.as_deref(),
-                        collection_page,
-                        selected_label.as_deref(),
+                        StreamReturnContextUpdate {
+                            original_input: &input,
+                            collection_url: collection_url.as_deref(),
+                            collection_page,
+                            selected_label: selected_label.as_deref(),
+                            previous_input: previous_input.as_deref(),
+                            previous_collection_page,
+                            previous_selected_label: previous_selected_label.as_deref(),
+                        },
                     );
                 } else {
                     crate::set_active_youtube_return_context(parent, None, None);
@@ -8605,12 +8737,20 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                         collection_url = next_selection.collection_url;
                         collection_page = next_selection.collection_page;
                         selected_label = next_selection.selected_label;
+                        previous_input = next_selection.previous_input;
+                        previous_collection_page = next_selection.previous_collection_page;
+                        previous_selected_label = next_selection.previous_selected_label;
                         update_youtube_return_context_from_selection(
                             parent,
-                            &input,
-                            collection_url.as_deref(),
-                            collection_page,
-                            selected_label.as_deref(),
+                            StreamReturnContextUpdate {
+                                original_input: &input,
+                                collection_url: collection_url.as_deref(),
+                                collection_page,
+                                selected_label: selected_label.as_deref(),
+                                previous_input: previous_input.as_deref(),
+                                previous_collection_page,
+                                previous_selected_label: previous_selected_label.as_deref(),
+                            },
                         );
                         continue 'select_video;
                     }
@@ -9180,10 +9320,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         if should_reopen_selection {
             update_youtube_return_context_from_selection(
                 parent,
-                &input,
-                collection_url.as_deref(),
-                collection_page,
-                selected_label.as_deref(),
+                StreamReturnContextUpdate {
+                    original_input: &input,
+                    collection_url: collection_url.as_deref(),
+                    collection_page,
+                    selected_label: selected_label.as_deref(),
+                    previous_input: previous_input.as_deref(),
+                    previous_collection_page,
+                    previous_selected_label: previous_selected_label.as_deref(),
+                },
             );
         } else {
             crate::set_active_youtube_return_context(parent, None, None);

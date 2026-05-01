@@ -1107,7 +1107,10 @@ pub fn start_audiobook_playback(hwnd: HWND, path: &Path) {
                 .bookmarks
                 .files
                 .get(&path_buf.to_string_lossy().to_string())
-                .and_then(|list| list.last())
+                .and_then(|list| {
+                    list.iter()
+                        .rfind(|bookmark| bookmark.is_visible(state.settings.automatic_bookmark))
+                })
                 .map(|bm| bm.position)
                 .unwrap_or(0);
             (

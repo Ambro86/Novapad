@@ -362,7 +362,10 @@ pub fn refresh_bookmarks_list(hwnd: HWND) {
     if unsafe {
         with_state(parent, |state| {
             if let Some(list) = state.bookmarks.files.get(&storage_key) {
-                for bm in list {
+                for bm in list
+                    .iter()
+                    .filter(|bookmark| bookmark.is_visible(state.settings.automatic_bookmark))
+                {
                     let text = format!("[{}] {}", bm.timestamp, bm.snippet);
                     let wide = to_wide(&text);
                     SendMessageW(
@@ -422,7 +425,10 @@ pub fn goto_selected(hwnd: HWND) {
     if unsafe {
         with_state(parent, |state| {
             if let Some(list) = state.bookmarks.files.get(&storage_key)
-                && let Some(bm) = list.get(sel as usize)
+                && let Some(bm) = list
+                    .iter()
+                    .filter(|bookmark| bookmark.is_visible(state.settings.automatic_bookmark))
+                    .nth(sel as usize)
             {
                 if matches!(format, FileFormat::Audiobook) {
                     if let Some(path) = path.as_ref() {
@@ -485,10 +491,16 @@ pub fn delete_selected(hwnd: HWND) {
 
     if {
         with_state(parent, |state| {
+            let automatic_bookmark_enabled = state.settings.automatic_bookmark;
             if let Some(list) = state.bookmarks.files.get_mut(&storage_key)
-                && sel < list.len() as i32
+                && let Some(index) = list
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, bookmark)| bookmark.is_visible(automatic_bookmark_enabled))
+                    .nth(sel as usize)
+                    .map(|(index, _)| index)
             {
-                list.remove(sel as usize);
+                list.remove(index);
                 if persist_to_disk {
                     crate::bookmarks::save_bookmarks(&state.bookmarks);
                 }

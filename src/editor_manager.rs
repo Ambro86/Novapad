@@ -8,8 +8,9 @@ use crate::settings::{
 use crate::{EM_LINEFROMCHAR, EM_LINEINDEX, get_active_edit, log_debug, with_state};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
+use windows::Win32::Foundation::{BOOL, HANDLE, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{HFONT, InvalidateRect};
+use windows::Win32::System::Memory::GMEM_MOVEABLE;
 use windows::Win32::UI::Controls::RichEdit::{
     CFM_COLOR, CFM_SIZE, CHARFORMAT2W, CHARRANGE, EM_EXGETSEL, EM_EXSETSEL, EM_GETTEXTRANGE,
     EM_SETCHARFORMAT, EM_SETEVENTMASK, ENM_CHANGE, ENM_SELCHANGE, MSFTEDIT_CLASS, SCF_ALL,
@@ -964,6 +965,7 @@ pub fn insert_voice_tag_at_caret(
                     WPARAM(1),
                     LPARAM(wide.as_ptr() as isize),
                 );
+                copy_voice_tag_to_clipboard(hwnd, &insert);
                 return;
             }
         }
@@ -1118,6 +1120,7 @@ pub fn insert_voice_tag_at_caret(
             WPARAM(1),
             LPARAM(wide.as_ptr() as isize),
         );
+        copy_voice_tag_to_clipboard(hwnd, &insert);
         // After EM_REPLACESEL the caret sits at the end of the inserted text.
         // Move it back by len(" </voice>") = close.len() + 1 to place it
         // between the two padding spaces: "<voice ...> | </voice>".
@@ -1155,6 +1158,70 @@ pub fn insert_voice_tag_at_caret(
             new_start, new_end, new_text_len
         ));
     }
+}
+
+pub fn insert_pause_tag_at_caret(hwnd: HWND, milliseconds: u32) {
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+        log_debug("insert_pause_tag_at_caret: no active edit");
+        return;
+    };
+    let tag = format!("<pause ms=\"{milliseconds}\"/>");
+    unsafe {
+        let wide = to_wide(&tag);
+        SendMessageW(
+            hwnd_edit,
+            EM_REPLACESEL,
+            WPARAM(1),
+            LPARAM(wide.as_ptr() as isize),
+        );
+        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+    }
+    copy_text_to_clipboard(hwnd, &tag, "pause tag");
+}
+
+fn copy_text_to_clipboard(hwnd: HWND, text: &str, context: &str) {
+    const CF_UNICODETEXT: u32 = 13;
+
+    let content = to_wide(text);
+    if content.is_empty() {
+        return;
+    }
+    if let Err(e) = crate::open_clipboard_safe(hwnd) {
+        log_debug(&format!("OpenClipboard failed for {}: {}", context, e));
+        return;
+    }
+    if let Err(e) = crate::empty_clipboard_safe() {
+        log_debug(&format!("EmptyClipboard failed for {}: {}", context, e));
+    }
+    let size = content.len() * std::mem::size_of::<u16>();
+    let handle = match crate::global_alloc_safe(GMEM_MOVEABLE, size) {
+        Ok(handle) => handle,
+        Err(e) => {
+            log_debug(&format!("GlobalAlloc failed for {}: {}", context, e));
+            crate::log_if_err!(crate::close_clipboard_safe());
+            return;
+        }
+    };
+    let ptr = crate::global_lock_as_safe(handle) as *mut u16;
+    if ptr.is_null() {
+        log_debug(&format!("GlobalLock failed for {}", context));
+        crate::log_if_err!(crate::close_clipboard_safe());
+        return;
+    }
+    // SAFETY: `ptr` points to a movable global memory block locked above with enough
+    // bytes for `content`, and the source slice is valid for `content.len()` u16s.
+    unsafe {
+        std::ptr::copy_nonoverlapping(content.as_ptr(), ptr, content.len());
+    }
+    crate::log_if_err!(crate::global_unlock_safe(handle));
+    if let Err(e) = crate::set_clipboard_data_safe(CF_UNICODETEXT, HANDLE(handle.0 as isize)) {
+        log_debug(&format!("SetClipboardData failed for {}: {}", context, e));
+    }
+    crate::log_if_err!(crate::close_clipboard_safe());
+}
+
+fn copy_voice_tag_to_clipboard(hwnd: HWND, tag: &str) {
+    copy_text_to_clipboard(hwnd, tag, "voice tag");
 }
 
 fn wrap_voice_tag_block(selected: &str, open: &str, close: &str) -> String {
@@ -3748,6 +3815,7 @@ pub fn layout_children(hwnd: HWND) {
                 state.voice_label_voice,
                 state.voice_combo_voice,
                 state.voice_button_insert_tag,
+                state.voice_button_insert_pause,
                 state.voice_label_speed,
                 state.voice_combo_speed,
                 state.voice_edit_speed,
@@ -3782,6 +3850,7 @@ pub fn layout_children(hwnd: HWND) {
             label_voice,
             combo_voice,
             button_insert_tag,
+            button_insert_pause,
             label_speed,
             combo_speed,
             edit_speed,
@@ -3839,7 +3908,7 @@ pub fn layout_children(hwnd: HWND) {
                 && !tts_only_multilingual;
             let mut rows = 0;
             if voice_panel_visible {
-                rows += 5;
+                rows += 6;
                 if show_multilingual {
                     rows += 1;
                 }
@@ -3927,31 +3996,15 @@ pub fn layout_children(hwnd: HWND) {
                     true,
                 ));
                 crate::log_if_err!(MoveWindow(
-                    label_speed,
-                    label_x,
+                    button_insert_pause,
+                    button_voice_x,
                     if show_language { row4_top } else { row3_top },
-                    VOICE_PANEL_LABEL_WIDTH,
+                    VOICE_PANEL_BUTTON_WIDTH,
                     VOICE_PANEL_ROW_HEIGHT,
                     true,
                 ));
                 crate::log_if_err!(MoveWindow(
-                    combo_speed,
-                    combo_x,
-                    (if show_language { row4_top } else { row3_top }) - 2,
-                    combo_width,
-                    VOICE_PANEL_COMBO_HEIGHT,
-                    true,
-                ));
-                crate::log_if_err!(MoveWindow(
-                    edit_speed,
-                    combo_x,
-                    (if show_language { row4_top } else { row3_top }) - 2,
-                    combo_width,
-                    VOICE_PANEL_COMBO_HEIGHT,
-                    true,
-                ));
-                crate::log_if_err!(MoveWindow(
-                    label_pitch,
+                    label_speed,
                     label_x,
                     if show_language { row5_top } else { row4_top },
                     VOICE_PANEL_LABEL_WIDTH,
@@ -3959,7 +4012,7 @@ pub fn layout_children(hwnd: HWND) {
                     true,
                 ));
                 crate::log_if_err!(MoveWindow(
-                    combo_pitch,
+                    combo_speed,
                     combo_x,
                     (if show_language { row5_top } else { row4_top }) - 2,
                     combo_width,
@@ -3967,7 +4020,7 @@ pub fn layout_children(hwnd: HWND) {
                     true,
                 ));
                 crate::log_if_err!(MoveWindow(
-                    edit_pitch,
+                    edit_speed,
                     combo_x,
                     (if show_language { row5_top } else { row4_top }) - 2,
                     combo_width,
@@ -3975,7 +4028,7 @@ pub fn layout_children(hwnd: HWND) {
                     true,
                 ));
                 crate::log_if_err!(MoveWindow(
-                    label_volume,
+                    label_pitch,
                     label_x,
                     if show_language { row6_top } else { row5_top },
                     VOICE_PANEL_LABEL_WIDTH,
@@ -3983,7 +4036,7 @@ pub fn layout_children(hwnd: HWND) {
                     true,
                 ));
                 crate::log_if_err!(MoveWindow(
-                    combo_volume,
+                    combo_pitch,
                     combo_x,
                     (if show_language { row6_top } else { row5_top }) - 2,
                     combo_width,
@@ -3991,15 +4044,39 @@ pub fn layout_children(hwnd: HWND) {
                     true,
                 ));
                 crate::log_if_err!(MoveWindow(
-                    edit_volume,
+                    edit_pitch,
                     combo_x,
                     (if show_language { row6_top } else { row5_top }) - 2,
                     combo_width,
                     VOICE_PANEL_COMBO_HEIGHT,
                     true,
                 ));
+                crate::log_if_err!(MoveWindow(
+                    label_volume,
+                    label_x,
+                    if show_language { row7_top } else { row6_top },
+                    VOICE_PANEL_LABEL_WIDTH,
+                    VOICE_PANEL_ROW_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    combo_volume,
+                    combo_x,
+                    (if show_language { row7_top } else { row6_top }) - 2,
+                    combo_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    edit_volume,
+                    combo_x,
+                    (if show_language { row7_top } else { row6_top }) - 2,
+                    combo_width,
+                    VOICE_PANEL_COMBO_HEIGHT,
+                    true,
+                ));
                 if show_multilingual {
-                    let checkbox_row = if show_language { row7_top } else { row6_top };
+                    let checkbox_row = if show_language { row8_top } else { row7_top };
                     crate::log_if_err!(MoveWindow(
                         checkbox_multilingual,
                         label_x,
@@ -4009,7 +4086,11 @@ pub fn layout_children(hwnd: HWND) {
                         true,
                     ));
                     if favorites_visible {
-                        let favorites_row = if show_language { row8_top } else { row7_top };
+                        let favorites_row = if show_language {
+                            row8_top + VOICE_PANEL_ROW_HEIGHT + VOICE_PANEL_SPACING
+                        } else {
+                            row8_top
+                        };
                         crate::log_if_err!(MoveWindow(
                             label_favorites,
                             label_x,
@@ -4028,10 +4109,11 @@ pub fn layout_children(hwnd: HWND) {
                         ));
                     }
                 } else if favorites_visible {
+                    let favorites_row = if show_language { row8_top } else { row7_top };
                     crate::log_if_err!(MoveWindow(
                         label_favorites,
                         label_x,
-                        row6_top,
+                        favorites_row,
                         VOICE_PANEL_LABEL_WIDTH,
                         VOICE_PANEL_ROW_HEIGHT,
                         true,
@@ -4039,7 +4121,7 @@ pub fn layout_children(hwnd: HWND) {
                     crate::log_if_err!(MoveWindow(
                         combo_favorites,
                         combo_x,
-                        row6_top - 2,
+                        favorites_row - 2,
                         combo_width,
                         VOICE_PANEL_COMBO_HEIGHT,
                         true,

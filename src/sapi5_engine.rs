@@ -1180,32 +1180,8 @@ fn map_sapi_volume(volume: i32) -> u16 {
     vol as u16
 }
 
-fn escape_xml(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for ch in text.chars() {
-        match ch {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&apos;"),
-            _ => out.push(ch),
-        }
-    }
-    out
-}
-
-fn format_rate(rate: i32) -> String {
-    format!("{:+}%", rate)
-}
-
-fn format_pitch(pitch: i32) -> String {
-    format!("{:+}Hz", pitch)
-}
-
-fn format_volume(volume: i32) -> String {
-    let delta = volume.saturating_sub(100);
-    format!("{:+}%", delta)
+fn format_sapi_pitch(pitch: i32) -> String {
+    format!("{:+}", pitch.clamp(-10, 10))
 }
 
 fn map_ssml_pos_to_text_pos(ssml: &str, ssml_pos_utf16: usize) -> usize {
@@ -1304,13 +1280,11 @@ fn drain_word_boundary_events(source: &ISpEventSource, last_text_pos_utf16: &mut
     saw_word_boundary
 }
 
-fn mk_sapi_ssml(text: &str, rate: i32, pitch: i32, volume: i32) -> String {
-    let escaped = escape_xml(text);
+fn mk_sapi_ssml(text: &str, _rate: i32, pitch: i32, _volume: i32) -> String {
+    let escaped = crate::tts_engine::render_sapi_ssml_text_with_pause_tags(text);
     format!(
-        "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis'><prosody pitch='{}' rate='{}' volume='{}'>{}</prosody></speak>",
-        format_pitch(pitch),
-        format_rate(rate),
-        format_volume(volume),
+        "<pitch absmiddle='{}'>{}</pitch>",
+        format_sapi_pitch(pitch),
         escaped
     )
 }

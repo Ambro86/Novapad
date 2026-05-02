@@ -2,17 +2,17 @@ use crate::accessibility::{handle_accessibility, screen_reader_speak, to_wide};
 use crate::app_windows::interpreter_select_window;
 use crate::app_windows::podcasts_window;
 use crate::editor_manager::{
-    apply_indent_settings_to_all_edits, apply_word_wrap_to_all_edits, insert_voice_tag_at_caret,
-    update_window_title,
+    apply_indent_settings_to_all_edits, apply_word_wrap_to_all_edits, insert_pause_tag_at_caret,
+    insert_voice_tag_at_caret, update_window_title,
 };
 use crate::settings::{
     AudiobookPartNamingMode, DEFAULT_VOICE_PROFILE_NAME, Language, ListDateDisplayMode,
     ListTimeDisplayMode, ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode,
     RssDeleteConfirmMode, RssPodcastUnreadLabelPosition, ShortcutBinding, ShortcutSettings,
-    SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, VOICE_LIST_URL, VoiceInfo, VoiceProfile,
-    apply_voice_profile_to_settings_fields, confirm_title, format_shortcut,
+    SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, TtsTuning, VOICE_LIST_URL, VoiceInfo,
+    VoiceProfile, apply_voice_profile_to_settings_fields, confirm_title, format_shortcut,
     save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
-    voice_profile_from_settings_fields,
+    tts_tuning_for_engine, voice_profile_from_settings_fields,
 };
 use crate::{
     i18n, rebuild_menus, refresh_voice_panel, tts_engine, update_voice_panel_menu_check, with_state,
@@ -43,20 +43,21 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCOUNT,
-    CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
-    CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
-    DefWindowProcW, ES_AUTOHSCROLL, ES_PASSWORD, ES_READONLY, GWLP_USERDATA, GetClassNameW,
-    GetClientRect, GetParent, GetScrollInfo, GetWindowLongPtrW, GetWindowTextLengthW,
-    GetWindowTextW, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONQUESTION, MB_ICONWARNING, MB_OK,
-    MB_YESNO, MSG, MessageBoxW, MoveWindow, PostMessageW, RegisterClassW, SB_BOTTOM, SB_LINEDOWN,
-    SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP, SB_VERT,
-    SCROLLINFO, SIF_PAGE, SIF_POS, SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW, SW_SHOWNORMAL,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowPos, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY,
-    WM_SETFOCUS, WM_SETFONT, WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING,
+    CB_GETCOUNT, CB_GETCURSEL, CB_GETDROPPEDSTATE, CB_GETITEMDATA, CB_RESETCONTENT, CB_SETCURSEL,
+    CB_SETITEMDATA, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu,
+    CreateWindowExW, DefWindowProcW, ES_AUTOHSCROLL, ES_PASSWORD, ES_READONLY, GWLP_USERDATA,
+    GetClassNameW, GetClientRect, GetCursorPos, GetParent, GetScrollInfo, GetWindowLongPtrW,
+    GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONQUESTION,
+    MB_ICONWARNING, MB_OK, MB_YESNO, MSG, MessageBoxW, MoveWindow, PostMessageW, RegisterClassW,
+    SB_BOTTOM, SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK,
+    SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS, SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW,
+    SW_SHOWNORMAL, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON,
+    TrackPopupMenu, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT,
+    WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -159,6 +160,12 @@ const OPTIONS_ID_DIALOGUE_VOICE_VOLUME: usize = 6054;
 const OPTIONS_ID_DIALOGUE_TTS_ENGINE: usize = 6055;
 const OPTIONS_ID_DIALOGUE_VOICE_LANGUAGE: usize = 6082;
 const OPTIONS_ID_TTS_INSERT_TAG: usize = 6056;
+const OPTIONS_ID_TTS_INSERT_PAUSE: usize = 6140;
+const PAUSE_TAG_MENU_250MS: usize = 6141;
+const PAUSE_TAG_MENU_500MS: usize = 6142;
+const PAUSE_TAG_MENU_1S: usize = 6143;
+const PAUSE_TAG_MENU_2S: usize = 6144;
+const PAUSE_TAG_MENU_CUSTOM: usize = 6145;
 const OPTIONS_ID_DIALOGUE_OPEN_QUOTE: usize = 6079;
 const OPTIONS_ID_DIALOGUE_CLOSE_QUOTE: usize = 6080;
 const OPTIONS_ID_DIALOGUE_ALLOW_MULTILINE: usize = 6081;
@@ -832,6 +839,12 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                     if is_insert_tag_button {
                         insert_voice_tag_from_options(hwnd);
                     }
+                    let is_insert_pause_button =
+                        with_options_state(hwnd, |state| focus == state.button_tts_insert_pause)
+                            .unwrap_or(false);
+                    if is_insert_pause_button {
+                        insert_pause_tag_from_options(hwnd);
+                    }
                     if with_options_state(hwnd, |state| {
                         SendMessageW(
                             hwnd,
@@ -868,6 +881,7 @@ struct OptionsDialogState {
     label_tts_volume: HWND,
     button_tts_preview: HWND,
     button_tts_insert_tag: HWND,
+    button_tts_insert_pause: HWND,
     button_rename_voice_profile: HWND,
     button_add_voice_profile: HWND,
     button_delete_voice_profile: HWND,
@@ -1049,6 +1063,10 @@ struct OptionsDialogState {
     dictation_microphone_device_ids: Vec<String>,
     voice_profiles: Vec<VoiceProfile>,
     active_voice_profile_name: String,
+    active_tts_engine: TtsEngine,
+    edge_tts_tuning: TtsTuning,
+    sapi5_tts_tuning: TtsTuning,
+    sapi4_tts_tuning: TtsTuning,
     active_tab: i32,
     scroll_offsets: [i32; OPTIONS_TAB_COUNT as usize],
     content_heights: [i32; OPTIONS_TAB_COUNT as usize],
@@ -1100,6 +1118,7 @@ struct OptionsLabels {
     label_tts_volume: String,
     label_tts_preview: String,
     label_tts_insert_tag: String,
+    label_tts_insert_pause: String,
     label_tts_manual_tuning: String,
     label_split_on_newline: String,
     label_word_wrap: String,
@@ -1313,6 +1332,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_tts_volume: i18n::tr(language, "tts_tuning.label_volume"),
         label_tts_preview: i18n::tr(language, "options.label.voice_preview"),
         label_tts_insert_tag: i18n::tr(language, "options.label.insert_voice_tag"),
+        label_tts_insert_pause: i18n::tr(language, "options.label.insert_pause_tag"),
         label_tts_manual_tuning: i18n::tr(language, "options.label.tts_manual_tuning"),
         label_split_on_newline: i18n::tr(language, "options.label.split_on_newline"),
         label_word_wrap: i18n::tr(language, "options.label.word_wrap"),
@@ -1955,9 +1975,10 @@ fn apply_selected_voice_profile(hwnd: HWND) {
         );
     }
 
-    select_combo_value(combo_tts_speed, profile.tts_rate);
-    select_combo_value(combo_tts_pitch, profile.tts_pitch);
-    select_combo_value(combo_tts_volume, profile.tts_volume);
+    let active_tts_tuning = voice_profile_tuning_for_engine(&profile, profile.tts_engine);
+    select_combo_value(combo_tts_speed, active_tts_tuning.rate);
+    select_combo_value(combo_tts_pitch, active_tts_tuning.pitch);
+    select_combo_value(combo_tts_volume, active_tts_tuning.volume);
     select_combo_value(combo_dialogue_voice_rate, profile.dialogue_voice_rate);
     select_combo_value(combo_dialogue_voice_pitch, profile.dialogue_voice_pitch);
     select_combo_value(combo_dialogue_voice_volume, profile.dialogue_voice_volume);
@@ -1976,19 +1997,19 @@ fn apply_selected_voice_profile(hwnd: HWND) {
 
     if let Err(e) = crate::set_window_text_w_safe(
         edit_tts_speed,
-        PCWSTR(to_wide(&tts_ui_value_from_internal(profile.tts_rate).to_string()).as_ptr()),
+        PCWSTR(to_wide(&tts_ui_value_from_internal(active_tts_tuning.rate).to_string()).as_ptr()),
     ) {
         crate::log_debug(&format!("Failed to set tts speed edit from profile: {e}"));
     }
     if let Err(e) = crate::set_window_text_w_safe(
         edit_tts_pitch,
-        PCWSTR(to_wide(&tts_ui_value_from_internal(profile.tts_pitch).to_string()).as_ptr()),
+        PCWSTR(to_wide(&tts_ui_value_from_internal(active_tts_tuning.pitch).to_string()).as_ptr()),
     ) {
         crate::log_debug(&format!("Failed to set tts pitch edit from profile: {e}"));
     }
     if let Err(e) = crate::set_window_text_w_safe(
         edit_tts_volume,
-        PCWSTR(to_wide(&profile.tts_volume.to_string()).as_ptr()),
+        PCWSTR(to_wide(&active_tts_tuning.volume.to_string()).as_ptr()),
     ) {
         crate::log_debug(&format!("Failed to set tts volume edit from profile: {e}"));
     }
@@ -2055,6 +2076,10 @@ fn apply_selected_voice_profile(hwnd: HWND) {
 
     if with_options_state(hwnd, |state| {
         state.active_voice_profile_name = profile.name.clone();
+        state.active_tts_engine = profile.tts_engine;
+        state.edge_tts_tuning = profile.edge_tts_tuning;
+        state.sapi5_tts_tuning = profile.sapi5_tts_tuning;
+        state.sapi4_tts_tuning = profile.sapi4_tts_tuning;
     })
     .is_none()
     {
@@ -2070,6 +2095,7 @@ fn apply_selected_voice_profile(hwnd: HWND) {
     }
 
     update_tts_manual_visibility(hwnd);
+    set_main_tts_tuning_controls(hwnd, profile.tts_engine, active_tts_tuning);
     refresh_voices(hwnd);
     update_dialogue_voice_visibility(hwnd);
     let tts_voices = voices_for_engine(parent, profile.tts_engine);
@@ -3364,6 +3390,22 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     26,
                     hwnd,
                     HMENU(OPTIONS_ID_TTS_INSERT_TAG as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let button_tts_insert_pause = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_tts_insert_pause).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_TTS_INSERT_PAUSE as isize),
                     HINSTANCE(0),
                     None,
                 );
@@ -5849,6 +5891,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_tts_volume,
                     button_tts_preview,
                     button_tts_insert_tag,
+                    button_tts_insert_pause,
                     label_audio_skip,
                     combo_audio_skip,
                     label_default_save_folder_kind,
@@ -6032,6 +6075,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     label_tts_volume,
                     button_tts_preview,
                     button_tts_insert_tag,
+                    button_tts_insert_pause,
                     button_rename_voice_profile,
                     button_add_voice_profile,
                     button_delete_voice_profile,
@@ -6213,6 +6257,10 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     dictation_microphone_device_ids,
                     voice_profiles: Vec::new(),
                     active_voice_profile_name: DEFAULT_VOICE_PROFILE_NAME.to_string(),
+                    active_tts_engine: TtsEngine::Edge,
+                    edge_tts_tuning: TtsTuning::default(),
+                    sapi5_tts_tuning: TtsTuning::default(),
+                    sapi4_tts_tuning: TtsTuning::default(),
                     active_tab: OPTIONS_TAB_GENERAL,
                     scroll_offsets: [0; OPTIONS_TAB_COUNT as usize],
                     content_heights: [0; OPTIONS_TAB_COUNT as usize],
@@ -6297,6 +6345,10 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         insert_voice_tag_from_options(hwnd);
                         LRESULT(0)
                     }
+                    OPTIONS_ID_TTS_INSERT_PAUSE => {
+                        insert_pause_tag_from_options(hwnd);
+                        LRESULT(0)
+                    }
                     OPTIONS_ID_VOICE_PROFILE => {
                         if code == CBN_SELCHANGE {
                             // Selecting a profile immediately loads its voice settings in the form.
@@ -6334,8 +6386,30 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                                     ensure_sapi_voices_loaded(parent, lang);
                                 }
                             }
+                            let new_engine = match sel {
+                                1 => TtsEngine::Sapi5,
+                                2 => TtsEngine::Sapi4,
+                                _ => TtsEngine::Edge,
+                            };
+                            let previous_engine = with_options_state(hwnd, |s| s.active_tts_engine)
+                                .unwrap_or(new_engine);
+                            store_main_tts_tuning_draft(hwnd, previous_engine);
+                            if with_options_state(hwnd, |s| s.active_tts_engine = new_engine)
+                                .is_none()
+                            {
+                                crate::log_debug(
+                                    "Failed to update active TTS engine in options state",
+                                );
+                            }
+                            if let Some(tuning) = main_tts_tuning_draft(hwnd, new_engine) {
+                                set_main_tts_tuning_controls(hwnd, new_engine, tuning);
+                            }
 
                             refresh_voices(hwnd);
+                            update_tts_manual_visibility(hwnd);
+                            if let Some(tuning) = main_tts_tuning_draft(hwnd, new_engine) {
+                                set_main_tts_tuning_controls(hwnd, new_engine, tuning);
+                            }
                             relayout_active_tab_content(hwnd);
                         }
                         LRESULT(0)
@@ -6410,8 +6484,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         LRESULT(0)
                     }
                     OPTIONS_ID_TTS_MANUAL_TUNING => {
-                        update_tts_manual_visibility(hwnd);
                         relayout_active_tab_content(hwnd);
+                        update_tts_manual_visibility(hwnd);
                         LRESULT(0)
                     }
                     OPTIONS_ID_USE_DIALOGUE_VOICE => {
@@ -7024,6 +7098,10 @@ fn initialize_options_dialog(hwnd: HWND) {
         if with_options_state(hwnd, |state| {
             state.voice_profiles = voice_profiles;
             state.active_voice_profile_name = active_voice_profile_name;
+            state.active_tts_engine = settings.tts_engine;
+            state.edge_tts_tuning = settings.edge_tts_tuning;
+            state.sapi5_tts_tuning = settings.sapi5_tts_tuning;
+            state.sapi4_tts_tuning = settings.sapi4_tts_tuning;
         })
         .is_none()
         {
@@ -8963,9 +9041,60 @@ const TTS_RATE_MIN: i32 = -100;
 const TTS_RATE_MAX: i32 = 100;
 const TTS_PITCH_MIN: i32 = -12;
 const TTS_PITCH_MAX: i32 = 12;
-const TTS_VOLUME_MIN: i32 = 25;
-const TTS_VOLUME_MAX: i32 = 200;
+const EDGE_TTS_VOLUME_MIN: i32 = 25;
+const EDGE_TTS_VOLUME_MAX: i32 = 200;
+const SAPI_TTS_VOLUME_MIN: i32 = 0;
+const SAPI_TTS_VOLUME_MAX: i32 = 100;
 const TTS_UI_OFFSET: i32 = 100;
+
+#[derive(Clone, Copy)]
+struct TtsTuningLimits {
+    rate_min: i32,
+    rate_max: i32,
+    pitch_min: i32,
+    pitch_max: i32,
+    volume_min: i32,
+    volume_max: i32,
+}
+
+fn tts_tuning_limits_for_engine(engine: TtsEngine) -> TtsTuningLimits {
+    match engine {
+        TtsEngine::Edge => TtsTuningLimits {
+            rate_min: TTS_RATE_MIN,
+            rate_max: TTS_RATE_MAX,
+            pitch_min: TTS_PITCH_MIN,
+            pitch_max: TTS_PITCH_MAX,
+            volume_min: EDGE_TTS_VOLUME_MIN,
+            volume_max: EDGE_TTS_VOLUME_MAX,
+        },
+        TtsEngine::Sapi5 | TtsEngine::Sapi4 => TtsTuningLimits {
+            rate_min: TTS_RATE_MIN,
+            rate_max: TTS_RATE_MAX,
+            pitch_min: TTS_PITCH_MIN,
+            pitch_max: TTS_PITCH_MAX,
+            volume_min: SAPI_TTS_VOLUME_MIN,
+            volume_max: SAPI_TTS_VOLUME_MAX,
+        },
+    }
+}
+
+fn clamp_tts_tuning_for_engine(engine: TtsEngine, tuning: TtsTuning) -> TtsTuning {
+    let limits = tts_tuning_limits_for_engine(engine);
+    TtsTuning::new(
+        tuning.rate.clamp(limits.rate_min, limits.rate_max),
+        tuning.pitch.clamp(limits.pitch_min, limits.pitch_max),
+        tuning.volume.clamp(limits.volume_min, limits.volume_max),
+    )
+}
+
+fn selected_tts_engine_from_combo(combo: HWND, fallback: TtsEngine) -> TtsEngine {
+    match crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
+        0 => TtsEngine::Edge,
+        _ => fallback,
+    }
+}
 
 fn read_tts_edit_value(edit: HWND, fallback: i32, min: i32, max: i32) -> i32 {
     unsafe {
@@ -9053,6 +9182,115 @@ fn select_combo_nearest_value(hwnd: HWND, value: i32) {
     }
 }
 
+fn main_tts_tuning_from_controls(
+    hwnd: HWND,
+    engine: TtsEngine,
+) -> Option<(TtsTuning, Option<i32>)> {
+    let (checkbox, combo_speed, combo_pitch, combo_volume, edit_speed, edit_pitch, edit_volume) =
+        with_options_state(hwnd, |state| {
+            (
+                state.checkbox_tts_manual,
+                state.combo_tts_speed,
+                state.combo_tts_pitch,
+                state.combo_tts_volume,
+                state.edit_tts_speed,
+                state.edit_tts_pitch,
+                state.edit_tts_volume,
+            )
+        })?;
+    let limits = tts_tuning_limits_for_engine(engine);
+    let manual = crate::send_message_w_safe(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
+        == BST_CHECKED.0;
+    if manual {
+        let (rate, adjusted_rate) =
+            read_tts_tuning_edit_value_with_clamp(edit_speed, 0, limits.rate_min, limits.rate_max);
+        let (pitch, adjusted_pitch) = read_tts_tuning_edit_value_with_clamp(
+            edit_pitch,
+            0,
+            limits.pitch_min,
+            limits.pitch_max,
+        );
+        let (volume, adjusted_volume) =
+            read_tts_edit_value_with_clamp(edit_volume, 100, limits.volume_min, limits.volume_max);
+        let adjusted = adjusted_rate.or(adjusted_pitch).or(adjusted_volume);
+        Some((TtsTuning::new(rate, pitch, volume), adjusted))
+    } else {
+        Some((
+            TtsTuning::new(
+                combo_value(combo_speed).clamp(limits.rate_min, limits.rate_max),
+                combo_value(combo_pitch).clamp(limits.pitch_min, limits.pitch_max),
+                combo_value(combo_volume).clamp(limits.volume_min, limits.volume_max),
+            ),
+            None,
+        ))
+    }
+}
+
+fn set_main_tts_tuning_controls(hwnd: HWND, engine: TtsEngine, tuning: TtsTuning) {
+    let Some((combo_speed, combo_pitch, combo_volume, edit_speed, edit_pitch, edit_volume)) =
+        with_options_state(hwnd, |state| {
+            (
+                state.combo_tts_speed,
+                state.combo_tts_pitch,
+                state.combo_tts_volume,
+                state.edit_tts_speed,
+                state.edit_tts_pitch,
+                state.edit_tts_volume,
+            )
+        })
+    else {
+        return;
+    };
+    let tuning = clamp_tts_tuning_for_engine(engine, tuning);
+    select_combo_nearest_value(combo_speed, tuning.rate);
+    select_combo_nearest_value(combo_pitch, tuning.pitch);
+    select_combo_nearest_value(combo_volume, tuning.volume);
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_speed,
+        PCWSTR(to_wide(&tts_ui_value_from_internal(tuning.rate).to_string()).as_ptr()),
+    ) {
+        crate::log_debug(&format!("Failed to set tts speed edit: {e}"));
+    }
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_pitch,
+        PCWSTR(to_wide(&tts_ui_value_from_internal(tuning.pitch).to_string()).as_ptr()),
+    ) {
+        crate::log_debug(&format!("Failed to set tts pitch edit: {e}"));
+    }
+    if let Err(e) = crate::set_window_text_w_safe(
+        edit_volume,
+        PCWSTR(to_wide(&tuning.volume.to_string()).as_ptr()),
+    ) {
+        crate::log_debug(&format!("Failed to set tts volume edit: {e}"));
+    }
+}
+
+fn store_main_tts_tuning_draft(hwnd: HWND, engine: TtsEngine) -> Option<Option<i32>> {
+    let (tuning, adjusted) = main_tts_tuning_from_controls(hwnd, engine)?;
+    with_options_state(hwnd, |state| match engine {
+        TtsEngine::Edge => state.edge_tts_tuning = tuning,
+        TtsEngine::Sapi5 => state.sapi5_tts_tuning = tuning,
+        TtsEngine::Sapi4 => state.sapi4_tts_tuning = tuning,
+    })?;
+    Some(adjusted)
+}
+
+fn main_tts_tuning_draft(hwnd: HWND, engine: TtsEngine) -> Option<TtsTuning> {
+    with_options_state(hwnd, |state| match engine {
+        TtsEngine::Edge => state.edge_tts_tuning,
+        TtsEngine::Sapi5 => state.sapi5_tts_tuning,
+        TtsEngine::Sapi4 => state.sapi4_tts_tuning,
+    })
+}
+
+fn voice_profile_tuning_for_engine(profile: &VoiceProfile, engine: TtsEngine) -> TtsTuning {
+    match engine {
+        TtsEngine::Edge => profile.edge_tts_tuning,
+        TtsEngine::Sapi5 => profile.sapi5_tts_tuning,
+        TtsEngine::Sapi4 => profile.sapi4_tts_tuning,
+    }
+}
+
 fn update_tts_manual_visibility(hwnd: HWND) {
     let (
         checkbox,
@@ -9062,18 +9300,21 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         edit_speed,
         edit_pitch,
         edit_volume,
+        combo_engine,
         combo_dialogue_voice_rate,
         edit_dialogue_voice_rate,
         combo_dialogue_voice_pitch,
         edit_dialogue_voice_pitch,
         combo_dialogue_voice_volume,
         edit_dialogue_voice_volume,
+        combo_dialogue_engine,
         combo_dialogue_secondary_voice_rate,
         edit_dialogue_secondary_voice_rate,
         combo_dialogue_secondary_voice_pitch,
         edit_dialogue_secondary_voice_pitch,
         combo_dialogue_secondary_voice_volume,
         edit_dialogue_secondary_voice_volume,
+        combo_dialogue_secondary_engine,
     ) = match with_options_state(hwnd, |state| {
         (
             state.checkbox_tts_manual,
@@ -9083,29 +9324,39 @@ fn update_tts_manual_visibility(hwnd: HWND) {
             state.edit_tts_speed,
             state.edit_tts_pitch,
             state.edit_tts_volume,
+            state.combo_tts_engine,
             state.combo_dialogue_voice_rate,
             state.edit_dialogue_voice_rate,
             state.combo_dialogue_voice_pitch,
             state.edit_dialogue_voice_pitch,
             state.combo_dialogue_voice_volume,
             state.edit_dialogue_voice_volume,
+            state.combo_dialogue_engine,
             state.combo_dialogue_secondary_voice_rate,
             state.edit_dialogue_secondary_voice_rate,
             state.combo_dialogue_secondary_voice_pitch,
             state.edit_dialogue_secondary_voice_pitch,
             state.combo_dialogue_secondary_voice_volume,
             state.edit_dialogue_secondary_voice_volume,
+            state.combo_dialogue_secondary_engine,
         )
     }) {
         Some(values) => values,
         None => return,
     };
+    let engine = selected_tts_engine_from_combo(combo_engine, TtsEngine::Edge);
+    let limits = tts_tuning_limits_for_engine(engine);
+    let dialogue_engine = selected_tts_engine_from_combo(combo_dialogue_engine, TtsEngine::Edge);
+    let dialogue_limits = tts_tuning_limits_for_engine(dialogue_engine);
+    let secondary_engine =
+        selected_tts_engine_from_combo(combo_dialogue_secondary_engine, TtsEngine::Edge);
+    let secondary_limits = tts_tuning_limits_for_engine(secondary_engine);
     let manual = crate::send_message_w_safe(checkbox, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
         == BST_CHECKED.0;
     if manual {
-        let rate = combo_value(combo_speed);
-        let pitch = combo_value(combo_pitch);
-        let volume = combo_value(combo_volume);
+        let rate = combo_value(combo_speed).clamp(limits.rate_min, limits.rate_max);
+        let pitch = combo_value(combo_pitch).clamp(limits.pitch_min, limits.pitch_max);
+        let volume = combo_value(combo_volume).clamp(limits.volume_min, limits.volume_max);
         if let Err(_e) = crate::set_window_text_w_safe(
             edit_speed,
             PCWSTR(to_wide(&tts_ui_value_from_internal(rate).to_string()).as_ptr()),
@@ -9124,12 +9375,18 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
-        let d_rate = combo_value(combo_dialogue_voice_rate);
-        let d_pitch = combo_value(combo_dialogue_voice_pitch);
-        let d_volume = combo_value(combo_dialogue_voice_volume);
-        let sd_rate = combo_value(combo_dialogue_secondary_voice_rate);
-        let sd_pitch = combo_value(combo_dialogue_secondary_voice_pitch);
-        let sd_volume = combo_value(combo_dialogue_secondary_voice_volume);
+        let d_rate = combo_value(combo_dialogue_voice_rate)
+            .clamp(dialogue_limits.rate_min, dialogue_limits.rate_max);
+        let d_pitch = combo_value(combo_dialogue_voice_pitch)
+            .clamp(dialogue_limits.pitch_min, dialogue_limits.pitch_max);
+        let d_volume = combo_value(combo_dialogue_voice_volume)
+            .clamp(dialogue_limits.volume_min, dialogue_limits.volume_max);
+        let sd_rate = combo_value(combo_dialogue_secondary_voice_rate)
+            .clamp(secondary_limits.rate_min, secondary_limits.rate_max);
+        let sd_pitch = combo_value(combo_dialogue_secondary_voice_pitch)
+            .clamp(secondary_limits.pitch_min, secondary_limits.pitch_max);
+        let sd_volume = combo_value(combo_dialogue_secondary_voice_volume)
+            .clamp(secondary_limits.volume_min, secondary_limits.volume_max);
         if let Err(_e) = crate::set_window_text_w_safe(
             edit_dialogue_voice_rate,
             PCWSTR(to_wide(&tts_ui_value_from_internal(d_rate).to_string()).as_ptr()),
@@ -9167,36 +9424,44 @@ fn update_tts_manual_visibility(hwnd: HWND) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
     } else {
-        let rate = read_tts_tuning_edit_value(edit_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX);
-        let pitch = read_tts_tuning_edit_value(edit_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX);
-        let volume = read_tts_edit_value(edit_volume, 100, TTS_VOLUME_MIN, TTS_VOLUME_MAX);
-        let d_rate =
-            read_tts_tuning_edit_value(edit_dialogue_voice_rate, 0, TTS_RATE_MIN, TTS_RATE_MAX);
-        let d_pitch =
-            read_tts_tuning_edit_value(edit_dialogue_voice_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX);
+        let rate = read_tts_tuning_edit_value(edit_speed, 0, limits.rate_min, limits.rate_max);
+        let pitch = read_tts_tuning_edit_value(edit_pitch, 0, limits.pitch_min, limits.pitch_max);
+        let volume = read_tts_edit_value(edit_volume, 100, limits.volume_min, limits.volume_max);
+        let d_rate = read_tts_tuning_edit_value(
+            edit_dialogue_voice_rate,
+            0,
+            dialogue_limits.rate_min,
+            dialogue_limits.rate_max,
+        );
+        let d_pitch = read_tts_tuning_edit_value(
+            edit_dialogue_voice_pitch,
+            0,
+            dialogue_limits.pitch_min,
+            dialogue_limits.pitch_max,
+        );
         let d_volume = read_tts_edit_value(
             edit_dialogue_voice_volume,
             100,
-            TTS_VOLUME_MIN,
-            TTS_VOLUME_MAX,
+            dialogue_limits.volume_min,
+            dialogue_limits.volume_max,
         );
         let sd_rate = read_tts_tuning_edit_value(
             edit_dialogue_secondary_voice_rate,
             0,
-            TTS_RATE_MIN,
-            TTS_RATE_MAX,
+            secondary_limits.rate_min,
+            secondary_limits.rate_max,
         );
         let sd_pitch = read_tts_tuning_edit_value(
             edit_dialogue_secondary_voice_pitch,
             0,
-            TTS_PITCH_MIN,
-            TTS_PITCH_MAX,
+            secondary_limits.pitch_min,
+            secondary_limits.pitch_max,
         );
         let sd_volume = read_tts_edit_value(
             edit_dialogue_secondary_voice_volume,
             100,
-            TTS_VOLUME_MIN,
-            TTS_VOLUME_MAX,
+            secondary_limits.volume_min,
+            secondary_limits.volume_max,
         );
         select_combo_nearest_value(combo_speed, rate);
         select_combo_nearest_value(combo_pitch, pitch);
@@ -9714,20 +9979,21 @@ fn preview_voice(hwnd: HWND) {
     let manual = crate::send_message_w_safe(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0))
         .0 as u32
         == BST_CHECKED.0;
+    let limits = tts_tuning_limits_for_engine(engine);
     let rate = if manual {
-        read_tts_tuning_edit_value(edit_tts_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX)
+        read_tts_tuning_edit_value(edit_tts_speed, 0, limits.rate_min, limits.rate_max)
     } else {
-        combo_value(combo_tts_speed)
+        combo_value(combo_tts_speed).clamp(limits.rate_min, limits.rate_max)
     };
     let pitch = if manual {
-        read_tts_tuning_edit_value(edit_tts_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX)
+        read_tts_tuning_edit_value(edit_tts_pitch, 0, limits.pitch_min, limits.pitch_max)
     } else {
-        combo_value(combo_tts_pitch)
+        combo_value(combo_tts_pitch).clamp(limits.pitch_min, limits.pitch_max)
     };
     let volume = if manual {
-        read_tts_edit_value(edit_tts_volume, 100, TTS_VOLUME_MIN, TTS_VOLUME_MAX)
+        read_tts_edit_value(edit_tts_volume, 100, limits.volume_min, limits.volume_max)
     } else {
-        combo_value(combo_tts_volume)
+        combo_value(combo_tts_volume).clamp(limits.volume_min, limits.volume_max)
     };
     let chunks = tts_engine::split_into_tts_chunks(&text, split_on_newline, &dictionary, engine);
 
@@ -9883,23 +10149,106 @@ fn insert_voice_tag_from_options(hwnd: HWND) {
     let manual = crate::send_message_w_safe(checkbox_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0
         as u32
         == BST_CHECKED.0;
+    let limits = tts_tuning_limits_for_engine(engine);
     let rate = if manual {
-        read_tts_tuning_edit_value(edit_speed, 0, TTS_RATE_MIN, TTS_RATE_MAX)
+        read_tts_tuning_edit_value(edit_speed, 0, limits.rate_min, limits.rate_max)
     } else {
-        combo_value(combo_speed)
+        combo_value(combo_speed).clamp(limits.rate_min, limits.rate_max)
     };
     let pitch = if manual {
-        read_tts_tuning_edit_value(edit_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX)
+        read_tts_tuning_edit_value(edit_pitch, 0, limits.pitch_min, limits.pitch_max)
     } else {
-        combo_value(combo_pitch)
+        combo_value(combo_pitch).clamp(limits.pitch_min, limits.pitch_max)
     };
     let volume = if manual {
-        read_tts_edit_value(edit_volume, 100, TTS_VOLUME_MIN, TTS_VOLUME_MAX)
+        read_tts_edit_value(edit_volume, 100, limits.volume_min, limits.volume_max)
     } else {
-        combo_value(combo_volume)
+        combo_value(combo_volume).clamp(limits.volume_min, limits.volume_max)
     };
 
     insert_voice_tag_at_caret(parent, engine, &voice, rate, pitch, volume);
+}
+
+fn insert_pause_tag_from_options(hwnd: HWND) {
+    let (parent, language) = match with_options_state(hwnd, |state| {
+        let language = with_state(state.parent, |main| main.settings.language).unwrap_or_default();
+        (state.parent, language)
+    }) {
+        Some(values) => values,
+        None => return,
+    };
+    if let Some(ms) = choose_pause_tag_milliseconds(hwnd, language) {
+        insert_pause_tag_at_caret(parent, ms);
+    }
+}
+
+fn choose_pause_tag_milliseconds(hwnd: HWND, language: Language) -> Option<u32> {
+    unsafe {
+        let menu = CreatePopupMenu().unwrap_or(HMENU(0));
+        if menu.0 == 0 {
+            return None;
+        }
+        for (id, key) in [
+            (PAUSE_TAG_MENU_250MS, "pause_tag.menu.250ms"),
+            (PAUSE_TAG_MENU_500MS, "pause_tag.menu.500ms"),
+            (PAUSE_TAG_MENU_1S, "pause_tag.menu.1s"),
+            (PAUSE_TAG_MENU_2S, "pause_tag.menu.2s"),
+            (PAUSE_TAG_MENU_CUSTOM, "pause_tag.menu.custom"),
+        ] {
+            let label = i18n::tr(language, key);
+            crate::log_if_err!(AppendMenuW(
+                menu,
+                windows::Win32::UI::WindowsAndMessaging::MF_STRING,
+                id,
+                PCWSTR(to_wide(&label).as_ptr()),
+            ));
+        }
+
+        let mut pt = windows::Win32::Foundation::POINT::default();
+        crate::log_if_err!(GetCursorPos(&mut pt));
+        SetForegroundWindow(hwnd);
+        let selected = TrackPopupMenu(
+            menu,
+            TPM_RETURNCMD | TPM_RIGHTBUTTON,
+            pt.x,
+            pt.y,
+            0,
+            hwnd,
+            None,
+        )
+        .0 as usize;
+        crate::log_if_err!(PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0)));
+        match selected {
+            PAUSE_TAG_MENU_250MS => Some(250),
+            PAUSE_TAG_MENU_500MS => Some(500),
+            PAUSE_TAG_MENU_1S => Some(1000),
+            PAUSE_TAG_MENU_2S => Some(2000),
+            PAUSE_TAG_MENU_CUSTOM => prompt_custom_pause_milliseconds(hwnd, language),
+            _ => None,
+        }
+    }
+}
+
+fn prompt_custom_pause_milliseconds(owner: HWND, language: Language) -> Option<u32> {
+    let title = i18n::tr(language, "pause_tag.custom.title");
+    let prompt = i18n::tr(language, "pause_tag.custom.prompt");
+    let value =
+        crate::app_windows::prompt_window::prompt_user(owner, &title, &prompt, "1000", language)?;
+    let parsed = value.trim().parse::<u32>().ok();
+    if let Some(ms) = parsed
+        && (tts_engine::PAUSE_TAG_MIN_MS..=tts_engine::PAUSE_TAG_MAX_MS).contains(&ms)
+    {
+        return Some(ms);
+    }
+    let min = tts_engine::PAUSE_TAG_MIN_MS.to_string();
+    let max = tts_engine::PAUSE_TAG_MAX_MS.to_string();
+    let message = i18n::tr_f(
+        language,
+        "pause_tag.custom.invalid",
+        &[("min", &min), ("max", &max)],
+    );
+    crate::show_error(owner, language, &message);
+    None
 }
 
 fn preview_dialogue_voice(hwnd: HWND) {
@@ -9976,25 +10325,36 @@ fn preview_dialogue_voice(hwnd: HWND) {
     let manual = crate::send_message_w_safe(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0))
         .0 as u32
         == BST_CHECKED.0;
+    let limits = tts_tuning_limits_for_engine(engine);
     let rate = if manual {
-        read_tts_tuning_edit_value(edit_dialogue_voice_rate, 0, TTS_RATE_MIN, TTS_RATE_MAX)
+        read_tts_tuning_edit_value(
+            edit_dialogue_voice_rate,
+            0,
+            limits.rate_min,
+            limits.rate_max,
+        )
     } else {
-        combo_value(combo_dialogue_voice_rate)
+        combo_value(combo_dialogue_voice_rate).clamp(limits.rate_min, limits.rate_max)
     };
     let pitch = if manual {
-        read_tts_tuning_edit_value(edit_dialogue_voice_pitch, 0, TTS_PITCH_MIN, TTS_PITCH_MAX)
+        read_tts_tuning_edit_value(
+            edit_dialogue_voice_pitch,
+            0,
+            limits.pitch_min,
+            limits.pitch_max,
+        )
     } else {
-        combo_value(combo_dialogue_voice_pitch)
+        combo_value(combo_dialogue_voice_pitch).clamp(limits.pitch_min, limits.pitch_max)
     };
     let volume = if manual {
         read_tts_edit_value(
             edit_dialogue_voice_volume,
             100,
-            TTS_VOLUME_MIN,
-            TTS_VOLUME_MAX,
+            limits.volume_min,
+            limits.volume_max,
         )
     } else {
-        combo_value(combo_dialogue_voice_volume)
+        combo_value(combo_dialogue_voice_volume).clamp(limits.volume_min, limits.volume_max)
     };
 
     match engine {
@@ -10166,35 +10526,37 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
     let manual = crate::send_message_w_safe(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0))
         .0 as u32
         == BST_CHECKED.0;
+    let limits = tts_tuning_limits_for_engine(engine);
     let rate = if manual {
         read_tts_tuning_edit_value(
             edit_dialogue_secondary_voice_rate,
             0,
-            TTS_RATE_MIN,
-            TTS_RATE_MAX,
+            limits.rate_min,
+            limits.rate_max,
         )
     } else {
-        combo_value(combo_dialogue_secondary_voice_rate)
+        combo_value(combo_dialogue_secondary_voice_rate).clamp(limits.rate_min, limits.rate_max)
     };
     let pitch = if manual {
         read_tts_tuning_edit_value(
             edit_dialogue_secondary_voice_pitch,
             0,
-            TTS_PITCH_MIN,
-            TTS_PITCH_MAX,
+            limits.pitch_min,
+            limits.pitch_max,
         )
     } else {
-        combo_value(combo_dialogue_secondary_voice_pitch)
+        combo_value(combo_dialogue_secondary_voice_pitch).clamp(limits.pitch_min, limits.pitch_max)
     };
     let volume = if manual {
         read_tts_edit_value(
             edit_dialogue_secondary_voice_volume,
             100,
-            TTS_VOLUME_MIN,
-            TTS_VOLUME_MAX,
+            limits.volume_min,
+            limits.volume_max,
         )
     } else {
         combo_value(combo_dialogue_secondary_voice_volume)
+            .clamp(limits.volume_min, limits.volume_max)
     };
 
     match engine {
@@ -10291,12 +10653,12 @@ fn apply_options_dialog(hwnd: HWND) {
             combo_open,
             combo_tts_engine,
             combo_voice,
-            combo_tts_speed,
-            combo_tts_pitch,
-            combo_tts_volume,
-            edit_tts_speed,
-            edit_tts_pitch,
-            edit_tts_volume,
+            _combo_tts_speed,
+            _combo_tts_pitch,
+            _combo_tts_volume,
+            _edit_tts_speed,
+            _edit_tts_pitch,
+            _edit_tts_volume,
             combo_audio_skip,
             edit_audiobook_save_folder,
             checkbox_show_media_save_confirmation,
@@ -10638,42 +11000,26 @@ fn apply_options_dialog(hwnd: HWND) {
         settings.tts_manual_tuning =
             SendMessageW(checkbox_tts_manual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
                 == BST_CHECKED.0;
-        if settings.tts_manual_tuning {
-            let (tts_rate, adjusted_rate) = read_tts_tuning_edit_value_with_clamp(
-                edit_tts_speed,
-                settings.tts_rate,
-                TTS_RATE_MIN,
-                TTS_RATE_MAX,
-            );
-            if clamped_manual_value.is_none() {
-                clamped_manual_value = adjusted_rate;
-            }
-            settings.tts_rate = tts_rate;
-            let (tts_pitch, adjusted_pitch) = read_tts_tuning_edit_value_with_clamp(
-                edit_tts_pitch,
-                settings.tts_pitch,
-                TTS_PITCH_MIN,
-                TTS_PITCH_MAX,
-            );
-            if clamped_manual_value.is_none() {
-                clamped_manual_value = adjusted_pitch;
-            }
-            settings.tts_pitch = tts_pitch;
-            let (tts_volume, adjusted_volume) = read_tts_edit_value_with_clamp(
-                edit_tts_volume,
-                settings.tts_volume,
-                TTS_VOLUME_MIN,
-                TTS_VOLUME_MAX,
-            );
-            if clamped_manual_value.is_none() {
-                clamped_manual_value = adjusted_volume;
-            }
-            settings.tts_volume = tts_volume;
-        } else {
-            settings.tts_rate = combo_value(combo_tts_speed);
-            settings.tts_pitch = combo_value(combo_tts_pitch);
-            settings.tts_volume = combo_value(combo_tts_volume);
+        if let Some(adjusted) = store_main_tts_tuning_draft(hwnd, settings.tts_engine).flatten()
+            && clamped_manual_value.is_none()
+        {
+            clamped_manual_value = Some(adjusted);
         }
+        if let Some((edge_tuning, sapi5_tuning, sapi4_tuning)) = with_options_state(hwnd, |state| {
+            (
+                state.edge_tts_tuning,
+                state.sapi5_tts_tuning,
+                state.sapi4_tts_tuning,
+            )
+        }) {
+            settings.edge_tts_tuning = edge_tuning;
+            settings.sapi5_tts_tuning = sapi5_tuning;
+            settings.sapi4_tts_tuning = sapi4_tuning;
+        }
+        let active_tuning = tts_tuning_for_engine(&settings, settings.tts_engine);
+        settings.tts_rate = active_tuning.rate;
+        settings.tts_pitch = active_tuning.pitch;
+        settings.tts_volume = active_tuning.volume;
 
         settings.tts_only_multilingual =
             SendMessageW(checkbox_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
@@ -11168,13 +11514,15 @@ fn apply_options_dialog(hwnd: HWND) {
                 settings.dialogue_secondary_voice = short_name;
             }
         }
+        let dialogue_limits = tts_tuning_limits_for_engine(settings.dialogue_tts_engine);
+        let secondary_limits = tts_tuning_limits_for_engine(settings.dialogue_secondary_tts_engine);
         if settings.tts_manual_tuning {
             let (dialogue_voice_rate, adjusted_dialogue_voice_rate) =
                 read_tts_tuning_edit_value_with_clamp(
                     edit_dialogue_voice_rate,
                     settings.dialogue_voice_rate,
-                    TTS_RATE_MIN,
-                    TTS_RATE_MAX,
+                    dialogue_limits.rate_min,
+                    dialogue_limits.rate_max,
                 );
             if clamped_manual_value.is_none() {
                 clamped_manual_value = adjusted_dialogue_voice_rate;
@@ -11184,8 +11532,8 @@ fn apply_options_dialog(hwnd: HWND) {
                 read_tts_tuning_edit_value_with_clamp(
                     edit_dialogue_voice_pitch,
                     settings.dialogue_voice_pitch,
-                    TTS_PITCH_MIN,
-                    TTS_PITCH_MAX,
+                    dialogue_limits.pitch_min,
+                    dialogue_limits.pitch_max,
                 );
             if clamped_manual_value.is_none() {
                 clamped_manual_value = adjusted_dialogue_voice_pitch;
@@ -11195,8 +11543,8 @@ fn apply_options_dialog(hwnd: HWND) {
                 read_tts_edit_value_with_clamp(
                     edit_dialogue_voice_volume,
                     settings.dialogue_voice_volume,
-                    TTS_VOLUME_MIN,
-                    TTS_VOLUME_MAX,
+                    dialogue_limits.volume_min,
+                    dialogue_limits.volume_max,
                 );
             if clamped_manual_value.is_none() {
                 clamped_manual_value = adjusted_dialogue_voice_volume;
@@ -11206,8 +11554,8 @@ fn apply_options_dialog(hwnd: HWND) {
                 read_tts_tuning_edit_value_with_clamp(
                     edit_dialogue_secondary_voice_rate,
                     settings.dialogue_secondary_voice_rate,
-                    TTS_RATE_MIN,
-                    TTS_RATE_MAX,
+                    secondary_limits.rate_min,
+                    secondary_limits.rate_max,
                 );
             if clamped_manual_value.is_none() {
                 clamped_manual_value = adjusted_dialogue_secondary_voice_rate;
@@ -11217,8 +11565,8 @@ fn apply_options_dialog(hwnd: HWND) {
                 read_tts_tuning_edit_value_with_clamp(
                     edit_dialogue_secondary_voice_pitch,
                     settings.dialogue_secondary_voice_pitch,
-                    TTS_PITCH_MIN,
-                    TTS_PITCH_MAX,
+                    secondary_limits.pitch_min,
+                    secondary_limits.pitch_max,
                 );
             if clamped_manual_value.is_none() {
                 clamped_manual_value = adjusted_dialogue_secondary_voice_pitch;
@@ -11228,23 +11576,29 @@ fn apply_options_dialog(hwnd: HWND) {
                 read_tts_edit_value_with_clamp(
                     edit_dialogue_secondary_voice_volume,
                     settings.dialogue_secondary_voice_volume,
-                    TTS_VOLUME_MIN,
-                    TTS_VOLUME_MAX,
+                    secondary_limits.volume_min,
+                    secondary_limits.volume_max,
                 );
             if clamped_manual_value.is_none() {
                 clamped_manual_value = adjusted_dialogue_secondary_voice_volume;
             }
             settings.dialogue_secondary_voice_volume = dialogue_secondary_voice_volume;
         } else {
-            settings.dialogue_voice_rate = combo_value(combo_dialogue_voice_rate);
-            settings.dialogue_voice_pitch = combo_value(combo_dialogue_voice_pitch);
-            settings.dialogue_voice_volume = combo_value(combo_dialogue_voice_volume);
+            settings.dialogue_voice_rate = combo_value(combo_dialogue_voice_rate)
+                .clamp(dialogue_limits.rate_min, dialogue_limits.rate_max);
+            settings.dialogue_voice_pitch = combo_value(combo_dialogue_voice_pitch)
+                .clamp(dialogue_limits.pitch_min, dialogue_limits.pitch_max);
+            settings.dialogue_voice_volume = combo_value(combo_dialogue_voice_volume)
+                .clamp(dialogue_limits.volume_min, dialogue_limits.volume_max);
             settings.dialogue_secondary_voice_rate =
-                combo_value(combo_dialogue_secondary_voice_rate);
+                combo_value(combo_dialogue_secondary_voice_rate)
+                    .clamp(secondary_limits.rate_min, secondary_limits.rate_max);
             settings.dialogue_secondary_voice_pitch =
-                combo_value(combo_dialogue_secondary_voice_pitch);
+                combo_value(combo_dialogue_secondary_voice_pitch)
+                    .clamp(secondary_limits.pitch_min, secondary_limits.pitch_max);
             settings.dialogue_secondary_voice_volume =
-                combo_value(combo_dialogue_secondary_voice_volume);
+                combo_value(combo_dialogue_secondary_voice_volume)
+                    .clamp(secondary_limits.volume_min, secondary_limits.volume_max);
         }
         if let Some(value) = clamped_manual_value {
             let message = i18n::tr_f(
@@ -11252,7 +11606,14 @@ fn apply_options_dialog(hwnd: HWND) {
                 "tts_tuning.value_clamped",
                 &[("value", &value.to_string())],
             );
-            crate::show_error(hwnd, settings.language, &message);
+            crate::log_debug(&format!("TTS manual tuning value clamped: {}", value));
+            let title = i18n::tr(settings.language, "options.title");
+            MessageBoxW(
+                hwnd,
+                PCWSTR(to_wide(&message).as_ptr()),
+                PCWSTR(to_wide(&title).as_ptr()),
+                MB_OK | MB_ICONWARNING,
+            );
         }
         let dialogue_open_quote_len = GetWindowTextLengthW(edit_dialogue_open_quote);
         if dialogue_open_quote_len >= 0 {
@@ -12238,6 +12599,7 @@ fn layout_voice_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
     y = layout_checkbox("checkbox_tts_manual", state.checkbox_tts_manual, y);
     y = layout_button_compact("button_tts_preview", state.button_tts_preview, y);
     y = layout_button_compact("button_tts_insert_tag", state.button_tts_insert_tag, y);
+    y = layout_button_compact("button_tts_insert_pause", state.button_tts_insert_pause, y);
     y += OPTIONS_SECTION_GAP;
     y = layout_checkbox(
         "checkbox_split_on_newline",
@@ -12967,6 +13329,8 @@ fn update_options_scrollbar(hwnd: HWND, state: &OptionsDialogState) {
 }
 
 fn relayout_active_tab_content(hwnd: HWND) {
+    let active_tab =
+        with_options_state(hwnd, |state| state.active_tab).unwrap_or(OPTIONS_TAB_GENERAL);
     if with_options_state(hwnd, |state| {
         let idx = tab_array_index(state.active_tab);
         let viewport_height = options_viewport_height(hwnd);
@@ -12981,6 +13345,10 @@ fn relayout_active_tab_content(hwnd: HWND) {
     .is_none()
     {
         crate::log_debug("Failed to access state in options_window");
+    }
+    if active_tab == OPTIONS_TAB_VOICE {
+        update_tts_manual_visibility(hwnd);
+        update_dialogue_voice_visibility(hwnd);
     }
 }
 
@@ -13164,6 +13532,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.edit_tts_volume,
             state.button_tts_preview,
             state.button_tts_insert_tag,
+            state.button_tts_insert_pause,
             state.checkbox_multilingual,
             state.checkbox_tts_manual,
             state.checkbox_split_on_newline,

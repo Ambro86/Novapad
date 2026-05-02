@@ -137,10 +137,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
     HCURSOR, HICON, HMENU, HWND_NOTOPMOST, HWND_TOPMOST, IDC_ARROW, IDI_APPLICATION, IDYES,
     IsChild, IsDialogMessageW, IsIconic, IsWindow, IsWindowVisible, KillTimer, LoadCursorW,
-    LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_OK, MB_YESNO, MENU_ITEM_FLAGS,
-    MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED,
-    MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW,
-    MoveWindow, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
+    LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_YESNO,
+    MENU_ITEM_FLAGS, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
+    MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW,
+    ModifyMenuW, MoveWindow, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
     RegisterWindowMessageW, SC_KEYMENU, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
     SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
     SetMenu, SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_RETURNCMD,
@@ -243,6 +243,12 @@ const VOICE_PANEL_ID_SPEED_EDIT: usize = 21008;
 const VOICE_PANEL_ID_PITCH_EDIT: usize = 21009;
 const VOICE_PANEL_ID_VOLUME_EDIT: usize = 21010;
 const VOICE_PANEL_ID_INSERT_TAG: usize = 21011;
+const VOICE_PANEL_ID_INSERT_PAUSE: usize = 21015;
+const PAUSE_TAG_MENU_250MS: usize = 21101;
+const PAUSE_TAG_MENU_500MS: usize = 21102;
+const PAUSE_TAG_MENU_1S: usize = 21103;
+const PAUSE_TAG_MENU_2S: usize = 21104;
+const PAUSE_TAG_MENU_CUSTOM: usize = 21105;
 const MAIN_STATUS_ID: usize = 22001;
 const VOICE_MENU_ID_ADD_FAVORITE: u32 = 9001;
 const VOICE_MENU_ID_REMOVE_FAVORITE: u32 = 9002;
@@ -6018,7 +6024,7 @@ fn toggle_voice_dictation(hwnd: HWND) {
     }
 }
 
-fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
+pub(crate) fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
     if should_route_player_command_to_mpv(hwnd) {
         let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         let result = match command {
@@ -6655,6 +6661,7 @@ pub(crate) struct AppState {
     voice_label_voice: HWND,
     voice_combo_voice: HWND,
     voice_button_insert_tag: HWND,
+    voice_button_insert_pause: HWND,
     voice_label_speed: HWND,
     voice_combo_speed: HWND,
     voice_edit_speed: HWND,
@@ -7295,11 +7302,25 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
             // Enter on the voice panel "Insert Tag" button: behave like the options dialog
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
                 let focus = GetFocus();
+                if is_voice_panel_tuning_edit(hwnd, focus) {
+                    handle_voice_panel_tuning_edit_change(hwnd);
+                    continue;
+                }
                 let is_insert_tag = focus.0 != 0
                     && with_state(hwnd, |state| focus == state.voice_button_insert_tag)
                         .unwrap_or(false);
                 if is_insert_tag {
                     insert_voice_tag_from_voice_panel(hwnd);
+                    if let Some(hwnd_edit) = get_active_edit(hwnd) {
+                        set_focus_safe(hwnd_edit);
+                    }
+                    continue;
+                }
+                let is_insert_pause = focus.0 != 0
+                    && with_state(hwnd, |state| focus == state.voice_button_insert_pause)
+                        .unwrap_or(false);
+                if is_insert_pause {
+                    show_pause_tag_menu_from_voice_panel(hwnd);
                     if let Some(hwnd_edit) = get_active_edit(hwnd) {
                         set_focus_safe(hwnd_edit);
                     }
@@ -7877,6 +7898,20 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     HINSTANCE(0),
                     None,
                 );
+                let button_insert_pause = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD | WS_TABSTOP,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_INSERT_PAUSE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
                 let label_speed = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
@@ -8226,6 +8261,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     voice_label_voice: label_voice,
                     voice_combo_voice: combo_voice,
                     voice_button_insert_tag: button_insert_tag,
+                    voice_button_insert_pause: button_insert_pause,
                     voice_label_speed: label_speed,
                     voice_combo_speed: combo_speed,
                     voice_edit_speed: edit_speed,
@@ -9591,6 +9627,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     insert_voice_tag_from_voice_panel(hwnd);
                     return LRESULT(0);
                 }
+                if cmd_id == VOICE_PANEL_ID_INSERT_PAUSE {
+                    show_pause_tag_menu_from_voice_panel(hwnd);
+                    return LRESULT(0);
+                }
                 if (cmd_id == VOICE_PANEL_ID_SPEED
                     || cmd_id == VOICE_PANEL_ID_PITCH
                     || cmd_id == VOICE_PANEL_ID_VOLUME)
@@ -10404,6 +10444,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         app_windows::youtube_transcript_window::play_streaming_audio_from_url(hwnd);
                         LRESULT(0)
                     }
+                    IDM_TOOLS_RADIO => {
+                        log_debug("Menu: Radio");
+                        app_windows::radio_window::open(hwnd);
+                        LRESULT(0)
+                    }
                     IDM_TOOLS_PROMPT => {
                         log_debug("Menu: Prompt");
                         app_windows::prompt_window::open(hwnd);
@@ -10627,6 +10672,7 @@ struct VoicePanelLabels {
     label_favorites: String,
     label_multilingual: String,
     button_insert_tag: String,
+    button_insert_pause: String,
     engine_edge: String,
     engine_sapi: String,
     engine_sapi4: String,
@@ -10647,6 +10693,7 @@ fn voice_panel_labels(language: Language) -> VoicePanelLabels {
         label_favorites: i18n::tr(language, "voice_panel.label_favorites"),
         label_multilingual: i18n::tr(language, "voice_panel.label_multilingual"),
         button_insert_tag: i18n::tr(language, "voice_panel.insert_tag"),
+        button_insert_pause: i18n::tr(language, "options.label.insert_pause_tag"),
         engine_edge: i18n::tr(language, "voice_panel.engine_edge"),
         engine_sapi: i18n::tr(language, "voice_panel.engine_sapi"),
         engine_sapi4: i18n::tr(language, "voice_panel.engine_sapi4"),
@@ -10747,9 +10794,61 @@ const TTS_RATE_MIN: i32 = -100;
 const TTS_RATE_MAX: i32 = 100;
 const TTS_PITCH_MIN: i32 = -12;
 const TTS_PITCH_MAX: i32 = 12;
-const TTS_VOLUME_MIN: i32 = 25;
-const TTS_VOLUME_MAX: i32 = 200;
+const EDGE_TTS_VOLUME_MIN: i32 = 25;
+const EDGE_TTS_VOLUME_MAX: i32 = 200;
+const SAPI_TTS_VOLUME_MIN: i32 = 0;
+const SAPI_TTS_VOLUME_MAX: i32 = 100;
 const TTS_UI_OFFSET: i32 = 100;
+
+#[derive(Clone, Copy)]
+struct TtsTuningLimits {
+    rate_min: i32,
+    rate_max: i32,
+    pitch_min: i32,
+    pitch_max: i32,
+    volume_min: i32,
+    volume_max: i32,
+}
+
+fn tts_tuning_limits_for_engine(engine: TtsEngine) -> TtsTuningLimits {
+    match engine {
+        TtsEngine::Edge => TtsTuningLimits {
+            rate_min: TTS_RATE_MIN,
+            rate_max: TTS_RATE_MAX,
+            pitch_min: TTS_PITCH_MIN,
+            pitch_max: TTS_PITCH_MAX,
+            volume_min: EDGE_TTS_VOLUME_MIN,
+            volume_max: EDGE_TTS_VOLUME_MAX,
+        },
+        TtsEngine::Sapi5 | TtsEngine::Sapi4 => TtsTuningLimits {
+            rate_min: TTS_RATE_MIN,
+            rate_max: TTS_RATE_MAX,
+            pitch_min: TTS_PITCH_MIN,
+            pitch_max: TTS_PITCH_MAX,
+            volume_min: SAPI_TTS_VOLUME_MIN,
+            volume_max: SAPI_TTS_VOLUME_MAX,
+        },
+    }
+}
+
+fn clamp_tts_tuning_for_engine(engine: TtsEngine, tuning: TtsTuning) -> TtsTuning {
+    let limits = tts_tuning_limits_for_engine(engine);
+    TtsTuning::new(
+        tuning.rate.clamp(limits.rate_min, limits.rate_max),
+        tuning.pitch.clamp(limits.pitch_min, limits.pitch_max),
+        tuning.volume.clamp(limits.volume_min, limits.volume_max),
+    )
+}
+
+fn set_active_tts_tuning(settings: &mut AppSettings, engine: TtsEngine, tuning: TtsTuning) {
+    let tuning = clamp_tts_tuning_for_engine(engine, tuning);
+    set_tts_tuning_for_engine(settings, engine, tuning);
+    if settings.tts_engine == engine {
+        settings.tts_rate = tuning.rate;
+        settings.tts_pitch = tuning.pitch;
+        settings.tts_volume = tuning.volume;
+    }
+}
 
 fn clamp_tts_chunk_offset(previous: i32, incoming: i32) -> i32 {
     previous.max(incoming.max(0))
@@ -10801,19 +10900,30 @@ fn select_combo_nearest_value(hwnd: HWND, value: i32) {
     }
 }
 
-fn read_tts_edit_value(edit: HWND, fallback: i32, min: i32, max: i32) -> i32 {
+fn read_tts_edit_value_with_clamp(
+    edit: HWND,
+    fallback: i32,
+    min: i32,
+    max: i32,
+) -> (i32, Option<i32>) {
     unsafe {
         let len = GetWindowTextLengthW(edit);
         if len <= 0 {
-            return fallback;
+            return (fallback, None);
         }
         let mut buf = vec![0u16; (len + 1) as usize];
         let read = GetWindowTextW(edit, &mut buf);
         let text = String::from_utf16_lossy(&buf[..read as usize]);
-        if let Ok(parsed) = text.trim().parse::<i32>() {
-            parsed.clamp(min, max)
-        } else {
-            fallback
+        match text.trim().parse::<i32>() {
+            Ok(parsed) => {
+                let clamped = parsed.clamp(min, max);
+                if clamped != parsed {
+                    (clamped, Some(clamped))
+                } else {
+                    (clamped, None)
+                }
+            }
+            Err(_) => (fallback, Some(fallback)),
         }
     }
 }
@@ -10822,12 +10932,30 @@ fn tts_ui_value_from_internal(value: i32) -> i32 {
     value + TTS_UI_OFFSET
 }
 
-fn read_tts_tuning_edit_value(edit: HWND, fallback_internal: i32, min: i32, max: i32) -> i32 {
+fn read_tts_tuning_edit_value_with_clamp(
+    edit: HWND,
+    fallback_internal: i32,
+    min: i32,
+    max: i32,
+) -> (i32, Option<i32>) {
     let ui_min = min + TTS_UI_OFFSET;
     let ui_max = max + TTS_UI_OFFSET;
     let ui_fallback = tts_ui_value_from_internal(fallback_internal).clamp(ui_min, ui_max);
-    let ui_value = read_tts_edit_value(edit, ui_fallback, ui_min, ui_max);
-    (ui_value - TTS_UI_OFFSET).clamp(min, max)
+    let (ui_value, adjusted) = read_tts_edit_value_with_clamp(edit, ui_fallback, ui_min, ui_max);
+    ((ui_value - TTS_UI_OFFSET).clamp(min, max), adjusted)
+}
+
+fn set_tts_tuning_edit_text(edit: HWND, value: i32, is_tuning_value: bool) {
+    let display_value = if is_tuning_value {
+        tts_ui_value_from_internal(value)
+    } else {
+        value
+    };
+    if let Err(e) =
+        crate::set_window_text_w_safe(edit, PCWSTR(to_wide(&display_value.to_string()).as_ptr()))
+    {
+        log_debug(&format!("Failed to update voice panel tuning edit: {e}"));
+    }
 }
 
 fn text_color_menu_id(text_color: u32) -> usize {
@@ -10984,6 +11112,7 @@ fn apply_ui_font(hwnd: HWND, face_name: String) {
                 state.voice_label_voice,
                 state.voice_combo_voice,
                 state.voice_button_insert_tag,
+                state.voice_button_insert_pause,
                 state.voice_label_speed,
                 state.voice_combo_speed,
                 state.voice_edit_speed,
@@ -11202,6 +11331,7 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
         label_voice,
         combo_voice,
         button_insert_tag,
+        button_insert_pause,
         label_speed,
         combo_speed,
         edit_speed,
@@ -11225,6 +11355,7 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
             state.voice_label_voice,
             state.voice_combo_voice,
             state.voice_button_insert_tag,
+            state.voice_button_insert_pause,
             state.voice_label_speed,
             state.voice_combo_speed,
             state.voice_edit_speed,
@@ -11251,6 +11382,7 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
         label_voice,
         combo_voice,
         button_insert_tag,
+        button_insert_pause,
         label_speed,
         combo_speed,
         edit_speed,
@@ -11342,6 +11474,7 @@ pub(crate) fn refresh_voice_panel(hwnd: HWND) {
             label_voice,
             combo_voice,
             button_insert_tag,
+            button_insert_pause,
             label_speed,
             combo_speed,
             edit_speed,
@@ -11365,6 +11498,7 @@ pub(crate) fn refresh_voice_panel(hwnd: HWND) {
                 state.voice_label_voice,
                 state.voice_combo_voice,
                 state.voice_button_insert_tag,
+                state.voice_button_insert_pause,
                 state.voice_label_speed,
                 state.voice_combo_speed,
                 state.voice_edit_speed,
@@ -11409,9 +11543,14 @@ pub(crate) fn refresh_voice_panel(hwnd: HWND) {
                 PCWSTR(label_voice_wide.as_ptr())
             ));
             let button_insert_wide = to_wide(&labels.button_insert_tag);
+            let button_pause_wide = to_wide(&labels.button_insert_pause);
             crate::log_if_err!(SetWindowTextW(
                 button_insert_tag,
                 PCWSTR(button_insert_wide.as_ptr())
+            ));
+            crate::log_if_err!(SetWindowTextW(
+                button_insert_pause,
+                PCWSTR(button_pause_wide.as_ptr())
             ));
             crate::log_if_err!(SetWindowTextW(
                 label_speed,
@@ -12052,7 +12191,21 @@ fn handle_voice_panel_engine_change(hwnd: HWND) {
         })
         .unwrap_or((TtsEngine::Edge, String::new()));
         with_state(hwnd, |state| {
+            let old_tuning = TtsTuning::new(
+                state.settings.tts_rate,
+                state.settings.tts_pitch,
+                state.settings.tts_volume,
+            );
+            set_tts_tuning_for_engine(&mut state.settings, old_engine, old_tuning);
             state.settings.tts_engine = new_engine;
+            let new_tuning = clamp_tts_tuning_for_engine(
+                new_engine,
+                tts_tuning_for_engine(&state.settings, new_engine),
+            );
+            set_tts_tuning_for_engine(&mut state.settings, new_engine, new_tuning);
+            state.settings.tts_rate = new_tuning.rate;
+            state.settings.tts_pitch = new_tuning.pitch;
+            state.settings.tts_volume = new_tuning.volume;
         });
         app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
         refresh_voice_panel(hwnd);
@@ -12152,6 +12305,85 @@ fn insert_voice_tag_from_voice_panel(hwnd: HWND) {
     }
 }
 
+fn show_pause_tag_menu_from_voice_panel(hwnd: HWND) {
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    if let Some(ms) = choose_pause_tag_milliseconds(hwnd, language) {
+        crate::editor_manager::insert_pause_tag_at_caret(hwnd, ms);
+        let label = clean_menu_label(&i18n::tr(language, "options.label.insert_pause_tag"));
+        if !label.is_empty() {
+            with_state(hwnd, |state| state.undo_action_label = Some(label));
+        }
+    }
+}
+
+fn choose_pause_tag_milliseconds(hwnd: HWND, language: Language) -> Option<u32> {
+    unsafe {
+        let menu = CreatePopupMenu().unwrap_or(HMENU(0));
+        if menu.0 == 0 {
+            return None;
+        }
+        for (id, key) in [
+            (PAUSE_TAG_MENU_250MS, "pause_tag.menu.250ms"),
+            (PAUSE_TAG_MENU_500MS, "pause_tag.menu.500ms"),
+            (PAUSE_TAG_MENU_1S, "pause_tag.menu.1s"),
+            (PAUSE_TAG_MENU_2S, "pause_tag.menu.2s"),
+            (PAUSE_TAG_MENU_CUSTOM, "pause_tag.menu.custom"),
+        ] {
+            let label = i18n::tr(language, key);
+            crate::log_if_err!(AppendMenuW(
+                menu,
+                MF_STRING,
+                id,
+                PCWSTR(to_wide(&label).as_ptr()),
+            ));
+        }
+
+        let mut pt = windows::Win32::Foundation::POINT::default();
+        crate::log_if_err!(GetCursorPos(&mut pt));
+        SetForegroundWindow(hwnd);
+        let selected = TrackPopupMenu(
+            menu,
+            TPM_RETURNCMD | TPM_RIGHTBUTTON,
+            pt.x,
+            pt.y,
+            0,
+            hwnd,
+            None,
+        )
+        .0 as usize;
+        crate::log_if_err!(PostMessageW(hwnd, WM_NULL, WPARAM(0), LPARAM(0)));
+        match selected {
+            PAUSE_TAG_MENU_250MS => Some(250),
+            PAUSE_TAG_MENU_500MS => Some(500),
+            PAUSE_TAG_MENU_1S => Some(1000),
+            PAUSE_TAG_MENU_2S => Some(2000),
+            PAUSE_TAG_MENU_CUSTOM => prompt_custom_pause_milliseconds(hwnd, language),
+            _ => None,
+        }
+    }
+}
+
+fn prompt_custom_pause_milliseconds(hwnd: HWND, language: Language) -> Option<u32> {
+    let title = i18n::tr(language, "pause_tag.custom.title");
+    let prompt = i18n::tr(language, "pause_tag.custom.prompt");
+    let value = app_windows::prompt_window::prompt_user(hwnd, &title, &prompt, "1000", language)?;
+    let parsed = value.trim().parse::<u32>().ok();
+    if let Some(ms) = parsed
+        && (tts_engine::PAUSE_TAG_MIN_MS..=tts_engine::PAUSE_TAG_MAX_MS).contains(&ms)
+    {
+        return Some(ms);
+    }
+    let min = tts_engine::PAUSE_TAG_MIN_MS.to_string();
+    let max = tts_engine::PAUSE_TAG_MAX_MS.to_string();
+    let message = i18n::tr_f(
+        language,
+        "pause_tag.custom.invalid",
+        &[("min", &min), ("max", &max)],
+    );
+    show_error(hwnd, language, &message);
+    None
+}
+
 fn is_voice_panel_tuning_edit(hwnd: HWND, target: HWND) -> bool {
     if target.0 == 0 {
         return false;
@@ -12168,33 +12400,45 @@ fn is_voice_panel_tuning_edit(hwnd: HWND, target: HWND) -> bool {
 
 fn handle_voice_panel_tuning_combo_change(hwnd: HWND) {
     {
-        let (combo_speed, combo_pitch, combo_volume, was_active, old_rate, old_pitch, old_volume) =
-            with_state(hwnd, |state| {
-                (
-                    state.voice_combo_speed,
-                    state.voice_combo_pitch,
-                    state.voice_combo_volume,
-                    state.tts_session.is_some(),
-                    state.settings.tts_rate,
-                    state.settings.tts_pitch,
-                    state.settings.tts_volume,
-                )
-            })
-            .unwrap_or((HWND(0), HWND(0), HWND(0), false, 0, 0, 100));
+        let (
+            combo_speed,
+            combo_pitch,
+            combo_volume,
+            was_active,
+            engine,
+            old_rate,
+            old_pitch,
+            old_volume,
+        ) = with_state(hwnd, |state| {
+            (
+                state.voice_combo_speed,
+                state.voice_combo_pitch,
+                state.voice_combo_volume,
+                state.tts_session.is_some(),
+                state.settings.tts_engine,
+                state.settings.tts_rate,
+                state.settings.tts_pitch,
+                state.settings.tts_volume,
+            )
+        })
+        .unwrap_or((HWND(0), HWND(0), HWND(0), false, TtsEngine::Edge, 0, 0, 100));
         if combo_speed.0 == 0 || combo_pitch.0 == 0 || combo_volume.0 == 0 {
             return;
         }
-        let rate = combo_value(combo_speed);
-        let pitch = combo_value(combo_pitch);
-        let volume = combo_value(combo_volume);
+        let limits = tts_tuning_limits_for_engine(engine);
+        let rate = combo_value(combo_speed).clamp(limits.rate_min, limits.rate_max);
+        let pitch = combo_value(combo_pitch).clamp(limits.pitch_min, limits.pitch_max);
+        let volume = combo_value(combo_volume).clamp(limits.volume_min, limits.volume_max);
         let changed = with_state(hwnd, |state| {
             if state.settings.tts_rate != rate
                 || state.settings.tts_pitch != pitch
                 || state.settings.tts_volume != volume
             {
-                state.settings.tts_rate = rate;
-                state.settings.tts_pitch = pitch;
-                state.settings.tts_volume = volume;
+                set_active_tts_tuning(
+                    &mut state.settings,
+                    engine,
+                    TtsTuning::new(rate, pitch, volume),
+                );
                 true
             } else {
                 false
@@ -12214,33 +12458,101 @@ fn handle_voice_panel_tuning_combo_change(hwnd: HWND) {
 
 fn handle_voice_panel_tuning_edit_change(hwnd: HWND) {
     {
-        let (edit_speed, edit_pitch, edit_volume, was_active, old_rate, old_pitch, old_volume) =
-            with_state(hwnd, |state| {
-                (
-                    state.voice_edit_speed,
-                    state.voice_edit_pitch,
-                    state.voice_edit_volume,
-                    state.tts_session.is_some(),
-                    state.settings.tts_rate,
-                    state.settings.tts_pitch,
-                    state.settings.tts_volume,
-                )
-            })
-            .unwrap_or((HWND(0), HWND(0), HWND(0), false, 0, 0, 100));
+        let (
+            edit_speed,
+            edit_pitch,
+            edit_volume,
+            was_active,
+            engine,
+            language,
+            old_rate,
+            old_pitch,
+            old_volume,
+        ) = with_state(hwnd, |state| {
+            (
+                state.voice_edit_speed,
+                state.voice_edit_pitch,
+                state.voice_edit_volume,
+                state.tts_session.is_some(),
+                state.settings.tts_engine,
+                state.settings.language,
+                state.settings.tts_rate,
+                state.settings.tts_pitch,
+                state.settings.tts_volume,
+            )
+        })
+        .unwrap_or((
+            HWND(0),
+            HWND(0),
+            HWND(0),
+            false,
+            TtsEngine::Edge,
+            Language::English,
+            0,
+            0,
+            100,
+        ));
         if edit_speed.0 == 0 || edit_pitch.0 == 0 || edit_volume.0 == 0 {
             return;
         }
-        let rate = read_tts_tuning_edit_value(edit_speed, old_rate, TTS_RATE_MIN, TTS_RATE_MAX);
-        let pitch = read_tts_tuning_edit_value(edit_pitch, old_pitch, TTS_PITCH_MIN, TTS_PITCH_MAX);
-        let volume = read_tts_edit_value(edit_volume, old_volume, TTS_VOLUME_MIN, TTS_VOLUME_MAX);
+        let limits = tts_tuning_limits_for_engine(engine);
+        let (rate, adjusted_rate) = read_tts_tuning_edit_value_with_clamp(
+            edit_speed,
+            old_rate,
+            limits.rate_min,
+            limits.rate_max,
+        );
+        let (pitch, adjusted_pitch) = read_tts_tuning_edit_value_with_clamp(
+            edit_pitch,
+            old_pitch,
+            limits.pitch_min,
+            limits.pitch_max,
+        );
+        let (volume, adjusted_volume) = read_tts_edit_value_with_clamp(
+            edit_volume,
+            old_volume,
+            limits.volume_min,
+            limits.volume_max,
+        );
+        if adjusted_rate.is_some() {
+            set_tts_tuning_edit_text(edit_speed, rate, true);
+        }
+        if adjusted_pitch.is_some() {
+            set_tts_tuning_edit_text(edit_pitch, pitch, true);
+        }
+        if adjusted_volume.is_some() {
+            set_tts_tuning_edit_text(edit_volume, volume, false);
+        }
+        if let Some(value) = adjusted_rate.or(adjusted_pitch).or(adjusted_volume) {
+            let message = i18n::tr_f(
+                language,
+                "tts_tuning.value_clamped",
+                &[("value", &value.to_string())],
+            );
+            log_debug(&format!(
+                "Voice panel TTS manual tuning value clamped: {}",
+                value
+            ));
+            let title = "Sonarpad";
+            unsafe {
+                MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(&message).as_ptr()),
+                    PCWSTR(to_wide(title).as_ptr()),
+                    MB_OK | MB_ICONWARNING,
+                );
+            }
+        }
         let changed = with_state(hwnd, |state| {
             if state.settings.tts_rate != rate
                 || state.settings.tts_pitch != pitch
                 || state.settings.tts_volume != volume
             {
-                state.settings.tts_rate = rate;
-                state.settings.tts_pitch = pitch;
-                state.settings.tts_volume = volume;
+                set_active_tts_tuning(
+                    &mut state.settings,
+                    engine,
+                    TtsTuning::new(rate, pitch, volume),
+                );
                 true
             } else {
                 false
@@ -12292,8 +12604,22 @@ fn handle_voice_panel_favorite_change(hwnd: HWND) {
             return;
         }
         with_state(hwnd, |state| {
+            let old_tuning = TtsTuning::new(
+                state.settings.tts_rate,
+                state.settings.tts_pitch,
+                state.settings.tts_volume,
+            );
+            set_tts_tuning_for_engine(&mut state.settings, old_engine, old_tuning);
             state.settings.tts_engine = fav.engine;
             state.settings.tts_voice = fav.short_name.clone();
+            let new_tuning = clamp_tts_tuning_for_engine(
+                fav.engine,
+                tts_tuning_for_engine(&state.settings, fav.engine),
+            );
+            set_tts_tuning_for_engine(&mut state.settings, fav.engine, new_tuning);
+            state.settings.tts_rate = new_tuning.rate;
+            state.settings.tts_pitch = new_tuning.pitch;
+            state.settings.tts_volume = new_tuning.volume;
         });
         let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
         app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
@@ -14057,6 +14383,7 @@ fn is_focus_in_voice_panel(hwnd: HWND) -> bool {
                 || is_match(state.voice_combo_language)
                 || is_match(state.voice_combo_voice)
                 || is_match(state.voice_button_insert_tag)
+                || is_match(state.voice_button_insert_pause)
                 || is_match(state.voice_combo_speed)
                 || is_match(state.voice_combo_pitch)
                 || is_match(state.voice_combo_volume)
@@ -14078,6 +14405,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             combo_language,
             combo_voice,
             button_insert_tag,
+            button_insert_pause,
             combo_speed,
             combo_pitch,
             combo_volume,
@@ -14098,6 +14426,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
                 state.voice_combo_language,
                 state.voice_combo_voice,
                 state.voice_button_insert_tag,
+                state.voice_button_insert_pause,
                 state.voice_combo_speed,
                 state.voice_combo_pitch,
                 state.voice_combo_volume,
@@ -14132,6 +14461,10 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
         } else if raw_focus == button_insert_tag || IsChild(button_insert_tag, raw_focus).as_bool()
         {
             button_insert_tag
+        } else if raw_focus == button_insert_pause
+            || IsChild(button_insert_pause, raw_focus).as_bool()
+        {
+            button_insert_pause
         } else if raw_focus == combo_speed || IsChild(combo_speed, raw_focus).as_bool() {
             combo_speed
         } else if raw_focus == combo_pitch || IsChild(combo_pitch, raw_focus).as_bool() {
@@ -14147,6 +14480,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             || (is_edge && !only_multilingual && focus == combo_language)
             || focus == combo_voice
             || focus == button_insert_tag
+            || focus == button_insert_pause
             || (!manual_tuning && focus == combo_speed)
             || (!manual_tuning && focus == combo_pitch)
             || (!manual_tuning && focus == combo_volume)
@@ -14189,6 +14523,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             && focus != combo_language
             && focus != combo_voice
             && focus != button_insert_tag
+            && focus != button_insert_pause
             && focus != speed_control
             && focus != pitch_control
             && focus != volume_control
@@ -14220,6 +14555,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             }
             order.push(combo_voice);
             order.push(button_insert_tag);
+            order.push(button_insert_pause);
             order.push(speed_control);
             order.push(pitch_control);
             order.push(volume_control);

@@ -34,9 +34,9 @@ use windows::Win32::Media::MediaFoundation::{
 };
 use windows::Win32::Media::Speech::{
     ISpMMSysAudio, ISpObjectToken, ISpVoice, ISpeechFileStream, ISpeechObjectToken,
-    ISpeechObjectTokenCategory, ISpeechVoice, SpeechVoiceSpeakFlags, SSFMCreateForWrite,
-    SpFileStream, SpMMAudioOut, SpObjectTokenCategory, SpVoice, SPAS_PAUSE, SPAS_RUN, SPAS_STOP,
-    SPF_ASYNC, SPF_PURGEBEFORESPEAK,
+    ISpeechObjectTokenCategory, ISpeechVoice, SSFMCreateForWrite, SpFileStream, SpMMAudioOut,
+    SpObjectTokenCategory, SpVoice, SpeechVoiceSpeakFlags, SPAS_PAUSE, SPAS_RUN, SPAS_STOP,
+    SPF_ASYNC, SPF_IS_XML, SPF_PURGEBEFORESPEAK,
 };
 
 // =========================
@@ -960,6 +960,33 @@ fn map_sapi5_volume(volume: i32) -> u16 {
     volume.clamp(0, 100) as u16
 }
 
+fn escape_sapi5_xml(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&apos;"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+fn sapi5_xml_with_pitch(text: &str, pitch: Option<i32>) -> String {
+    let escaped = escape_sapi5_xml(text);
+    match pitch {
+        Some(p) => format!(
+            "<pitch absmiddle='{:+}'>{}</pitch>",
+            p.clamp(-10, 10),
+            escaped
+        ),
+        None => escaped,
+    }
+}
+
 fn configure_sapi5_voice(
     voice: &ISpVoice,
     voice_name: &str,
@@ -990,7 +1017,7 @@ fn configure_sapi5_voice(
 fn run_sapi5_server(
     voice_name: &str,
     rate: Option<i32>,
-    _pitch: Option<i32>,
+    pitch: Option<i32>,
     volume: Option<i32>,
 ) -> Result<(), String> {
     let _com = ComGuard::init_mta()?;
@@ -1027,10 +1054,17 @@ fn run_sapi5_server(
     loop {
         match rx.recv() {
             Ok(ServerCommand::Speak(text)) => {
-                let wide = U16CString::from_str(text)
-                    .map_err(|e| format!("Invalid UTF-16 text: {}", e))?;
-                unsafe { voice.Speak(PCWSTR(wide.as_ptr()), SPF_ASYNC.0 as u32, None) }
-                    .map_err(|e| format!("Speak failed: {}", e))?;
+                let xml = sapi5_xml_with_pitch(&text, pitch);
+                let wide =
+                    U16CString::from_str(xml).map_err(|e| format!("Invalid UTF-16 text: {}", e))?;
+                unsafe {
+                    voice.Speak(
+                        PCWSTR(wide.as_ptr()),
+                        (SPF_ASYNC.0 | SPF_IS_XML.0) as u32,
+                        None,
+                    )
+                }
+                .map_err(|e| format!("Speak failed: {}", e))?;
             }
             Ok(ServerCommand::Pause) => {
                 if let Some(audio) = &audio_output {
@@ -1072,7 +1106,7 @@ fn speak_sapi5_to_file(
     voice_name: &str,
     out_path: &str,
     rate: Option<i32>,
-    _pitch: Option<i32>,
+    pitch: Option<i32>,
     volume: Option<i32>,
 ) -> Result<(), String> {
     let _com = ComGuard::init_mta()?;
@@ -1119,8 +1153,9 @@ fn speak_sapi5_to_file(
         .map_err(|e| format!("putref_AudioOutputStream failed: {}", e))?;
 
     if !text.trim().is_empty() {
-        let text_bstr = windows::core::BSTR::from(text);
-        unsafe { voice.Speak(&text_bstr, SpeechVoiceSpeakFlags(0)) }
+        let xml = sapi5_xml_with_pitch(&text, pitch);
+        let text_bstr = windows::core::BSTR::from(xml);
+        unsafe { voice.Speak(&text_bstr, SpeechVoiceSpeakFlags(8)) }
             .map_err(|e| format!("Speak failed: {}", e))?;
         unsafe { voice.WaitUntilDone(i32::MAX) }
             .map_err(|e| format!("WaitUntilDone failed: {}", e))?;

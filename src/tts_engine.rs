@@ -43,6 +43,8 @@ pub const MAX_TTS_TEXT_LEN: usize = 3000;
 pub const MAX_TTS_TEXT_LEN_LONG: usize = 2000;
 pub const MAX_TTS_FIRST_CHUNK_LEN_LONG: usize = 800;
 pub const TTS_LONG_TEXT_THRESHOLD: usize = MAX_TTS_TEXT_LEN;
+pub(crate) const PAUSE_TAG_MIN_MS: u32 = 50;
+pub(crate) const PAUSE_TAG_MAX_MS: u32 = 60_000;
 // Some voices silently truncate long SSML payloads without returning an error.
 // Keep Edge chunks conservative to avoid partial audiobook exports.
 const EDGE_TTS_MAX_BYTES: usize = 1800;
@@ -3438,6 +3440,7 @@ fn mkssml(text: &str, voice: &str, tts_rate: i32, tts_pitch: i32, tts_volume: i3
     } else {
         "en-US".to_string()
     };
+    let rendered_text = render_edge_ssml_text_with_pause_tags(text);
     format!(
         "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='{}'><voice name='{}'><prosody pitch='{}' rate='{}' volume='{}'>{}</prosody></voice></speak>",
         lang,
@@ -3445,8 +3448,124 @@ fn mkssml(text: &str, voice: &str, tts_rate: i32, tts_pitch: i32, tts_volume: i3
         format_pitch(tts_pitch),
         format_rate(tts_rate),
         format_volume(tts_volume),
-        text
+        rendered_text
     )
+}
+
+fn parse_pause_tag_milliseconds(tag: &str) -> Option<u32> {
+    let trimmed = tag.trim();
+    let inner = trimmed
+        .strip_prefix('<')?
+        .strip_suffix('>')?
+        .trim()
+        .trim_end_matches('/')
+        .trim();
+    let rest = inner.strip_prefix("pause")?.trim();
+    if rest.is_empty() {
+        return None;
+    }
+    for token in rest.split_whitespace() {
+        let value = token
+            .strip_prefix("ms=")
+            .or_else(|| token.strip_prefix("milliseconds="))
+            .unwrap_or(token)
+            .trim_matches(['"', '\'']);
+        if let Ok(ms) = value.parse::<u32>()
+            && (PAUSE_TAG_MIN_MS..=PAUSE_TAG_MAX_MS).contains(&ms)
+        {
+            return Some(ms);
+        }
+    }
+    None
+}
+
+fn render_ssml_text_with_pause_tags(text: &str, pause_markup: impl Fn(u32) -> String) -> String {
+    let lower = text.to_ascii_lowercase();
+    let mut out = String::with_capacity(text.len());
+    let mut cursor = 0usize;
+    let mut i = 0usize;
+    let bytes = lower.as_bytes();
+    while i < bytes.len() {
+        if bytes[i] == b'<' {
+            let remaining = &lower[i..];
+            if remaining.starts_with("<pause")
+                && let Some(end_rel) = remaining.find('>')
+            {
+                let end = i + end_rel + 1;
+                let tag = &text[i..end];
+                if let Some(ms) = parse_pause_tag_milliseconds(&lower[i..end]) {
+                    if i > cursor {
+                        out.push_str(&escape_xml(&text[cursor..i]));
+                    }
+                    out.push_str(&pause_markup(ms));
+                    cursor = end;
+                    i = end;
+                    continue;
+                }
+                if i > cursor {
+                    out.push_str(&escape_xml(&text[cursor..i]));
+                }
+                out.push_str(&escape_xml(tag));
+                cursor = end;
+                i = end;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    if cursor < text.len() {
+        out.push_str(&escape_xml(&text[cursor..]));
+    }
+    out
+}
+
+pub(crate) fn render_edge_ssml_text_with_pause_tags(text: &str) -> String {
+    let lower = text.to_ascii_lowercase();
+    let mut out = String::with_capacity(text.len());
+    let mut cursor = 0usize;
+    let mut i = 0usize;
+    let bytes = lower.as_bytes();
+    while i < bytes.len() {
+        if bytes[i] == b'<' {
+            let remaining = &lower[i..];
+            if remaining.starts_with("<pause")
+                && let Some(end_rel) = remaining.find('>')
+            {
+                let end = i + end_rel + 1;
+                if let Some(ms) = parse_pause_tag_milliseconds(&lower[i..end]) {
+                    out.push_str(&text[cursor..i]);
+                    out.push_str(&format!("<break time=\"{ms}ms\"/>"));
+                    cursor = end;
+                    i = end;
+                    continue;
+                }
+            }
+        } else if bytes[i] == b'&' {
+            let remaining = &lower[i..];
+            if remaining.starts_with("&lt;pause")
+                && let Some(end_rel) = remaining.find("&gt;")
+            {
+                let end = i + end_rel + "&gt;".len();
+                let decoded = decode_basic_xml_entities(&lower[i..end]);
+                if let Some(ms) = parse_pause_tag_milliseconds(&decoded) {
+                    out.push_str(&text[cursor..i]);
+                    out.push_str(&format!("<break time=\"{ms}ms\"/>"));
+                    cursor = end;
+                    i = end;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+    if cursor < text.len() {
+        out.push_str(&text[cursor..]);
+    }
+    out
+}
+
+pub(crate) fn render_sapi_ssml_text_with_pause_tags(text: &str) -> String {
+    render_ssml_text_with_pause_tags(text, |ms| format!("<silence msec=\"{ms}\"/>"))
 }
 
 pub fn remove_long_dash_runs(line: &str) -> String {
@@ -5896,6 +6015,7 @@ mod tests {
         TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, find_edge_split_idx,
         is_edge_text_usable, normalize_for_tts, parse_edge_binary_audio_payload,
         parse_sapi4_part_index, parse_voice_tag_override, prepare_tts_text, preview_for_log,
+        render_edge_ssml_text_with_pause_tags, render_sapi_ssml_text_with_pause_tags,
         sanitize_edge_text, split_into_tts_chunks, split_long_sentence_edge_with_limit,
         split_sentences, split_text_for_engine, split_voice_tag_spans, strip_dashed_lines,
     };
@@ -5931,6 +6051,26 @@ mod tests {
         assert_eq!(
             prepare_tts_text("Ciao cIAO ciao", false, &dictionary),
             "salve salve salve"
+        );
+    }
+
+    #[test]
+    fn pause_tags_render_as_edge_breaks_from_raw_or_escaped_text() {
+        assert_eq!(
+            render_edge_ssml_text_with_pause_tags("Ciao <pause ms=\"500\"/> dopo"),
+            "Ciao <break time=\"500ms\"/> dopo"
+        );
+        assert_eq!(
+            render_edge_ssml_text_with_pause_tags("Ciao &lt;pause ms=&quot;1000&quot;/&gt; dopo"),
+            "Ciao <break time=\"1000ms\"/> dopo"
+        );
+    }
+
+    #[test]
+    fn pause_tags_render_as_sapi_silence() {
+        assert_eq!(
+            render_sapi_ssml_text_with_pause_tags("Ciao <pause ms=\"500\"/> dopo"),
+            "Ciao <silence msec=\"500\"/> dopo"
         );
     }
 

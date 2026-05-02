@@ -148,6 +148,7 @@ pub const IDM_TOOLS_RAI_AUDIODESCRIZIONI: usize = 5012;
 pub const IDM_TOOLS_RAIPLAYSOUND: usize = 5013;
 pub const IDM_TOOLS_RAIPLAY: usize = 5014;
 pub const IDM_TOOLS_ITALIAONLINE: usize = 5015;
+pub const IDM_TOOLS_RADIO: usize = 5016;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;

@@ -194,6 +194,34 @@ fn default_voice_profile_name() -> String {
     DEFAULT_VOICE_PROFILE_NAME.to_string()
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct TtsTuning {
+    pub rate: i32,
+    pub pitch: i32,
+    pub volume: i32,
+}
+
+impl TtsTuning {
+    pub fn new(rate: i32, pitch: i32, volume: i32) -> Self {
+        Self {
+            rate,
+            pitch,
+            volume,
+        }
+    }
+}
+
+impl Default for TtsTuning {
+    fn default() -> Self {
+        Self {
+            rate: 0,
+            pitch: 0,
+            volume: 100,
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct VoiceProfile {
@@ -205,6 +233,9 @@ pub struct VoiceProfile {
     pub tts_rate: i32,
     pub tts_pitch: i32,
     pub tts_volume: i32,
+    pub edge_tts_tuning: TtsTuning,
+    pub sapi5_tts_tuning: TtsTuning,
+    pub sapi4_tts_tuning: TtsTuning,
     pub use_dialogue_voice: bool,
     pub dialogue_tts_engine: TtsEngine,
     pub dialogue_voice: String,
@@ -230,6 +261,9 @@ impl Default for VoiceProfile {
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            edge_tts_tuning: TtsTuning::default(),
+            sapi5_tts_tuning: TtsTuning::default(),
+            sapi4_tts_tuning: TtsTuning::default(),
             use_dialogue_voice: false,
             dialogue_tts_engine: TtsEngine::Edge,
             dialogue_voice: String::new(),
@@ -568,6 +602,12 @@ fn shortcut_key_name(key: u16) -> &'static str {
 }
 
 pub const PODCAST_DEVICE_DEFAULT: &str = "default";
+#[derive(Clone, Serialize, Deserialize)]
+pub struct RadioFavorite {
+    pub language_code: String,
+    pub name: String,
+    pub stream_url: String,
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -693,6 +733,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub podcast_search_provider: PodcastSearchProvider,
     #[serde(default)]
+    pub radio_favorites: Vec<RadioFavorite>,
+    #[serde(default)]
     pub gemini_api_key: String,
     pub youtube_include_timestamps: bool,
     #[serde(default = "default_stream_audio_output_format")]
@@ -721,6 +763,12 @@ pub struct AppSettings {
     pub tts_rate: i32,
     pub tts_pitch: i32,
     pub tts_volume: i32,
+    #[serde(default)]
+    pub edge_tts_tuning: TtsTuning,
+    #[serde(default)]
+    pub sapi5_tts_tuning: TtsTuning,
+    #[serde(default)]
+    pub sapi4_tts_tuning: TtsTuning,
     #[serde(default)]
     pub voice_profiles: Vec<VoiceProfile>,
     #[serde(default = "default_voice_profile_name")]
@@ -883,6 +931,9 @@ pub fn voice_profile_from_settings_fields(name: String, settings: &AppSettings) 
         tts_rate: settings.tts_rate,
         tts_pitch: settings.tts_pitch,
         tts_volume: settings.tts_volume,
+        edge_tts_tuning: settings.edge_tts_tuning,
+        sapi5_tts_tuning: settings.sapi5_tts_tuning,
+        sapi4_tts_tuning: settings.sapi4_tts_tuning,
         use_dialogue_voice: settings.use_dialogue_voice,
         dialogue_tts_engine: settings.dialogue_tts_engine,
         dialogue_voice: settings.dialogue_voice.clone(),
@@ -903,9 +954,13 @@ pub fn apply_voice_profile_to_settings_fields(settings: &mut AppSettings, profil
     settings.tts_voice = profile.tts_voice.clone();
     settings.tts_only_multilingual = profile.tts_only_multilingual;
     settings.tts_manual_tuning = profile.tts_manual_tuning;
-    settings.tts_rate = profile.tts_rate;
-    settings.tts_pitch = profile.tts_pitch;
-    settings.tts_volume = profile.tts_volume;
+    settings.edge_tts_tuning = profile.edge_tts_tuning;
+    settings.sapi5_tts_tuning = profile.sapi5_tts_tuning;
+    settings.sapi4_tts_tuning = profile.sapi4_tts_tuning;
+    let active_tuning = tts_tuning_for_engine(settings, profile.tts_engine);
+    settings.tts_rate = active_tuning.rate;
+    settings.tts_pitch = active_tuning.pitch;
+    settings.tts_volume = active_tuning.volume;
     settings.use_dialogue_voice = profile.use_dialogue_voice;
     settings.dialogue_tts_engine = profile.dialogue_tts_engine;
     settings.dialogue_voice = profile.dialogue_voice.clone();
@@ -918,6 +973,22 @@ pub fn apply_voice_profile_to_settings_fields(settings: &mut AppSettings, profil
     settings.dialogue_secondary_voice_rate = profile.dialogue_secondary_voice_rate;
     settings.dialogue_secondary_voice_pitch = profile.dialogue_secondary_voice_pitch;
     settings.dialogue_secondary_voice_volume = profile.dialogue_secondary_voice_volume;
+}
+
+pub fn tts_tuning_for_engine(settings: &AppSettings, engine: TtsEngine) -> TtsTuning {
+    match engine {
+        TtsEngine::Edge => settings.edge_tts_tuning,
+        TtsEngine::Sapi5 => settings.sapi5_tts_tuning,
+        TtsEngine::Sapi4 => settings.sapi4_tts_tuning,
+    }
+}
+
+pub fn set_tts_tuning_for_engine(settings: &mut AppSettings, engine: TtsEngine, tuning: TtsTuning) {
+    match engine {
+        TtsEngine::Edge => settings.edge_tts_tuning = tuning,
+        TtsEngine::Sapi5 => settings.sapi5_tts_tuning = tuning,
+        TtsEngine::Sapi4 => settings.sapi4_tts_tuning = tuning,
+    }
 }
 
 fn default_true() -> bool {
@@ -1053,6 +1124,7 @@ impl Default for AppSettings {
             podcast_cache_limit_mb: 500,
             show_media_save_confirmation: true,
             podcast_index_api_key: String::new(),
+            radio_favorites: Vec::new(),
             podcast_index_api_secret: String::new(),
             rai_luce_code: String::new(),
             podcast_directory_country: String::new(),
@@ -1077,6 +1149,9 @@ impl Default for AppSettings {
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            edge_tts_tuning: TtsTuning::default(),
+            sapi5_tts_tuning: TtsTuning::default(),
+            sapi4_tts_tuning: TtsTuning::default(),
             voice_profiles: Vec::new(),
             active_voice_profile: default_voice_profile_name(),
             editor_font_face: String::new(),
@@ -1672,8 +1747,27 @@ fn known_folder_path(folder: &windows::core::GUID) -> Option<PathBuf> {
 }
 
 fn normalize_voice_profiles(settings: &mut AppSettings) {
+    set_tts_tuning_for_engine(
+        settings,
+        settings.tts_engine,
+        TtsTuning::new(settings.tts_rate, settings.tts_pitch, settings.tts_volume),
+    );
     for profile in &mut settings.voice_profiles {
         profile.name = profile.name.trim().to_string();
+        match profile.tts_engine {
+            TtsEngine::Edge => {
+                profile.edge_tts_tuning =
+                    TtsTuning::new(profile.tts_rate, profile.tts_pitch, profile.tts_volume);
+            }
+            TtsEngine::Sapi5 => {
+                profile.sapi5_tts_tuning =
+                    TtsTuning::new(profile.tts_rate, profile.tts_pitch, profile.tts_volume);
+            }
+            TtsEngine::Sapi4 => {
+                profile.sapi4_tts_tuning =
+                    TtsTuning::new(profile.tts_rate, profile.tts_pitch, profile.tts_volume);
+            }
+        }
     }
     settings.voice_profiles.retain(|p| !p.name.is_empty());
 

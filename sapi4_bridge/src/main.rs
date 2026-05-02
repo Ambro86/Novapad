@@ -12,6 +12,7 @@ use std::path::Path;
 use std::ptr;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use winapi::shared::guiddef::{GUID, REFIID};
 use winapi::shared::minwindef::{DWORD, FILETIME, WORD};
@@ -132,6 +133,11 @@ enum ServerCommand {
     Resume,
     Stop,
     Quit,
+}
+
+enum SpeakItem {
+    Text(U16CString),
+    Pause(u32),
 }
 
 // =========================
@@ -352,7 +358,7 @@ struct ITTSAttributes {
 struct SpeakState {
     done: AtomicBool,
     current_text: Mutex<Option<U16CString>>,
-    queue: Mutex<VecDeque<U16CString>>,
+    queue: Mutex<VecDeque<SpeakItem>>,
 }
 impl SpeakState {
     fn new() -> Self {
@@ -1259,6 +1265,74 @@ fn sanitize_text_for_u16c(text: &str) -> String {
     }
 }
 
+enum ParsedSpeakSegment {
+    Text(String),
+    Pause(u32),
+}
+
+fn parse_pause_tag_milliseconds(tag: &str) -> Option<u32> {
+    let inner = tag
+        .trim()
+        .strip_prefix('<')?
+        .strip_suffix('>')?
+        .trim()
+        .trim_end_matches('/')
+        .trim();
+    let rest = inner.strip_prefix("pause")?.trim();
+    for token in rest.split_whitespace() {
+        let value = token
+            .strip_prefix("ms=")
+            .or_else(|| token.strip_prefix("milliseconds="))
+            .unwrap_or(token)
+            .trim_matches(['"', '\'']);
+        if let Ok(ms) = value.parse::<u32>() {
+            return Some(ms.clamp(50, 60_000));
+        }
+    }
+    None
+}
+
+fn split_pause_tag_segments(text: &str) -> Vec<ParsedSpeakSegment> {
+    let lower = text.to_ascii_lowercase();
+    let mut out = Vec::new();
+    let mut cursor = 0usize;
+    let mut i = 0usize;
+    let bytes = lower.as_bytes();
+    while i < bytes.len() {
+        if bytes[i] == b'<' {
+            let remaining = &lower[i..];
+            if remaining.starts_with("<pause") {
+                if let Some(end_rel) = remaining.find('>') {
+                    let end = i + end_rel + 1;
+                    if let Some(ms) = parse_pause_tag_milliseconds(&lower[i..end]) {
+                        if i > cursor {
+                            let part = text[cursor..i].trim();
+                            if !part.is_empty() {
+                                out.push(ParsedSpeakSegment::Text(part.to_string()));
+                            }
+                        }
+                        out.push(ParsedSpeakSegment::Pause(ms));
+                        cursor = end;
+                        i = end;
+                        continue;
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+    if cursor < text.len() {
+        let part = text[cursor..].trim();
+        if !part.is_empty() {
+            out.push(ParsedSpeakSegment::Text(part.to_string()));
+        }
+    }
+    if out.is_empty() && !text.trim().is_empty() {
+        out.push(ParsedSpeakSegment::Text(text.to_string()));
+    }
+    out
+}
+
 fn set_current_text(state: &Arc<SpeakState>, text: U16CString) {
     let mut guard = match state.current_text.lock() {
         Ok(g) => g,
@@ -1267,15 +1341,15 @@ fn set_current_text(state: &Arc<SpeakState>, text: U16CString) {
     *guard = Some(text);
 }
 
-fn enqueue_text(state: &Arc<SpeakState>, text: U16CString) {
+fn enqueue_item(state: &Arc<SpeakState>, item: SpeakItem) {
     let mut q = match state.queue.lock() {
         Ok(g) => g,
         Err(poisoned) => poisoned.into_inner(),
     };
-    q.push_back(text);
+    q.push_back(item);
 }
 
-fn pop_next_text(state: &Arc<SpeakState>) -> Option<U16CString> {
+fn pop_next_item(state: &Arc<SpeakState>) -> Option<SpeakItem> {
     let mut q = match state.queue.lock() {
         Ok(g) => g,
         Err(poisoned) => poisoned.into_inner(),
@@ -1567,6 +1641,7 @@ struct ServerSession {
     notify_handle: SinkHandle<ITTSNotifySink>,
     reg_key: DWORD,
     registered: bool,
+    pause_until: Option<Instant>,
 }
 
 impl ServerSession {
@@ -1613,32 +1688,56 @@ impl ServerSession {
             notify_handle,
             reg_key,
             registered,
+            pause_until: None,
         })
     }
 
-    unsafe fn enqueue_and_maybe_start(&self, text: &str) {
-        let cleaned = sanitize_text_for_u16c(text);
-        match U16CString::from_str(&cleaned) {
-            Ok(u16c) => enqueue_text(&self.state, u16c),
-            Err(_) => {
-                eprintln!("Failed to convert text to UTF-16 C-string (interior NUL?)");
-                return;
+    unsafe fn enqueue_and_maybe_start(&mut self, text: &str) {
+        for segment in split_pause_tag_segments(text) {
+            match segment {
+                ParsedSpeakSegment::Text(segment_text) => {
+                    let cleaned = sanitize_text_for_u16c(&segment_text);
+                    match U16CString::from_str(&cleaned) {
+                        Ok(u16c) => enqueue_item(&self.state, SpeakItem::Text(u16c)),
+                        Err(_) => {
+                            eprintln!("Failed to convert text to UTF-16 C-string (interior NUL?)");
+                            return;
+                        }
+                    }
+                }
+                ParsedSpeakSegment::Pause(ms) => {
+                    enqueue_item(&self.state, SpeakItem::Pause(ms));
+                }
             }
         }
         self.try_start_next();
     }
 
-    unsafe fn try_start_next(&self) {
+    unsafe fn try_start_next(&mut self) {
+        if let Some(until) = self.pause_until {
+            if Instant::now() < until {
+                return;
+            }
+            self.pause_until = None;
+            self.state.mark_done();
+        }
         if !self.state.done.load(Ordering::Acquire) {
             return;
         }
 
-        let next = match pop_next_text(&self.state) {
+        let next = match pop_next_item(&self.state) {
             Some(t) => t,
             None => return,
         };
 
         self.state.mark_running();
+        let next = match next {
+            SpeakItem::Text(text) => text,
+            SpeakItem::Pause(ms) => {
+                self.pause_until = Some(Instant::now() + Duration::from_millis(u64::from(ms)));
+                return;
+            }
+        };
         set_current_text(&self.state, next);
 
         let hr = speak_from_state_with_flags(self.central_ptr.as_ptr(), &self.state, 0);
@@ -1667,13 +1766,14 @@ impl ServerSession {
         }
     }
 
-    unsafe fn stop(&self) {
+    unsafe fn stop(&mut self) {
         let hr = ((*self.central_vtbl).audio_reset)(self.central_ptr.as_ptr());
         if !hr_ok(hr) {
             eprintln!("AudioReset failed: {:#x}", hr);
         }
 
         self.state.mark_done();
+        self.pause_until = None;
         {
             let mut guard = match self.state.current_text.lock() {
                 Ok(g) => g,
@@ -1717,7 +1817,7 @@ fn run_server(
 ) -> Result<(), String> {
     let _com = ComGuard::init_mta()?;
 
-    let session = unsafe { ServerSession::new(target_idx, rate, pitch, volume)? };
+    let mut session = unsafe { ServerSession::new(target_idx, rate, pitch, volume)? };
     let rx = spawn_command_reader();
     let mut running = true;
 
@@ -1926,9 +2026,18 @@ unsafe fn try_start_next_recording_chunk(
         return;
     }
 
-    let next = match pop_next_text(state) {
+    let next = match pop_next_item(state) {
         Some(t) => t,
         None => return,
+    };
+
+    let next = match next {
+        SpeakItem::Text(text) => text,
+        SpeakItem::Pause(ms) => {
+            std::thread::sleep(Duration::from_millis(u64::from(ms)));
+            state.mark_done();
+            return;
+        }
     };
 
     state.mark_running();
@@ -2073,12 +2182,18 @@ fn speak_to_file(
             return Ok(());
         }
 
-        let cleaned = sanitize_text_for_u16c(&text);
-        let chunks = split_text_for_recording(&cleaned, 8000); // Chunks più grandi per meno overhead
-
-        for ch in chunks {
-            if let Ok(u16c) = U16CString::from_str(&ch) {
-                enqueue_text(&state, u16c);
+        for segment in split_pause_tag_segments(&text) {
+            match segment {
+                ParsedSpeakSegment::Text(segment_text) => {
+                    let cleaned = sanitize_text_for_u16c(&segment_text);
+                    let chunks = split_text_for_recording(&cleaned, 8000);
+                    for ch in chunks {
+                        if let Ok(u16c) = U16CString::from_str(&ch) {
+                            enqueue_item(&state, SpeakItem::Text(u16c));
+                        }
+                    }
+                }
+                ParsedSpeakSegment::Pause(ms) => enqueue_item(&state, SpeakItem::Pause(ms)),
             }
         }
 

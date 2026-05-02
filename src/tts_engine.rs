@@ -11,6 +11,7 @@ use chrono::Local;
 use cpal::Sample;
 use futures_util::{SinkExt, StreamExt, future::join_all};
 use rand::Rng;
+use rodio::buffer::SamplesBuffer;
 use rodio::{Decoder, OutputStreamBuilder, Sink, Source};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -73,9 +74,10 @@ pub struct TtsChunk {
     pub text_to_read: String,
     pub original_len: usize,
     pub override_voice: Option<VoiceOverride>,
+    pub pause_ms: Option<u32>,
 }
 
-type TtsAudioPacket = (Vec<u8>, usize, String);
+type TtsAudioPacket = (Vec<u8>, usize, String, Option<u32>);
 type EdgeAudioTx<'a> = Option<&'a mpsc::Sender<Result<TtsAudioPacket, String>>>;
 
 #[derive(Clone)]
@@ -203,6 +205,10 @@ fn parse_voice_tag_override(tag: &str, default_engine: TtsEngine) -> Option<Voic
 
 pub(crate) fn has_voice_tags(text: &str) -> bool {
     text.to_ascii_lowercase().contains("<voice")
+}
+
+pub(crate) fn has_pause_tags(text: &str) -> bool {
+    text.to_ascii_lowercase().contains("<pause")
 }
 
 fn utf16_len(text: &str) -> usize {
@@ -506,8 +512,9 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             .unwrap_or_else(|| "it-IT-IsabellaNeural".to_string())
     };
     let has_tags = has_voice_tags(&text);
+    let has_pause = has_pause_tags(&text);
 
-    if has_tags && tts_engine != TtsEngine::Edge {
+    if (has_tags && tts_engine != TtsEngine::Edge) || has_pause {
         queue_tts_playback_from_text(TtsQueuedPlayback {
             hwnd,
             engine: tts_engine,
@@ -637,6 +644,21 @@ pub fn speak_text_once(hwnd: HWND, text: String) {
         ));
 
     let initial_caret_pos = 0;
+    if has_pause_tags(&text) {
+        queue_tts_playback_from_text(TtsQueuedPlayback {
+            hwnd,
+            engine: tts_engine,
+            text,
+            voice,
+            split_on_newline,
+            dictionary,
+            initial_caret_pos,
+            rate: tts_rate,
+            pitch: tts_pitch,
+            volume: tts_volume,
+        });
+        return;
+    }
     match tts_engine {
         TtsEngine::Edge => queue_tts_playback_from_text(TtsQueuedPlayback {
             hwnd,
@@ -954,6 +976,27 @@ fn write_wav_from_pcm(
         .map_err(|e| e.to_string())?;
     writer.finalize().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+fn silence_sample_count(milliseconds: u32, sample_rate: u32, channels: u16) -> usize {
+    let frames = (u64::from(milliseconds) * u64::from(sample_rate)).div_ceil(1000);
+    frames
+        .saturating_mul(u64::from(channels.max(1)))
+        .min(usize::MAX as u64) as usize
+}
+
+fn silence_samples(milliseconds: u32, sample_rate: u32, channels: u16) -> Vec<f32> {
+    vec![0.0; silence_sample_count(milliseconds, sample_rate, channels)]
+}
+
+fn write_silence_wav(
+    path: &Path,
+    milliseconds: u32,
+    sample_rate: u32,
+    channels: u16,
+) -> Result<(), String> {
+    let samples = silence_samples(milliseconds, sample_rate, channels);
+    write_wav_from_pcm(path, &samples, sample_rate, channels)
 }
 
 struct SynthesisConfig {
@@ -1427,6 +1470,21 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                                 if cancel_downloader.load(Ordering::SeqCst) {
                                     return;
                                 }
+                                if let Some(ms) = chunk_obj.pause_ms {
+                                    if audio_tx
+                                        .send(Ok((
+                                            Vec::new(),
+                                            chunk_obj.original_len,
+                                            String::new(),
+                                            Some(ms),
+                                        )))
+                                        .await
+                                        .is_err()
+                                    {
+                                        return;
+                                    }
+                                    continue;
+                                }
                                 let (chunk_voice, chunk_rate, chunk_pitch, chunk_volume) =
                                     if let Some(ov) = &chunk_obj.override_voice {
                                         (
@@ -1459,7 +1517,12 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                                     Ok(audio) => {
                                         let len = chunk_obj.original_len;
                                         if audio_tx
-                                            .send(Ok((audio, len, chunk_obj.text_to_read.clone())))
+                                            .send(Ok((
+                                                audio,
+                                                len,
+                                                chunk_obj.text_to_read.clone(),
+                                                None,
+                                            )))
                                             .await
                                             .is_err()
                                         {
@@ -1510,6 +1573,21 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
             if cancel_downloader.load(Ordering::SeqCst) {
                 break;
             }
+            if let Some(ms) = chunk_obj.pause_ms {
+                if audio_tx
+                    .send(Ok((
+                        Vec::new(),
+                        chunk_obj.original_len,
+                        String::new(),
+                        Some(ms),
+                    )))
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
+                continue;
+            }
             let (engine, chunk_voice, chunk_rate, chunk_pitch, chunk_volume) =
                 if let Some(ov) = &chunk_obj.override_voice {
                     (
@@ -1539,6 +1617,7 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                             data,
                             chunk_obj.original_len,
                             chunk_obj.text_to_read.clone(),
+                            None,
                         )))
                         .await
                         .is_err()
@@ -1605,7 +1684,7 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
             }
             break;
         };
-        let (audio, orig_len, progress_text) = match res {
+        let (audio, orig_len, progress_text, pause_ms) = match res {
             Ok(data) => data,
             Err(e) => {
                 post_tts_error(hwnd_copy, session_id, e);
@@ -1613,6 +1692,37 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                 break;
             }
         };
+
+        if let Some(ms) = pause_ms {
+            let samples = silence_samples(ms, 44_100, 1);
+            let source = SamplesBuffer::new(1, 44_100, samples);
+            let progress_source = TtsPlaybackProgressSource::new(
+                source,
+                hwnd_copy,
+                session_id,
+                current_offset,
+                orig_len,
+                progress_text,
+            );
+            sink.append(progress_source);
+            appended_any = true;
+            while !sink.empty() {
+                if cancel_flag.load(Ordering::SeqCst) {
+                    sink.stop();
+                    end_reason = "cancelled";
+                    break;
+                }
+                while let Ok(cmd) = rx.try_recv() {
+                    if handle_tts_command(cmd, &sink, cancel_flag.as_ref(), &mut paused) {
+                        end_reason = "stopped";
+                        break;
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            current_offset = current_offset.saturating_add(orig_len.max(1));
+            continue;
+        }
 
         if audio.is_empty() {
             current_offset = current_offset.saturating_add(orig_len.max(1));
@@ -2085,6 +2195,23 @@ async fn download_edge_chunks_ws(
         if cancel.load(Ordering::Relaxed) {
             return Err("Cancelled".to_string());
         }
+        if let Some(ms) = chunk.pause_ms {
+            if let Some(tx) = audio_tx
+                && tx
+                    .send(Ok((
+                        Vec::new(),
+                        chunk.original_len,
+                        String::new(),
+                        Some(ms),
+                    )))
+                    .await
+                    .is_err()
+            {
+                return Ok(processed_count);
+            }
+            processed_count = processed_count.saturating_add(1);
+            continue;
+        }
         let (voice, chunk_rate, chunk_pitch, chunk_volume) = if let Some(ov) = &chunk.override_voice
         {
             (
@@ -2211,7 +2338,7 @@ async fn download_edge_chunks_ws(
         if let Some(tx) = audio_tx {
             let len = chunk.original_len;
             if tx
-                .send(Ok((audio, len, chunk.text_to_read.clone())))
+                .send(Ok((audio, len, chunk.text_to_read.clone(), None)))
                 .await
                 .is_err()
             {
@@ -2756,6 +2883,7 @@ fn run_split_audiobook_by_time_edge(
             text_to_read: chunk.clone(),
             original_len: utf16_len(chunk),
             override_voice: None,
+            pause_ms: None,
         })
         .collect();
 
@@ -3477,6 +3605,64 @@ fn parse_pause_tag_milliseconds(tag: &str) -> Option<u32> {
         }
     }
     None
+}
+
+enum PauseSplitSegment {
+    Text(String, usize),
+    Pause(u32, usize),
+}
+
+fn split_pause_tag_segments(text: &str) -> Vec<PauseSplitSegment> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+    let lower = text.to_ascii_lowercase();
+    let mut out = Vec::new();
+    let mut cursor = 0usize;
+    let mut i = 0usize;
+    let bytes = lower.as_bytes();
+    while i < bytes.len() {
+        if bytes[i] == b'<' {
+            let remaining = &lower[i..];
+            if remaining.starts_with("<pause")
+                && let Some(end_rel) = remaining.find('>')
+            {
+                let end = i + end_rel + 1;
+                if let Some(ms) = parse_pause_tag_milliseconds(&lower[i..end]) {
+                    if i > cursor {
+                        let text_part = decode_basic_xml_entities(&text[cursor..i]);
+                        if !text_part.is_empty() {
+                            out.push(PauseSplitSegment::Text(
+                                text_part,
+                                utf16_len(&text[cursor..i]),
+                            ));
+                        }
+                    }
+                    out.push(PauseSplitSegment::Pause(ms, utf16_len(&text[i..end])));
+                    cursor = end;
+                    i = end;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+    if cursor < text.len() {
+        let text_part = decode_basic_xml_entities(&text[cursor..]);
+        if !text_part.is_empty() {
+            out.push(PauseSplitSegment::Text(
+                text_part,
+                utf16_len(&text[cursor..]),
+            ));
+        }
+    }
+    if out.is_empty() {
+        out.push(PauseSplitSegment::Text(
+            decode_basic_xml_entities(text),
+            utf16_len(text),
+        ));
+    }
+    out
 }
 
 fn render_ssml_text_with_pause_tags(text: &str, pause_markup: impl Fn(u32) -> String) -> String {
@@ -4353,11 +4539,13 @@ async fn download_edge_chunk_ws_adaptive_lt(
         text_to_read: left,
         original_len: chunk.original_len / 2,
         override_voice: chunk.override_voice.clone(),
+        pause_ms: None,
     };
     let right_chunk = TtsChunk {
         text_to_read: right,
         original_len: chunk.original_len.saturating_sub(left_chunk.original_len),
         override_voice: chunk.override_voice.clone(),
+        pause_ms: None,
     };
 
     let left_audio = Box::pin(download_edge_chunk_ws_adaptive_lt(
@@ -4400,6 +4588,7 @@ async fn download_edge_chunk_ws_strict_small_lt(
             text_to_read: part,
             original_len: chunk.original_len,
             override_voice: chunk.override_voice.clone(),
+            pause_ms: None,
         };
         let audio = download_edge_chunk_ws_with_retry(&sub, options, idx, max_retries).await?;
         out.extend_from_slice(&audio);
@@ -4612,78 +4801,102 @@ pub fn split_into_tts_chunks(
             .as_ref()
             .map(|v| v.engine)
             .unwrap_or(default_engine);
-        if span_text.trim().is_empty() {
-            if let Some(last) = chunks.last_mut() {
-                last.original_len += span_orig_len;
-            }
-            continue;
-        }
-        let mut sentences = Vec::new();
-        let mut current_sentence = String::new();
-        let mut current_len = 0usize;
-        let chars: Vec<char> = span_text.chars().collect();
-        for (idx, ch) in chars.iter().copied().enumerate() {
-            current_sentence.push(ch);
-            current_len += 1;
-            let is_terminal = matches!(ch, '.' | '!' | '?' | ';' | ':');
-            let next_ch = chars.get(idx + 1).copied();
-            let edge_dot_run =
-                span_engine == TtsEngine::Edge && ch == '.' && matches!(next_ch, Some('.'));
-            if is_terminal && !edge_dot_run {
-                let should_split = span_engine != TtsEngine::Edge
-                    || current_sentence.chars().any(|c| c.is_alphanumeric());
-                if should_split && !current_sentence.trim().is_empty() {
-                    sentences.push((current_sentence.clone(), current_len));
-                    current_sentence.clear();
-                    current_len = 0;
-                }
-            }
-        }
-        if !current_sentence.trim().is_empty() {
-            sentences.push((current_sentence, current_len));
-        }
-
-        let extra_len = span_orig_len.saturating_sub(utf16_len(&span_text));
-        let mut pending_len = extra_len;
-
-        for (s_text, _s_len) in sentences.into_iter() {
-            let cleaned = strip_dashed_lines(&s_text);
-            let dict_segments = split_by_custom_dictionary(&cleaned, &[]);
-            for (dict_text, _override_voice, dict_len) in dict_segments {
-                let prepared = prepare_tts_text(&dict_text, split_on_newline, dictionary);
-                if prepared.trim().is_empty() {
-                    pending_len += dict_len;
+        let span_extra_len = span_orig_len.saturating_sub(utf16_len(&span_text));
+        let mut span_pending_len = span_extra_len;
+        let pause_segments = split_pause_tag_segments(&span_text);
+        for pause_segment in pause_segments {
+            let (span_text, span_orig_len) = match pause_segment {
+                PauseSplitSegment::Pause(ms, tag_len) => {
+                    chunks.push(TtsChunk {
+                        text_to_read: String::new(),
+                        original_len: tag_len.saturating_add(span_pending_len),
+                        override_voice: span_override.clone(),
+                        pause_ms: Some(ms),
+                    });
+                    span_pending_len = 0;
                     continue;
                 }
-                let orig_len = dict_len + pending_len;
-                pending_len = 0;
-                if span_engine == TtsEngine::Edge {
-                    let parts = split_text_edge(&prepared);
-                    if parts.is_empty() {
-                        continue;
+                PauseSplitSegment::Text(text, len) => {
+                    let orig_len = len.saturating_add(span_pending_len);
+                    span_pending_len = 0;
+                    (text, orig_len)
+                }
+            };
+            if span_text.trim().is_empty() {
+                if let Some(last) = chunks.last_mut() {
+                    last.original_len += span_orig_len;
+                }
+                continue;
+            }
+            let mut sentences = Vec::new();
+            let mut current_sentence = String::new();
+            let mut current_len = 0usize;
+            let chars: Vec<char> = span_text.chars().collect();
+            for (idx, ch) in chars.iter().copied().enumerate() {
+                current_sentence.push(ch);
+                current_len += 1;
+                let is_terminal = matches!(ch, '.' | '!' | '?' | ';' | ':');
+                let next_ch = chars.get(idx + 1).copied();
+                let edge_dot_run =
+                    span_engine == TtsEngine::Edge && ch == '.' && matches!(next_ch, Some('.'));
+                if is_terminal && !edge_dot_run {
+                    let should_split = span_engine != TtsEngine::Edge
+                        || current_sentence.chars().any(|c| c.is_alphanumeric());
+                    if should_split && !current_sentence.trim().is_empty() {
+                        sentences.push((current_sentence.clone(), current_len));
+                        current_sentence.clear();
+                        current_len = 0;
                     }
-                    let base = orig_len / parts.len();
-                    let extra = orig_len % parts.len();
-                    for (idx, part) in parts.into_iter().enumerate() {
-                        let part_len = base + if idx < extra { 1 } else { 0 };
-                        chunks.push(TtsChunk {
-                            text_to_read: part,
-                            original_len: part_len,
-                            override_voice: span_override.clone(),
-                        });
-                    }
-                } else {
-                    chunks.push(TtsChunk {
-                        text_to_read: prepared,
-                        original_len: orig_len,
-                        override_voice: span_override.clone(),
-                    });
                 }
             }
-            if pending_len > 0
-                && let Some(last) = chunks.last_mut()
-            {
-                last.original_len += pending_len;
+            if !current_sentence.trim().is_empty() {
+                sentences.push((current_sentence, current_len));
+            }
+
+            let extra_len = span_orig_len.saturating_sub(utf16_len(&span_text));
+            let mut pending_len = extra_len;
+
+            for (s_text, _s_len) in sentences.into_iter() {
+                let cleaned = strip_dashed_lines(&s_text);
+                let dict_segments = split_by_custom_dictionary(&cleaned, &[]);
+                for (dict_text, _override_voice, dict_len) in dict_segments {
+                    let prepared = prepare_tts_text(&dict_text, split_on_newline, dictionary);
+                    if prepared.trim().is_empty() {
+                        pending_len += dict_len;
+                        continue;
+                    }
+                    let orig_len = dict_len + pending_len;
+                    pending_len = 0;
+                    if span_engine == TtsEngine::Edge {
+                        let parts = split_text_edge(&prepared);
+                        if parts.is_empty() {
+                            continue;
+                        }
+                        let base = orig_len / parts.len();
+                        let extra = orig_len % parts.len();
+                        for (idx, part) in parts.into_iter().enumerate() {
+                            let part_len = base + if idx < extra { 1 } else { 0 };
+                            chunks.push(TtsChunk {
+                                text_to_read: part,
+                                original_len: part_len,
+                                override_voice: span_override.clone(),
+                                pause_ms: None,
+                            });
+                        }
+                    } else {
+                        chunks.push(TtsChunk {
+                            text_to_read: prepared,
+                            original_len: orig_len,
+                            override_voice: span_override.clone(),
+                            pause_ms: None,
+                        });
+                    }
+                }
+                if pending_len > 0
+                    && let Some(last) = chunks.last_mut()
+                {
+                    last.original_len += pending_len;
+                }
             }
         }
     }
@@ -4807,11 +5020,13 @@ fn start_audiobook_with_text(
     let cleaned = strip_dashed_lines(&text);
     let use_epub_split = audiobook_split_by_epub_chapter && epub_chapters.as_ref().is_some();
     let mixed_needed = if use_epub_split {
-        epub_chapters
-            .as_ref()
-            .is_some_and(|chapters| chapters.iter().any(|chapter| has_voice_tags(chapter)))
+        epub_chapters.as_ref().is_some_and(|chapters| {
+            chapters
+                .iter()
+                .any(|chapter| has_voice_tags(chapter) || has_pause_tags(chapter))
+        })
     } else {
-        has_voice_tags(&cleaned)
+        has_voice_tags(&cleaned) || has_pause_tags(&cleaned)
     };
     let mut split_by_time = audiobook_split_by_time;
     let split_minutes = audiobook_split_minutes.clamp(1, 60);
@@ -6075,6 +6290,24 @@ mod tests {
     }
 
     #[test]
+    fn pause_tags_become_silence_chunks_for_all_engines() {
+        let chunks =
+            split_into_tts_chunks("Ciao <pause ms=\"500\"/> dopo", true, &[], TtsEngine::Edge);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0].text_to_read, "Ciao");
+        assert_eq!(chunks[1].pause_ms, Some(500));
+        assert_eq!(chunks[2].text_to_read, "dopo");
+        let chunks =
+            split_into_tts_chunks("Ciao <pause ms=\"500\"/> dopo", true, &[], TtsEngine::Sapi5);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[1].pause_ms, Some(500));
+        let chunks =
+            split_into_tts_chunks("Ciao <pause ms=\"500\"/> dopo", true, &[], TtsEngine::Sapi4);
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[1].pause_ms, Some(500));
+    }
+
+    #[test]
     fn parse_sapi4_part_index_prefers_named_prefix() {
         assert_eq!(parse_sapi4_part_index("sub_0"), 0);
         assert_eq!(parse_sapi4_part_index("sub_12"), 12);
@@ -7080,6 +7313,7 @@ pub(crate) fn run_tts_audiobook_part(
                 text_to_read: chunk.clone(),
                 original_len: utf16_len(chunk),
                 override_voice: None,
+                pause_ms: None,
             })
             .collect();
 
@@ -7490,6 +7724,24 @@ async fn synthesize_mixed_chunk_with_retry(
         chunk.override_voice.is_some(),
         preview_for_log(&chunk.text_to_read, 120)
     ));
+
+    if let Some(ms) = chunk.pause_ms {
+        let path = std::env::temp_dir().join(format!(
+            "sonarpad_pause_{}_{}.wav",
+            std::process::id(),
+            Uuid::new_v4().simple()
+        ));
+        return match write_silence_wav(&path, ms, target.sample_rate, target.channels) {
+            Ok(()) => Some(path),
+            Err(err) => {
+                crate::log_debug(&format!(
+                    "Mixed audiobook: failed to create pause chunk={} duration_ms={}: {}",
+                    chunk_idx, ms, err
+                ));
+                None
+            }
+        };
+    }
 
     if !mixed_chunk_has_usable_content(&chunk.text_to_read) {
         crate::log_debug(&format!(

@@ -3442,7 +3442,7 @@ fn mkssml(text: &str, voice: &str, tts_rate: i32, tts_pitch: i32, tts_volume: i3
     };
     let rendered_text = render_edge_ssml_text_with_pause_tags(text);
     format!(
-        "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='{}'><voice name='{}'><prosody pitch='{}' rate='{}' volume='{}'>{}</prosody></voice></speak>",
+        "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='{}'><voice name='{}'><prosody pitch='{}' rate='{}' volume='{}'>{}</prosody></voice></speak>",
         lang,
         voice,
         format_pitch(tts_pitch),
@@ -3534,7 +3534,9 @@ pub(crate) fn render_edge_ssml_text_with_pause_tags(text: &str) -> String {
                 let end = i + end_rel + 1;
                 if let Some(ms) = parse_pause_tag_milliseconds(&lower[i..end]) {
                     out.push_str(&text[cursor..i]);
-                    out.push_str(&format!("<break time=\"{ms}ms\"/>"));
+                    out.push_str(&format!(
+                        "<mstts:silence type=\"Sentenceboundary\" value=\"{ms}ms\"/>"
+                    ));
                     cursor = end;
                     i = end;
                     continue;
@@ -3549,7 +3551,9 @@ pub(crate) fn render_edge_ssml_text_with_pause_tags(text: &str) -> String {
                 let decoded = decode_basic_xml_entities(&lower[i..end]);
                 if let Some(ms) = parse_pause_tag_milliseconds(&decoded) {
                     out.push_str(&text[cursor..i]);
-                    out.push_str(&format!("<break time=\"{ms}ms\"/>"));
+                    out.push_str(&format!(
+                        "<mstts:silence type=\"Sentenceboundary\" value=\"{ms}ms\"/>"
+                    ));
                     cursor = end;
                     i = end;
                     continue;
@@ -6058,11 +6062,11 @@ mod tests {
     fn pause_tags_render_as_edge_breaks_from_raw_or_escaped_text() {
         assert_eq!(
             render_edge_ssml_text_with_pause_tags("Ciao <pause ms=\"500\"/> dopo"),
-            "Ciao <break time=\"500ms\"/> dopo"
+            "Ciao <mstts:silence type=\"Sentenceboundary\" value=\"500ms\"/> dopo"
         );
         assert_eq!(
             render_edge_ssml_text_with_pause_tags("Ciao &lt;pause ms=&quot;1000&quot;/&gt; dopo"),
-            "Ciao <break time=\"1000ms\"/> dopo"
+            "Ciao <mstts:silence type=\"Sentenceboundary\" value=\"1000ms\"/> dopo"
         );
     }
 

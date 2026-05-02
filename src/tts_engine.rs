@@ -3441,7 +3441,7 @@ fn mkssml(text: &str, voice: &str, tts_rate: i32, tts_pitch: i32, tts_volume: i3
         "en-US".to_string()
     };
     let rendered_text = render_edge_ssml_text_with_pause_tags(text);
-    let ssml_out = format!(
+    format!(
         "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='{}'><voice name='{}'><prosody pitch='{}' rate='{}' volume='{}'>{}</prosody></voice></speak>",
         lang,
         voice,
@@ -3449,8 +3449,7 @@ fn mkssml(text: &str, voice: &str, tts_rate: i32, tts_pitch: i32, tts_volume: i3
         format_rate(tts_rate),
         format_volume(tts_volume),
         rendered_text
-    );
-    ssml_out
+    )
 }
 
 fn parse_pause_tag_milliseconds(tag: &str) -> Option<u32> {
@@ -3533,11 +3532,9 @@ pub(crate) fn render_edge_ssml_text_with_pause_tags(text: &str) -> String {
                 && let Some(end_rel) = remaining.find('>')
             {
                 let end = i + end_rel + 1;
-                if parse_pause_tag_milliseconds(&lower[i..end]).is_some() {
+                if let Some(ms) = parse_pause_tag_milliseconds(&lower[i..end]) {
                     out.push_str(&text[cursor..i]);
-                    // Edge TTS does not support XML break/silence tags.
-                    // Fallback to a natural ellipsis pause.
-                    out.push_str("... ");
+                    out.push_str(&format!("<break time=\"{ms}ms\"/>"));
                     cursor = end;
                     i = end;
                     continue;
@@ -3550,11 +3547,9 @@ pub(crate) fn render_edge_ssml_text_with_pause_tags(text: &str) -> String {
             {
                 let end = i + end_rel + "&gt;".len();
                 let decoded = decode_basic_xml_entities(&lower[i..end]);
-                if parse_pause_tag_milliseconds(&decoded).is_some() {
+                if let Some(ms) = parse_pause_tag_milliseconds(&decoded) {
                     out.push_str(&text[cursor..i]);
-                    // Edge TTS does not support XML break/silence tags.
-                    // Fallback to a natural ellipsis pause.
-                    out.push_str("... ");
+                    out.push_str(&format!("<break time=\"{ms}ms\"/>"));
                     cursor = end;
                     i = end;
                     continue;
@@ -6063,11 +6058,11 @@ mod tests {
     fn pause_tags_render_as_edge_breaks_from_raw_or_escaped_text() {
         assert_eq!(
             render_edge_ssml_text_with_pause_tags("Ciao <pause ms=\"500\"/> dopo"),
-            "Ciao ... dopo"
+            "Ciao <break time=\"500ms\"/> dopo"
         );
         assert_eq!(
             render_edge_ssml_text_with_pause_tags("Ciao &lt;pause ms=&quot;1000&quot;/&gt; dopo"),
-            "Ciao ... dopo"
+            "Ciao <break time=\"1000ms\"/> dopo"
         );
     }
 

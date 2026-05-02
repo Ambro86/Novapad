@@ -1,35 +1,12 @@
-use sonarpad::tts_engine::*;
-
+﻿mod curl_client;
 fn main() {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        println!("Testing Edge TTS...");
-        // Test normal text
-        let res = download_edge_chunk_ws_with_retry("Hello world", "en-US-AriaNeural", 0, 0, 0).await;
-        match res {
-            Ok(bytes) => println!("Normal Text - Success! Bytes: {}", bytes.len()),
-            Err(e) => println!("Normal Text - Error: {}", e),
+    let url = "https://www.adnkronos.com/economia/vicenzaoro-2026-inaugurato-oggi-il-salone-internazionale-del-gioiello-di-ieg_7HBF2sDgfGE1ZAQSK3FjxG";
+    match curl_client::fetch_url_impersonated(url) {
+        Ok(bytes) => {
+            let html = String::from_utf8_lossy(&bytes);
+            std::fs::write("debug_adnkronos.html", html.as_ref()).unwrap();
+            println!("HTML salvato in debug_adnkronos.html ({} bytes)", bytes.len());
         }
-        
-        // Test mstts:silence inside prosody
-        let res = download_edge_chunk_ws_with_retry("Hello <mstts:silence type=\"Sentenceboundary\" value=\"500ms\"/> world", "en-US-AriaNeural", 0, 0, 0).await;
-        match res {
-            Ok(bytes) => println!("mstts:silence inside prosody - Success! Bytes: {}", bytes.len()),
-            Err(e) => println!("mstts:silence inside prosody - Error: {}", e),
-        }
-        
-        // Test break inside prosody
-        let res = download_edge_chunk_ws_with_retry("Hello <break time=\"500ms\"/> world", "en-US-AriaNeural", 0, 0, 0).await;
-        match res {
-            Ok(bytes) => println!("break inside prosody - Success! Bytes: {}", bytes.len()),
-            Err(e) => println!("break inside prosody - Error: {}", e),
-        }
-        
-        // Test break OUTSIDE prosody
-        let res = download_edge_chunk_ws_with_retry("Hello </prosody><break time=\"500ms\"/><prosody pitch='+0Hz' rate='+0%' volume='+0%'> world", "en-US-AriaNeural", 0, 0, 0).await;
-        match res {
-            Ok(bytes) => println!("break outside prosody - Success! Bytes: {}", bytes.len()),
-            Err(e) => println!("break outside prosody - Error: {}", e),
-        }
-    });
+        Err(e) => println!("Errore: {}", e),
+    }
 }

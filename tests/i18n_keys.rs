@@ -37,7 +37,10 @@ fn i18n_files_have_matching_keys() {
         if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
             continue;
         }
-        if path.file_name().and_then(|name| name.to_str()) == Some("en.json") {
+        if matches!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some("en.json" | "radio.json")
+        ) {
             continue;
         }
 

@@ -6367,6 +6367,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.transcription_progress_window.0 != 0
                 || state.batch_audiobooks_window.0 != 0
                 || state.convert_audio_window.0 != 0
+                || state.radio_window.0 != 0
                 || state.podcasts_window.0 != 0
                 || state.podcasts_add_dialog.0 != 0
                 || state.podcasts_categories_dialog.0 != 0
@@ -6404,6 +6405,7 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
                 && !transcription_blocks_focus
                 && state.bdciechi_window.0 == 0
                 && state.replace_progress_window.0 == 0
+                && state.radio_window.0 == 0
                 && !audiobook_progress_in_foreground
                 && !is_reader_mode
         })
@@ -6564,6 +6566,7 @@ pub(crate) struct AppState {
     transcription_progress_window: HWND,
     batch_audiobooks_window: HWND,
     convert_audio_window: HWND,
+    radio_window: HWND,
     podcasts_window: HWND,
     podcasts_add_dialog: HWND,
     podcasts_categories_dialog: HWND,
@@ -8171,6 +8174,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     transcription_progress_window: HWND(0),
                     batch_audiobooks_window: HWND(0),
                     convert_audio_window: HWND(0),
+                    radio_window: HWND(0),
 
                     find_msg,
                     find_text: vec![0u16; 256],

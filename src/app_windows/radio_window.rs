@@ -3,8 +3,9 @@ use crate::i18n;
 use crate::launch_stream_url_in_mpv;
 use crate::settings::{Language, RadioFavorite, load_settings, save_settings};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::time::Duration;
+use url::Url;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, DEFAULT_GUI_FONT, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -24,18 +25,34 @@ use windows::core::{PCWSTR, w};
 
 const CLASS_NAME: &str = "SonarpadRadioWindow";
 const RADIO_RESULTS_PAGE_SIZE: usize = 25;
-const RADIO_BROWSER_LIMIT: &str = "100000";
+const RADIO_BROWSER_LIMIT: &str = "100";
+const COMMUNITY_RADIOS_URL: &str = "https://sonarpad.com/api/get_community_radios.php";
 
 const ID_EDIT_SEARCH: usize = 1001;
 const ID_COMBO_LANGUAGE: usize = 1002;
 const ID_LIST_RESULTS: usize = 1003;
+const ID_COMBO_GENRE: usize = 1004;
 const ID_BUTTON_SEARCH: usize = 1005;
-const ID_BUTTON_PREV: usize = 1006;
-const ID_BUTTON_NEXT: usize = 1007;
+const ID_LIST_FAVORITES: usize = 1008;
 const ID_BUTTON_CLOSE: usize = 1011;
+const ID_BUTTON_ADD_COMMUNITY: usize = 1017;
+
+const ADD_RADIO_CLASS_NAME: &str = "SonarpadAddCommunityRadioWindow";
+const ID_ADD_NAME: usize = 2101;
+const ID_ADD_URL: usize = 2102;
+const ID_ADD_LANGUAGE: usize = 2103;
+const ID_ADD_GENRE: usize = 2104;
+const ID_ADD_SUBMIT: usize = 2105;
+const ID_ADD_CANCEL: usize = 2106;
+const ID_ADD_LABEL_NAME: usize = 2107;
+const ID_ADD_LABEL_URL: usize = 2108;
+const ID_ADD_LABEL_LANGUAGE: usize = 2109;
+const ID_ADD_LABEL_GENRE: usize = 2110;
 const ID_LABEL_PAGE: usize = 1012;
 const ID_LABEL_SEARCH: usize = 1013;
 const ID_LABEL_LANGUAGE: usize = 1014;
+const ID_LABEL_GENRE: usize = 1015;
+const ID_LABEL_FAVORITES: usize = 1016;
 
 const CB_ADDSTRING: u32 = 0x0143;
 const CB_SETCURSEL: u32 = 0x014E;
@@ -45,13 +62,40 @@ const LB_RESETCONTENT: u32 = 0x0184;
 const LB_SETCURSEL: u32 = 0x0186;
 const LB_GETCURSEL: u32 = 0x0188;
 const WM_RADIO_FOCUS_RESULTS: u32 = WM_APP + 77;
+const WM_RADIO_SEARCH_COMPLETE: u32 = WM_APP + 78;
+const RADIO_REFOCUS_DELAYS_MS: &[u64] = &[150, 500];
 const ID_CONTEXT_ADD_FAVORITE: usize = 1;
 const ID_CONTEXT_REMOVE_FAVORITE: usize = 2;
+const ID_CONTEXT_COPY_STREAM_URL: usize = 3;
 
 #[derive(Clone, Deserialize)]
 struct RadioStation {
     name: String,
     stream_url: String,
+}
+
+#[derive(Deserialize)]
+struct CommunityRadioApiResponse {
+    #[serde(default)]
+    ok: bool,
+    #[serde(default)]
+    message: String,
+    #[serde(default)]
+    error: String,
+}
+
+#[derive(Deserialize)]
+struct CommunityRadioStation {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    url: String,
+    #[serde(default)]
+    language: String,
+    #[serde(default)]
+    genre: String,
+    #[serde(default)]
+    genre_label: String,
 }
 
 #[derive(Deserialize)]
@@ -62,6 +106,19 @@ struct RadioBrowserStation {
     url: String,
     #[serde(default)]
     url_resolved: String,
+    #[serde(default)]
+    tags: String,
+    #[serde(default)]
+    lastcheckok: i32,
+}
+
+struct AddRadioDialogState {
+    parent: HWND,
+    language: Language,
+    edit_name: HWND,
+    edit_url: HWND,
+    combo_language: HWND,
+    combo_genre: HWND,
 }
 
 struct RadioDialogState {
@@ -69,13 +126,221 @@ struct RadioDialogState {
     language: Language,
     edit_search: HWND,
     combo_language: HWND,
+    combo_genre: HWND,
+    list_favorites: HWND,
     list_results: HWND,
     label_page: HWND,
+    favorite_results: Vec<RadioFavorite>,
     all_results: Vec<RadioFavorite>,
     page: usize,
     languages: Vec<(String, String)>,
-    stations_by_language: HashMap<String, Vec<RadioStation>>,
 }
+
+struct RadioSearchComplete {
+    language: Language,
+    result: Result<Vec<RadioFavorite>, String>,
+}
+
+#[derive(Clone, Copy)]
+struct GenreOption {
+    key: &'static str,
+    label: &'static str,
+    value: &'static str,
+    tag: Option<&'static str>,
+}
+
+const GENRE_OPTIONS: &[GenreOption] = &[
+    GenreOption {
+        key: "radio.genre.all",
+        label: "Tutti i generi",
+        value: "all",
+        tag: None,
+    },
+    GenreOption {
+        key: "radio.genre.news",
+        label: "Notizie",
+        value: "news",
+        tag: Some("news"),
+    },
+    GenreOption {
+        key: "radio.genre.music",
+        label: "Musica",
+        value: "music",
+        tag: Some("music"),
+    },
+    GenreOption {
+        key: "radio.genre.sport",
+        label: "Sport",
+        value: "sport",
+        tag: Some("sport"),
+    },
+    GenreOption {
+        key: "radio.genre.talk",
+        label: "Talk e approfondimenti",
+        value: "talk",
+        tag: Some("talk"),
+    },
+    GenreOption {
+        key: "radio.genre.pop",
+        label: "Pop",
+        value: "pop",
+        tag: Some("pop"),
+    },
+    GenreOption {
+        key: "radio.genre.rock",
+        label: "Rock",
+        value: "rock",
+        tag: Some("rock"),
+    },
+    GenreOption {
+        key: "radio.genre.classical",
+        label: "Classica",
+        value: "classical",
+        tag: Some("classical"),
+    },
+    GenreOption {
+        key: "radio.genre.jazz",
+        label: "Jazz",
+        value: "jazz",
+        tag: Some("jazz"),
+    },
+    GenreOption {
+        key: "radio.genre.dance",
+        label: "Dance",
+        value: "dance",
+        tag: Some("dance"),
+    },
+    GenreOption {
+        key: "radio.genre.blues",
+        label: "Blues",
+        value: "blues",
+        tag: Some("blues"),
+    },
+    GenreOption {
+        key: "radio.genre.country",
+        label: "Country",
+        value: "country",
+        tag: Some("country"),
+    },
+    GenreOption {
+        key: "radio.genre.hiphop",
+        label: "Hip hop",
+        value: "hiphop",
+        tag: Some("hiphop"),
+    },
+    GenreOption {
+        key: "radio.genre.electronic",
+        label: "Elettronica",
+        value: "electronic",
+        tag: Some("electronic"),
+    },
+    GenreOption {
+        key: "radio.genre.latin",
+        label: "Latina",
+        value: "latin",
+        tag: Some("latin"),
+    },
+    GenreOption {
+        key: "radio.genre.reggae",
+        label: "Reggae",
+        value: "reggae",
+        tag: Some("reggae"),
+    },
+    GenreOption {
+        key: "radio.genre.metal",
+        label: "Metal",
+        value: "metal",
+        tag: Some("metal"),
+    },
+    GenreOption {
+        key: "radio.genre.folk",
+        label: "Folk",
+        value: "folk",
+        tag: Some("folk"),
+    },
+    GenreOption {
+        key: "radio.genre.religion",
+        label: "Religione",
+        value: "religion",
+        tag: Some("religion"),
+    },
+    GenreOption {
+        key: "radio.genre.local",
+        label: "Locale",
+        value: "local",
+        tag: Some("local"),
+    },
+    GenreOption {
+        key: "radio.genre.culture",
+        label: "Cultura",
+        value: "culture",
+        tag: Some("culture"),
+    },
+    GenreOption {
+        key: "radio.genre.oldies",
+        label: "Anni 70 / 80 / 90",
+        value: "oldies",
+        tag: Some("oldies"),
+    },
+    GenreOption {
+        key: "radio.genre.kids",
+        label: "Bambini",
+        value: "kids",
+        tag: Some("kids"),
+    },
+    GenreOption {
+        key: "radio.genre.ambient",
+        label: "Ambient",
+        value: "ambient",
+        tag: Some("ambient"),
+    },
+    GenreOption {
+        key: "radio.genre.custom",
+        label: "Altro genere...",
+        value: "custom",
+        tag: None,
+    },
+];
+
+#[derive(Clone, Copy)]
+struct CommunityLanguageOption {
+    key: &'static str,
+    label: &'static str,
+    value: &'static str,
+}
+
+const COMMUNITY_LANGUAGE_OPTIONS: &[CommunityLanguageOption] = &[
+    CommunityLanguageOption {
+        key: "radio.community_lang.it",
+        label: "Italiano",
+        value: "italian",
+    },
+    CommunityLanguageOption {
+        key: "radio.community_lang.en",
+        label: "Inglese",
+        value: "english",
+    },
+    CommunityLanguageOption {
+        key: "radio.community_lang.es",
+        label: "Spagnolo",
+        value: "spanish",
+    },
+    CommunityLanguageOption {
+        key: "radio.community_lang.fr",
+        label: "Francese",
+        value: "french",
+    },
+    CommunityLanguageOption {
+        key: "radio.community_lang.de",
+        label: "Tedesco",
+        value: "german",
+    },
+    CommunityLanguageOption {
+        key: "radio.community_lang.pt",
+        label: "Portoghese",
+        value: "portuguese",
+    },
+];
 
 pub fn open(parent: HWND) {
     unsafe {
@@ -121,6 +386,9 @@ pub fn open(parent: HWND) {
             if handle_enter_key(hwnd, &msg) {
                 continue;
             }
+            if handle_escape_key(hwnd, &msg) {
+                continue;
+            }
             if !IsDialogMessageW(hwnd, &msg).as_bool() {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
@@ -139,10 +407,16 @@ fn handle_enter_key(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessaging::M
         return false;
     }
     let target = with_radio_state(hwnd, |state| {
-        if msg.hwnd == state.list_results {
+        if msg.hwnd == state.list_favorites {
+            Some(RadioEnterTarget::Favorites)
+        } else if msg.hwnd == state.list_results {
             Some(RadioEnterTarget::Results)
+        } else if msg.hwnd == state.edit_search {
+            Some(RadioEnterTarget::Search)
         } else if msg.hwnd == state.combo_language
             || crate::is_child_safe(state.combo_language, msg.hwnd)
+            || msg.hwnd == state.combo_genre
+            || crate::is_child_safe(state.combo_genre, msg.hwnd)
         {
             Some(RadioEnterTarget::Language)
         } else {
@@ -151,15 +425,33 @@ fn handle_enter_key(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessaging::M
     })
     .flatten();
     match target {
+        Some(RadioEnterTarget::Favorites) => open_selected_favorite(hwnd),
         Some(RadioEnterTarget::Results) => open_selected(hwnd),
+        Some(RadioEnterTarget::Search) => search(hwnd),
         Some(RadioEnterTarget::Language) => show_all_and_focus(hwnd),
         None => return false,
     }
     true
 }
 
+fn handle_escape_key(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessaging::MSG) -> bool {
+    if msg.message != WM_KEYDOWN || msg.wParam.0 as u32 != VK_ESCAPE.0 as u32 {
+        return false;
+    }
+    crate::log_debug(&format!("Radio: ESC closes dialog hwnd={:?}", hwnd));
+    crate::log_if_err!(crate::post_message_w_safe(
+        hwnd,
+        WM_CLOSE,
+        WPARAM(0),
+        LPARAM(0)
+    ));
+    true
+}
+
 enum RadioEnterTarget {
+    Favorites,
     Results,
+    Search,
     Language,
 }
 
@@ -187,11 +479,6 @@ fn route_player_keyboard(
         return RadioLoopAction::NotHandled;
     };
     if !has_player {
-        if is_escape {
-            crate::log_debug("Radio: ESC no active player, focusing results list");
-            focus_results_list(hwnd);
-            return RadioLoopAction::Handled;
-        }
         return RadioLoopAction::NotHandled;
     }
     let command = handle_player_keyboard(msg, skip_seconds);
@@ -215,8 +502,25 @@ fn route_player_keyboard(
             WPARAM(0),
             LPARAM(0)
         ));
+        schedule_results_refocus(hwnd);
     }
     RadioLoopAction::Handled
+}
+
+fn schedule_results_refocus(hwnd: HWND) {
+    let hwnd_value = hwnd.0;
+    std::thread::spawn(move || {
+        for delay in RADIO_REFOCUS_DELAYS_MS {
+            std::thread::sleep(Duration::from_millis(*delay));
+            let hwnd = HWND(hwnd_value);
+            crate::log_if_err!(crate::post_message_w_safe(
+                hwnd,
+                WM_RADIO_FOCUS_RESULTS,
+                WPARAM(0),
+                LPARAM(0)
+            ));
+        }
+    });
 }
 
 fn focus_results_list(hwnd: HWND) {
@@ -244,17 +548,53 @@ fn focus_results_list(hwnd: HWND) {
     }
 }
 
+fn focus_favorites_list(hwnd: HWND) {
+    crate::set_foreground_window_safe(hwnd);
+    if let Some(list_favorites) = with_radio_state(hwnd, |state| state.list_favorites) {
+        crate::log_debug(&format!(
+            "Radio: focus favorites list hwnd={:?} list={:?} before={:?}",
+            hwnd,
+            list_favorites,
+            crate::get_focus_safe()
+        ));
+        crate::set_focus_safe(list_favorites);
+        crate::send_message_w_safe(
+            hwnd,
+            WM_NEXTDLGCTL,
+            WPARAM(list_favorites.0 as usize),
+            LPARAM(1),
+        );
+        crate::log_debug(&format!(
+            "Radio: focus favorites list after={:?}",
+            crate::get_focus_safe()
+        ));
+    } else {
+        crate::log_debug("Radio: focus favorites list failed, state unavailable");
+    }
+}
+
 fn show_station_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> bool {
     let target = HWND(wparam.0 as isize);
-    let Some((list_results, language)) =
-        with_radio_state(hwnd, |state| (state.list_results, state.language))
-    else {
+    let Some((list_favorites, list_results, language)) = with_radio_state(hwnd, |state| {
+        (state.list_favorites, state.list_results, state.language)
+    }) else {
         return false;
     };
-    if target.0 != 0 && target != hwnd && target != list_results {
+    if target.0 != 0 && target != hwnd && target != list_favorites && target != list_results {
         return false;
     }
-    if selected_result(hwnd).is_none() {
+    let list_kind = if target == list_favorites {
+        RadioListKind::Favorites
+    } else if target == list_results {
+        RadioListKind::Results
+    } else {
+        selected_radio_list_kind(hwnd).unwrap_or(RadioListKind::Results)
+    };
+    match list_kind {
+        RadioListKind::Favorites => crate::set_focus_safe(list_favorites),
+        RadioListKind::Results => crate::set_focus_safe(list_results),
+    }
+    if selected_result(hwnd, list_kind).is_none() {
         return false;
     }
 
@@ -301,6 +641,23 @@ fn show_station_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> bool
         return false;
     }
 
+    let copy_label = to_wide(&tr(language, "radio.copy_audio_url", "Copia URL audio"));
+    if let Err(err) = unsafe {
+        AppendMenuW(
+            menu,
+            MF_STRING,
+            ID_CONTEXT_COPY_STREAM_URL,
+            PCWSTR(copy_label.as_ptr()),
+        )
+    } {
+        crate::log_debug(&format!(
+            "Radio: AppendMenuW copy stream URL failed: {}",
+            err
+        ));
+        crate::log_if_err!(unsafe { DestroyMenu(menu) });
+        return false;
+    }
+
     let point = if lparam.0 == -1 {
         let mut pt = POINT::default();
         if let Err(err) = unsafe { GetCursorPos(&mut pt) } {
@@ -332,6 +689,7 @@ fn show_station_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> bool
     match command.0 as usize {
         ID_CONTEXT_ADD_FAVORITE => add_selected_favorite(hwnd),
         ID_CONTEXT_REMOVE_FAVORITE => remove_selected_favorite(hwnd),
+        ID_CONTEXT_COPY_STREAM_URL => copy_selected_stream_url(hwnd),
         0 => {}
         other => crate::log_debug(&format!("Radio: unknown context menu command {}", other)),
     }
@@ -346,9 +704,19 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 focus_results_list(hwnd);
                 LRESULT(0)
             }
+            WM_RADIO_SEARCH_COMPLETE => {
+                let result = Box::from_raw(lparam.0 as *mut RadioSearchComplete);
+                finish_radio_search(hwnd, *result);
+                LRESULT(0)
+            }
             WM_CREATE => {
                 let create = lparam.0 as *const CREATESTRUCTW;
                 let parent = HWND((*create).lpCreateParams as isize);
+                if parent.0 != 0 {
+                    crate::with_state(parent, |state| {
+                        state.radio_window = hwnd;
+                    });
+                }
                 create_controls(hwnd, parent);
                 LRESULT(0)
             }
@@ -370,12 +738,8 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                         search(hwnd);
                         LRESULT(0)
                     }
-                    ID_BUTTON_PREV => {
-                        change_page(hwnd, -1);
-                        LRESULT(0)
-                    }
-                    ID_BUTTON_NEXT => {
-                        change_page(hwnd, 1);
+                    ID_BUTTON_ADD_COMMUNITY => {
+                        open_add_community_radio_dialog(hwnd);
                         LRESULT(0)
                     }
                     ID_BUTTON_CLOSE => {
@@ -388,11 +752,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             WM_KEYDOWN => {
                 if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
                     crate::log_debug(&format!("Radio: ESC in wndproc hwnd={:?}", hwnd));
-                    let parent = with_radio_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
                     crate::log_if_err!(DestroyWindow(hwnd));
-                    if parent.0 != 0 {
-                        crate::restore_editor_focus(parent);
-                    }
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -401,8 +761,32 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 crate::log_if_err!(DestroyWindow(hwnd));
                 LRESULT(0)
             }
-            WM_DESTROY => LRESULT(0),
+            WM_DESTROY => {
+                let parent = with_radio_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+                if parent.0 != 0 {
+                    crate::with_state(parent, |state| {
+                        if state.radio_window == hwnd {
+                            state.radio_window = HWND(0);
+                        }
+                    });
+                    crate::log_if_err!(crate::post_message_w_safe(
+                        parent,
+                        crate::WM_FOCUS_EDITOR,
+                        WPARAM(0),
+                        LPARAM(0)
+                    ));
+                }
+                LRESULT(0)
+            }
             WM_NCDESTROY => {
+                let parent = with_radio_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+                if parent.0 != 0 {
+                    crate::with_state(parent, |state| {
+                        if state.radio_window == hwnd {
+                            state.radio_window = HWND(0);
+                        }
+                    });
+                }
                 let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RadioDialogState;
                 if !ptr.is_null() {
                     let _box = Box::from_raw(ptr);
@@ -415,12 +799,410 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     }
 }
 
+fn open_add_community_radio_dialog(parent: HWND) {
+    unsafe {
+        let language = load_settings().language;
+        let hinstance = HINSTANCE(GetModuleHandleW(None).map(|m| m.0).unwrap_or(0));
+        let class_name = to_wide(ADD_RADIO_CLASS_NAME);
+        let wc = WNDCLASSW {
+            hCursor: LoadCursorW(None, IDC_ARROW).unwrap_or_default(),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(add_radio_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+
+        let title = to_wide(&tr(
+            language,
+            "radio.add_community_title",
+            "Aggiungi radio alla comunità Sonarpad",
+        ));
+        let hwnd = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_POPUP | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            560,
+            260,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(parent.0 as *const std::ffi::c_void),
+        );
+        if hwnd.0 == 0 {
+            return;
+        }
+        ShowWindow(hwnd, SW_SHOW);
+
+        let mut msg = Default::default();
+        while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).as_bool() {
+            if !IsDialogMessageW(hwnd, &msg).as_bool() {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+    }
+}
+
+unsafe extern "system" fn add_radio_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create = lparam.0 as *const CREATESTRUCTW;
+                let parent = HWND((*create).lpCreateParams as isize);
+                create_add_radio_controls(hwnd, parent);
+                LRESULT(0)
+            }
+            WM_SIZE => {
+                layout_add_radio_dialog(hwnd);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                match id {
+                    ID_ADD_SUBMIT => {
+                        submit_add_community_radio(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_ADD_CANCEL => {
+                        crate::log_if_err!(DestroyWindow(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                }
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    crate::log_if_err!(DestroyWindow(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_CLOSE => {
+                crate::log_if_err!(DestroyWindow(hwnd));
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut AddRadioDialogState;
+                if !ptr.is_null() {
+                    let _box = Box::from_raw(ptr);
+                    SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
+    }
+}
+
+fn create_add_radio_controls(hwnd: HWND, parent: HWND) {
+    let language = load_settings().language;
+    let font = HFONT(crate::get_stock_object_safe(DEFAULT_GUI_FONT).0);
+
+    let label_name = create_static(
+        hwnd,
+        &tr(language, "radio.add_name", "Nome radio:"),
+        ID_ADD_LABEL_NAME,
+    );
+    let edit_name = create_edit(hwnd, ID_ADD_NAME);
+    let label_url = create_static(
+        hwnd,
+        &tr(language, "radio.add_url", "Indirizzo streaming:"),
+        ID_ADD_LABEL_URL,
+    );
+    let edit_url = create_edit(hwnd, ID_ADD_URL);
+    let label_language = create_static(
+        hwnd,
+        &tr(language, "radio.language", "Lingua:"),
+        ID_ADD_LABEL_LANGUAGE,
+    );
+    let combo_language = create_combo(hwnd, ID_ADD_LANGUAGE);
+    let label_genre = create_static(
+        hwnd,
+        &tr(language, "radio.genre", "Genere:"),
+        ID_ADD_LABEL_GENRE,
+    );
+    let combo_genre = create_combo(hwnd, ID_ADD_GENRE);
+    let btn_submit = create_button(
+        hwnd,
+        &tr(language, "radio.add_submit", "Verifica e aggiungi"),
+        ID_ADD_SUBMIT,
+        true,
+    );
+    let btn_cancel = create_button(
+        hwnd,
+        &tr(language, "radio.cancel", "Annulla"),
+        ID_ADD_CANCEL,
+        false,
+    );
+
+    for hwnd_ctrl in [
+        label_name,
+        edit_name,
+        label_url,
+        edit_url,
+        label_language,
+        combo_language,
+        label_genre,
+        combo_genre,
+        btn_submit,
+        btn_cancel,
+    ] {
+        crate::send_message_w_safe(hwnd_ctrl, WM_SETFONT, WPARAM(font.0 as usize), LPARAM(1));
+    }
+
+    for option in COMMUNITY_LANGUAGE_OPTIONS {
+        let w = to_wide(&tr(language, option.key, option.label));
+        crate::send_message_w_safe(
+            combo_language,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(w.as_ptr() as isize),
+        );
+    }
+    crate::send_message_w_safe(combo_language, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+
+    for option in GENRE_OPTIONS.iter().filter(|option| option.tag.is_some()) {
+        let w = to_wide(&tr(language, option.key, option.label));
+        crate::send_message_w_safe(
+            combo_genre,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(w.as_ptr() as isize),
+        );
+    }
+    crate::send_message_w_safe(combo_genre, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+
+    let state = Box::new(AddRadioDialogState {
+        parent,
+        language,
+        edit_name,
+        edit_url,
+        combo_language,
+        combo_genre,
+    });
+    crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+    layout_add_radio_dialog(hwnd);
+    crate::set_focus_safe(edit_name);
+}
+
+fn layout_add_radio_dialog(hwnd: HWND) {
+    let mut rc = Default::default();
+    crate::log_if_err!(crate::get_client_rect_safe(hwnd, &mut rc));
+    let w = rc.right - rc.left;
+    let margin = 10;
+    let label_w = 145;
+    let row_h = 25;
+    let mut y = margin;
+
+    move_id(hwnd, ID_ADD_LABEL_NAME, margin, y + 4, label_w, row_h);
+    move_id(
+        hwnd,
+        ID_ADD_NAME,
+        margin + label_w,
+        y,
+        w - margin * 2 - label_w,
+        row_h,
+    );
+    y += 35;
+    move_id(hwnd, ID_ADD_LABEL_URL, margin, y + 4, label_w, row_h);
+    move_id(
+        hwnd,
+        ID_ADD_URL,
+        margin + label_w,
+        y,
+        w - margin * 2 - label_w,
+        row_h,
+    );
+    y += 35;
+    move_id(hwnd, ID_ADD_LABEL_LANGUAGE, margin, y + 4, label_w, row_h);
+    move_id(
+        hwnd,
+        ID_ADD_LANGUAGE,
+        margin + label_w,
+        y,
+        w - margin * 2 - label_w,
+        140,
+    );
+    y += 38;
+    move_id(hwnd, ID_ADD_LABEL_GENRE, margin, y + 4, label_w, row_h);
+    move_id(
+        hwnd,
+        ID_ADD_GENRE,
+        margin + label_w,
+        y,
+        w - margin * 2 - label_w,
+        180,
+    );
+    y += 46;
+    move_id(hwnd, ID_ADD_SUBMIT, w - margin - 260, y, 160, 30);
+    move_id(hwnd, ID_ADD_CANCEL, w - margin - 90, y, 90, 30);
+}
+
+fn with_add_radio_state<R>(hwnd: HWND, f: impl FnOnce(&mut AddRadioDialogState) -> R) -> Option<R> {
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut AddRadioDialogState;
+    crate::with_raw_mut_ptr_safe(ptr, f)
+}
+
+fn selected_community_language_value(state: &AddRadioDialogState) -> &'static str {
+    let idx = crate::send_message_w_safe(state.combo_language, CB_GETCURSEL, WPARAM(0), LPARAM(0))
+        .0
+        .max(0) as usize;
+    COMMUNITY_LANGUAGE_OPTIONS
+        .get(idx)
+        .map(|option| option.value)
+        .unwrap_or("italian")
+}
+
+fn selected_community_genre_value(state: &AddRadioDialogState) -> &'static str {
+    let idx = crate::send_message_w_safe(state.combo_genre, CB_GETCURSEL, WPARAM(0), LPARAM(0))
+        .0
+        .max(0) as usize;
+    GENRE_OPTIONS
+        .iter()
+        .filter(|option| option.tag.is_some())
+        .nth(idx)
+        .map(|option| option.value)
+        .unwrap_or("news")
+}
+
+fn submit_add_community_radio(hwnd: HWND) {
+    let Some((parent, language, name, url, radio_language, genre)) =
+        with_add_radio_state(hwnd, |state| {
+            (
+                state.parent,
+                state.language,
+                get_edit_text(state.edit_name).trim().to_string(),
+                get_edit_text(state.edit_url).trim().to_string(),
+                selected_community_language_value(state),
+                selected_community_genre_value(state),
+            )
+        })
+    else {
+        return;
+    };
+
+    if name.is_empty() || url.is_empty() {
+        message(
+            hwnd,
+            "Radio",
+            &tr(
+                language,
+                "radio.add_missing_fields",
+                "Inserisci nome radio e indirizzo streaming.",
+            ),
+        );
+        return;
+    }
+
+    match post_community_radio(language, &name, &url, radio_language, genre) {
+        Ok(text) => {
+            message(hwnd, "Radio", &text);
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
+            focus_favorites_list(parent);
+        }
+        Err(err) => message(hwnd, "Radio", &err),
+    }
+}
+
+fn post_community_radio(
+    app_language: Language,
+    name: &str,
+    url: &str,
+    language: &str,
+    genre: &str,
+) -> Result<String, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(12))
+        .user_agent("Sonarpad/1.0 (https://sonarpad.com)")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let response = client
+        .post("https://sonarpad.com/api/add_community_radio.php")
+        .form(&[
+            ("name", name),
+            ("url", url),
+            ("language", language),
+            ("genre", genre),
+        ])
+        .send()
+        .map_err(|e| e.to_string())?;
+
+    let status = response.status();
+    let body = response.text().map_err(|e| e.to_string())?;
+
+    let response = serde_json::from_str::<CommunityRadioApiResponse>(&body).map_err(|e| {
+        let status = status.to_string();
+        if body.trim().is_empty() {
+            let error = e.to_string();
+            tr_fallback(
+                app_language,
+                "radio.server_empty_response",
+                &[("status", status.as_str()), ("error", error.as_str())],
+                "Il server ha risposto con stato {status}, ma senza un messaggio leggibile: {error}",
+            )
+        } else {
+            tr_fallback(
+                app_language,
+                "radio.server_invalid_json",
+                &[("status", status.as_str()), ("body", body.as_str())],
+                "Il server ha risposto con stato {status}, ma la risposta non è JSON valida: {body}",
+            )
+        }
+    })?;
+
+    if !status.is_success() && response.error.trim().is_empty() {
+        let status = status.to_string();
+        return Err(tr_fallback(
+            app_language,
+            "radio.server_rejected",
+            &[("status", status.as_str())],
+            "Il server ha rifiutato la richiesta con stato {status}.",
+        ));
+    };
+
+    if response.ok {
+        if response.message.trim().is_empty() {
+            Ok(tr(
+                app_language,
+                "radio.community_added",
+                "Radio aggiunta correttamente alla comunità Sonarpad.",
+            ))
+        } else {
+            Ok(response.message)
+        }
+    } else if response.error.trim().is_empty() {
+        Err(tr(
+            app_language,
+            "radio.community_add_error",
+            "Errore durante l'aggiunta della radio.",
+        ))
+    } else {
+        Err(response.error)
+    }
+}
+
 fn create_controls(hwnd: HWND, parent: HWND) {
     let language = load_settings().language;
     let font = HFONT(crate::get_stock_object_safe(DEFAULT_GUI_FONT).0);
     let languages = radio_menu_languages(language);
-    let stations_by_language = embedded_radio_stations();
 
+    let label_favorites = create_static(
+        hwnd,
+        &tr(language, "radio.favorites", "Preferiti:"),
+        ID_LABEL_FAVORITES,
+    );
+    let list_favorites = create_listbox(hwnd, ID_LIST_FAVORITES);
     let label_search = create_static(
         hwnd,
         &tr(language, "radio.search_text", "Cerca radio:"),
@@ -433,6 +1215,12 @@ fn create_controls(hwnd: HWND, parent: HWND) {
         ID_LABEL_LANGUAGE,
     );
     let combo_language = create_combo(hwnd, ID_COMBO_LANGUAGE);
+    let label_genre = create_static(
+        hwnd,
+        &tr(language, "radio.genre", "Genere:"),
+        ID_LABEL_GENRE,
+    );
+    let combo_genre = create_combo(hwnd, ID_COMBO_GENRE);
     let list_results = create_listbox(hwnd, ID_LIST_RESULTS);
     let label_page = create_static(hwnd, "", ID_LABEL_PAGE);
     let btn_search = create_button(
@@ -441,16 +1229,10 @@ fn create_controls(hwnd: HWND, parent: HWND) {
         ID_BUTTON_SEARCH,
         true,
     );
-    let btn_prev = create_button(
+    let btn_add = create_button(
         hwnd,
-        &tr(language, "radio.previous", "Precedenti"),
-        ID_BUTTON_PREV,
-        false,
-    );
-    let btn_next = create_button(
-        hwnd,
-        &tr(language, "radio.next", "Successivi"),
-        ID_BUTTON_NEXT,
+        &tr(language, "radio.add_community", "Aggiungi radio"),
+        ID_BUTTON_ADD_COMMUNITY,
         false,
     );
     let btn_close = create_button(
@@ -461,15 +1243,18 @@ fn create_controls(hwnd: HWND, parent: HWND) {
     );
 
     for hwnd_ctrl in [
+        label_favorites,
+        list_favorites,
         label_search,
         edit_search,
         label_lang,
         combo_language,
+        label_genre,
+        combo_genre,
         list_results,
         label_page,
         btn_search,
-        btn_prev,
-        btn_next,
+        btn_add,
         btn_close,
     ] {
         crate::send_message_w_safe(hwnd_ctrl, WM_SETFONT, WPARAM(font.0 as usize), LPARAM(1));
@@ -484,24 +1269,37 @@ fn create_controls(hwnd: HWND, parent: HWND) {
         );
     }
     crate::send_message_w_safe(combo_language, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+    for genre in GENRE_OPTIONS {
+        let w = to_wide(&tr(language, genre.key, genre.label));
+        crate::send_message_w_safe(
+            combo_genre,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(w.as_ptr() as isize),
+        );
+    }
+    crate::send_message_w_safe(combo_genre, CB_SETCURSEL, WPARAM(0), LPARAM(0));
 
     let mut state = Box::new(RadioDialogState {
         parent,
         language,
         edit_search,
         combo_language,
+        combo_genre,
+        list_favorites,
         list_results,
         label_page,
+        favorite_results: Vec::new(),
         all_results: Vec::new(),
         page: 0,
         languages,
-        stations_by_language,
     });
-    state.all_results = initial_results(&state);
+    state.favorite_results = initial_results();
     crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+    populate_favorites(hwnd);
     populate_results(hwnd);
     layout(hwnd);
-    crate::set_focus_safe(edit_search);
+    crate::set_focus_safe(list_favorites);
 }
 
 fn create_static(parent: HWND, text: &str, id: usize) -> HWND {
@@ -609,6 +1407,16 @@ fn layout(hwnd: HWND) {
     let label_w = 80;
     let row_h = 25;
     let mut y = margin;
+    move_id(hwnd, ID_LABEL_FAVORITES, margin, y + 4, label_w, row_h);
+    move_id(
+        hwnd,
+        ID_LIST_FAVORITES,
+        margin + label_w,
+        y,
+        w - margin * 2 - label_w,
+        90,
+    );
+    y += 100;
     move_id(hwnd, ID_LABEL_SEARCH, margin, y + 4, label_w, row_h);
     move_id(
         hwnd,
@@ -629,21 +1437,23 @@ fn layout(hwnd: HWND) {
         140,
     );
     y += 38;
-    move_id(hwnd, ID_BUTTON_SEARCH, w - margin - 100, y, 100, 30);
+    move_id(hwnd, ID_LABEL_GENRE, margin, y + 4, label_w, row_h);
+    move_id(
+        hwnd,
+        ID_COMBO_GENRE,
+        margin + label_w,
+        y,
+        w - margin * 2 - label_w,
+        180,
+    );
+    y += 35;
+    move_id(hwnd, ID_BUTTON_SEARCH, w - margin - 240, y, 100, 30);
+    move_id(hwnd, ID_BUTTON_ADD_COMMUNITY, w - margin - 130, y, 130, 30);
     y += 42;
     let list_h = (rc.bottom - y - 92).max(80);
     move_id(hwnd, ID_LIST_RESULTS, margin, y, w - margin * 2, list_h);
     y += list_h + 8;
-    move_id(hwnd, ID_BUTTON_PREV, margin, y, 100, 28);
-    move_id(
-        hwnd,
-        ID_LABEL_PAGE,
-        margin + 110,
-        y + 5,
-        w - margin * 2 - 220,
-        28,
-    );
-    move_id(hwnd, ID_BUTTON_NEXT, w - margin - 100, y, 100, 28);
+    move_id(hwnd, ID_LABEL_PAGE, margin, y + 5, w - margin * 2, 28);
     y += 36;
     move_id(hwnd, ID_BUTTON_CLOSE, w - margin - 90, y, 90, 30);
 }
@@ -663,6 +1473,19 @@ fn tr(language: Language, key: &str, fallback: &str) -> String {
     let value = i18n::tr(language, key);
     if value == key {
         fallback.to_string()
+    } else {
+        value
+    }
+}
+
+fn tr_fallback(language: Language, key: &str, args: &[(&str, &str)], fallback: &str) -> String {
+    let value = i18n::tr_f(language, key, args);
+    if value == key {
+        let mut out = fallback.to_string();
+        for (name, value) in args {
+            out = out.replace(&format!("{{{name}}}"), value);
+        }
+        out
     } else {
         value
     }
@@ -702,24 +1525,8 @@ fn radio_menu_languages(language: Language) -> Vec<(String, String)> {
     ]
 }
 
-fn embedded_radio_stations() -> HashMap<String, Vec<RadioStation>> {
-    serde_json::from_str::<HashMap<String, Vec<RadioStation>>>(include_str!(
-        "../../i18n/radio.json"
-    ))
-    .unwrap_or_default()
-    .into_iter()
-    .map(|(k, v)| (k, normalize_radio_stations(v)))
-    .collect()
-}
-
-fn initial_results(state: &RadioDialogState) -> Vec<RadioFavorite> {
-    let mut results = load_settings().radio_favorites;
-    if let Some(stations) = state.stations_by_language.get("it") {
-        for s in stations.iter().take(50) {
-            results.push(favorite_from_station("it", s));
-        }
-    }
-    normalize_favorites(results)
+fn initial_results() -> Vec<RadioFavorite> {
+    normalize_favorites(load_settings().radio_favorites)
 }
 
 fn selected_language_code(state: &RadioDialogState) -> String {
@@ -733,92 +1540,196 @@ fn selected_language_code(state: &RadioDialogState) -> String {
         .unwrap_or_else(|| "it".into())
 }
 
-fn show_all(hwnd: HWND) {
-    let should_populate = with_radio_state(hwnd, |state| {
-        let code = selected_language_code(state);
-        let mut results = state
-            .stations_by_language
-            .get(&code)
-            .cloned()
-            .unwrap_or_default();
-        if results.is_empty() {
-            match fetch_radio_browser_stations(&code) {
-                Ok(v) => results = v,
-                Err(e) => {
-                    message(hwnd, &tr(state.language, "radio.error", "Errore"), &e);
-                    return false;
-                }
-            }
-        }
-        state.all_results = normalize_favorites(
-            results
-                .iter()
-                .map(|s| favorite_from_station(&code, s))
-                .collect(),
-        );
-        state.page = 0;
-        true
-    })
-    .unwrap_or(false);
-    if should_populate {
-        populate_results(hwnd);
+fn selected_genre_tag(state: &RadioDialogState) -> Option<String> {
+    let idx = crate::send_message_w_safe(state.combo_genre, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if idx >= 0 {
+        return GENRE_OPTIONS
+            .get(idx as usize)
+            .and_then(|genre| genre_tag_from_value(genre.value))
+            .map(str::to_string);
     }
+    let typed = get_edit_text(state.combo_genre);
+    let typed = typed.trim();
+    if typed.is_empty() {
+        None
+    } else {
+        Some(typed.to_string())
+    }
+}
+
+fn genre_tag_from_value(value: &str) -> Option<&'static str> {
+    GENRE_OPTIONS
+        .iter()
+        .find(|genre| genre.value == value)
+        .and_then(|genre| genre.tag)
+}
+
+fn show_all(hwnd: HWND) {
+    start_radio_search(hwnd, None);
 }
 
 fn show_all_and_focus(hwnd: HWND) {
     show_all(hwnd);
-    focus_results_list(hwnd);
 }
 
 fn search(hwnd: HWND) {
-    let should_populate = with_radio_state(hwnd, |state| {
-        let keyword = normalized_radio_name(&get_edit_text(state.edit_search));
-        if keyword.is_empty() {
-            message(
-                hwnd,
-                "Radio",
-                &tr(
-                    state.language,
-                    "radio.enter_search",
-                    "Inserisci un testo da cercare.",
-                ),
-            );
-            return false;
-        }
-        let code = selected_language_code(state);
-        let mut stations = state
-            .stations_by_language
-            .get(&code)
-            .cloned()
-            .unwrap_or_default();
-        if stations.is_empty() {
-            stations = fetch_radio_browser_stations(&code).unwrap_or_default();
-        }
-        let mut results: Vec<_> = stations
-            .iter()
-            .filter(|s| radio_name_matches_keyword(&s.name, &keyword))
-            .map(|s| favorite_from_station(&code, s))
-            .collect();
-        results.sort_by(|a, b| {
-            radio_search_rank(&a.name, &keyword)
-                .cmp(&radio_search_rank(&b.name, &keyword))
-                .then_with(|| a.name.cmp(&b.name))
-        });
-        state.all_results = normalize_favorites(results);
-        state.page = 0;
-        if state.all_results.is_empty() {
-            message(
-                hwnd,
-                "Radio",
-                &tr(state.language, "radio.none_found", "Nessuna radio trovata."),
-            );
-        }
-        true
+    let keyword = with_radio_state(hwnd, |state| {
+        normalized_radio_name(&get_edit_text(state.edit_search))
     })
-    .unwrap_or(false);
-    if should_populate {
-        populate_results(hwnd);
+    .unwrap_or_default();
+    let name_query = if keyword.is_empty() {
+        None
+    } else {
+        Some(keyword)
+    };
+    start_radio_search(hwnd, name_query);
+}
+
+fn start_radio_search(hwnd: HWND, name_query: Option<String>) {
+    let Some((language, code, genre)) = with_radio_state(hwnd, |state| {
+        show_loading_in_results(state);
+        (
+            state.language,
+            selected_language_code(state),
+            selected_genre_tag(state),
+        )
+    }) else {
+        return;
+    };
+    let hwnd_value = hwnd.0;
+    std::thread::spawn(move || {
+        let result = run_radio_search(&code, name_query.as_deref(), genre.as_deref());
+        let complete = Box::new(RadioSearchComplete { language, result });
+        let ptr = Box::into_raw(complete);
+        let hwnd = HWND(hwnd_value);
+        if let Err(err) = crate::post_message_w_safe(
+            hwnd,
+            WM_RADIO_SEARCH_COMPLETE,
+            WPARAM(0),
+            LPARAM(ptr as isize),
+        ) {
+            crate::log_debug(&format!("Radio: post search complete failed: {}", err));
+        }
+    });
+}
+
+fn show_loading_in_results(state: &mut RadioDialogState) {
+    let message = tr(state.language, "radio.loading", "Caricamento radio...");
+    show_status_in_results(state, &message);
+}
+
+fn show_status_in_results(state: &mut RadioDialogState, text: &str) {
+    state.all_results.clear();
+    state.page = 0;
+    crate::send_message_w_safe(state.list_results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let text = to_wide(text);
+    crate::send_message_w_safe(
+        state.list_results,
+        LB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(text.as_ptr() as isize),
+    );
+    crate::send_message_w_safe(state.list_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+    let page = to_wide("");
+    crate::log_if_err!(crate::set_window_text_w_safe(
+        state.label_page,
+        PCWSTR(page.as_ptr())
+    ));
+    focus_results_list_from_state(state);
+}
+
+fn run_radio_search(
+    code: &str,
+    name_query: Option<&str>,
+    genre: Option<&str>,
+) -> Result<Vec<RadioFavorite>, String> {
+    let keyword = name_query.unwrap_or_default().to_string();
+    let mut stations = match fetch_radio_browser_stations(code, name_query, genre) {
+        Ok(stations) => stations,
+        Err(err) => {
+            crate::log_debug(&format!(
+                "Radio Browser search failed, trying community radios only: {}",
+                err
+            ));
+            Vec::new()
+        }
+    };
+    match fetch_community_radio_stations(code, name_query, genre) {
+        Ok(mut community_stations) => stations.append(&mut community_stations),
+        Err(err) => crate::log_debug(&format!("Community radio search failed: {}", err)),
     }
+    let mut results: Vec<_> = stations
+        .iter()
+        .filter(|s| keyword.is_empty() || radio_name_matches_keyword(&s.name, &keyword))
+        .map(|s| favorite_from_station(code, s))
+        .collect();
+    results.sort_by(|a, b| {
+        radio_search_rank(&a.name, &keyword)
+            .cmp(&radio_search_rank(&b.name, &keyword))
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    Ok(normalize_favorites(results))
+}
+
+fn finish_radio_search(hwnd: HWND, complete: RadioSearchComplete) {
+    match complete.result {
+        Ok(results) => {
+            let empty = results.is_empty();
+            with_radio_state(hwnd, |state| {
+                state.all_results = results;
+                state.page = 0;
+            });
+            populate_results(hwnd);
+            focus_results_list(hwnd);
+            if empty {
+                message(
+                    hwnd,
+                    "Radio",
+                    &tr(
+                        complete.language,
+                        "radio.none_found",
+                        "Nessuna radio trovata.",
+                    ),
+                );
+            }
+        }
+        Err(error) => {
+            crate::log_debug(&format!(
+                "Radio Browser search finished with error: {}",
+                error
+            ));
+            with_radio_state(hwnd, |state| {
+                let message = tr(
+                    complete.language,
+                    "radio.search_failed",
+                    "Errore durante la ricerca radio. Riprova tra poco.",
+                );
+                show_status_in_results(state, &message);
+            });
+        }
+    }
+}
+
+fn focus_results_list_from_state(state: &RadioDialogState) {
+    crate::set_focus_safe(state.list_results);
+}
+
+fn populate_favorites(hwnd: HWND) {
+    with_radio_state(hwnd, |state| {
+        crate::send_message_w_safe(state.list_favorites, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        for item in &state.favorite_results {
+            let w = to_wide(&radio_label(item, state.language));
+            crate::send_message_w_safe(
+                state.list_favorites,
+                LB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(w.as_ptr() as isize),
+            );
+        }
+        if !state.favorite_results.is_empty() {
+            crate::send_message_w_safe(state.list_favorites, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+        }
+    });
 }
 
 fn populate_results(hwnd: HWND) {
@@ -832,6 +1743,16 @@ fn populate_results(hwnd: HWND) {
         state.page = state.page.min(total_pages.saturating_sub(1));
         let start = state.page * RADIO_RESULTS_PAGE_SIZE;
         let end = (start + RADIO_RESULTS_PAGE_SIZE).min(state.all_results.len());
+        if state.page > 0 {
+            let previous = tr(state.language, "radio.previous", "Precedenti");
+            let w = to_wide(&previous);
+            crate::send_message_w_safe(
+                state.list_results,
+                LB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(w.as_ptr() as isize),
+            );
+        }
         for item in &state.all_results[start..end] {
             let w = to_wide(&radio_label(item, state.language));
             crate::send_message_w_safe(
@@ -841,8 +1762,24 @@ fn populate_results(hwnd: HWND) {
                 LPARAM(w.as_ptr() as isize),
             );
         }
+        if state.page + 1 < total_pages {
+            let next = tr(state.language, "radio.next", "Successivi");
+            let w = to_wide(&next);
+            crate::send_message_w_safe(
+                state.list_results,
+                LB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(w.as_ptr() as isize),
+            );
+        }
         if end > start {
-            crate::send_message_w_safe(state.list_results, LB_SETCURSEL, WPARAM(0), LPARAM(0));
+            let selected = if state.page > 0 { 1 } else { 0 };
+            crate::send_message_w_safe(
+                state.list_results,
+                LB_SETCURSEL,
+                WPARAM(selected),
+                LPARAM(0),
+            );
         }
         let page = i18n::tr_f(
             state.language,
@@ -882,22 +1819,100 @@ fn change_page(hwnd: HWND, delta: isize) {
     }
 }
 
-fn selected_result(hwnd: HWND) -> Option<RadioFavorite> {
-    with_radio_state(hwnd, selected_result_from_state).flatten()
+#[derive(Clone, Copy)]
+enum RadioListKind {
+    Favorites,
+    Results,
 }
 
-fn selected_result_from_state(state: &mut RadioDialogState) -> Option<RadioFavorite> {
+fn selected_radio_list_kind(hwnd: HWND) -> Option<RadioListKind> {
+    let focus = crate::get_focus_safe();
+    with_radio_state(hwnd, |state| {
+        if focus == state.list_favorites {
+            Some(RadioListKind::Favorites)
+        } else if focus == state.list_results {
+            Some(RadioListKind::Results)
+        } else {
+            None
+        }
+    })
+    .flatten()
+}
+
+fn selected_result(hwnd: HWND, kind: RadioListKind) -> Option<RadioFavorite> {
+    with_radio_state(hwnd, |state| selected_result_from_state(state, kind)).flatten()
+}
+
+enum RadioListAction {
+    Open(RadioFavorite),
+    PreviousPage,
+    NextPage,
+}
+
+fn selected_list_action_from_state(state: &mut RadioDialogState) -> Option<RadioListAction> {
     let sel = crate::send_message_w_safe(state.list_results, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
     if sel < 0 {
         return None;
     }
-    let index = state.page * RADIO_RESULTS_PAGE_SIZE + sel as usize;
-    state.all_results.get(index).cloned()
+    let start = state.page * RADIO_RESULTS_PAGE_SIZE;
+    let end = (start + RADIO_RESULTS_PAGE_SIZE).min(state.all_results.len());
+    if state.page > 0 && sel == 0 {
+        return Some(RadioListAction::PreviousPage);
+    }
+    let radio_row = if state.page > 0 {
+        (sel as usize).saturating_sub(1)
+    } else {
+        sel as usize
+    };
+    let index = start + radio_row;
+    if index < end {
+        return state
+            .all_results
+            .get(index)
+            .cloned()
+            .map(RadioListAction::Open);
+    }
+    let total_pages = state
+        .all_results
+        .len()
+        .div_ceil(RADIO_RESULTS_PAGE_SIZE)
+        .max(1);
+    if radio_row == end.saturating_sub(start) && state.page + 1 < total_pages {
+        Some(RadioListAction::NextPage)
+    } else {
+        None
+    }
 }
 
-fn open_selected(hwnd: HWND) {
+fn selected_result_from_state(
+    state: &mut RadioDialogState,
+    kind: RadioListKind,
+) -> Option<RadioFavorite> {
+    match kind {
+        RadioListKind::Favorites => {
+            let sel = crate::send_message_w_safe(
+                state.list_favorites,
+                LB_GETCURSEL,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0;
+            if sel < 0 {
+                return None;
+            }
+            state.favorite_results.get(sel as usize).cloned()
+        }
+        RadioListKind::Results => match selected_list_action_from_state(state)? {
+            RadioListAction::Open(item) => Some(item),
+            RadioListAction::PreviousPage => None,
+            RadioListAction::NextPage => None,
+        },
+    }
+}
+
+fn open_selected_favorite(hwnd: HWND) {
     if let Some((parent, item)) = with_radio_state(hwnd, |state| {
-        selected_result_from_state(state).map(|item| (state.parent, item))
+        selected_result_from_state(state, RadioListKind::Favorites).map(|item| (state.parent, item))
     })
     .flatten()
         && let Err(err) =
@@ -906,8 +1921,35 @@ fn open_selected(hwnd: HWND) {
         message(hwnd, "Radio", &err);
     }
 }
+
+fn open_selected(hwnd: HWND) {
+    match with_radio_state(hwnd, |state| {
+        selected_list_action_from_state(state).map(|action| (state.parent, action))
+    })
+    .flatten()
+    {
+        Some((_, RadioListAction::PreviousPage)) => change_page(hwnd, -1),
+        Some((_, RadioListAction::NextPage)) => change_page(hwnd, 1),
+        Some((parent, RadioListAction::Open(item))) => {
+            if let Err(err) = launch_stream_url_in_mpv(
+                parent,
+                &item.stream_url,
+                Some(&item.name),
+                None,
+                None,
+                None,
+            ) {
+                message(hwnd, "Radio", &err);
+            }
+        }
+        None => {}
+    }
+}
 fn add_selected_favorite(hwnd: HWND) {
-    let Some(item) = selected_result(hwnd) else {
+    let Some(kind) = selected_radio_list_kind(hwnd) else {
+        return;
+    };
+    let Some(item) = selected_result(hwnd, kind) else {
         return;
     };
     let mut settings = load_settings();
@@ -929,16 +1971,27 @@ fn add_selected_favorite(hwnd: HWND) {
     }
     settings.radio_favorites.push(item.clone());
     settings.radio_favorites = normalize_favorites(settings.radio_favorites.clone());
+    let favorites = settings.radio_favorites.clone();
     let lang = settings.language;
     save_settings(settings);
+    with_radio_state(hwnd, |state| {
+        state.favorite_results = favorites;
+    });
+    populate_favorites(hwnd);
     message(
         hwnd,
         "Radio",
         &i18n::tr_f(lang, "radio.favorite_added", &[("name", &item.name)]),
     );
+    with_radio_state(hwnd, |state| {
+        crate::set_focus_safe(state.list_favorites);
+    });
 }
 fn remove_selected_favorite(hwnd: HWND) {
-    let Some(item) = selected_result(hwnd) else {
+    let Some(kind) = selected_radio_list_kind(hwnd) else {
+        return;
+    };
+    let Some(item) = selected_result(hwnd, kind) else {
         return;
     };
     let mut settings = load_settings();
@@ -947,14 +2000,30 @@ fn remove_selected_favorite(hwnd: HWND) {
         .radio_favorites
         .retain(|f| f.stream_url != item.stream_url);
     if settings.radio_favorites.len() != before {
+        settings.radio_favorites = normalize_favorites(settings.radio_favorites.clone());
+        let favorites = settings.radio_favorites.clone();
         let lang = settings.language;
         save_settings(settings);
+        with_radio_state(hwnd, |state| {
+            state.favorite_results = favorites;
+        });
+        populate_favorites(hwnd);
         message(
             hwnd,
             "Radio",
             &i18n::tr_f(lang, "radio.favorite_removed", &[("name", &item.name)]),
         );
     }
+}
+
+fn copy_selected_stream_url(hwnd: HWND) {
+    let Some(kind) = selected_radio_list_kind(hwnd) else {
+        return;
+    };
+    let Some(item) = selected_result(hwnd, kind) else {
+        return;
+    };
+    crate::app_windows::rai_audiodescrizioni_window::copy_text_to_clipboard(hwnd, &item.stream_url);
 }
 
 fn message(hwnd: HWND, title: &str, body: &str) {
@@ -984,7 +2053,7 @@ fn normalize_favorites(mut items: Vec<RadioFavorite>) -> Vec<RadioFavorite> {
     });
     items.dedup_by(|a, b| {
         canonical_radio_name(&a.name) == canonical_radio_name(&b.name)
-            || a.stream_url == b.stream_url
+            || normalize_stream_url(&a.stream_url) == normalize_stream_url(&b.stream_url)
     });
     items
 }
@@ -1049,7 +2118,7 @@ fn normalize_radio_stations(mut stations: Vec<RadioStation>) -> Vec<RadioStation
     });
     stations.dedup_by(|a, b| {
         canonical_radio_name(&a.name) == canonical_radio_name(&b.name)
-            || a.stream_url == b.stream_url
+            || normalize_stream_url(&a.stream_url) == normalize_stream_url(&b.stream_url)
     });
     stations
 }
@@ -1115,66 +2184,188 @@ fn radio_browser_language_name(code: &str) -> &str {
         _ => code,
     }
 }
-fn fetch_radio_browser_stations(language_code: &str) -> Result<Vec<RadioStation>, String> {
+fn fetch_community_radio_stations(
+    language_code: &str,
+    name_query: Option<&str>,
+    genre: Option<&str>,
+) -> Result<Vec<RadioStation>, String> {
     let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(10))
-        .user_agent("Sonarpad Radio/1.0")
+        .timeout(Duration::from_secs(8))
+        .user_agent("Sonarpad/1.0 (https://sonarpad.com)")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let stations = client
+        .get(COMMUNITY_RADIOS_URL)
+        .send()
+        .and_then(|r| r.error_for_status())
+        .and_then(|r| r.json::<Vec<CommunityRadioStation>>())
+        .map_err(|e| e.to_string())?;
+
+    let Some(wanted_language) = community_language_from_radio_code(language_code) else {
+        return Ok(Vec::new());
+    };
+    let keyword = name_query.unwrap_or_default();
+    let wanted_genre = genre.unwrap_or_default().trim();
+
+    let mut seen = HashSet::new();
+    let results = stations
+        .into_iter()
+        .filter(|station| {
+            station
+                .language
+                .trim()
+                .eq_ignore_ascii_case(wanted_language)
+        })
+        .filter(|station| {
+            wanted_genre.is_empty() || station.genre.trim().eq_ignore_ascii_case(wanted_genre)
+        })
+        .filter_map(|station| {
+            let url = station.url.trim().to_string();
+            if url.is_empty() || !seen.insert(normalize_stream_url(&url)) {
+                return None;
+            }
+
+            let mut name = station.name.trim().replace('&', "");
+            if name.is_empty() {
+                name = url.clone();
+            } else if !station.genre_label.trim().is_empty() {
+                name = format!("{} - {}", name, station.genre_label.trim());
+            }
+
+            if !keyword.is_empty() && !radio_name_matches_keyword(&name, keyword) {
+                return None;
+            }
+
+            Some(RadioStation {
+                name,
+                stream_url: url,
+            })
+        })
+        .collect();
+
+    Ok(normalize_radio_stations(results))
+}
+
+fn community_language_from_radio_code(code: &str) -> Option<&'static str> {
+    match code {
+        "it" => Some("italian"),
+        "en" => Some("english"),
+        "es" => Some("spanish"),
+        "fr" => Some("french"),
+        "pt" => Some("portuguese"),
+        "country:de" | "de" => Some("german"),
+        _ => None,
+    }
+}
+
+fn fetch_radio_browser_stations(
+    language_code: &str,
+    name_query: Option<&str>,
+    genre: Option<&str>,
+) -> Result<Vec<RadioStation>, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .user_agent("Sonarpad/1.0 (https://sonarpad.com)")
         .build()
         .map_err(|e| e.to_string())?;
     let mut last = None;
     for mirror in [
+        "https://all.api.radio-browser.info",
         "https://de1.api.radio-browser.info",
         "https://fi1.api.radio-browser.info",
         "https://at1.api.radio-browser.info",
     ] {
-        let mut req = client
-            .get(format!("{mirror}/json/stations/search"))
-            .query(&[
-                ("hidebroken", "true"),
-                ("order", "clickcount"),
-                ("reverse", "true"),
-                ("limit", RADIO_BROWSER_LIMIT),
-            ]);
-        req = if let Some(country) = language_code.strip_prefix("country:") {
-            req.query(&[("countrycode", country)])
-        } else {
-            req.query(&[
-                ("language", radio_browser_language_name(language_code)),
-                ("languageExact", "true"),
-            ])
-        };
-        match req
+        let mut url =
+            Url::parse(&format!("{mirror}/json/stations/search")).map_err(|e| e.to_string())?;
+        {
+            let mut query = url.query_pairs_mut();
+            query.append_pair("hidebroken", "true");
+            query.append_pair("order", "votes");
+            query.append_pair("reverse", "true");
+            query.append_pair("limit", RADIO_BROWSER_LIMIT);
+            if let Some(name) = name_query.map(str::trim).filter(|s| !s.is_empty()) {
+                query.append_pair("name", name);
+            }
+            if let Some(tag) = genre.map(str::trim).filter(|s| !s.is_empty()) {
+                query.append_pair("tag", tag);
+            }
+            if let Some(country) = language_code.strip_prefix("country:") {
+                query.append_pair("countrycode", country);
+            } else {
+                query.append_pair("language", radio_browser_language_name(language_code));
+                query.append_pair("languageExact", "true");
+            }
+        }
+        let request_url = url.to_string();
+        crate::log_debug(&format!("Radio Browser search URL: {}", request_url));
+        match client
+            .get(url)
             .send()
             .and_then(|r| r.error_for_status())
             .and_then(|r| r.json::<Vec<RadioBrowserStation>>())
         {
             Ok(v) => {
-                return Ok(normalize_radio_stations(
-                    v.into_iter()
-                        .filter_map(|s| {
-                            let url = if s.url_resolved.trim().is_empty() {
-                                s.url.trim().to_string()
-                            } else {
-                                s.url_resolved.trim().to_string()
-                            };
-                            if url.is_empty() {
-                                None
-                            } else {
-                                Some(RadioStation {
-                                    name: if s.name.trim().is_empty() {
-                                        url.clone()
-                                    } else {
-                                        s.name.replace('&', "")
-                                    },
-                                    stream_url: url,
-                                })
-                            }
+                let mut seen = HashSet::new();
+                let stations = v
+                    .into_iter()
+                    .filter(|s| s.lastcheckok == 1)
+                    .filter_map(|s| {
+                        let url = if s.url_resolved.trim().is_empty() {
+                            s.url.trim().to_string()
+                        } else {
+                            s.url_resolved.trim().to_string()
+                        };
+                        if url.is_empty() || !seen.insert(normalize_stream_url(&url)) {
+                            return None;
+                        }
+                        let name = if s.name.trim().is_empty() {
+                            url.clone()
+                        } else if s.tags.trim().is_empty() {
+                            s.name.replace('&', "")
+                        } else {
+                            format!("{} - {}", s.name.replace('&', ""), s.tags)
+                        };
+                        Some(RadioStation {
+                            name,
+                            stream_url: url,
                         })
-                        .collect(),
-                ));
+                    })
+                    .collect();
+                return Ok(normalize_radio_stations(stations));
             }
-            Err(e) => last = Some(e.to_string()),
+            Err(e) => {
+                crate::log_debug(&format!(
+                    "Radio Browser search failed: url={} error={} debug={:?}",
+                    request_url, e, e
+                ));
+                last = Some(format!("{e:?}; url={request_url}"));
+            }
         }
     }
     Err(last.unwrap_or_else(|| "radio browser request failed".to_string()))
+}
+
+fn normalize_stream_url(raw_url: &str) -> String {
+    let raw_url = raw_url.trim();
+    match Url::parse(raw_url) {
+        Ok(mut parsed) => {
+            if let Err(err) = parsed.set_scheme("http") {
+                crate::log_debug(&format!("Radio: normalize scheme failed: {:?}", err));
+            }
+            let host = parsed.host_str().unwrap_or("").to_lowercase();
+            let path = parsed.path().trim_end_matches('/');
+            let mut key = format!("{host}{path}");
+            if let Some(query) = parsed.query() {
+                key.push('?');
+                key.push_str(query);
+            }
+            key
+        }
+        Err(_) => raw_url
+            .trim_start_matches("http://")
+            .trim_start_matches("https://")
+            .trim_end_matches('/')
+            .to_lowercase(),
+    }
 }

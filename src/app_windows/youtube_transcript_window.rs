@@ -239,6 +239,13 @@ fn youtube_ui_language_code(language: Language) -> &'static str {
     }
 }
 
+fn youtube_flat_playlist_extractor_args(language: Language) -> String {
+    format!(
+        "youtube:lang={};youtubetab:approximate_date",
+        youtube_ui_language_code(language)
+    )
+}
+
 fn ytdlp_debug_enabled() -> bool {
     std::env::var("SONARPAD_YTDLP_DEBUG")
         .map(|v| {
@@ -1909,6 +1916,11 @@ fn probe_youtube_collection_entries(
     let start = page * STREAM_SELECTION_PAGE_SIZE + 1;
     let end = start + STREAM_SELECTION_PAGE_SIZE;
     let target_url = normalize_youtube_collection_url(url).unwrap_or_else(|| url.to_string());
+    let extractor_args = youtube_flat_playlist_extractor_args(language);
+    crate::log_debug(&format!(
+        "yt-dlp collection probe extractor args: {}",
+        extractor_args
+    ));
     let output = ytdlp_command(ytdlp_path)
         .arg("--flat-playlist")
         .arg("--dump-single-json")
@@ -1919,10 +1931,7 @@ fn probe_youtube_collection_entries(
         .arg("--no-warnings")
         .arg("--skip-download")
         .arg("--extractor-args")
-        .arg(format!(
-            "youtube:lang={}",
-            youtube_ui_language_code(language)
-        ))
+        .arg(extractor_args)
         .arg("--")
         .arg(&target_url)
         .stdout(Stdio::piped())
@@ -1961,6 +1970,11 @@ fn probe_youtube_search_entries(
     let limit = (page + 1) * STREAM_SELECTION_PAGE_SIZE + 1;
     let encoded_query: String = url::form_urlencoded::byte_serialize(query.as_bytes()).collect();
     let search_url = format!("https://www.youtube.com/results?search_query={encoded_query}");
+    let extractor_args = youtube_flat_playlist_extractor_args(language);
+    crate::log_debug(&format!(
+        "yt-dlp search probe extractor args: {}",
+        extractor_args
+    ));
     let output = ytdlp_command(ytdlp_path)
         .arg("--flat-playlist")
         .arg("--dump-single-json")
@@ -1969,10 +1983,7 @@ fn probe_youtube_search_entries(
         .arg("--no-warnings")
         .arg("--skip-download")
         .arg("--extractor-args")
-        .arg(format!(
-            "youtube:lang={}",
-            youtube_ui_language_code(language)
-        ))
+        .arg(extractor_args)
         .arg("--")
         .arg(&search_url)
         .stdout(Stdio::piped())
@@ -4832,6 +4843,15 @@ fn choose_youtube_collection_entry(
             has_more,
             initial_selected_label.filter(|_| page == initial_page.unwrap_or(0)),
         ) else {
+            if page > 0 {
+                crate::log_debug(&format!(
+                    "stream transition [collection_probe.cancel_previous]: current_page={} next_page={}",
+                    page,
+                    page.saturating_sub(1)
+                ));
+                page = page.saturating_sub(1);
+                continue;
+            }
             restore_stream_parent_after_selection_cancel(parent);
             return Ok(None);
         };
@@ -4969,6 +4989,15 @@ fn choose_youtube_search_entry(
             has_more,
             initial_selected_label.filter(|_| page == 0),
         ) else {
+            if page > 0 {
+                crate::log_debug(&format!(
+                    "stream transition [search_probe.cancel_previous]: current_page={} next_page={}",
+                    page,
+                    page.saturating_sub(1)
+                ));
+                page = page.saturating_sub(1);
+                continue;
+            }
             restore_stream_parent_after_selection_cancel(parent);
             return Ok(None);
         };
@@ -7154,18 +7183,6 @@ fn plain_label(text: &str) -> String {
     text.replace('&', "")
 }
 
-fn format_stream_entry_upload_date(entry: &serde_json::Value) -> Option<String> {
-    let raw = entry.get("upload_date")?.as_str()?.trim();
-    if raw.len() == 8 && raw.chars().all(|ch| ch.is_ascii_digit()) {
-        return Some(format!("{}-{}-{}", &raw[0..4], &raw[4..6], &raw[6..8]));
-    }
-    if raw.is_empty() {
-        None
-    } else {
-        Some(raw.to_string())
-    }
-}
-
 fn format_stream_entry_view_count(entry: &serde_json::Value, language: Language) -> Option<String> {
     let count = entry.get("view_count")?.as_u64()?;
     let formatted = format_stream_count(count);
@@ -7276,9 +7293,6 @@ fn format_stream_entry_label(entry: &serde_json::Value, language: Language) -> S
         && let Some(subscriber_count) = format_stream_entry_subscriber_count(entry, language)
     {
         parts.push(subscriber_count);
-    }
-    if let Some(date) = format_stream_entry_upload_date(entry) {
-        parts.push(date);
     }
     if let Some(view_count) = format_stream_entry_view_count(entry, language) {
         parts.push(view_count);

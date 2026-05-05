@@ -178,6 +178,7 @@ pub struct MenuLabels {
     pub menu_raiplay: String,
     pub menu_raiplaysound: String,
     pub menu_italiaonline: String,
+    pub menu_radio: String,
     pub menu_prompt: String,
     pub menu_rss: String,
     pub menu_podcasts: String,
@@ -309,6 +310,11 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         },
         menu_italiaonline: if language == Language::Italian {
             "Pagine Bianche e Gialle...\tAlt+Shift+G".to_string()
+        } else {
+            String::new()
+        },
+        menu_radio: if language == Language::Italian {
+            i18n::tr(language, "menu.radio")
         } else {
             String::new()
         },
@@ -1463,6 +1469,7 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 IDM_TOOLS_ITALIAONLINE,
                 &labels.menu_italiaonline,
             );
+            append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RADIO, &labels.menu_radio);
             append_menu_string(
                 tools_menu,
                 MF_STRING,

@@ -336,6 +336,7 @@
   "menu.import_youtube": "Importuj transkrypcję &YouTube...\tCtrl+Y",
   "menu.insert": "&Wstaw",
   "menu.options": "&Opcje...\tCtrl+Shift+O",
+  "menu.paths_navigation": "Trasy i nawigacja",
   "menu.playback": "&Odtwarzanie",
   "menu.podcasts": "&Podcasty...\tCtrl+Shift+P",
   "menu.prompt": "&Dostępny terminal...\tCtrl+Shift+T",

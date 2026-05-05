@@ -336,6 +336,7 @@
   "menu.import_youtube": "Импорт транскрипции &YouTube...\tCtrl+Y",
   "menu.insert": "&Закладки",
   "menu.options": "&Параметры...\tCtrl+Shift+O",
+  "menu.paths_navigation": "Маршруты и навигация",
   "menu.playback": "&Воспроизведение",
   "menu.podcasts": "&Подкасты...\tCtrl+Shift+P",
   "menu.prompt": "&Доступный терминал...\tCtrl+Shift+T",

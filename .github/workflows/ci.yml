@@ -7,6 +7,11 @@ on:
     branches: [ "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
 env:
   CARGO_TERM_COLOR: always
   SONARPAD_RELEASE_TAG: v0.7.0
@@ -164,6 +169,59 @@ jobs:
       shell: powershell
       run: Get-ChildItem -Path target/release -Recurse
 
+    - name: Generate GitHub build info and SHA256 hashes
+      shell: powershell
+      run: |
+        $outDir = "target/release"
+
+        $buildInfo = @"
+        Sonarpad official GitHub Actions build
+
+        Repository: $env:GITHUB_REPOSITORY
+        Workflow: $env:GITHUB_WORKFLOW
+        Run ID: $env:GITHUB_RUN_ID
+        Run number: $env:GITHUB_RUN_NUMBER
+        Run attempt: $env:GITHUB_RUN_ATTEMPT
+        Commit SHA: $env:GITHUB_SHA
+        Ref: $env:GITHUB_REF
+        Actor: $env:GITHUB_ACTOR
+        Build URL: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID
+        "@
+
+        $buildInfo | Out-File -FilePath "$outDir/GITHUB_BUILD_INFO.txt" -Encoding utf8
+
+        $files = @()
+        $files += Get-Item "$outDir/sonarpad.exe" -ErrorAction SilentlyContinue
+        $files += Get-Item "$outDir/sonarpad-standalone.exe" -ErrorAction SilentlyContinue
+        $files += Get-ChildItem "$outDir" -Filter "*-setup.exe" -ErrorAction SilentlyContinue
+        $files += Get-ChildItem "$outDir" -Filter "*.msi" -ErrorAction SilentlyContinue
+
+        if ($files.Count -eq 0) {
+          throw "No release files found for SHA256 generation."
+        }
+
+        $hashLines = foreach ($file in $files) {
+          $hash = Get-FileHash -Algorithm SHA256 -Path $file.FullName
+          "$($hash.Hash.ToLower())  $($file.Name)"
+        }
+
+        $hashLines | Out-File -FilePath "$outDir/SHA256SUMS.txt" -Encoding ascii
+
+        Write-Host "Generated SHA256SUMS.txt:"
+        Get-Content "$outDir/SHA256SUMS.txt"
+
+    - name: Attest GitHub build provenance
+      if: github.event_name != 'pull_request'
+      uses: actions/attest-build-provenance@v2
+      with:
+        subject-path: |
+          target/release/sonarpad.exe
+          target/release/sonarpad-standalone.exe
+          target/release/*-setup.exe
+          target/release/*.msi
+          target/release/SHA256SUMS.txt
+          target/release/GITHUB_BUILD_INFO.txt
+
     - name: Upload Portable (Exe)
       uses: actions/upload-artifact@v4
       with:
@@ -187,3 +245,15 @@ jobs:
       with:
         name: Sonarpad-MSI
         path: target/release/*.msi
+
+    - name: Upload SHA256 hashes
+      uses: actions/upload-artifact@v4
+      with:
+        name: Sonarpad-SHA256SUMS
+        path: target/release/SHA256SUMS.txt
+
+    - name: Upload GitHub build info
+      uses: actions/upload-artifact@v4
+      with:
+        name: Sonarpad-GitHub-Build-Info
+        path: target/release/GITHUB_BUILD_INFO.txt

@@ -336,6 +336,7 @@
   "menu.import_youtube": "Import &YouTube transcript...\tCtrl+Y",
   "menu.insert": "&Bookmarks",
   "menu.options": "&Options...\tCtrl+Shift+O",
+  "menu.paths_navigation": "Routes and navigation",
   "menu.playback": "&Playback",
   "menu.podcasts": "&Podcasts...\tCtrl+Shift+P",
   "menu.prompt": "&Accessible Terminal...\tCtrl+Shift+T",

@@ -149,6 +149,7 @@ pub const IDM_TOOLS_RAIPLAYSOUND: usize = 5013;
 pub const IDM_TOOLS_RAIPLAY: usize = 5014;
 pub const IDM_TOOLS_ITALIAONLINE: usize = 5015;
 pub const IDM_TOOLS_RADIO: usize = 5016;
+pub const IDM_TOOLS_PATHS_NAVIGATION: usize = 5017;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -182,6 +183,7 @@ pub struct MenuLabels {
     pub menu_prompt: String,
     pub menu_rss: String,
     pub menu_podcasts: String,
+    pub menu_paths_navigation: String,
     pub view_text_color: String,
     pub view_text_size: String,
     pub view_text_color_black: String,
@@ -321,6 +323,11 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_prompt: i18n::tr(language, "menu.prompt"),
         menu_rss: i18n::tr(language, "menu.rss"),
         menu_podcasts: i18n::tr(language, "menu.podcasts"),
+        menu_paths_navigation: if language == Language::Italian {
+            i18n::tr(language, "menu.paths_navigation")
+        } else {
+            String::new()
+        },
         view_text_color: i18n::tr(language, "view.text_color"),
         view_text_size: i18n::tr(language, "view.text_size"),
         view_text_color_black: i18n::tr(language, "view.text_color.black"),
@@ -1475,6 +1482,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 MF_STRING,
                 IDM_TOOLS_BDCIECHI,
                 &labels.menu_bdciechi,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_PATHS_NAVIGATION,
+                &labels.menu_paths_navigation,
             );
         }
         append_menu_string(

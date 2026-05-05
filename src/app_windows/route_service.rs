@@ -61,23 +61,54 @@ impl RouteClient {
             ));
         }
 
+        // Prova la query originale
+        let results = self.fetch_geocode(address)?;
+
+        // Se i risultati sono solo la città (fallback del geocoder), prova a semplificare la query
+        if is_all_city_fallback(&results, address) {
+            if let Some(simplified) = simplify_query(address)
+                && let Ok(fallback_results) = self.fetch_geocode(&simplified)
+                && !fallback_results.is_empty()
+                && !is_all_city_fallback(&fallback_results, &simplified)
+            {
+                return Ok(fallback_results);
+            }
+
+            // Prova un secondo livello di semplificazione (rimuovendo un'altra parola)
+            if let Some(more_simplified) = simplify_query_more(address)
+                && let Ok(fallback_results) = self.fetch_geocode(&more_simplified)
+                && !fallback_results.is_empty()
+                && !is_all_city_fallback(&fallback_results, &more_simplified)
+            {
+                return Ok(fallback_results);
+            }
+        }
+
+        Ok(results)
+    }
+
+    fn fetch_geocode(&self, q: &str) -> Result<Vec<GeocodeCandidate>, RouteError> {
         let url = format!("{}/ors_geocode.php", self.base_url);
 
         let response: GeocodeApiResponse = self
             .client
             .get(url)
-            .query(&[("q", address)])
+            .query(&[
+                ("q", q),
+                ("size", "20"),
+                ("layers", "address,street,venue"),
+                ("sources", "osm,oa"),
+                ("boundary.country", "ITA"),
+            ])
             .send()
             .map_err(|error| RouteError::Network(error.to_string()))?
             .json()
             .map_err(|error| RouteError::InvalidResponse(error.to_string()))?;
 
         if !response.ok {
-            return Err(RouteError::Server(
-                response
-                    .error
-                    .unwrap_or_else(|| "Errore durante la ricerca dell’indirizzo.".to_string()),
-            ));
+            return Err(RouteError::Server(response.error.unwrap_or_else(|| {
+                "Errore durante la ricerca dell’indirizzo.".to_string()
+            })));
         }
 
         Ok(response.results)
@@ -89,32 +120,16 @@ impl RouteClient {
         to: &GeocodeCandidate,
         profile: RouteProfile,
     ) -> Result<RouteResult, RouteError> {
-        let from_lat = from.latitude.ok_or_else(|| {
-            RouteError::InvalidInput("La partenza non contiene la latitudine.".to_string())
-        })?;
-
-        let from_lon = from.longitude.ok_or_else(|| {
-            RouteError::InvalidInput("La partenza non contiene la longitudine.".to_string())
-        })?;
-
-        let to_lat = to.latitude.ok_or_else(|| {
-            RouteError::InvalidInput("La destinazione non contiene la latitudine.".to_string())
-        })?;
-
-        let to_lon = to.longitude.ok_or_else(|| {
-            RouteError::InvalidInput("La destinazione non contiene la longitudine.".to_string())
-        })?;
-
         let url = format!("{}/ors_route.php", self.base_url);
 
         let response: RouteApiResponse = self
             .client
             .get(url)
             .query(&[
-                ("from_lat", from_lat.to_string()),
-                ("from_lon", from_lon.to_string()),
-                ("to_lat", to_lat.to_string()),
-                ("to_lon", to_lon.to_string()),
+                ("from_lat", from.latitude.to_string()),
+                ("from_lon", from.longitude.to_string()),
+                ("to_lat", to.latitude.to_string()),
+                ("to_lon", to.longitude.to_string()),
                 ("profile", profile.api_value().to_string()),
             ])
             .send()
@@ -123,11 +138,9 @@ impl RouteClient {
             .map_err(|error| RouteError::InvalidResponse(error.to_string()))?;
 
         if !response.ok {
-            return Err(RouteError::Server(
-                response
-                    .error
-                    .unwrap_or_else(|| "Errore durante il calcolo del percorso.".to_string()),
-            ));
+            return Err(RouteError::Server(response.error.unwrap_or_else(|| {
+                "Errore durante il calcolo del percorso.".to_string()
+            })));
         }
 
         Ok(RouteResult {
@@ -140,13 +153,6 @@ impl RouteClient {
         })
     }
 
-    /*
-     * Questa funzione fa tutto:
-     * 1. geocoding partenza
-     * 2. geocoding arrivo
-     * 3. se ci sono più risultati, restituisce NeedsSelection
-     * 4. se c’è un solo risultato per parte, calcola direttamente il percorso
-     */
     pub fn route_from_addresses(
         &self,
         from_address: &str,
@@ -186,12 +192,6 @@ impl RouteClient {
 #[derive(Debug, Clone)]
 pub enum RouteRequestResult {
     Ready(RouteResult),
-
-    /*
-     * Se ci sono più indirizzi possibili, la UI deve mostrare queste liste.
-     * L’utente sceglie una partenza e un arrivo.
-     * Poi richiami route_between_coordinates().
-     */
     NeedsSelection {
         from_candidates: Vec<GeocodeCandidate>,
         to_candidates: Vec<GeocodeCandidate>,
@@ -204,12 +204,15 @@ pub struct GeocodeCandidate {
     pub label: String,
     pub name: String,
     pub country: String,
+    #[allow(dead_code)]
     pub region: String,
+    #[allow(dead_code)]
     pub county: String,
     pub locality: String,
+    #[allow(dead_code)]
     pub postalcode: String,
-    pub longitude: Option<f64>,
-    pub latitude: Option<f64>,
+    pub latitude: f64,
+    pub longitude: f64,
 }
 
 impl GeocodeCandidate {
@@ -301,6 +304,7 @@ impl RouteResult {
 pub struct RouteStep {
     pub instruction: String,
     pub distance_meters: f64,
+    #[allow(dead_code)]
     pub duration_seconds: f64,
 }
 
@@ -407,4 +411,65 @@ pub fn format_duration(seconds: f64) -> String {
     }
 
     format!("{hours} ore e {minutes} minuti")
+}
+
+fn is_all_city_fallback(results: &[GeocodeCandidate], original_query: &str) -> bool {
+    if results.is_empty() {
+        return false;
+    }
+
+    // Se la query originale è corta, non consideriamolo un fallback
+    if original_query.split_whitespace().count() <= 1 {
+        return false;
+    }
+
+    // Se tutti i risultati hanno postalcode vuoto e il nome è uguale alla località, è probabilmente un fallback del geocoder alla città
+    results.iter().all(|c| {
+        c.postalcode.is_empty()
+            && (c.name == c.locality || c.name == c.region || c.name == c.country)
+    })
+}
+
+fn simplify_query(query: &str) -> Option<String> {
+    let mut words: Vec<&str> = query.split_whitespace().collect();
+    if words.len() <= 1 {
+        return None;
+    }
+
+    // Rimuovi prefissi comuni (via, corso, etc.)
+    let prefixes = [
+        "via", "corso", "viale", "piazza", "vicolo", "largo", "strada", "v.", "c.so", "p.zza",
+        "p.za",
+    ];
+    if prefixes.contains(&words[0].to_lowercase().as_str()) {
+        words.remove(0);
+    }
+
+    if words.is_empty() {
+        return None;
+    }
+
+    Some(words.join(" "))
+}
+
+fn simplify_query_more(query: &str) -> Option<String> {
+    let mut words: Vec<&str> = query.split_whitespace().collect();
+
+    // Rimuovi il prefisso se esiste
+    let prefixes = [
+        "via", "corso", "viale", "piazza", "vicolo", "largo", "strada", "v.", "c.so", "p.zza",
+        "p.za",
+    ];
+    if !words.is_empty() && prefixes.contains(&words[0].to_lowercase().as_str()) {
+        words.remove(0);
+    }
+
+    // Se rimangono più di 2 parole (es. "Pierluigi Palestrina 45 Torino"), prova a rimuovere la prima parola del nome
+    // Spesso i geocoder falliscono sui nomi propri composti o con refusi
+    if words.len() > 2 {
+        words.remove(0);
+        return Some(words.join(" "));
+    }
+
+    None
 }

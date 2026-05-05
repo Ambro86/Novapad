@@ -336,6 +336,7 @@
   "menu.import_youtube": "Importar transcripción de &YouTube...\tCtrl+Y",
   "menu.insert": "&Marcadores",
   "menu.options": "&Opciones...\tCtrl+Shift+O",
+  "menu.paths_navigation": "Rutas y navegación",
   "menu.playback": "&Reproducción",
   "menu.podcasts": "&Podcasts...\tCtrl+Shift+P",
   "menu.prompt": "&Terminal accesible...\tCtrl+Shift+T",

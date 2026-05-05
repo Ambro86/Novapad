@@ -10493,6 +10493,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         app_windows::italiaonline_window::open(hwnd);
                         LRESULT(0)
                     }
+                    IDM_TOOLS_PATHS_NAVIGATION => {
+                        log_debug("Menu: Paths and navigation");
+                        app_windows::route_window::open(hwnd);
+                        LRESULT(0)
+                    }
                     IDM_HELP_GUIDE => {
                         log_debug("Menu: Guide");
                         app_windows::help_window::open(hwnd);

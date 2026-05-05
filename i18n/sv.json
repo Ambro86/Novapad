@@ -336,6 +336,7 @@
   "menu.import_youtube": "Importera &YouTube-transkriptering...\tCtrl+Y",
   "menu.insert": "&Bokmärken",
   "menu.options": "&Alternativ...\tCtrl+Shift+O",
+  "menu.paths_navigation": "Rutter och navigering",
   "menu.playback": "&Uppspelning",
   "menu.podcasts": "&Poddar...\tCtrl+Shift+P",
   "menu.prompt": "&Tillgänglig terminal...\tCtrl+Shift+T",

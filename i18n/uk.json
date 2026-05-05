@@ -336,6 +336,7 @@
   "menu.import_youtube": "Імпорт &тексту відео з YouTube...\tCtrl+Y",
   "menu.insert": "&Закладки",
   "menu.options": "&Налаштування...\tCtrl+Shift+O",
+  "menu.paths_navigation": "Маршрути та навігація",
   "menu.playback": "&Відтворення",
   "menu.podcasts": "&Подкасти...\tCtrl+Shift+P",
   "menu.prompt": "&Доступний термінал...\tCtrl+Shift+T",

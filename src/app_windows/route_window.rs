@@ -71,10 +71,10 @@ fn prompt_route_params(parent: HWND, language: Language) -> Option<RouteParams> 
 
     let options = PromptDirectoryOptions {
         title: "Percorsi e navigazione".to_string(),
-        type_label: "Inserisci gli indirizzi e scegli il mezzo di trasporto.".to_string(),
+        type_label: "Scegli il mezzo di trasporto.".to_string(),
         options: profile_options,
         default_selection: 0,
-        focus_primary_field: true,
+        focus_primary_field: false,
         primary_label: "Partenza:".to_string(),
         primary_labels: Vec::new(),
         primary_default: String::new(),

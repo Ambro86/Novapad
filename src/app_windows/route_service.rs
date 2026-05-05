@@ -312,6 +312,7 @@ pub struct RouteStep {
 struct GeocodeApiResponse {
     ok: bool,
     error: Option<String>,
+    #[serde(default)]
     results: Vec<GeocodeCandidate>,
 }
 
@@ -321,6 +322,7 @@ struct RouteApiResponse {
     error: Option<String>,
     distance_meters: Option<f64>,
     duration_seconds: Option<f64>,
+    #[serde(default)]
     steps: Vec<RouteStep>,
 }
 

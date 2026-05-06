@@ -1268,7 +1268,28 @@ fn create_controls(hwnd: HWND, parent: HWND) {
             LPARAM(w.as_ptr() as isize),
         );
     }
-    crate::send_message_w_safe(combo_language, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+    let current_code = match language {
+        Language::Italian => "it",
+        Language::English => "en",
+        Language::Spanish => "es",
+        Language::Portuguese => "pt",
+        Language::Swedish => "sv",
+        Language::Vietnamese => "vi",
+        Language::Czech => "cs",
+        Language::Polish => "pl",
+        Language::French => "fr",
+        Language::Serbian => "sr",
+        Language::Ukrainian => "uk",
+        Language::Lithuanian => "lt",
+        Language::Russian => "ru",
+        Language::Chinese => "zh",
+        Language::Hindi => "hi",
+    };
+    let default_idx = languages
+        .iter()
+        .position(|(code, _)| code == current_code)
+        .unwrap_or(0);
+    crate::send_message_w_safe(combo_language, CB_SETCURSEL, WPARAM(default_idx), LPARAM(0));
     for genre in GENRE_OPTIONS {
         let w = to_wide(&tr(language, genre.key, genre.label));
         crate::send_message_w_safe(

@@ -1502,10 +1502,8 @@ fn radio_menu_languages(language: Language) -> Vec<(String, String)> {
     vec![
         ("it".into(), tr(language, "radio.lang.it", "Italiano")),
         ("en".into(), tr(language, "radio.lang.en", "Inglese")),
-        (
-            "country:de".into(),
-            tr(language, "radio.lang.de", "Germania"),
-        ),
+        ("de".into(), tr(language, "radio.lang.de", "Tedesco")),
+        ("hi".into(), tr(language, "radio.lang.hi", "Hindi")),
         (
             "country:ch".into(),
             tr(language, "radio.lang.ch", "Svizzera"),

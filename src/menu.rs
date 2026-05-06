@@ -315,11 +315,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         } else {
             String::new()
         },
-        menu_radio: if language == Language::Italian {
-            i18n::tr(language, "menu.radio")
-        } else {
-            String::new()
-        },
+        menu_radio: i18n::tr(language, "menu.radio"),
         menu_prompt: i18n::tr(language, "menu.prompt"),
         menu_rss: i18n::tr(language, "menu.rss"),
         menu_podcasts: i18n::tr(language, "menu.podcasts"),
@@ -1476,7 +1472,6 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 IDM_TOOLS_ITALIAONLINE,
                 &labels.menu_italiaonline,
             );
-            append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RADIO, &labels.menu_radio);
             append_menu_string(
                 tools_menu,
                 MF_STRING,
@@ -1490,6 +1485,7 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 &labels.menu_paths_navigation,
             );
         }
+        append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RADIO, &labels.menu_radio);
         append_menu_string(
             tools_menu,
             MF_STRING,

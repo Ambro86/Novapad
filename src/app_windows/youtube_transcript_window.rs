@@ -68,7 +68,6 @@ const STREAM_ID_URL: usize = 9311;
 const STREAM_ID_FORMAT: usize = 9312;
 const STREAM_ID_OK: usize = 9313;
 const STREAM_ID_CANCEL: usize = 9314;
-const STREAM_ID_DIRECT_PLAY: usize = 9315;
 const STREAM_ID_FAVORITES: usize = 9316;
 const STREAM_ID_OPEN_COMMENTS: usize = 9317;
 
@@ -1734,8 +1733,8 @@ struct YoutubeCommentsDialogInit {
     flat_search: Option<YoutubeFlatSearchInit>,
     flat_secondary_action: Option<YoutubeFlatSecondaryActionInit>,
     flat_close_button_label: Option<String>,
-    flat_context_action:
-        Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
+    flat_context_actions:
+        Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     right_arrow_accepts_selection: bool,
     left_arrow_closes: bool,
 }
@@ -1747,8 +1746,8 @@ struct YoutubeCommentsDialogMode {
     flat_search: Option<YoutubeFlatSearchInit>,
     flat_secondary_action: Option<YoutubeFlatSecondaryActionInit>,
     flat_close_button_label: Option<String>,
-    flat_context_action:
-        Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
+    flat_context_actions:
+        Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     right_arrow_accepts_selection: bool,
     left_arrow_closes: bool,
 }
@@ -1800,8 +1799,8 @@ struct YoutubeCommentsDialogState {
     flat_selection_result: Option<Arc<Mutex<Option<String>>>>,
     flat_search_result: Option<Arc<Mutex<Option<String>>>>,
     flat_secondary_action_result: Option<Arc<Mutex<bool>>>,
-    flat_context_action:
-        Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
+    flat_context_actions:
+        Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     right_arrow_accepts_selection: bool,
     left_arrow_closes: bool,
 }
@@ -1818,8 +1817,8 @@ pub(crate) struct MultilineSearchOptions {
     pub(crate) search_button_label: String,
     pub(crate) show_search_edit: bool,
     pub(crate) secondary_action_label: Option<String>,
-    pub(crate) context_action:
-        Option<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
+    pub(crate) context_actions:
+        Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     pub(crate) right_arrow_accepts_selection: bool,
     pub(crate) left_arrow_closes: bool,
 }
@@ -2306,7 +2305,7 @@ pub(crate) fn select_multiline_items_with_search(
                 }
             }),
             flat_close_button_label: None,
-            flat_context_action: search_options.context_action,
+            flat_context_actions: search_options.context_actions,
             right_arrow_accepts_selection: search_options.right_arrow_accepts_selection,
             left_arrow_closes: search_options.left_arrow_closes,
         },
@@ -2453,7 +2452,7 @@ fn open_youtube_comments_window_with_mode(
         flat_search: mode.flat_search,
         flat_secondary_action: mode.flat_secondary_action,
         flat_close_button_label: mode.flat_close_button_label,
-        flat_context_action: mode.flat_context_action,
+        flat_context_actions: mode.flat_context_actions,
         right_arrow_accepts_selection: mode.right_arrow_accepts_selection,
         left_arrow_closes: mode.left_arrow_closes,
     });
@@ -2978,7 +2977,7 @@ fn youtube_comments_dialog_wndproc_inner(
                     .flat_secondary_action
                     .as_ref()
                     .map(|secondary| Arc::clone(&secondary.result)),
-                flat_context_action: init.flat_context_action,
+                flat_context_actions: init.flat_context_actions,
                 right_arrow_accepts_selection: init.right_arrow_accepts_selection,
                 left_arrow_closes: init.left_arrow_closes,
             });
@@ -3815,28 +3814,36 @@ fn selected_youtube_comment_id(state: &YoutubeCommentsDialogState) -> Option<Str
     Some(comment.id.clone())
 }
 
-fn trigger_youtube_comments_context_action(hwnd: HWND) -> bool {
+fn restore_youtube_comments_dialog_focus(hwnd: HWND) {
+    crate::set_foreground_window_safe(hwnd);
     with_youtube_comments_state(hwnd, |state| {
-        let Some(action) = state.flat_context_action.as_ref() else {
-            return false;
-        };
-        let Some(selected_id) = selected_youtube_comment_id(state) else {
-            return false;
-        };
-        if !(action.enabled)(&selected_id) {
-            return false;
+        if state.flat_list_mode && crate::is_window_handle_valid(state.accessibility_proxy) {
+            sync_youtube_comments_accessibility_proxy_selection(state, true);
         }
-        (action.handler)(selected_id);
-        true
+    });
+}
+
+fn trigger_youtube_comments_context_action(hwnd: HWND) -> bool {
+    let action = with_youtube_comments_state(hwnd, |state| {
+        let selected_id = selected_youtube_comment_id(state)?;
+        state
+            .flat_context_actions
+            .iter()
+            .find(|action| action.ctrl_c_shortcut && (action.enabled)(&selected_id))
+            .cloned()
+            .map(|action| (action, selected_id))
     })
-    .unwrap_or(false)
+    .flatten();
+    let Some((action, selected_id)) = action else {
+        return false;
+    };
+    (action.handler)(selected_id);
+    restore_youtube_comments_dialog_focus(hwnd);
+    true
 }
 
 fn show_youtube_comments_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> bool {
     with_youtube_comments_state(hwnd, |state| unsafe {
-        let Some(action) = state.flat_context_action.as_ref() else {
-            return false;
-        };
         let target = HWND(wparam.0 as isize);
         if target.0 != 0
             && target != hwnd
@@ -3848,7 +3855,13 @@ fn show_youtube_comments_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM
         let Some(selected_id) = selected_youtube_comment_id(state) else {
             return false;
         };
-        if !(action.enabled)(&selected_id) {
+        let applicable_actions = state
+            .flat_context_actions
+            .iter()
+            .filter(|action| (action.enabled)(&selected_id))
+            .cloned()
+            .collect::<Vec<_>>();
+        if applicable_actions.is_empty() {
             return false;
         }
 
@@ -3859,14 +3872,16 @@ fn show_youtube_comments_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM
                 return false;
             }
         };
-        let label = to_wide(&action.label);
-        if let Err(err) = AppendMenuW(menu, MF_STRING, 1, PCWSTR(label.as_ptr())) {
-            crate::log_debug(&format!(
-                "Failed to append multiline context menu item: {}",
-                err
-            ));
-            crate::log_if_err!(DestroyMenu(menu));
-            return false;
+        for (index, action) in applicable_actions.iter().enumerate() {
+            let label = to_wide(&action.label);
+            if let Err(err) = AppendMenuW(menu, MF_STRING, index + 1, PCWSTR(label.as_ptr())) {
+                crate::log_debug(&format!(
+                    "Failed to append multiline context menu item: {}",
+                    err
+                ));
+                crate::log_if_err!(DestroyMenu(menu));
+                return false;
+            }
         }
         let point = if lparam.0 == -1 {
             let mut pt = POINT::default();
@@ -3895,8 +3910,16 @@ fn show_youtube_comments_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM
             None,
         );
         crate::log_if_err!(DestroyMenu(menu));
-        if command.0 == 1 {
-            (action.handler)(selected_id);
+        if command.0 > 0 {
+            let index = command.0 as usize - 1;
+            if let Some(action) = applicable_actions.get(index) {
+                (action.handler)(selected_id);
+                crate::set_foreground_window_safe(hwnd);
+                if state.flat_list_mode && crate::is_window_handle_valid(state.accessibility_proxy)
+                {
+                    sync_youtube_comments_accessibility_proxy_selection(state, true);
+                }
+            }
         }
         true
     })
@@ -5361,7 +5384,6 @@ struct StreamDialogState {
     favorites: Vec<StreamFavorite>,
     format_combo: HWND,
     quality_combo: HWND,
-    direct_play_check: HWND,
     open_comments_button: HWND,
     ok_button: HWND,
     result: Arc<Mutex<Option<StreamDialogResult>>>,
@@ -5692,27 +5714,13 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     HINSTANCE(0),
                     None,
                 );
-                let direct_play_check = CreateWindowExW(
-                    Default::default(),
-                    WC_BUTTON,
-                    PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.direct_play")).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                    110,
-                    82,
-                    330,
-                    22,
-                    hwnd,
-                    HMENU(STREAM_ID_DIRECT_PLAY as isize),
-                    HINSTANCE(0),
-                    None,
-                );
                 let format_label = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
                     PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.format_label")).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    116,
+                    82,
                     90,
                     20,
                     hwnd,
@@ -5726,7 +5734,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     110,
-                    114,
+                    80,
                     210,
                     180,
                     hwnd,
@@ -5742,7 +5750,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     ),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    148,
+                    114,
                     90,
                     20,
                     hwnd,
@@ -5756,7 +5764,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     110,
-                    146,
+                    112,
                     210,
                     180,
                     hwnd,
@@ -5772,7 +5780,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     ),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     110,
-                    178,
+                    146,
                     130,
                     28,
                     hwnd,
@@ -5786,7 +5794,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     350,
-                    178,
+                    146,
                     90,
                     28,
                     hwnd,
@@ -5800,7 +5808,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     350,
-                    210,
+                    178,
                     90,
                     28,
                     hwnd,
@@ -5818,7 +5826,6 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     format_combo,
                     quality_label,
                     quality_combo,
-                    direct_play_check,
                     open_comments_button,
                     ok_button,
                     cancel_button,
@@ -5853,7 +5860,6 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     favorites,
                     format_combo,
                     quality_combo,
-                    direct_play_check,
                     open_comments_button,
                     ok_button,
                     result: init.result.clone(),
@@ -6064,19 +6070,12 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                             .get(quality_idx.max(0) as usize)
                             .map(|(_, q)| *q)
                             .unwrap_or(StreamQualitySelection::Original);
-                        let direct_play = SendMessageW(
-                            state.direct_play_check,
-                            BM_GETCHECK,
-                            WPARAM(0),
-                            LPARAM(0),
-                        )
-                        .0 == BST_CHECKED.0 as isize;
                         *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
                             Some(StreamDialogResult {
                                 url,
                                 format,
                                 quality,
-                                direct_play,
+                                direct_play: true,
                                 reopen_collection_page: None,
                                 reopen_selected_label: None,
                                 previous_input: None,
@@ -6181,7 +6180,7 @@ fn show_stream_dialog(
             url: input,
             format: default_format,
             quality: StreamQualitySelection::Original,
-            direct_play: false,
+            direct_play: true,
             reopen_collection_page: context.collection_page,
             reopen_selected_label: context.selected_label,
             previous_input: context.previous_input,

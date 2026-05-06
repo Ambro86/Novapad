@@ -1059,6 +1059,8 @@ fn credentials_prompt_wndproc_inner(
                     secondary_label,
                     tertiary_label,
                 } => {
+                    let show_tertiary =
+                        !tertiary_label.trim().is_empty() || !tertiary_value.is_empty();
                     let kind_label = unsafe {
                         CreateWindowExW(
                             Default::default(),
@@ -1169,7 +1171,11 @@ fn credentials_prompt_wndproc_inner(
                             Default::default(),
                             WC_STATIC,
                             PCWSTR(to_wide(&tertiary_label).as_ptr()),
-                            WS_CHILD | WS_VISIBLE,
+                            if show_tertiary {
+                                WS_CHILD | WS_VISIBLE
+                            } else {
+                                WS_CHILD
+                            },
                             20,
                             140,
                             100,
@@ -1185,10 +1191,14 @@ fn credentials_prompt_wndproc_inner(
                             WS_EX_CLIENTEDGE,
                             WC_EDIT,
                             PCWSTR(to_wide(&tertiary_value).as_ptr()),
-                            WS_CHILD
-                                | WS_VISIBLE
-                                | WS_TABSTOP
-                                | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                            if show_tertiary {
+                                WS_CHILD
+                                    | WS_VISIBLE
+                                    | WS_TABSTOP
+                                    | WINDOW_STYLE(ES_AUTOHSCROLL as u32)
+                            } else {
+                                WS_CHILD | WINDOW_STYLE(ES_AUTOHSCROLL as u32)
+                            },
                             128,
                             136,
                             250,

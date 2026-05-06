@@ -7,7 +7,19 @@
       "Bash(cargo build:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(cargo fmt:*)"
+      "Bash(cargo fmt:*)",
+      "Bash(git ls-files \"*.rs\" | findstr /i \"youtube mpv transcript transcription trascrizione\")",
+      "Bash(git ls-files *.rs | findstr /i youtube)",
+      "Bash(git ls-files *.rs | findstr /i mpv)",
+      "Bash(git ls-files *.rs | findstr /i transcript)",
+      "Bash(git ls-files *.rs | findstr /i trascrizione)",
+      "Bash(powershell -NoProfile -Command \"git ls-files '*.rs' | Select-String -Pattern 'youtube'\")",
+      "Bash(powershell -NoProfile -Command \"git ls-files '*.rs' | Select-String -Pattern 'mpv'\")",
+      "Bash(powershell -NoProfile -Command \"git ls-files '*.rs' | Select-String -Pattern 'transcript'\")",
+      "Bash(powershell -NoProfile -Command \"git ls-files '*.rs' | Select-String -Pattern 'player'\")",
+      "Bash(powershell -NoProfile -Command \"git ls-files '*.rs' | Select-String -Pattern 'window'\")",
+      "Bash(powershell -NoProfile -Command \"Get-Content src/app_windows/youtube_transcript_window.rs -TotalCount 260\")",
+      "Bash(powershell -NoProfile -Command \"Get-Content src/audio_player.rs -TotalCount 260\")"
     ]
   },
   "outputStyle": "default",

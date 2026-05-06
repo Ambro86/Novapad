@@ -335,7 +335,7 @@ fn browse_results(
                 search_button_label: "Nuova ricerca".to_string(),
                 show_search_edit: false,
                 secondary_action_label: Some("Apri tutto".to_string()),
-                context_action: None,
+                context_actions: Vec::new(),
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: false,
             },

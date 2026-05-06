@@ -2716,6 +2716,25 @@ fn select_raiplay_mpv_audio_track(hwnd: HWND) {
     log_debug("Managed mpv: preferred RaiPlay audio track not available");
 }
 
+fn log_managed_mpv_raiplay_video_snapshot(hwnd: HWND, label: &str) {
+    for property in [
+        "track-list",
+        "vid",
+        "video-codec",
+        "demuxer-cache-state",
+        "stream-open-filename",
+    ] {
+        match query_managed_mpv_property_transient(hwnd, property) {
+            Ok(value) => log_debug(&format!(
+                "Managed mpv Rai video snapshot [{label}] {property}={value}"
+            )),
+            Err(err) => log_debug(&format!(
+                "Managed mpv Rai video snapshot [{label}] {property} error: {err}"
+            )),
+        }
+    }
+}
+
 fn try_send_command_to_managed_mpv_transient(hwnd: HWND, command_json: &str) -> Result<(), String> {
     let session = with_state(hwnd, |state| state.active_mpv_session.clone())
         .flatten()
@@ -3016,6 +3035,16 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
             (resolved_url.clone(), resolved_url, show_video, false, None)
         }
     };
+    log_debug(&format!(
+        "Managed mpv Rai launch: origin={:?} show_video={} render_video={} playback_url={} media_url={} external_audio={} select_raiplay_audio_track={}",
+        rai_origin,
+        show_video,
+        render_video,
+        playback_url,
+        playback_media_url,
+        external_audio_url.as_deref().unwrap_or(""),
+        select_raiplay_audio_track
+    ));
     let bookmark_start_secs = saved_audio_bookmark_position_secs(
         hwnd,
         &PathBuf::from(url),
@@ -3032,6 +3061,10 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
         }
     })
     .unwrap_or(HWND(0));
+    log_debug(&format!(
+        "Managed mpv Rai launch video host: render_video={} hwnd_video={:?}",
+        render_video, hwnd_video
+    ));
     if hwnd_video.0 != 0 {
         set_local_mpv_video_mode(hwnd, true);
     }
@@ -3051,6 +3084,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
         command.arg(format!("--audio-file={audio_url}"));
     }
     if hwnd_video.0 != 0 {
+        log_debug("Managed mpv Rai launch: enabling embedded video output");
         command
             .arg(format!("--wid={}", hwnd_video.0))
             .arg("--force-window=yes")
@@ -3058,6 +3092,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
             .arg("--vo=gpu")
             .arg("--gpu-context=win");
     } else {
+        log_debug("Managed mpv Rai launch: disabling video output");
         command.arg("--no-video");
     }
     if let Some(start_seconds) = start_seconds {
@@ -3106,6 +3141,10 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
             }
             if select_raiplay_audio_track {
                 select_raiplay_mpv_audio_track(hwnd);
+            }
+            if render_video && rai_origin == RaiAudioOrigin::RaiPlay {
+                std::thread::sleep(std::time::Duration::from_millis(1200));
+                log_managed_mpv_raiplay_video_snapshot(hwnd, "after_start");
             }
             set_active_podcast_episode_info(
                 hwnd,
@@ -4788,6 +4827,8 @@ pub(crate) fn restore_transcription_progress_focus_for_current_document(hwnd: HW
         transcription_in_progress,
         transcription_media_path,
         current_doc_path,
+        active_podcast_episode_url,
+        mpv_active,
         tab_hwnd,
         focused_hwnd,
     ) = with_state(hwnd, |state| {
@@ -4803,11 +4844,13 @@ pub(crate) fn restore_transcription_progress_focus_for_current_document(hwnd: HW
             state.transcription_in_progress,
             state.transcription_media_path.clone(),
             current_doc_path,
+            state.active_podcast_episode_url.clone(),
+            state.active_mpv_session.is_some(),
             state.hwnd_tab,
             crate::get_focus_safe(),
         )
     })
-    .unwrap_or((HWND(0), false, None, None, HWND(0), HWND(0)));
+    .unwrap_or((HWND(0), false, None, None, None, false, HWND(0), HWND(0)));
 
     if !transcription_in_progress || progress_hwnd.0 == 0 || !is_window_handle_valid(progress_hwnd)
     {
@@ -4829,7 +4872,14 @@ pub(crate) fn restore_transcription_progress_focus_for_current_document(hwnd: HW
         return false;
     };
 
-    if current_doc_path != transcription_media_path {
+    let current_matches_transcription = current_doc_path == transcription_media_path;
+    let current_matches_active_stream = mpv_active
+        && is_stream_cache_media(&transcription_media_path)
+        && active_podcast_episode_url
+            .as_ref()
+            .is_some_and(|url| current_doc_path.to_string_lossy() == url.as_str());
+
+    if !current_matches_transcription && !current_matches_active_stream {
         return false;
     }
 
@@ -5178,14 +5228,29 @@ fn start_whisper_transcription(hwnd: HWND) {
         return;
     };
     let media_info = with_state(hwnd, |state| {
+        let active_stream_title_for_path = |path: &Path| {
+            state
+                .active_podcast_episode_url
+                .as_ref()
+                .filter(|url| path.to_string_lossy() == url.as_str())
+                .and(state.active_podcast_episode_title.clone())
+        };
         if let Some(player) = state.active_audiobook.as_ref() {
-            return Some((player.path.clone(), state.selected_audio_track));
+            return Some((
+                player.path.clone(),
+                state.selected_audio_track,
+                active_stream_title_for_path(&player.path),
+            ));
         }
         state.docs.get(state.current).and_then(|doc| {
             if matches!(doc.format, FileFormat::Audiobook) {
-                doc.path
-                    .as_ref()
-                    .map(|path| (path.clone(), state.selected_audio_track))
+                doc.path.as_ref().map(|path| {
+                    (
+                        path.clone(),
+                        state.selected_audio_track,
+                        active_stream_title_for_path(path),
+                    )
+                })
             } else {
                 None
             }
@@ -5193,7 +5258,7 @@ fn start_whisper_transcription(hwnd: HWND) {
     })
     .flatten();
 
-    let Some((mut media_path, mut stream_index)) = media_info else {
+    let Some((mut media_path, mut stream_index, media_title)) = media_info else {
         screen_reader_speak(&i18n::tr(language, "whisper.error.no_active_media"));
         return;
     };
@@ -5353,11 +5418,15 @@ fn start_whisper_transcription(hwnd: HWND) {
                 LPARAM(0),
             );
 
-            let base_name = media_path
+            let fallback_name = media_path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .or_else(|| media_path.file_name().and_then(|s| s.to_str()))
                 .unwrap_or("audio");
+            let base_name = media_title
+                .as_deref()
+                .filter(|title| !title.trim().is_empty())
+                .unwrap_or(fallback_name);
             let mut title_path = PathBuf::from(i18n::tr_f(
                 language,
                 "whisper.output_title",
@@ -6398,8 +6467,21 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
                 state.audiobook_progress.0 != 0 && foreground == state.audiobook_progress;
             let transcription_blocks_focus = state.transcription_progress_window.0 != 0
                 && state.transcription_in_progress
-                && state.transcription_media_path.is_some()
-                && state.transcription_media_path == current_doc_path;
+                && state
+                    .transcription_media_path
+                    .as_ref()
+                    .is_some_and(|media_path| {
+                        state.transcription_media_path == current_doc_path
+                            || (state.active_mpv_session.is_some()
+                                && is_stream_cache_media(media_path)
+                                && state
+                                    .active_podcast_episode_url
+                                    .as_ref()
+                                    .zip(current_doc_path.as_ref())
+                                    .is_some_and(|(url, doc_path)| {
+                                        doc_path.to_string_lossy() == url.as_str()
+                                    }))
+                    });
             !blocking_modal_open
                 && state.update_progress_window.0 == 0
                 && !transcription_blocks_focus

@@ -118,11 +118,11 @@ pub enum FeedFetchError {
     HttpStatus {
         status: u16,
         kind: String,
-        cache: RssFeedCache,
+        cache: Box<RssFeedCache>,
     },
     Network {
         message: String,
-        cache: RssFeedCache,
+        cache: Box<RssFeedCache>,
     },
 }
 
@@ -1079,7 +1079,10 @@ async fn fetch_bytes_with_retries(
         let response = {
             let _permits = http.acquire_permits(&host).await.map_err(|e| {
                 let cache = cache.as_deref().cloned().unwrap_or_default();
-                FeedFetchError::Network { message: e, cache }
+                FeedFetchError::Network {
+                    message: e,
+                    cache: Box::new(cache),
+                }
             })?;
             let mut req = http.client.get(url);
             if is_feed && let Some(c) = cache.as_ref() {
@@ -1116,7 +1119,7 @@ async fn fetch_bytes_with_retries(
                     return Err(FeedFetchError::HttpStatus {
                         status: status.as_u16(),
                         kind: "http_error".to_string(),
-                        cache,
+                        cache: Box::new(cache),
                     });
                 }
                 let bytes = resp
@@ -1126,7 +1129,7 @@ async fn fetch_bytes_with_retries(
                         let cache = cache.as_deref().cloned().unwrap_or_default();
                         FeedFetchError::Network {
                             message: e.to_string(),
-                            cache,
+                            cache: Box::new(cache),
                         }
                     })?
                     .to_vec();
@@ -1152,7 +1155,7 @@ async fn fetch_bytes_with_retries(
                 let cache = cache.as_deref().cloned().unwrap_or_default();
                 return Err(FeedFetchError::Network {
                     message: format_error_chain(&err),
-                    cache,
+                    cache: Box::new(cache),
                 });
             }
         }
@@ -1160,7 +1163,7 @@ async fn fetch_bytes_with_retries(
     let cache = cache.as_deref().cloned().unwrap_or_default();
     Err(FeedFetchError::Network {
         message: i18n::tr(language, "rss.error.retries_exhausted"),
-        cache,
+        cache: Box::new(cache),
     })
 }
 
@@ -1204,7 +1207,7 @@ pub async fn fetch_and_parse(
     let mut url = normalize_url(url);
     let http = shared_http().map_err(|e| FeedFetchError::Network {
         message: e,
-        cache: cache.clone(),
+        cache: Box::new(cache.clone()),
     })?;
     let mut cache = cache;
 
@@ -1229,7 +1232,7 @@ pub async fn fetch_and_parse(
                 }
                 FeedFetchError::Network { cache, message } => (cache, message),
             };
-            cache = returned_cache;
+            cache = *returned_cache;
             crate::log_debug(&format!(
                 "Standard fetch failed for {}, trying CurlClient. Error: {}",
                 url, msg
@@ -1253,7 +1256,7 @@ pub async fn fetch_and_parse(
                     };
                     return Err(FeedFetchError::Network {
                         message: msg,
-                        cache,
+                        cache: Box::new(cache),
                     });
                 }
             }
@@ -1319,7 +1322,7 @@ pub async fn fetch_and_parse(
 
     Err(FeedFetchError::Network {
         message: "Parsing failed".to_string(),
-        cache,
+        cache: Box::new(cache),
     })
 }
 
@@ -1337,11 +1340,11 @@ pub async fn fetch_url_bytes(
         Ok(Ok(bytes)) => Ok(bytes),
         Ok(Err(err)) => Err(FeedFetchError::Network {
             message: err,
-            cache: RssFeedCache::default(),
+            cache: Box::new(RssFeedCache::default()),
         }),
         Err(err) => Err(FeedFetchError::Network {
             message: err.to_string(),
-            cache: RssFeedCache::default(),
+            cache: Box::new(RssFeedCache::default()),
         }),
     }
 }
@@ -1694,9 +1697,12 @@ pub async fn fetch_podcast_feed(
     language: Language,
 ) -> Result<PodcastFetchOutcome, FeedFetchError> {
     let url = normalize_url(url);
+    if crate::tools::raiplaysound::is_raiplaysound_url(&url) {
+        return fetch_raiplaysound_podcast_page(&url, cache, cfg);
+    }
     let http = shared_http().map_err(|e| FeedFetchError::Network {
         message: e,
-        cache: cache.clone(),
+        cache: Box::new(cache.clone()),
     })?;
     let mut cache = cache;
 
@@ -1711,7 +1717,7 @@ pub async fn fetch_podcast_feed(
                 }
                 FeedFetchError::Network { cache, message } => (cache, message),
             };
-            cache = returned_cache;
+            cache = *returned_cache;
             crate::log_debug(&format!(
                 "Standard fetch failed for {}, trying CurlClient. Error: {}",
                 url, msg
@@ -1735,7 +1741,7 @@ pub async fn fetch_podcast_feed(
                     };
                     return Err(FeedFetchError::Network {
                         message: msg,
-                        cache,
+                        cache: Box::new(cache),
                     });
                 }
             }
@@ -1758,6 +1764,54 @@ pub async fn fetch_podcast_feed(
     }
     Err(FeedFetchError::Network {
         message: "Parsing failed".to_string(),
+        cache: Box::new(cache),
+    })
+}
+
+fn fetch_raiplaysound_podcast_page(
+    url: &str,
+    mut cache: RssFeedCache,
+    cfg: RssFetchConfig,
+) -> Result<PodcastFetchOutcome, FeedFetchError> {
+    let page =
+        crate::tools::raiplaysound::load_page(url).map_err(|message| FeedFetchError::Network {
+            message,
+            cache: Box::new(cache.clone()),
+        })?;
+    cache.etag = None;
+    cache.last_modified = None;
+    cache.last_fetch = Some(now_unix());
+    cache.last_status = Some(200);
+    cache.consecutive_failures = 0;
+
+    let items = page
+        .items
+        .into_iter()
+        .filter_map(|item| {
+            let audio_url = item.audio_url?;
+            let title = item.title.trim().to_string();
+            if title.is_empty() || audio_url.trim().is_empty() {
+                return None;
+            }
+            Some(PodcastEpisode {
+                title,
+                link: item.path_id.unwrap_or_else(|| audio_url.clone()),
+                description: item.description.unwrap_or_default(),
+                guid: item.id,
+                enclosure_url: Some(audio_url),
+                enclosure_type: Some("audio/mpeg".to_string()),
+                chapters_url: None,
+                chapters_type: None,
+                podlove_chapters: Vec::new(),
+                pub_date: None,
+            })
+        })
+        .take(cfg.max_items_per_feed)
+        .collect();
+
+    Ok(PodcastFetchOutcome {
+        title: page.title,
+        items,
         cache,
     })
 }

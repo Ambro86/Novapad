@@ -4709,9 +4709,9 @@ fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                         status,
                         kind,
                         cache,
-                    } => (format!("Feed error {status} ({kind})."), Some(cache)),
+                    } => (format!("Feed error {status} ({kind})."), Some(*cache)),
                     rss::FeedFetchError::Network { message, cache } => {
-                        (format!("Error: {message}"), Some(cache))
+                        (format!("Error: {message}"), Some(*cache))
                     }
                 };
 

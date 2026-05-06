@@ -96,9 +96,9 @@ fn browse_page(
                 description: item.description.clone(),
             })
             .collect::<Vec<_>>();
-        let context_items_for_enabled = page.items.clone();
-        let context_items_for_handler = page.items.clone();
-        let context_action =
+        let context_items_for_copy_enabled = page.items.clone();
+        let context_items_for_copy_handler = page.items.clone();
+        let copy_context_action =
             crate::app_windows::interpreter_select_window::InterpreterContextAction {
                 label: format!(
                     "{} (Ctrl+C)",
@@ -106,7 +106,7 @@ fn browse_page(
                 ),
                 ctrl_c_shortcut: true,
                 enabled: Arc::new(move |selected_id: &str| {
-                    context_items_for_enabled
+                    context_items_for_copy_enabled
                         .iter()
                         .find(|item| item.id == selected_id)
                         .map(|item| {
@@ -120,7 +120,7 @@ fn browse_page(
                         .unwrap_or(false)
                 }),
                 handler: Arc::new(move |selected_id: String| {
-                    if let Some(item) = context_items_for_handler
+                    if let Some(item) = context_items_for_copy_handler
                         .iter()
                         .find(|item| item.id == selected_id)
                         && let Some(audio_url) = item.audio_url.as_ref()
@@ -131,6 +131,51 @@ fn browse_page(
                                 language, &item.title, audio_url,
                             ),
                         );
+                    }
+                }),
+            };
+        let context_items_for_podcast_enabled = page.items.clone();
+        let container_url = page.source.clone();
+        let container_url_for_enabled = container_url.clone();
+        let container_title = page.title.clone();
+        let add_to_podcasts_context_action =
+            crate::app_windows::interpreter_select_window::InterpreterContextAction {
+                label: "Aggiungi ai podcast".to_string(),
+                ctrl_c_shortcut: false,
+                enabled: Arc::new(move |selected_id: &str| {
+                    if !raiplaysound::is_raiplaysound_url(&container_url_for_enabled) {
+                        return false;
+                    }
+                    context_items_for_podcast_enabled
+                        .iter()
+                        .find(|item| item.id == selected_id)
+                        .map(|item| {
+                            item.kind == BrowseItemKind::Audio
+                                && item
+                                    .audio_url
+                                    .as_ref()
+                                    .map(|url| !url.trim().is_empty())
+                                    .unwrap_or(false)
+                        })
+                        .unwrap_or(false)
+                }),
+                handler: Arc::new(move |selected_id: String| {
+                    if selected_id.trim().is_empty() {
+                        return;
+                    }
+                    if crate::app_windows::podcasts_window::add_podcast_source(
+                        parent,
+                        &container_url,
+                        &container_title,
+                    )
+                    .is_some()
+                    {
+                        crate::screen_reader_speak(&crate::i18n::tr(language, "podcasts.added"));
+                        crate::app_windows::podcasts_window::show_subscription_confirmation(
+                            parent, language,
+                        );
+                    } else {
+                        crate::screen_reader_speak("Podcast gia presente");
                     }
                 }),
             };
@@ -146,7 +191,7 @@ fn browse_page(
                 search_button_label: "Cerca".to_string(),
                 show_search_edit: true,
                 secondary_action_label: None,
-                context_action: Some(context_action),
+                context_actions: vec![copy_context_action, add_to_podcasts_context_action],
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
             },

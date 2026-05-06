@@ -45,6 +45,10 @@ pub(crate) fn load_page(path_or_url: &str) -> Result<BrowsePage, String> {
     load_page_from_url(&absolute_url(path_or_url)?)
 }
 
+pub(crate) fn is_raiplaysound_url(url: &str) -> bool {
+    url.trim().to_ascii_lowercase().contains("raiplaysound.it")
+}
+
 pub(crate) fn search(query: &str) -> Result<BrowsePage, String> {
     let trimmed_query = query.trim();
     if trimmed_query.is_empty() {

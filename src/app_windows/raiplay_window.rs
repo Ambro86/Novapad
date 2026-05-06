@@ -194,7 +194,7 @@ fn browse_page(
                 search_button_label: "Cerca".to_string(),
                 show_search_edit: true,
                 secondary_action_label: None,
-                context_action: Some(context_action),
+                context_actions: vec![context_action],
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
             },
@@ -337,6 +337,12 @@ fn open_media_item(
     });
     match playback_target {
         PlaybackTarget::Download(url) => {
+            crate::log_debug(&format!(
+                "RaiPlay playback: download target title={:?} container={:?} url={}",
+                title,
+                container_title.as_deref(),
+                url
+            ));
             crate::play_named_remote_audio_from_url_with_rai_origin(
                 parent,
                 url,
@@ -351,6 +357,15 @@ fn open_media_item(
             is_live,
             live_audio_tracks,
         } => {
+            crate::log_debug(&format!(
+                "RaiPlay playback: direct stream title={:?} container={:?} audio_url={} media_url={} is_live={} live_tracks={}",
+                title,
+                container_title.as_deref(),
+                url,
+                media_url,
+                is_live,
+                live_audio_tracks.len()
+            ));
             if is_live {
                 crate::play_live_stream_audio_from_url_with_rai_origin(
                     parent,

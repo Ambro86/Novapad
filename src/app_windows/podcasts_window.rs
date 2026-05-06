@@ -2821,7 +2821,7 @@ fn set_source_unheard(hwnd: HWND, hitem: HTREEITEM, unheard: bool) {
     }
 }
 
-fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Option<usize> {
+pub(crate) fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Option<usize> {
     let normalized = rss::normalize_url(feed_url);
     if normalized.is_empty() {
         return None;
@@ -2858,6 +2858,19 @@ fn add_podcast_source(parent: HWND, feed_url: &str, title: &str) -> Option<usize
         })
     }
     .flatten()
+}
+
+pub(crate) fn show_subscription_confirmation(hwnd: HWND, language: Language) {
+    let title = i18n::tr(language, "podcasts.subscribed_title");
+    let message = i18n::tr(language, "podcasts.subscribed_message");
+    unsafe {
+        MessageBoxW(
+            hwnd,
+            PCWSTR(to_wide(&message).as_ptr()),
+            PCWSTR(to_wide(&title).as_ptr()),
+            MB_OK | MB_ICONINFORMATION,
+        );
+    }
 }
 
 fn render_search_results_list(
@@ -4748,18 +4761,7 @@ fn subscribe_selected_result(hwnd: HWND) {
     if let Some(index) = new_index {
         let language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
         announce_status(&i18n::tr(language, "podcasts.added"));
-
-        // Show confirmation dialog
-        let title = i18n::tr(language, "podcasts.subscribed_title");
-        let message = i18n::tr(language, "podcasts.subscribed_message");
-        unsafe {
-            MessageBoxW(
-                hwnd,
-                PCWSTR(to_wide(&message).as_ptr()),
-                PCWSTR(to_wide(&title).as_ptr()),
-                MB_OK | MB_ICONINFORMATION,
-            );
-        }
+        show_subscription_confirmation(hwnd, language);
 
         let hwnd_tree = with_podcast_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
         if hwnd_tree.0 != 0 {

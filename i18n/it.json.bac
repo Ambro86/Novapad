@@ -388,6 +388,7 @@
   "menu.import_youtube": "Importa Trascrizione &YouTube...\tCtrl+Y",
   "menu.insert": "&Segnalibri",
   "menu.options": "&Opzioni...\tCtrl+Shift+O",
+  "menu.paths_navigation": "Percorsi e navigazione",
   "menu.playback": "&Riproduzione",
   "menu.podcasts": "&Podcast...\tCtrl+Shift+P",
   "menu.prompt": "&Terminale Accessibile...\tCtrl+Shift+T",

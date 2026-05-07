@@ -89,7 +89,7 @@ fn labels(language: Language) -> WikipediaLabels {
     WikipediaLabels {
         title: i18n::tr(language, "wikipedia.title"),
         search_label: i18n::tr(language, "wikipedia.search_label"),
-        language_label: i18n::tr(language, "dictionary.lookup.language"),
+        language_label: i18n::tr(language, "options.label.wikipedia_language"),
         language_auto: i18n::tr(language, "dictionary.lookup.language.auto"),
         search_button: i18n::tr(language, "wikipedia.search_button"),
         results_label: i18n::tr(language, "wikipedia.results_label"),

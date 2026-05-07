@@ -319,7 +319,6 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
         let recent_item_id =
             with_state(parent, |state| state.last_rai_recent_item_id.clone()).unwrap_or(None);
         crate::set_foreground_window_safe(parent);
-        crate::set_focus_safe(parent);
         open_recent_catalog(parent, language, recent_item_id);
         return;
     };

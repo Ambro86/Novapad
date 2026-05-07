@@ -104,6 +104,7 @@ struct InterpreterSelectState {
     original_mode: InterpreterDialogInitMode,
     language: Language,
     initial_list_value: Option<String>,
+    secondary_button: Option<HWND>,
     filter_edit: Option<HWND>,
     flat_list: Option<HWND>,
     flat_list_values: Vec<FlatListValue>,
@@ -397,7 +398,23 @@ fn select_interpreter_internal(
                 continue;
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
-                crate::log_if_err!(PostMessageW(hwnd, WM_COMMAND, WPARAM(ID_OK), LPARAM(0)));
+                let command_id = with_interpreter_state(hwnd, |state| {
+                    if state
+                        .secondary_button
+                        .is_some_and(|button| focused == button)
+                    {
+                        ID_SECONDARY
+                    } else {
+                        ID_OK
+                    }
+                })
+                .unwrap_or(ID_OK);
+                crate::log_if_err!(PostMessageW(
+                    hwnd,
+                    WM_COMMAND,
+                    WPARAM(command_id),
+                    LPARAM(0)
+                ));
                 continue;
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_RIGHT.0 as u32 {
@@ -826,6 +843,7 @@ fn interpreter_select_wndproc_inner(
                 original_mode: init.mode,
                 language: init.language,
                 initial_list_value: init.initial_list_value,
+                secondary_button,
                 filter_edit,
                 flat_list,
                 flat_list_values: Vec::new(),

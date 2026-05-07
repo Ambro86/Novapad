@@ -16,13 +16,14 @@ use windows::Win32::UI::Controls::{
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWNLIST,
-    CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, ES_AUTOHSCROLL, GWLP_USERDATA,
-    GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT,
-    LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MSG,
-    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFOCUS, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, ES_AUTOHSCROLL, GW_CHILD,
+    GWLP_USERDATA, GetWindow, GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LB_ADDSTRING,
+    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT,
+    LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -508,6 +509,15 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     );
                     SetWindowLongPtrW(control, GWLP_USERDATA, prev);
                 }
+                let input_edit = GetWindow(input, GW_CHILD);
+                if input_edit.0 != 0 {
+                    let prev = SetWindowLongPtrW(
+                        input_edit,
+                        windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                        proc_ptr as isize,
+                    );
+                    SetWindowLongPtrW(input_edit, GWLP_USERDATA, prev);
+                }
                 SetFocus(input);
                 LRESULT(0)
             }
@@ -750,6 +760,7 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                 != 0;
             let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
+                log_wikipedia_tab(parent, hwnd, shift_down);
                 focus_next_control(parent, hwnd, shift_down);
                 return LRESULT(0);
             }
@@ -769,7 +780,12 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         let id = crate::get_dlg_ctrl_id_safe(hwnd);
         if matches!(
             id,
-            WIKIPEDIA_CLOSE_ID | WIKIPEDIA_SEARCH_ID | WIKIPEDIA_RESULTS_ID | WIKIPEDIA_IMPORT_ID
+            WIKIPEDIA_INPUT_ID
+                | WIKIPEDIA_LANGUAGE_ID
+                | WIKIPEDIA_CLOSE_ID
+                | WIKIPEDIA_SEARCH_ID
+                | WIKIPEDIA_RESULTS_ID
+                | WIKIPEDIA_IMPORT_ID
         ) {
             return LRESULT(windows::Win32::UI::WindowsAndMessaging::DLGC_WANTALLKEYS as isize);
         }
@@ -806,7 +822,16 @@ fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     if order.is_empty() {
         return;
     }
-    let Some(pos) = order.iter().position(|hwnd| *hwnd == current) else {
+    let mut current_ctrl = current;
+    let mut pos = order.iter().position(|hwnd| *hwnd == current_ctrl);
+    if pos.is_none() {
+        let maybe_parent = crate::get_parent_safe(current_ctrl);
+        if maybe_parent.0 != 0 {
+            current_ctrl = maybe_parent;
+            pos = order.iter().position(|hwnd| *hwnd == current_ctrl);
+        }
+    }
+    let Some(pos) = pos else {
         return;
     };
     let next_index = if shift_down {
@@ -821,7 +846,47 @@ fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
         unsafe {
             SetFocus(target);
         }
+        crate::log_debug(&format!(
+            "wikipedia_tab_focus: shift={} current={:?} target={:?}",
+            shift_down, current, target
+        ));
     }
+}
+
+fn log_wikipedia_tab(parent: HWND, current: HWND, shift_down: bool) {
+    let current_focus = crate::get_focus_safe();
+    let Some((input, language_combo, search, results, sections, import_button, close)) =
+        with_window_state(parent, |state| {
+            (
+                state.input,
+                state.language_combo,
+                state.search,
+                state.results,
+                state.sections,
+                state.import_button,
+                state.close,
+            )
+        })
+    else {
+        crate::log_debug(&format!(
+            "wikipedia_tab: missing_state shift={} current={:?} focus={:?}",
+            shift_down, current, current_focus
+        ));
+        return;
+    };
+    crate::log_debug(&format!(
+        "wikipedia_tab: shift={} current={:?} focus={:?} input={:?} language={:?} search={:?} results={:?} sections={:?} import={:?} close={:?}",
+        shift_down,
+        current,
+        current_focus,
+        input,
+        language_combo,
+        search,
+        results,
+        sections,
+        import_button,
+        close
+    ));
 }
 
 fn with_window_state<F, R>(hwnd: HWND, f: F) -> Option<R>

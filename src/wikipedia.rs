@@ -178,7 +178,8 @@ pub fn resolve_language_code(language: Language, preference: &str) -> String {
         return language_to_code(language).to_string();
     }
     match pref.as_str() {
-        "it" | "en" | "es" | "pt" | "sv" | "vi" | "cs" | "pl" | "fr" | "ru" | "zh" => pref,
+        "it" | "en" | "es" | "pt" | "sv" | "vi" | "cs" | "pl" | "fr" | "sr" | "uk" | "lt"
+        | "ru" | "zh" | "hi" => pref,
         _ => language_to_code(language).to_string(),
     }
 }

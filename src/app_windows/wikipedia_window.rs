@@ -1,7 +1,7 @@
 use crate::accessibility::{handle_accessibility, normalize_to_crlf, to_wide, to_wide_normalized};
 use crate::editor_manager::{self, get_edit_text};
 use crate::i18n;
-use crate::settings::Language;
+use crate::settings::{Language, save_settings};
 use crate::wikipedia;
 use crate::{WM_FOCUS_EDITOR, get_active_edit, show_error, with_state};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -34,6 +34,7 @@ const WIKIPEDIA_STATUS_ID: usize = 9504;
 const WIKIPEDIA_CLOSE_ID: usize = 9505;
 const WIKIPEDIA_SECTIONS_ID: usize = 9506;
 const WIKIPEDIA_IMPORT_ID: usize = 9507;
+const WIKIPEDIA_LANGUAGE_ID: usize = 9508;
 
 const WM_WIKI_SEARCH_DONE: u32 = WM_APP + 110;
 const WM_WIKI_IMPORT_DONE: u32 = WM_APP + 111;
@@ -43,6 +44,7 @@ static IMPORT_GENERATION: AtomicUsize = AtomicUsize::new(0);
 struct WikipediaWindowState {
     parent: HWND,
     input: HWND,
+    language_combo: HWND,
     search: HWND,
     results: HWND,
     sections: HWND,
@@ -56,6 +58,8 @@ struct WikipediaWindowState {
 struct WikipediaLabels {
     title: String,
     search_label: String,
+    language_label: String,
+    language_auto: String,
     search_button: String,
     results_label: String,
     sections_label: String,
@@ -84,6 +88,8 @@ fn labels(language: Language) -> WikipediaLabels {
     WikipediaLabels {
         title: i18n::tr(language, "wikipedia.title"),
         search_label: i18n::tr(language, "wikipedia.search_label"),
+        language_label: i18n::tr(language, "dictionary.lookup.language"),
+        language_auto: i18n::tr(language, "dictionary.lookup.language.auto"),
         search_button: i18n::tr(language, "wikipedia.search_button"),
         results_label: i18n::tr(language, "wikipedia.results_label"),
         sections_label: tr_or(language, "wikipedia.sections_label", "Import:"),
@@ -238,6 +244,7 @@ pub fn open(parent: HWND) {
         let state = Box::new(WikipediaWindowState {
             parent,
             input: HWND(0),
+            language_combo: HWND(0),
             search: HWND(0),
             results: HWND(0),
             status: HWND(0),
@@ -350,6 +357,20 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     PCWSTR(to_wide(&label_set.results_label).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     12,
+                    78,
+                    120,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&label_set.language_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
                     44,
                     120,
                     20,
@@ -358,6 +379,21 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     hinstance,
                     None,
                 );
+                let language_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    90,
+                    40,
+                    220,
+                    240,
+                    hwnd,
+                    HMENU(WIKIPEDIA_LANGUAGE_ID as isize),
+                    hinstance,
+                    None,
+                );
+                populate_language_combo(parent, language_combo, language, &label_set);
                 let results = CreateWindowExW(
                     WS_EX_CLIENTEDGE,
                     WC_LISTBOXW,
@@ -368,9 +404,9 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                         | WS_VSCROLL
                         | WINDOW_STYLE((LBS_NOTIFY | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT) as u32),
                     12,
-                    66,
+                    100,
                     498,
-                    230,
+                    196,
                     hwnd,
                     HMENU(WIKIPEDIA_RESULTS_ID as isize),
                     hinstance,
@@ -448,6 +484,7 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                 );
 
                 (*init_ptr).input = input;
+                (*init_ptr).language_combo = language_combo;
                 (*init_ptr).search = search;
                 (*init_ptr).results = results;
                 (*init_ptr).sections = sections;
@@ -455,7 +492,15 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                 (*init_ptr).status = status;
                 (*init_ptr).close = close;
                 let proc_ptr = tab_subclass_proc as *const () as usize;
-                for control in [input, search, results, sections, import_button, close] {
+                for control in [
+                    input,
+                    language_combo,
+                    search,
+                    results,
+                    sections,
+                    import_button,
+                    close,
+                ] {
                     let prev = SetWindowLongPtrW(
                         control,
                         windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
@@ -663,6 +708,10 @@ fn handle_enter_key(hwnd: HWND) -> bool {
         run_search(parent);
         return true;
     }
+    if id == WIKIPEDIA_LANGUAGE_ID {
+        run_search(parent);
+        return true;
+    }
     if id == WIKIPEDIA_RESULTS_ID {
         start_article_load(parent);
         return true;
@@ -745,6 +794,7 @@ fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     let order = with_window_state(parent, |state| {
         vec![
             state.input,
+            state.language_combo,
             state.search,
             state.results,
             state.sections,
@@ -782,15 +832,87 @@ where
     crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
+fn populate_language_combo(
+    parent: HWND,
+    combo: HWND,
+    language: Language,
+    label_set: &WikipediaLabels,
+) {
+    if combo.0 == 0 {
+        return;
+    }
+    let language_options = [
+        (label_set.language_auto.clone(), "auto"),
+        (i18n::tr(language, "options.lang.it"), "it"),
+        (i18n::tr(language, "options.lang.en"), "en"),
+        (i18n::tr(language, "options.lang.es"), "es"),
+        (i18n::tr(language, "options.lang.pt"), "pt"),
+        (i18n::tr(language, "options.lang.sv"), "sv"),
+        (i18n::tr(language, "options.lang.vi"), "vi"),
+        (i18n::tr(language, "options.lang.cs"), "cs"),
+        (i18n::tr(language, "options.lang.pl"), "pl"),
+        (i18n::tr(language, "options.lang.fr"), "fr"),
+        (i18n::tr(language, "options.lang.sr"), "sr"),
+        (i18n::tr(language, "options.lang.uk"), "uk"),
+        (i18n::tr(language, "options.lang.lt"), "lt"),
+        (i18n::tr(language, "options.lang.zh"), "zh"),
+        (i18n::tr(language, "options.lang.hi"), "hi"),
+    ];
+    let saved_pref = with_state(parent, |state| state.settings.wikipedia_language.clone())
+        .unwrap_or_else(|| "auto".to_string())
+        .trim()
+        .to_ascii_lowercase();
+    let mut selected_index = 0usize;
+    for (idx, (label, value)) in language_options.iter().enumerate() {
+        crate::send_message_w_safe(
+            combo,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(label).as_ptr() as isize),
+        );
+        if saved_pref == *value {
+            selected_index = idx;
+        }
+    }
+    crate::send_message_w_safe(combo, CB_SETCURSEL, WPARAM(selected_index), LPARAM(0));
+}
+
+fn selected_language_pref(combo: HWND) -> String {
+    let sel = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    match sel {
+        1 => "it",
+        2 => "en",
+        3 => "es",
+        4 => "pt",
+        5 => "sv",
+        6 => "vi",
+        7 => "cs",
+        8 => "pl",
+        9 => "fr",
+        10 => "sr",
+        11 => "uk",
+        12 => "lt",
+        13 => "zh",
+        14 => "hi",
+        _ => "auto",
+    }
+    .to_string()
+}
+
 fn run_search(hwnd: HWND) {
-    let Some((parent, input, results, status)) = with_window_state(hwnd, |state| {
-        (state.parent, state.input, state.results, state.status)
+    let Some((parent, input, language_combo, results, status)) = with_window_state(hwnd, |state| {
+        (
+            state.parent,
+            state.input,
+            state.language_combo,
+            state.results,
+            state.status,
+        )
     }) else {
         return;
     };
     let language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
-    let pref = { with_state(parent, |s| s.settings.wikipedia_language.clone()) }
-        .unwrap_or_else(|| "auto".to_string());
+    let pref = selected_language_pref(language_combo);
     let label_set = labels(language);
 
     let len = crate::get_window_text_length_w_safe(input);
@@ -838,6 +960,12 @@ fn run_search(hwnd: HWND) {
         crate::send_message_w_safe(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
     }
     reset_sections(hwnd, &label_set.import_all);
+    if let Some(settings_clone) = with_state(parent, |state| {
+        state.settings.wikipedia_language = pref.clone();
+        state.settings.clone()
+    }) {
+        save_settings(settings_clone);
+    }
 
     let generation = SEARCH_GENERATION
         .fetch_add(1, Ordering::SeqCst)

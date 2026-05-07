@@ -1,4 +1,4 @@
-{
+﻿{
   "about.message": "Sonarpad là trình soạn thảo văn bản cho Windows hỗ trợ nhiều định dạng. Phần mềm có thể mở TXT, PDF, DOCX, EPUB và các tệp bảng tính; đọc văn bản bằng TTS, tạo và phát sách nói MP3.",
   "about.title": "Giới thiệu phần mềm",
   "app.action_completed": "Đã hoàn tất: {action}.",
@@ -1312,6 +1312,8 @@
   "whisper.status.starting": "Bắt đầu chuyển đổi...",
   "whisper.status.transcribing": "Đang chuyển đổi...",
   "wikipedia.close": "Đóng",
+  "wikipedia.import_all_article": "Nhập toàn bộ bài viết",
+  "wikipedia.import_button": "Nhập",
   "wikipedia.import_error": "Lỗi khi nhập nội dung.",
   "wikipedia.importing": "Đang nhập nội dung...",
   "wikipedia.loading": "Đang tải...",
@@ -1321,6 +1323,7 @@
   "wikipedia.search_button": "Tìm kiếm",
   "wikipedia.search_error": "Lỗi tìm kiếm.",
   "wikipedia.search_label": "Tìm kiếm:",
+  "wikipedia.sections_label": "Nhập:",
   "wikipedia.title": "Tìm và nhập từ Wikipedia",
   "window.close_all": "Đóng tất cả",
   "window.close_others": "Đóng tất cả trừ tệp này",

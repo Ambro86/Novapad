@@ -1,4 +1,4 @@
-{
+﻿{
   "about.message": "Sonarpad je Windows uređivač teksta sa podrškom za više formata. Otvara TXT, PDF, DOCX, EPUB i proračunske tabele; čita tekst pomoću TTS‑a, pravi MP3 audio-knjige i reprodukuje audio-knjige. Verzija: {version}. Autor: Ambrogio Riili.",
   "about.title": "O programu",
   "app.action_completed": "Akcija je završena.",
@@ -1312,6 +1312,8 @@
   "whisper.status.starting": "Pokretanje transkripcije...",
   "whisper.status.transcribing": "Transkripcija u toku...",
   "wikipedia.close": "Zatvori",
+  "wikipedia.import_all_article": "Увези цео чланак",
+  "wikipedia.import_button": "Увези",
   "wikipedia.import_error": "Greška pri uvozu.",
   "wikipedia.importing": "Uvozim...",
   "wikipedia.loading": "Učitavanje...",
@@ -1321,6 +1323,7 @@
   "wikipedia.search_button": "Pretraži",
   "wikipedia.search_error": "Greška pri pretrazi.",
   "wikipedia.search_label": "Pretraži:",
+  "wikipedia.sections_label": "Увези:",
   "wikipedia.title": "Pretraži i uvezi sa Vikipedije.",
   "window.close_all": "Zatvori sve",
   "window.close_others": "Zatvori sve osim ovog",

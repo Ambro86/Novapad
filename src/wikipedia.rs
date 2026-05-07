@@ -17,6 +17,14 @@ pub struct SearchResult {
 pub struct ExtractResult {
     pub extract: String,
     pub url: String,
+    pub sections: Vec<ArticleSection>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ArticleSection {
+    pub title: String,
+    pub level: usize,
+    pub text: String,
 }
 
 #[derive(Debug)]
@@ -359,6 +367,81 @@ fn heading_text(name: &str, text: &str) -> String {
     }
 }
 
+fn wrapped_heading_name(element: &ElementRef<'_>) -> Option<&'static str> {
+    let classes = element.value().classes().collect::<Vec<_>>();
+    if classes.contains(&"mw-heading2") {
+        Some("h2")
+    } else if classes.contains(&"mw-heading3") {
+        Some("h3")
+    } else if classes.contains(&"mw-heading4") {
+        Some("h4")
+    } else if classes.contains(&"mw-heading5") {
+        Some("h5")
+    } else if classes.contains(&"mw-heading6") {
+        Some("h6")
+    } else {
+        None
+    }
+}
+
+fn heading_title(line: &str) -> Option<(usize, String)> {
+    let trimmed = line.trim();
+    for level in 2..=6 {
+        let marks = "=".repeat(level);
+        let prefix = format!("{marks} ");
+        let suffix = format!(" {marks}");
+        let Some(body) = trimmed
+            .strip_prefix(&prefix)
+            .and_then(|s| s.strip_suffix(&suffix))
+        else {
+            continue;
+        };
+        if body.contains("==") {
+            return None;
+        }
+        let title = body.trim();
+        if title.is_empty() {
+            return None;
+        }
+        return Some((level, title.to_string()));
+    }
+    None
+}
+
+fn extract_article_sections(text: &str) -> Vec<ArticleSection> {
+    let mut sections = Vec::new();
+    let lines = text.lines().collect::<Vec<_>>();
+    let mut headings = Vec::new();
+
+    for (line_index, line) in lines.iter().enumerate() {
+        if let Some((level, title)) = heading_title(line) {
+            crate::log_debug(&format!(
+                "Wikipedia import: heading found level={level} title={title}"
+            ));
+            headings.push((line_index, level, title));
+        }
+    }
+
+    for (heading_index, (start, level, title)) in headings.iter().enumerate() {
+        let end = headings
+            .iter()
+            .skip(heading_index + 1)
+            .find(|(_, next_level, _)| next_level <= level)
+            .map(|(line_index, _, _)| *line_index)
+            .unwrap_or(lines.len());
+        let section_text = lines[*start..end].join("\n").trim().to_string();
+        if !section_text.is_empty() {
+            sections.push(ArticleSection {
+                title: title.clone(),
+                level: *level,
+                text: section_text,
+            });
+        }
+    }
+
+    sections
+}
+
 fn parse_article_html_to_text(html: &str) -> String {
     let document = Html::parse_fragment(html);
     let selector = match Selector::parse("div.mw-parser-output") {
@@ -391,7 +474,9 @@ fn parse_article_html_to_text(html: &str) -> String {
             continue;
         }
 
-        if name.starts_with('h') {
+        if let Some(heading_name) = wrapped_heading_name(&element) {
+            blocks.push(heading_text(heading_name, &text));
+        } else if name.starts_with('h') {
             blocks.push(heading_text(name, &text));
         } else {
             blocks.push(text);
@@ -438,6 +523,9 @@ pub fn search_articles(
 }
 
 pub fn fetch_extract(lang: &str, pageid: i64) -> Result<ExtractResult, WikipediaError> {
+    crate::log_debug(&format!(
+        "Wikipedia import: fetch_extract start lang={lang} pageid={pageid}"
+    ));
     let url = build_parse_url(lang, pageid)?;
     let client = http_client()?;
     let resp = client
@@ -450,16 +538,35 @@ pub fn fetch_extract(lang: &str, pageid: i64) -> Result<ExtractResult, Wikipedia
     let parsed: ParseResponse = parse_or_error(value)?;
     let title = parsed.parse.title;
     let extract = parse_article_html_to_text(&parsed.parse.text);
+    crate::log_debug(&format!(
+        "Wikipedia import: parsed title={title} html_len={} extract_len={}",
+        parsed.parse.text.len(),
+        extract.len()
+    ));
     if title.trim().is_empty() || extract.trim().is_empty() {
         return Err(WikipediaError::NotFound);
     }
     let url = build_article_url(lang, &title)?;
-    Ok(ExtractResult { extract, url })
+    let sections = extract_article_sections(&extract);
+    crate::log_debug(&format!(
+        "Wikipedia import: section_count={} titles={}",
+        sections.len(),
+        sections
+            .iter()
+            .map(|section| format!("h{} {}", section.level, section.title))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    ));
+    Ok(ExtractResult {
+        extract,
+        url,
+        sections,
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse_article_html_to_text;
+    use super::{extract_article_sections, parse_article_html_to_text};
 
     #[test]
     fn wikipedia_html_parser_keeps_quote_after_intro_line() {
@@ -482,5 +589,39 @@ mod tests {
                 "Anche don Morosini fu visto da Pertini dopo un interrogatorio delle SS."
             )
         );
+    }
+
+    #[test]
+    fn wikipedia_section_parser_uses_nested_sections() {
+        let text = "Intro\n\n== History ==\nA\n\n=== Details ===\nB\n\n== Notes ==\nC";
+
+        let sections = extract_article_sections(text);
+
+        assert_eq!(sections.len(), 3);
+        assert_eq!(sections[0].title, "History");
+        assert_eq!(sections[0].level, 2);
+        assert!(sections[0].text.contains("=== Details ==="));
+        assert_eq!(sections[1].title, "Details");
+        assert_eq!(sections[1].level, 3);
+        assert!(!sections[1].text.contains("== Notes =="));
+        assert_eq!(sections[2].title, "Notes");
+    }
+
+    #[test]
+    fn wikipedia_html_parser_marks_wrapped_headings() {
+        let html = r#"
+        <div class="mw-parser-output">
+          <p>Intro.</p>
+          <div class="mw-heading mw-heading2"><h2>Biography</h2></div>
+          <p>Body.</p>
+          <div class="mw-heading mw-heading3"><h3>Works</h3></div>
+          <p>Books.</p>
+        </div>
+        "#;
+
+        let text = parse_article_html_to_text(html);
+
+        assert!(text.contains("== Biography =="));
+        assert!(text.contains("=== Works ==="));
     }
 }

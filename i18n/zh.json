@@ -1,4 +1,4 @@
-{
+﻿{
   "about.message": "Sonarpad是一款支持多格式的Windows文本编辑器。它可打开TXT、PDF、DOCX、EPUB及电子表格文件；通过语音合成技术朗读文本，创建MP3有声书并播放有声内容。版本号：{version}。作者：Ambrogio Riili。",
   "about.title": "关于该项目",
   "app.action_completed": "{action} 已完成。",
@@ -1312,6 +1312,8 @@
   "whisper.status.starting": "开始转录...",
   "whisper.status.transcribing": "正在转录...",
   "wikipedia.close": "关闭",
+  "wikipedia.import_all_article": "导入整篇文章",
+  "wikipedia.import_button": "导入",
   "wikipedia.import_error": "导入错误。",
   "wikipedia.importing": "正在导入...",
   "wikipedia.loading": "正在加载...",
@@ -1321,6 +1323,7 @@
   "wikipedia.search_button": "搜索",
   "wikipedia.search_error": "搜索错误。",
   "wikipedia.search_label": "搜索：",
+  "wikipedia.sections_label": "导入：",
   "wikipedia.title": "从维基百科搜索并导入",
   "window.close_all": "关闭所有",
   "window.close_others": "关闭所有窗口，只保留当前窗口",

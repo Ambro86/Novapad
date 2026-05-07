@@ -1,4 +1,4 @@
-{
+﻿{
   "about.message": "Sonarpad - это текстовый редактор для Windows с поддержкой нескольких форматов. Он открывает файлы TXT, PDF, DOCX, EPUB и электронные таблицы; читает текст с помощью TTS, создает аудиокниги в формате MP3 и воспроизводит аудиокниги. Версия: {version}. Автор: Ambrogio Riili.",
   "about.title": "О программе",
   "app.action_completed": "{action} завершено.",
@@ -1312,6 +1312,8 @@
   "whisper.status.starting": "Начало транскрипции...",
   "whisper.status.transcribing": "Идет транскрипция...",
   "wikipedia.close": "Закрыть",
+  "wikipedia.import_all_article": "Импортировать всю статью",
+  "wikipedia.import_button": "Импортировать",
   "wikipedia.import_error": "Ошибка импорта.",
   "wikipedia.importing": "Импорт...",
   "wikipedia.loading": "Загрузка...",
@@ -1321,6 +1323,7 @@
   "wikipedia.search_button": "Поиск",
   "wikipedia.search_error": "Ошибка поиска.",
   "wikipedia.search_label": "Поиск:",
+  "wikipedia.sections_label": "Импортировать:",
   "wikipedia.title": "Поиск и импорт из Википедии",
   "window.close_all": "Закрыть все",
   "window.close_others": "Закрыть все, кроме этого",

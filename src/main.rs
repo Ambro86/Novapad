@@ -7251,6 +7251,16 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     app_windows::find_in_files_window::reopen_results(hwnd);
                     continue;
                 }
+                let wikipedia_hwnd =
+                    with_state(hwnd, |state| state.wikipedia_window).unwrap_or(HWND(0));
+                if wikipedia_hwnd.0 != 0
+                    && let Some(hwnd_edit) = get_active_edit(hwnd)
+                    && GetFocus() == hwnd_edit
+                    && editor_manager::current_document_is_from_wikipedia(hwnd)
+                    && app_windows::wikipedia_window::focus_import_choice(wikipedia_hwnd)
+                {
+                    continue;
+                }
                 let save_hwnd =
                     with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
                 if save_hwnd.0 != 0 {
@@ -16364,6 +16374,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 from_rss: false,
                 from_italiaonline: false,
                 from_find_in_files: false,
+                from_wikipedia: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
@@ -16607,6 +16618,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 from_rss: false,
                 from_italiaonline: false,
                 from_find_in_files: false,
+                from_wikipedia: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,

@@ -1280,6 +1280,7 @@ pub struct Document {
     pub from_rss: bool,
     pub from_italiaonline: bool,
     pub from_find_in_files: bool,
+    pub from_wikipedia: bool,
     pub is_temporary: bool,
     pub prefer_title_for_save_suggestion: bool,
     pub prefer_mpv_playback: bool,
@@ -1307,6 +1308,7 @@ impl Default for Document {
             from_rss: false,
             from_italiaonline: false,
             from_find_in_files: false,
+            from_wikipedia: false,
             is_temporary: false,
             prefer_title_for_save_suggestion: false,
             prefer_mpv_playback: false,
@@ -3197,6 +3199,7 @@ pub fn new_document(hwnd: HWND) {
                 from_rss: false,
                 from_italiaonline: false,
                 from_find_in_files: false,
+                from_wikipedia: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
@@ -3241,6 +3244,7 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
                 from_rss: false,
                 from_italiaonline: false,
                 from_find_in_files: false,
+                from_wikipedia: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
@@ -3522,6 +3526,19 @@ pub fn mark_current_document_from_italiaonline(hwnd: HWND, from_italiaonline: bo
     }
 }
 
+pub fn mark_current_document_from_wikipedia(hwnd: HWND, from_wikipedia: bool) {
+    let result = {
+        with_state(hwnd, |state| {
+            if let Some(doc) = state.docs.get_mut(state.current) {
+                doc.from_wikipedia = from_wikipedia;
+            }
+        })
+    };
+    if result.is_none() {
+        crate::log_debug("Failed to access editor state");
+    }
+}
+
 pub fn mark_current_document_prefer_mpv_playback(hwnd: HWND, prefer_mpv_playback: bool) {
     let result = {
         with_state(hwnd, |state| {
@@ -3603,6 +3620,19 @@ pub fn current_document_is_from_find_in_files(hwnd: HWND) -> bool {
     }
 }
 
+pub fn current_document_is_from_wikipedia(hwnd: HWND) -> bool {
+    {
+        with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .map(|doc| doc.from_wikipedia)
+                .unwrap_or(false)
+        })
+        .unwrap_or(false)
+    }
+}
+
 pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
     {
         let (index, hwnd_edit) = with_state(hwnd, |state| {
@@ -3632,6 +3662,7 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
                 from_rss: true,
                 from_italiaonline: false,
                 from_find_in_files: false,
+                from_wikipedia: false,
                 is_temporary: true,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
@@ -4436,6 +4467,7 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
             if force_dialog {
                 state.docs[index].is_temporary = false;
                 state.docs[index].from_rss = false;
+                state.docs[index].from_wikipedia = false;
             }
             SendMessageW(hwnd_edit, EM_SETMODIFY, WPARAM(0), LPARAM(0));
             let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");

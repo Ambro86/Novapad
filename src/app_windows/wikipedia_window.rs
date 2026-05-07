@@ -1,5 +1,5 @@
 use crate::accessibility::{handle_accessibility, normalize_to_crlf, to_wide, to_wide_normalized};
-use crate::editor_manager::get_edit_text;
+use crate::editor_manager::{self, get_edit_text};
 use crate::i18n;
 use crate::settings::Language;
 use crate::wikipedia;
@@ -11,18 +11,18 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL};
 use windows::Win32::UI::Controls::{
-    EM_LIMITTEXT, EM_SCROLLCARET, EM_SETSEL, WC_LISTBOXW, WC_STATIC,
+    EM_LIMITTEXT, EM_SCROLLCARET, EM_SETSEL, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetFocus, SetFocus, VK_ESCAPE, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
-    ES_AUTOHSCROLL, GWLP_USERDATA, GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LB_ADDSTRING,
-    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT,
-    LBS_NOTIFY, LoadCursorW, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWNLIST,
+    CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, ES_AUTOHSCROLL, GWLP_USERDATA,
+    GetWindowLongPtrW, HMENU, IDC_ARROW, IsWindow, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT,
+    LB_SETCURSEL, LBN_DBLCLK, LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MSG,
+    PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
+    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFOCUS, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -32,6 +32,8 @@ const WIKIPEDIA_SEARCH_ID: usize = 9502;
 const WIKIPEDIA_RESULTS_ID: usize = 9503;
 const WIKIPEDIA_STATUS_ID: usize = 9504;
 const WIKIPEDIA_CLOSE_ID: usize = 9505;
+const WIKIPEDIA_SECTIONS_ID: usize = 9506;
+const WIKIPEDIA_IMPORT_ID: usize = 9507;
 
 const WM_WIKI_SEARCH_DONE: u32 = WM_APP + 110;
 const WM_WIKI_IMPORT_DONE: u32 = WM_APP + 111;
@@ -43,9 +45,12 @@ struct WikipediaWindowState {
     input: HWND,
     search: HWND,
     results: HWND,
+    sections: HWND,
+    import_button: HWND,
     status: HWND,
     close: HWND,
     results_data: Vec<wikipedia::SearchResult>,
+    current_extract: Option<wikipedia::ExtractResult>,
 }
 
 struct WikipediaLabels {
@@ -53,6 +58,9 @@ struct WikipediaLabels {
     search_label: String,
     search_button: String,
     results_label: String,
+    sections_label: String,
+    import_all: String,
+    import_button: String,
     status_loading: String,
     status_no_results: String,
     status_no_query: String,
@@ -68,7 +76,7 @@ struct SearchPayload {
 }
 
 struct ImportPayload {
-    text: Option<String>,
+    extract: Option<wikipedia::ExtractResult>,
     error: Option<String>,
 }
 
@@ -78,6 +86,13 @@ fn labels(language: Language) -> WikipediaLabels {
         search_label: i18n::tr(language, "wikipedia.search_label"),
         search_button: i18n::tr(language, "wikipedia.search_button"),
         results_label: i18n::tr(language, "wikipedia.results_label"),
+        sections_label: tr_or(language, "wikipedia.sections_label", "Import:"),
+        import_all: tr_or(
+            language,
+            "wikipedia.import_all_article",
+            "Import whole article",
+        ),
+        import_button: tr_or(language, "wikipedia.import_button", "Import"),
         status_loading: i18n::tr(language, "wikipedia.loading"),
         status_no_results: i18n::tr(language, "wikipedia.no_results"),
         status_no_query: i18n::tr(language, "wikipedia.no_query"),
@@ -88,19 +103,44 @@ fn labels(language: Language) -> WikipediaLabels {
     }
 }
 
+fn tr_or(language: Language, key: &str, fallback: &str) -> String {
+    let value = i18n::tr(language, key);
+    if value == key {
+        fallback.to_string()
+    } else {
+        value
+    }
+}
+
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message == windows::Win32::UI::WindowsAndMessaging::WM_KEYDOWN {
         if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
+            if focus_search_after_section_import(hwnd) {
+                return true;
+            }
             crate::log_if_err!(crate::destroy_window_safe(hwnd));
             return true;
         }
         if msg.wParam.0 as u32 == VK_RETURN.0 as u32 {
             let focus = crate::get_focus_safe();
-            if let Some((input, search, results, close)) = with_window_state(hwnd, |state| {
-                (state.input, state.search, state.results, state.close)
-            }) {
+            if let Some((input, search, results, sections, import_button, close)) =
+                with_window_state(hwnd, |state| {
+                    (
+                        state.input,
+                        state.search,
+                        state.results,
+                        state.sections,
+                        state.import_button,
+                        state.close,
+                    )
+                })
+            {
                 if focus == close {
                     crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                    return true;
+                }
+                if focus == sections || focus == import_button {
+                    import_selected_section(hwnd);
                     return true;
                 }
                 if focus == input || focus == search {
@@ -108,13 +148,65 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                     return true;
                 }
                 if focus == results {
-                    start_import(hwnd);
+                    start_article_load(hwnd);
                     return true;
                 }
             }
         }
     }
     handle_accessibility(hwnd, msg)
+}
+
+pub fn focus_import_choice(hwnd: HWND) -> bool {
+    let Some((sections, import_button)) =
+        with_window_state(hwnd, |state| (state.sections, state.import_button))
+    else {
+        return false;
+    };
+    let target = if sections.0 != 0 {
+        sections
+    } else {
+        import_button
+    };
+    if target.0 == 0 {
+        return false;
+    }
+    unsafe {
+        SetForegroundWindow(hwnd);
+        SetFocus(target);
+    }
+    true
+}
+
+fn focus_search_after_section_import(hwnd: HWND) -> bool {
+    let Some((sections, import_button, results, input, has_extract)) =
+        with_window_state(hwnd, |state| {
+            (
+                state.sections,
+                state.import_button,
+                state.results,
+                state.input,
+                state.current_extract.is_some(),
+            )
+        })
+    else {
+        return false;
+    };
+    if !has_extract {
+        return false;
+    }
+    let focus = crate::get_focus_safe();
+    if focus != sections && focus != import_button {
+        return false;
+    }
+    let target = if results.0 != 0 { results } else { input };
+    if target.0 == 0 {
+        return false;
+    }
+    unsafe {
+        SetFocus(target);
+    }
+    true
 }
 
 pub fn open(parent: HWND) {
@@ -149,8 +241,11 @@ pub fn open(parent: HWND) {
             search: HWND(0),
             results: HWND(0),
             status: HWND(0),
+            sections: HWND(0),
+            import_button: HWND(0),
             close: HWND(0),
             results_data: Vec::new(),
+            current_extract: None,
         });
         let state_ptr = Box::into_raw(state);
         let hwnd = CreateWindowExW(
@@ -161,7 +256,7 @@ pub fn open(parent: HWND) {
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             540,
-            420,
+            455,
             parent,
             HMENU(0),
             hinstance,
@@ -275,9 +370,37 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     12,
                     66,
                     498,
-                    260,
+                    230,
                     hwnd,
                     HMENU(WIKIPEDIA_RESULTS_ID as isize),
+                    hinstance,
+                    None,
+                );
+                CreateWindowExW(
+                    Default::default(),
+                    w!("STATIC"),
+                    PCWSTR(to_wide(&label_set.sections_label).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    306,
+                    80,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    hinstance,
+                    None,
+                );
+                let sections = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    90,
+                    302,
+                    310,
+                    220,
+                    hwnd,
+                    HMENU(WIKIPEDIA_SECTIONS_ID as isize),
                     hinstance,
                     None,
                 );
@@ -288,10 +411,24 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     WS_CHILD | WS_VISIBLE,
                     12,
                     334,
-                    380,
+                    360,
                     20,
                     hwnd,
                     HMENU(WIKIPEDIA_STATUS_ID as isize),
+                    hinstance,
+                    None,
+                );
+                let import_button = CreateWindowExW(
+                    Default::default(),
+                    w!("BUTTON"),
+                    PCWSTR(to_wide(&label_set.import_button).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    410,
+                    300,
+                    100,
+                    26,
+                    hwnd,
+                    HMENU(WIKIPEDIA_IMPORT_ID as isize),
                     hinstance,
                     None,
                 );
@@ -313,10 +450,12 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                 (*init_ptr).input = input;
                 (*init_ptr).search = search;
                 (*init_ptr).results = results;
+                (*init_ptr).sections = sections;
+                (*init_ptr).import_button = import_button;
                 (*init_ptr).status = status;
                 (*init_ptr).close = close;
                 let proc_ptr = tab_subclass_proc as *const () as usize;
-                for control in [input, search, results, close] {
+                for control in [input, search, results, sections, import_button, close] {
                     let prev = SetWindowLongPtrW(
                         control,
                         windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
@@ -337,13 +476,24 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
             }
             WM_KEYDOWN => {
                 if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    if focus_search_after_section_import(hwnd) {
+                        return LRESULT(0);
+                    }
                     crate::log_if_err!(crate::destroy_window_safe(hwnd));
                     return LRESULT(0);
                 }
                 if wparam.0 as u32 == VK_RETURN.0 as u32 {
                     let focus = GetFocus();
-                    let Some((search, close, results)) =
-                        with_window_state(hwnd, |state| (state.search, state.close, state.results))
+                    let Some((search, close, results, sections, import_button)) =
+                        with_window_state(hwnd, |state| {
+                            (
+                                state.search,
+                                state.close,
+                                state.results,
+                                state.sections,
+                                state.import_button,
+                            )
+                        })
                     else {
                         return DefWindowProcW(hwnd, msg, wparam, lparam);
                     };
@@ -355,12 +505,16 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                         run_search(hwnd);
                         return LRESULT(0);
                     }
+                    if focus == sections || focus == import_button {
+                        import_selected_section(hwnd);
+                        return LRESULT(0);
+                    }
                     if focus == with_window_state(hwnd, |state| state.input).unwrap_or(HWND(0)) {
                         run_search(hwnd);
                         return LRESULT(0);
                     }
                     if focus == results {
-                        start_import(hwnd);
+                        start_article_load(hwnd);
                         return LRESULT(0);
                     }
                 }
@@ -376,9 +530,13 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     run_search(hwnd);
                     return LRESULT(0);
                 }
+                if id == WIKIPEDIA_IMPORT_ID {
+                    import_selected_section(hwnd);
+                    return LRESULT(0);
+                }
                 if id == WIKIPEDIA_RESULTS_ID && ((wparam.0 >> 16) & 0xffff) == LBN_DBLCLK as usize
                 {
-                    start_import(hwnd);
+                    start_article_load(hwnd);
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -464,17 +622,13 @@ fn wikipedia_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                     );
                     return LRESULT(0);
                 }
-                let text = if let Some(ref text) = payload.text {
-                    text
+                let extract = if let Some(extract) = payload.extract {
+                    extract
                 } else {
                     show_error(parent, language, &label_set.status_import_error);
                     return LRESULT(0);
                 };
-                if !apply_import_text(parent, text) {
-                    show_error(parent, language, &label_set.status_import_error);
-                    return LRESULT(0);
-                }
-                crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                populate_sections(hwnd, extract, &label_set);
                 LRESULT(0)
             }
             WM_DESTROY => LRESULT(0),
@@ -510,7 +664,11 @@ fn handle_enter_key(hwnd: HWND) -> bool {
         return true;
     }
     if id == WIKIPEDIA_RESULTS_ID {
-        start_import(parent);
+        start_article_load(parent);
+        return true;
+    }
+    if id == WIKIPEDIA_SECTIONS_ID || id == WIKIPEDIA_IMPORT_ID {
+        import_selected_section(parent);
         return true;
     }
     false
@@ -560,7 +718,10 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
     }
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_GETDLGCODE {
         let id = crate::get_dlg_ctrl_id_safe(hwnd);
-        if id == WIKIPEDIA_CLOSE_ID || id == WIKIPEDIA_SEARCH_ID || id == WIKIPEDIA_RESULTS_ID {
+        if matches!(
+            id,
+            WIKIPEDIA_CLOSE_ID | WIKIPEDIA_SEARCH_ID | WIKIPEDIA_RESULTS_ID | WIKIPEDIA_IMPORT_ID
+        ) {
             return LRESULT(windows::Win32::UI::WindowsAndMessaging::DLGC_WANTALLKEYS as isize);
         }
     }
@@ -582,7 +743,14 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
 
 fn focus_next_control(parent: HWND, current: HWND, shift_down: bool) {
     let order = with_window_state(parent, |state| {
-        vec![state.input, state.search, state.results, state.close]
+        vec![
+            state.input,
+            state.search,
+            state.results,
+            state.sections,
+            state.import_button,
+            state.close,
+        ]
     })
     .unwrap_or_default();
     if order.is_empty() {
@@ -669,6 +837,7 @@ fn run_search(hwnd: HWND) {
     if results.0 != 0 {
         crate::send_message_w_safe(results, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
     }
+    reset_sections(hwnd, &label_set.import_all);
 
     let generation = SEARCH_GENERATION
         .fetch_add(1, Ordering::SeqCst)
@@ -709,7 +878,7 @@ fn run_search(hwnd: HWND) {
     });
 }
 
-fn start_import(hwnd: HWND) {
+fn start_article_load(hwnd: HWND) {
     let Some((parent, results_hwnd)) =
         with_window_state(hwnd, |state| (state.parent, state.results))
     else {
@@ -731,6 +900,10 @@ fn start_import(hwnd: HWND) {
     let Some(selection) = selection else {
         return;
     };
+    crate::log_debug(&format!(
+        "Wikipedia import: selected result pageid={} title={}",
+        selection.pageid, selection.title
+    ));
     let label_set = labels(language);
     if let Some(status) = with_window_state(hwnd, |state| state.status)
         && let Err(e) = crate::set_window_text_w_safe(
@@ -750,17 +923,12 @@ fn start_import(hwnd: HWND) {
         let lang_code = wikipedia::resolve_language_code(language, &pref);
         let result = wikipedia::fetch_extract(&lang_code, selection.pageid);
         let payload = match result {
-            Ok(extract) => {
-                let mut text = extract.extract.trim_end().to_string();
-                text.push_str("\n\nFonte: Wikipedia (CC BY-SA)\n");
-                text.push_str(&extract.url);
-                ImportPayload {
-                    text: Some(text),
-                    error: None,
-                }
-            }
+            Ok(extract) => ImportPayload {
+                extract: Some(extract),
+                error: None,
+            },
             Err(err) => ImportPayload {
-                text: None,
+                extract: None,
                 error: Some(err.to_string()),
             },
         };
@@ -782,6 +950,106 @@ fn start_import(hwnd: HWND) {
             }
         }
     });
+}
+
+fn reset_sections(hwnd: HWND, import_all_label: &str) {
+    let Some(sections) = with_window_state(hwnd, |state| state.sections) else {
+        return;
+    };
+    with_window_state(hwnd, |state| state.current_extract = None);
+    if sections.0 == 0 {
+        return;
+    }
+    crate::send_message_w_safe(sections, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    crate::send_message_w_safe(
+        sections,
+        CB_ADDSTRING,
+        WPARAM(0),
+        LPARAM(to_wide(import_all_label).as_ptr() as isize),
+    );
+    crate::send_message_w_safe(sections, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+}
+
+fn populate_sections(hwnd: HWND, extract: wikipedia::ExtractResult, label_set: &WikipediaLabels) {
+    let Some((sections, status)) = with_window_state(hwnd, |state| (state.sections, state.status))
+    else {
+        return;
+    };
+    crate::log_debug(&format!(
+        "Wikipedia import: populate combo section_count={}",
+        extract.sections.len()
+    ));
+    if sections.0 != 0 {
+        crate::send_message_w_safe(sections, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+        crate::send_message_w_safe(
+            sections,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&label_set.import_all).as_ptr() as isize),
+        );
+        for section in &extract.sections {
+            let label = section_combo_label(section);
+            crate::send_message_w_safe(
+                sections,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            );
+        }
+        crate::send_message_w_safe(sections, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        unsafe {
+            SetFocus(sections);
+        }
+    }
+    with_window_state(hwnd, |state| state.current_extract = Some(extract));
+    if status.0 != 0
+        && let Err(e) = crate::set_window_text_w_safe(status, PCWSTR(to_wide("").as_ptr()))
+    {
+        crate::log_debug(&format!("SetWindowTextW failed: {}", e));
+    }
+}
+
+fn section_combo_label(section: &wikipedia::ArticleSection) -> String {
+    if section.level <= 2 {
+        section.title.clone()
+    } else {
+        format!("{}{}", "  ".repeat(section.level - 2), section.title)
+    }
+}
+
+fn import_selected_section(hwnd: HWND) {
+    let Some((parent, sections, extract)) = with_window_state(hwnd, |state| {
+        (state.parent, state.sections, state.current_extract.clone())
+    }) else {
+        return;
+    };
+    let Some(extract) = extract else {
+        start_article_load(hwnd);
+        return;
+    };
+    let sel = crate::send_message_w_safe(sections, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 as i32;
+    let body = if sel > 0 {
+        crate::log_debug(&format!("Wikipedia import: importing section index={sel}"));
+        extract
+            .sections
+            .get((sel - 1) as usize)
+            .map(|section| section.text.as_str())
+            .unwrap_or(extract.extract.as_str())
+    } else {
+        crate::log_debug("Wikipedia import: importing whole article");
+        extract.extract.as_str()
+    };
+    let mut text = body.trim_end().to_string();
+    text.push_str("\n\nFonte: Wikipedia (CC BY-SA)\n");
+    text.push_str(&extract.url);
+
+    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+    let label_set = labels(language);
+    if !apply_import_text(parent, &text) {
+        show_error(parent, language, &label_set.status_import_error);
+        return;
+    }
+    editor_manager::mark_current_document_from_wikipedia(parent, true);
 }
 
 fn force_focus_editor_on_parent(parent: HWND) {

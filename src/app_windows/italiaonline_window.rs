@@ -157,6 +157,12 @@ fn prompt_search_query_with_focus(
             type_label: "Tipo".to_string(),
             options: kind_options,
             default_selection: default_kind,
+            secondary_type_label: String::new(),
+            secondary_options: Vec::new(),
+            secondary_default_selection: 0,
+            tertiary_type_label: String::new(),
+            tertiary_options: Vec::new(),
+            tertiary_default_selection: 0,
             focus_primary_field,
             primary_label: initial.kind.primary_field_label().to_string(),
             primary_labels: vec![

@@ -32,6 +32,56 @@ impl RouteProfile {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoutePreference {
+    Fastest,
+    Shortest,
+}
+
+impl RoutePreference {
+    pub fn api_value(self) -> &'static str {
+        match self {
+            RoutePreference::Fastest => "fastest",
+            RoutePreference::Shortest => "shortest",
+        }
+    }
+
+    pub fn label_it(self) -> &'static str {
+        match self {
+            RoutePreference::Fastest => "più veloce",
+            RoutePreference::Shortest => "più breve",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RouteAvoid {
+    None,
+    Highways,
+    Tollways,
+    HighwaysAndTollways,
+}
+
+impl RouteAvoid {
+    pub fn api_value(self) -> &'static str {
+        match self {
+            RouteAvoid::None => "",
+            RouteAvoid::Highways => "highways",
+            RouteAvoid::Tollways => "tollways",
+            RouteAvoid::HighwaysAndTollways => "highways,tollways",
+        }
+    }
+
+    pub fn label_it(self) -> &'static str {
+        match self {
+            RouteAvoid::None => "",
+            RouteAvoid::Highways => "evita autostrade",
+            RouteAvoid::Tollways => "evita pedaggi",
+            RouteAvoid::HighwaysAndTollways => "evita autostrade e pedaggi",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RouteClient {
     client: Client,
@@ -119,6 +169,8 @@ impl RouteClient {
         from: &GeocodeCandidate,
         to: &GeocodeCandidate,
         profile: RouteProfile,
+        preference: RoutePreference,
+        avoid: RouteAvoid,
     ) -> Result<RouteResult, RouteError> {
         let url = format!("{}/ors_route.php", self.base_url);
 
@@ -131,6 +183,8 @@ impl RouteClient {
                 ("to_lat", to.latitude.to_string()),
                 ("to_lon", to.longitude.to_string()),
                 ("profile", profile.api_value().to_string()),
+                ("preference", preference.api_value().to_string()),
+                ("avoid", avoid.api_value().to_string()),
             ])
             .send()
             .map_err(|error| RouteError::Network(error.to_string()))?
@@ -145,11 +199,11 @@ impl RouteClient {
 
         Ok(RouteResult {
             profile,
+            preference,
+            avoid,
             from_label: from.label.clone(),
             to_label: to.label.clone(),
-            distance_meters: response.distance_meters.unwrap_or(0.0),
-            duration_seconds: response.duration_seconds.unwrap_or(0.0),
-            steps: response.steps,
+            paths: response.into_paths(),
         })
     }
 
@@ -158,6 +212,8 @@ impl RouteClient {
         from_address: &str,
         to_address: &str,
         profile: RouteProfile,
+        preference: RoutePreference,
+        avoid: RouteAvoid,
     ) -> Result<RouteRequestResult, RouteError> {
         let from_candidates = self.geocode(from_address)?;
         let to_candidates = self.geocode(to_address)?;
@@ -179,11 +235,18 @@ impl RouteClient {
                 from_candidates,
                 to_candidates,
                 profile,
+                preference,
+                avoid,
             });
         }
 
-        let route =
-            self.route_between_coordinates(&from_candidates[0], &to_candidates[0], profile)?;
+        let route = self.route_between_coordinates(
+            &from_candidates[0],
+            &to_candidates[0],
+            profile,
+            preference,
+            avoid,
+        )?;
 
         Ok(RouteRequestResult::Ready(route))
     }
@@ -196,6 +259,8 @@ pub enum RouteRequestResult {
         from_candidates: Vec<GeocodeCandidate>,
         to_candidates: Vec<GeocodeCandidate>,
         profile: RouteProfile,
+        preference: RoutePreference,
+        avoid: RouteAvoid,
     },
 }
 
@@ -242,10 +307,18 @@ impl GeocodeCandidate {
 #[derive(Debug, Clone)]
 pub struct RouteResult {
     pub profile: RouteProfile,
+    pub preference: RoutePreference,
+    pub avoid: RouteAvoid,
     pub from_label: String,
     pub to_label: String,
+    pub paths: Vec<RoutePath>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RoutePath {
     pub distance_meters: f64,
     pub duration_seconds: f64,
+    #[serde(default)]
     pub steps: Vec<RouteStep>,
 }
 
@@ -255,6 +328,12 @@ impl RouteResult {
 
         output.push_str("Percorso ");
         output.push_str(self.profile.label_it());
+        output.push(' ');
+        output.push_str(self.preference.label_it());
+        if self.avoid != RouteAvoid::None {
+            output.push_str(", ");
+            output.push_str(self.avoid.label_it());
+        }
         output.push_str(" trovato.\n\n");
 
         output.push_str("Partenza: ");
@@ -263,37 +342,59 @@ impl RouteResult {
 
         output.push_str("Arrivo: ");
         output.push_str(&self.to_label);
-        output.push_str("\n\n");
+        output.push('\n');
 
-        output.push_str("Distanza: ");
-        output.push_str(&format_distance(self.distance_meters));
-        output.push_str(".\n");
-
-        output.push_str("Durata stimata: ");
-        output.push_str(&format_duration(self.duration_seconds));
-        output.push_str(".\n\n");
-
-        output.push_str("Indicazioni:\n");
-
-        if self.steps.is_empty() {
-            output.push_str("Nessuna istruzione disponibile.");
+        if self.paths.is_empty() {
+            output.push_str("\nNessun percorso disponibile.");
             return output;
         }
 
-        for (index, step) in self.steps.iter().enumerate() {
-            let instruction = clean_route_instruction(&step.instruction);
-            let distance = format_distance(step.distance_meters);
+        if self.paths.len() > 1 {
+            output.push_str("\nPercorsi alternativi trovati: ");
+            output.push_str(&self.paths.len().to_string());
+            output.push_str(".\n");
+        }
 
-            output.push_str(&(index + 1).to_string());
-            output.push_str(". ");
-            output.push_str(&instruction);
+        for (path_index, path) in self.paths.iter().enumerate() {
+            output.push('\n');
+            if path_index == 0 {
+                output.push_str("Percorso principale");
+            } else {
+                output.push_str("Alternativa ");
+                output.push_str(&path_index.to_string());
+            }
+            output.push_str(".\n");
 
-            if step.distance_meters > 0.0 {
-                output.push_str(", per ");
-                output.push_str(&distance);
+            output.push_str("Distanza: ");
+            output.push_str(&format_distance(path.distance_meters));
+            output.push_str(".\n");
+
+            output.push_str("Durata stimata: ");
+            output.push_str(&format_duration(path.duration_seconds));
+            output.push_str(".\n\n");
+
+            output.push_str("Indicazioni:\n");
+
+            if path.steps.is_empty() {
+                output.push_str("Nessuna istruzione disponibile.\n");
+                continue;
             }
 
-            output.push_str(".\n");
+            for (index, step) in path.steps.iter().enumerate() {
+                let instruction = clean_route_instruction(&step.instruction);
+                let distance = format_distance(step.distance_meters);
+
+                output.push_str(&(index + 1).to_string());
+                output.push_str(". ");
+                output.push_str(&instruction);
+
+                if step.distance_meters > 0.0 {
+                    output.push_str(", per ");
+                    output.push_str(&distance);
+                }
+
+                output.push_str(".\n");
+            }
         }
 
         output
@@ -324,6 +425,22 @@ struct RouteApiResponse {
     duration_seconds: Option<f64>,
     #[serde(default)]
     steps: Vec<RouteStep>,
+    #[serde(default)]
+    routes: Vec<RoutePath>,
+}
+
+impl RouteApiResponse {
+    fn into_paths(self) -> Vec<RoutePath> {
+        if !self.routes.is_empty() {
+            return self.routes;
+        }
+
+        vec![RoutePath {
+            distance_meters: self.distance_meters.unwrap_or(0.0),
+            duration_seconds: self.duration_seconds.unwrap_or(0.0),
+            steps: self.steps,
+        }]
+    }
 }
 
 #[derive(Debug, Clone)]

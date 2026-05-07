@@ -1445,7 +1445,6 @@
   "radio.community_lang.fr": "फ़्रेंच",
   "radio.community_lang.de": "जर्मन",
   "radio.community_lang.pt": "पुर्तगाली",
-  "radio.community_lang.hi": "हिंदी",
   "radio.copy_audio_url": "ऑडियो URL कॉपी करें",
   "radio.server_empty_response": "सर्वर ने स्थिति {status} के साथ उत्तर दिया, लेकिन कोई पढ़ने योग्य संदेश नहीं दिया: {error}",
   "radio.server_invalid_json": "सर्वर ने स्थिति {status} के साथ उत्तर दिया, लेकिन उत्तर मान्य JSON नहीं है: {body}",

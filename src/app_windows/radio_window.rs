@@ -17,9 +17,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     LoadCursorW, MB_ICONINFORMATION, MB_OK, MF_STRING, MoveWindow, RegisterClassW, SW_SHOW,
     SetWindowLongPtrW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu, TranslateMessage,
     WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_SETFONT, WM_SIZE, WNDCLASSW, WS_BORDER,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_OVERLAPPED, WS_POPUP,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
+    WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME,
+    WS_OVERLAPPED, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -62,6 +62,7 @@ const LB_RESETCONTENT: u32 = 0x0184;
 const LB_SETCURSEL: u32 = 0x0186;
 const LB_GETCURSEL: u32 = 0x0188;
 const WM_RADIO_FOCUS_RESULTS: u32 = WM_APP + 77;
+const WM_RADIO_FOCUS_FAVORITES: u32 = WM_APP + 79;
 const WM_RADIO_SEARCH_COMPLETE: u32 = WM_APP + 78;
 const RADIO_REFOCUS_DELAYS_MS: &[u64] = &[150, 500];
 const ID_CONTEXT_ADD_FAVORITE: usize = 1;
@@ -340,6 +341,11 @@ const COMMUNITY_LANGUAGE_OPTIONS: &[CommunityLanguageOption] = &[
         label: "Portoghese",
         value: "portuguese",
     },
+    CommunityLanguageOption {
+        key: "radio.community_lang.hi",
+        label: "Hindi",
+        value: "hindi",
+    },
 ];
 
 pub fn open(parent: HWND) {
@@ -548,15 +554,25 @@ fn focus_results_list(hwnd: HWND) {
     }
 }
 
+fn schedule_favorites_refocus(hwnd: HWND) {
+    let hwnd_value = hwnd.0;
+    std::thread::spawn(move || {
+        for delay in RADIO_REFOCUS_DELAYS_MS {
+            std::thread::sleep(Duration::from_millis(*delay));
+            let hwnd = HWND(hwnd_value);
+            crate::log_if_err!(crate::post_message_w_safe(
+                hwnd,
+                WM_RADIO_FOCUS_FAVORITES,
+                WPARAM(0),
+                LPARAM(0)
+            ));
+        }
+    });
+}
+
 fn focus_favorites_list(hwnd: HWND) {
     crate::set_foreground_window_safe(hwnd);
     if let Some(list_favorites) = with_radio_state(hwnd, |state| state.list_favorites) {
-        crate::log_debug(&format!(
-            "Radio: focus favorites list hwnd={:?} list={:?} before={:?}",
-            hwnd,
-            list_favorites,
-            crate::get_focus_safe()
-        ));
         crate::set_focus_safe(list_favorites);
         crate::send_message_w_safe(
             hwnd,
@@ -564,12 +580,6 @@ fn focus_favorites_list(hwnd: HWND) {
             WPARAM(list_favorites.0 as usize),
             LPARAM(1),
         );
-        crate::log_debug(&format!(
-            "Radio: focus favorites list after={:?}",
-            crate::get_focus_safe()
-        ));
-    } else {
-        crate::log_debug("Radio: focus favorites list failed, state unavailable");
     }
 }
 
@@ -594,9 +604,13 @@ fn show_station_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> bool
         RadioListKind::Favorites => crate::set_focus_safe(list_favorites),
         RadioListKind::Results => crate::set_focus_safe(list_results),
     }
-    if selected_result(hwnd, list_kind).is_none() {
+    let Some(item) = selected_result(hwnd, list_kind) else {
         return false;
-    }
+    };
+    let is_fav = load_settings()
+        .radio_favorites
+        .iter()
+        .any(|f| f.stream_url == item.stream_url);
 
     let menu = match unsafe { CreatePopupMenu() } {
         Ok(menu) => menu,
@@ -606,39 +620,41 @@ fn show_station_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> bool
         }
     };
 
-    let add_label = to_wide(&tr(language, "radio.add_favorite", "Aggiungi ai preferiti"));
-    if let Err(err) = unsafe {
-        AppendMenuW(
-            menu,
-            MF_STRING,
-            ID_CONTEXT_ADD_FAVORITE,
-            PCWSTR(add_label.as_ptr()),
-        )
-    } {
-        crate::log_debug(&format!("Radio: AppendMenuW add favorite failed: {}", err));
-        crate::log_if_err!(unsafe { DestroyMenu(menu) });
-        return false;
-    }
-
-    let remove_label = to_wide(&tr(
-        language,
-        "radio.remove_favorite",
-        "Rimuovi dai preferiti",
-    ));
-    if let Err(err) = unsafe {
-        AppendMenuW(
-            menu,
-            MF_STRING,
-            ID_CONTEXT_REMOVE_FAVORITE,
-            PCWSTR(remove_label.as_ptr()),
-        )
-    } {
-        crate::log_debug(&format!(
-            "Radio: AppendMenuW remove favorite failed: {}",
-            err
+    if !is_fav {
+        let add_label = to_wide(&tr(language, "radio.add_favorite", "Aggiungi ai preferiti"));
+        if let Err(err) = unsafe {
+            AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CONTEXT_ADD_FAVORITE,
+                PCWSTR(add_label.as_ptr()),
+            )
+        } {
+            crate::log_debug(&format!("Radio: AppendMenuW add favorite failed: {}", err));
+            crate::log_if_err!(unsafe { DestroyMenu(menu) });
+            return false;
+        }
+    } else {
+        let remove_label = to_wide(&tr(
+            language,
+            "radio.remove_favorite",
+            "Rimuovi dai preferiti",
         ));
-        crate::log_if_err!(unsafe { DestroyMenu(menu) });
-        return false;
+        if let Err(err) = unsafe {
+            AppendMenuW(
+                menu,
+                MF_STRING,
+                ID_CONTEXT_REMOVE_FAVORITE,
+                PCWSTR(remove_label.as_ptr()),
+            )
+        } {
+            crate::log_debug(&format!(
+                "Radio: AppendMenuW remove favorite failed: {}",
+                err
+            ));
+            crate::log_if_err!(unsafe { DestroyMenu(menu) });
+            return false;
+        }
     }
 
     let copy_label = to_wide(&tr(language, "radio.copy_audio_url", "Copia URL audio"));
@@ -704,6 +720,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                 focus_results_list(hwnd);
                 LRESULT(0)
             }
+            WM_RADIO_FOCUS_FAVORITES => {
+                crate::log_debug("Radio: deferred focus favorites message");
+                focus_favorites_list(hwnd);
+                LRESULT(0)
+            }
             WM_RADIO_SEARCH_COMPLETE => {
                 let result = Box::from_raw(lparam.0 as *mut RadioSearchComplete);
                 finish_radio_search(hwnd, *result);
@@ -722,6 +743,10 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             WM_SIZE => {
                 layout(hwnd);
+                LRESULT(0)
+            }
+            WM_SETFOCUS => {
+                focus_favorites_list(hwnd);
                 LRESULT(0)
             }
             WM_CONTEXTMENU => {
@@ -840,6 +865,14 @@ fn open_add_community_radio_dialog(parent: HWND) {
 
         let mut msg = Default::default();
         while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).as_bool() {
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
+                let parent = with_add_radio_state(hwnd, |s| s.parent);
+                crate::log_if_err!(DestroyWindow(hwnd));
+                if let Some(p) = parent {
+                    schedule_favorites_refocus(p);
+                }
+                continue;
+            }
             if !IsDialogMessageW(hwnd, &msg).as_bool() {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
@@ -874,7 +907,11 @@ unsafe extern "system" fn add_radio_wndproc(
                         LRESULT(0)
                     }
                     ID_ADD_CANCEL => {
+                        let parent = with_add_radio_state(hwnd, |s| s.parent);
                         crate::log_if_err!(DestroyWindow(hwnd));
+                        if let Some(p) = parent {
+                            schedule_favorites_refocus(p);
+                        }
                         LRESULT(0)
                     }
                     _ => DefWindowProcW(hwnd, msg, wparam, lparam),
@@ -882,13 +919,21 @@ unsafe extern "system" fn add_radio_wndproc(
             }
             WM_KEYDOWN => {
                 if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    let parent = with_add_radio_state(hwnd, |s| s.parent);
                     crate::log_if_err!(DestroyWindow(hwnd));
+                    if let Some(p) = parent {
+                        schedule_favorites_refocus(p);
+                    }
                     return LRESULT(0);
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_CLOSE => {
+                let parent = with_add_radio_state(hwnd, |s| s.parent);
                 crate::log_if_err!(DestroyWindow(hwnd));
+                if let Some(p) = parent {
+                    schedule_favorites_refocus(p);
+                }
                 LRESULT(0)
             }
             WM_NCDESTROY => {
@@ -969,7 +1014,20 @@ fn create_add_radio_controls(hwnd: HWND, parent: HWND) {
             LPARAM(w.as_ptr() as isize),
         );
     }
-    crate::send_message_w_safe(combo_language, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+    let current_code = match language {
+        Language::Italian => "radio.community_lang.it",
+        Language::English => "radio.community_lang.en",
+        Language::Spanish => "radio.community_lang.es",
+        Language::Portuguese => "radio.community_lang.pt",
+        Language::French => "radio.community_lang.fr",
+        Language::Hindi => "radio.community_lang.hi",
+        _ => "radio.community_lang.en",
+    };
+    let default_idx = COMMUNITY_LANGUAGE_OPTIONS
+        .iter()
+        .position(|opt| opt.key == current_code)
+        .unwrap_or(0);
+    crate::send_message_w_safe(combo_language, CB_SETCURSEL, WPARAM(default_idx), LPARAM(0));
 
     for option in GENRE_OPTIONS.iter().filter(|option| option.tag.is_some()) {
         let w = to_wide(&tr(language, option.key, option.label));
@@ -1108,7 +1166,7 @@ fn submit_add_community_radio(hwnd: HWND) {
         Ok(text) => {
             message(hwnd, "Radio", &text);
             crate::log_if_err!(crate::destroy_window_safe(hwnd));
-            focus_favorites_list(parent);
+            schedule_favorites_refocus(parent);
         }
         Err(err) => message(hwnd, "Radio", &err),
     }

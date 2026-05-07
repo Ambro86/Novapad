@@ -1445,6 +1445,7 @@
   "radio.community_lang.fr": "Tiếng Pháp",
   "radio.community_lang.de": "Tiếng Đức",
   "radio.community_lang.pt": "Tiếng Bồ Đào Nha",
+  "radio.community_lang.hi": "Tiếng Hindi",
   "radio.copy_audio_url": "Sao chép URL âm thanh",
   "radio.server_empty_response": "Máy chủ đã phản hồi với trạng thái {status}, nhưng không có thông báo có thể đọc được: {error}",
   "radio.server_invalid_json": "Máy chủ đã phản hồi với trạng thái {status}, nhưng phản hồi không phải là JSON hợp lệ: {body}",

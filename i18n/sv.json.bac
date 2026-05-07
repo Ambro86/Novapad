@@ -1445,7 +1445,6 @@
   "radio.community_lang.fr": "Franska",
   "radio.community_lang.de": "Tyska",
   "radio.community_lang.pt": "Portugisiska",
-  "radio.community_lang.hi": "Hindi",
   "radio.copy_audio_url": "Kopiera ljud-URL",
   "radio.server_empty_response": "Servern svarade med status {status}, men utan ett läsbart meddelande: {error}",
   "radio.server_invalid_json": "Servern svarade med status {status}, men svaret är inte giltig JSON: {body}",

@@ -1445,7 +1445,6 @@
   "radio.community_lang.fr": "Prancūzų",
   "radio.community_lang.de": "Vokiečių",
   "radio.community_lang.pt": "Portugalų",
-  "radio.community_lang.hi": "Hindi",
   "radio.copy_audio_url": "Kopijuoti garso URL",
   "radio.server_empty_response": "Serveris atsakė būsena {status}, bet nepateikė skaitomo pranešimo: {error}",
   "radio.server_invalid_json": "Serveris atsakė būsena {status}, bet atsakymas nėra galiojantis JSON: {body}",

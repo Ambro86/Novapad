@@ -1498,6 +1498,7 @@
   "radio.community_lang.fr": "Francese",
   "radio.community_lang.de": "Tedesco",
   "radio.community_lang.pt": "Portoghese",
+  "radio.community_lang.hi": "Hindi",
   "radio.copy_audio_url": "Copia URL audio",
   "radio.server_empty_response": "Il server ha risposto con stato {status}, ma senza un messaggio leggibile: {error}",
   "radio.server_invalid_json": "Il server ha risposto con stato {status}, ma la risposta non è JSON valida: {body}",

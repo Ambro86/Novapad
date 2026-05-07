@@ -1445,7 +1445,6 @@
   "radio.community_lang.fr": "法语",
   "radio.community_lang.de": "德语",
   "radio.community_lang.pt": "葡萄牙语",
-  "radio.community_lang.hi": "印地语",
   "radio.copy_audio_url": "复制音频 URL",
   "radio.server_empty_response": "服务器返回状态 {status}，但没有可读的消息：{error}",
   "radio.server_invalid_json": "服务器返回状态 {status}，但响应不是有效的 JSON：{body}",

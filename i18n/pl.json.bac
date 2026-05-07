@@ -1445,7 +1445,6 @@
   "radio.community_lang.fr": "Francuski",
   "radio.community_lang.de": "Niemiecki",
   "radio.community_lang.pt": "Portugalski",
-  "radio.community_lang.hi": "Hindi",
   "radio.copy_audio_url": "Kopiuj URL audio",
   "radio.server_empty_response": "Serwer odpowiedział statusem {status}, ale bez czytelnej wiadomości: {error}",
   "radio.server_invalid_json": "Serwer odpowiedział statusem {status}, ale odpowiedź nie jest prawidłowym JSON-em: {body}",

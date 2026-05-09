@@ -178,6 +178,8 @@ fn prompt_search_query_with_focus(
             secondary_default: initial_city,
             tertiary_label: "Indirizzo (facoltativo)".to_string(),
             tertiary_default: initial_address,
+            checkbox_label: String::new(),
+            checkbox_default: false,
         },
         language,
     )?;

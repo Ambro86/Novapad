@@ -171,6 +171,7 @@ impl RouteClient {
         profile: RouteProfile,
         preference: RoutePreference,
         avoid: RouteAvoid,
+        include_municipalities: bool,
     ) -> Result<RouteResult, RouteError> {
         let url = format!("{}/ors_route.php", self.base_url);
 
@@ -185,6 +186,11 @@ impl RouteClient {
                 ("profile", profile.api_value().to_string()),
                 ("preference", preference.api_value().to_string()),
                 ("avoid", avoid.api_value().to_string()),
+                (
+                    "include_municipalities",
+                    if include_municipalities { "1" } else { "0" }.to_string(),
+                ),
+                ("language", "it".to_string()),
             ])
             .send()
             .map_err(|error| RouteError::Network(error.to_string()))?
@@ -214,6 +220,7 @@ impl RouteClient {
         profile: RouteProfile,
         preference: RoutePreference,
         avoid: RouteAvoid,
+        include_municipalities: bool,
     ) -> Result<RouteRequestResult, RouteError> {
         let from_candidates = self.geocode(from_address)?;
         let to_candidates = self.geocode(to_address)?;
@@ -237,6 +244,7 @@ impl RouteClient {
                 profile,
                 preference,
                 avoid,
+                include_municipalities,
             });
         }
 
@@ -246,6 +254,7 @@ impl RouteClient {
             profile,
             preference,
             avoid,
+            include_municipalities,
         )?;
 
         Ok(RouteRequestResult::Ready(route))
@@ -261,6 +270,7 @@ pub enum RouteRequestResult {
         profile: RouteProfile,
         preference: RoutePreference,
         avoid: RouteAvoid,
+        include_municipalities: bool,
     },
 }
 
@@ -322,6 +332,8 @@ pub struct RoutePath {
     pub steps: Vec<RouteStep>,
     #[serde(default)]
     pub geometry: Vec<[f64; 2]>,
+    #[serde(default)]
+    pub municipality_changes: Vec<MunicipalityChange>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -393,34 +405,24 @@ impl RouteResult {
 
             output.push_str("Durata stimata: ");
             output.push_str(&format_duration(path.duration_seconds));
-            output.push_str(".\n\n");
+            output.push_str(".\n");
 
-            output.push_str("Indicazioni:\n");
+            output.push_str("\nIndicazioni:\n");
 
-            if path.steps.is_empty() {
-                output.push_str("Nessuna istruzione disponibile.\n");
-                continue;
-            }
-
-            for (index, step) in path.steps.iter().enumerate() {
-                let instruction = clean_route_instruction(&step.instruction);
-                let distance = format_distance(step.distance_meters);
-
-                output.push_str(&(index + 1).to_string());
-                output.push_str(". ");
-                output.push_str(&instruction);
-
-                if step.distance_meters > 0.0 {
-                    output.push_str(", per ");
-                    output.push_str(&distance);
-                }
-
-                output.push_str(".\n");
-            }
+            append_route_steps_with_municipality_changes(&mut output, path);
         }
 
         output
     }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MunicipalityChange {
+    pub name: String,
+    #[serde(default)]
+    pub distance_meters: f64,
+    #[allow(dead_code)]
+    pub coordinate: Option<[f64; 2]>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -462,6 +464,7 @@ impl RouteApiResponse {
             duration_seconds: self.duration_seconds.unwrap_or(0.0),
             steps: self.steps,
             geometry: Vec::new(),
+            municipality_changes: Vec::new(),
         }]
     }
 }
@@ -490,6 +493,113 @@ impl fmt::Display for RouteError {
 }
 
 impl std::error::Error for RouteError {}
+
+fn append_route_steps_with_municipality_changes(output: &mut String, path: &RoutePath) {
+    let changes = sorted_municipality_changes(path);
+
+    if let Some(start_municipality) = changes
+        .first()
+        .filter(|change| change.distance_meters <= 1.0)
+    {
+        output.push_str("Comune di partenza: ");
+        output.push_str(start_municipality.name.trim());
+        output.push_str(".\n");
+    }
+
+    let mut next_change = first_route_municipality_change_index(&changes);
+
+    if path.steps.is_empty() {
+        output.push_str("Nessuna istruzione disponibile.\n");
+        append_remaining_municipality_changes(output, &changes, next_change, 1);
+        return;
+    }
+
+    let mut instruction_number = 1usize;
+    let mut cumulative_distance = 0.0f64;
+
+    for step in &path.steps {
+        let instruction = clean_route_instruction(&step.instruction);
+        let distance = format_distance(step.distance_meters);
+
+        output.push_str(&instruction_number.to_string());
+        output.push_str(". ");
+        output.push_str(&instruction);
+
+        if step.distance_meters > 0.0 {
+            output.push_str(", per ");
+            output.push_str(&distance);
+        }
+
+        output.push_str(".\n");
+        instruction_number += 1;
+
+        cumulative_distance += step.distance_meters.max(0.0);
+
+        while next_change < changes.len()
+            && changes[next_change].distance_meters <= cumulative_distance + 10.0
+        {
+            append_municipality_instruction(output, instruction_number, changes[next_change]);
+            instruction_number += 1;
+            next_change += 1;
+        }
+    }
+
+    append_remaining_municipality_changes(output, &changes, next_change, instruction_number);
+}
+
+fn sorted_municipality_changes(path: &RoutePath) -> Vec<&MunicipalityChange> {
+    let mut changes: Vec<&MunicipalityChange> = path
+        .municipality_changes
+        .iter()
+        .filter(|change| !change.name.trim().is_empty())
+        .collect();
+
+    changes.sort_by(|left, right| left.distance_meters.total_cmp(&right.distance_meters));
+
+    let mut seen = std::collections::HashSet::new();
+    changes
+        .into_iter()
+        .filter(|change| seen.insert(municipality_dedupe_key(&change.name)))
+        .collect()
+}
+
+fn municipality_dedupe_key(name: &str) -> String {
+    name.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+fn first_route_municipality_change_index(changes: &[&MunicipalityChange]) -> usize {
+    changes
+        .iter()
+        .position(|change| change.distance_meters > 1.0)
+        .unwrap_or(changes.len())
+}
+
+fn append_municipality_instruction(
+    output: &mut String,
+    instruction_number: usize,
+    change: &MunicipalityChange,
+) {
+    output.push_str(&instruction_number.to_string());
+    output.push_str(". Entri nel comune di ");
+    output.push_str(change.name.trim());
+    output.push_str(".\n");
+}
+
+fn append_remaining_municipality_changes(
+    output: &mut String,
+    changes: &[&MunicipalityChange],
+    mut next_change: usize,
+    mut instruction_number: usize,
+) {
+    while next_change < changes.len() {
+        append_municipality_instruction(output, instruction_number, changes[next_change]);
+        next_change += 1;
+        instruction_number += 1;
+    }
+}
 
 pub fn clean_route_instruction(instruction: &str) -> String {
     instruction

@@ -102,6 +102,7 @@ pub struct PromptDirectoryResult {
     pub primary_value: String,
     pub secondary_value: String,
     pub tertiary_value: String,
+    pub checkbox_checked: bool,
 }
 
 pub struct PromptDirectoryOptions {
@@ -123,6 +124,8 @@ pub struct PromptDirectoryOptions {
     pub secondary_default: String,
     pub tertiary_label: String,
     pub tertiary_default: String,
+    pub checkbox_label: String,
+    pub checkbox_default: bool,
 }
 
 struct AnsiStripper {
@@ -517,14 +520,19 @@ pub fn prompt_directory_search(
 
         let extra_combo_count = usize::from(!options.secondary_options.is_empty())
             + usize::from(!options.tertiary_options.is_empty());
-        let window_height = 304 + (extra_combo_count as i32 * 36);
+        let checkbox_extra_height = if options.checkbox_label.trim().is_empty() {
+            0
+        } else {
+            34
+        };
+        let window_height = 304 + (extra_combo_count as i32 * 36) + checkbox_extra_height;
 
         let mut data = CredentialsPromptData {
             body: options.type_label,
             username: options.primary_default,
             password: options.secondary_default,
             tertiary: options.tertiary_default,
-            save_credentials: false,
+            save_credentials: options.checkbox_default,
             directory_selected_index: options
                 .default_selection
                 .min(options.options.len().saturating_sub(1)),
@@ -550,6 +558,7 @@ pub fn prompt_directory_search(
                 primary_labels: options.primary_labels,
                 secondary_label: options.secondary_label,
                 tertiary_label: options.tertiary_label,
+                checkbox_label: options.checkbox_label,
             })),
         };
 
@@ -611,6 +620,7 @@ pub fn prompt_directory_search(
                 primary_value: data.username,
                 secondary_value: data.password,
                 tertiary_value: data.tertiary,
+                checkbox_checked: data.save_credentials,
             })
         } else {
             None
@@ -661,6 +671,7 @@ struct DirectorySearchPromptMode {
     primary_labels: Vec<String>,
     secondary_label: String,
     tertiary_label: String,
+    checkbox_label: String,
 }
 
 unsafe extern "system" fn simple_prompt_wndproc(
@@ -1374,6 +1385,43 @@ fn credentials_prompt_wndproc_inner(
                     if show_tertiary {
                         y += 36;
                     }
+                    let show_checkbox = !config.checkbox_label.trim().is_empty();
+                    let checkbox = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_BUTTON,
+                            PCWSTR(to_wide(&config.checkbox_label).as_ptr()),
+                            if show_checkbox {
+                                WS_CHILD
+                                    | WS_VISIBLE
+                                    | WS_TABSTOP
+                                    | WINDOW_STYLE(BS_AUTOCHECKBOX as u32)
+                            } else {
+                                WS_CHILD | WINDOW_STYLE(BS_AUTOCHECKBOX as u32)
+                            },
+                            20,
+                            y + 4,
+                            358,
+                            24,
+                            hwnd,
+                            HMENU(IDC_CREDENTIALS_SAVE),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    if save_credentials {
+                        unsafe {
+                            SendMessageW(
+                                checkbox,
+                                BM_SETCHECK,
+                                WPARAM(BST_CHECKED.0 as usize),
+                                LPARAM(0),
+                            );
+                        }
+                    }
+                    if show_checkbox {
+                        y += 34;
+                    }
                     let ok = unsafe {
                         CreateWindowExW(
                             Default::default(),
@@ -1506,6 +1554,7 @@ fn credentials_prompt_wndproc_inner(
                                 pass_edit,
                                 tertiary_label_hwnd,
                                 tertiary_edit,
+                                checkbox,
                                 ok,
                                 cancel,
                             ] {
@@ -1791,6 +1840,7 @@ fn credentials_prompt_wndproc_inner(
                                     crate::get_dlg_item_safe(hwnd, 201),
                                     crate::get_dlg_item_safe(hwnd, 202),
                                     crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_TERTIARY),
+                                    crate::get_dlg_item_safe(hwnd, 203),
                                     crate::get_dlg_item_safe(hwnd, 1),
                                     crate::get_dlg_item_safe(hwnd, 2),
                                 ],

@@ -38,6 +38,7 @@ fn run_route_flow(parent: HWND, language: Language) {
         params.plan.profile,
         params.plan.preference,
         params.plan.avoid,
+        params.include_municipalities,
     ) {
         Ok(RouteRequestResult::Ready(route)) => {
             display_route(parent, language, route);
@@ -48,11 +49,13 @@ fn run_route_flow(parent: HWND, language: Language) {
             profile,
             preference,
             avoid,
+            include_municipalities,
         }) => {
             let plan = RoutePlan {
                 profile,
                 preference,
                 avoid,
+                include_municipalities,
             };
             handle_selection_and_route(
                 parent,
@@ -73,6 +76,7 @@ struct RouteParams {
     from: String,
     to: String,
     plan: RoutePlan,
+    include_municipalities: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -80,6 +84,7 @@ struct RoutePlan {
     profile: RouteProfile,
     preference: RoutePreference,
     avoid: RouteAvoid,
+    include_municipalities: bool,
 }
 
 fn prompt_route_params(parent: HWND, language: Language) -> Option<RouteParams> {
@@ -135,6 +140,8 @@ fn prompt_route_params(parent: HWND, language: Language) -> Option<RouteParams> 
         secondary_default: String::new(),
         tertiary_label: String::new(),
         tertiary_default: String::new(),
+        checkbox_label: "Inserisci i comuni attraversati".to_string(),
+        checkbox_default: false,
     };
 
     let result = prompt_window::prompt_directory_search(parent, options, language)?;
@@ -163,7 +170,9 @@ fn prompt_route_params(parent: HWND, language: Language) -> Option<RouteParams> 
             profile,
             preference,
             avoid,
+            include_municipalities: result.checkbox_checked,
         },
+        include_municipalities: result.checkbox_checked,
     })
 }
 
@@ -256,6 +265,7 @@ fn handle_selection_and_route(
         plan.profile,
         plan.preference,
         plan.avoid,
+        plan.include_municipalities,
     ) {
         Ok(route) => display_route(parent, language, route),
         Err(err) => show_error(parent, language, &err.to_string()),

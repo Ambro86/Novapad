@@ -266,9 +266,13 @@ fn display_route(parent: HWND, _language: Language, route: RouteResult) {
     let Some(route) = select_route_path(parent, _language, route) else {
         return;
     };
+    let route_map = route.map_data();
     let text = route.format_for_speech_or_text();
     editor_manager::new_document(parent);
     editor_manager::set_current_document_title(parent, "Percorso");
+    if let Some(route_map) = route_map {
+        editor_manager::set_current_route_map(parent, route_map);
+    }
     if let Some(hwnd_edit) = crate::get_active_edit(parent) {
         editor_manager::set_edit_text(hwnd_edit, &text);
     }

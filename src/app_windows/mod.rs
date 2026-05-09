@@ -22,6 +22,7 @@ pub mod radio_window;
 pub mod rai_audiodescrizioni_window;
 pub mod raiplay_window;
 pub mod raiplaysound_window;
+pub mod route_map_export;
 pub mod route_service;
 pub mod route_window;
 pub mod rss_window;

@@ -1,5 +1,5 @@
 use reqwest::blocking::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 const DEFAULT_BASE_URL: &str = "https://sonarpad.com/api";
@@ -320,9 +320,31 @@ pub struct RoutePath {
     pub duration_seconds: f64,
     #[serde(default)]
     pub steps: Vec<RouteStep>,
+    #[serde(default)]
+    pub geometry: Vec<[f64; 2]>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RouteMapData {
+    pub from_label: String,
+    pub to_label: String,
+    pub geometry: Vec<[f64; 2]>,
 }
 
 impl RouteResult {
+    pub fn map_data(&self) -> Option<RouteMapData> {
+        let path = self.paths.first()?;
+        if path.geometry.len() < 2 {
+            return None;
+        }
+
+        Some(RouteMapData {
+            from_label: self.from_label.clone(),
+            to_label: self.to_label.clone(),
+            geometry: path.geometry.clone(),
+        })
+    }
+
     pub fn format_for_speech_or_text(&self) -> String {
         let mut output = String::new();
 
@@ -439,6 +461,7 @@ impl RouteApiResponse {
             distance_meters: self.distance_meters.unwrap_or(0.0),
             duration_seconds: self.duration_seconds.unwrap_or(0.0),
             steps: self.steps,
+            geometry: Vec::new(),
         }]
     }
 }

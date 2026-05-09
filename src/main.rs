@@ -9542,6 +9542,15 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 ));
                 if main_menu.0 != 0 {
                     update_voice_panel_menu_check(hwnd);
+                    let file_menu = GetSubMenu(main_menu, 0);
+                    if file_menu == hmenu {
+                        let flags = if editor_manager::current_document_has_route_map(hwnd) {
+                            MF_BYCOMMAND | MF_ENABLED
+                        } else {
+                            MF_BYCOMMAND | MF_GRAYED
+                        };
+                        let _enabled = EnableMenuItem(hmenu, IDM_FILE_SAVE_IMAGE as u32, flags);
+                    }
                     let edit_menu = GetSubMenu(main_menu, 1);
                     if edit_menu == hmenu {
                         let can_undo = can_undo_now(hwnd);
@@ -9845,6 +9854,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         log_debug("Menu: Save all documents");
                         editor_manager::save_all_documents(hwnd);
                         editor_manager::refresh_current_editor_visual(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_FILE_SAVE_IMAGE => {
+                        log_debug("Menu: Save route image");
+                        app_windows::route_map_export::export_current_route_map_image(hwnd);
                         LRESULT(0)
                     }
                     IDM_FILE_CLOSE => {
@@ -16378,6 +16392,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
+                route_map: None,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -16622,6 +16637,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
+                route_map: None,
             };
             state.docs.push(doc);
             if large_file_no_wrap {

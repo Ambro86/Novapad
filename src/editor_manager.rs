@@ -1,4 +1,5 @@
 use crate::accessibility::{EM_GETSEL, EM_REPLACESEL, EM_SCROLLCARET, to_wide, to_wide_normalized};
+use crate::app_windows::route_service::RouteMapData;
 use crate::file_handler::decode_text_with_encoding;
 use crate::file_handler::*;
 use crate::settings::{
@@ -1284,6 +1285,7 @@ pub struct Document {
     pub is_temporary: bool,
     pub prefer_title_for_save_suggestion: bool,
     pub prefer_mpv_playback: bool,
+    pub route_map: Option<RouteMapData>,
 }
 
 #[derive(Clone)]
@@ -1312,6 +1314,7 @@ impl Default for Document {
             is_temporary: false,
             prefer_title_for_save_suggestion: false,
             prefer_mpv_playback: false,
+            route_map: None,
         }
     }
 }
@@ -3203,6 +3206,7 @@ pub fn new_document(hwnd: HWND) {
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
+                route_map: None,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -3248,6 +3252,7 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
+                route_map: None,
             };
             SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
             ShowWindow(hwnd_edit, SW_HIDE);
@@ -3581,6 +3586,43 @@ pub fn set_current_document_title(hwnd: HWND, title: &str) {
     }
 }
 
+pub fn set_current_route_map(hwnd: HWND, route_map: RouteMapData) {
+    let updated = with_state(hwnd, |state| {
+        let index = state.current;
+        if index >= state.docs.len() {
+            return false;
+        }
+        state.docs[index].route_map = Some(route_map);
+        true
+    })
+    .unwrap_or(false);
+
+    if !updated {
+        crate::log_debug("Failed to set current route map");
+    }
+}
+
+pub fn current_route_map(hwnd: HWND) -> Option<RouteMapData> {
+    with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .and_then(|doc| doc.route_map.clone())
+    })
+    .flatten()
+}
+
+pub fn current_document_has_route_map(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .and_then(|doc| doc.route_map.as_ref())
+            .is_some()
+    })
+    .unwrap_or(false)
+}
+
 pub fn current_document_is_from_rss(hwnd: HWND) -> bool {
     {
         with_state(hwnd, |state| {
@@ -3666,6 +3708,7 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
                 is_temporary: true,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
+                route_map: None,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);

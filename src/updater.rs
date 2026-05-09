@@ -14,13 +14,13 @@ use windows::Win32::Storage::FileSystem::{
     OPEN_EXISTING, REPLACEFILE_WRITE_THROUGH, ReplaceFileW,
 };
 use windows::Win32::System::Threading::{
-    GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE,
-    WaitForSingleObject,
+    GetCurrentThreadId, GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    PROCESS_SYNCHRONIZE, WaitForSingleObject,
 };
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    IDYES, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_SETFOREGROUND, MB_YESNO,
-    MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, WM_CLOSE,
+    GetWindowThreadProcessId, IDYES, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK,
+    MB_SETFOREGROUND, MB_YESNO, MESSAGEBOX_STYLE, MessageBoxW, PostMessageW, SW_SHOW, WM_CLOSE,
 };
 use windows::core::{HSTRING, PCWSTR};
 
@@ -1850,6 +1850,28 @@ pub(crate) fn check_pending_update(hwnd: HWND, force: bool) {
     }
 
     let (meta_size, meta_hash, meta_release_tag) = read_update_metadata(&pending);
+    if let Some(release_tag) = meta_release_tag.as_deref() {
+        let pending_version = normalize_version(release_tag);
+        let current_version = current_version_for_update_check(
+            hwnd,
+            app_beta_updates_enabled(hwnd),
+            env!("CARGO_PKG_VERSION"),
+        );
+        if parse_version(&pending_version).is_some()
+            && !is_newer_version(&pending_version, &current_version)
+        {
+            log_debug(&format!(
+                "Pending update release {pending_version} is not newer than current {current_version}. Clearing pending update."
+            ));
+            crate::log_if_err!(std::fs::remove_file(&pending));
+            crate::log_if_err!(std::fs::remove_file(temp_update_meta_path(&pending)));
+            if force {
+                let language = app_language(hwnd);
+                show_update_info(language, UpdateInfo::NoPending);
+            }
+            return;
+        }
+    }
 
     // Early integrity check BEFORE showing any dialog - silently clean up corrupted files
     if let Err(err) = stabilize_download(&pending) {
@@ -2034,6 +2056,17 @@ fn show_update_message(
         let msg = HSTRING::from(text);
         let tit = HSTRING::from(title);
         return unsafe { MessageBoxW(None, &msg, &tit, flags) };
+    }
+    let window_thread = unsafe { GetWindowThreadProcessId(target, None) };
+    let current_thread = unsafe { GetCurrentThreadId() };
+    if window_thread == current_thread {
+        let msg = HSTRING::from(text);
+        let tit = HSTRING::from(title);
+        log_debug(&format!(
+            "Updater: Showing update dialog directly on UI thread for {:?}",
+            target
+        ));
+        return unsafe { MessageBoxW(target, &msg, &tit, flags) };
     }
 
     let (tx, rx) = std::sync::mpsc::channel();

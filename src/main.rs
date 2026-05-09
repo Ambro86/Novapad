@@ -5699,13 +5699,21 @@ fn start_whisper_folder_transcription(hwnd: HWND) {
 }
 
 fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionResult) {
-    let language = with_state(hwnd, |state| {
+    let (language, documents_save_folder) = with_state(hwnd, |state| {
         state.transcription_in_progress = false;
         state.transcription_cancel = None;
         state.transcription_media_path = None;
-        state.settings.language
+        (
+            state.settings.language,
+            state.settings.documents_save_folder.clone(),
+        )
     })
-    .unwrap_or_default();
+    .unwrap_or_else(|| {
+        (
+            Language::default(),
+            settings::default_documents_save_folder(),
+        )
+    });
     prevent_sleep(false);
     close_whisper_progress_window(hwnd);
     crate::menu::update_playback_menu(hwnd, true);
@@ -5719,20 +5727,38 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
         return;
     }
 
+    let auto_save_result = auto_save_whisper_transcription(
+        Path::new(&documents_save_folder),
+        &result.title,
+        &result.text,
+    );
+    let (saved_path, save_error) = match auto_save_result {
+        Ok(path) => (Some(path), None),
+        Err(err) => (None, Some(err)),
+    };
+
     editor_manager::new_document(hwnd);
     with_state(hwnd, |state| {
         let idx = state.current;
         let hwnd_tab = state.hwnd_tab;
         if let Some(doc) = state.docs.get_mut(idx) {
-            doc.title = result.title.clone();
-            doc.path = None;
+            doc.title = saved_path
+                .as_ref()
+                .and_then(|path| path.file_name())
+                .and_then(|name| name.to_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| result.title.clone());
+            doc.path = saved_path.clone();
             doc.format = FileFormat::Text(TextEncoding::Utf8);
             editor_manager::set_edit_text(doc.hwnd_edit, &result.text);
-            doc.dirty = true;
-            doc.prefer_title_for_save_suggestion = true;
-            editor_manager::update_tab_title(hwnd_tab, idx, &doc.title, true);
+            doc.dirty = saved_path.is_none();
+            doc.prefer_title_for_save_suggestion = saved_path.is_none();
+            editor_manager::update_tab_title(hwnd_tab, idx, &doc.title, doc.dirty);
         }
     });
+    if let Some(path) = saved_path.as_ref() {
+        crate::push_recent_file(hwnd, path);
+    }
     editor_manager::update_window_title(hwnd);
     crate::log_if_err!(post_message_w_safe(
         hwnd,
@@ -5740,7 +5766,82 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
         WPARAM(0),
         LPARAM(0)
     ));
-    screen_reader_speak(&result.completed_message);
+    if let Some(err) = save_error {
+        let message = format!(
+            "{} Salvataggio automatico non riuscito: {}",
+            result.completed_message, err
+        );
+        crate::show_error(hwnd, language, &message);
+        screen_reader_speak(&message);
+    } else if let Some(path) = saved_path {
+        screen_reader_speak(&format!(
+            "{} Salvata in: {}",
+            result.completed_message,
+            path.display()
+        ));
+    } else {
+        screen_reader_speak(&result.completed_message);
+    }
+}
+
+fn auto_save_whisper_transcription(
+    documents_save_folder: &Path,
+    suggested_title: &str,
+    text: &str,
+) -> Result<PathBuf, String> {
+    std::fs::create_dir_all(documents_save_folder).map_err(|err| err.to_string())?;
+    let path = unique_whisper_transcription_path(documents_save_folder, suggested_title);
+    std::fs::write(&path, encode_text(text, TextEncoding::Utf8)).map_err(|err| err.to_string())?;
+    Ok(path)
+}
+
+fn unique_whisper_transcription_path(
+    documents_save_folder: &Path,
+    suggested_title: &str,
+) -> PathBuf {
+    let mut candidate_name = sanitize_filename(suggested_title);
+    if candidate_name.is_empty() {
+        candidate_name = format!(
+            "Trascrizione_{}.txt",
+            Local::now().format("%Y-%m-%d_%H-%M-%S")
+        );
+    }
+    if Path::new(&candidate_name).extension().is_none() {
+        candidate_name.push_str(".txt");
+    }
+
+    let candidate_path = PathBuf::from(&candidate_name);
+    let stem = candidate_path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or("Trascrizione")
+        .to_string();
+    let extension = candidate_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .filter(|ext| !ext.trim().is_empty())
+        .unwrap_or("txt")
+        .to_string();
+
+    let first_path = documents_save_folder.join(format!("{stem}.{extension}"));
+    if !first_path.exists() {
+        return first_path;
+    }
+
+    for index in 2..10_000 {
+        let path = documents_save_folder.join(format!("{stem}_{index}.{extension}"));
+        if !path.exists() {
+            return path;
+        }
+    }
+
+    documents_save_folder.join(format!(
+        "{}_{}.{}",
+        stem,
+        Local::now().format("%Y-%m-%d_%H-%M-%S"),
+        extension
+    ))
 }
 
 fn insert_text_into_edit(hwnd_edit: HWND, text: &str) -> bool {

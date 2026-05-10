@@ -14316,6 +14316,19 @@ fn should_join_soft_line_break(previous_line: &str, next_line: &str) -> bool {
         return false;
     }
 
+    if previous.ends_with('-') {
+        return true;
+    }
+
+    let sentence_ended = previous
+        .chars()
+        .rev()
+        .find(|ch| !ch.is_whitespace() && !matches!(ch, '"' | '\'' | ')' | ']' | '}' | '”' | '’'))
+        .is_some_and(|ch| matches!(ch, '.' | '!' | '?' | ':' | ';'));
+    if !sentence_ended && previous.chars().count() >= 40 {
+        return true;
+    }
+
     // TXT/PDF exports often wrap a sentence on a plain newline.
     // The most reliable signal here is whether the next visible line starts
     // with a lowercase continuation. This also fixes lines ending with
@@ -14324,7 +14337,7 @@ fn should_join_soft_line_break(previous_line: &str, next_line: &str) -> bool {
 }
 
 fn normalize_soft_line_breaks_for_translation(text: &str) -> String {
-    if !text.contains('\n') {
+    if !text.contains('\n') && !text.contains('\r') {
         return text.to_string();
     }
 
@@ -14486,12 +14499,15 @@ fn start_editor_translation_text(
     let target = target_lang.to_string();
     let source = deepl_source_code_from_ui_language(language).to_string();
     let original_chars = text.chars().count();
+    let original_cr = text.matches('\r').count();
+    let original_lf = text.matches('\n').count();
     let text = normalize_soft_line_breaks_for_translation(&text);
     let normalized_chars = text.chars().count();
+    let normalized_lf = text.matches('\n').count();
     if normalized_chars != original_chars {
         log_debug(&format!(
-            "Editor translation: normalized soft line breaks chars_before={} chars_after={}",
-            original_chars, normalized_chars
+            "Editor translation: normalized soft line breaks chars_before={} chars_after={} cr_before={} lf_before={} lf_after={}",
+            original_chars, normalized_chars, original_cr, original_lf, normalized_lf
         ));
     }
     log_debug(&format!(
@@ -16821,7 +16837,8 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
 mod tests {
     use super::{
         SentenceNavigationDirection, audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
-        relative_audiobook_bookmark, sentence_navigation_target, sentence_start_offsets_utf16,
+        normalize_soft_line_breaks_for_translation, relative_audiobook_bookmark,
+        sentence_navigation_target, sentence_start_offsets_utf16,
     };
     use crate::bookmarks::Bookmark;
 
@@ -16914,6 +16931,41 @@ mod tests {
         let target = relative_audiobook_bookmark(&bookmarks, Some(4), 4.9, false)
             .map(|bookmark| bookmark.position);
         assert_eq!(target, Some(2));
+    }
+
+    #[test]
+    fn translation_normalization_joins_wrapped_book_lines() {
+        let text = "what it takes the three of us two days to \ndo.\" My college roommate";
+
+        assert_eq!(
+            normalize_soft_line_breaks_for_translation(text),
+            "what it takes the three of us two days to do.\" My college roommate"
+        );
+    }
+
+    #[test]
+    fn translation_normalization_joins_rich_edit_cr_line_breaks() {
+        let text =
+            "My college roommate was working at a retail electronics store in \rthe early 2000s";
+
+        assert_eq!(
+            normalize_soft_line_breaks_for_translation(text),
+            "My college roommate was working at a retail electronics store in the early 2000s"
+        );
+    }
+
+    #[test]
+    fn translation_normalization_preserves_sentence_breaks() {
+        let text = "First complete sentence.\nSecond complete sentence.";
+
+        assert_eq!(normalize_soft_line_breaks_for_translation(text), text);
+    }
+
+    #[test]
+    fn translation_normalization_preserves_short_heading_breaks() {
+        let text = "Chapter One\nA Beginning";
+
+        assert_eq!(normalize_soft_line_breaks_for_translation(text), text);
     }
 }
 

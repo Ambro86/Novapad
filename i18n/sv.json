@@ -75,6 +75,7 @@
   "common.cancel": "Avbryt",
   "common.ok": "OK",
   "context_menu.audiobook_selection": "Skapa ljudbok från markeringen",
+  "context_menu.translate": "Traduci",
   "context_menu.dictionary": "Ordlista",
   "context_menu.open_with": "Öppna med Sonarpad",
   "context_menu.spelling_add_to_dictionary": "Lägg till i ordlista",

@@ -15,6 +15,7 @@ mod diagnostics;
 mod sentry_integration;
 mod settings;
 mod telemetry;
+mod translator;
 mod watchdog;
 use editor_manager::Document;
 use settings::*;
@@ -68,9 +69,9 @@ use std::mem::size_of;
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, mpsc};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use chrono::Local;
 use serde::{Deserialize, Serialize};
@@ -207,6 +208,7 @@ const WM_PODCAST_EPISODE_PLAY_READY: u32 = WM_APP + 37;
 const WM_PODCAST_EPISODE_PLAY_FAILED: u32 = WM_APP + 38;
 const WM_LOCAL_MPV_VIDEO_MODE: u32 = WM_APP + 40;
 const WM_LOCAL_MPV_MENU_VISIBLE: u32 = WM_APP + 41;
+const WM_EDITOR_TRANSLATION_DONE: u32 = WM_APP + 42;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
@@ -218,6 +220,70 @@ const MPV_BASS_FOCUS_DEBUG_TIMER_ID4: usize = 11;
 const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID1: usize = 12;
 const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID2: usize = 13;
 const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID3: usize = 14;
+
+struct EditorTranslateLanguage {
+    key: &'static str,
+    target: &'static str,
+}
+
+const EDITOR_TRANSLATE_LANGUAGES: [EditorTranslateLanguage; menu::IDM_EDIT_TRANSLATE_TARGET_MAX] = [
+    EditorTranslateLanguage {
+        key: "it",
+        target: "it",
+    },
+    EditorTranslateLanguage {
+        key: "en",
+        target: "en",
+    },
+    EditorTranslateLanguage {
+        key: "es",
+        target: "es",
+    },
+    EditorTranslateLanguage {
+        key: "fr",
+        target: "fr",
+    },
+    EditorTranslateLanguage {
+        key: "pt",
+        target: "pt",
+    },
+    EditorTranslateLanguage {
+        key: "cs",
+        target: "cs",
+    },
+    EditorTranslateLanguage {
+        key: "pl",
+        target: "pl",
+    },
+    EditorTranslateLanguage {
+        key: "ru",
+        target: "ru",
+    },
+    EditorTranslateLanguage {
+        key: "sv",
+        target: "sv",
+    },
+    EditorTranslateLanguage {
+        key: "uk",
+        target: "uk",
+    },
+    EditorTranslateLanguage {
+        key: "lt",
+        target: "lt",
+    },
+    EditorTranslateLanguage {
+        key: "zh",
+        target: "zh",
+    },
+];
+
+struct EditorTranslationResult {
+    hwnd_edit: isize,
+    cp_min: i32,
+    cp_max: i32,
+    language: Language,
+    result: Result<String, String>,
+}
 const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID4: usize = 15;
 const MPV_ESC_FOCUS_DEBUG_TIMER_ID1: usize = 16;
 const MPV_ESC_FOCUS_DEBUG_TIMER_ID2: usize = 17;
@@ -6774,6 +6840,8 @@ pub(crate) struct AppState {
     replace_cancel_requested: bool,
     replace_cancel_token: Option<Arc<AtomicBool>>,
     podcast_save_cancel_token: Option<Arc<AtomicBool>>,
+    editor_translation_progress_window: HWND,
+    editor_translation_cancel_token: Option<Arc<AtomicBool>>,
     pdf_loading: Vec<PdfLoadingState>,
     next_timer_id: usize,
     tts_session: Option<TtsSession>,
@@ -8385,6 +8453,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     replace_cancel_requested: false,
                     replace_cancel_token: None,
                     podcast_save_cancel_token: None,
+                    editor_translation_progress_window: HWND(0),
+                    editor_translation_cancel_token: None,
                     pdf_loading: Vec::new(),
                     next_timer_id: 1,
                     tts_session: None,
@@ -9047,6 +9117,15 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 LRESULT(0)
             }
+            WM_EDITOR_TRANSLATION_DONE => {
+                let ptr = lparam.0 as *mut EditorTranslationResult;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let payload = box_from_raw_safe(ptr);
+                apply_editor_translation_result(hwnd, *payload);
+                LRESULT(0)
+            }
             WM_PODCAST_EPISODE_PLAY_READY => {
                 let ptr = lparam.0 as *mut PodcastEpisodePlayReady;
                 if ptr.is_null() {
@@ -9300,6 +9379,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         state.replace_cancel_requested = false;
                         state.replace_cancel_token = None;
                     }
+                    if state.editor_translation_progress_window == closed_hwnd {
+                        state.editor_translation_progress_window = HWND(0);
+                        state.editor_translation_cancel_token = None;
+                    }
                 });
                 LRESULT(0)
             }
@@ -9319,6 +9402,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         && state.transcription_progress_window == source_hwnd
                 })
                 .unwrap_or(false);
+                let is_editor_translation = with_state(hwnd, |state| {
+                    source_hwnd.0 != 0 && state.editor_translation_progress_window == source_hwnd
+                })
+                .unwrap_or(false);
                 if is_replace {
                     with_state(hwnd, |state| {
                         state.replace_cancel_requested = true;
@@ -9334,6 +9421,22 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     with_state(hwnd, |state| {
                         if let Some(token) = state.podcast_save_cancel_token.as_ref() {
                             token.store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
+                    });
+                }
+                if is_editor_translation {
+                    with_state(hwnd, |state| {
+                        if let Some(token) = state.editor_translation_cancel_token.as_ref() {
+                            token.store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
+                        if state.editor_translation_progress_window.0 != 0 {
+                            app_windows::podcast_save_window::set_status_text(
+                                state.editor_translation_progress_window,
+                                match state.settings.language {
+                                    Language::Italian => "Annullamento traduzione...",
+                                    _ => "Canceling translation...",
+                                },
+                            );
                         }
                     });
                 }
@@ -10031,6 +10134,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_EDIT_AUDIOBOOK_SELECTION => {
                         log_debug("Menu: Record audiobook from selection");
                         tts_engine::start_audiobook_from_selection(hwnd);
+                        LRESULT(0)
+                    }
+                    cmd if editor_translate_language_for_menu_id(cmd).is_some() => {
+                        log_debug("Menu: Translate selection");
+                        handle_editor_translate_menu_command(hwnd, cmd);
                         LRESULT(0)
                     }
                     IDM_FILE_BATCH_AUDIOBOOK => {
@@ -13995,6 +14103,36 @@ pub(crate) fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPAR
             std::mem::swap(&mut selection.cpMin, &mut selection.cpMax);
         }
         let has_selection = selection.cpMin != selection.cpMax;
+        if let Ok(submenu) = CreatePopupMenu()
+            && submenu.0 != 0
+        {
+            let saved_target = with_state(hwnd, |state| {
+                state.settings.editor_translate_target_language.clone()
+            })
+            .unwrap_or_else(|| EDITOR_TRANSLATE_LANGUAGES[0].key.to_string());
+            let saved_target = normalized_editor_translate_target_language(&saved_target);
+            for (idx, translate_language) in EDITOR_TRANSLATE_LANGUAGES.iter().enumerate() {
+                let key = format!("options.lang.{}", translate_language.key);
+                let label = i18n::tr(language_ui, &key);
+                let mut flags = MF_STRING;
+                if translate_language.key == saved_target {
+                    flags |= MF_CHECKED;
+                }
+                crate::log_if_err!(AppendMenuW(
+                    submenu,
+                    flags,
+                    menu::IDM_EDIT_TRANSLATE_TARGET_BASE + idx,
+                    PCWSTR(to_wide(&label).as_ptr()),
+                ));
+            }
+            let label = i18n::tr(language_ui, "context_menu.translate");
+            crate::log_if_err!(AppendMenuW(
+                menu,
+                MF_POPUP,
+                submenu.0 as usize,
+                PCWSTR(to_wide(&label).as_ptr()),
+            ));
+        }
         if has_selection {
             let label = i18n::tr(language_ui, "context_menu.audiobook_selection");
             crate::log_if_err!(AppendMenuW(
@@ -14003,8 +14141,8 @@ pub(crate) fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPAR
                 menu::IDM_EDIT_AUDIOBOOK_SELECTION,
                 PCWSTR(to_wide(&label).as_ptr()),
             ));
-            crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
         }
+        crate::log_if_err!(AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()));
 
         let undo_flags = if can_undo_now(hwnd) {
             MF_STRING
@@ -14076,6 +14214,596 @@ pub(crate) fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPAR
             state.dictionary_context_expanded = false;
         });
     }
+}
+
+fn editor_translate_language_for_menu_id(
+    cmd_id: usize,
+) -> Option<&'static EditorTranslateLanguage> {
+    let idx = cmd_id.checked_sub(menu::IDM_EDIT_TRANSLATE_TARGET_BASE)?;
+    EDITOR_TRANSLATE_LANGUAGES.get(idx)
+}
+
+fn normalized_editor_translate_target_language(value: &str) -> &'static str {
+    let value = value.trim();
+    EDITOR_TRANSLATE_LANGUAGES
+        .iter()
+        .find(|language| language.key.eq_ignore_ascii_case(value))
+        .map(|language| language.key)
+        .unwrap_or(EDITOR_TRANSLATE_LANGUAGES[0].key)
+}
+
+const DEEPL_FREE_COOLDOWN_SECONDS: u64 = 10 * 60;
+static DEEPL_FREE_COOLDOWN_UNTIL: AtomicU64 = AtomicU64::new(0);
+
+fn unix_timestamp_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+fn deepl_free_cooldown_remaining_seconds() -> u64 {
+    let now = unix_timestamp_seconds();
+    let until = DEEPL_FREE_COOLDOWN_UNTIL.load(Ordering::Relaxed);
+    until.saturating_sub(now)
+}
+
+fn mark_deepl_free_cooldown() {
+    let until = unix_timestamp_seconds().saturating_add(DEEPL_FREE_COOLDOWN_SECONDS);
+    DEEPL_FREE_COOLDOWN_UNTIL.store(until, Ordering::Relaxed);
+}
+
+fn is_deepl_too_many_requests_error(err: &translator::TranslatorError) -> bool {
+    match err {
+        translator::TranslatorError::HttpStatus { status, body } => {
+            *status == 429 || body.to_ascii_lowercase().contains("too many requests")
+        }
+        _ => false,
+    }
+}
+
+fn deepl_source_code_from_ui_language(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "it",
+        Language::English => "en",
+        Language::Spanish => "es",
+        Language::Portuguese => "pt",
+        Language::Swedish => "sv",
+        Language::Czech => "cs",
+        Language::Polish => "pl",
+        Language::French => "fr",
+        Language::Ukrainian => "uk",
+        Language::Lithuanian => "lt",
+        Language::Russian => "ru",
+        Language::Chinese => "zh",
+        Language::Vietnamese | Language::Serbian | Language::Hindi => "auto",
+    }
+}
+
+fn line_starts_with_uppercase_letter(line: &str) -> bool {
+    line.trim_start()
+        .chars()
+        .find(|ch| ch.is_alphabetic())
+        .is_some_and(|ch| ch.is_uppercase())
+}
+
+fn line_looks_like_list_or_heading(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    if trimmed.is_empty() {
+        return true;
+    }
+    if trimmed
+        .chars()
+        .next()
+        .is_some_and(|ch| matches!(ch, '-' | '*' | '•' | '–' | '—'))
+    {
+        return true;
+    }
+    let mut chars = trimmed.chars();
+    let Some(first) = chars.next() else {
+        return true;
+    };
+    first.is_ascii_digit() && chars.take(3).any(|ch| matches!(ch, '.' | ')' | ':' | '-'))
+}
+
+fn should_join_soft_line_break(previous_line: &str, next_line: &str) -> bool {
+    let previous = previous_line.trim_end();
+    let next = next_line.trim_start();
+    if previous.is_empty() || next.is_empty() {
+        return false;
+    }
+    if line_looks_like_list_or_heading(next) {
+        return false;
+    }
+
+    // TXT/PDF exports often wrap a sentence on a plain newline.
+    // The most reliable signal here is whether the next visible line starts
+    // with a lowercase continuation. This also fixes lines ending with
+    // ellipsis or quotes where punctuation alone is misleading.
+    !line_starts_with_uppercase_letter(next)
+}
+
+fn normalize_soft_line_breaks_for_translation(text: &str) -> String {
+    if !text.contains('\n') {
+        return text.to_string();
+    }
+
+    let normalized_newlines = text.replace("\r\n", "\n").replace('\r', "\n");
+    let mut lines = normalized_newlines.split('\n').peekable();
+    let mut output = String::with_capacity(text.len());
+
+    while let Some(line) = lines.next() {
+        output.push_str(line.trim_end());
+        let Some(next_line) = lines.peek().copied() else {
+            break;
+        };
+
+        if should_join_soft_line_break(line, next_line) {
+            if line.trim_end().ends_with('-') {
+                output.pop();
+            } else if !output.chars().last().is_some_and(|ch| ch.is_whitespace()) {
+                output.push(' ');
+            }
+        } else {
+            output.push('\n');
+        }
+    }
+
+    output
+}
+
+fn editor_translation_progress_labels(
+    language: Language,
+) -> app_windows::podcast_save_window::SaveDialogLabels {
+    let (title, in_progress, cancel_confirm) = match language {
+        Language::Italian => (
+            "Traduzione in corso".to_string(),
+            "Traduzione in corso...".to_string(),
+            "Vuoi annullare la traduzione?".to_string(),
+        ),
+        _ => (
+            "Translation in progress".to_string(),
+            "Translation in progress...".to_string(),
+            "Do you want to cancel the translation?".to_string(),
+        ),
+    };
+
+    app_windows::podcast_save_window::SaveDialogLabels {
+        title,
+        in_progress,
+        cancel: i18n::tr(language, "podcast.save.cancel"),
+        cancel_confirm,
+    }
+}
+
+fn open_editor_translation_progress_window(
+    hwnd: HWND,
+    language: Language,
+    cancel_token: Arc<AtomicBool>,
+) {
+    let labels = editor_translation_progress_labels(language);
+    let dialog = app_windows::podcast_save_window::open_with_labels(hwnd, language, labels, true);
+    if dialog.0 != 0 {
+        app_windows::podcast_save_window::focus_cancel_button(dialog);
+    }
+    with_state(hwnd, |state| {
+        state.editor_translation_progress_window = dialog;
+        state.editor_translation_cancel_token = Some(cancel_token);
+    });
+}
+
+fn close_editor_translation_progress_window(hwnd: HWND) {
+    let dialog =
+        with_state(hwnd, |state| state.editor_translation_progress_window).unwrap_or(HWND(0));
+    if dialog.0 != 0 {
+        crate::send_message_w_safe(
+            dialog,
+            app_windows::podcast_save_window::WM_PODCAST_SAVE_DONE,
+            WPARAM(0),
+            LPARAM(0),
+        );
+    }
+    with_state(hwnd, |state| {
+        state.editor_translation_progress_window = HWND(0);
+        state.editor_translation_cancel_token = None;
+    });
+}
+
+fn selected_text_from_edit(hwnd_edit: HWND, selection: CHARRANGE) -> Option<String> {
+    let start = selection.cpMin.min(selection.cpMax).max(0) as usize;
+    let end = selection.cpMin.max(selection.cpMax).max(0) as usize;
+    if start >= end {
+        log_debug(&format!(
+            "Editor translation: empty range start={start} end={end}"
+        ));
+        return None;
+    }
+
+    let len = end.checked_sub(start)?;
+    let mut buffer = vec![0u16; len + 1];
+    let range = TEXTRANGEW {
+        chrg: CHARRANGE {
+            cpMin: start.min(i32::MAX as usize) as i32,
+            cpMax: end.min(i32::MAX as usize) as i32,
+        },
+        lpstrText: PWSTR(buffer.as_mut_ptr()),
+    };
+    let copied = send_message_w_safe(
+        hwnd_edit,
+        EM_GETTEXTRANGE,
+        WPARAM(0),
+        LPARAM(&range as *const _ as isize),
+    )
+    .0
+    .max(0) as usize;
+    if copied == 0 {
+        log_debug(&format!(
+            "Editor translation: EM_GETTEXTRANGE copied 0 chars start={start} end={end}"
+        ));
+        return None;
+    }
+
+    log_debug(&format!(
+        "Editor translation: extracted text chars={} range={}..{}",
+        copied, start, end
+    ));
+    Some(String::from_utf16_lossy(&buffer[..copied]))
+}
+
+fn start_editor_selection_translation(
+    hwnd: HWND,
+    hwnd_edit: HWND,
+    selection: CHARRANGE,
+    target_lang: &'static str,
+    language: Language,
+) {
+    let Some(text) = selected_text_from_edit(hwnd_edit, selection) else {
+        log_debug("Editor translation: no text extracted, translation not started");
+        return;
+    };
+    start_editor_translation_text(
+        hwnd,
+        hwnd_edit,
+        selection.cpMin.min(selection.cpMax),
+        selection.cpMin.max(selection.cpMax),
+        text,
+        target_lang,
+        language,
+    );
+}
+
+fn start_editor_translation_text(
+    hwnd: HWND,
+    hwnd_edit: HWND,
+    cp_min: i32,
+    cp_max: i32,
+    text: String,
+    target_lang: &'static str,
+    language: Language,
+) {
+    let hwnd_value = hwnd.0;
+    let hwnd_edit_value = hwnd_edit.0;
+    let target = target_lang.to_string();
+    let source = deepl_source_code_from_ui_language(language).to_string();
+    let original_chars = text.chars().count();
+    let text = normalize_soft_line_breaks_for_translation(&text);
+    let normalized_chars = text.chars().count();
+    if normalized_chars != original_chars {
+        log_debug(&format!(
+            "Editor translation: normalized soft line breaks chars_before={} chars_after={}",
+            original_chars, normalized_chars
+        ));
+    }
+    log_debug(&format!(
+        "Editor translation: starting source={} target={} range={}..{} chars={}",
+        source, target, cp_min, cp_max, normalized_chars
+    ));
+
+    let cancel_token = Arc::new(AtomicBool::new(false));
+    open_editor_translation_progress_window(hwnd, language, cancel_token.clone());
+
+    let spawn_result = std::thread::Builder::new()
+        .name("editor-selection-translation".to_string())
+        .spawn(move || {
+            log_debug(&format!(
+                "Editor translation worker: request begin source={} target={} chars={}",
+                source,
+                target,
+                text.chars().count()
+            ));
+            let result = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| format!("Runtime traduzione non disponibile: {err}"))
+                .and_then(|runtime| {
+                    runtime.block_on(async {
+                        let google_source = if source == target {
+                            "auto".to_string()
+                        } else {
+                            source.clone()
+                        };
+
+                        let translate_with_google = |deepl_status: String,
+                                                     google_source: String,
+                                                     target: String,
+                                                     text: String,
+                                                     cancel_token: Arc<AtomicBool>| async move {
+                            log_debug(&format!(
+                                "Editor translation worker: Google fallback source={} target={}",
+                                google_source, target
+                            ));
+                            let google_translator =
+                                translator::TranslatorGoogleFree::new(target.clone(), google_source)
+                                    .map_err(|err| err.to_string())?;
+                            google_translator
+                                .translate_chunked_cancellable(&text, Some(cancel_token.as_ref()))
+                                .await
+                                .map_err(|google_err| {
+                                    format!(
+                                        "{deepl_status}; Google fallback failed: {google_err}"
+                                    )
+                                })
+                        };
+
+                        let cooldown_remaining = deepl_free_cooldown_remaining_seconds();
+                        if cooldown_remaining > 0 {
+                            let deepl_status =
+                                format!("DeepL cooldown active for {cooldown_remaining}s");
+                            log_debug(&format!(
+                                "Editor translation worker: {deepl_status}, using Google fallback directly"
+                            ));
+                            return translate_with_google(
+                                deepl_status,
+                                google_source,
+                                target,
+                                text,
+                                cancel_token.clone(),
+                            )
+                            .await;
+                        }
+
+                        let deepl_translator = if source == "auto" {
+                            translator::TranslatorDeepLFree::new(target.clone())
+                        } else {
+                            translator::TranslatorDeepLFree::with_source_lang(
+                                target.clone(),
+                                source.clone(),
+                            )
+                        }
+                        .map_err(|err| err.to_string())?;
+
+                        if cancel_token.load(Ordering::Relaxed) {
+                            return Err(translator::TranslatorError::Cancelled.to_string());
+                        }
+
+                        match deepl_translator
+                            .translate_chunked_cancellable(&text, Some(cancel_token.as_ref()))
+                            .await
+                        {
+                            Ok(translated) => Ok(translated),
+                            Err(deepl_err) => {
+                                if is_deepl_too_many_requests_error(&deepl_err) {
+                                    mark_deepl_free_cooldown();
+                                    log_debug(&format!(
+                                        "Editor translation worker: DeepL too many requests, cooldown set for {}s",
+                                        DEEPL_FREE_COOLDOWN_SECONDS
+                                    ));
+                                }
+                                let deepl_status = format!("DeepL failed: {deepl_err}");
+                                log_debug(&format!(
+                                    "Editor translation worker: {deepl_status}, trying Google fallback"
+                                ));
+                                translate_with_google(
+                                    deepl_status,
+                                    google_source,
+                                    target,
+                                    text,
+                                    cancel_token.clone(),
+                                )
+                                .await
+                            }
+                        }
+                    })
+                });
+            match &result {
+                Ok(translated) => log_debug(&format!(
+                    "Editor translation worker: request ok translated_chars={}",
+                    translated.chars().count()
+                )),
+                Err(err) => log_debug(&format!("Editor translation worker: request failed: {err}")),
+            }
+            let payload = Box::new(EditorTranslationResult {
+                hwnd_edit: hwnd_edit_value,
+                cp_min,
+                cp_max,
+                language,
+                result,
+            });
+            let ptr = Box::into_raw(payload);
+            if let Err(err) = post_message_w_safe(
+                HWND(hwnd_value),
+                WM_EDITOR_TRANSLATION_DONE,
+                WPARAM(0),
+                LPARAM(ptr as isize),
+            ) {
+                log_debug(&format!("Failed to post WM_EDITOR_TRANSLATION_DONE: {err}"));
+                let _unused_box = box_from_raw_safe(ptr);
+            }
+        });
+
+    if let Err(err) = spawn_result {
+        close_editor_translation_progress_window(hwnd);
+        show_error(
+            hwnd,
+            language,
+            &format!("Impossibile avviare la traduzione: {err}"),
+        );
+    }
+}
+
+fn handle_editor_translate_menu_command(hwnd: HWND, cmd_id: usize) {
+    let Some(target_language) = editor_translate_language_for_menu_id(cmd_id) else {
+        log_debug(&format!(
+            "Editor translation: command ignored, unknown cmd_id={cmd_id}"
+        ));
+        return;
+    };
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+        log_debug("Editor translation: command ignored, no active editor");
+        return;
+    };
+    log_debug(&format!(
+        "Editor translation: command cmd_id={} key={} target={}",
+        cmd_id, target_language.key, target_language.target
+    ));
+
+    let language = with_state(hwnd, |state| {
+        state.settings.editor_translate_target_language = target_language.key.to_string();
+        let language = state.settings.language;
+        save_settings(state.settings.clone());
+        language
+    })
+    .unwrap_or_default();
+
+    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+    send_message_w_safe(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut selection as *mut _ as isize),
+    );
+    if selection.cpMin == selection.cpMax {
+        let text = editor_manager::get_edit_text(hwnd_edit);
+        if text.is_empty() {
+            log_debug("Editor translation: document empty, translation not started");
+            return;
+        }
+        log_debug(&format!(
+            "Editor translation: no selection, using full document chars={}",
+            text.chars().count()
+        ));
+        start_editor_translation_text(
+            hwnd,
+            hwnd_edit,
+            0,
+            -1,
+            text,
+            target_language.target,
+            language,
+        );
+        return;
+    } else {
+        log_debug(&format!(
+            "Editor translation: using selection range={}..{}",
+            selection.cpMin, selection.cpMax
+        ));
+    }
+
+    start_editor_selection_translation(
+        hwnd,
+        hwnd_edit,
+        selection,
+        target_language.target,
+        language,
+    );
+}
+
+fn apply_editor_translation_result(hwnd: HWND, payload: EditorTranslationResult) {
+    close_editor_translation_progress_window(hwnd);
+    let cp_min = payload.cp_min;
+    let cp_max = payload.cp_max;
+    let translated_text = match payload.result {
+        Ok(translated_text) => translated_text,
+        Err(err) => {
+            log_debug(&format!(
+                "Editor translation: applying failed result: {err}"
+            ));
+            if err.contains("Translation canceled") {
+                return;
+            }
+            show_error(
+                hwnd,
+                payload.language,
+                &format!("Errore durante la traduzione: {err}"),
+            );
+            return;
+        }
+    };
+    let hwnd_edit = HWND(payload.hwnd_edit);
+    if hwnd_edit.0 == 0 || !is_window_handle_valid(hwnd_edit) {
+        log_debug("Editor translation: target editor is no longer valid");
+        return;
+    }
+    log_debug(&format!(
+        "Editor translation: applying result range={}..{} translated_chars={}",
+        cp_min,
+        cp_max,
+        translated_text.chars().count()
+    ));
+
+    let before_text = editor_manager::get_edit_text(hwnd_edit);
+    search::replace_range_text(hwnd_edit, cp_min, cp_max, &translated_text);
+    let after_text = editor_manager::get_edit_text(hwnd_edit);
+    log_debug(&format!(
+        "Editor translation: replace_range_text changed={} chars_before={} chars_after={}",
+        after_text != before_text,
+        before_text.chars().count(),
+        after_text.chars().count()
+    ));
+    if after_text == before_text {
+        if translated_text == before_text {
+            log_debug("Editor translation: translated text is identical to current editor text");
+            return;
+        }
+        log_debug("Editor translation: replace_range_text unchanged, using set_edit_text fallback");
+        if !replace_editor_text_with_set_text(
+            hwnd_edit,
+            &before_text,
+            &translated_text,
+            cp_min,
+            cp_max,
+        ) {
+            log_debug("Editor translation: set_edit_text fallback failed");
+            return;
+        }
+        let verified_text = editor_manager::get_edit_text(hwnd_edit);
+        log_debug(&format!(
+            "Editor translation: set_edit_text fallback changed={}",
+            verified_text != before_text
+        ));
+        if verified_text == before_text {
+            return;
+        }
+    }
+    send_message_w_safe(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+    editor_manager::mark_dirty_from_edit(hwnd, hwnd_edit);
+    set_focus_safe(hwnd_edit);
+}
+
+fn replace_editor_text_with_set_text(
+    hwnd_edit: HWND,
+    before_text: &str,
+    translated_text: &str,
+    cp_min: i32,
+    cp_max: i32,
+) -> bool {
+    if cp_max < 0 {
+        editor_manager::set_edit_text(hwnd_edit, translated_text);
+        return true;
+    }
+
+    let mut utf16 = before_text.encode_utf16().collect::<Vec<_>>();
+    let start = cp_min.min(cp_max).max(0) as usize;
+    let end = cp_min.max(cp_max).max(0) as usize;
+    if start >= utf16.len() {
+        return false;
+    }
+    let end = end.min(utf16.len());
+    let translated = translated_text.encode_utf16().collect::<Vec<_>>();
+    utf16.splice(start..end, translated);
+    let updated = String::from_utf16_lossy(&utf16);
+    editor_manager::set_edit_text(hwnd_edit, &updated);
+    true
 }
 
 fn open_dictionary_lookup(hwnd: HWND) {

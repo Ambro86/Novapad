@@ -75,6 +75,7 @@
   "common.cancel": "Cancelar",
   "common.ok": "OK",
   "context_menu.audiobook_selection": "Crear audiolibro desde la selección",
+  "context_menu.translate": "Traduci",
   "context_menu.dictionary": "Diccionario",
   "context_menu.open_with": "Abrir con Sonarpad",
   "context_menu.spelling_add_to_dictionary": "Agregar al diccionario",

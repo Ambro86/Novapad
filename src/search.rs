@@ -1395,7 +1395,7 @@ fn escape_regex_literal(text: &str) -> String {
     out
 }
 
-fn replace_range_text(hwnd_edit: HWND, start_utf16: i32, end_utf16: i32, text: &str) {
+pub(crate) fn replace_range_text(hwnd_edit: HWND, start_utf16: i32, end_utf16: i32, text: &str) {
     let mut range = CHARRANGE {
         cpMin: start_utf16,
         cpMax: end_utf16,

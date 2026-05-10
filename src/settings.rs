@@ -757,6 +757,8 @@ pub struct AppSettings {
     pub dictionary_translation_language: String,
     #[serde(default = "default_dictionary_lookup_language")]
     pub dictionary_lookup_language: String,
+    #[serde(default = "default_editor_translate_target_language")]
+    pub editor_translate_target_language: String,
     #[serde(default)]
     pub dictionary_search_history: Vec<String>,
     pub wikipedia_language: String,
@@ -1041,6 +1043,10 @@ fn default_dictionary_lookup_language() -> String {
     "auto".to_string()
 }
 
+fn default_editor_translate_target_language() -> String {
+    "it".to_string()
+}
+
 fn default_stream_audio_output_format() -> String {
     "auto".to_string()
 }
@@ -1145,6 +1151,7 @@ impl Default for AppSettings {
             dictionary: Vec::new(),
             dictionary_translation_language: "auto".to_string(),
             dictionary_lookup_language: default_dictionary_lookup_language(),
+            editor_translate_target_language: default_editor_translate_target_language(),
             dictionary_search_history: Vec::new(),
             wikipedia_language: "auto".to_string(),
             text_color: 0x000000,
@@ -2192,6 +2199,13 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     }
     if settings.dictionary_lookup_language.trim().is_empty() {
         settings.dictionary_lookup_language = default_dictionary_lookup_language();
+    }
+    settings.editor_translate_target_language = settings
+        .editor_translate_target_language
+        .trim()
+        .to_ascii_lowercase();
+    if settings.editor_translate_target_language.is_empty() {
+        settings.editor_translate_target_language = default_editor_translate_target_language();
     }
     settings.gemini_api_key = settings.gemini_api_key.trim().to_string();
     settings.stream_audio_default_format = settings.stream_audio_default_format.trim().to_string();

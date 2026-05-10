@@ -134,6 +134,7 @@ fn prompt_route_params(parent: HWND, language: Language) -> Option<RouteParams> 
         tertiary_type_label: i18n::tr(language, "route.avoid_label"),
         tertiary_options: avoid_list,
         tertiary_default_selection: 0,
+        tertiary_options_primary_index_only: Some(2),
         quaternary_type_label: i18n::tr(language, "route.country_label"),
         quaternary_options: country_list,
         quaternary_default_selection: country_default_selection,

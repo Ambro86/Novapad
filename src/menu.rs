@@ -323,11 +323,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_prompt: i18n::tr(language, "menu.prompt"),
         menu_rss: i18n::tr(language, "menu.rss"),
         menu_podcasts: i18n::tr(language, "menu.podcasts"),
-        menu_paths_navigation: if language == Language::Italian {
-            i18n::tr(language, "menu.paths_navigation")
-        } else {
-            String::new()
-        },
+        menu_paths_navigation: i18n::tr(language, "menu.paths_navigation"),
         view_text_color: i18n::tr(language, "view.text_color"),
         view_text_size: i18n::tr(language, "view.text_size"),
         view_text_color_black: i18n::tr(language, "view.text_color.black"),
@@ -1493,13 +1489,13 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 IDM_TOOLS_BDCIECHI,
                 &labels.menu_bdciechi,
             );
-            append_menu_string(
-                tools_menu,
-                MF_STRING,
-                IDM_TOOLS_PATHS_NAVIGATION,
-                &labels.menu_paths_navigation,
-            );
         }
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_PATHS_NAVIGATION,
+            &labels.menu_paths_navigation,
+        );
         append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RADIO, &labels.menu_radio);
         append_menu_string(
             tools_menu,

@@ -117,6 +117,7 @@ pub struct PromptDirectoryOptions {
     pub tertiary_type_label: String,
     pub tertiary_options: Vec<String>,
     pub tertiary_default_selection: usize,
+    pub tertiary_options_primary_index_only: Option<usize>,
     pub quaternary_type_label: String,
     pub quaternary_options: Vec<String>,
     pub quaternary_default_selection: usize,
@@ -562,6 +563,7 @@ pub fn prompt_directory_search(
                 tertiary_type_label: options.tertiary_type_label,
                 tertiary_options: options.tertiary_options,
                 tertiary_selected_index: options.tertiary_default_selection,
+                tertiary_options_primary_index_only: options.tertiary_options_primary_index_only,
                 quaternary_type_label: options.quaternary_type_label,
                 quaternary_options: options.quaternary_options,
                 quaternary_selected_index: options.quaternary_default_selection,
@@ -680,6 +682,7 @@ struct DirectorySearchPromptMode {
     tertiary_type_label: String,
     tertiary_options: Vec<String>,
     tertiary_selected_index: usize,
+    tertiary_options_primary_index_only: Option<usize>,
     quaternary_type_label: String,
     quaternary_options: Vec<String>,
     quaternary_selected_index: usize,
@@ -1156,10 +1159,9 @@ fn credentials_prompt_wndproc_inner(
                     let show_secondary_kind = !secondary_options.is_empty();
                     let show_tertiary_kind = !tertiary_options.is_empty();
                     let show_quaternary_kind = !quaternary_options.is_empty();
-                    let tertiary_kind_auto_only =
-                        tertiary_type_label.to_lowercase().contains("solo auto");
-                    let show_tertiary_kind_initial =
-                        show_tertiary_kind && (!tertiary_kind_auto_only || selected_index == 2);
+                    let tertiary_primary_index_only = config.tertiary_options_primary_index_only;
+                    let show_tertiary_kind_initial = show_tertiary_kind
+                        && tertiary_primary_index_only.is_none_or(|idx| selected_index == idx);
                     let mut y = 20;
                     let kind_label = unsafe {
                         CreateWindowExW(
@@ -1615,8 +1617,8 @@ fn credentials_prompt_wndproc_inner(
                         ));
                     }
 
-                    if tertiary_kind_auto_only {
-                        let show = selected_index == 2;
+                    if let Some(primary_index) = tertiary_primary_index_only {
+                        let show = selected_index == primary_index;
                         let command = if show { SW_SHOW } else { SW_HIDE };
                         unsafe {
                             ShowWindow(tertiary_kind_label, command);
@@ -1701,12 +1703,11 @@ fn credentials_prompt_wndproc_inner(
                         }
                         if let CredentialsPromptMode::DirectorySearch(config) = &data.mode
                             && !config.tertiary_options.is_empty()
-                            && config
-                                .tertiary_type_label
-                                .to_lowercase()
-                                .contains("solo auto")
+                            && config.tertiary_options_primary_index_only.is_some()
                         {
-                            let show = combo_value == 2;
+                            let show = config
+                                .tertiary_options_primary_index_only
+                                .is_some_and(|idx| combo_value as usize == idx);
                             let command = if show { SW_SHOW } else { SW_HIDE };
                             let label =
                                 crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_TERTIARY_KIND_LABEL);

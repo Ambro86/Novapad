@@ -1639,7 +1639,72 @@ fn normalize_youtube_input_for_download(input: &str) -> Option<String> {
     }
 }
 
+fn normalize_youtube_playlist_url_from_input(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let compact: String = trimmed.chars().filter(|ch| !ch.is_whitespace()).collect();
+    let normalized = compact
+        .replace("&amp;", "&")
+        .replace("\\?", "?")
+        .replace("\\=", "=")
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .to_string();
+    if normalized.is_empty() {
+        return None;
+    }
+
+    let candidate = if normalized.starts_with("http://") || normalized.starts_with("https://") {
+        normalized
+    } else {
+        format!("https://{normalized}")
+    };
+    let url = Url::parse(&candidate).ok()?;
+    for (key, value) in url.query_pairs() {
+        let k = key.as_ref();
+        if k.eq_ignore_ascii_case("url")
+            || k.eq_ignore_ascii_case("u")
+            || k.eq_ignore_ascii_case("q")
+        {
+            let v = value.trim();
+            if v.starts_with("http://") || v.starts_with("https://") {
+                if let Some(unwrapped) = normalize_youtube_playlist_url_from_input(v) {
+                    return Some(unwrapped);
+                }
+            } else if v.starts_with('/') {
+                let joined = format!("https://www.youtube.com{v}");
+                if let Some(unwrapped) = normalize_youtube_playlist_url_from_input(&joined) {
+                    return Some(unwrapped);
+                }
+            }
+        }
+    }
+
+    let host = url.host_str()?;
+    if !(host.eq_ignore_ascii_case("youtu.be")
+        || host.eq_ignore_ascii_case("youtube.com")
+        || host.ends_with(".youtube.com"))
+    {
+        return None;
+    }
+
+    let list_id = url
+        .query_pairs()
+        .find(|(key, value)| key == "list" && !value.trim().is_empty())
+        .map(|(_, value)| value.into_owned())?;
+    let mut playlist_url = Url::parse("https://www.youtube.com/playlist").ok()?;
+    playlist_url.query_pairs_mut().append_pair("list", &list_id);
+    Some(playlist_url.to_string())
+}
+
 fn normalize_youtube_collection_url(input: &str) -> Option<String> {
+    if let Some(playlist_url) = normalize_youtube_playlist_url_from_input(input) {
+        return Some(playlist_url);
+    }
     let normalized = normalize_youtube_input_for_download(input)?;
     let Ok(mut url) = Url::parse(&normalized) else {
         return Some(normalized);
@@ -4850,6 +4915,7 @@ fn choose_youtube_collection_entry(
                 "stream transition [collection_probe.empty]: page={} url={}",
                 page, url
             ));
+            restore_stream_parent_after_selection_cancel(parent);
             return if page == 0 {
                 Err(i18n::tr(language, "stream_audio.no_matching_videos"))
             } else {
@@ -4996,6 +5062,7 @@ fn choose_youtube_search_entry(
         }
         close_progress_dialog(progress);
         if entries.is_empty() {
+            restore_stream_parent_after_selection_cancel(parent);
             return if page == 0 {
                 Err(i18n::tr(language, "stream_audio.no_matching_videos"))
             } else {
@@ -8398,9 +8465,12 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 return;
             }
             Err(err) => {
+                restore_stream_parent_after_selection(parent);
+                crate::set_active_youtube_return_context(parent, None, None);
                 let message =
                     i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]);
                 show_error(parent, language, &message);
+                post_focus_editor(parent);
                 return;
             }
         };

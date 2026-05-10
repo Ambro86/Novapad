@@ -2,22 +2,19 @@ use windows::Win32::Foundation::HWND;
 
 use crate::app_windows::prompt_window::{self, PromptDirectoryOptions};
 use crate::app_windows::route_service::{
-    GeocodeCandidate, RouteAvoid, RouteClient, RoutePath, RoutePreference, RouteProfile,
-    RouteRequestResult, RouteResult, format_distance, format_duration,
+    GeocodeCandidate, RouteAvoid, RouteClient, RouteOptions, RoutePath, RoutePreference,
+    RouteProfile, RouteRequestResult, RouteResult, format_distance_for_language,
+    format_duration_for_language,
 };
 use crate::app_windows::youtube_transcript_window::{
     self, MultilineSearchOptions, MultilineSelectionItem, MultilineSelectionResult,
 };
 use crate::editor_manager;
 use crate::settings::Language;
-use crate::{show_error, with_state};
+use crate::{i18n, show_error, with_state};
 
 pub fn open(parent: HWND) {
     let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
-    if language != Language::Italian {
-        return;
-    }
-
     run_route_flow(parent, language);
 }
 
@@ -29,17 +26,10 @@ fn run_route_flow(parent: HWND, language: Language) {
         return;
     };
 
-    crate::screen_reader_speak("Ricerca percorso in corso");
+    crate::screen_reader_speak(&i18n::tr(language, "route.searching"));
 
     // 2. Esegui la ricerca
-    match client.route_from_addresses(
-        &params.from,
-        &params.to,
-        params.plan.profile,
-        params.plan.preference,
-        params.plan.avoid,
-        params.include_municipalities,
-    ) {
+    match client.route_from_addresses(&params.from, &params.to, params.plan) {
         Ok(RouteRequestResult::Ready(route)) => {
             display_route(parent, language, route);
         }
@@ -51,11 +41,12 @@ fn run_route_flow(parent: HWND, language: Language) {
             avoid,
             include_municipalities,
         }) => {
-            let plan = RoutePlan {
+            let plan = RouteOptions {
                 profile,
                 preference,
                 avoid,
                 include_municipalities,
+                language,
             };
             handle_selection_and_route(
                 parent,
@@ -75,16 +66,7 @@ fn run_route_flow(parent: HWND, language: Language) {
 struct RouteParams {
     from: String,
     to: String,
-    plan: RoutePlan,
-    include_municipalities: bool,
-}
-
-#[derive(Clone, Copy)]
-struct RoutePlan {
-    profile: RouteProfile,
-    preference: RoutePreference,
-    avoid: RouteAvoid,
-    include_municipalities: bool,
+    plan: RouteOptions,
 }
 
 fn prompt_route_params(parent: HWND, language: Language) -> Option<RouteParams> {
@@ -104,43 +86,43 @@ fn prompt_route_params(parent: HWND, language: Language) -> Option<RouteParams> 
 
     let options_list = profile_options
         .iter()
-        .map(|profile| profile.label_it().to_string())
+        .map(|profile| profile.label(language))
         .collect();
     let preference_list = preference_options
         .iter()
-        .map(|preference| preference.label_it().to_string())
+        .map(|preference| preference.label(language))
         .collect();
     let avoid_list = avoid_options
         .iter()
         .map(|avoid| {
             if *avoid == RouteAvoid::None {
-                "nessuna".to_string()
+                i18n::tr(language, "route.avoid.none")
             } else {
-                avoid.label_it().to_string()
+                avoid.label(language)
             }
         })
         .collect();
 
     let options = PromptDirectoryOptions {
-        title: "Percorsi e navigazione".to_string(),
-        type_label: "Mezzo".to_string(),
+        title: i18n::tr(language, "route.title"),
+        type_label: i18n::tr(language, "route.profile_label"),
         options: options_list,
         default_selection: 0,
-        secondary_type_label: "Tipo".to_string(),
+        secondary_type_label: i18n::tr(language, "route.preference_label"),
         secondary_options: preference_list,
         secondary_default_selection: 0,
-        tertiary_type_label: "Solo auto: evita".to_string(),
+        tertiary_type_label: i18n::tr(language, "route.avoid_label"),
         tertiary_options: avoid_list,
         tertiary_default_selection: 0,
         focus_primary_field: false,
-        primary_label: "Partenza:".to_string(),
+        primary_label: i18n::tr(language, "route.from_label"),
         primary_labels: Vec::new(),
         primary_default: String::new(),
-        secondary_label: "Arrivo:".to_string(),
+        secondary_label: i18n::tr(language, "route.to_label"),
         secondary_default: String::new(),
         tertiary_label: String::new(),
         tertiary_default: String::new(),
-        checkbox_label: "Inserisci i comuni attraversati".to_string(),
+        checkbox_label: i18n::tr(language, "route.include_municipalities"),
         checkbox_default: false,
     };
 
@@ -166,13 +148,13 @@ fn prompt_route_params(parent: HWND, language: Language) -> Option<RouteParams> 
     Some(RouteParams {
         from: result.primary_value,
         to: result.secondary_value,
-        plan: RoutePlan {
+        plan: RouteOptions {
             profile,
             preference,
             avoid,
             include_municipalities: result.checkbox_checked,
+            language,
         },
-        include_municipalities: result.checkbox_checked,
     })
 }
 
@@ -182,7 +164,7 @@ fn handle_selection_and_route(
     client: &RouteClient,
     from_candidates: Vec<GeocodeCandidate>,
     to_candidates: Vec<GeocodeCandidate>,
-    plan: RoutePlan,
+    plan: RouteOptions,
 ) {
     let from_selected = if from_candidates.len() > 1 {
         let items = from_candidates
@@ -198,7 +180,7 @@ fn handle_selection_and_route(
         match youtube_transcript_window::select_multiline_items_with_search(
             parent,
             language,
-            "Scegli la partenza".to_string(),
+            i18n::tr(language, "route.choose_from"),
             items,
             None,
             MultilineSearchOptions {
@@ -235,7 +217,7 @@ fn handle_selection_and_route(
         match youtube_transcript_window::select_multiline_items_with_search(
             parent,
             language,
-            "Scegli la destinazione".to_string(),
+            i18n::tr(language, "route.choose_to"),
             items,
             None,
             MultilineSearchOptions {
@@ -258,28 +240,21 @@ fn handle_selection_and_route(
         to_candidates[0].clone()
     };
 
-    crate::screen_reader_speak("Calcolo percorso in corso");
-    match client.route_between_coordinates(
-        &from_selected,
-        &to_selected,
-        plan.profile,
-        plan.preference,
-        plan.avoid,
-        plan.include_municipalities,
-    ) {
+    crate::screen_reader_speak(&i18n::tr(language, "route.calculating"));
+    match client.route_between_coordinates(&from_selected, &to_selected, plan) {
         Ok(route) => display_route(parent, language, route),
         Err(err) => show_error(parent, language, &err.to_string()),
     }
 }
 
-fn display_route(parent: HWND, _language: Language, route: RouteResult) {
-    let Some(route) = select_route_path(parent, _language, route) else {
+fn display_route(parent: HWND, language: Language, route: RouteResult) {
+    let Some(route) = select_route_path(parent, language, route) else {
         return;
     };
     let route_map = route.map_data();
-    let text = route.format_for_speech_or_text();
+    let text = route.format_for_speech_or_text(language);
     editor_manager::new_document(parent);
-    editor_manager::set_current_document_title(parent, "Percorso");
+    editor_manager::set_current_document_title(parent, &i18n::tr(language, "route.document_title"));
     if let Some(route_map) = route_map {
         editor_manager::set_current_route_map(parent, route_map);
     }
@@ -298,13 +273,13 @@ fn select_route_path(parent: HWND, language: Language, route: RouteResult) -> Op
         .paths
         .iter()
         .enumerate()
-        .map(|(idx, path)| route_path_selection_item(idx, path))
+        .map(|(idx, path)| route_path_selection_item(language, idx, path))
         .collect();
 
     let selected = youtube_transcript_window::select_multiline_items_with_search(
         parent,
         language,
-        "Scegli il percorso".to_string(),
+        i18n::tr(language, "route.choose_route"),
         items,
         None,
         MultilineSearchOptions {
@@ -331,16 +306,20 @@ fn select_route_path(parent: HWND, language: Language, route: RouteResult) -> Op
     }
 }
 
-fn route_path_selection_item(index: usize, path: &RoutePath) -> MultilineSelectionItem {
+fn route_path_selection_item(
+    language: Language,
+    index: usize,
+    path: &RoutePath,
+) -> MultilineSelectionItem {
     let title = if index == 0 {
-        "Percorso principale".to_string()
+        i18n::tr(language, "route.main_route")
     } else {
-        format!("Alternativa {index}")
+        format!("{} {index}", i18n::tr(language, "route.alternative_route"))
     };
     let description = format!(
         "{}; {}",
-        format_distance(path.distance_meters),
-        format_duration(path.duration_seconds)
+        format_distance_for_language(path.distance_meters, language),
+        format_duration_for_language(path.duration_seconds, language)
     );
 
     MultilineSelectionItem {

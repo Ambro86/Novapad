@@ -23,7 +23,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::PCWSTR;
 
 use crate::accessibility::to_wide;
-use crate::{editor_manager, show_error, with_state};
+use crate::{editor_manager, i18n, show_error, with_state};
 
 const ROUTE_MAP_WIDTH: i32 = 1200;
 const ROUTE_MAP_HEIGHT: i32 = 800;
@@ -37,29 +37,25 @@ enum RenderEvent {
 pub fn export_current_route_map_image(parent: HWND) {
     let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
     let Some(route_map) = editor_manager::current_route_map(parent) else {
-        show_error(
-            parent,
-            language,
-            "Questo documento non contiene una mappa percorso.",
-        );
+        show_error(parent, language, &i18n::tr(language, "route.map.no_map"));
         return;
     };
 
-    let Some(output_path) = save_route_map_dialog(parent) else {
+    let Some(output_path) = save_route_map_dialog(parent, language) else {
         return;
     };
 
-    match build_leaflet_html(&route_map)
+    match build_leaflet_html(&route_map, language)
         .and_then(|html| capture_route_map_with_webview2(parent, &html, &output_path))
     {
         Ok(()) => {
-            crate::screen_reader_speak("Immagine percorso salvata");
+            crate::screen_reader_speak(&i18n::tr(language, "route.map.saved"));
         }
         Err(error) => show_error(parent, language, &error),
     }
 }
 
-fn save_route_map_dialog(parent: HWND) -> Option<PathBuf> {
+fn save_route_map_dialog(parent: HWND, language: crate::settings::Language) -> Option<PathBuf> {
     let _com = match crate::com_guard::ComGuard::new_sta() {
         Ok(com) => com,
         Err(error) => {
@@ -87,7 +83,7 @@ fn save_route_map_dialog(parent: HWND) -> Option<PathBuf> {
             .SetDefaultExtension(PCWSTR(default_ext.as_ptr()))
             .ok()?;
 
-        let default_name = to_wide("percorso.png");
+        let default_name = to_wide(&i18n::tr(language, "route.map.default_filename"));
         dialog.SetFileName(PCWSTR(default_name.as_ptr())).ok()?;
 
         if let Some(initial_dir) = std::env::current_dir().ok().and_then(|path| {
@@ -113,13 +109,14 @@ fn save_route_map_dialog(parent: HWND) -> Option<PathBuf> {
 
 fn build_leaflet_html(
     route_map: &crate::app_windows::route_service::RouteMapData,
+    language: crate::settings::Language,
 ) -> Result<String, String> {
     let geometry = serde_json::to_string(&route_map.geometry)
-        .map_err(|error| format!("Impossibile preparare la geometria mappa: {error}"))?;
+        .map_err(|error| format!("{} {error}", i18n::tr(language, "route.map.geometry_error")))?;
     let from_label = serde_json::to_string(&route_map.from_label)
-        .map_err(|error| format!("Impossibile preparare la partenza mappa: {error}"))?;
+        .map_err(|error| format!("{} {error}", i18n::tr(language, "route.map.from_error")))?;
     let to_label = serde_json::to_string(&route_map.to_label)
-        .map_err(|error| format!("Impossibile preparare l'arrivo mappa: {error}"))?;
+        .map_err(|error| format!("{} {error}", i18n::tr(language, "route.map.to_error")))?;
 
     Ok(format!(
         r#"<!doctype html>

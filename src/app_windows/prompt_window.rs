@@ -99,6 +99,7 @@ pub struct PromptDirectoryResult {
     pub selected_index: usize,
     pub secondary_selected_index: usize,
     pub tertiary_selected_index: usize,
+    pub quaternary_selected_index: usize,
     pub primary_value: String,
     pub secondary_value: String,
     pub tertiary_value: String,
@@ -116,6 +117,9 @@ pub struct PromptDirectoryOptions {
     pub tertiary_type_label: String,
     pub tertiary_options: Vec<String>,
     pub tertiary_default_selection: usize,
+    pub quaternary_type_label: String,
+    pub quaternary_options: Vec<String>,
+    pub quaternary_default_selection: usize,
     pub focus_primary_field: bool,
     pub primary_label: String,
     pub primary_labels: Vec<String>,
@@ -434,6 +438,7 @@ pub fn prompt_credentials(
             directory_selected_index: 0,
             secondary_directory_selected_index: 0,
             tertiary_directory_selected_index: 0,
+            quaternary_directory_selected_index: 0,
             confirmed: false,
             language,
             mode: CredentialsPromptMode::Credentials,
@@ -519,7 +524,8 @@ pub fn prompt_directory_search(
         });
 
         let extra_combo_count = usize::from(!options.secondary_options.is_empty())
-            + usize::from(!options.tertiary_options.is_empty());
+            + usize::from(!options.tertiary_options.is_empty())
+            + usize::from(!options.quaternary_options.is_empty());
         let checkbox_extra_height = if options.checkbox_label.trim().is_empty() {
             0
         } else {
@@ -542,6 +548,9 @@ pub fn prompt_directory_search(
             tertiary_directory_selected_index: options
                 .tertiary_default_selection
                 .min(options.tertiary_options.len().saturating_sub(1)),
+            quaternary_directory_selected_index: options
+                .quaternary_default_selection
+                .min(options.quaternary_options.len().saturating_sub(1)),
             confirmed: false,
             language,
             mode: CredentialsPromptMode::DirectorySearch(Box::new(DirectorySearchPromptMode {
@@ -553,6 +562,9 @@ pub fn prompt_directory_search(
                 tertiary_type_label: options.tertiary_type_label,
                 tertiary_options: options.tertiary_options,
                 tertiary_selected_index: options.tertiary_default_selection,
+                quaternary_type_label: options.quaternary_type_label,
+                quaternary_options: options.quaternary_options,
+                quaternary_selected_index: options.quaternary_default_selection,
                 focus_primary_field: options.focus_primary_field,
                 primary_label: options.primary_label,
                 primary_labels: options.primary_labels,
@@ -617,6 +629,7 @@ pub fn prompt_directory_search(
                 selected_index: data.directory_selected_index,
                 secondary_selected_index: data.secondary_directory_selected_index,
                 tertiary_selected_index: data.tertiary_directory_selected_index,
+                quaternary_selected_index: data.quaternary_directory_selected_index,
                 primary_value: data.username,
                 secondary_value: data.password,
                 tertiary_value: data.tertiary,
@@ -645,6 +658,7 @@ struct CredentialsPromptData {
     directory_selected_index: usize,
     secondary_directory_selected_index: usize,
     tertiary_directory_selected_index: usize,
+    quaternary_directory_selected_index: usize,
     confirmed: bool,
     language: Language,
     mode: CredentialsPromptMode,
@@ -666,6 +680,9 @@ struct DirectorySearchPromptMode {
     tertiary_type_label: String,
     tertiary_options: Vec<String>,
     tertiary_selected_index: usize,
+    quaternary_type_label: String,
+    quaternary_options: Vec<String>,
+    quaternary_selected_index: usize,
     focus_primary_field: bool,
     primary_label: String,
     primary_labels: Vec<String>,
@@ -902,6 +919,7 @@ fn credentials_prompt_wndproc_inner(
     const IDC_CREDENTIALS_SECONDARY_KIND: i32 = 207;
     const IDC_CREDENTIALS_TERTIARY_KIND: i32 = 208;
     const IDC_CREDENTIALS_TERTIARY_KIND_LABEL: i32 = 209;
+    const IDC_CREDENTIALS_QUATERNARY_KIND: i32 = 210;
     match msg {
         WM_CREATE => {
             let create_struct =
@@ -1125,6 +1143,9 @@ fn credentials_prompt_wndproc_inner(
                     let tertiary_type_label = &config.tertiary_type_label;
                     let tertiary_options = &config.tertiary_options;
                     let tertiary_selected_index = config.tertiary_selected_index;
+                    let quaternary_type_label = &config.quaternary_type_label;
+                    let quaternary_options = &config.quaternary_options;
+                    let quaternary_selected_index = config.quaternary_selected_index;
                     let focus_primary_field = config.focus_primary_field;
                     let primary_label = &config.primary_label;
                     let primary_labels = &config.primary_labels;
@@ -1134,6 +1155,7 @@ fn credentials_prompt_wndproc_inner(
                         !tertiary_label.trim().is_empty() || !tertiary_value.is_empty();
                     let show_secondary_kind = !secondary_options.is_empty();
                     let show_tertiary_kind = !tertiary_options.is_empty();
+                    let show_quaternary_kind = !quaternary_options.is_empty();
                     let tertiary_kind_auto_only =
                         tertiary_type_label.to_lowercase().contains("solo auto");
                     let show_tertiary_kind_initial =
@@ -1265,6 +1287,52 @@ fn credentials_prompt_wndproc_inner(
                         )
                     };
                     if show_tertiary_kind {
+                        y += 36;
+                    }
+                    let quaternary_kind_label = unsafe {
+                        CreateWindowExW(
+                            Default::default(),
+                            WC_STATIC,
+                            PCWSTR(to_wide(quaternary_type_label).as_ptr()),
+                            if show_quaternary_kind {
+                                WS_CHILD | WS_VISIBLE
+                            } else {
+                                WS_CHILD
+                            },
+                            20,
+                            y + 4,
+                            100,
+                            20,
+                            hwnd,
+                            HMENU(0),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    let quaternary_kind_combo = unsafe {
+                        CreateWindowExW(
+                            WS_EX_CLIENTEDGE,
+                            WC_COMBOBOXW,
+                            PCWSTR::null(),
+                            if show_quaternary_kind {
+                                WS_CHILD
+                                    | WS_VISIBLE
+                                    | WS_TABSTOP
+                                    | WINDOW_STYLE(CBS_DROPDOWNLIST as u32)
+                            } else {
+                                WS_CHILD | WINDOW_STYLE(CBS_DROPDOWNLIST as u32)
+                            },
+                            128,
+                            y,
+                            250,
+                            180,
+                            hwnd,
+                            HMENU(IDC_CREDENTIALS_QUATERNARY_KIND as isize),
+                            HINSTANCE(0),
+                            None,
+                        )
+                    };
+                    if show_quaternary_kind {
                         y += 36;
                     }
                     let user_label = unsafe {
@@ -1488,6 +1556,17 @@ fn credentials_prompt_wndproc_inner(
                             );
                         }
                     }
+                    for option in quaternary_options {
+                        let option_wide = to_wide(option);
+                        unsafe {
+                            SendMessageW(
+                                quaternary_kind_combo,
+                                CB_ADDSTRING,
+                                WPARAM(0),
+                                LPARAM(option_wide.as_ptr() as isize),
+                            );
+                        }
+                    }
                     unsafe {
                         SendMessageW(
                             kind_combo,
@@ -1513,6 +1592,17 @@ fn credentials_prompt_wndproc_inner(
                                 WPARAM(
                                     tertiary_selected_index
                                         .min(tertiary_options.len().saturating_sub(1)),
+                                ),
+                                LPARAM(0),
+                            );
+                        }
+                        if show_quaternary_kind {
+                            SendMessageW(
+                                quaternary_kind_combo,
+                                CB_SETCURSEL,
+                                WPARAM(
+                                    quaternary_selected_index
+                                        .min(quaternary_options.len().saturating_sub(1)),
                                 ),
                                 LPARAM(0),
                             );
@@ -1548,6 +1638,8 @@ fn credentials_prompt_wndproc_inner(
                                 secondary_kind_combo,
                                 tertiary_kind_label,
                                 tertiary_kind_combo,
+                                quaternary_kind_label,
+                                quaternary_kind_combo,
                                 user_label,
                                 user_edit,
                                 pass_label,
@@ -1684,6 +1776,24 @@ fn credentials_prompt_wndproc_inner(
                     });
                 }
                 return LRESULT(0);
+            } else if id == IDC_CREDENTIALS_QUATERNARY_KIND as usize
+                && notify == windows::Win32::UI::WindowsAndMessaging::CBN_SELCHANGE as u16
+            {
+                let combo_value = crate::send_message_w_safe(
+                    crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_QUATERNARY_KIND),
+                    CB_GETCURSEL,
+                    WPARAM(0),
+                    LPARAM(0),
+                )
+                .0;
+                let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
+                    as *mut CredentialsPromptData;
+                if combo_value >= 0 {
+                    let _updated = crate::with_raw_mut_ptr_safe(ptr, |data| {
+                        data.quaternary_directory_selected_index = combo_value as usize;
+                    });
+                }
+                return LRESULT(0);
             } else if id == 1 {
                 let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
                     as *mut CredentialsPromptData;
@@ -1696,6 +1806,8 @@ fn credentials_prompt_wndproc_inner(
                         crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_SECONDARY_KIND);
                     let tertiary_kind_combo =
                         crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_TERTIARY_KIND);
+                    let quaternary_kind_combo =
+                        crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_QUATERNARY_KIND);
                     let user_len = crate::get_window_text_length_w_safe(user_edit);
                     let pass_len = crate::get_window_text_length_w_safe(pass_edit);
                     let tertiary_len = crate::get_window_text_length_w_safe(tertiary_edit);
@@ -1739,6 +1851,13 @@ fn credentials_prompt_wndproc_inner(
                         LPARAM(0),
                     )
                     .0;
+                    let quaternary_combo_value = crate::send_message_w_safe(
+                        quaternary_kind_combo,
+                        CB_GETCURSEL,
+                        WPARAM(0),
+                        LPARAM(0),
+                    )
+                    .0;
                     if crate::with_raw_mut_ptr_safe(ptr, |data| {
                         data.username = username;
                         data.password = password;
@@ -1753,6 +1872,10 @@ fn credentials_prompt_wndproc_inner(
                         }
                         if tertiary_combo_value >= 0 {
                             data.tertiary_directory_selected_index = tertiary_combo_value as usize;
+                        }
+                        if quaternary_combo_value >= 0 {
+                            data.quaternary_directory_selected_index =
+                                quaternary_combo_value as usize;
                         }
                         data.confirmed = true;
                     })
@@ -1805,21 +1928,6 @@ fn credentials_prompt_wndproc_inner(
                     return LRESULT(0);
                 }
 
-                if shift_down
-                    && current_focus == crate::get_dlg_item_safe(hwnd, 201)
-                    && route_auto_selected
-                {
-                    unsafe {
-                        ShowWindow(avoid_combo, SW_SHOW);
-                        EnableWindow(avoid_combo, true);
-                    }
-                    crate::set_focus_safe(avoid_combo);
-                    crate::log_debug(&format!(
-                        "route_prompt_shift_tab_forced_avoid: after_focus={:?}",
-                        crate::get_focus_safe()
-                    ));
-                    return LRESULT(0);
-                }
                 let order = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
                     .try_into()
                     .ok()
@@ -1837,6 +1945,7 @@ fn credentials_prompt_wndproc_inner(
                                     crate::get_dlg_item_safe(hwnd, 204),
                                     crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_SECONDARY_KIND),
                                     crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_TERTIARY_KIND),
+                                    crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_QUATERNARY_KIND),
                                     crate::get_dlg_item_safe(hwnd, 201),
                                     crate::get_dlg_item_safe(hwnd, 202),
                                     crate::get_dlg_item_safe(hwnd, IDC_CREDENTIALS_TERTIARY),

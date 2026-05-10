@@ -731,6 +731,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub podcast_directory_country: String,
     #[serde(default)]
+    pub route_country: String,
+    #[serde(default)]
     pub podcast_search_provider: PodcastSearchProvider,
     #[serde(default)]
     pub radio_favorites: Vec<RadioFavorite>,
@@ -1128,6 +1130,7 @@ impl Default for AppSettings {
             podcast_index_api_secret: String::new(),
             rai_luce_code: String::new(),
             podcast_directory_country: String::new(),
+            route_country: String::new(),
             podcast_search_provider: PodcastSearchProvider::Itunes,
             gemini_api_key: String::new(),
             youtube_include_timestamps: true,
@@ -1640,6 +1643,12 @@ pub fn default_documents_save_folder() -> String {
     base.to_string_lossy().to_string()
 }
 
+pub fn default_images_save_folder() -> String {
+    let mut base = sonarpad_documents_root();
+    base.push("Images");
+    base.to_string_lossy().to_string()
+}
+
 fn legacy_podcast_save_folder() -> String {
     let mut base = known_documents_dir();
     base.push("Novapad Recordings");
@@ -2004,6 +2013,7 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
         .podcast_directory_country
         .trim()
         .to_ascii_lowercase();
+    settings.route_country = settings.route_country.trim().to_ascii_lowercase();
     if !settings.remember_bdciechi_credentials {
         settings.bdciechi_username.clear();
         settings.bdciechi_password.clear();

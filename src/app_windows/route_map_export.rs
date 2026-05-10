@@ -41,7 +41,8 @@ pub fn export_current_route_map_image(parent: HWND) {
         return;
     };
 
-    let Some(output_path) = save_route_map_dialog(parent, language) else {
+    let Some(output_path) = save_route_map_dialog(parent, language, &route_map.suggested_filename)
+    else {
         return;
     };
 
@@ -55,7 +56,11 @@ pub fn export_current_route_map_image(parent: HWND) {
     }
 }
 
-fn save_route_map_dialog(parent: HWND, language: crate::settings::Language) -> Option<PathBuf> {
+fn save_route_map_dialog(
+    parent: HWND,
+    language: crate::settings::Language,
+    suggested_filename: &str,
+) -> Option<PathBuf> {
     let _com = match crate::com_guard::ComGuard::new_sta() {
         Ok(com) => com,
         Err(error) => {
@@ -83,20 +88,25 @@ fn save_route_map_dialog(parent: HWND, language: crate::settings::Language) -> O
             .SetDefaultExtension(PCWSTR(default_ext.as_ptr()))
             .ok()?;
 
-        let default_name = to_wide(&i18n::tr(language, "route.map.default_filename"));
+        let default_filename = if suggested_filename.trim().is_empty() {
+            i18n::tr(language, "route.map.default_filename")
+        } else {
+            format!("{suggested_filename}.png")
+        };
+        let default_name = to_wide(&default_filename);
         dialog.SetFileName(PCWSTR(default_name.as_ptr())).ok()?;
 
-        if let Some(initial_dir) = std::env::current_dir().ok().and_then(|path| {
-            path.parent()
-                .map(|parent_path| parent_path.to_string_lossy().to_string())
-        }) {
-            let initial_dir_wide = to_wide(&initial_dir);
-            if let Ok(shell_folder) = SHCreateItemFromParsingName::<_, _, IShellItem>(
-                PCWSTR(initial_dir_wide.as_ptr()),
-                None,
-            ) && let Err(error) = dialog.SetDefaultFolder(&shell_folder)
-            {
+        let initial_dir = crate::settings::default_images_save_folder();
+        crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
+        let initial_dir_wide = to_wide(&initial_dir);
+        if let Ok(shell_folder) =
+            SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(initial_dir_wide.as_ptr()), None)
+        {
+            if let Err(error) = dialog.SetDefaultFolder(&shell_folder) {
                 crate::log_debug(&format!("Route map SetDefaultFolder failed: {error}"));
+            }
+            if let Err(error) = dialog.SetFolder(&shell_folder) {
+                crate::log_debug(&format!("Route map SetFolder failed: {error}"));
             }
         }
 
@@ -159,7 +169,20 @@ const tiles = L.tileLayer('https://tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png'
     crossOrigin: true,
     attribution: '&copy; OpenStreetMap contributors'
 }}).addTo(map);
-const line = L.polyline(latLngs, {{ color: '#0b57d0', weight: 5 }}).addTo(map);
+const routeShadow = L.polyline(latLngs, {{
+    color: '#ffffff',
+    weight: 13,
+    opacity: 1,
+    lineCap: 'round',
+    lineJoin: 'round'
+}}).addTo(map);
+const line = L.polyline(latLngs, {{
+    color: '#0b57d0',
+    weight: 7,
+    opacity: 0.98,
+    lineCap: 'round',
+    lineJoin: 'round'
+}}).addTo(map);
 const startMarker = L.marker(latLngs[0]).addTo(map).bindPopup(fromLabel);
 const endMarker = L.marker(latLngs[latLngs.length - 1]).addTo(map).bindPopup(toLabel);
 const bounds = line.getBounds()

@@ -18065,10 +18065,22 @@ pub(crate) fn save_file_dialog_with_encoding(
         pfd.SetFileTypes(&spec).ok()?;
         pfd.SetFileTypeIndex(1).ok()?; // Default to TXT
         pfd.SetDefaultExtension(w!("txt")).ok()?;
-        let initial_dir = with_state(hwnd, |state| state.settings.documents_save_folder.clone())
-            .map(|path| path.trim().to_string())
-            .filter(|path| !path.is_empty())
-            .unwrap_or_else(settings::default_documents_save_folder);
+        let route_document = with_state(hwnd, |state| {
+            state
+                .docs
+                .get(state.current)
+                .and_then(|doc| doc.route_map.as_ref())
+                .is_some()
+        })
+        .unwrap_or(false);
+        let initial_dir = if route_document {
+            settings::default_documents_save_folder()
+        } else {
+            with_state(hwnd, |state| state.settings.documents_save_folder.clone())
+                .map(|path| path.trim().to_string())
+                .filter(|path| !path.is_empty())
+                .unwrap_or_else(settings::default_documents_save_folder)
+        };
         crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
         let initial_dir_w = to_wide(&initial_dir);
         if let Ok(shell_folder) =

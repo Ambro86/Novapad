@@ -3557,6 +3557,31 @@ pub fn mark_current_document_prefer_mpv_playback(hwnd: HWND, prefer_mpv_playback
     }
 }
 
+pub fn mark_current_document_dirty_prefer_title(hwnd: HWND) {
+    let updated = with_state(hwnd, |state| {
+        let index = state.current;
+        if index >= state.docs.len() {
+            return false;
+        }
+        state.docs[index].dirty = true;
+        state.docs[index].prefer_title_for_save_suggestion = true;
+        update_tab_title(
+            state.hwnd_tab,
+            index,
+            &state.docs[index].title,
+            state.docs[index].dirty,
+        );
+        true
+    })
+    .unwrap_or(false);
+
+    if updated {
+        update_window_title(hwnd);
+    } else {
+        crate::log_debug("Failed to mark current document dirty");
+    }
+}
+
 pub fn set_current_document_title(hwnd: HWND, title: &str) {
     let new_title = title.trim();
     if new_title.is_empty() {

@@ -163,6 +163,9 @@ fn prompt_search_query_with_focus(
             tertiary_type_label: String::new(),
             tertiary_options: Vec::new(),
             tertiary_default_selection: 0,
+            quaternary_type_label: String::new(),
+            quaternary_options: Vec::new(),
+            quaternary_default_selection: 0,
             focus_primary_field,
             primary_label: initial.kind.primary_field_label().to_string(),
             primary_labels: vec![

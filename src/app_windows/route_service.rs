@@ -6,6 +6,7 @@ use crate::i18n;
 use crate::settings::Language;
 
 const DEFAULT_BASE_URL: &str = "https://sonarpad.com/api";
+const USER_AGENT: &str = concat!("Sonarpad/", env!("CARGO_PKG_VERSION"));
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RouteProfile {
@@ -88,13 +89,14 @@ impl RouteAvoid {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct RouteOptions {
     pub profile: RouteProfile,
     pub preference: RoutePreference,
     pub avoid: RouteAvoid,
     pub include_municipalities: bool,
     pub language: Language,
+    pub country: String,
 }
 
 #[derive(Debug, Clone)]
@@ -111,8 +113,18 @@ impl Default for RouteClient {
 
 impl RouteClient {
     pub fn new(base_url: &str) -> Self {
+        let client = Client::builder()
+            .user_agent(USER_AGENT)
+            .build()
+            .unwrap_or_else(|error| {
+                crate::log_debug(&format!(
+                    "Route HTTP client user-agent setup failed: {error}"
+                ));
+                Client::new()
+            });
+
         Self {
-            client: Client::new(),
+            client,
             base_url: base_url.trim_end_matches('/').to_string(),
         }
     }
@@ -121,6 +133,7 @@ impl RouteClient {
         &self,
         address: &str,
         language: Language,
+        country: &str,
     ) -> Result<Vec<GeocodeCandidate>, RouteError> {
         let address = address.trim();
 
@@ -132,12 +145,12 @@ impl RouteClient {
         }
 
         // Prova la query originale
-        let results = self.fetch_geocode(address, language)?;
+        let results = self.fetch_geocode(address, language, country)?;
 
         // Se i risultati sono solo la città (fallback del geocoder), prova a semplificare la query
         if is_all_city_fallback(&results, address) {
             if let Some(simplified) = simplify_query(address)
-                && let Ok(fallback_results) = self.fetch_geocode(&simplified, language)
+                && let Ok(fallback_results) = self.fetch_geocode(&simplified, language, country)
                 && !fallback_results.is_empty()
                 && !is_all_city_fallback(&fallback_results, &simplified)
             {
@@ -146,7 +159,8 @@ impl RouteClient {
 
             // Prova un secondo livello di semplificazione (rimuovendo un'altra parola)
             if let Some(more_simplified) = simplify_query_more(address)
-                && let Ok(fallback_results) = self.fetch_geocode(&more_simplified, language)
+                && let Ok(fallback_results) =
+                    self.fetch_geocode(&more_simplified, language, country)
                 && !fallback_results.is_empty()
                 && !is_all_city_fallback(&fallback_results, &more_simplified)
             {
@@ -161,8 +175,10 @@ impl RouteClient {
         &self,
         q: &str,
         language: Language,
+        country: &str,
     ) -> Result<Vec<GeocodeCandidate>, RouteError> {
         let url = format!("{}/ors_geocode.php", self.base_url);
+        let boundary_country = route_country_alpha3(country);
 
         let response: GeocodeApiResponse = self
             .client
@@ -172,7 +188,8 @@ impl RouteClient {
                 ("size", "20"),
                 ("layers", "address,street,venue"),
                 ("sources", "osm,oa"),
-                ("boundary.country", "ITA"),
+                ("boundary.country", boundary_country),
+                ("language", route_backend_language(language)),
             ])
             .send()
             .map_err(|error| route_network_error(language, error.to_string()))?
@@ -195,6 +212,7 @@ impl RouteClient {
         options: RouteOptions,
     ) -> Result<RouteResult, RouteError> {
         let url = format!("{}/ors_route.php", self.base_url);
+        let boundary_country = route_country_alpha3(&options.country);
 
         let response: RouteApiResponse = self
             .client
@@ -220,6 +238,7 @@ impl RouteClient {
                     "language",
                     route_backend_language(options.language).to_string(),
                 ),
+                ("boundary.country", boundary_country.to_string()),
             ])
             .send()
             .map_err(|error| route_network_error(options.language, error.to_string()))?
@@ -248,8 +267,8 @@ impl RouteClient {
         to_address: &str,
         options: RouteOptions,
     ) -> Result<RouteRequestResult, RouteError> {
-        let from_candidates = self.geocode(from_address, options.language)?;
-        let to_candidates = self.geocode(to_address, options.language)?;
+        let from_candidates = self.geocode(from_address, options.language, &options.country)?;
+        let to_candidates = self.geocode(to_address, options.language, &options.country)?;
 
         if from_candidates.is_empty() {
             return Err(RouteError::NotFound(i18n::tr(
@@ -362,11 +381,16 @@ pub struct RoutePath {
 pub struct RouteMapData {
     pub from_label: String,
     pub to_label: String,
+    pub suggested_filename: String,
     pub geometry: Vec<[f64; 2]>,
 }
 
 impl RouteResult {
-    pub fn map_data(&self) -> Option<RouteMapData> {
+    pub fn suggested_filename(&self, language: Language) -> String {
+        route_filename(language, &self.from_label, &self.to_label)
+    }
+
+    pub fn map_data(&self, language: Language) -> Option<RouteMapData> {
         let path = self.paths.first()?;
         if path.geometry.len() < 2 {
             return None;
@@ -375,6 +399,7 @@ impl RouteResult {
         Some(RouteMapData {
             from_label: self.from_label.clone(),
             to_label: self.to_label.clone(),
+            suggested_filename: self.suggested_filename(language),
             geometry: path.geometry.clone(),
         })
     }
@@ -409,6 +434,16 @@ impl RouteResult {
             output.push('\n');
             output.push_str(&i18n::tr(language, "route.no_route_available"));
             return output;
+        }
+
+        if self
+            .paths
+            .first()
+            .map(|path| path.geometry.len() >= 2)
+            .unwrap_or(false)
+        {
+            output.push_str(&i18n::tr(language, "route.map.available_hint"));
+            output.push('\n');
         }
 
         if self.paths.len() > 1 {
@@ -455,6 +490,41 @@ impl RouteResult {
 
         output
     }
+}
+
+pub fn route_filename(language: Language, from_label: &str, to_label: &str) -> String {
+    let template = i18n::tr_f(
+        language,
+        "route.filename_template",
+        &[("from", from_label), ("to", to_label)],
+    );
+    sanitize_route_filename(&template)
+}
+
+fn sanitize_route_filename(name: &str) -> String {
+    let mut sanitized = String::with_capacity(name.len());
+
+    for ch in name.chars() {
+        if matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*') || ch.is_control() {
+            sanitized.push(' ');
+        } else {
+            sanitized.push(ch);
+        }
+    }
+
+    let sanitized = sanitized
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim_matches('.')
+        .trim()
+        .to_string();
+
+    if sanitized.is_empty() {
+        return "route".to_string();
+    }
+
+    sanitized.chars().take(150).collect()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -520,6 +590,126 @@ fn route_backend_language(language: Language) -> &'static str {
         Language::Russian => "ru",
         Language::Chinese => "zh",
         _ => "en",
+    }
+}
+
+fn route_country_alpha3(country: &str) -> &'static str {
+    match country.trim().to_ascii_lowercase().as_str() {
+        "ae" => "ARE",
+        "al" => "ALB",
+        "am" => "ARM",
+        "ar" => "ARG",
+        "at" => "AUT",
+        "au" => "AUS",
+        "az" => "AZE",
+        "bd" => "BGD",
+        "be" => "BEL",
+        "bg" => "BGR",
+        "bn" => "BRN",
+        "bo" => "BOL",
+        "br" => "BRA",
+        "bt" => "BTN",
+        "bw" => "BWA",
+        "ca" => "CAN",
+        "ch" => "CHE",
+        "ci" => "CIV",
+        "cl" => "CHL",
+        "cm" => "CMR",
+        "cn" => "CHN",
+        "co" => "COL",
+        "cr" => "CRI",
+        "cy" => "CYP",
+        "cz" => "CZE",
+        "de" => "DEU",
+        "dk" => "DNK",
+        "do" => "DOM",
+        "dz" => "DZA",
+        "ec" => "ECU",
+        "ee" => "EST",
+        "eg" => "EGY",
+        "es" => "ESP",
+        "et" => "ETH",
+        "fi" => "FIN",
+        "fr" => "FRA",
+        "gb" => "GBR",
+        "ge" => "GEO",
+        "gh" => "GHA",
+        "gr" => "GRC",
+        "gt" => "GTM",
+        "hk" => "HKG",
+        "hn" => "HND",
+        "hr" => "HRV",
+        "hu" => "HUN",
+        "id" => "IDN",
+        "ie" => "IRL",
+        "il" => "ISR",
+        "in" => "IND",
+        "is" => "ISL",
+        "it" => "ITA",
+        "jm" => "JAM",
+        "jo" => "JOR",
+        "jp" => "JPN",
+        "ke" => "KEN",
+        "kg" => "KGZ",
+        "kh" => "KHM",
+        "kr" => "KOR",
+        "kw" => "KWT",
+        "kz" => "KAZ",
+        "la" => "LAO",
+        "lb" => "LBN",
+        "lk" => "LKA",
+        "lt" => "LTU",
+        "lu" => "LUX",
+        "lv" => "LVA",
+        "ma" => "MAR",
+        "mg" => "MDG",
+        "mk" => "MKD",
+        "ml" => "MLI",
+        "mn" => "MNG",
+        "mt" => "MLT",
+        "mu" => "MUS",
+        "mv" => "MDV",
+        "mx" => "MEX",
+        "my" => "MYS",
+        "na" => "NAM",
+        "ng" => "NGA",
+        "ni" => "NIC",
+        "nl" => "NLD",
+        "no" => "NOR",
+        "np" => "NPL",
+        "nz" => "NZL",
+        "pa" => "PAN",
+        "pe" => "PER",
+        "ph" => "PHL",
+        "pk" => "PAK",
+        "pl" => "POL",
+        "pt" => "PRT",
+        "py" => "PRY",
+        "qa" => "QAT",
+        "ro" => "ROU",
+        "rs" => "SRB",
+        "sa" => "SAU",
+        "se" => "SWE",
+        "sg" => "SGP",
+        "si" => "SVN",
+        "sk" => "SVK",
+        "sn" => "SEN",
+        "sv" => "SLV",
+        "th" => "THA",
+        "tn" => "TUN",
+        "tr" => "TUR",
+        "tw" => "TWN",
+        "tz" => "TZA",
+        "ua" => "UKR",
+        "ug" => "UGA",
+        "us" => "USA",
+        "uy" => "URY",
+        "uz" => "UZB",
+        "ve" => "VEN",
+        "vn" => "VNM",
+        "zm" => "ZMB",
+        "zw" => "ZWE",
+        _ => "ITA",
     }
 }
 

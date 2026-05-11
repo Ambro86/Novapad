@@ -78,14 +78,18 @@ use serde::{Deserialize, Serialize};
 
 use windows::Win32::Foundation::{
     BOOL, ERROR_INVALID_PARAMETER, ERROR_INVALID_WINDOW_HANDLE, ERROR_MENU_ITEM_NOT_FOUND,
-    GetLastError, HANDLE, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, SetLastError, WIN32_ERROR,
-    WPARAM,
+    GetLastError, GlobalFree, HANDLE, HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, SetLastError,
+    WIN32_ERROR, WPARAM,
 };
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
 use windows::Win32::Graphics::Gdi::{
-    COLOR_WINDOW, DEFAULT_GUI_FONT, DeleteObject, GET_STOCK_OBJECT_FLAGS, GetObjectW,
-    GetStockObject, HBRUSH, HFONT, HGDIOBJ, InvalidateRect, LOGFONTW, ScreenToClient,
+    COLOR_WINDOW, DEFAULT_GUI_FONT, DeleteDC, DeleteObject, GET_STOCK_OBJECT_FLAGS, GetDeviceCaps,
+    GetObjectW, GetStockObject, HBRUSH, HDC, HFONT, HGDIOBJ, HORZRES, InvalidateRect, LOGFONTW,
+    LOGPIXELSX, LOGPIXELSY, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY, PHYSICALWIDTH,
+    ScreenToClient,
 };
+use windows::Win32::Graphics::Printing::GetDefaultPrinterW;
+use windows::Win32::Storage::Xps::{DOCINFOW, EndDoc, EndPage, StartDocW, StartPage};
 use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
 use windows::Win32::System::DataExchange::{
     COPYDATASTRUCT, CloseClipboard, EmptyClipboard, IsClipboardFormatAvailable, OpenClipboard,
@@ -101,6 +105,8 @@ use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
     FINDREPLACE_FLAGS, FINDREPLACEW, GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER,
     OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
+    PD_NOPAGENUMS, PD_NOSELECTION, PD_RETURNDC, PD_USEDEVMODECOPIESANDCOLLATE, PRINTDLGW,
+    PrintDlgW,
 };
 use windows::Win32::UI::Controls::RichEdit::{
     CFE_AUTOBACKCOLOR, CFM_BACKCOLOR, CHARFORMAT2W, CHARRANGE, EM_EXGETSEL, EM_EXSETSEL,
@@ -162,6 +168,9 @@ const EM_LINEINDEX: u32 = 0x00BB;
 const EM_LINELENGTH: u32 = 0x00C1;
 const EM_SETSEL: u32 = 0x00B1;
 const EM_CANUNDO: u32 = 0x00C6;
+const EM_FORMATRANGE: u32 = 0x0439;
+const TWIPS_PER_INCH: i32 = 1440;
+const PRINT_MARGIN_TWIPS: i32 = 720;
 const APPCOMMAND_MEDIA_PLAY_PAUSE: usize = 14;
 
 use crate::app_windows::find_in_files_window::{
@@ -10060,6 +10069,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         editor_manager::refresh_current_editor_visual(hwnd);
                         LRESULT(0)
                     }
+                    IDM_FILE_PRINT => {
+                        log_debug("Menu: Print document");
+                        print_current_document(hwnd);
+                        LRESULT(0)
+                    }
                     IDM_FILE_SAVE_IMAGE => {
                         log_debug("Menu: Save route image");
                         app_windows::route_map_export::export_current_route_map_image(hwnd);
@@ -13288,6 +13302,468 @@ fn restart_tts_from_position(hwnd: HWND, hwnd_edit: HWND, pos: i32) {
             LPARAM(&mut original_selection as *mut _ as isize),
         );
     }
+}
+
+#[repr(C)]
+struct RichEditFormatRange {
+    hdc: HDC,
+    hdc_target: HDC,
+    rc: RECT,
+    rc_page: RECT,
+    chrg: CHARRANGE,
+}
+
+fn print_current_document(hwnd: HWND) {
+    let (path, hwnd_edit, dirty) = with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .map(|doc| (doc.path.clone(), doc.hwnd_edit, doc.dirty))
+    })
+    .flatten()
+    .unwrap_or((None, HWND(0), false));
+    log_debug(&format!(
+        "Print: start hwnd={:?} hwnd_edit={:?} has_path={} dirty={}",
+        hwnd,
+        hwnd_edit,
+        path.is_some(),
+        dirty
+    ));
+
+    if should_print_with_editor(hwnd_edit, path.as_deref()) {
+        match print_current_editor_text(hwnd, hwnd_edit) {
+            Ok(()) => {
+                log_debug("Print: internal RichEdit print completed");
+                screen_reader_speak("Stampa completata.");
+            }
+            Err(err) => {
+                log_debug(&format!("Print: internal RichEdit print failed err={err}"));
+                show_print_message(
+                    hwnd,
+                    &format!("Impossibile stampare il testo del documento: {err}"),
+                    MB_OK | MB_ICONERROR,
+                );
+            }
+        }
+        return;
+    }
+
+    let Some(path) = path else {
+        log_debug("Print: abort, no active document path and editor is not printable");
+        show_print_message(
+            hwnd,
+            "Nessun documento attivo da stampare.",
+            MB_OK | MB_ICONWARNING,
+        );
+        return;
+    };
+
+    if dirty {
+        log_debug("Print: non-text document dirty, printing saved file path only");
+        screen_reader_speak(
+            "Stampa del file salvato. Le modifiche non salvate potrebbero non essere incluse.",
+        );
+    }
+
+    match try_print_external_document(hwnd, &path) {
+        PrintLaunchResult::Started => {
+            log_debug("Print: external launch result started");
+            screen_reader_speak("Stampa avviata.");
+        }
+        PrintLaunchResult::Failed { print_error } => {
+            log_debug(&format!(
+                "Print: external print failed print_error={print_error}"
+            ));
+            show_print_message(
+                hwnd,
+                &format!(
+                    "Impossibile avviare la stampa diretta per questo tipo di file. Codice errore: {print_error}.\n\nSe PDF, DOCX o altri formati sono associati a Sonarpad, Windows non può usare automaticamente l'app originale per stamparli. Apri il file con il programma corretto, oppure cambia l'associazione di quel formato."
+                ),
+                MB_OK | MB_ICONERROR,
+            );
+        }
+    }
+}
+
+fn should_print_with_editor(hwnd_edit: HWND, path: Option<&Path>) -> bool {
+    if hwnd_edit.0 == 0 {
+        return false;
+    }
+
+    match path
+        .and_then(|p| p.extension())
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_ascii_lowercase())
+    {
+        None => true,
+        Some(ext) => matches!(
+            ext.as_str(),
+            "txt"
+                | "log"
+                | "md"
+                | "markdown"
+                | "csv"
+                | "json"
+                | "xml"
+                | "html"
+                | "htm"
+                | "rs"
+                | "py"
+                | "js"
+                | "ts"
+                | "css"
+                | "c"
+                | "cpp"
+                | "h"
+                | "hpp"
+                | "java"
+                | "cs"
+                | "php"
+                | "ini"
+                | "toml"
+                | "yaml"
+                | "yml"
+        ),
+    }
+}
+
+fn print_current_editor_text(hwnd: HWND, hwnd_edit: HWND) -> Result<(), String> {
+    if hwnd_edit.0 == 0 {
+        return Err("nessun editor attivo".to_string());
+    }
+
+    let text_len = send_message_w_safe(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+    log_debug(&format!("Print: RichEdit text_len={text_len}"));
+    if text_len <= 0 {
+        return Err("il documento è vuoto".to_string());
+    }
+
+    let mut print_dialog = PRINTDLGW {
+        lStructSize: size_of::<PRINTDLGW>() as u32,
+        hwndOwner: hwnd,
+        Flags: PD_RETURNDC | PD_NOSELECTION | PD_NOPAGENUMS | PD_USEDEVMODECOPIESANDCOLLATE,
+        ..Default::default()
+    };
+
+    // SAFETY: PRINTDLGW is initialized with its documented size and owner hwnd.
+    // The dialog fills the structure synchronously before returning.
+    let dialog_ok = unsafe { PrintDlgW(&mut print_dialog).as_bool() };
+    log_debug(&format!("Print: PrintDlgW ok={dialog_ok}"));
+    if !dialog_ok {
+        return Err("stampa annullata o nessuna stampante disponibile".to_string());
+    }
+
+    let hdc = print_dialog.hDC;
+    if hdc.0 == 0 {
+        free_print_dialog_handles(&print_dialog);
+        return Err("impossibile ottenere il contesto della stampante".to_string());
+    }
+
+    let result = print_rich_edit_to_hdc(hwnd_edit, hdc, text_len);
+
+    // SAFETY: hdc comes from PrintDlgW with PD_RETURNDC and is owned by this function.
+    let deleted_dc = unsafe { DeleteDC(hdc).as_bool() };
+    if !deleted_dc {
+        log_debug(&format!(
+            "Print: DeleteDC failed after print dialog: {}",
+            unsafe { GetLastError().0 }
+        ));
+    }
+    free_print_dialog_handles(&print_dialog);
+
+    result
+}
+
+fn print_rich_edit_to_hdc(hwnd_edit: HWND, hdc: HDC, text_len: i32) -> Result<(), String> {
+    // SAFETY: hdc is a printer DC returned by PrintDlgW and remains valid for this print job.
+    let log_pixels_x = unsafe { GetDeviceCaps(hdc, LOGPIXELSX) };
+    // SAFETY: hdc is a printer DC returned by PrintDlgW and remains valid for this print job.
+    let log_pixels_y = unsafe { GetDeviceCaps(hdc, LOGPIXELSY) };
+    // SAFETY: hdc is a printer DC returned by PrintDlgW and remains valid for this print job.
+    let physical_width = unsafe { GetDeviceCaps(hdc, PHYSICALWIDTH) };
+    // SAFETY: hdc is a printer DC returned by PrintDlgW and remains valid for this print job.
+    let physical_height = unsafe { GetDeviceCaps(hdc, PHYSICALHEIGHT) };
+    // SAFETY: hdc is a printer DC returned by PrintDlgW and remains valid for this print job.
+    let offset_x = unsafe { GetDeviceCaps(hdc, PHYSICALOFFSETX) };
+    // SAFETY: hdc is a printer DC returned by PrintDlgW and remains valid for this print job.
+    let offset_y = unsafe { GetDeviceCaps(hdc, PHYSICALOFFSETY) };
+    // SAFETY: hdc is a printer DC returned by PrintDlgW and remains valid for this print job.
+    let horz_res = unsafe { GetDeviceCaps(hdc, HORZRES) };
+    // SAFETY: hdc is a printer DC returned by PrintDlgW and remains valid for this print job.
+    let vert_res = unsafe { GetDeviceCaps(hdc, windows::Win32::Graphics::Gdi::VERTRES) };
+
+    log_debug(&format!(
+        "Print: device caps dpi=({log_pixels_x},{log_pixels_y}) physical=({physical_width},{physical_height}) offset=({offset_x},{offset_y}) res=({horz_res},{vert_res})"
+    ));
+
+    if log_pixels_x <= 0 || log_pixels_y <= 0 || physical_width <= 0 || physical_height <= 0 {
+        return Err("parametri stampante non validi".to_string());
+    }
+
+    let to_twips_x = |value: i32| value.saturating_mul(TWIPS_PER_INCH) / log_pixels_x;
+    let to_twips_y = |value: i32| value.saturating_mul(TWIPS_PER_INCH) / log_pixels_y;
+
+    let rc_page = RECT {
+        left: 0,
+        top: 0,
+        right: to_twips_x(physical_width),
+        bottom: to_twips_y(physical_height),
+    };
+
+    let mut rc = RECT {
+        left: to_twips_x(offset_x).saturating_add(PRINT_MARGIN_TWIPS),
+        top: to_twips_y(offset_y).saturating_add(PRINT_MARGIN_TWIPS),
+        right: to_twips_x(offset_x.saturating_add(horz_res)).saturating_sub(PRINT_MARGIN_TWIPS),
+        bottom: to_twips_y(offset_y.saturating_add(vert_res)).saturating_sub(PRINT_MARGIN_TWIPS),
+    };
+
+    if rc.right <= rc.left || rc.bottom <= rc.top {
+        log_debug("Print: margins too large, using printable area without extra margins");
+        rc = RECT {
+            left: to_twips_x(offset_x),
+            top: to_twips_y(offset_y),
+            right: to_twips_x(offset_x.saturating_add(horz_res)),
+            bottom: to_twips_y(offset_y.saturating_add(vert_res)),
+        };
+    }
+    log_debug(&format!(
+        "Print: format rect page=({},{}-{},{}), content=({},{}-{},{}), text_len={}",
+        rc_page.left,
+        rc_page.top,
+        rc_page.right,
+        rc_page.bottom,
+        rc.left,
+        rc.top,
+        rc.right,
+        rc.bottom,
+        text_len
+    ));
+
+    let doc_name = to_wide("Sonarpad");
+    let doc_info = DOCINFOW {
+        cbSize: size_of::<DOCINFOW>() as i32,
+        lpszDocName: PCWSTR(doc_name.as_ptr()),
+        ..Default::default()
+    };
+
+    // SAFETY: hdc is a valid printer DC and doc_info points to live UTF-16 data for the call.
+    let start_doc = unsafe { StartDocW(hdc, &doc_info) };
+    log_debug(&format!("Print: StartDocW result={start_doc}"));
+    if start_doc <= 0 {
+        return Err(format!("StartDocW fallito: {}", unsafe {
+            GetLastError().0
+        }));
+    }
+
+    let mut next_char = 0i32;
+    let mut page = 0i32;
+    let mut ok = true;
+    let mut err = String::new();
+
+    while next_char < text_len {
+        page += 1;
+        // SAFETY: hdc is inside an active StartDocW/EndDoc print job.
+        let start_page = unsafe { StartPage(hdc) };
+        log_debug(&format!(
+            "Print: StartPage page={page} result={start_page} next_char={next_char}"
+        ));
+        if start_page <= 0 {
+            ok = false;
+            err = format!("StartPage fallito: {}", unsafe { GetLastError().0 });
+            break;
+        }
+
+        let mut format_range = RichEditFormatRange {
+            hdc,
+            hdc_target: hdc,
+            rc,
+            rc_page,
+            chrg: CHARRANGE {
+                cpMin: next_char,
+                cpMax: text_len,
+            },
+        };
+
+        let formatted_until = send_message_w_safe(
+            hwnd_edit,
+            EM_FORMATRANGE,
+            WPARAM(1),
+            LPARAM(&mut format_range as *mut _ as isize),
+        )
+        .0 as i32;
+        log_debug(&format!(
+            "Print: EM_FORMATRANGE page={page} formatted_until={formatted_until}"
+        ));
+
+        // SAFETY: hdc is inside an active StartPage/EndPage pair.
+        let end_page = unsafe { EndPage(hdc) };
+        log_debug(&format!("Print: EndPage page={page} result={end_page}"));
+        if end_page <= 0 {
+            ok = false;
+            err = format!("EndPage fallito: {}", unsafe { GetLastError().0 });
+            break;
+        }
+
+        if formatted_until >= text_len.saturating_sub(1) {
+            next_char = text_len;
+            continue;
+        }
+
+        if formatted_until <= next_char {
+            ok = false;
+            err = "RichEdit non ha avanzato nella stampa del testo".to_string();
+            break;
+        }
+        next_char = formatted_until;
+    }
+
+    send_message_w_safe(hwnd_edit, EM_FORMATRANGE, WPARAM(0), LPARAM(0));
+    // SAFETY: hdc is inside an active StartDocW/EndDoc print job.
+    let end_doc = unsafe { EndDoc(hdc) };
+    log_debug(&format!("Print: EndDoc result={end_doc} ok={ok}"));
+
+    if !ok {
+        return Err(err);
+    }
+    if end_doc <= 0 {
+        return Err(format!("EndDoc fallito: {}", unsafe { GetLastError().0 }));
+    }
+    Ok(())
+}
+
+fn free_print_dialog_handles(print_dialog: &PRINTDLGW) {
+    unsafe {
+        if !print_dialog.hDevMode.0.is_null()
+            && let Err(err) = GlobalFree(print_dialog.hDevMode)
+        {
+            log_debug(&format!("Print: GlobalFree hDevMode failed: {err}"));
+        }
+        if !print_dialog.hDevNames.0.is_null()
+            && let Err(err) = GlobalFree(print_dialog.hDevNames)
+        {
+            log_debug(&format!("Print: GlobalFree hDevNames failed: {err}"));
+        }
+    }
+}
+
+enum PrintLaunchResult {
+    Started,
+    Failed { print_error: isize },
+}
+
+fn try_print_external_document(hwnd: HWND, path: &Path) -> PrintLaunchResult {
+    log_debug(&format!(
+        "Print: try external shell print path={}",
+        path.display()
+    ));
+    let print_result = shell_execute_path(hwnd, w!("print"), path, None, SW_HIDE);
+    log_debug(&format!(
+        "Print: ShellExecute verb=print result={print_result}"
+    ));
+    if print_result > 32 {
+        return PrintLaunchResult::Started;
+    }
+
+    if let Some(printer_name) = get_default_printer_name() {
+        log_debug(&format!("Print: default printer found name={printer_name}"));
+        let printer_param = format!("\"{printer_name}\"");
+        let printto_result =
+            shell_execute_path(hwnd, w!("printto"), path, Some(&printer_param), SW_HIDE);
+        log_debug(&format!(
+            "Print: ShellExecute verb=printto result={printto_result}"
+        ));
+        if printto_result > 32 {
+            return PrintLaunchResult::Started;
+        }
+    } else {
+        log_debug("Print: no default printer name available");
+    }
+
+    PrintLaunchResult::Failed {
+        print_error: print_result,
+    }
+}
+
+fn shell_execute_path(
+    hwnd: HWND,
+    verb: PCWSTR,
+    path: &Path,
+    parameters: Option<&str>,
+    show: windows::Win32::UI::WindowsAndMessaging::SHOW_WINDOW_CMD,
+) -> isize {
+    let path_wide = to_wide(&path.to_string_lossy());
+    let parameters_wide = parameters.map(to_wide);
+    let parameters_ptr = parameters_wide
+        .as_ref()
+        .map(|wide| PCWSTR(wide.as_ptr()))
+        .unwrap_or_else(PCWSTR::null);
+
+    unsafe {
+        ShellExecuteW(
+            hwnd,
+            verb,
+            PCWSTR(path_wide.as_ptr()),
+            parameters_ptr,
+            PCWSTR::null(),
+            show,
+        )
+        .0 as isize
+    }
+}
+
+fn get_default_printer_name() -> Option<String> {
+    let mut needed = 0u32;
+    let first_probe_ok = unsafe { GetDefaultPrinterW(PWSTR::null(), &mut needed).as_bool() };
+    log_debug(&format!(
+        "Print: GetDefaultPrinter probe ok={} needed={}",
+        first_probe_ok, needed
+    ));
+    if needed == 0 {
+        log_debug("Print: GetDefaultPrinter probe returned zero buffer size");
+        return None;
+    }
+
+    let mut buffer = vec![0u16; needed as usize];
+    let ok = unsafe { GetDefaultPrinterW(PWSTR(buffer.as_mut_ptr()), &mut needed).as_bool() };
+    log_debug(&format!(
+        "Print: GetDefaultPrinter read ok={} final_needed={}",
+        ok, needed
+    ));
+    if !ok {
+        return None;
+    }
+
+    let end = buffer
+        .iter()
+        .position(|ch| *ch == 0)
+        .unwrap_or(buffer.len());
+    if end == 0 {
+        log_debug("Print: default printer buffer was empty");
+        None
+    } else {
+        let printer_name = String::from_utf16_lossy(&buffer[..end]);
+        log_debug(&format!(
+            "Print: default printer decoded chars={}",
+            printer_name.chars().count()
+        ));
+        Some(printer_name)
+    }
+}
+
+fn show_print_message(hwnd: HWND, message: &str, flags: MESSAGEBOX_STYLE) {
+    log_debug(&format!(
+        "Print: showing message flags={:#x} chars={}",
+        flags.0,
+        message.chars().count()
+    ));
+    let message_wide = to_wide(message);
+    let title_wide = to_wide("Stampa");
+    message_box_modal(
+        hwnd,
+        PCWSTR(message_wide.as_ptr()),
+        PCWSTR(title_wide.as_ptr()),
+        flags,
+    );
 }
 
 fn adjust_tts_restart_pos(hwnd_edit: HWND, pos: i32) -> i32 {

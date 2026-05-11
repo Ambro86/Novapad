@@ -24,6 +24,7 @@ pub const IDM_FILE_READ_STOP: usize = 1010;
 pub const IDM_FILE_READ_PREVIOUS_SENTENCE: usize = 1017;
 pub const IDM_FILE_READ_NEXT_SENTENCE: usize = 1018;
 pub const IDM_FILE_SAVE_IMAGE: usize = 1019;
+pub const IDM_FILE_PRINT: usize = 1020;
 pub const IDM_FILE_EXECUTE: usize = 1015;
 pub const IDM_FILE_AUDIOBOOK: usize = 1011;
 pub const IDM_FILE_PODCAST: usize = 1012;
@@ -215,6 +216,7 @@ pub struct MenuLabels {
     pub file_save_as: String,
     pub file_save_all: String,
     pub file_save_image: String,
+    pub file_print: String,
     pub file_close: String,
     pub file_recent: String,
     file_read_start: String,
@@ -352,6 +354,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         file_save_as: i18n::tr(language, "file.save_as"),
         file_save_all: i18n::tr(language, "file.save_all"),
         file_save_image: i18n::tr(language, "file.save_image"),
+        file_print: "Stampa".to_string(),
         file_close: i18n::tr(language, "file.close"),
         file_recent: i18n::tr(language, "file.recent"),
         file_read_start: i18n::tr(language, "file.read_start"),
@@ -965,6 +968,7 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             IDM_FILE_SAVE_ALL,
             &labels.file_save_all,
         );
+        append_menu_string(file_menu, MF_STRING, IDM_FILE_PRINT, &labels.file_print);
         append_menu_string(
             file_menu,
             MF_STRING | MF_GRAYED,

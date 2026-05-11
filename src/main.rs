@@ -13314,14 +13314,18 @@ struct RichEditFormatRange {
 }
 
 fn print_current_document(hwnd: HWND) {
-    let (path, hwnd_edit, dirty) = with_state(hwnd, |state| {
-        state
-            .docs
-            .get(state.current)
-            .map(|doc| (doc.path.clone(), doc.hwnd_edit, doc.dirty))
+    let (path, hwnd_edit, dirty, language) = with_state(hwnd, |state| {
+        state.docs.get(state.current).map(|doc| {
+            (
+                doc.path.clone(),
+                doc.hwnd_edit,
+                doc.dirty,
+                state.settings.language,
+            )
+        })
     })
     .flatten()
-    .unwrap_or((None, HWND(0), false));
+    .unwrap_or((None, HWND(0), false, Language::default()));
     log_debug(&format!(
         "Print: start hwnd={:?} hwnd_edit={:?} has_path={} dirty={}",
         hwnd,
@@ -13331,16 +13335,22 @@ fn print_current_document(hwnd: HWND) {
     ));
 
     if should_print_with_editor(hwnd_edit, path.as_deref()) {
-        match print_current_editor_text(hwnd, hwnd_edit) {
+        match print_current_editor_text(hwnd, hwnd_edit, language) {
             Ok(()) => {
                 log_debug("Print: internal RichEdit print completed");
-                show_print_message(hwnd, "Stampa completata.", MB_OK | MB_ICONINFORMATION);
+                show_print_message(
+                    hwnd,
+                    language,
+                    &i18n::tr(language, "print.completed"),
+                    MB_OK | MB_ICONINFORMATION,
+                );
             }
             Err(err) => {
                 log_debug(&format!("Print: internal RichEdit print failed err={err}"));
                 show_print_message(
                     hwnd,
-                    &format!("Impossibile stampare il testo del documento: {err}"),
+                    language,
+                    &i18n::tr_f(language, "print.document_text_error", &[("error", &err)]),
                     MB_OK | MB_ICONERROR,
                 );
             }
@@ -13352,7 +13362,8 @@ fn print_current_document(hwnd: HWND) {
         log_debug("Print: abort, no active document path and editor is not printable");
         show_print_message(
             hwnd,
-            "Nessun documento attivo da stampare.",
+            language,
+            &i18n::tr(language, "print.no_active_document"),
             MB_OK | MB_ICONWARNING,
         );
         return;
@@ -13360,15 +13371,18 @@ fn print_current_document(hwnd: HWND) {
 
     if dirty {
         log_debug("Print: non-text document dirty, printing saved file path only");
-        screen_reader_speak(
-            "Stampa del file salvato. Le modifiche non salvate potrebbero non essere incluse.",
-        );
+        screen_reader_speak(&i18n::tr(language, "print.saved_file_warning"));
     }
 
     match try_print_external_document(hwnd, &path) {
         PrintLaunchResult::Started => {
             log_debug("Print: external launch result started");
-            show_print_message(hwnd, "Stampa completata.", MB_OK | MB_ICONINFORMATION);
+            show_print_message(
+                hwnd,
+                language,
+                &i18n::tr(language, "print.completed"),
+                MB_OK | MB_ICONINFORMATION,
+            );
         }
         PrintLaunchResult::Failed { print_error } => {
             log_debug(&format!(
@@ -13376,16 +13390,22 @@ fn print_current_document(hwnd: HWND) {
             ));
             if hwnd_edit.0 != 0 {
                 log_debug("Print: external print failed, trying loaded editor text fallback");
-                match print_current_editor_text(hwnd, hwnd_edit) {
+                match print_current_editor_text(hwnd, hwnd_edit, language) {
                     Ok(()) => {
                         log_debug("Print: editor text fallback print completed");
-                        show_print_message(hwnd, "Stampa completata.", MB_OK | MB_ICONINFORMATION);
+                        show_print_message(
+                            hwnd,
+                            language,
+                            &i18n::tr(language, "print.completed"),
+                            MB_OK | MB_ICONINFORMATION,
+                        );
                     }
                     Err(err) => {
                         log_debug(&format!("Print: editor text fallback failed err={err}"));
                         show_print_message(
                             hwnd,
-                            &format!("Impossibile stampare il testo del documento: {err}"),
+                            language,
+                            &i18n::tr_f(language, "print.document_text_error", &[("error", &err)]),
                             MB_OK | MB_ICONERROR,
                         );
                     }
@@ -13393,8 +13413,11 @@ fn print_current_document(hwnd: HWND) {
             } else {
                 show_print_message(
                     hwnd,
-                    &format!(
-                        "Impossibile avviare la stampa diretta per questo tipo di file. Codice errore: {print_error}.\n\nSe PDF, DOCX o altri formati sono associati a Sonarpad, Windows non può usare automaticamente l'app originale per stamparli. Apri il file con il programma corretto, oppure cambia l'associazione di quel formato."
+                    language,
+                    &i18n::tr_f(
+                        language,
+                        "print.external_direct_error",
+                        &[("code", &print_error.to_string())],
                     ),
                     MB_OK | MB_ICONERROR,
                 );
@@ -13445,9 +13468,13 @@ fn should_print_with_editor(hwnd_edit: HWND, path: Option<&Path>) -> bool {
     }
 }
 
-fn print_current_editor_text(hwnd: HWND, hwnd_edit: HWND) -> Result<(), String> {
+fn print_current_editor_text(
+    hwnd: HWND,
+    hwnd_edit: HWND,
+    language: Language,
+) -> Result<(), String> {
     if hwnd_edit.0 == 0 {
-        return Err("nessun editor attivo".to_string());
+        return Err(i18n::tr(language, "print.no_active_editor"));
     }
 
     let window_text_len =
@@ -13464,7 +13491,7 @@ fn print_current_editor_text(hwnd: HWND, hwnd_edit: HWND) -> Result<(), String> 
         "Print: RichEdit text_len={text_len} window_text_len={window_text_len}"
     ));
     if text_len <= 0 {
-        return Err("il documento è vuoto".to_string());
+        return Err(i18n::tr(language, "print.empty_document"));
     }
 
     let mut print_dialog = PRINTDLGW {
@@ -13479,16 +13506,16 @@ fn print_current_editor_text(hwnd: HWND, hwnd_edit: HWND) -> Result<(), String> 
     let dialog_ok = unsafe { PrintDlgW(&mut print_dialog).as_bool() };
     log_debug(&format!("Print: PrintDlgW ok={dialog_ok}"));
     if !dialog_ok {
-        return Err("stampa annullata o nessuna stampante disponibile".to_string());
+        return Err(i18n::tr(language, "print.cancelled_or_no_printer"));
     }
 
     let hdc = print_dialog.hDC;
     if hdc.0 == 0 {
         free_print_dialog_handles(&print_dialog);
-        return Err("impossibile ottenere il contesto della stampante".to_string());
+        return Err(i18n::tr(language, "print.no_printer_context"));
     }
 
-    let result = print_rich_edit_to_hdc(hwnd_edit, hdc, text_len);
+    let result = print_rich_edit_to_hdc(hwnd_edit, hdc, text_len, language);
 
     // SAFETY: hdc comes from PrintDlgW with PD_RETURNDC and is owned by this function.
     let deleted_dc = unsafe { DeleteDC(hdc).as_bool() };
@@ -13503,7 +13530,12 @@ fn print_current_editor_text(hwnd: HWND, hwnd_edit: HWND) -> Result<(), String> 
     result
 }
 
-fn print_rich_edit_to_hdc(hwnd_edit: HWND, hdc: HDC, text_len: i32) -> Result<(), String> {
+fn print_rich_edit_to_hdc(
+    hwnd_edit: HWND,
+    hdc: HDC,
+    text_len: i32,
+    language: Language,
+) -> Result<(), String> {
     // SAFETY: hdc is a printer DC returned by PrintDlgW and remains valid for this print job.
     let log_pixels_x = unsafe { GetDeviceCaps(hdc, LOGPIXELSX) };
     // SAFETY: hdc is a printer DC returned by PrintDlgW and remains valid for this print job.
@@ -13526,7 +13558,7 @@ fn print_rich_edit_to_hdc(hwnd_edit: HWND, hdc: HDC, text_len: i32) -> Result<()
     ));
 
     if log_pixels_x <= 0 || log_pixels_y <= 0 || physical_width <= 0 || physical_height <= 0 {
-        return Err("parametri stampante non validi".to_string());
+        return Err(i18n::tr(language, "print.invalid_printer_parameters"));
     }
 
     let to_twips_x = |value: i32| value.saturating_mul(TWIPS_PER_INCH) / log_pixels_x;
@@ -13579,9 +13611,12 @@ fn print_rich_edit_to_hdc(hwnd_edit: HWND, hdc: HDC, text_len: i32) -> Result<()
     let start_doc = unsafe { StartDocW(hdc, &doc_info) };
     log_debug(&format!("Print: StartDocW result={start_doc}"));
     if start_doc <= 0 {
-        return Err(format!("StartDocW fallito: {}", unsafe {
-            GetLastError().0
-        }));
+        let error = unsafe { GetLastError().0 }.to_string();
+        return Err(i18n::tr_f(
+            language,
+            "print.start_doc_failed",
+            &[("error", &error)],
+        ));
     }
 
     let mut next_char = 0i32;
@@ -13598,7 +13633,8 @@ fn print_rich_edit_to_hdc(hwnd_edit: HWND, hdc: HDC, text_len: i32) -> Result<()
         ));
         if start_page <= 0 {
             ok = false;
-            err = format!("StartPage fallito: {}", unsafe { GetLastError().0 });
+            let error = unsafe { GetLastError().0 }.to_string();
+            err = i18n::tr_f(language, "print.start_page_failed", &[("error", &error)]);
             break;
         }
 
@@ -13629,7 +13665,8 @@ fn print_rich_edit_to_hdc(hwnd_edit: HWND, hdc: HDC, text_len: i32) -> Result<()
         log_debug(&format!("Print: EndPage page={page} result={end_page}"));
         if end_page <= 0 {
             ok = false;
-            err = format!("EndPage fallito: {}", unsafe { GetLastError().0 });
+            let error = unsafe { GetLastError().0 }.to_string();
+            err = i18n::tr_f(language, "print.end_page_failed", &[("error", &error)]);
             break;
         }
 
@@ -13640,7 +13677,7 @@ fn print_rich_edit_to_hdc(hwnd_edit: HWND, hdc: HDC, text_len: i32) -> Result<()
 
         if formatted_until <= next_char {
             ok = false;
-            err = "RichEdit non ha avanzato nella stampa del testo".to_string();
+            err = i18n::tr(language, "print.richedit_no_progress");
             break;
         }
         next_char = formatted_until;
@@ -13655,7 +13692,12 @@ fn print_rich_edit_to_hdc(hwnd_edit: HWND, hdc: HDC, text_len: i32) -> Result<()
         return Err(err);
     }
     if end_doc <= 0 {
-        return Err(format!("EndDoc fallito: {}", unsafe { GetLastError().0 }));
+        let error = unsafe { GetLastError().0 }.to_string();
+        return Err(i18n::tr_f(
+            language,
+            "print.end_doc_failed",
+            &[("error", &error)],
+        ));
     }
     Ok(())
 }
@@ -13779,14 +13821,14 @@ fn get_default_printer_name() -> Option<String> {
     }
 }
 
-fn show_print_message(hwnd: HWND, message: &str, flags: MESSAGEBOX_STYLE) {
+fn show_print_message(hwnd: HWND, language: Language, message: &str, flags: MESSAGEBOX_STYLE) {
     log_debug(&format!(
         "Print: showing message flags={:#x} chars={}",
         flags.0,
         message.chars().count()
     ));
     let message_wide = to_wide(message);
-    let title_wide = to_wide("Stampa");
+    let title_wide = to_wide(&i18n::tr(language, "print.title"));
     message_box_modal(
         hwnd,
         PCWSTR(message_wide.as_ptr()),

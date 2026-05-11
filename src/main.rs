@@ -13432,8 +13432,19 @@ fn print_current_editor_text(hwnd: HWND, hwnd_edit: HWND) -> Result<(), String> 
         return Err("nessun editor attivo".to_string());
     }
 
-    let text_len = send_message_w_safe(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
-    log_debug(&format!("Print: RichEdit text_len={text_len}"));
+    let window_text_len =
+        send_message_w_safe(hwnd_edit, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as i32;
+    let text = editor_manager::get_text_range(
+        hwnd_edit,
+        CHARRANGE {
+            cpMin: 0,
+            cpMax: window_text_len,
+        },
+    );
+    let text_len = text.encode_utf16().count() as i32;
+    log_debug(&format!(
+        "Print: RichEdit text_len={text_len} window_text_len={window_text_len}"
+    ));
     if text_len <= 0 {
         return Err("il documento è vuoto".to_string());
     }

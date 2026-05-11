@@ -1540,5 +1540,12 @@
   "whisper.status.saved_in": "{completed} Saved in: {path}",
   "whisper.status.save_failed": "{completed} Automatic saving failed: {error}",
   "whisper.default_filename": "Transcription",
-  "bookmark.already_present": "Bookmark already present at this position."
+  "bookmark.already_present": "Bookmark already present at this position.",
+  "options.gemini_api_key": "Gemini API key:",
+  "options.gemini_get_key": "Get Gemini API key...",
+  "options.gemini_model": "Gemini model:",
+  "options.gemini_refresh_models": "Refresh Gemini models",
+  "options.gemini_no_key": "Please enter a Gemini API key first.",
+  "options.gemini_loading_models": "Loading Gemini models...",
+  "options.gemini_error_models": "Unable to load Gemini models: {error}"
 }

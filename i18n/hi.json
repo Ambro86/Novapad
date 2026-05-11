@@ -1540,5 +1540,12 @@
   "whisper.status.saved_in": "{completed} इसमें सहेजा गया: {path}",
   "whisper.status.save_failed": "{completed} स्वचालित सहेजना विफल रहा: {error}",
   "whisper.default_filename": "लिप्यंतरण",
-  "bookmark.already_present": "इस स्थिति पर बुकमार्क पहले से मौजूद है।"
+  "bookmark.already_present": "इस स्थिति पर बुकमार्क पहले से मौजूद है।",
+  "options.gemini_api_key": "Gemini API कुंजी:",
+  "options.gemini_get_key": "Gemini API कुंजी प्राप्त करें...",
+  "options.gemini_model": "Gemini मॉडल:",
+  "options.gemini_refresh_models": "Gemini मॉडल रीफ़्रेश करें",
+  "options.gemini_no_key": "कृपया पहले Gemini API कुंजी दर्ज करें.",
+  "options.gemini_loading_models": "Gemini मॉडल लोड हो रहे हैं...",
+  "options.gemini_error_models": "Gemini मॉडल लोड नहीं किए जा सके: {error}"
 }

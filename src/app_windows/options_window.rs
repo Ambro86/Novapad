@@ -19,9 +19,11 @@ use crate::{
 };
 use reqwest::blocking::Client;
 use reqwest::header::USER_AGENT;
+use serde_json;
+use std::collections::VecDeque;
 use std::process::Command;
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -56,11 +58,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON,
     TrackPopupMenu, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
     WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT,
-    WM_VSCROLL, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WM_VSCROLL, WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
     WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
+const WM_GEMINI_MODELS_LOADED: u32 = WM_APP + 50;
 const OPTIONS_CLASS_NAME: &str = "SonarpadOptions";
 const OPTIONS_ID_LANG: usize = 6001;
 const OPTIONS_ID_MODIFIED_MARKER_POSITION: usize = 6023;
@@ -119,6 +122,10 @@ const OPTIONS_ID_WHISPER_MODEL: usize = 6111;
 const OPTIONS_ID_WHISPER_CUDA: usize = 6112;
 const OPTIONS_ID_WHISPER_KEEP_ORIGINAL_LANGUAGE: usize = 6113;
 const OPTIONS_ID_WHISPER_INCLUDE_TIMESTAMPS: usize = 6114;
+const OPTIONS_ID_GEMINI_API_KEY: usize = 6146;
+const OPTIONS_ID_GEMINI_GET_KEY: usize = 6147;
+const OPTIONS_ID_GEMINI_MODEL: usize = 6148;
+const OPTIONS_ID_GEMINI_REFRESH_MODELS: usize = 6149;
 const OPTIONS_ID_DICTATION_MICROPHONE: usize = 6121;
 const OPTIONS_ID_DICTIONARY_TRANSLATION: usize = 6038;
 const OPTIONS_ID_WIKIPEDIA_LANGUAGE: usize = 6040;
@@ -231,6 +238,13 @@ const OPTIONS_WHEEL_DELTA: i32 = 120;
 const DEFAULT_SAVE_FOLDER_AUDIOBOOK: u32 = 0;
 const DEFAULT_SAVE_FOLDER_MEDIA: u32 = 1;
 const DEFAULT_SAVE_FOLDER_DOCUMENTS: u32 = 2;
+
+struct GeminiModelsPayload {
+    result: Result<Vec<String>, String>,
+    language: Language,
+}
+
+static GEMINI_MODELS_PAYLOADS: OnceLock<Mutex<VecDeque<GeminiModelsPayload>>> = OnceLock::new();
 
 fn proxy_is_valid(proxy_url: &str, username: &str, password: &str) -> Result<(), String> {
     let mut proxy = reqwest::Proxy::all(proxy_url).map_err(|e| e.to_string())?;
@@ -952,6 +966,12 @@ struct OptionsDialogState {
     checkbox_whisper_cuda: HWND,
     checkbox_whisper_keep_original_language: HWND,
     checkbox_whisper_include_timestamps: HWND,
+    label_gemini_api_key: HWND,
+    edit_gemini_api_key: HWND,
+    button_gemini_get_key: HWND,
+    label_gemini_model: HWND,
+    combo_gemini_model: HWND,
+    button_gemini_refresh_models: HWND,
     label_dictation_microphone: HWND,
     combo_dictation_microphone: HWND,
     button_podcastindex_signup: HWND,
@@ -1201,6 +1221,10 @@ struct OptionsLabels {
     label_whisper_cuda: String,
     label_whisper_keep_original_language: String,
     label_whisper_include_timestamps: String,
+    label_gemini_api_key: String,
+    button_gemini_get_key: String,
+    label_gemini_model: String,
+    button_gemini_refresh_models: String,
     label_dictation_microphone: String,
     option_podcast_device_default: String,
     whisper_model_small: String,
@@ -1523,6 +1547,10 @@ fn options_labels(language: Language) -> OptionsLabels {
             language,
             "options.label.whisper_include_timestamps",
         ),
+        label_gemini_api_key: i18n::tr(language, "options.gemini_api_key"),
+        button_gemini_get_key: i18n::tr(language, "options.gemini_get_key"),
+        label_gemini_model: i18n::tr(language, "options.gemini_model"),
+        button_gemini_refresh_models: i18n::tr(language, "options.gemini_refresh_models"),
         label_dictation_microphone: i18n::tr(language, "podcast.mic_device"),
         option_podcast_device_default: i18n::tr(language, "podcast.device.default"),
         whisper_model_small: i18n::tr(language, "options.whisper_model.small"),
@@ -4935,6 +4963,102 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 30;
 
+                let label_gemini_api_key = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_gemini_api_key).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_gemini_api_key = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WS_BORDER
+                        | WINDOW_STYLE(ES_AUTOHSCROLL as u32 | ES_PASSWORD as u32),
+                    170,
+                    y - 2,
+                    300,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_GEMINI_API_KEY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let button_gemini_get_key = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.button_gemini_get_key).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y,
+                    300,
+                    30,
+                    hwnd,
+                    HMENU(OPTIONS_ID_GEMINI_GET_KEY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
+                let label_gemini_model = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_gemini_model).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_gemini_model = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_GEMINI_MODEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
+
+                let button_gemini_refresh_models = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.button_gemini_refresh_models).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    170,
+                    y,
+                    300,
+                    30,
+                    hwnd,
+                    HMENU(OPTIONS_ID_GEMINI_REFRESH_MODELS as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 40;
+
                 let label_dictation_microphone = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
@@ -5945,6 +6069,12 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_whisper_cuda,
                     checkbox_whisper_keep_original_language,
                     checkbox_whisper_include_timestamps,
+                    label_gemini_api_key,
+                    edit_gemini_api_key,
+                    button_gemini_get_key,
+                    label_gemini_model,
+                    combo_gemini_model,
+                    button_gemini_refresh_models,
                     label_dictation_microphone,
                     combo_dictation_microphone,
                     button_podcastindex_signup,
@@ -6146,6 +6276,12 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_whisper_cuda,
                     checkbox_whisper_keep_original_language,
                     checkbox_whisper_include_timestamps,
+                    label_gemini_api_key,
+                    edit_gemini_api_key,
+                    button_gemini_get_key,
+                    label_gemini_model,
+                    combo_gemini_model,
+                    button_gemini_refresh_models,
                     label_dictation_microphone,
                     combo_dictation_microphone,
                     button_podcastindex_signup,
@@ -6282,6 +6418,10 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 focus_tab_first(hwnd, active_tab);
                 LRESULT(0)
             }
+            WM_GEMINI_MODELS_LOADED => {
+                handle_next_gemini_models_payload(hwnd);
+                LRESULT(0)
+            }
             WM_NOTIFY => {
                 let hdr = &*(lparam.0 as *const NMHDR);
                 if hdr.idFrom == OPTIONS_ID_TABS && hdr.code == TCN_SELCHANGE {
@@ -6347,6 +6487,22 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     }
                     OPTIONS_ID_TTS_INSERT_PAUSE => {
                         insert_pause_tag_from_options(hwnd);
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_GEMINI_GET_KEY => {
+                        let url = to_wide("https://aistudio.google.com/app/apikey");
+                        ShellExecuteW(
+                            HWND(0),
+                            w!("open"),
+                            PCWSTR(url.as_ptr()),
+                            PCWSTR::null(),
+                            PCWSTR::null(),
+                            SW_SHOWNORMAL,
+                        );
+                        LRESULT(0)
+                    }
+                    OPTIONS_ID_GEMINI_REFRESH_MODELS => {
+                        refresh_gemini_models(hwnd);
                         LRESULT(0)
                     }
                     OPTIONS_ID_VOICE_PROFILE => {
@@ -6824,6 +6980,15 @@ fn initialize_options_dialog(hwnd: HWND) {
             edit_rai_luce_code,
             _label_whisper_model,
             combo_whisper_model,
+            _checkbox_whisper_cuda,
+            _checkbox_whisper_keep_original_language,
+            _checkbox_whisper_include_timestamps,
+            _label_gemini_api_key,
+            _edit_gemini_api_key,
+            _button_gemini_get_key,
+            _label_gemini_model,
+            _combo_gemini_model,
+            _button_gemini_refresh_models,
             _label_dictation_microphone,
             _combo_dictation_microphone,
             _button_podcastindex_signup,
@@ -6963,6 +7128,15 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.edit_rai_luce_code,
                 state.label_whisper_model,
                 state.combo_whisper_model,
+                state.checkbox_whisper_cuda,
+                state.checkbox_whisper_keep_original_language,
+                state.checkbox_whisper_include_timestamps,
+                state.label_gemini_api_key,
+                state.edit_gemini_api_key,
+                state.button_gemini_get_key,
+                state.label_gemini_model,
+                state.combo_gemini_model,
+                state.button_gemini_refresh_models,
                 state.label_dictation_microphone,
                 state.combo_dictation_microphone,
                 state.button_podcastindex_signup,
@@ -8827,6 +9001,55 @@ fn initialize_options_dialog(hwnd: HWND) {
                 LPARAM(0),
             );
         }
+        if let Some((edit_api_key, combo_model)) = with_options_state(hwnd, |state| {
+            (state.edit_gemini_api_key, state.combo_gemini_model)
+        }) {
+            crate::log_if_err!(SetWindowTextW(
+                edit_api_key,
+                PCWSTR(to_wide(&settings.gemini_api_key).as_ptr()),
+            ));
+
+            SendMessageW(combo_model, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+
+            // Default model
+            SendMessageW(
+                combo_model,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(crate::settings::DEFAULT_GEMINI_MODEL).as_ptr() as isize),
+            );
+
+            // If settings model is different, add it too
+            if !settings.gemini_model.is_empty()
+                && settings.gemini_model != crate::settings::DEFAULT_GEMINI_MODEL
+            {
+                SendMessageW(
+                    combo_model,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&settings.gemini_model).as_ptr() as isize),
+                );
+            }
+
+            // Select current model
+            let mut text_wide = to_wide(&settings.gemini_model);
+            let index = SendMessageW(
+                combo_model,
+                windows::Win32::UI::WindowsAndMessaging::CB_FINDSTRINGEXACT,
+                WPARAM(usize::MAX),
+                LPARAM(text_wide.as_mut_ptr() as isize),
+            );
+            if index.0 >= 0 {
+                SendMessageW(
+                    combo_model,
+                    CB_SETCURSEL,
+                    WPARAM(index.0 as usize),
+                    LPARAM(0),
+                );
+            } else {
+                SendMessageW(combo_model, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            }
+        }
         if let Some((combo_dictation_microphone, device_ids)) = with_options_state(hwnd, |state| {
             (
                 state.combo_dictation_microphone,
@@ -8983,6 +9206,21 @@ fn selected_voice_short_name_from_combo_text(combo: HWND) -> Option<String> {
     } else {
         Some(short_name.to_string())
     }
+}
+
+fn window_text(hwnd: HWND) -> String {
+    let len = crate::get_window_text_length_w_safe(hwnd);
+    if len <= 0 {
+        return String::new();
+    }
+
+    let mut buf = vec![0u16; (len + 1) as usize];
+    let read = crate::get_window_text_w_safe(hwnd, &mut buf);
+    if read <= 0 {
+        return String::new();
+    }
+
+    String::from_utf16_lossy(&buf[..read as usize])
 }
 
 fn selected_shortcut_action(hwnd: HWND) -> ShortcutAction {
@@ -10684,6 +10922,8 @@ fn apply_options_dialog(hwnd: HWND) {
             edit_podcastindex_secret,
             edit_rai_luce_code,
             combo_whisper_model,
+            edit_gemini_api_key,
+            combo_gemini_model,
             checkbox_tts_manual,
             checkbox_multilingual,
             checkbox_use_dialogue_voice,
@@ -10780,6 +11020,8 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.edit_podcastindex_secret,
                 state.edit_rai_luce_code,
                 state.combo_whisper_model,
+                state.edit_gemini_api_key,
+                state.combo_gemini_model,
                 state.checkbox_tts_manual,
                 state.checkbox_multilingual,
                 state.checkbox_use_dialogue_voice,
@@ -11883,6 +12125,13 @@ fn apply_options_dialog(hwnd: HWND) {
             .0 as u32
                 == BST_CHECKED.0;
         }
+        settings.gemini_api_key = window_text(edit_gemini_api_key).trim().to_string();
+        let gemini_model = window_text(combo_gemini_model).trim().to_string();
+        settings.gemini_model = if gemini_model.is_empty() {
+            crate::settings::DEFAULT_GEMINI_MODEL.to_string()
+        } else {
+            gemini_model
+        };
         if let Some((combo_dictation_microphone, device_ids)) = with_options_state(hwnd, |state| {
             (
                 state.combo_dictation_microphone,
@@ -13220,6 +13469,29 @@ fn layout_ai_transcription_tab(state: &OptionsDialogState, scroll_offset: i32) -
         state.checkbox_whisper_include_timestamps,
         y,
     );
+    y += OPTIONS_SECTION_GAP;
+    y = layout_label_control(
+        "label_gemini_api_key",
+        state.label_gemini_api_key,
+        "edit_gemini_api_key",
+        state.edit_gemini_api_key,
+        y,
+        OPTIONS_EDIT_HEIGHT,
+    );
+    y = layout_button("button_gemini_get_key", state.button_gemini_get_key, y);
+    y = layout_label_control(
+        "label_gemini_model",
+        state.label_gemini_model,
+        "combo_gemini_model",
+        state.combo_gemini_model,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_button(
+        "button_gemini_refresh_models",
+        state.button_gemini_refresh_models,
+        y,
+    );
     y + scroll_offset
 }
 
@@ -14100,5 +14372,162 @@ fn search_for_interpreter(hwnd: HWND) {
             edit,
             PCWSTR(to_wide(&selected).as_ptr())
         ));
+    }
+}
+
+pub fn refresh_gemini_models(hwnd: HWND) {
+    let state = match with_options_state(hwnd, |s| {
+        (
+            s.edit_gemini_api_key,
+            s.button_gemini_refresh_models,
+            s.parent,
+        )
+    }) {
+        Some(s) => s,
+        None => return,
+    };
+
+    let (edit_key, btn_refresh, _parent) = state;
+
+    let api_key = window_text(edit_key);
+    if api_key.trim().is_empty() {
+        let language = crate::load_settings().language;
+        crate::show_error(hwnd, language, &i18n::tr(language, "options.gemini_no_key"));
+        return;
+    }
+    let api_key = api_key.trim().to_string();
+
+    let language = crate::load_settings().language;
+    let loading_msg = i18n::tr(language, "options.gemini_loading_models");
+    crate::log_if_err!(crate::set_window_text_w_safe(
+        btn_refresh,
+        PCWSTR(to_wide(&loading_msg).as_ptr())
+    ));
+    crate::enable_window_safe(btn_refresh, false);
+
+    thread::spawn(move || {
+        let url = "https://generativelanguage.googleapis.com/v1beta/models";
+        let client = reqwest::blocking::Client::new();
+        let result = client
+            .get(url)
+            .header("x-goog-api-key", api_key)
+            .send()
+            .map_err(|err| err.to_string())
+            .and_then(|res| {
+                let status = res.status();
+                let value = res
+                    .json::<serde_json::Value>()
+                    .map_err(|err| err.to_string())?;
+                if status.is_success() {
+                    Ok(value)
+                } else {
+                    Err(gemini_api_error(status.as_u16(), &value))
+                }
+            });
+
+        let payload = match result {
+            Ok(resp) => {
+                let mut models: Vec<String> = Vec::new();
+                if let Some(list) = resp["models"].as_array() {
+                    for m in list {
+                        let supports_generate_content = m["supportedGenerationMethods"]
+                            .as_array()
+                            .is_some_and(|methods| {
+                                methods
+                                    .iter()
+                                    .any(|method| method.as_str() == Some("generateContent"))
+                            });
+                        if supports_generate_content && let Some(name) = m["name"].as_str() {
+                            let clean_name = name.replace("models/", "");
+                            if clean_name.starts_with("gemini") {
+                                models.push(clean_name);
+                            }
+                        }
+                    }
+                }
+                if models.is_empty() {
+                    GeminiModelsPayload {
+                        result: Err("No compatible Gemini models found".to_string()),
+                        language,
+                    }
+                } else {
+                    models.sort();
+                    models.dedup();
+                    GeminiModelsPayload {
+                        result: Ok(models),
+                        language,
+                    }
+                }
+            }
+            Err(e) => GeminiModelsPayload {
+                result: Err(e.to_string()),
+                language,
+            },
+        };
+
+        let queue = GEMINI_MODELS_PAYLOADS.get_or_init(|| Mutex::new(VecDeque::new()));
+        match queue.lock() {
+            Ok(mut guard) => guard.push_back(payload),
+            Err(err) => {
+                crate::log_debug(&format!("Failed to queue Gemini models payload: {}", err));
+                return;
+            }
+        }
+
+        if let Err(err) =
+            crate::post_message_w_safe(hwnd, WM_GEMINI_MODELS_LOADED, WPARAM(0), LPARAM(0))
+        {
+            crate::log_debug(&format!("Failed to post WM_GEMINI_MODELS_LOADED: {}", err));
+        }
+    });
+}
+
+fn gemini_api_error(status: u16, value: &serde_json::Value) -> String {
+    if let Some(message) = value["error"]["message"].as_str() {
+        format!("HTTP {status}: {message}")
+    } else {
+        format!("HTTP {status}")
+    }
+}
+
+fn handle_next_gemini_models_payload(hwnd: HWND) {
+    let payload = GEMINI_MODELS_PAYLOADS
+        .get()
+        .and_then(|queue| queue.lock().ok()?.pop_front());
+    let Some(payload) = payload else {
+        return;
+    };
+
+    if let Some((combo_model, btn_refresh)) = with_options_state(hwnd, |s| {
+        (s.combo_gemini_model, s.button_gemini_refresh_models)
+    }) {
+        let refresh_label = i18n::tr(payload.language, "options.gemini_refresh_models");
+        match payload.result {
+            Ok(models) => {
+                crate::send_message_w_safe(combo_model, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                for model in models {
+                    crate::send_message_w_safe(
+                        combo_model,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(&model).as_ptr() as isize),
+                    );
+                }
+                crate::send_message_w_safe(combo_model, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+            }
+            Err(error) => {
+                let err_msg = i18n::tr_f(
+                    payload.language,
+                    "options.gemini_error_models",
+                    &[("error", &error)],
+                );
+                crate::show_error(hwnd, payload.language, &err_msg);
+            }
+        }
+        crate::log_if_err!(crate::set_window_text_w_safe(
+            btn_refresh,
+            PCWSTR(to_wide(&refresh_label).as_ptr()),
+        ));
+        crate::enable_window_safe(btn_refresh, true);
     }
 }

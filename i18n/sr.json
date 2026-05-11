@@ -1540,5 +1540,12 @@
   "whisper.status.saved_in": "{completed} Sačuvano u: {path}",
   "whisper.status.save_failed": "{completed} Automatsko čuvanje nije uspelo: {error}",
   "whisper.default_filename": "Transkripcija",
-  "bookmark.already_present": "Obeleživač je već prisutan na ovoj poziciji."
+  "bookmark.already_present": "Obeleživač je već prisutan na ovoj poziciji.",
+  "options.gemini_api_key": "Gemini API ključ:",
+  "options.gemini_get_key": "Nabavi Gemini API ključ...",
+  "options.gemini_model": "Gemini model:",
+  "options.gemini_refresh_models": "Osveži Gemini modele",
+  "options.gemini_no_key": "Prvo unesite Gemini API ključ.",
+  "options.gemini_loading_models": "Učitavanje Gemini modela...",
+  "options.gemini_error_models": "Nije moguće učitati Gemini modele: {error}"
 }

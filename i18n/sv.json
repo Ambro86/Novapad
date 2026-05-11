@@ -1540,5 +1540,12 @@
   "whisper.status.saved_in": "{completed} Sparad i: {path}",
   "whisper.status.save_failed": "{completed} Automatisk sparning misslyckades: {error}",
   "whisper.default_filename": "Transkription",
-  "bookmark.already_present": "Bokmärke finns redan på denna position."
+  "bookmark.already_present": "Bokmärke finns redan på denna position.",
+  "options.gemini_api_key": "Gemini API-nyckel:",
+  "options.gemini_get_key": "Hämta Gemini API-nyckel...",
+  "options.gemini_model": "Gemini-modell:",
+  "options.gemini_refresh_models": "Uppdatera Gemini-modeller",
+  "options.gemini_no_key": "Ange först en Gemini API-nyckel.",
+  "options.gemini_loading_models": "Läser in Gemini-modeller...",
+  "options.gemini_error_models": "Det gick inte att läsa in Gemini-modeller: {error}"
 }

@@ -1540,5 +1540,12 @@
   "whisper.status.saved_in": "{completed} Сохранено в: {path}",
   "whisper.status.save_failed": "{completed} Не удалось автоматически сохранить: {error}",
   "whisper.default_filename": "Транскрипция",
-  "bookmark.already_present": "Закладка уже присутствует в этой позиции."
+  "bookmark.already_present": "Закладка уже присутствует в этой позиции.",
+  "options.gemini_api_key": "Ключ API Gemini:",
+  "options.gemini_get_key": "Получить ключ API Gemini...",
+  "options.gemini_model": "Модель Gemini:",
+  "options.gemini_refresh_models": "Обновить модели Gemini",
+  "options.gemini_no_key": "Сначала введите ключ API Gemini.",
+  "options.gemini_loading_models": "Загрузка моделей Gemini...",
+  "options.gemini_error_models": "Не удалось загрузить модели Gemini: {error}"
 }

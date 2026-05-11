@@ -15116,6 +15116,33 @@ fn start_editor_translation_text(
                 .map_err(|err| format!("Runtime traduzione non disponibile: {err}"))
                 .and_then(|runtime| {
                     runtime.block_on(async {
+                        let settings = crate::load_settings();
+                        if !settings.gemini_api_key.trim().is_empty() {
+                            log_debug(&format!(
+                                "Editor translation worker: using Gemini (model={})",
+                                settings.gemini_model
+                            ));
+                            let gemini_translator = translator::TranslatorGemini::new(
+                                settings.gemini_api_key.clone(),
+                                settings.gemini_model.clone(),
+                                target.clone(),
+                                if source == "auto" { None } else { Some(source.clone()) },
+                            )
+                            .map_err(|err| err.to_string())?;
+
+                            match gemini_translator
+                                .translate_chunked_cancellable(&text, cancel_token.as_ref())
+                                .await
+                            {
+                                Ok(translated) => return Ok(translated),
+                                Err(err) => {
+                                    log_debug(&format!(
+                                        "Editor translation worker: Gemini failed: {err}, falling back to DeepL/Google"
+                                    ));
+                                }
+                            }
+                        }
+
                         let google_source = if source == target {
                             "auto".to_string()
                         } else {

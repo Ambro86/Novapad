@@ -1540,5 +1540,12 @@
   "whisper.status.saved_in": "{completed} Enregistrée dans : {path}",
   "whisper.status.save_failed": "{completed} Échec de l’enregistrement automatique : {error}",
   "whisper.default_filename": "Transcription",
-  "bookmark.already_present": "Signet déjà présent à cette position."
+  "bookmark.already_present": "Signet déjà présent à cette position.",
+  "options.gemini_api_key": "Clé API Gemini :",
+  "options.gemini_get_key": "Obtenir une clé API Gemini...",
+  "options.gemini_model": "Modèle Gemini :",
+  "options.gemini_refresh_models": "Actualiser les modèles Gemini",
+  "options.gemini_no_key": "Saisissez d’abord une clé API Gemini.",
+  "options.gemini_loading_models": "Chargement des modèles Gemini...",
+  "options.gemini_error_models": "Impossible de charger les modèles Gemini : {error}"
 }

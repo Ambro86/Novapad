@@ -1540,5 +1540,12 @@
   "whisper.status.saved_in": "{completed} Đã lưu vào: {path}",
   "whisper.status.save_failed": "{completed} Không thể tự động lưu: {error}",
   "whisper.default_filename": "Bản ghi",
-  "bookmark.already_present": "Dấu trang đã tồn tại ở vị trí này."
+  "bookmark.already_present": "Dấu trang đã tồn tại ở vị trí này.",
+  "options.gemini_api_key": "Khóa API Gemini:",
+  "options.gemini_get_key": "Lấy khóa API Gemini...",
+  "options.gemini_model": "Mô hình Gemini:",
+  "options.gemini_refresh_models": "Làm mới mô hình Gemini",
+  "options.gemini_no_key": "Trước tiên hãy nhập khóa API Gemini.",
+  "options.gemini_loading_models": "Đang tải mô hình Gemini...",
+  "options.gemini_error_models": "Không thể tải mô hình Gemini: {error}"
 }

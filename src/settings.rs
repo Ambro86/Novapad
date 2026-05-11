@@ -34,6 +34,7 @@ pub const DRIVE_REMOVABLE: u32 = 2;
 pub const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 pub const VOICE_LIST_URL: &str =
     "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list";
+pub const DEFAULT_GEMINI_MODEL: &str = "gemini-3-flash-preview";
 
 static RAI_LUCE_CODE_CACHE: OnceLock<RwLock<Option<String>>> = OnceLock::new();
 static RAI_LUCE_EXPLICIT_CLEAR_PENDING: AtomicBool = AtomicBool::new(false);
@@ -738,6 +739,8 @@ pub struct AppSettings {
     pub radio_favorites: Vec<RadioFavorite>,
     #[serde(default)]
     pub gemini_api_key: String,
+    #[serde(default = "default_gemini_model")]
+    pub gemini_model: String,
     pub youtube_include_timestamps: bool,
     #[serde(default = "default_stream_audio_output_format")]
     pub stream_audio_default_format: String,
@@ -1039,6 +1042,10 @@ fn default_audiobook_split_start_number() -> u32 {
     1
 }
 
+fn default_gemini_model() -> String {
+    DEFAULT_GEMINI_MODEL.to_string()
+}
+
 fn default_dictionary_lookup_language() -> String {
     "auto".to_string()
 }
@@ -1139,6 +1146,7 @@ impl Default for AppSettings {
             route_country: String::new(),
             podcast_search_provider: PodcastSearchProvider::Itunes,
             gemini_api_key: String::new(),
+            gemini_model: default_gemini_model(),
             youtube_include_timestamps: true,
             stream_audio_default_format: default_stream_audio_output_format(),
             stream_favorites: Vec::new(),
@@ -2207,7 +2215,13 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.editor_translate_target_language.is_empty() {
         settings.editor_translate_target_language = default_editor_translate_target_language();
     }
+    settings.gemini_api_key =
+        decrypt_gemini_api_key(&settings.gemini_api_key).unwrap_or(settings.gemini_api_key);
     settings.gemini_api_key = settings.gemini_api_key.trim().to_string();
+    settings.gemini_model = settings.gemini_model.trim().to_string();
+    if settings.gemini_model.is_empty() {
+        settings.gemini_model = default_gemini_model();
+    }
     settings.stream_audio_default_format = settings.stream_audio_default_format.trim().to_string();
     if settings.stream_audio_default_format.is_empty() {
         settings.stream_audio_default_format = default_stream_audio_output_format();
@@ -2354,6 +2368,27 @@ pub fn decrypt_podcast_index_secret(secret: &str) -> Option<String> {
     let decoded = match hex::decode(secret) {
         Ok(decoded) => decoded,
         Err(_) => return Some(secret.to_string()),
+    };
+    let bytes = dpapi_unprotect(&decoded)?;
+    String::from_utf8(bytes).ok()
+}
+
+pub fn encrypt_gemini_api_key(api_key: &str) -> String {
+    if api_key.trim().is_empty() {
+        return String::new();
+    }
+    dpapi_protect(api_key.as_bytes())
+        .map(hex::encode)
+        .unwrap_or_default()
+}
+
+pub fn decrypt_gemini_api_key(api_key: &str) -> Option<String> {
+    if api_key.trim().is_empty() {
+        return None;
+    }
+    let decoded = match hex::decode(api_key) {
+        Ok(decoded) => decoded,
+        Err(_) => return Some(api_key.to_string()),
     };
     let bytes = dpapi_unprotect(&decoded)?;
     String::from_utf8(bytes).ok()
@@ -2698,6 +2733,7 @@ pub fn save_settings(settings: AppSettings) {
     } else if explicit_clear_requested {
         delete_rai_luce_backup();
     }
+    persisted.gemini_api_key = encrypt_gemini_api_key(&persisted.gemini_api_key);
     let path = get_settings_path();
     if let Some(parent) = path.parent()
         && let Err(e) = std::fs::create_dir_all(parent)

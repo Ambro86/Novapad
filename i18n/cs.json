@@ -1540,5 +1540,12 @@
   "whisper.status.saved_in": "{completed} Uloženo do: {path}",
   "whisper.status.save_failed": "{completed} Automatické uložení se nezdařilo: {error}",
   "whisper.default_filename": "Přepis",
-  "bookmark.already_present": "Záložka je na této pozici již přítomna."
+  "bookmark.already_present": "Záložka je na této pozici již přítomna.",
+  "options.gemini_api_key": "Klíč API Gemini:",
+  "options.gemini_get_key": "Získat klíč API Gemini...",
+  "options.gemini_model": "Model Gemini:",
+  "options.gemini_refresh_models": "Aktualizovat modely Gemini",
+  "options.gemini_no_key": "Nejprve zadejte klíč API Gemini.",
+  "options.gemini_loading_models": "Načítání modelů Gemini...",
+  "options.gemini_error_models": "Nelze načíst modely Gemini: {error}"
 }

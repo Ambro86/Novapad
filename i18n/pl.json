@@ -1540,5 +1540,12 @@
   "whisper.status.saved_in": "{completed} Zapisano w: {path}",
   "whisper.status.save_failed": "{completed} Automatyczne zapisywanie nie powiodło się: {error}",
   "whisper.default_filename": "Transkrypcja",
-  "bookmark.already_present": "Zakładka jest już obecna w tej pozycji."
+  "bookmark.already_present": "Zakładka jest już obecna w tej pozycji.",
+  "options.gemini_api_key": "Klucz API Gemini:",
+  "options.gemini_get_key": "Uzyskaj klucz API Gemini...",
+  "options.gemini_model": "Model Gemini:",
+  "options.gemini_refresh_models": "Odśwież modele Gemini",
+  "options.gemini_no_key": "Najpierw wprowadź klucz API Gemini.",
+  "options.gemini_loading_models": "Ładowanie modeli Gemini...",
+  "options.gemini_error_models": "Nie można załadować modeli Gemini: {error}"
 }

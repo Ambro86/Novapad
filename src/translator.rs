@@ -565,3 +565,169 @@ impl TranslatorDeepLFree {
         Ok(translated_text)
     }
 }
+
+pub struct TranslatorGemini {
+    pub api_key: String,
+    pub model: String,
+    pub target_lang: String,
+    pub source_lang: Option<String>,
+    client: Client,
+}
+
+impl TranslatorGemini {
+    pub fn new(
+        api_key: String,
+        model: String,
+        target_lang: String,
+        source_lang: Option<String>,
+    ) -> Result<Self, TranslatorError> {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(45))
+            .build()
+            .map_err(|err| TranslatorError::HttpClientBuild(err.to_string()))?;
+
+        Ok(Self {
+            api_key,
+            model: if model.trim().is_empty() {
+                crate::settings::DEFAULT_GEMINI_MODEL.to_string()
+            } else {
+                model.trim().to_string()
+            },
+            target_lang,
+            source_lang,
+            client,
+        })
+    }
+
+    fn next_chunk_end(text: &str, start: usize, max_chars: usize) -> usize {
+        let mut hard_end = text.len();
+        let mut last_soft_boundary = None;
+
+        for (char_count, (offset, ch)) in text[start..].char_indices().enumerate() {
+            if char_count >= max_chars {
+                hard_end = start + offset;
+                break;
+            }
+            if matches!(ch, '\n' | '.' | '!' | '?' | ';') {
+                last_soft_boundary = Some(start + offset + ch.len_utf8());
+            }
+        }
+
+        if hard_end == text.len() {
+            return hard_end;
+        }
+
+        last_soft_boundary
+            .filter(|end| *end > start)
+            .unwrap_or(hard_end)
+    }
+
+    fn split_translation_chunks(text: &str, max_chars: usize) -> Vec<String> {
+        if text.chars().count() <= max_chars {
+            return vec![text.to_string()];
+        }
+
+        let mut chunks = Vec::new();
+        let mut start = 0usize;
+        while start < text.len() {
+            let end = Self::next_chunk_end(text, start, max_chars);
+            chunks.push(text[start..end].to_string());
+            start = end;
+        }
+        chunks
+    }
+
+    pub async fn translate(
+        &self,
+        text: &str,
+        cancel: &AtomicBool,
+    ) -> Result<String, TranslatorError> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(TranslatorError::Cancelled);
+        }
+
+        let prompt = if let Some(source_lang) = self.source_lang.as_deref() {
+            format!(
+                "Translate the following text from {} to {}. Return ONLY the translated text, no comments, no intro, no formatting codes.\n\n{}",
+                source_lang, self.target_lang, text
+            )
+        } else {
+            format!(
+                "Translate the following text to {}. Return ONLY the translated text, no comments, no intro, no formatting codes.\n\n{}",
+                self.target_lang, text
+            )
+        };
+
+        let body = json!({
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }],
+            "generationConfig": {
+                "temperature": 0.1,
+            }
+        });
+
+        let api_key = HeaderValue::from_str(self.api_key.trim())
+            .map_err(|err| TranslatorError::HttpClientBuild(err.to_string()))?;
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
+            self.model
+        );
+
+        let response = self
+            .client
+            .post(url)
+            .header(CONTENT_TYPE, "application/json")
+            .header(HeaderName::from_static("x-goog-api-key"), api_key)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|err| TranslatorError::Network(err.to_string()))?;
+
+        if !response.status().is_success() {
+            let status = response.status().as_u16();
+            let body = response.text().await.unwrap_or_default();
+            return Err(TranslatorError::HttpStatus { status, body });
+        }
+
+        let resp_json: Value = response
+            .json()
+            .await
+            .map_err(|err| TranslatorError::ParseJson(err.to_string()))?;
+
+        let translated = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+            .as_str()
+            .ok_or(TranslatorError::MissingTranslatedText)?
+            .trim()
+            .to_string();
+
+        Ok(translated)
+    }
+
+    pub async fn translate_chunked_cancellable(
+        &self,
+        text: &str,
+        cancel: &AtomicBool,
+    ) -> Result<String, TranslatorError> {
+        const MAX_CHUNK_CHARS: usize = 6_000;
+
+        let chunks = Self::split_translation_chunks(text, MAX_CHUNK_CHARS);
+        if chunks.len() == 1 {
+            return self.translate(text, cancel).await;
+        }
+
+        let mut translated_text = String::new();
+        for chunk in chunks {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(TranslatorError::Cancelled);
+            }
+            if chunk.trim().is_empty() {
+                translated_text.push_str(&chunk);
+                continue;
+            }
+            translated_text.push_str(&self.translate(&chunk, cancel).await?);
+        }
+
+        Ok(translated_text)
+    }
+}

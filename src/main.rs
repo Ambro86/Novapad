@@ -13334,7 +13334,7 @@ fn print_current_document(hwnd: HWND) {
         match print_current_editor_text(hwnd, hwnd_edit) {
             Ok(()) => {
                 log_debug("Print: internal RichEdit print completed");
-                screen_reader_speak("Stampa completata.");
+                show_print_message(hwnd, "Stampa completata.", MB_OK | MB_ICONINFORMATION);
             }
             Err(err) => {
                 log_debug(&format!("Print: internal RichEdit print failed err={err}"));

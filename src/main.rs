@@ -143,21 +143,21 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetMenu, GetMenuItemCount, GetMessageW, GetNextDlgTabItem, GetParent, GetSubMenu,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, HACCEL,
     HCURSOR, HICON, HMENU, HWND_NOTOPMOST, HWND_TOPMOST, IDC_ARROW, IDI_APPLICATION, IDYES,
-    IsChild, IsDialogMessageW, IsIconic, IsWindow, IsWindowVisible, KillTimer, LoadCursorW,
-    LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_YESNO,
-    MENU_ITEM_FLAGS, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
-    MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MF_UNCHECKED, MSG, MessageBoxW,
-    ModifyMenuW, MoveWindow, OBJID_CLIENT, PostMessageW, PostQuitMessage, RegisterClassW,
-    RegisterWindowMessageW, SC_KEYMENU, SW_HIDE, SW_RESTORE, SW_SHOW, SW_SHOWMAXIMIZED,
-    SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
-    SetMenu, SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_RETURNCMD,
-    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW, TranslateMessage, WINDOW_STYLE,
-    WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CANCELMODE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
-    WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES, WM_GETTEXTLENGTH,
-    WM_INITMENUPOPUP, WM_KEYDOWN, WM_MOUSEMOVE, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL,
-    WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSCOMMAND,
-    WM_SYSKEYDOWN, WM_SYSKEYUP, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN,
-    WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    InsertMenuW, IsChild, IsDialogMessageW, IsIconic, IsWindow, IsWindowVisible, KillTimer,
+    LoadCursorW, LoadIconW, MB_ICONASTERISK, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING,
+    MB_OK, MB_YESNO, MENU_ITEM_FLAGS, MESSAGEBOX_RESULT, MESSAGEBOX_STYLE, MF_BYCOMMAND,
+    MF_BYPOSITION, MF_CHECKED, MF_ENABLED, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
+    MF_UNCHECKED, MSG, MessageBoxW, ModifyMenuW, MoveWindow, OBJID_CLIENT, PostMessageW,
+    PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SC_KEYMENU, SW_HIDE, SW_RESTORE,
+    SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW,
+    SetForegroundWindow, SetMenu, SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW,
+    ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
+    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CANCELMODE, WM_CLOSE,
+    WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
+    WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN, WM_MOUSEMOVE, WM_NCDESTROY, WM_NEXTDLGCTL,
+    WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR,
+    WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD,
+    WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
@@ -185,6 +185,36 @@ pub(crate) fn app_release_tag() -> &'static str {
 
 pub(crate) fn app_display_version() -> &'static str {
     app_release_tag()
+}
+
+fn update_route_image_menu_item(hwnd: HWND, file_menu: HMENU) {
+    unsafe {
+        crate::log_if_err!(DeleteMenu(
+            file_menu,
+            IDM_FILE_SAVE_IMAGE as u32,
+            MF_BYCOMMAND,
+        ));
+
+        if !editor_manager::current_document_has_route_map(hwnd) {
+            return;
+        }
+
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        let label = i18n::tr(language, "file.save_image");
+        let item_count = GetMenuItemCount(file_menu);
+        let insert_pos = if item_count > 6 {
+            6
+        } else {
+            item_count.max(0) as u32
+        };
+        crate::log_if_err!(InsertMenuW(
+            file_menu,
+            insert_pos,
+            MF_BYPOSITION | MF_STRING | MF_ENABLED,
+            IDM_FILE_SAVE_IMAGE,
+            PCWSTR(to_wide(&label).as_ptr()),
+        ));
+    }
 }
 
 const WM_PDF_LOADED: u32 = WM_APP + 1;
@@ -5802,10 +5832,12 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
         return;
     }
 
+    let default_prefix = i18n::tr(language, "whisper.default_filename");
     let auto_save_result = auto_save_whisper_transcription(
         Path::new(&documents_save_folder),
         &result.title,
         &result.text,
+        &default_prefix,
     );
     let (saved_path, save_error) = match auto_save_result {
         Ok(path) => (Some(path), None),
@@ -5842,18 +5874,23 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
         LPARAM(0)
     ));
     if let Some(err) = save_error {
-        let message = format!(
-            "{} Salvataggio automatico non riuscito: {}",
-            result.completed_message, err
+        let message = i18n::tr_f(
+            language,
+            "whisper.status.save_failed",
+            &[("completed", &result.completed_message), ("error", &err)],
         );
         crate::show_error(hwnd, language, &message);
         screen_reader_speak(&message);
     } else if let Some(path) = saved_path {
-        screen_reader_speak(&format!(
-            "{} Salvata in: {}",
-            result.completed_message,
-            path.display()
-        ));
+        let message = i18n::tr_f(
+            language,
+            "whisper.status.saved_in",
+            &[
+                ("completed", &result.completed_message),
+                ("path", &path.display().to_string()),
+            ],
+        );
+        screen_reader_speak(&message);
     } else {
         screen_reader_speak(&result.completed_message);
     }
@@ -5863,9 +5900,11 @@ fn auto_save_whisper_transcription(
     documents_save_folder: &Path,
     suggested_title: &str,
     text: &str,
+    default_prefix: &str,
 ) -> Result<PathBuf, String> {
     std::fs::create_dir_all(documents_save_folder).map_err(|err| err.to_string())?;
-    let path = unique_whisper_transcription_path(documents_save_folder, suggested_title);
+    let path =
+        unique_whisper_transcription_path(documents_save_folder, suggested_title, default_prefix);
     std::fs::write(&path, encode_text(text, TextEncoding::Utf8)).map_err(|err| err.to_string())?;
     Ok(path)
 }
@@ -5873,11 +5912,13 @@ fn auto_save_whisper_transcription(
 fn unique_whisper_transcription_path(
     documents_save_folder: &Path,
     suggested_title: &str,
+    default_prefix: &str,
 ) -> PathBuf {
     let mut candidate_name = sanitize_filename(suggested_title);
     if candidate_name.is_empty() {
         candidate_name = format!(
-            "Trascrizione_{}.txt",
+            "{}_{}.txt",
+            default_prefix,
             Local::now().format("%Y-%m-%d_%H-%M-%S")
         );
     }
@@ -5890,7 +5931,7 @@ fn unique_whisper_transcription_path(
         .file_stem()
         .and_then(|name| name.to_str())
         .filter(|name| !name.trim().is_empty())
-        .unwrap_or("Trascrizione")
+        .unwrap_or(default_prefix)
         .to_string();
     let extension = candidate_path
         .extension()
@@ -9757,12 +9798,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     update_voice_panel_menu_check(hwnd);
                     let file_menu = GetSubMenu(main_menu, 0);
                     if file_menu == hmenu {
-                        let flags = if editor_manager::current_document_has_route_map(hwnd) {
-                            MF_BYCOMMAND | MF_ENABLED
-                        } else {
-                            MF_BYCOMMAND | MF_GRAYED
-                        };
-                        let _enabled = EnableMenuItem(hmenu, IDM_FILE_SAVE_IMAGE as u32, flags);
+                        update_route_image_menu_item(hwnd, hmenu);
                     }
                     let edit_menu = GetSubMenu(main_menu, 1);
                     if edit_menu == hmenu {
@@ -17028,7 +17064,11 @@ fn insert_bookmark(hwnd: HWND) {
     if inserted {
         confirm_menu_action(hwnd, "insert.bookmark");
     } else {
-        crate::accessibility::screen_reader_speak("Segnalibro già presente in questa posizione.");
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        crate::accessibility::screen_reader_speak(&crate::i18n::tr(
+            language,
+            "bookmark.already_present",
+        ));
     }
 }
 

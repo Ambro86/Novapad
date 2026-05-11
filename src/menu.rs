@@ -215,7 +215,6 @@ pub struct MenuLabels {
     pub file_save: String,
     pub file_save_as: String,
     pub file_save_all: String,
-    pub file_save_image: String,
     pub file_print: String,
     pub file_close: String,
     pub file_recent: String,
@@ -353,7 +352,6 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         file_save: i18n::tr(language, "file.save"),
         file_save_as: i18n::tr(language, "file.save_as"),
         file_save_all: i18n::tr(language, "file.save_all"),
-        file_save_image: i18n::tr(language, "file.save_image"),
         file_print: i18n::tr(language, "file.print"),
         file_close: i18n::tr(language, "file.close"),
         file_recent: i18n::tr(language, "file.recent"),
@@ -969,12 +967,6 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             &labels.file_save_all,
         );
         append_menu_string(file_menu, MF_STRING, IDM_FILE_PRINT, &labels.file_print);
-        append_menu_string(
-            file_menu,
-            MF_STRING | MF_GRAYED,
-            IDM_FILE_SAVE_IMAGE,
-            &labels.file_save_image,
-        );
         crate::log_if_err!(AppendMenuW(file_menu, MF_SEPARATOR, 0, PCWSTR::null()));
         append_menu_string(
             file_menu,

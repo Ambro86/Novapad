@@ -1168,6 +1168,69 @@ pub fn insert_pause_tag_at_caret(hwnd: HWND, milliseconds: u32) {
     };
     let tag = format!("<pause ms=\"{milliseconds}\"/>");
     unsafe {
+        let mut start: u32 = 0;
+        let mut end: u32 = 0;
+        SendMessageW(
+            hwnd_edit,
+            EM_GETSEL,
+            WPARAM(&mut start as *mut u32 as usize),
+            LPARAM(&mut end as *mut u32 as isize),
+        );
+
+        if start == end {
+            let full_text = get_edit_text(hwnd_edit);
+            let lower = full_text.to_ascii_lowercase();
+            let full_utf16: Vec<u16> = full_text.encode_utf16().collect();
+            let lower_utf16: Vec<u16> = lower.encode_utf16().collect();
+            let caret_pos = start as usize;
+            let open_needle: Vec<u16> = "<voice".encode_utf16().collect();
+            let close_needle: Vec<u16> = "</voice>".encode_utf16().collect();
+
+            let last_open = find_last_utf16_before(&lower_utf16, &open_needle, caret_pos);
+            let last_close = find_last_utf16_before(&lower_utf16, &close_needle, caret_pos);
+            let inside_voice = matches!(
+                last_open,
+                Some(open_pos) if last_close.map(|close_pos| open_pos > close_pos).unwrap_or(true)
+            );
+
+            if inside_voice
+                && let Some(close_pos) = find_next_utf16_at_or_after(
+                    &lower_utf16,
+                    &close_needle,
+                    caret_pos.saturating_sub(close_needle.len().saturating_sub(1)),
+                )
+            {
+                let insert_pos = close_pos + close_needle.len();
+                let needs_newline = full_utf16
+                    .get(insert_pos.saturating_sub(1))
+                    .copied()
+                    .map(|prev| prev != '\n' as u16 && prev != '\r' as u16)
+                    .unwrap_or(true);
+                let pos_i32 = insert_pos as i32;
+                SendMessageW(
+                    hwnd_edit,
+                    EM_SETSEL,
+                    WPARAM(pos_i32 as usize),
+                    LPARAM(pos_i32 as isize),
+                );
+                let insert_text = if needs_newline {
+                    format!("\r\n{tag}")
+                } else {
+                    tag.clone()
+                };
+                let wide = to_wide(&insert_text);
+                SendMessageW(
+                    hwnd_edit,
+                    EM_REPLACESEL,
+                    WPARAM(1),
+                    LPARAM(wide.as_ptr() as isize),
+                );
+                SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+                copy_text_to_clipboard(hwnd, &tag, "pause tag");
+                return;
+            }
+        }
+
         let wide = to_wide(&tag);
         SendMessageW(
             hwnd_edit,

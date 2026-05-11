@@ -1536,5 +1536,9 @@
   "route.map.default_filename": "route.png",
   "route.map.geometry_error": "无法准备地图几何数据：",
   "route.map.from_error": "无法准备地图出发地：",
-  "route.map.to_error": "无法准备地图目的地："
+  "route.map.to_error": "无法准备地图目的地：",
+  "whisper.status.saved_in": "{completed} 已保存到：{path}",
+  "whisper.status.save_failed": "{completed} 自动保存失败：{error}",
+  "whisper.default_filename": "转录",
+  "bookmark.already_present": "该位置已存在书签。"
 }

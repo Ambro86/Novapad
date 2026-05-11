@@ -1536,5 +1536,9 @@
   "route.map.default_filename": "ruta.png",
   "route.map.geometry_error": "No se puede preparar la geometría del mapa:",
   "route.map.from_error": "No se puede preparar la salida del mapa:",
-  "route.map.to_error": "No se puede preparar la llegada del mapa:"
+  "route.map.to_error": "No se puede preparar la llegada del mapa:",
+  "whisper.status.saved_in": "{completed} Guardada en: {path}",
+  "whisper.status.save_failed": "{completed} No se pudo guardar automáticamente: {error}",
+  "whisper.default_filename": "Transcripción",
+  "bookmark.already_present": "Marcador ya presente en esta posición."
 }

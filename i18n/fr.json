@@ -248,7 +248,7 @@
   "file_handler.pdf_font_error": "Erreur de police PDF : {err}",
   "file_handler.pdf_no_text": "(Ce PDF ne contient aucun texte extractible)",
   "file_handler.pdf_page_label": "Page {page} sur {total}",
-  "file_handler.pdf_parse_error": "Erreur d’analyse du PDF\u00A0: le fichier est peut-être corrompu ou contient du contenu non pris en charge.",
+  "file_handler.pdf_parse_error": "Erreur d’analyse du PDF : le fichier est peut-être corrompu ou contient du contenu non pris en charge.",
   "file_handler.pdf_read_error": "Erreur de lecture PDF : {err}",
   "file_handler.pdf_save_error": "Erreur d'enregistrement PDF : {err}",
   "file_handler.utf16be_invalid_length": "Le fichier UTF-16BE a une longueur invalide.",
@@ -1536,5 +1536,9 @@
   "route.map.default_filename": "itineraire.png",
   "route.map.geometry_error": "Impossible de préparer la géométrie de la carte :",
   "route.map.from_error": "Impossible de préparer le départ de la carte :",
-  "route.map.to_error": "Impossible de préparer l’arrivée de la carte :"
+  "route.map.to_error": "Impossible de préparer l’arrivée de la carte :",
+  "whisper.status.saved_in": "{completed} Enregistrée dans : {path}",
+  "whisper.status.save_failed": "{completed} Échec de l’enregistrement automatique : {error}",
+  "whisper.default_filename": "Transcription",
+  "bookmark.already_present": "Signet déjà présent à cette position."
 }

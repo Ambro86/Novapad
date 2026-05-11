@@ -1536,5 +1536,9 @@
   "route.map.default_filename": "rutt.png",
   "route.map.geometry_error": "Det gick inte att förbereda kartgeometrin:",
   "route.map.from_error": "Det gick inte att förbereda kartans startpunkt:",
-  "route.map.to_error": "Det gick inte att förbereda kartans destination:"
+  "route.map.to_error": "Det gick inte att förbereda kartans destination:",
+  "whisper.status.saved_in": "{completed} Sparad i: {path}",
+  "whisper.status.save_failed": "{completed} Automatisk sparning misslyckades: {error}",
+  "whisper.default_filename": "Transkription",
+  "bookmark.already_present": "Bokmärke finns redan på denna position."
 }

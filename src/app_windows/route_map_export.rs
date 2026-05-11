@@ -50,7 +50,8 @@ pub fn export_current_route_map_image(parent: HWND) {
         .and_then(|html| capture_route_map_with_webview2(parent, &html, &output_path))
     {
         Ok(()) => {
-            crate::screen_reader_speak(&i18n::tr(language, "route.map.saved"));
+            let msg = i18n::tr(language, "route.map.saved");
+            crate::show_info(parent, language, &msg);
         }
         Err(error) => show_error(parent, language, &error),
     }

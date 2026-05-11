@@ -272,6 +272,7 @@
   "file.save": "&Save Ctrl+S",
   "file.save_all": "Išsaugoti viską Alt+Shift+S",
   "file.save_as": "Išsaugoti kaip...",
+  "file.save_image": "Išsaugoti vaizdą",
   "find_in_files.browse": "Naršyti...",
   "find_in_files.empty_folder": "Pasirinkite aplanką.",
   "find_in_files.empty_term": "Įveskite paieškos terminą.",

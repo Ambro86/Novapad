@@ -272,6 +272,7 @@
   "file.save": "&Сохранить\tCtrl+S",
   "file.save_all": "Сохранить &все\tAlt+Shift+S",
   "file.save_as": "Сохранить &как...",
+  "file.save_image": "Сохранить изображение",
   "find_in_files.browse": "Обзор...",
   "find_in_files.empty_folder": "Выберите папку.",
   "find_in_files.empty_term": "Введите поисковый запрос.",

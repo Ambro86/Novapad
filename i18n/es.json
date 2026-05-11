@@ -272,6 +272,7 @@
   "file.save": "&Guardar\tCtrl+S",
   "file.save_all": "Guardar &todo\tAlt+Shift+S",
   "file.save_as": "Guardar co&mo...",
+  "file.save_image": "Guardar imagen",
   "find_in_files.browse": "Examinar...",
   "find_in_files.empty_folder": "Selecciona una carpeta.",
   "find_in_files.empty_term": "Escribe un término de búsqueda.",

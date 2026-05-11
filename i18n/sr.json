@@ -272,6 +272,7 @@
   "file.save": "&Sačuvaj\tCtrl+S",
   "file.save_all": "Sačuvaj s&ve\tAlt+Shift+S",
   "file.save_as": "Sačuvaj &kao...",
+  "file.save_image": "Sačuvaj sliku",
   "find_in_files.browse": "Pretraži...",
   "find_in_files.empty_folder": "Izaberi fasciklu.",
   "find_in_files.empty_term": "Unesi pojam za pretragu.",

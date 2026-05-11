@@ -351,11 +351,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         file_save: i18n::tr(language, "file.save"),
         file_save_as: i18n::tr(language, "file.save_as"),
         file_save_all: i18n::tr(language, "file.save_all"),
-        file_save_image: if language == Language::Italian {
-            "Salva immagine...".to_string()
-        } else {
-            "Save image...".to_string()
-        },
+        file_save_image: i18n::tr(language, "file.save_image"),
         file_close: i18n::tr(language, "file.close"),
         file_recent: i18n::tr(language, "file.recent"),
         file_read_start: i18n::tr(language, "file.read_start"),

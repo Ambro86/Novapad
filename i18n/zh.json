@@ -272,6 +272,7 @@
   "file.save": "&保存 Ctrl+S",
   "file.save_all": "全部保&存\tAlt+Shift+S",
   "file.save_as": "另存为...",
+  "file.save_image": "保存图像",
   "find_in_files.browse": "浏览...",
   "find_in_files.empty_folder": "选择一个文件夹。",
   "find_in_files.empty_term": "输入搜索词。",

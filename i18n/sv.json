@@ -272,6 +272,7 @@
   "file.save": "&Spara\tCtrl+S",
   "file.save_all": "Spara a&lla\tAlt+Shift+S",
   "file.save_as": "Spara &som...",
+  "file.save_image": "Spara bild",
   "find_in_files.browse": "Bläddra...",
   "find_in_files.empty_folder": "Välj en mapp.",
   "find_in_files.empty_term": "Ange en sökterm.",

@@ -272,6 +272,7 @@
   "file.save": "&Зберегти\tCtrl+S",
   "file.save_all": "Зберегти &все\tAlt+Shift+S",
   "file.save_as": "Зберегти &як...",
+  "file.save_image": "Зберегти зображення",
   "find_in_files.browse": "Огляд...",
   "find_in_files.empty_folder": "Виберіть папку.",
   "find_in_files.empty_term": "Введіть пошуковий запит.",

@@ -272,6 +272,7 @@
   "file.save": "&Lưu\tCtrl+S",
   "file.save_all": "Lưu &tất cả\tAlt+Shift+S",
   "file.save_as": "Lưu &mới thành...",
+  "file.save_image": "Lưu hình ảnh",
   "find_in_files.browse": "Duyệt...",
   "find_in_files.empty_folder": "Vui lòng chọn một thư mục.",
   "find_in_files.empty_term": "Vui lòng nhập từ khóa tìm kiếm.",

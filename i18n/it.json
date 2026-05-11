@@ -324,6 +324,7 @@
   "file.save": "&Salva\tCtrl+S",
   "file.save_all": "Salva &tutto\tAlt+Shift+S",
   "file.save_as": "Salva con no&me...",
+  "file.save_image": "Salva immagine",
   "find_in_files.browse": "Sfoglia...",
   "find_in_files.empty_folder": "Seleziona una cartella.",
   "find_in_files.empty_term": "Inserisci il termine di ricerca.",

@@ -272,6 +272,7 @@
   "file.save": "&Uložit\tCtrl+S",
   "file.save_all": "Uložit vš&e\tAlt+Shift+S",
   "file.save_as": "Uložit &jako...",
+  "file.save_image": "Uložit obrázek",
   "find_in_files.browse": "Procházet...",
   "find_in_files.empty_folder": "Vyberte složku.",
   "find_in_files.empty_term": "Zadejte hledaný výraz.",

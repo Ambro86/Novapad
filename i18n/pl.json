@@ -272,6 +272,7 @@
   "file.save": "&Zapisz\tCtrl+S",
   "file.save_all": "Zapisz w&szystko\tAlt+Shift+S",
   "file.save_as": "Zapisz &jako...",
+  "file.save_image": "Zapisz obraz",
   "find_in_files.browse": "Przeglądaj...",
   "find_in_files.empty_folder": "Wybierz folder.",
   "find_in_files.empty_term": "Wprowadź szukaną frazę.",

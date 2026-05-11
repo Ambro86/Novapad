@@ -272,6 +272,7 @@
   "file.save": "सहेजें\tCtrl+S",
   "file.save_all": "सभी सहेजें\tAlt+Shift+S",
   "file.save_as": "इस नाम से सहेजें...",
+  "file.save_image": "छवि सहेजें",
   "find_in_files.browse": "ब्राउज़ करें...",
   "find_in_files.empty_folder": "एक फ़ोल्डर चुनें।",
   "find_in_files.empty_term": "खोज शब्द दर्ज करें।",

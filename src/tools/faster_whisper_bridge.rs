@@ -443,10 +443,17 @@ fn remove_case_insensitive_all(input: &str, needle: &str) -> String {
     output
 }
 
-fn strip_amara_signature(text: &str) -> String {
+fn strip_hallucinations(text: &str) -> String {
     let mut cleaned = text.to_string();
 
     for needle in [
+        "sottotitoli e revisione a cura di qtss",
+        "sottotitoli a cura di qtss",
+        "sottotitoli di qtss",
+        "traduzione a cura di qtss",
+        "revisione a cura di qtss",
+        "subtitles by qtss",
+        "translated by qtss",
         "sottotitoli creati dalla comunità amara.org",
         "sottotitoli creati dalla comunita amara.org",
         "sottotitoli creati dalla comunità amara org",
@@ -455,12 +462,16 @@ fn strip_amara_signature(text: &str) -> String {
         "subtitles created by the amara org community",
         "subtitles by the amara.org community",
         "subtitles by the amara org community",
+        "sottotitoli di amara.org",
+        "sottotitoli di amara org",
+        "subtitles by amara.org",
+        "subtitles by amara org",
     ] {
         cleaned = remove_case_insensitive_all(&cleaned, needle);
     }
 
     let lower = cleaned.to_ascii_lowercase();
-    for tail in ["amara.org", "amara org"] {
+    for tail in ["amara.org", "amara org", "qtss.", "qtss"] {
         if let Some(pos) = lower.rfind(tail)
             && lower.len().saturating_sub(pos) <= 96
         {
@@ -472,7 +483,7 @@ fn strip_amara_signature(text: &str) -> String {
     cleaned
         .lines()
         .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
-        .filter(|line| !line.is_empty())
+        .filter(|line| !line.is_empty() && !line.replace('.', "").trim().is_empty())
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -1190,7 +1201,7 @@ pub fn transcribe_wav(
     if let Some(result) = bridge_result {
         if result.ok {
             crate::log_debug("Bridge: returning successful transcript");
-            return Ok(strip_amara_signature(&result.text));
+            return Ok(strip_hallucinations(&result.text));
         }
         if !result.error.trim().is_empty() {
             crate::log_debug(&format!("Bridge: returning error '{}'", result.error));
@@ -1373,7 +1384,7 @@ pub fn transcribe_wav_with_shared_worker(
                     }
                     if result.ok {
                         worker.last_used_at = Instant::now();
-                        return Ok(strip_amara_signature(&result.text));
+                        return Ok(strip_hallucinations(&result.text));
                     }
                     let err = if result.error.trim().is_empty() {
                         "bridge worker returned no transcript".to_string()

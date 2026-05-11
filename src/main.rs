@@ -13368,7 +13368,7 @@ fn print_current_document(hwnd: HWND) {
     match try_print_external_document(hwnd, &path) {
         PrintLaunchResult::Started => {
             log_debug("Print: external launch result started");
-            screen_reader_speak("Stampa avviata.");
+            show_print_message(hwnd, "Stampa completata.", MB_OK | MB_ICONINFORMATION);
         }
         PrintLaunchResult::Failed { print_error } => {
             log_debug(&format!(

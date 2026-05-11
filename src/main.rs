@@ -13374,13 +13374,31 @@ fn print_current_document(hwnd: HWND) {
             log_debug(&format!(
                 "Print: external print failed print_error={print_error}"
             ));
-            show_print_message(
-                hwnd,
-                &format!(
-                    "Impossibile avviare la stampa diretta per questo tipo di file. Codice errore: {print_error}.\n\nSe PDF, DOCX o altri formati sono associati a Sonarpad, Windows non può usare automaticamente l'app originale per stamparli. Apri il file con il programma corretto, oppure cambia l'associazione di quel formato."
-                ),
-                MB_OK | MB_ICONERROR,
-            );
+            if hwnd_edit.0 != 0 {
+                log_debug("Print: external print failed, trying loaded editor text fallback");
+                match print_current_editor_text(hwnd, hwnd_edit) {
+                    Ok(()) => {
+                        log_debug("Print: editor text fallback print completed");
+                        show_print_message(hwnd, "Stampa completata.", MB_OK | MB_ICONINFORMATION);
+                    }
+                    Err(err) => {
+                        log_debug(&format!("Print: editor text fallback failed err={err}"));
+                        show_print_message(
+                            hwnd,
+                            &format!("Impossibile stampare il testo del documento: {err}"),
+                            MB_OK | MB_ICONERROR,
+                        );
+                    }
+                }
+            } else {
+                show_print_message(
+                    hwnd,
+                    &format!(
+                        "Impossibile avviare la stampa diretta per questo tipo di file. Codice errore: {print_error}.\n\nSe PDF, DOCX o altri formati sono associati a Sonarpad, Windows non può usare automaticamente l'app originale per stamparli. Apri il file con il programma corretto, oppure cambia l'associazione di quel formato."
+                    ),
+                    MB_OK | MB_ICONERROR,
+                );
+            }
         }
     }
 }

@@ -653,6 +653,8 @@
   "options.shortcuts.action.open_dictionary": "Открыть словарь",
   "options.shortcuts.action.open_options": "Открыть параметры",
   "options.shortcuts.action.open_podcasts": "Открыть подкасты",
+  "options.shortcuts.action.open_paths_navigation": "Открыть маршруты и навигацию",
+  "options.shortcuts.action.open_radio": "Открыть радио",
   "options.shortcuts.action.open_rss": "Открыть RSS",
   "options.shortcuts.action.open_terminal": "Открыть терминал",
   "options.shortcuts.action.quote_lines": "Цитировать строки",

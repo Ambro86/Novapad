@@ -36,10 +36,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     IDC_ARROW, IsDialogMessageW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION, MB_OKCANCEL,
     MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW,
     SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, ShowWindow, TranslateMessage,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY,
-    WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE, WS_VSCROLL,
+    WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION,
+    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::PCWSTR;
 
@@ -54,6 +54,7 @@ const PROMPT_ID_BEEP_ON_IDLE: usize = 9306;
 const PROMPT_ID_PREVENT_SLEEP: usize = 9307;
 
 const WM_PROMPT_OUTPUT: u32 = WM_APP + 60;
+const WM_CREDENTIALS_PROMPT_REFOCUS: u32 = WM_APP + 61;
 const EM_SETSEL: u32 = 0x00B1;
 const EM_LIMITTEXT: u32 = 0x00C5;
 const EM_SETREADONLY: u32 = 0x00CF;
@@ -2007,11 +2008,64 @@ fn credentials_prompt_wndproc_inner(
             }
             crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
+        WM_ACTIVATE => {
+            if (wparam.0 & 0xffff) != 0 {
+                focus_credentials_prompt_initial_control(hwnd, "activate.immediate");
+                if credentials_prompt_needs_posted_refocus(hwnd) {
+                    crate::log_if_err!(crate::post_message_w_safe(
+                        hwnd,
+                        WM_CREDENTIALS_PROMPT_REFOCUS,
+                        WPARAM(0),
+                        LPARAM(0),
+                    ));
+                }
+            }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
+        }
+        WM_CREDENTIALS_PROMPT_REFOCUS => {
+            focus_credentials_prompt_initial_control(hwnd, "activate.posted");
+            LRESULT(0)
+        }
         WM_CLOSE => {
             crate::log_if_err!(crate::destroy_window_safe(hwnd));
             LRESULT(0)
         }
         _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
+    }
+}
+
+fn credentials_prompt_needs_posted_refocus(hwnd: HWND) -> bool {
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut CredentialsPromptData;
+    crate::with_raw_mut_ptr_safe(ptr, |data| match &data.mode {
+        CredentialsPromptMode::Credentials => false,
+        CredentialsPromptMode::DirectorySearch(config) => !config.focus_primary_field,
+    })
+    .unwrap_or(false)
+}
+
+fn focus_credentials_prompt_initial_control(hwnd: HWND, reason: &str) {
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut CredentialsPromptData;
+    let target = crate::with_raw_mut_ptr_safe(ptr, |data| match &data.mode {
+        CredentialsPromptMode::Credentials => crate::get_dlg_item_safe(hwnd, 201),
+        CredentialsPromptMode::DirectorySearch(config) => {
+            if config.focus_primary_field {
+                crate::get_dlg_item_safe(hwnd, 201)
+            } else {
+                crate::get_dlg_item_safe(hwnd, 204)
+            }
+        }
+    })
+    .unwrap_or(HWND(0));
+    if target.0 != 0 {
+        let focus_before = crate::get_focus_safe();
+        crate::set_focus_safe(target);
+        crate::log_debug(&format!(
+            "credentials_prompt_refocus: reason={} target={:?} focus_before={:?} focus_after={:?}",
+            reason,
+            target,
+            focus_before,
+            crate::get_focus_safe()
+        ));
     }
 }
 

@@ -297,6 +297,8 @@ enum ShortcutAction {
     ConvertAudio,
     OpenRss,
     OpenPodcasts,
+    OpenPathsNavigation,
+    OpenRadio,
     OpenDictionary,
     OpenOptions,
     OpenTerminal,
@@ -312,7 +314,7 @@ enum ShortcutAction {
 }
 
 impl ShortcutAction {
-    const ALL: [ShortcutAction; 25] = [
+    const ALL: [ShortcutAction; 27] = [
         ShortcutAction::ReadPauseResume,
         ShortcutAction::ReadStart,
         ShortcutAction::ReadPreviousSentence,
@@ -326,6 +328,8 @@ impl ShortcutAction {
         ShortcutAction::ConvertAudio,
         ShortcutAction::OpenRss,
         ShortcutAction::OpenPodcasts,
+        ShortcutAction::OpenPathsNavigation,
+        ShortcutAction::OpenRadio,
         ShortcutAction::OpenDictionary,
         ShortcutAction::OpenOptions,
         ShortcutAction::OpenTerminal,
@@ -394,6 +398,8 @@ fn shortcut_action_i18n_key(action: ShortcutAction) -> &'static str {
         ShortcutAction::ConvertAudio => "options.shortcuts.action.convert_audio",
         ShortcutAction::OpenRss => "options.shortcuts.action.open_rss",
         ShortcutAction::OpenPodcasts => "options.shortcuts.action.open_podcasts",
+        ShortcutAction::OpenPathsNavigation => "options.shortcuts.action.open_paths_navigation",
+        ShortcutAction::OpenRadio => "options.shortcuts.action.open_radio",
         ShortcutAction::OpenDictionary => "options.shortcuts.action.open_dictionary",
         ShortcutAction::OpenOptions => "options.shortcuts.action.open_options",
         ShortcutAction::OpenTerminal => "options.shortcuts.action.open_terminal",
@@ -451,6 +457,8 @@ fn shortcut_binding_for_action(
         ShortcutAction::ConvertAudio => settings.convert_audio,
         ShortcutAction::OpenRss => settings.open_rss,
         ShortcutAction::OpenPodcasts => settings.open_podcasts,
+        ShortcutAction::OpenPathsNavigation => settings.open_paths_navigation,
+        ShortcutAction::OpenRadio => settings.open_radio,
         ShortcutAction::OpenDictionary => settings.open_dictionary,
         ShortcutAction::OpenOptions => settings.open_options,
         ShortcutAction::OpenTerminal => settings.open_terminal,
@@ -485,6 +493,8 @@ fn set_shortcut_binding_for_action(
         ShortcutAction::ConvertAudio => settings.convert_audio = binding,
         ShortcutAction::OpenRss => settings.open_rss = binding,
         ShortcutAction::OpenPodcasts => settings.open_podcasts = binding,
+        ShortcutAction::OpenPathsNavigation => settings.open_paths_navigation = binding,
+        ShortcutAction::OpenRadio => settings.open_radio = binding,
         ShortcutAction::OpenDictionary => settings.open_dictionary = binding,
         ShortcutAction::OpenOptions => settings.open_options = binding,
         ShortcutAction::OpenTerminal => settings.open_terminal = binding,
@@ -531,6 +541,10 @@ fn find_fixed_shortcut_conflict_label(
         (
             ShortcutBinding::new(true, true, false, 'S' as u16),
             labels.file_save_all,
+        ),
+        (
+            ShortcutBinding::new(true, false, false, 'P' as u16),
+            labels.file_print,
         ),
         (
             ShortcutBinding::new(true, false, false, 'W' as u16),

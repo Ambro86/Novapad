@@ -653,6 +653,8 @@
   "options.shortcuts.action.open_dictionary": "Abrir dicionário",
   "options.shortcuts.action.open_options": "Abrir opções",
   "options.shortcuts.action.open_podcasts": "Abrir podcasts",
+  "options.shortcuts.action.open_paths_navigation": "Abrir rotas e navegação",
+  "options.shortcuts.action.open_radio": "Abrir rádio",
   "options.shortcuts.action.open_rss": "Abrir RSS",
   "options.shortcuts.action.open_terminal": "Abrir terminal",
   "options.shortcuts.action.quote_lines": "Citar linhas",

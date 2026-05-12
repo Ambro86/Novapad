@@ -16769,6 +16769,14 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_PODCASTS);
         return true;
     }
+    if shortcut_matches_message(shortcuts.open_paths_navigation, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_PATHS_NAVIGATION);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.open_radio, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_RADIO);
+        return true;
+    }
     if shortcut_matches_message(shortcuts.open_dictionary, msg) {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_DICTIONARY);
         return true;
@@ -16847,6 +16855,11 @@ fn create_accelerators() -> HACCEL {
                 fVirt: virt_shift,
                 key: 'S' as u16,
                 cmd: IDM_FILE_SAVE_ALL as u16,
+            },
+            ACCEL {
+                fVirt: virt,
+                key: 'P' as u16,
+                cmd: IDM_FILE_PRINT as u16,
             },
             ACCEL {
                 fVirt: virt,

@@ -653,6 +653,8 @@
   "options.shortcuts.action.open_dictionary": "打开词典",
   "options.shortcuts.action.open_options": "打开设置",
   "options.shortcuts.action.open_podcasts": "打开播客",
+  "options.shortcuts.action.open_paths_navigation": "打开路线和导航",
+  "options.shortcuts.action.open_radio": "打开广播",
   "options.shortcuts.action.open_rss": "打开 RSS",
   "options.shortcuts.action.open_terminal": "打开终端",
   "options.shortcuts.action.quote_lines": "添加引用行",

@@ -923,6 +923,7 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
             .unwrap_or_else(ShortcutSettings::default);
         labels.file_read_start = label_with_shortcut(&labels.file_read_start, shortcuts.read_start);
+        labels.file_print = format!("{}\tCtrl+P", labels.file_print);
         labels.file_read_previous_sentence = label_with_shortcut(
             &labels.file_read_previous_sentence,
             shortcuts.read_previous_sentence,
@@ -943,6 +944,11 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             label_with_shortcut(&labels.file_convert_audio, shortcuts.convert_audio);
         labels.menu_rss = label_with_shortcut(&labels.menu_rss, shortcuts.open_rss);
         labels.menu_podcasts = label_with_shortcut(&labels.menu_podcasts, shortcuts.open_podcasts);
+        labels.menu_paths_navigation = label_with_shortcut(
+            &labels.menu_paths_navigation,
+            shortcuts.open_paths_navigation,
+        );
+        labels.menu_radio = label_with_shortcut(&labels.menu_radio, shortcuts.open_radio);
         labels.menu_dictionary =
             label_with_shortcut(&labels.menu_dictionary, shortcuts.open_dictionary);
         labels.menu_options = label_with_shortcut(&labels.menu_options, shortcuts.open_options);

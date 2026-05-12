@@ -4471,13 +4471,16 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                 })
                 .unwrap_or_else(|| state.docs[index].title.clone());
             if is_lossy_doc {
-                let mut name_path = PathBuf::from(&suggested_name);
-                name_path.set_extension("txt");
-                suggested_name = name_path
+                let mut base_name = Path::new(&suggested_name)
                     .file_name()
                     .and_then(|name| name.to_str())
-                    .unwrap_or("document.txt")
+                    .filter(|name| !name.trim().is_empty())
+                    .unwrap_or("document")
                     .to_string();
+                if !base_name.to_ascii_lowercase().ends_with(".txt") {
+                    base_name.push_str(".txt");
+                }
+                suggested_name = base_name;
             }
 
             let path_info = if !force_dialog && !is_lossy_doc {

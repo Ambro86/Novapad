@@ -146,3 +146,31 @@ fn ukrainian_language_variant_is_exercised() {
     let label = i18n::tr(settings::Language::Ukrainian, "reader.no_title");
     assert_eq!(label, "No Title");
 }
+
+#[test]
+fn corriere_podcast_body_article_content_is_extracted() {
+    let html = r#"
+        <html>
+            <head>
+                <meta property="og:title" content="Podcast title">
+                <meta name="description" content="Short feed preview that should not replace the article body.">
+            </head>
+            <body>
+                <main>
+                    <section class="body-article">
+                        <div class="content">
+                            <p>Il monitoraggio della diffusione in Italia apre il testo completo del podcast. Questa parte contiene il secondo tema, poi il terzo tema, e prosegue con molti dettagli utili per superare la soglia del parser. Il testo deve rimanere quello del corpo pagina, non la descrizione breve nei meta tag.</p>
+                        </div>
+                    </section>
+                </main>
+            </body>
+        </html>
+    "#;
+
+    let article = reader::reader_mode_extract(html, settings::Language::Italian)
+        .expect("expected Corriere podcast body article extraction");
+
+    assert!(article.content.contains("Il monitoraggio della diffusione"));
+    assert!(article.content.contains("non la descrizione breve"));
+    assert!(!article.content.contains("Short feed preview"));
+}

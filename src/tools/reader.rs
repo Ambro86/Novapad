@@ -706,6 +706,7 @@ pub fn reader_mode_extract(html_content: &str, language: Language) -> Option<Art
     // 3. FALLBACK CSS
     if !found_anything || body_acc.len() < 300 {
         let content_selectors = [
+            ".body-article .content h2, .body-article .content h3, .body-article .content p, .body-article .content li",
             ".blog-detail-wrapper .rich-text h2, .blog-detail-wrapper .rich-text h3, .blog-detail-wrapper .rich-text p, .blog-detail-wrapper .rich-text li",
             ".node-text .textarea-content-body",
             ".node-summary",

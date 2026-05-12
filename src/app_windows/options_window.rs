@@ -4963,6 +4963,75 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 30;
 
+                let label_dictation_microphone = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_dictation_microphone).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let combo_dictation_microphone = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    200,
+                    hwnd,
+                    HMENU(OPTIONS_ID_DICTATION_MICROPHONE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let default_index = SendMessageW(
+                    combo_dictation_microphone,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.option_podcast_device_default).as_ptr() as isize),
+                )
+                .0 as usize;
+                SendMessageW(
+                    combo_dictation_microphone,
+                    CB_SETITEMDATA,
+                    WPARAM(default_index),
+                    LPARAM(0),
+                );
+                let mut dictation_microphone_device_ids =
+                    vec![crate::settings::PODCAST_DEVICE_DEFAULT.to_string()];
+                if let Ok(devices) = crate::podcast_recorder::list_input_devices() {
+                    for device in devices {
+                        let idx = SendMessageW(
+                            combo_dictation_microphone,
+                            CB_ADDSTRING,
+                            WPARAM(0),
+                            LPARAM(to_wide(&device.name).as_ptr() as isize),
+                        )
+                        .0 as usize;
+                        SendMessageW(
+                            combo_dictation_microphone,
+                            CB_SETITEMDATA,
+                            WPARAM(idx),
+                            LPARAM(dictation_microphone_device_ids.len() as isize),
+                        );
+                        dictation_microphone_device_ids.push(device.id);
+                    }
+                }
+                SendMessageW(
+                    combo_dictation_microphone,
+                    CB_SETCURSEL,
+                    WPARAM(0),
+                    LPARAM(0),
+                );
+                y += 30;
+
                 let label_gemini_api_key = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
@@ -5058,75 +5127,6 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     None,
                 );
                 y += 40;
-
-                let label_dictation_microphone = CreateWindowExW(
-                    Default::default(),
-                    WC_STATIC,
-                    PCWSTR(to_wide(&labels.label_dictation_microphone).as_ptr()),
-                    WS_CHILD | WS_VISIBLE,
-                    20,
-                    y,
-                    140,
-                    20,
-                    hwnd,
-                    HMENU(0),
-                    HINSTANCE(0),
-                    None,
-                );
-                let combo_dictation_microphone = CreateWindowExW(
-                    WS_EX_CLIENTEDGE,
-                    WC_COMBOBOXW,
-                    PCWSTR::null(),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                    170,
-                    y - 2,
-                    300,
-                    200,
-                    hwnd,
-                    HMENU(OPTIONS_ID_DICTATION_MICROPHONE as isize),
-                    HINSTANCE(0),
-                    None,
-                );
-                let default_index = SendMessageW(
-                    combo_dictation_microphone,
-                    CB_ADDSTRING,
-                    WPARAM(0),
-                    LPARAM(to_wide(&labels.option_podcast_device_default).as_ptr() as isize),
-                )
-                .0 as usize;
-                SendMessageW(
-                    combo_dictation_microphone,
-                    CB_SETITEMDATA,
-                    WPARAM(default_index),
-                    LPARAM(0),
-                );
-                let mut dictation_microphone_device_ids =
-                    vec![crate::settings::PODCAST_DEVICE_DEFAULT.to_string()];
-                if let Ok(devices) = crate::podcast_recorder::list_input_devices() {
-                    for device in devices {
-                        let idx = SendMessageW(
-                            combo_dictation_microphone,
-                            CB_ADDSTRING,
-                            WPARAM(0),
-                            LPARAM(to_wide(&device.name).as_ptr() as isize),
-                        )
-                        .0 as usize;
-                        SendMessageW(
-                            combo_dictation_microphone,
-                            CB_SETITEMDATA,
-                            WPARAM(idx),
-                            LPARAM(dictation_microphone_device_ids.len() as isize),
-                        );
-                        dictation_microphone_device_ids.push(device.id);
-                    }
-                }
-                SendMessageW(
-                    combo_dictation_microphone,
-                    CB_SETCURSEL,
-                    WPARAM(0),
-                    LPARAM(0),
-                );
-                y += 30;
 
                 let button_podcastindex_signup = CreateWindowExW(
                     Default::default(),
@@ -13471,6 +13471,15 @@ fn layout_ai_transcription_tab(state: &OptionsDialogState, scroll_offset: i32) -
     );
     y += OPTIONS_SECTION_GAP;
     y = layout_label_control(
+        "label_dictation_microphone",
+        state.label_dictation_microphone,
+        "combo_dictation_microphone",
+        state.combo_dictation_microphone,
+        y,
+        OPTIONS_COMBO_HEIGHT,
+    );
+    y += OPTIONS_SECTION_GAP;
+    y = layout_label_control(
         "label_gemini_api_key",
         state.label_gemini_api_key,
         "edit_gemini_api_key",
@@ -14529,5 +14538,6 @@ fn handle_next_gemini_models_payload(hwnd: HWND) {
             PCWSTR(to_wide(&refresh_label).as_ptr()),
         ));
         crate::enable_window_safe(btn_refresh, true);
+        crate::set_focus_safe(combo_model);
     }
 }

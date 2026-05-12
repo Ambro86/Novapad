@@ -763,6 +763,8 @@ pub struct AppSettings {
     #[serde(default = "default_editor_translate_target_language")]
     pub editor_translate_target_language: String,
     #[serde(default)]
+    pub editor_translate_recent_languages: Vec<String>,
+    #[serde(default)]
     pub dictionary_search_history: Vec<String>,
     pub wikipedia_language: String,
     pub text_color: u32,
@@ -1054,6 +1056,8 @@ fn default_editor_translate_target_language() -> String {
     "it".to_string()
 }
 
+const MAX_EDITOR_TRANSLATE_RECENT_LANGUAGES: usize = 12;
+
 fn default_stream_audio_output_format() -> String {
     "auto".to_string()
 }
@@ -1160,6 +1164,7 @@ impl Default for AppSettings {
             dictionary_translation_language: "auto".to_string(),
             dictionary_lookup_language: default_dictionary_lookup_language(),
             editor_translate_target_language: default_editor_translate_target_language(),
+            editor_translate_recent_languages: Vec::new(),
             dictionary_search_history: Vec::new(),
             wikipedia_language: "auto".to_string(),
             text_color: 0x000000,
@@ -2215,6 +2220,22 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.editor_translate_target_language.is_empty() {
         settings.editor_translate_target_language = default_editor_translate_target_language();
     }
+    let mut editor_translate_recent_languages = Vec::new();
+    for language in settings.editor_translate_recent_languages.drain(..) {
+        let language = language.trim().to_ascii_lowercase();
+        if language.is_empty()
+            || editor_translate_recent_languages
+                .iter()
+                .any(|existing: &String| existing == &language)
+        {
+            continue;
+        }
+        editor_translate_recent_languages.push(language);
+        if editor_translate_recent_languages.len() >= MAX_EDITOR_TRANSLATE_RECENT_LANGUAGES {
+            break;
+        }
+    }
+    settings.editor_translate_recent_languages = editor_translate_recent_languages;
     settings.gemini_api_key =
         decrypt_gemini_api_key(&settings.gemini_api_key).unwrap_or(settings.gemini_api_key);
     settings.gemini_api_key = settings.gemini_api_key.trim().to_string();

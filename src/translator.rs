@@ -658,6 +658,10 @@ impl TranslatorGemini {
             )
         };
 
+        self.generate_text(&prompt).await
+    }
+
+    async fn generate_text(&self, prompt: &str) -> Result<String, TranslatorError> {
         let body = json!({
             "contents": [{
                 "parts": [{"text": prompt}]
@@ -695,13 +699,29 @@ impl TranslatorGemini {
             .await
             .map_err(|err| TranslatorError::ParseJson(err.to_string()))?;
 
-        let translated = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+        let generated = resp_json["candidates"][0]["content"]["parts"][0]["text"]
             .as_str()
             .ok_or(TranslatorError::MissingTranslatedText)?
             .trim()
             .to_string();
 
-        Ok(translated)
+        Ok(generated)
+    }
+
+    pub async fn summarize_same_language(
+        &self,
+        text: &str,
+        cancel: &AtomicBool,
+    ) -> Result<String, TranslatorError> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(TranslatorError::Cancelled);
+        }
+
+        let prompt = format!(
+            "Summarize the following text while keeping the same language as the original text. Do not translate. Preserve important names, dates, numbers, and concrete facts. Return ONLY the summary, no comments, no intro, no formatting codes.\n\n{}",
+            text
+        );
+        self.generate_text(&prompt).await
     }
 
     pub async fn translate_chunked_cancellable(

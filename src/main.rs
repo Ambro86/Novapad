@@ -248,6 +248,7 @@ const WM_PODCAST_EPISODE_PLAY_FAILED: u32 = WM_APP + 38;
 const WM_LOCAL_MPV_VIDEO_MODE: u32 = WM_APP + 40;
 const WM_LOCAL_MPV_MENU_VISIBLE: u32 = WM_APP + 41;
 const WM_EDITOR_TRANSLATION_DONE: u32 = WM_APP + 42;
+const WM_EDITOR_SUMMARY_DONE: u32 = WM_APP + 43;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
@@ -321,6 +322,17 @@ struct EditorTranslationResult {
     cp_min: i32,
     cp_max: i32,
     language: Language,
+    result: Result<EditorTranslationSuccess, String>,
+}
+
+struct EditorTranslationSuccess {
+    text: String,
+    provider: &'static str,
+    fallback_from: Option<&'static str>,
+}
+
+struct EditorSummaryResult {
+    language: Language,
     result: Result<String, String>,
 }
 const ITALIAONLINE_CLOSE_FOCUS_DEBUG_TIMER_ID4: usize = 15;
@@ -330,6 +342,8 @@ const MPV_ESC_FOCUS_DEBUG_TIMER_ID3: usize = 18;
 const MPV_ESC_FOCUS_DEBUG_TIMER_ID4: usize = 19;
 const MPV_ESC_FOCUS_DEBUG_TIMER_ID5: usize = 20;
 const MPV_ESC_FOCUS_DEBUG_TIMER_ID6: usize = 21;
+const EDITOR_TRANSLATION_SPEAK_TIMER_ID: usize = 22;
+const GEMINI_TRANSLATION_FALLBACK_MODEL: &str = "gemini-2.5-flash";
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
 const AUDIO_PLAYLIST_TIMER_ID: usize = 7;
@@ -929,6 +943,20 @@ pub(crate) fn get_window_text_w_safe(hwnd: HWND, string: &mut [u16]) -> i32 {
 }
 
 fn log_foreground_snapshot(tag: &str) {
+    const WINDOW_TEXT_LOG_PREVIEW_CHARS: usize = 180;
+
+    fn preview_window_text(text: &str) -> String {
+        let mut preview = text
+            .chars()
+            .take(WINDOW_TEXT_LOG_PREVIEW_CHARS)
+            .collect::<String>();
+        preview = preview.replace('\r', "\\r").replace('\n', "\\n");
+        if text.chars().count() > WINDOW_TEXT_LOG_PREVIEW_CHARS {
+            preview.push_str("...");
+        }
+        preview
+    }
+
     let foreground = unsafe { GetForegroundWindow() };
     let focus = unsafe { GetFocus() };
     let describe_hwnd = |hwnd: HWND| {
@@ -947,13 +975,22 @@ fn log_foreground_snapshot(tag: &str) {
         } else {
             String::new()
         };
-        (class_name, window_text)
+        let text_chars = window_text.chars().count();
+        (class_name, preview_window_text(&window_text), text_chars)
     };
-    let (foreground_class, foreground_text) = describe_hwnd(foreground);
-    let (focus_class, focus_text) = describe_hwnd(focus);
+    let (foreground_class, foreground_text, foreground_text_chars) = describe_hwnd(foreground);
+    let (focus_class, focus_text, focus_text_chars) = describe_hwnd(focus);
     log_debug(&format!(
-        "{}: foreground={:?} class='{}' text='{}' focus={:?} focus_class='{}' focus_text='{}'",
-        tag, foreground, foreground_class, foreground_text, focus, focus_class, focus_text
+        "{}: foreground={:?} class='{}' text='{}' text_chars={} focus={:?} focus_class='{}' focus_text='{}' focus_text_chars={}",
+        tag,
+        foreground,
+        foreground_class,
+        foreground_text,
+        foreground_text_chars,
+        focus,
+        focus_class,
+        focus_text,
+        focus_text_chars
     ));
 }
 
@@ -6830,6 +6867,7 @@ pub(crate) struct AppState {
     local_mpv_video_mode_active: bool,
     local_mpv_alt_menu_pending: bool,
     local_mpv_menu_visible: bool,
+    editor_translation_pending_speak: Option<String>,
     docs: Vec<Document>,
     current: usize,
     untitled_count: usize,
@@ -6892,6 +6930,7 @@ pub(crate) struct AppState {
     podcast_save_cancel_token: Option<Arc<AtomicBool>>,
     editor_translation_progress_window: HWND,
     editor_translation_cancel_token: Option<Arc<AtomicBool>>,
+    editor_progress_canceling_message: String,
     pdf_loading: Vec<PdfLoadingState>,
     next_timer_id: usize,
     tts_session: Option<TtsSession>,
@@ -8442,6 +8481,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     local_mpv_video_mode_active: false,
                     local_mpv_alt_menu_pending: false,
                     local_mpv_menu_visible: false,
+                    editor_translation_pending_speak: None,
                     docs: Vec::new(),
                     current: 0,
                     untitled_count: 0,
@@ -8505,6 +8545,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     podcast_save_cancel_token: None,
                     editor_translation_progress_window: HWND(0),
                     editor_translation_cancel_token: None,
+                    editor_progress_canceling_message: String::new(),
                     pdf_loading: Vec::new(),
                     next_timer_id: 1,
                     tts_session: None,
@@ -8985,6 +9026,15 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     update_chapter_announcement(hwnd);
                     return LRESULT(0);
                 }
+                if wparam.0 == EDITOR_TRANSLATION_SPEAK_TIMER_ID {
+                    kill_timer_best_effort(
+                        hwnd,
+                        EDITOR_TRANSLATION_SPEAK_TIMER_ID,
+                        "KillTimer EDITOR_TRANSLATION_SPEAK",
+                    );
+                    speak_pending_editor_translation_message(hwnd);
+                    return LRESULT(0);
+                }
                 if wparam.0 == SPELLCHECK_HIGHLIGHT_TIMER_ID {
                     kill_timer_best_effort(
                         hwnd,
@@ -9174,6 +9224,15 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 let payload = box_from_raw_safe(ptr);
                 apply_editor_translation_result(hwnd, *payload);
+                LRESULT(0)
+            }
+            WM_EDITOR_SUMMARY_DONE => {
+                let ptr = lparam.0 as *mut EditorSummaryResult;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let payload = box_from_raw_safe(ptr);
+                apply_editor_summary_result(hwnd, *payload);
                 LRESULT(0)
             }
             WM_PODCAST_EPISODE_PLAY_READY => {
@@ -9432,6 +9491,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     if state.editor_translation_progress_window == closed_hwnd {
                         state.editor_translation_progress_window = HWND(0);
                         state.editor_translation_cancel_token = None;
+                        state.editor_progress_canceling_message.clear();
                     }
                 });
                 LRESULT(0)
@@ -9480,12 +9540,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                             token.store(true, std::sync::atomic::Ordering::Relaxed);
                         }
                         if state.editor_translation_progress_window.0 != 0 {
+                            let canceling_message = state.editor_progress_canceling_message.clone();
                             app_windows::podcast_save_window::set_status_text(
                                 state.editor_translation_progress_window,
-                                match state.settings.language {
-                                    Language::Italian => "Annullamento traduzione...",
-                                    _ => "Canceling translation...",
-                                },
+                                &canceling_message,
                             );
                         }
                     });
@@ -10189,6 +10247,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     cmd if editor_translate_language_for_menu_id(cmd).is_some() => {
                         log_debug("Menu: Translate selection");
                         handle_editor_translate_menu_command(hwnd, cmd);
+                        LRESULT(0)
+                    }
+                    menu::IDM_EDIT_SUMMARIZE_TEXT => {
+                        log_debug("Menu: Summarize text");
+                        handle_editor_summarize_menu_command(hwnd);
                         LRESULT(0)
                     }
                     IDM_FILE_BATCH_AUDIOBOOK => {
@@ -14689,12 +14752,16 @@ pub(crate) fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPAR
         if let Ok(submenu) = CreatePopupMenu()
             && submenu.0 != 0
         {
-            let saved_target = with_state(hwnd, |state| {
-                state.settings.editor_translate_target_language.clone()
+            let (saved_target, recent_languages) = with_state(hwnd, |state| {
+                (
+                    state.settings.editor_translate_target_language.clone(),
+                    state.settings.editor_translate_recent_languages.clone(),
+                )
             })
-            .unwrap_or_else(|| EDITOR_TRANSLATE_LANGUAGES[0].key.to_string());
+            .unwrap_or_else(|| (EDITOR_TRANSLATE_LANGUAGES[0].key.to_string(), Vec::new()));
             let saved_target = normalized_editor_translate_target_language(&saved_target);
-            for (idx, translate_language) in EDITOR_TRANSLATE_LANGUAGES.iter().enumerate() {
+            for idx in editor_translate_ordered_language_indices(&recent_languages) {
+                let translate_language = &EDITOR_TRANSLATE_LANGUAGES[idx];
                 let key = format!("options.lang.{}", translate_language.key);
                 let label = i18n::tr(language_ui, &key);
                 let mut flags = MF_STRING;
@@ -14713,6 +14780,19 @@ pub(crate) fn show_editor_context_menu(hwnd: HWND, hwnd_edit: HWND, lparam: LPAR
                 menu,
                 MF_POPUP,
                 submenu.0 as usize,
+                PCWSTR(to_wide(&label).as_ptr()),
+            ));
+        }
+        let has_gemini_key = with_state(hwnd, |state| {
+            !state.settings.gemini_api_key.trim().is_empty()
+        })
+        .unwrap_or(false);
+        if has_gemini_key {
+            let label = i18n::tr(language_ui, "context_menu.summarize");
+            crate::log_if_err!(AppendMenuW(
+                menu,
+                MF_STRING,
+                menu::IDM_EDIT_SUMMARIZE_TEXT,
                 PCWSTR(to_wide(&label).as_ptr()),
             ));
         }
@@ -14806,6 +14886,31 @@ fn editor_translate_language_for_menu_id(
     EDITOR_TRANSLATE_LANGUAGES.get(idx)
 }
 
+fn editor_translate_language_index_by_key(value: &str) -> Option<usize> {
+    let value = value.trim();
+    EDITOR_TRANSLATE_LANGUAGES
+        .iter()
+        .position(|language| language.key.eq_ignore_ascii_case(value))
+}
+
+fn editor_translate_ordered_language_indices(recent_languages: &[String]) -> Vec<usize> {
+    let mut indices = Vec::with_capacity(EDITOR_TRANSLATE_LANGUAGES.len());
+    for language in recent_languages {
+        let Some(idx) = editor_translate_language_index_by_key(language) else {
+            continue;
+        };
+        if !indices.contains(&idx) {
+            indices.push(idx);
+        }
+    }
+    for idx in 0..EDITOR_TRANSLATE_LANGUAGES.len() {
+        if !indices.contains(&idx) {
+            indices.push(idx);
+        }
+    }
+    indices
+}
+
 fn normalized_editor_translate_target_language(value: &str) -> &'static str {
     let value = value.trim();
     EDITOR_TRANSLATE_LANGUAGES
@@ -14813,6 +14918,20 @@ fn normalized_editor_translate_target_language(value: &str) -> &'static str {
         .find(|language| language.key.eq_ignore_ascii_case(value))
         .map(|language| language.key)
         .unwrap_or(EDITOR_TRANSLATE_LANGUAGES[0].key)
+}
+
+fn record_editor_translate_recent_language(settings: &mut settings::AppSettings, key: &str) {
+    let Some(idx) = editor_translate_language_index_by_key(key) else {
+        return;
+    };
+    let key = EDITOR_TRANSLATE_LANGUAGES[idx].key.to_string();
+    settings
+        .editor_translate_recent_languages
+        .retain(|language| !language.eq_ignore_ascii_case(&key));
+    settings.editor_translate_recent_languages.insert(0, key);
+    settings
+        .editor_translate_recent_languages
+        .truncate(EDITOR_TRANSLATE_LANGUAGES.len());
 }
 
 const DEEPL_FREE_COOLDOWN_SECONDS: u64 = 10 * 60;
@@ -14972,12 +15091,56 @@ fn editor_translation_progress_labels(
     }
 }
 
+fn editor_summary_progress_labels(
+    language: Language,
+) -> app_windows::podcast_save_window::SaveDialogLabels {
+    let in_progress = i18n::tr(language, "summarize.status.starting");
+    let cancel_confirm = match language {
+        Language::Italian => "Vuoi annullare il riassunto?".to_string(),
+        _ => "Do you want to cancel the summary?".to_string(),
+    };
+
+    app_windows::podcast_save_window::SaveDialogLabels {
+        title: in_progress.clone(),
+        in_progress,
+        cancel: i18n::tr(language, "podcast.save.cancel"),
+        cancel_confirm,
+    }
+}
+
 fn open_editor_translation_progress_window(
     hwnd: HWND,
     language: Language,
     cancel_token: Arc<AtomicBool>,
 ) {
     let labels = editor_translation_progress_labels(language);
+    let canceling_message = match language {
+        Language::Italian => "Annullamento traduzione...".to_string(),
+        _ => "Canceling translation...".to_string(),
+    };
+    open_editor_progress_window(hwnd, language, labels, cancel_token, canceling_message);
+}
+
+fn open_editor_summary_progress_window(
+    hwnd: HWND,
+    language: Language,
+    cancel_token: Arc<AtomicBool>,
+) {
+    let labels = editor_summary_progress_labels(language);
+    let canceling_message = match language {
+        Language::Italian => "Annullamento riassunto...".to_string(),
+        _ => "Canceling summary...".to_string(),
+    };
+    open_editor_progress_window(hwnd, language, labels, cancel_token, canceling_message);
+}
+
+fn open_editor_progress_window(
+    hwnd: HWND,
+    language: Language,
+    labels: app_windows::podcast_save_window::SaveDialogLabels,
+    cancel_token: Arc<AtomicBool>,
+    canceling_message: String,
+) {
     let dialog = app_windows::podcast_save_window::open_with_labels(hwnd, language, labels, true);
     if dialog.0 != 0 {
         app_windows::podcast_save_window::focus_cancel_button(dialog);
@@ -14985,6 +15148,7 @@ fn open_editor_translation_progress_window(
     with_state(hwnd, |state| {
         state.editor_translation_progress_window = dialog;
         state.editor_translation_cancel_token = Some(cancel_token);
+        state.editor_progress_canceling_message = canceling_message;
     });
 }
 
@@ -15134,8 +15298,55 @@ fn start_editor_translation_text(
                                 .translate_chunked_cancellable(&text, cancel_token.as_ref())
                                 .await
                             {
-                                Ok(translated) => return Ok(translated),
+                                Ok(translated) => {
+                                    return Ok(EditorTranslationSuccess {
+                                        text: translated,
+                                        provider: "Gemini",
+                                        fallback_from: None,
+                                    });
+                                }
                                 Err(err) => {
+                                    if settings.gemini_model.starts_with("gemini-3")
+                                        && !cancel_token.load(Ordering::Relaxed)
+                                    {
+                                        log_debug(&format!(
+                                            "Editor translation worker: Gemini model {} failed: {err}, retrying {}",
+                                            settings.gemini_model,
+                                            GEMINI_TRANSLATION_FALLBACK_MODEL
+                                        ));
+                                        let fallback_gemini = translator::TranslatorGemini::new(
+                                            settings.gemini_api_key.clone(),
+                                            GEMINI_TRANSLATION_FALLBACK_MODEL.to_string(),
+                                            target.clone(),
+                                            if source == "auto" {
+                                                None
+                                            } else {
+                                                Some(source.clone())
+                                            },
+                                        )
+                                        .map_err(|err| err.to_string())?;
+                                        match fallback_gemini
+                                            .translate_chunked_cancellable(
+                                                &text,
+                                                cancel_token.as_ref(),
+                                            )
+                                            .await
+                                        {
+                                            Ok(translated) => {
+                                                return Ok(EditorTranslationSuccess {
+                                                    text: translated,
+                                                    provider: "Gemini 2.5 Flash",
+                                                    fallback_from: Some("Gemini 3.0"),
+                                                });
+                                            }
+                                            Err(fallback_err) => {
+                                                log_debug(&format!(
+                                                    "Editor translation worker: Gemini fallback model {} failed: {fallback_err}",
+                                                    GEMINI_TRANSLATION_FALLBACK_MODEL
+                                                ));
+                                            }
+                                        }
+                                    }
                                     log_debug(&format!(
                                         "Editor translation worker: Gemini failed: {err}, falling back to DeepL/Google"
                                     ));
@@ -15153,6 +15364,7 @@ fn start_editor_translation_text(
                                                      google_source: String,
                                                      target: String,
                                                      text: String,
+                                                     fallback_from: &'static str,
                                                      cancel_token: Arc<AtomicBool>| async move {
                             log_debug(&format!(
                                 "Editor translation worker: Google fallback source={} target={}",
@@ -15164,6 +15376,11 @@ fn start_editor_translation_text(
                             google_translator
                                 .translate_chunked_cancellable(&text, Some(cancel_token.as_ref()))
                                 .await
+                                .map(|translated| EditorTranslationSuccess {
+                                    text: translated,
+                                    provider: "Google Translate",
+                                    fallback_from: Some(fallback_from),
+                                })
                                 .map_err(|google_err| {
                                     format!(
                                         "{deepl_status}; Google fallback failed: {google_err}"
@@ -15183,6 +15400,7 @@ fn start_editor_translation_text(
                                 google_source,
                                 target,
                                 text,
+                                "DeepL",
                                 cancel_token.clone(),
                             )
                             .await;
@@ -15206,7 +15424,15 @@ fn start_editor_translation_text(
                             .translate_chunked_cancellable(&text, Some(cancel_token.as_ref()))
                             .await
                         {
-                            Ok(translated) => Ok(translated),
+                            Ok(translated) => Ok(EditorTranslationSuccess {
+                                text: translated,
+                                provider: "DeepL",
+                                fallback_from: if !settings.gemini_api_key.trim().is_empty() {
+                                    Some("Gemini")
+                                } else {
+                                    None
+                                },
+                            }),
                             Err(deepl_err) => {
                                 if is_deepl_too_many_requests_error(&deepl_err) {
                                     mark_deepl_free_cooldown();
@@ -15224,6 +15450,11 @@ fn start_editor_translation_text(
                                     google_source,
                                     target,
                                     text,
+                                    if !settings.gemini_api_key.trim().is_empty() {
+                                        "Gemini"
+                                    } else {
+                                        "DeepL"
+                                    },
                                     cancel_token.clone(),
                                 )
                                 .await
@@ -15233,8 +15464,10 @@ fn start_editor_translation_text(
                 });
             match &result {
                 Ok(translated) => log_debug(&format!(
-                    "Editor translation worker: request ok translated_chars={}",
-                    translated.chars().count()
+                    "Editor translation worker: request ok provider={} fallback_from={:?} translated_chars={}",
+                    translated.provider,
+                    translated.fallback_from,
+                    translated.text.chars().count()
                 )),
                 Err(err) => log_debug(&format!("Editor translation worker: request failed: {err}")),
             }
@@ -15285,6 +15518,7 @@ fn handle_editor_translate_menu_command(hwnd: HWND, cmd_id: usize) {
 
     let language = with_state(hwnd, |state| {
         state.settings.editor_translate_target_language = target_language.key.to_string();
+        record_editor_translate_recent_language(&mut state.settings, target_language.key);
         let language = state.settings.language;
         save_settings(state.settings.clone());
         language
@@ -15334,12 +15568,155 @@ fn handle_editor_translate_menu_command(hwnd: HWND, cmd_id: usize) {
     );
 }
 
+fn handle_editor_summarize_menu_command(hwnd: HWND) {
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+        log_debug("Editor summary: command ignored, no active editor");
+        return;
+    };
+    let (language, api_key, model) = with_state(hwnd, |state| {
+        (
+            state.settings.language,
+            state.settings.gemini_api_key.clone(),
+            state.settings.gemini_model.clone(),
+        )
+    })
+    .unwrap_or_default();
+    if api_key.trim().is_empty() {
+        show_error(
+            hwnd,
+            language,
+            &i18n::tr(language, "summarize.error.no_gemini_key"),
+        );
+        return;
+    }
+
+    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+    send_message_w_safe(
+        hwnd_edit,
+        EM_EXGETSEL,
+        WPARAM(0),
+        LPARAM(&mut selection as *mut _ as isize),
+    );
+    let text = if selection.cpMin != selection.cpMax {
+        selected_text_from_edit(hwnd_edit, selection).unwrap_or_default()
+    } else {
+        editor_manager::get_edit_text(hwnd_edit)
+    };
+    if text.trim().is_empty() {
+        log_debug("Editor summary: empty text, summary not started");
+        return;
+    }
+
+    let starting = i18n::tr(language, "summarize.status.starting");
+    set_main_status_message(hwnd, &starting);
+    screen_reader_speak(&starting);
+    let cancel_token = Arc::new(AtomicBool::new(false));
+    open_editor_summary_progress_window(hwnd, language, cancel_token.clone());
+    start_editor_summary_text(hwnd, text, language, api_key, model, cancel_token);
+}
+
+fn start_editor_summary_text(
+    hwnd: HWND,
+    text: String,
+    language: Language,
+    api_key: String,
+    model: String,
+    cancel_token: Arc<AtomicBool>,
+) {
+    let hwnd_value = hwnd.0;
+    let spawn_result = std::thread::Builder::new()
+        .name("editor-summary".to_string())
+        .spawn(move || {
+            log_debug(&format!(
+                "Editor summary worker: request begin chars={}",
+                text.chars().count()
+            ));
+            let result = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|err| format!("Runtime riassunto non disponibile: {err}"))
+                .and_then(|runtime| {
+                    runtime.block_on(async {
+                        let gemini =
+                            translator::TranslatorGemini::new(api_key, model, String::new(), None)
+                                .map_err(|err| err.to_string())?;
+                        let summary = gemini
+                            .summarize_same_language(&text, cancel_token.as_ref())
+                            .await
+                            .map_err(|err| err.to_string())?;
+                        if cancel_token.load(Ordering::Relaxed) {
+                            return Err(translator::TranslatorError::Cancelled.to_string());
+                        }
+                        Ok(summary)
+                    })
+                });
+            match &result {
+                Ok(summary) => log_debug(&format!(
+                    "Editor summary worker: request ok summary_chars={}",
+                    summary.chars().count()
+                )),
+                Err(err) => log_debug(&format!("Editor summary worker: request failed: {err}")),
+            }
+            let payload = Box::new(EditorSummaryResult { language, result });
+            let ptr = Box::into_raw(payload);
+            if let Err(err) = post_message_w_safe(
+                HWND(hwnd_value),
+                WM_EDITOR_SUMMARY_DONE,
+                WPARAM(0),
+                LPARAM(ptr as isize),
+            ) {
+                log_debug(&format!("Failed to post WM_EDITOR_SUMMARY_DONE: {err}"));
+                let _unused_box = box_from_raw_safe(ptr);
+            }
+        });
+
+    if let Err(err) = spawn_result {
+        close_editor_translation_progress_window(hwnd);
+        let message = i18n::tr_f(
+            language,
+            "summarize.error.failed",
+            &[("err", &err.to_string())],
+        );
+        show_error(hwnd, language, &message);
+    }
+}
+
+fn apply_editor_summary_result(hwnd: HWND, payload: EditorSummaryResult) {
+    close_editor_translation_progress_window(hwnd);
+    let summary = match payload.result {
+        Ok(summary) => summary,
+        Err(err) => {
+            if err.contains("canceled") || err.contains("cancelled") {
+                return;
+            }
+            let message = i18n::tr_f(payload.language, "summarize.error.failed", &[("err", &err)]);
+            show_error(hwnd, payload.language, &message);
+            return;
+        }
+    };
+    editor_manager::new_document(hwnd);
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+        log_debug("Editor summary: no active editor for summary result");
+        return;
+    };
+    editor_manager::set_current_document_title(
+        hwnd,
+        &i18n::tr(payload.language, "context_menu.summarize"),
+    );
+    editor_manager::set_edit_text(hwnd_edit, &summary);
+    editor_manager::mark_dirty_from_edit(hwnd, hwnd_edit);
+    let completed = i18n::tr(payload.language, "summarize.status.completed");
+    set_main_status_message(hwnd, &completed);
+    set_focus_safe(hwnd_edit);
+    schedule_editor_translation_speak(hwnd, completed);
+}
+
 fn apply_editor_translation_result(hwnd: HWND, payload: EditorTranslationResult) {
     close_editor_translation_progress_window(hwnd);
     let cp_min = payload.cp_min;
     let cp_max = payload.cp_max;
-    let translated_text = match payload.result {
-        Ok(translated_text) => translated_text,
+    let success = match payload.result {
+        Ok(success) => success,
         Err(err) => {
             log_debug(&format!(
                 "Editor translation: applying failed result: {err}"
@@ -15355,6 +15732,7 @@ fn apply_editor_translation_result(hwnd: HWND, payload: EditorTranslationResult)
             return;
         }
     };
+    let translated_text = success.text;
     let hwnd_edit = HWND(payload.hwnd_edit);
     if hwnd_edit.0 == 0 || !is_window_handle_valid(hwnd_edit) {
         log_debug("Editor translation: target editor is no longer valid");
@@ -15379,6 +15757,12 @@ fn apply_editor_translation_result(hwnd: HWND, payload: EditorTranslationResult)
     if after_text == before_text {
         if translated_text == before_text {
             log_debug("Editor translation: translated text is identical to current editor text");
+            announce_editor_translation_completed(
+                hwnd,
+                payload.language,
+                success.provider,
+                success.fallback_from,
+            );
             return;
         }
         log_debug("Editor translation: replace_range_text unchanged, using set_edit_text fallback");
@@ -15404,6 +15788,68 @@ fn apply_editor_translation_result(hwnd: HWND, payload: EditorTranslationResult)
     send_message_w_safe(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
     editor_manager::mark_dirty_from_edit(hwnd, hwnd_edit);
     set_focus_safe(hwnd_edit);
+    announce_editor_translation_completed(
+        hwnd,
+        payload.language,
+        success.provider,
+        success.fallback_from,
+    );
+}
+
+fn announce_editor_translation_completed(
+    hwnd: HWND,
+    language: Language,
+    provider: &str,
+    fallback_from: Option<&str>,
+) {
+    let message = if let Some(primary) = fallback_from {
+        i18n::tr_f(
+            language,
+            "translation.completed_with_fallback",
+            &[("primary", primary), ("provider", provider)],
+        )
+    } else {
+        i18n::tr_f(
+            language,
+            "translation.completed_with_provider",
+            &[("provider", provider)],
+        )
+    };
+    set_main_status_message(hwnd, &message);
+    schedule_editor_translation_speak(hwnd, message);
+}
+
+fn schedule_editor_translation_speak(hwnd: HWND, message: String) {
+    let scheduled = with_state(hwnd, |state| {
+        state.editor_translation_pending_speak = Some(message);
+        unsafe { SetTimer(hwnd, EDITOR_TRANSLATION_SPEAK_TIMER_ID, 300, None) != 0 }
+    })
+    .unwrap_or(false);
+    if !scheduled {
+        log_debug("Failed to set EDITOR_TRANSLATION_SPEAK_TIMER_ID");
+        speak_pending_editor_translation_message(hwnd);
+    }
+}
+
+fn speak_pending_editor_translation_message(hwnd: HWND) {
+    let message = with_state(hwnd, |state| state.editor_translation_pending_speak.take()).flatten();
+    if let Some(message) = message {
+        screen_reader_speak(&message);
+    }
+}
+
+fn set_main_status_message(hwnd: HWND, message: &str) {
+    let hwnd_status = with_state(hwnd, |state| state.hwnd_status).unwrap_or(HWND(0));
+    if hwnd_status.0 == 0 {
+        return;
+    }
+    let message_wide = to_wide(message);
+    send_message_w_safe(
+        hwnd_status,
+        SB_SETTEXTW,
+        WPARAM(0),
+        LPARAM(message_wide.as_ptr() as isize),
+    );
 }
 
 fn replace_editor_text_with_set_text(

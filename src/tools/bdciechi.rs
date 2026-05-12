@@ -7,8 +7,15 @@ use std::time::Duration;
 const BASE_URL: &str = "https://www.bdciechi.it/route.php";
 const IDEN_SP: &str = "SP";
 
+#[derive(Clone)]
+pub struct BdcQuota {
+    pub remaining: String,
+    pub monthly_total: String,
+}
+
 pub struct IdentifyResponse {
     pub nprov: String,
+    pub quota: Option<BdcQuota>,
 }
 
 pub struct UtcCatalogResponse {
@@ -83,15 +90,50 @@ pub fn identify(username: &str, password: &str) -> Result<IdentifyResponse, Stri
     if is_protocol_error(&body) {
         return Err(body);
     }
-    let nprov = body
-        .split(';')
-        .next()
+    let parts: Vec<&str> = body.trim().split(';').collect();
+    let nprov = parts
+        .first()
+        .copied()
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .ok_or_else(|| "Risposta identificazione non valida".to_string())?
         .to_string();
+    let quota = parse_identify_quota(&parts);
 
-    Ok(IdentifyResponse { nprov })
+    Ok(IdentifyResponse { nprov, quota })
+}
+
+fn parse_identify_quota(parts: &[&str]) -> Option<BdcQuota> {
+    let remaining = parts.get(1)?.trim();
+    if remaining.is_empty() {
+        return None;
+    }
+    let monthly_total = parts
+        .get(2)
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("60");
+    Some(BdcQuota {
+        remaining: remaining.to_string(),
+        monthly_total: monthly_total.to_string(),
+    })
+}
+
+pub fn parse_work_quota(info: &str) -> Option<BdcQuota> {
+    let parts: Vec<&str> = info.trim().split(';').collect();
+    let remaining = parts.get(1)?.trim();
+    if remaining.is_empty() {
+        return None;
+    }
+    let monthly_total = parts
+        .get(4)
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("60");
+    Some(BdcQuota {
+        remaining: remaining.to_string(),
+        monthly_total: monthly_total.to_string(),
+    })
 }
 
 pub fn fetch_catalog_list(nprov: &str) -> Result<String, String> {

@@ -57,6 +57,7 @@ struct LoginDonePayload {
     username: String,
     password: String,
     nprov: String,
+    quota: Option<bdciechi::BdcQuota>,
     catalog_raw: String,
     auto_login: bool,
     error: Option<String>,
@@ -123,6 +124,29 @@ fn set_sample_text(state: &BdState, text: &str) {
         state.sample_edit,
         PCWSTR(to_wide(text).as_ptr())
     ));
+}
+
+fn format_quota_message(quota: &bdciechi::BdcQuota) -> String {
+    format!(
+        "Libri ancora disponibili questo mese: {} su {}.",
+        quota.remaining, quota.monthly_total
+    )
+}
+
+fn speak_bdc_message_delayed(message: String) {
+    match std::thread::Builder::new()
+        .name("bdciechi-quota-speak".to_string())
+        .spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            if !crate::accessibility::screen_reader_speak(&message) {
+                crate::log_debug("bdciechi: delayed screen reader speak failed");
+            }
+        }) {
+        Ok(_handle) => {}
+        Err(err) => crate::log_debug(&format!(
+            "bdciechi: failed to spawn delayed speak thread: {err}"
+        )),
+    }
 }
 
 fn set_sample_visible(state: &BdState, visible: bool) {
@@ -737,13 +761,15 @@ fn do_login_impl(hwnd: HWND, auto_login: bool) {
 
         let hwnd_val = hwnd.0;
         std::thread::spawn(move || {
-            let payload = match bdciechi::identify(&username, &password)
-                .and_then(|id| bdciechi::fetch_catalog_list(&id.nprov).map(|c| (id.nprov, c)))
-            {
-                Ok((nprov, catalog_raw)) => LoginDonePayload {
+            let payload = match bdciechi::identify(&username, &password).and_then(|id| {
+                let quota = id.quota.clone();
+                bdciechi::fetch_catalog_list(&id.nprov).map(|c| (id.nprov, quota, c))
+            }) {
+                Ok((nprov, quota, catalog_raw)) => LoginDonePayload {
                     username,
                     password,
                     nprov,
+                    quota,
                     catalog_raw,
                     auto_login,
                     error: None,
@@ -752,6 +778,7 @@ fn do_login_impl(hwnd: HWND, auto_login: bool) {
                     username,
                     password,
                     nprov: String::new(),
+                    quota: None,
                     catalog_raw: String::new(),
                     auto_login,
                     error: Some(err),
@@ -1086,6 +1113,13 @@ fn download_selected(hwnd: HWND) {
                 &[("path", &path.display().to_string())],
             ),
         );
+        let quota_message = bdciechi::parse_work_quota(&work.info).map(|quota| {
+            crate::log_debug(&format!(
+                "bdciechi: download quota remaining={} total={}",
+                quota.remaining, quota.monthly_total
+            ));
+            format_quota_message(&quota)
+        });
 
         let ask = crate::message_box_w_safe(
             state.parent,
@@ -1093,6 +1127,9 @@ fn download_selected(hwnd: HWND) {
             PCWSTR(to_wide(&tr("title")).as_ptr()),
             MESSAGEBOX_STYLE(MB_YESNO.0 | MB_ICONQUESTION.0),
         );
+        if let Some(message) = quota_message {
+            speak_bdc_message_delayed(message);
+        }
         if ask == IDYES {
             Some((state.parent, path))
         } else {
@@ -1999,7 +2036,20 @@ fn bdc_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             &[("count", &state.catalog_rows.len().to_string())],
                         ),
                     );
-                    crate::accessibility::screen_reader_speak(&tr("status.login_completed"));
+                    let login_message = if let Some(quota) = &payload.quota {
+                        crate::log_debug(&format!(
+                            "bdciechi: login quota remaining={} total={}",
+                            quota.remaining, quota.monthly_total
+                        ));
+                        format!(
+                            "{} {}",
+                            tr("status.login_completed"),
+                            format_quota_message(quota)
+                        )
+                    } else {
+                        tr("status.login_completed")
+                    };
+                    speak_bdc_message_delayed(login_message);
                     SetForegroundWindow(hwnd);
                     SetFocus(state.search);
                 });

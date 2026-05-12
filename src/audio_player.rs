@@ -1210,7 +1210,38 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
                             &player.subtitle_speech_command,
                             "stopped_restart",
                         );
-                        let resume_seconds = player.accumulated_seconds;
+                        let duration_secs = crate::audio_player::audiobook_duration_secs(&player.path)
+                            .or_else(|| {
+                                player
+                                    .duration_secs()
+                                    .map(|secs| secs.max(0.0).floor() as u64)
+                            });
+                        let current_seconds = audiobook_position_secs(&player).max(0.0).floor() as u64;
+                        let resume_seconds = if crate::automatic_media_bookmark_reached_end(
+                            current_seconds,
+                            duration_secs,
+                        ) {
+                            crate::log_debug(&format!(
+                                "Audio player: stopped stream reached end, restarting from beginning path={} position={} duration={:?}",
+                                player.path.display(),
+                                current_seconds,
+                                duration_secs
+                            ));
+                            state
+                                .stopped_audiobook_positions
+                                .remove(&player.path);
+                            if state
+                                .last_stopped_audiobook
+                                .as_ref()
+                                .is_some_and(|path| path == &player.path)
+                            {
+                                state.last_stopped_audiobook = None;
+                                state.last_stopped_audiobook_position_secs = None;
+                            }
+                            0
+                        } else {
+                            player.accumulated_seconds
+                        };
                         player.subtitle_cancel.store(true, Ordering::Relaxed);
                         player.stop();
                         return Some(ToggleAction::RestartFromPosition {

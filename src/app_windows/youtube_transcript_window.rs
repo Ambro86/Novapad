@@ -1752,6 +1752,29 @@ fn is_youtube_collection_url(input: &str) -> bool {
         || path == "/playlist"
 }
 
+fn youtube_mix_seed_video_url(input: &str) -> Option<String> {
+    let normalized = normalize_youtube_collection_url(input)?;
+    let url = Url::parse(&normalized).ok()?;
+    let list_id = url
+        .query_pairs()
+        .find(|(key, value)| key == "list" && !value.trim().is_empty())
+        .map(|(_, value)| value.into_owned())?;
+    for prefix in ["RDAMVM", "RDMM", "RD"] {
+        if let Some(rest) = list_id.strip_prefix(prefix)
+            && rest.len() >= 11
+        {
+            let video_id = &rest[..11];
+            if video_id
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+            {
+                return Some(format!("https://www.youtube.com/watch?v={video_id}"));
+            }
+        }
+    }
+    None
+}
+
 fn is_youtube_channel_url(input: &str) -> bool {
     let Some(normalized) = normalize_youtube_collection_url(input) else {
         return false;
@@ -4897,8 +4920,32 @@ fn choose_youtube_collection_entry(
             std::thread::sleep(std::time::Duration::from_millis(30));
         }
         let (entries, has_more) = match worker.join() {
-            Ok(result) => result?,
-            Err(_) => return Err("yt-dlp collection probe worker failed".to_string()),
+            Ok(Ok(result)) => result,
+            Ok(Err(err)) => {
+                close_progress_dialog(progress);
+                restore_stream_parent_after_selection_cancel(parent);
+                if let Some(seed_url) = youtube_mix_seed_video_url(url) {
+                    crate::log_debug(&format!(
+                        "stream transition [collection_probe.mix_seed_fallback]: url={} seed_url={}",
+                        url, seed_url
+                    ));
+                    return Ok(Some(ResolvedStreamSelection {
+                        url: seed_url,
+                        collection_url: None,
+                        collection_page: None,
+                        selected_label: None,
+                        previous_input: None,
+                        previous_collection_page: None,
+                        previous_selected_label: None,
+                    }));
+                }
+                return Err(err);
+            }
+            Err(_) => {
+                close_progress_dialog(progress);
+                restore_stream_parent_after_selection_cancel(parent);
+                return Err("yt-dlp collection probe worker failed".to_string());
+            }
         };
         crate::log_debug(&format!(
             "stream transition [collection_probe.completed]: page={} entries={} has_more={}",
@@ -4983,9 +5030,16 @@ fn choose_youtube_collection_entry(
                     None,
                 )? {
                     Some(mut selection) => {
-                        selection.previous_input = Some(url.to_string());
-                        selection.previous_collection_page = Some(page);
-                        selection.previous_selected_label = Some(selected);
+                        if selection.collection_url.is_some() || selection.collection_page.is_some()
+                        {
+                            selection.previous_input = Some(url.to_string());
+                            selection.previous_collection_page = Some(page);
+                            selection.previous_selected_label = Some(selected);
+                        } else {
+                            selection.collection_url = Some(url.to_string());
+                            selection.collection_page = Some(page);
+                            selection.selected_label = Some(selected);
+                        }
                         return Ok(Some(selection));
                     }
                     None => continue,
@@ -5048,8 +5102,17 @@ fn choose_youtube_search_entry(
             std::thread::sleep(std::time::Duration::from_millis(30));
         }
         let (entries, has_more) = match worker.join() {
-            Ok(result) => result?,
-            Err(_) => return Err("yt-dlp search probe worker failed".to_string()),
+            Ok(Ok(result)) => result,
+            Ok(Err(err)) => {
+                close_progress_dialog(progress);
+                restore_stream_parent_after_selection_cancel(parent);
+                return Err(err);
+            }
+            Err(_) => {
+                close_progress_dialog(progress);
+                restore_stream_parent_after_selection_cancel(parent);
+                return Err("yt-dlp search probe worker failed".to_string());
+            }
         };
         crate::log_debug(&format!(
             "stream transition [search_probe.completed]: page={} entries={} has_more={}",
@@ -5120,9 +5183,14 @@ fn choose_youtube_search_entry(
                     None,
                 )? {
                     Some(mut selection) => {
-                        selection.previous_input = Some(query.to_string());
-                        selection.previous_collection_page = None;
-                        selection.previous_selected_label = Some(selected);
+                        if selection.collection_url.is_some() || selection.collection_page.is_some()
+                        {
+                            selection.previous_input = Some(query.to_string());
+                            selection.previous_collection_page = None;
+                            selection.previous_selected_label = Some(selected);
+                        } else {
+                            selection.selected_label = Some(selected);
+                        }
                         return Ok(Some(selection));
                     }
                     None => continue,

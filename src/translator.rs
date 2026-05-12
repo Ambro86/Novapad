@@ -255,6 +255,14 @@ impl TranslatorGoogleFree {
             }
 
             if let Some(err) = last_error {
+                if !translated_text.trim().is_empty() {
+                    crate::log_debug(&format!(
+                        "DeepL translation: chunk {} failed after partial output: {}",
+                        index + 1,
+                        err
+                    ));
+                    return Ok(translated_text);
+                }
                 return Err(err);
             }
         }
@@ -559,7 +567,18 @@ impl TranslatorDeepLFree {
                 continue;
             }
 
-            translated_text.push_str(&self.translate(chunk).await?);
+            match self.translate(chunk).await {
+                Ok(translated_chunk) => translated_text.push_str(&translated_chunk),
+                Err(err) if !translated_text.trim().is_empty() => {
+                    crate::log_debug(&format!(
+                        "Google translation: chunk {} failed after partial output: {}",
+                        index + 1,
+                        err
+                    ));
+                    return Ok(translated_text);
+                }
+                Err(err) => return Err(err),
+            }
         }
 
         Ok(translated_text)
@@ -724,6 +743,59 @@ impl TranslatorGemini {
         self.generate_text(&prompt).await
     }
 
+    pub async fn summarize_same_language_chunked_cancellable(
+        &self,
+        text: &str,
+        cancel: &AtomicBool,
+    ) -> Result<String, TranslatorError> {
+        const MAX_CHUNK_CHARS: usize = 6_000;
+
+        let chunks = Self::split_translation_chunks(text, MAX_CHUNK_CHARS);
+        if chunks.len() == 1 {
+            return self.summarize_same_language(text, cancel).await;
+        }
+
+        let chunk_count = chunks.len();
+        crate::log_debug(&format!(
+            "Gemini summary: chunking input chars={} chunks={}",
+            text.chars().count(),
+            chunk_count
+        ));
+        let mut partial_summaries = Vec::new();
+        for (index, chunk) in chunks.into_iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(TranslatorError::Cancelled);
+            }
+            if chunk.trim().is_empty() {
+                continue;
+            }
+            crate::log_debug(&format!(
+                "Gemini summary: summarizing chunk {}/{} chars={}",
+                index + 1,
+                chunk_count,
+                chunk.chars().count()
+            ));
+            match self.summarize_same_language(&chunk, cancel).await {
+                Ok(summary) => partial_summaries.push(summary),
+                Err(TranslatorError::Cancelled) => return Err(TranslatorError::Cancelled),
+                Err(err) if !partial_summaries.is_empty() => {
+                    crate::log_debug(&format!(
+                        "Gemini summary: chunk {} failed after partial output: {}",
+                        index + 1,
+                        err
+                    ));
+                    return Ok(partial_summaries.join("\n\n"));
+                }
+                Err(err) => return Err(err),
+            }
+        }
+
+        if cancel.load(Ordering::Relaxed) {
+            return Err(TranslatorError::Cancelled);
+        }
+        Ok(partial_summaries.join("\n\n"))
+    }
+
     pub async fn translate_chunked_cancellable(
         &self,
         text: &str,
@@ -737,7 +809,7 @@ impl TranslatorGemini {
         }
 
         let mut translated_text = String::new();
-        for chunk in chunks {
+        for (index, chunk) in chunks.into_iter().enumerate() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(TranslatorError::Cancelled);
             }
@@ -745,7 +817,19 @@ impl TranslatorGemini {
                 translated_text.push_str(&chunk);
                 continue;
             }
-            translated_text.push_str(&self.translate(&chunk, cancel).await?);
+            match self.translate(&chunk, cancel).await {
+                Ok(translated_chunk) => translated_text.push_str(&translated_chunk),
+                Err(TranslatorError::Cancelled) => return Err(TranslatorError::Cancelled),
+                Err(err) if !translated_text.trim().is_empty() => {
+                    crate::log_debug(&format!(
+                        "Gemini translation: chunk {} failed after partial output: {}",
+                        index + 1,
+                        err
+                    ));
+                    return Ok(translated_text);
+                }
+                Err(err) => return Err(err),
+            }
         }
 
         Ok(translated_text)

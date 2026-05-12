@@ -518,11 +518,11 @@ pub fn format_shortcut(binding: ShortcutBinding) -> String {
     if binding.ctrl {
         parts.push("Ctrl");
     }
-    if binding.shift {
-        parts.push("Shift");
-    }
     if binding.alt {
         parts.push("Alt");
+    }
+    if binding.shift {
+        parts.push("Shift");
     }
     parts.push(shortcut_key_name(binding.key));
     parts.join("+")

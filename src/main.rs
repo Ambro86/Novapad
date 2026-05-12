@@ -152,12 +152,13 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SW_SHOW, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW,
     SetForegroundWindow, SetMenu, SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW,
     ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
-    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CANCELMODE, WM_CLOSE,
-    WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY, WM_DROPFILES,
-    WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN, WM_MOUSEMOVE, WM_NCDESTROY, WM_NEXTDLGCTL,
-    WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR,
-    WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD,
-    WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
+    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CANCELMODE, WM_CHAR,
+    WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
+    WM_DROPFILES, WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN, WM_KEYUP, WM_MOUSEMOVE,
+    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
+    WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_TIMER,
+    WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
+    WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
@@ -2960,6 +2961,17 @@ fn local_mpv_position_secs_for_path(hwnd: HWND, path: &Path) -> Option<f64> {
         .ok()
         .and_then(|value| value.as_f64())
         .filter(|value| value.is_finite())
+}
+
+fn local_mpv_duration_secs_for_path(hwnd: HWND, path: &Path) -> Option<f64> {
+    let (active_path, _) = active_local_mpv_media(hwnd)?;
+    if active_path != path {
+        return None;
+    }
+    query_managed_mpv_property_transient(hwnd, "duration")
+        .ok()
+        .and_then(|value| value.as_f64())
+        .filter(|value| value.is_finite() && *value > 0.0)
 }
 
 pub(crate) fn seek_local_mpv_to_seconds(
@@ -6867,6 +6879,8 @@ pub(crate) struct AppState {
     local_mpv_video_mode_active: bool,
     local_mpv_alt_menu_pending: bool,
     local_mpv_menu_visible: bool,
+    alt_menu_suppressed: bool,
+    alt_menu_used_with_key: bool,
     editor_translation_pending_speak: Option<String>,
     docs: Vec<Document>,
     current: usize,
@@ -7315,6 +7329,7 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
         while GetMessageW(&mut msg, HWND(0), 0, 0).into() {
             // Keep the watchdog aligned with UI message-loop activity.
             watchdog.heartbeat();
+            log_alt_raw_key_probe(hwnd, &msg);
             // Priority 1: Global navigation keys (Ctrl+Tab)
             if msg.message == WM_KEYDOWN
                 && msg.wParam.0 as u32 == VK_TAB.0 as u32
@@ -7399,9 +7414,20 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
             }
             if msg.message == WM_KEYDOWN || msg.message == WM_SYSKEYDOWN {
                 let key = msg.wParam.0 as u32;
+                if key != u32::from(VK_MENU.0) {
+                    with_state(hwnd, |state| {
+                        if state.alt_menu_suppressed {
+                            state.alt_menu_used_with_key = true;
+                        }
+                    });
+                }
                 if msg.message == WM_SYSKEYDOWN && key == u32::from(VK_MENU.0) {
                     let alt_down =
                         (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+                    let shift_down =
+                        (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                    let ctrl_down =
+                        (crate::get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
                     let should_show_menu = with_state(hwnd, |state| {
                         state.local_mpv_alt_menu_pending = false;
                         alt_down
@@ -7420,6 +7446,17 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     ));
                     if should_show_menu {
                         set_local_mpv_video_menu_visible(hwnd, true);
+                    }
+                    if alt_down && !should_show_menu {
+                        with_state(hwnd, |state| {
+                            state.alt_menu_suppressed = true;
+                            state.alt_menu_used_with_key = shift_down || ctrl_down;
+                        });
+                        log_debug(&format!(
+                            "shortcut probe: suppress Alt menu activation shift_down={} ctrl_down={}",
+                            shift_down, ctrl_down
+                        ));
+                        continue;
                     }
                 }
                 let is_context_key = key == u32::from(VK_APPS.0)
@@ -7462,10 +7499,48 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     }
                 }
             }
+            if msg.message == WM_SYSKEYUP && msg.wParam.0 as u32 == 'R' as u32 {
+                let ctrl_down =
+                    (crate::get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+                let shift_down =
+                    (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                let alt_down =
+                    (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+                let should_dispatch = with_state(hwnd, |state| {
+                    let should_dispatch =
+                        state.alt_menu_suppressed && !ctrl_down && shift_down && alt_down;
+                    if should_dispatch {
+                        state.alt_menu_suppressed = false;
+                        state.alt_menu_used_with_key = true;
+                    }
+                    should_dispatch
+                })
+                .unwrap_or(false);
+                if should_dispatch {
+                    log_debug("shortcut probe: WM_SYSKEYUP Alt+Shift+R -> radio");
+                    dispatch_shortcut_command(hwnd, IDM_TOOLS_RADIO);
+                    continue;
+                }
+            }
             if msg.message == WM_SYSKEYUP && msg.wParam.0 as u32 == u32::from(VK_MENU.0) {
-                with_state(hwnd, |state| {
+                let show_alt_menu = with_state(hwnd, |state| {
+                    let show = state.alt_menu_suppressed && !state.alt_menu_used_with_key;
+                    state.alt_menu_suppressed = false;
+                    state.alt_menu_used_with_key = false;
                     state.local_mpv_alt_menu_pending = false;
-                });
+                    show
+                })
+                .unwrap_or(false);
+                if show_alt_menu {
+                    log_debug("shortcut probe: Alt released alone -> open menu");
+                    crate::log_if_err!(PostMessageW(
+                        hwnd,
+                        WM_SYSCOMMAND,
+                        WPARAM(SC_KEYMENU as usize),
+                        LPARAM(0)
+                    ));
+                    continue;
+                }
             }
             if msg.message == WM_MOUSEMOVE {
                 let video_hwnd =
@@ -8481,6 +8556,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     local_mpv_video_mode_active: false,
                     local_mpv_alt_menu_pending: false,
                     local_mpv_menu_visible: false,
+                    alt_menu_suppressed: false,
+                    alt_menu_used_with_key: false,
                     editor_translation_pending_speak: None,
                     docs: Vec::new(),
                     current: 0,
@@ -9845,9 +9922,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 let hmenu = HMENU(wparam.0 as isize);
                 let main_menu = GetMenu(hwnd);
                 log_debug(&format!(
-                    "WM_INITMENUPOPUP: popup={:?} main_menu={:?} video_mode={} menu_visible={} hidden_menu={:?}",
+                    "WM_INITMENUPOPUP: popup={:?} main_menu={:?} focus={:?} video_mode={} menu_visible={} hidden_menu={:?}",
                     hmenu,
                     main_menu,
+                    crate::get_focus_safe(),
                     with_state(hwnd, |state| state.local_mpv_video_mode_active).unwrap_or(false),
                     with_state(hwnd, |state| state.local_mpv_menu_visible).unwrap_or(false),
                     with_state(hwnd, |state| state.local_mpv_hidden_menu).unwrap_or(HMENU(0))
@@ -9996,6 +10074,18 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
             WM_COMMAND => {
                 let cmd_id = wparam.0 & 0xffff;
                 let notification = (wparam.0 >> 16) as u16;
+                if cmd_id == IDM_TOOLS_RADIO
+                    || cmd_id == IDM_TOOLS_PATHS_NAVIGATION
+                    || cmd_id == IDM_FILE_PRINT
+                {
+                    log_debug(&format!(
+                        "shortcut probe: WM_COMMAND cmd={} notification={} lparam={:?} focus={:?}",
+                        cmd_id,
+                        notification,
+                        lparam,
+                        crate::get_focus_safe()
+                    ));
+                }
                 if u32::from(notification) == EN_KILLFOCUS {
                     log_mpv_focus_snapshot(hwnd, &format!("mpv_en_killfocus.cmd_{}", cmd_id));
                 }
@@ -10972,16 +11062,26 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 let alt_down =
                     (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
                 let sys_char = wparam.0 as u32;
-                if !ctrl_down
-                    && shift_down
-                    && alt_down
-                    && (sys_char == u32::from(b'a') || sys_char == u32::from(b'A'))
-                {
-                    dispatch_shortcut_command(hwnd, IDM_TOOLS_RAI_AUDIODESCRIZIONI);
-                    LRESULT(0)
-                } else {
-                    DefWindowProcW(hwnd, msg, wparam, lparam)
+                if !ctrl_down && shift_down && alt_down {
+                    match sys_char {
+                        value if value == u32::from(b'a') || value == u32::from(b'A') => {
+                            dispatch_shortcut_command(hwnd, IDM_TOOLS_RAI_AUDIODESCRIZIONI);
+                            return LRESULT(0);
+                        }
+                        value if value == u32::from(b'r') || value == u32::from(b'R') => {
+                            log_debug("shortcut probe: WM_SYSCHAR Alt+Shift+R -> radio");
+                            dispatch_shortcut_command(hwnd, IDM_TOOLS_RADIO);
+                            return LRESULT(0);
+                        }
+                        value if value == u32::from(b'n') || value == u32::from(b'N') => {
+                            log_debug("shortcut probe: WM_SYSCHAR Alt+Shift+N -> paths navigation");
+                            dispatch_shortcut_command(hwnd, IDM_TOOLS_PATHS_NAVIGATION);
+                            return LRESULT(0);
+                        }
+                        _ => {}
+                    }
                 }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_CLOSE => {
                 try_close_app(hwnd);
@@ -15641,7 +15741,10 @@ fn start_editor_summary_text(
                             translator::TranslatorGemini::new(api_key, model, String::new(), None)
                                 .map_err(|err| err.to_string())?;
                         let summary = gemini
-                            .summarize_same_language(&text, cancel_token.as_ref())
+                            .summarize_same_language_chunked_cancellable(
+                                &text,
+                                cancel_token.as_ref(),
+                            )
                             .await
                             .map_err(|err| err.to_string())?;
                         if cancel_token.load(Ordering::Relaxed) {
@@ -16650,6 +16753,67 @@ fn dispatch_shortcut_command(hwnd: HWND, cmd: usize) {
     }
 }
 
+fn log_alt_raw_key_probe(hwnd: HWND, msg: &MSG) {
+    let is_key_message = matches!(
+        msg.message,
+        WM_KEYDOWN | WM_SYSKEYDOWN | WM_KEYUP | WM_SYSKEYUP | WM_CHAR | WM_SYSCHAR
+    );
+    if !is_key_message {
+        return;
+    }
+    let ctrl_down = (crate::get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+    let shift_down = (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+    let alt_down = (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+    let (suppressed, used_with_key) = with_state(hwnd, |state| {
+        (state.alt_menu_suppressed, state.alt_menu_used_with_key)
+    })
+    .unwrap_or((false, false));
+    let key = msg.wParam.0 as u32;
+    if alt_down || suppressed || key == u32::from(b'R') || key == u32::from(b'r') {
+        crate::log_debug(&format!(
+            "shortcut raw: msg={} key={} ctrl={} shift={} alt={} suppressed={} used={} msg_hwnd={:?} focus={:?}",
+            msg.message,
+            key,
+            ctrl_down,
+            shift_down,
+            alt_down,
+            suppressed,
+            used_with_key,
+            msg.hwnd,
+            crate::get_focus_safe()
+        ));
+    }
+}
+
+fn log_alt_shift_shortcut_probe(
+    msg: &MSG,
+    key: u16,
+    ctrl_down: bool,
+    shift_down: bool,
+    alt_down: bool,
+    shortcuts: &ShortcutSettings,
+) {
+    if !ctrl_down && shift_down && alt_down && (key == 'R' as u16 || key == 'N' as u16) {
+        crate::log_debug(&format!(
+            "shortcut probe: key={} msg={} msg_hwnd={:?} focus={:?} radio_binding=ctrl:{} shift:{} alt:{} key:{} paths_binding=ctrl:{} shift:{} alt:{} key:{} radio_match={} paths_match={}",
+            key as u8 as char,
+            msg.message,
+            msg.hwnd,
+            crate::get_focus_safe(),
+            shortcuts.open_radio.ctrl,
+            shortcuts.open_radio.shift,
+            shortcuts.open_radio.alt,
+            shortcuts.open_radio.key,
+            shortcuts.open_paths_navigation.ctrl,
+            shortcuts.open_paths_navigation.shift,
+            shortcuts.open_paths_navigation.alt,
+            shortcuts.open_paths_navigation.key,
+            shortcut_matches_message(shortcuts.open_radio, msg),
+            shortcut_matches_message(shortcuts.open_paths_navigation, msg)
+        ));
+    }
+}
+
 fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     if msg.message != WM_KEYDOWN && msg.message != WM_SYSKEYDOWN {
         return false;
@@ -16670,6 +16834,7 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     let ctrl_down = (crate::get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
     let shift_down = (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
     let alt_down = (crate::get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+    log_alt_shift_shortcut_probe(msg, key, ctrl_down, shift_down, alt_down, &shortcuts);
     let has_active_player = with_state(hwnd, |state| {
         state.active_audiobook.is_some() || state.active_mpv_session.is_some()
     })
@@ -16770,10 +16935,16 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         return true;
     }
     if shortcut_matches_message(shortcuts.open_paths_navigation, msg) {
+        if key == 'N' as u16 && !ctrl_down && shift_down && alt_down {
+            crate::log_debug("shortcut probe: dispatch Alt+Shift+N -> paths navigation");
+        }
         dispatch_shortcut_command(hwnd, IDM_TOOLS_PATHS_NAVIGATION);
         return true;
     }
     if shortcut_matches_message(shortcuts.open_radio, msg) {
+        if key == 'R' as u16 && !ctrl_down && shift_down && alt_down {
+            crate::log_debug("shortcut probe: dispatch Alt+Shift+R -> radio");
+        }
         dispatch_shortcut_command(hwnd, IDM_TOOLS_RADIO);
         return true;
     }
@@ -16824,6 +16995,11 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     if shortcut_matches_message(shortcuts.chapter_next, msg) {
         dispatch_shortcut_command(hwnd, IDM_PLAYBACK_CHAPTER_NEXT);
         return true;
+    }
+    if !ctrl_down && shift_down && alt_down && (key == 'R' as u16 || key == 'N' as u16) {
+        crate::log_debug(
+            "shortcut probe: no custom shortcut matched, passing to accelerator/dispatch",
+        );
     }
     false
 }
@@ -17271,6 +17447,16 @@ fn text_bookmark_at_position(hwnd_edit: HWND, pos: i32) -> Bookmark {
     )
 }
 
+pub(crate) fn automatic_media_bookmark_reached_end(
+    position_secs: u64,
+    duration_secs: Option<u64>,
+) -> bool {
+    const END_TOLERANCE_SECS: u64 = 2;
+    duration_secs
+        .filter(|duration| *duration > 0)
+        .is_some_and(|duration| position_secs.saturating_add(END_TOLERANCE_SECS) >= duration)
+}
+
 fn current_text_bookmark_position(hwnd: HWND, doc_index: usize, hwnd_edit: HWND) -> i32 {
     with_state(hwnd, |state| {
         if state.current == doc_index
@@ -17320,6 +17506,46 @@ fn clear_stale_tts_automatic_bookmark_for_edit(hwnd: HWND, hwnd_edit: HWND) {
     });
 }
 
+fn clear_automatic_bookmark_for_storage_key(
+    hwnd: HWND,
+    storage_key: &str,
+    hwnd_edit: HWND,
+) -> bool {
+    let (bookmarks_window, removed) = with_state(hwnd, |state| {
+        let mut removed = false;
+        let remove_empty = if let Some(list) = state.bookmarks.files.get_mut(storage_key) {
+            let before = list.len();
+            list.retain(|bookmark| !bookmark.automatic);
+            removed = list.len() != before;
+            list.is_empty()
+        } else {
+            false
+        };
+        if remove_empty {
+            state.bookmarks.files.remove(storage_key);
+        }
+        if removed {
+            save_bookmarks(&state.bookmarks);
+            let should_clear_tts_bookmark = state
+                .tts_automatic_bookmark_position
+                .as_ref()
+                .is_some_and(|(bookmark_hwnd, bookmark_key, _)| {
+                    *bookmark_hwnd == hwnd_edit && bookmark_key == storage_key
+                });
+            if should_clear_tts_bookmark {
+                state.tts_automatic_bookmark_position = None;
+            }
+        }
+        (state.bookmarks_window, removed)
+    })
+    .unwrap_or((HWND(0), false));
+
+    if removed && bookmarks_window.0 != 0 {
+        app_windows::bookmarks_window::refresh_bookmarks_list(bookmarks_window);
+    }
+    removed
+}
+
 pub(crate) fn save_automatic_bookmark_for_document(hwnd: HWND, doc_index: usize) -> bool {
     let Some((hwnd_edit, path, format, title, automatic_enabled)) = with_state(hwnd, |state| {
         state.docs.get(doc_index).map(|doc| {
@@ -17349,6 +17575,9 @@ pub(crate) fn save_automatic_bookmark_for_document(hwnd: HWND, doc_index: usize)
         let mpv_position_secs = path
             .as_deref()
             .and_then(|bookmark_path| local_mpv_position_secs_for_path(hwnd, bookmark_path));
+        let mpv_duration_secs = path
+            .as_deref()
+            .and_then(|bookmark_path| local_mpv_duration_secs_for_path(hwnd, bookmark_path));
         let Some((pos, snippet)) = with_state(hwnd, |state| {
             if let Some(position_secs) = mpv_position_secs {
                 return Some(audio_bookmark_position_and_snippet(position_secs));
@@ -17379,6 +17608,31 @@ pub(crate) fn save_automatic_bookmark_for_document(hwnd: HWND, doc_index: usize)
         .flatten() else {
             return false;
         };
+        let duration_secs = mpv_duration_secs
+            .map(|duration| duration.max(0.0).floor() as u64)
+            .or_else(|| {
+                path.as_ref()
+                    .and_then(|bookmark_path| audiobook_duration_secs(bookmark_path))
+            })
+            .or_else(|| {
+                with_state(hwnd, |state| {
+                    let bookmark_path = path.as_ref()?;
+                    let player = state.active_audiobook.as_ref()?;
+                    (player.path == *bookmark_path).then(|| {
+                        player
+                            .duration_secs()
+                            .map(|secs| secs.max(0.0).floor() as u64)
+                    })?
+                })
+                .flatten()
+            });
+        if automatic_media_bookmark_reached_end(pos.max(0) as u64, duration_secs) {
+            crate::log_debug(&format!(
+                "Automatic media bookmark reached end, clearing: key={} pos={} duration={:?}",
+                storage_key, pos, duration_secs
+            ));
+            return clear_automatic_bookmark_for_storage_key(hwnd, &storage_key, hwnd_edit);
+        }
         Bookmark::automatic(
             pos,
             snippet,

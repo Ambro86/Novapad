@@ -51,6 +51,9 @@ struct CompletionDialog {
 
 enum SplitFailure {
     Message(String),
+    Canceled,
+    DurationUnavailable,
+    InvalidInputFolder,
     TimeTooLong {
         part_duration: String,
         media_duration: String,
@@ -410,6 +413,54 @@ fn split_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> 
                                     owner: state.parent,
                                 })
                             }
+                            Err(SplitFailure::Canceled) => {
+                                let msg = i18n::tr(state.language, "media_split.error.canceled");
+                                crate::log_if_err!(SetWindowTextW(
+                                    state.status,
+                                    PCWSTR(to_wide(&msg).as_ptr()),
+                                ));
+                                Some(CompletionDialog {
+                                    message: msg,
+                                    language: state.language,
+                                    success: false,
+                                    close_after: true,
+                                    owner: state.parent,
+                                })
+                            }
+                            Err(SplitFailure::DurationUnavailable) => {
+                                let msg = i18n::tr(
+                                    state.language,
+                                    "media_split.error.duration_unavailable",
+                                );
+                                crate::log_if_err!(SetWindowTextW(
+                                    state.status,
+                                    PCWSTR(to_wide(&msg).as_ptr()),
+                                ));
+                                Some(CompletionDialog {
+                                    message: msg,
+                                    language: state.language,
+                                    success: false,
+                                    close_after: false,
+                                    owner: state.parent,
+                                })
+                            }
+                            Err(SplitFailure::InvalidInputFolder) => {
+                                let msg = i18n::tr(
+                                    state.language,
+                                    "media_split.error.invalid_input_folder",
+                                );
+                                crate::log_if_err!(SetWindowTextW(
+                                    state.status,
+                                    PCWSTR(to_wide(&msg).as_ptr()),
+                                ));
+                                Some(CompletionDialog {
+                                    message: msg,
+                                    language: state.language,
+                                    success: false,
+                                    close_after: false,
+                                    owner: state.parent,
+                                })
+                            }
                             Err(SplitFailure::TimeTooLong {
                                 part_duration,
                                 media_duration,
@@ -606,13 +657,11 @@ where
     F: FnMut(u32),
 {
     if cancel.load(Ordering::Relaxed) {
-        return Err(SplitFailure::Message("Canceled".to_string()));
+        return Err(SplitFailure::Canceled);
     }
     let duration = crate::ffmpeg_export::media_duration_secs(input_path)
         .or_else(|| crate::audio_player::audiobook_duration_secs(input_path))
-        .ok_or_else(|| {
-            SplitFailure::Message("FFmpeg: unable to detect media duration".to_string())
-        })?;
+        .ok_or(SplitFailure::DurationUnavailable)?;
     let segment_seconds = match value {
         SplitValue::Parts(parts) => duration.div_ceil(parts as u64).max(1),
         SplitValue::Seconds(seconds) => {
@@ -653,7 +702,7 @@ where
     )
     .map_err(SplitFailure::Message)?;
     if cancel.load(Ordering::Relaxed) {
-        return Err(SplitFailure::Message("Canceled".to_string()));
+        return Err(SplitFailure::Canceled);
     }
     progress(100);
     Ok(folder)
@@ -662,7 +711,7 @@ where
 fn output_folder(input_path: &Path) -> Result<PathBuf, SplitFailure> {
     let parent = input_path
         .parent()
-        .ok_or_else(|| SplitFailure::Message("Invalid input folder".to_string()))?;
+        .ok_or(SplitFailure::InvalidInputFolder)?;
     let stem = input_path
         .file_stem()
         .and_then(|s| s.to_str())

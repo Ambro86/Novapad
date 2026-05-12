@@ -1149,7 +1149,7 @@
   "stream_audio.quality.medium": "Qualità media",
   "stream_audio.quality.original": "Originale",
   "stream_audio.save_credentials": "Salva le credenziali per questo sito (gestiscile in Opzioni > Audio)",
-  "stream_audio.saved_credentials_failed": "Le credenziali salvate non hanno funzionato. Inserisci di nuovo le credenziali per questo sito:",
+  "stream_audio.saved_credentials_failed": "Le credenziali salvate non funzionano. Inserisci di nuovo le credenziali per questo sito:",
   "stream_audio.subscribers_label": "Iscritti",
   "stream_audio.track.auto": "Automatico",
   "stream_audio.url_label": "URL o stringa di ricerca per YouTube:",
@@ -1629,5 +1629,13 @@
   "media_split.error.invalid_parts": "Inserisci un numero di parti valido, da 2 a 999.",
   "media_split.error.invalid_time": "Inserisci una durata valida, per esempio 30:00 oppure 01:00:00.",
   "media_split.error.failed": "Errore durante la divisione: {err}",
-  "media_split.error.time_too_long": "La durata di ogni parte ({part_duration}) deve essere inferiore alla durata del media ({media_duration})."
+  "media_split.error.time_too_long": "La durata di ogni parte ({part_duration}) deve essere inferiore alla durata del media ({media_duration}).",
+  "edit.insert_ellipsis": "Inserisci puntini di sospensione",
+  "media_split.error.canceled": "Divisione annullata.",
+  "media_split.error.duration_unavailable": "Impossibile rilevare la durata del media.",
+  "media_split.error.invalid_input_folder": "Cartella di input non valida.",
+  "stream_audio.auth_prompt": "Inserisci le credenziali richieste da questo sito:",
+  "editor.translation.canceling": "Annullamento traduzione...",
+  "editor.summary.canceling": "Annullamento riassunto...",
+  "editor.translation.error": "Errore durante la traduzione: {err}"
 }

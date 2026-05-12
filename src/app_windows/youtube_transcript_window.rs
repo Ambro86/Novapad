@@ -5339,18 +5339,12 @@ fn prompt_ytdlp_credentials(
         "stream_audio.auth_required_title",
         "Authentication required",
     );
-    let (body_key, body_fallback) = if saved_credentials_failed {
-        (
-            "stream_audio.saved_credentials_failed",
-            "Saved credentials did not work. Enter the credentials for this site again:",
-        )
+    let body_key = if saved_credentials_failed {
+        "stream_audio.saved_credentials_failed"
     } else {
-        (
-            "stream_audio.auth_prompt",
-            "Enter the credentials required by this site:",
-        )
+        "stream_audio.auth_prompt"
     };
-    let body = tr_or(language, body_key, body_fallback);
+    let body = i18n::tr(language, body_key);
     let result = prompt_window::prompt_credentials(
         parent,
         &title,

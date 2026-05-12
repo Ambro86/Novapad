@@ -15254,10 +15254,7 @@ fn open_editor_translation_progress_window(
     cancel_token: Arc<AtomicBool>,
 ) {
     let labels = editor_translation_progress_labels(language);
-    let canceling_message = match language {
-        Language::Italian => "Annullamento traduzione...".to_string(),
-        _ => "Canceling translation...".to_string(),
-    };
+    let canceling_message = i18n::tr(language, "editor.translation.canceling");
     open_editor_progress_window(hwnd, language, labels, cancel_token, canceling_message);
 }
 
@@ -15267,10 +15264,7 @@ fn open_editor_summary_progress_window(
     cancel_token: Arc<AtomicBool>,
 ) {
     let labels = editor_summary_progress_labels(language);
-    let canceling_message = match language {
-        Language::Italian => "Annullamento riassunto...".to_string(),
-        _ => "Canceling summary...".to_string(),
-    };
+    let canceling_message = i18n::tr(language, "editor.summary.canceling");
     open_editor_progress_window(hwnd, language, labels, cancel_token, canceling_message);
 }
 
@@ -15867,11 +15861,12 @@ fn apply_editor_translation_result(hwnd: HWND, payload: EditorTranslationResult)
             if err.contains("Translation canceled") {
                 return;
             }
-            show_error(
-                hwnd,
+            let message = i18n::tr_f(
                 payload.language,
-                &format!("Errore durante la traduzione: {err}"),
+                "editor.translation.error",
+                &[("err", &err)],
             );
+            show_error(hwnd, payload.language, &message);
             return;
         }
     };

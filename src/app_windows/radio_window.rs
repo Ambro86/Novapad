@@ -1153,11 +1153,7 @@ fn submit_add_community_radio(hwnd: HWND) {
         message(
             hwnd,
             "Radio",
-            &tr(
-                language,
-                "radio.add_missing_fields",
-                "Inserisci nome radio e indirizzo streaming.",
-            ),
+            &i18n::tr(language, "radio.add_missing_fields"),
         );
         return;
     }
@@ -1240,11 +1236,7 @@ fn post_community_radio(
             Ok(response.message)
         }
     } else if response.error.trim().is_empty() {
-        Err(tr(
-            app_language,
-            "radio.community_add_error",
-            "Errore durante l'aggiunta della radio.",
-        ))
+        Err(i18n::tr(app_language, "radio.community_add_error"))
     } else {
         Err(response.error)
     }
@@ -1691,7 +1683,7 @@ fn start_radio_search(hwnd: HWND, name_query: Option<String>) {
 }
 
 fn show_loading_in_results(state: &mut RadioDialogState) {
-    let message = tr(state.language, "radio.loading", "Caricamento radio...");
+    let message = i18n::tr(state.language, "radio.loading");
     show_status_in_results(state, &message);
 }
 
@@ -1776,11 +1768,7 @@ fn finish_radio_search(hwnd: HWND, complete: RadioSearchComplete) {
                 error
             ));
             with_radio_state(hwnd, |state| {
-                let message = tr(
-                    complete.language,
-                    "radio.search_failed",
-                    "Errore durante la ricerca radio. Riprova tra poco.",
-                );
+                let message = i18n::tr(complete.language, "radio.search_failed");
                 show_status_in_results(state, &message);
             });
         }

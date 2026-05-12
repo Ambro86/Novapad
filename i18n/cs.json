@@ -1097,7 +1097,7 @@
   "stream_audio.quality.medium": "Střední kvalita",
   "stream_audio.quality.original": "Původní kvalita",
   "stream_audio.save_credentials": "Uložit přihlašovací údaje pro tento web (spravovat v Možnosti > Zvuk)",
-  "stream_audio.saved_credentials_failed": "Uložené přihlašovací údaje nefungují. Zadejte je prosím znovu:",
+  "stream_audio.saved_credentials_failed": "Uložené přihlašovací údaje nefungují. Zadejte přihlašovací údaje pro tento web znovu:",
   "stream_audio.subscribers_label": "Odběratelé",
   "stream_audio.track.auto": "Automaticky",
   "stream_audio.url_label": "URL nebo vyhledávací dotaz pro YouTube:",
@@ -1444,7 +1444,7 @@
   "radio.add_submit": "Ověřit a přidat",
   "radio.cancel": "Zrušit",
   "radio.add_missing_fields": "Zadejte název rádia a adresu streamu.",
-  "radio.search_failed": "Chyba při vyhledávání rádií. Zkuste to za chvíli znovu.",
+  "radio.search_failed": "Chyba při hledání rádií. Zkuste to za chvíli znovu.",
   "radio.genre.all": "Všechny žánry",
   "radio.genre.news": "Zprávy",
   "radio.genre.music": "Hudba",
@@ -1577,5 +1577,13 @@
   "media_split.error.no_local_media": "Tato funkce je dostupná pouze pro otevřené místní médium.",
   "media_split.error.invalid_parts": "Zadejte platný počet částí od 2 do 999.",
   "media_split.error.invalid_time": "Zadejte platnou délku, například 30:00 nebo 01:00:00.",
-  "media_split.error.failed": "Chyba při dělení: {err}"
+  "media_split.error.failed": "Chyba při dělení: {err}",
+  "edit.insert_ellipsis": "Vložit výpustku",
+  "media_split.error.canceled": "Dělení zrušeno.",
+  "media_split.error.duration_unavailable": "Nelze zjistit délku média.",
+  "media_split.error.invalid_input_folder": "Neplatná vstupní složka.",
+  "stream_audio.auth_prompt": "Zadejte přihlašovací údaje požadované tímto webem:",
+  "editor.translation.canceling": "Rušení překladu...",
+  "editor.summary.canceling": "Rušení shrnutí...",
+  "editor.translation.error": "Chyba při překladu: {err}"
 }

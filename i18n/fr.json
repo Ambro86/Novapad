@@ -1101,7 +1101,7 @@
   "stream_audio.quality.medium": "Qualité moyenne",
   "stream_audio.quality.original": "Qualité originale",
   "stream_audio.save_credentials": "Enregistrer les identifiants pour ce site (les gérer dans Options > Audio)",
-  "stream_audio.saved_credentials_failed": "Les identifiants enregistrés n'ont pas fonctionné. Veuillez les saisir à nouveau :",
+  "stream_audio.saved_credentials_failed": "Les identifiants enregistrés ne fonctionnent pas. Saisissez à nouveau les identifiants pour ce site :",
   "stream_audio.subscribers_label": "Abonnés",
   "stream_audio.track.auto": "Automatique",
   "stream_audio.url_label": "URL ou recherche YouTube :",
@@ -1444,7 +1444,7 @@
   "radio.add_submit": "Vérifier et ajouter",
   "radio.cancel": "Annuler",
   "radio.add_missing_fields": "Saisissez le nom de la radio et l’adresse du flux.",
-  "radio.search_failed": "Erreur lors de la recherche des radios. Réessayez dans un instant.",
+  "radio.search_failed": "Erreur lors de la recherche des radios. Réessayez dans quelques instants.",
   "radio.genre.all": "Tous les genres",
   "radio.genre.news": "Actualités",
   "radio.genre.music": "Musique",
@@ -1577,5 +1577,13 @@
   "media_split.error.no_local_media": "Cette fonction est disponible uniquement pour un média local ouvert.",
   "media_split.error.invalid_parts": "Saisissez un nombre de parties valide, de 2 à 999.",
   "media_split.error.invalid_time": "Saisissez une durée valide, par exemple 30:00 ou 01:00:00.",
-  "media_split.error.failed": "Erreur lors de la division : {err}"
+  "media_split.error.failed": "Erreur lors de la division : {err}",
+  "edit.insert_ellipsis": "Insérer des points de suspension",
+  "media_split.error.canceled": "Division annulée.",
+  "media_split.error.duration_unavailable": "Impossible de détecter la durée du média.",
+  "media_split.error.invalid_input_folder": "Dossier d’entrée non valide.",
+  "stream_audio.auth_prompt": "Saisissez les identifiants requis par ce site :",
+  "editor.translation.canceling": "Annulation de la traduction...",
+  "editor.summary.canceling": "Annulation du résumé...",
+  "editor.translation.error": "Erreur lors de la traduction : {err}"
 }

@@ -92,6 +92,8 @@ pub const IDM_PLAYBACK_SEEK_TO_END: usize = 8026;
 pub const IDM_PLAYBACK_TRANSCRIBE_CURRENT: usize = 8027;
 pub const IDM_PLAYBACK_TRANSCRIBE_CURRENT_FOLDER: usize = 8028;
 pub const IDM_PLAYBACK_TRANSCRIBE_CANCEL: usize = 8030;
+pub const IDM_PLAYBACK_SPLIT_PARTS: usize = 8031;
+pub const IDM_PLAYBACK_SPLIT_TIME: usize = 8032;
 pub const IDM_PLAYBACK_ADD_SUBTITLES: usize = 8019;
 pub const IDM_PLAYBACK_REMOVE_SUBTITLES: usize = 8020;
 pub const IDM_PLAYBACK_CHAPTER_PREV: usize = 8012;
@@ -611,6 +613,9 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 i18n::tr(language, "playback.download_episode")
             );
             let transcribe_current = i18n::tr(language, "playback.transcribe_current");
+            let split_media = i18n::tr(language, "playback.split_media");
+            let split_media_parts = i18n::tr(language, "playback.split_media.parts");
+            let split_media_time = i18n::tr(language, "playback.split_media.time");
             let transcribe_current_folder = format!(
                 "{}\tAlt+Shift+C",
                 i18n::tr(language, "playback.transcribe_current_folder")
@@ -624,6 +629,7 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 )
             })
             .unwrap_or_default();
+            let can_split_local_media = crate::current_local_playback_media_path(hwnd).is_some();
 
             append_menu_string(
                 playback_menu,
@@ -716,6 +722,29 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     IDM_PLAYBACK_TRANSCRIBE_CURRENT_FOLDER,
                     &transcribe_current_folder,
                 );
+            }
+            if can_split_local_media {
+                let split_menu = CreateMenu().unwrap_or(HMENU(0));
+                if split_menu.0 != 0 {
+                    append_menu_string(
+                        split_menu,
+                        MF_STRING,
+                        IDM_PLAYBACK_SPLIT_PARTS,
+                        &split_media_parts,
+                    );
+                    append_menu_string(
+                        split_menu,
+                        MF_STRING,
+                        IDM_PLAYBACK_SPLIT_TIME,
+                        &split_media_time,
+                    );
+                    append_menu_string(
+                        playback_menu,
+                        MF_POPUP,
+                        split_menu.0 as usize,
+                        &split_media,
+                    );
+                }
             }
             append_menu_string(
                 playback_menu,

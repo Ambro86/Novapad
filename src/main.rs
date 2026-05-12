@@ -4975,6 +4975,14 @@ pub(crate) fn current_playback_media_path(hwnd: HWND) -> Option<PathBuf> {
     .flatten()
 }
 
+pub(crate) fn current_local_playback_media_path(hwnd: HWND) -> Option<PathBuf> {
+    let path = current_playback_media_path(hwnd)?;
+    if is_direct_stream_url_path(&path) || is_local_cached_media_path(&path) || !path.is_file() {
+        return None;
+    }
+    Some(path)
+}
+
 pub(crate) fn restore_transcription_progress_focus_for_current_document(hwnd: HWND) -> bool {
     let (
         progress_hwnd,
@@ -6702,6 +6710,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.transcription_progress_window.0 != 0
                 || state.batch_audiobooks_window.0 != 0
                 || state.convert_audio_window.0 != 0
+                || state.media_split_window.0 != 0
                 || state.radio_window.0 != 0
                 || state.podcasts_window.0 != 0
                 || state.podcasts_add_dialog.0 != 0
@@ -6917,6 +6926,7 @@ pub(crate) struct AppState {
     transcription_progress_window: HWND,
     batch_audiobooks_window: HWND,
     convert_audio_window: HWND,
+    media_split_window: HWND,
     radio_window: HWND,
     podcasts_window: HWND,
     podcasts_add_dialog: HWND,
@@ -8077,6 +8087,21 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     handled = true;
                     return;
                 }
+                if state.media_split_window.0 != 0
+                    && app_windows::media_split_window::handle_navigation(
+                        state.media_split_window,
+                        &msg,
+                    )
+                {
+                    handled = true;
+                    return;
+                }
+                if state.media_split_window.0 != 0
+                    && handle_accessibility(state.media_split_window, &msg)
+                {
+                    handled = true;
+                    return;
+                }
 
                 if state.prompt_window.0 != 0
                     && app_windows::prompt_window::handle_navigation(state.prompt_window, &msg)
@@ -8602,6 +8627,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     transcription_progress_window: HWND(0),
                     batch_audiobooks_window: HWND(0),
                     convert_audio_window: HWND(0),
+                    media_split_window: HWND(0),
                     radio_window: HWND(0),
 
                     find_msg,
@@ -10678,6 +10704,20 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     }
                     IDM_PLAYBACK_GO_TO_TIME => {
                         handle_player_command(hwnd, PlayerCommand::GoToTime);
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_SPLIT_PARTS => {
+                        app_windows::media_split_window::open(
+                            hwnd,
+                            app_windows::media_split_window::MediaSplitMode::Parts,
+                        );
+                        LRESULT(0)
+                    }
+                    IDM_PLAYBACK_SPLIT_TIME => {
+                        app_windows::media_split_window::open(
+                            hwnd,
+                            app_windows::media_split_window::MediaSplitMode::Time,
+                        );
                         LRESULT(0)
                     }
                     IDM_PLAYBACK_ANNOUNCE_TIME => {

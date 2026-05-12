@@ -398,11 +398,77 @@ fn segment_format_from_path(path: &Path) -> Option<&'static str> {
     }
 }
 
+pub fn media_duration_secs(path: &Path) -> Option<u64> {
+    let api = ffmpeg_api().ok()?;
+    let input_c = CString::new(path.to_string_lossy().as_bytes()).ok()?;
+    let mut in_ctx: *mut AVFormatContext = ptr::null_mut();
+    let open_ret = crate::ffmpeg_source::avformat_open_input_safe(
+        api,
+        &mut in_ctx,
+        input_c.as_ptr(),
+        ptr::null_mut(),
+        ptr::null_mut(),
+    );
+    if open_ret < 0 || in_ctx.is_null() {
+        return None;
+    }
+    let stream_info_ret =
+        crate::ffmpeg_source::avformat_find_stream_info_safe(api, in_ctx, ptr::null_mut());
+    if stream_info_ret < 0 {
+        log_debug(&format!(
+            "FFmpeg: media duration stream info failed with code {}",
+            stream_info_ret
+        ));
+    }
+    let duration = unsafe { (*in_ctx).duration };
+    crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
+    if duration > 0 {
+        Some((duration as u64).div_ceil(1_000_000))
+    } else {
+        None
+    }
+}
+
+pub fn segment_media_file(
+    input_path: &Path,
+    output_pattern: &Path,
+    segment_seconds: u32,
+    start_number: u32,
+    progress: Option<&mut dyn FnMut(u32)>,
+) -> Result<(), String> {
+    segment_media_file_inner(
+        input_path,
+        output_pattern,
+        segment_seconds,
+        start_number,
+        false,
+        progress,
+    )
+}
+
 pub fn segment_audio_file(
     input_path: &Path,
     output_pattern: &Path,
     segment_seconds: u32,
     start_number: u32,
+) -> Result<(), String> {
+    segment_media_file_inner(
+        input_path,
+        output_pattern,
+        segment_seconds,
+        start_number,
+        true,
+        None,
+    )
+}
+
+fn segment_media_file_inner(
+    input_path: &Path,
+    output_pattern: &Path,
+    segment_seconds: u32,
+    start_number: u32,
+    audio_only: bool,
+    mut progress: Option<&mut dyn FnMut(u32)>,
 ) -> Result<(), String> {
     let api = ffmpeg_api()?;
     let input_c = CString::new(input_path.to_string_lossy().as_bytes())
@@ -411,6 +477,10 @@ pub fn segment_audio_file(
         .map_err(|_| "FFmpeg: invalid output pattern".to_string())?;
     let format_c =
         CString::new("segment").map_err(|_| "FFmpeg: invalid segment format".to_string())?;
+
+    if segment_seconds == 0 {
+        return Err("FFmpeg: segment time must be > 0".to_string());
+    }
 
     let mut in_ctx: *mut AVFormatContext = ptr::null_mut();
     let mut out_ctx: *mut AVFormatContext = ptr::null_mut();
@@ -430,19 +500,13 @@ pub fn segment_audio_file(
         return Err("FFmpeg: input stream info failed".to_string());
     }
 
-    let audio_stream_idx = crate::ffmpeg_source::av_find_best_stream_safe(
-        api,
-        in_ctx,
-        AVMediaType_AVMEDIA_TYPE_AUDIO,
-        -1,
-        -1,
-        ptr::null_mut(),
-        0,
-    );
-    if audio_stream_idx < 0 {
-        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
-        return Err("FFmpeg: audio stream not found".to_string());
-    }
+    let total_duration_us = unsafe {
+        if (*in_ctx).duration > 0 {
+            Some((*in_ctx).duration)
+        } else {
+            None
+        }
+    };
 
     let alloc_ret = crate::ffmpeg_source::avformat_alloc_output_context2_safe(
         api,
@@ -456,36 +520,66 @@ pub fn segment_audio_file(
         return Err("FFmpeg: failed to allocate segment output".to_string());
     }
 
-    let in_stream = unsafe { *(*in_ctx).streams.add(audio_stream_idx as usize) };
-    let out_stream = crate::ffmpeg_source::avformat_new_stream_safe(api, out_ctx, ptr::null());
-    if out_stream.is_null() {
+    let nb_streams = crate::ffmpeg_source::av_format_context_nb_streams_safe(in_ctx) as usize;
+    let mut stream_map: Vec<*mut AVStream> = vec![ptr::null_mut(); nb_streams];
+    let mut mapped_streams = 0usize;
+    for (i, stream_slot) in stream_map.iter_mut().enumerate() {
+        let in_stream = unsafe { *(*in_ctx).streams.add(i) };
+        if in_stream.is_null() {
+            continue;
+        }
+        let codecpar = crate::ffmpeg_source::av_stream_codecpar_safe(in_stream);
+        if codecpar.is_null() {
+            continue;
+        }
+        let codec_type = crate::ffmpeg_source::av_codecpar_codec_type_safe(codecpar);
+        let keep = if audio_only {
+            codec_type == AVMediaType_AVMEDIA_TYPE_AUDIO && mapped_streams == 0
+        } else {
+            codec_type == AVMediaType_AVMEDIA_TYPE_AUDIO
+                || codec_type == AVMediaType_AVMEDIA_TYPE_VIDEO
+        };
+        if !keep {
+            continue;
+        }
+        let out_stream = crate::ffmpeg_source::avformat_new_stream_safe(api, out_ctx, ptr::null());
+        if out_stream.is_null() {
+            crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
+            crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
+            return Err("FFmpeg: failed to create output stream".to_string());
+        }
+        let codecpar_copy_ret = crate::ffmpeg_source::avcodec_parameters_copy_safe(
+            api,
+            crate::ffmpeg_source::av_stream_codecpar_safe(out_stream),
+            codecpar,
+        );
+        if codecpar_copy_ret < 0 {
+            crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
+            crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
+            return Err(format!(
+                "FFmpeg: failed to copy codec parameters (code {})",
+                codecpar_copy_ret
+            ));
+        }
+        unsafe {
+            (*out_stream).time_base = crate::ffmpeg_source::av_stream_time_base_safe(in_stream);
+            (*crate::ffmpeg_source::av_stream_codecpar_safe(out_stream)).codec_tag = 0;
+        }
+        *stream_slot = out_stream;
+        mapped_streams += 1;
+    }
+
+    if mapped_streams == 0 {
         crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
         crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
-        return Err("FFmpeg: failed to create output stream".to_string());
-    }
-    let codecpar_copy_ret = crate::ffmpeg_source::avcodec_parameters_copy_safe(
-        api,
-        crate::ffmpeg_source::av_stream_codecpar_safe(out_stream),
-        crate::ffmpeg_source::av_stream_codecpar_safe(in_stream),
-    );
-    if codecpar_copy_ret < 0 {
-        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
-        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
-        return Err(format!(
-            "FFmpeg: failed to copy codec parameters (code {})",
-            codecpar_copy_ret
-        ));
-    }
-    unsafe {
-        (*out_stream).time_base = crate::ffmpeg_source::av_stream_time_base_safe(in_stream);
+        return Err(if audio_only {
+            "FFmpeg: audio stream not found".to_string()
+        } else {
+            "FFmpeg: no supported media streams found".to_string()
+        });
     }
 
     let mut dict: *mut AVDictionary = ptr::null_mut();
-    if segment_seconds == 0 {
-        crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
-        crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
-        return Err("FFmpeg: segment time must be > 0".to_string());
-    }
     dict_set_str(api, &mut dict, "segment_time", &segment_seconds.to_string())?;
     let start_number = start_number.max(1);
     dict_set_str(
@@ -507,6 +601,10 @@ pub fn segment_audio_file(
         return Err("FFmpeg: failed to write segment header".to_string());
     }
 
+    if let Some(cb) = progress.as_deref_mut() {
+        cb(0);
+    }
+    let mut last_pct = 0u32;
     let mut pkt = crate::ffmpeg_source::av_packet_alloc_safe(api);
     if pkt.is_null() {
         let trailer_ret = crate::ffmpeg_source::av_write_trailer_safe(api, out_ctx);
@@ -526,9 +624,35 @@ pub fn segment_audio_file(
         if read_ret < 0 {
             break;
         }
-        if crate::ffmpeg_source::av_packet_stream_index_safe(pkt) != audio_stream_idx {
+        let input_index = crate::ffmpeg_source::av_packet_stream_index_safe(pkt);
+        if input_index < 0
+            || input_index as usize >= stream_map.len()
+            || stream_map[input_index as usize].is_null()
+        {
             crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
             continue;
+        }
+        let in_stream = unsafe { *(*in_ctx).streams.add(input_index as usize) };
+        let out_stream = stream_map[input_index as usize];
+        if let (Some(total), Some(cb)) = (total_duration_us, progress.as_deref_mut()) {
+            let pts = unsafe { (*pkt).pts };
+            if total > 0 && pts != AV_NOPTS_VALUE_I64 {
+                let tb = crate::ffmpeg_source::av_stream_time_base_safe(in_stream);
+                if tb.den != 0 {
+                    let pos_us = (pts as i128)
+                        .saturating_mul(tb.num as i128)
+                        .saturating_mul(1_000_000)
+                        / (tb.den as i128);
+                    if pos_us > 0 {
+                        let pct = ((pos_us.min(total as i128) * 100) / (total as i128)) as u32;
+                        let pct = pct.min(99);
+                        if pct > last_pct {
+                            last_pct = pct;
+                            cb(pct);
+                        }
+                    }
+                }
+            }
         }
         crate::ffmpeg_source::av_packet_set_stream_index_safe(
             pkt,
@@ -554,6 +678,9 @@ pub fn segment_audio_file(
     crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
     crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
     crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
+    if let Some(cb) = progress.as_mut() {
+        cb(100);
+    }
     Ok(())
 }
 

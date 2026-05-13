@@ -1638,6 +1638,7 @@
   "stream_audio.auth_prompt": "Inserisci le credenziali richieste da questo sito:",
   "editor.translation.canceling": "Annullamento traduzione...",
   "editor.summary.canceling": "Annullamento riassunto...",
+  "summary.partial_created_error": "Riassunto parziale creato. Una parte del testo non è stata riassunta a causa di un errore.",
   "editor.translation.error": "Errore durante la traduzione: {err}",
   "document.translation.title": "Traduzione"
 }

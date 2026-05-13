@@ -1586,6 +1586,7 @@
   "stream_audio.auth_prompt": "Unesite podatke za prijavu koje zahteva ovaj sajt:",
   "editor.translation.canceling": "Otkazivanje prevoda...",
   "editor.summary.canceling": "Otkazivanje sažetka...",
+  "summary.partial_created_error": "Napravljen je delimičan sažetak. Deo teksta nije sažet zbog greške.",
   "editor.translation.error": "Greška tokom prevoda: {err}",
   "document.translation.title": "Prevod"
 }

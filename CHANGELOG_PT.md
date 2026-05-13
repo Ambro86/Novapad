@@ -1,5 +1,27 @@
 # Changelog
 
+Versão 0.7.1 – 2026-05-13
+
+Novidades e melhorias
+• Corrigido o problema em que ficheiros com acentos ou caracteres especiais causavam erro ao iniciar a transcrição de voz.
+• A partir de agora, no menu Ver, opções como Quebra automática de linha e Mostrar vídeo durante a reprodução irão aparecer sempre com o estado correto, ativadas ou desativadas.
+• Melhorada a pesquisa no YouTube, permitindo voltar com Esc à página ou ao ecrã anterior.
+• Adicionada uma verificação preliminar para confirmar se um vídeo pode ser reproduzido. A reprodução também foi melhorada: o Sonarpad agora consegue reproduzir vídeos ou playlists marcados como mix, que antes não eram reproduzidos.
+• Melhorada a gestão dos marcadores automáticos. Antes, se a opção Marcadores automáticos estivesse ativa e fosse depois desativada, esses marcadores permaneciam; agora o programa ignora-os corretamente até que a opção seja reativada. Além disso, ao chegar ao fim de um ficheiro multimédia, o marcador é apagado automaticamente.
+• Melhorada a gestão das etiquetas com os diálogos ativos. O Sonarpad agora gere corretamente ambas as funções, permitindo inserir etiquetas mesmo quando a opção de diálogos está ativa.
+• Melhoradas as definições de voz, separando claramente cada motor para tornar os ajustes mais precisos. Os perfis de voz conservam corretamente as definições de cada motor individual: Edge, Sapi5 e Sapi4.
+• Adicionada uma etiqueta para inserir pausas, diretamente a partir das opções ou do painel de vozes premindo Tab a partir do editor. As opções são: 250 ms, 500 ms, 1 segundo, 2 segundos ou duração personalizada.
+• Corrigido o comportamento ao reproduzir um vídeo do YouTube e iniciar a transcrição. Agora, ao voltar com Alt+Tab, o foco ficará corretamente no botão Cancelar da transcrição em curso.
+• As transcrições passam agora a ser guardadas automaticamente no fim do processo.
+• Melhorada a importação da Wikipédia. É possível escolher ler apenas uma secção e depois, a partir do artigo, premir Esc para voltar à pesquisa, ou importar o artigo completo. Também é possível escolher o idioma da Wikipédia a consultar.
+• Adicionada uma secção de rádios de todo o mundo, onde será possível procurar uma rádio por país, idioma e género. Também será possível adicionar rádios locais à base de dados do Sonarpad, para que outros utilizadores possam ouvi-las. Também é possível adicionar uma rádio aos favoritos.
+• Adicionada uma secção de percursos para calcular rotas escolhendo o meio: a pé, de bicicleta, de carro ou em cadeira de rodas. É possível escolher se o percurso deve ser mais curto ou mais rápido e se devem ser mostrados os municípios atravessados. Depois de importar o percurso, também será possível guardar o mapa visual no menu Ficheiro, Guardar imagem.
+• Adicionada a opção Imprimir ao menu Ficheiro. O Sonarpad imprimirá ficheiros TXT usando o próprio programa e usará o programa associado para outros ficheiros, como DOCX, PDF e semelhantes, para preservar ao máximo o layout original.
+• Integrado no Sonarpad um serviço de tradução para cada documento, acessível a partir do menu contextual do editor. O utilizador poderá usar gratuitamente DeepL e Google Translate sem inserir nenhuma chave API; inserindo uma chave API Gemini, poderá traduzir usando Gemini.
+• No menu de tradução, o utilizador poderá escolher o idioma de destino. O menu reorganiza-se automaticamente: se um utilizador escolher primeiro inglês, depois francês e depois italiano, estas três opções ficarão no topo do menu de idiomas.
+• Se o utilizador inserir a sua chave API Gemini, poderá também aceder à função Resumir texto, sempre disponível no menu contextual, para resumir qualquer artigo.
+• Adicionado ao menu Reproduzir, visível durante a reprodução de um ficheiro multimédia, um menu para dividir o média atual. Funciona com MP3, MP4 e outros formatos, dividindo por número de partes ou pela duração de cada parte.
+
 Versão 0.7.0 – 2026-04-25
 
 Novidades

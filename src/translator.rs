@@ -219,7 +219,9 @@ impl TranslatorGoogleFree {
             if cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
                 return Err(TranslatorError::Cancelled);
             }
-            return self.translate(text).await;
+            let translated = self.translate(text).await?;
+            progress(1, 1);
+            return Ok(translated);
         }
 
         let mut translated_text = String::new();
@@ -235,6 +237,7 @@ impl TranslatorGoogleFree {
 
             if chunk.trim().is_empty() {
                 translated_text.push_str(chunk);
+                progress(index + 1, chunks.len());
                 continue;
             }
 
@@ -547,7 +550,9 @@ impl TranslatorDeepLFree {
             if cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
                 return Err(TranslatorError::Cancelled);
             }
-            return self.translate(text).await;
+            let translated = self.translate(text).await?;
+            progress(1, 1);
+            return Ok(translated);
         }
 
         let mut translated_text = String::new();
@@ -563,6 +568,7 @@ impl TranslatorDeepLFree {
 
             if chunk.trim().is_empty() {
                 translated_text.push_str(chunk);
+                progress(index + 1, chunks.len());
                 continue;
             }
 
@@ -755,7 +761,9 @@ impl TranslatorGemini {
 
         let chunks = Self::split_translation_chunks(text, MAX_CHUNK_CHARS);
         if chunks.len() == 1 {
-            return self.summarize_same_language(text, cancel).await;
+            let summary = self.summarize_same_language(text, cancel).await?;
+            progress(1, 1);
+            return Ok(summary);
         }
 
         let chunk_count = chunks.len();
@@ -770,6 +778,7 @@ impl TranslatorGemini {
                 return Err(TranslatorError::Cancelled);
             }
             if chunk.trim().is_empty() {
+                progress(index + 1, chunk_count);
                 continue;
             }
             crate::log_debug(&format!(
@@ -816,7 +825,9 @@ impl TranslatorGemini {
 
         let chunks = Self::split_translation_chunks(text, MAX_CHUNK_CHARS);
         if chunks.len() == 1 {
-            return self.translate(text, cancel).await;
+            let translated = self.translate(text, cancel).await?;
+            progress(1, 1);
+            return Ok(translated);
         }
 
         let chunk_count = chunks.len();
@@ -827,6 +838,7 @@ impl TranslatorGemini {
             }
             if chunk.trim().is_empty() {
                 translated_text.push_str(&chunk);
+                progress(index + 1, chunk_count);
                 continue;
             }
             match self.translate(&chunk, cancel).await {

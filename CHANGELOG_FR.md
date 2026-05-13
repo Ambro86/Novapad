@@ -1,5 +1,27 @@
 # Journal des modifications
 
+Version 0.7.1 – 2026-05-13
+
+Nouveautés et améliorations
+• Correction du problème qui provoquait une erreur avec les fichiers contenant des accents ou des caractères spéciaux lors du lancement de la transcription vocale.
+• Désormais, dans le menu Affichage, les options comme Retour automatique à la ligne et Afficher la vidéo pendant la lecture afficheront toujours leur état correct, activé ou désactivé.
+• Amélioration de la recherche YouTube, avec la possibilité de revenir à la page ou à l’écran précédent avec Échap.
+• Ajout d’une vérification préliminaire pour contrôler si une vidéo peut être lue. La lecture a également été améliorée : Sonarpad peut désormais lire les vidéos ou playlists marquées comme mix, qui ne pouvaient pas être lues auparavant.
+• Amélioration de la gestion des signets automatiques. Auparavant, si l’option Signets automatiques était activée puis désactivée, ces signets restaient ; désormais le programme les ignore correctement jusqu’à ce que l’option soit réactivée. De plus, lorsque la fin d’un fichier multimédia est atteinte, le signet est supprimé automatiquement.
+• Amélioration de la gestion des balises lorsque les dialogues sont activés. Sonarpad gère désormais correctement les deux fonctions, permettant d’insérer des balises même lorsque l’option dialogues est active.
+• Amélioration des paramètres vocaux, avec une séparation claire de chaque moteur afin de rendre les réglages plus précis. Les profils vocaux conservent correctement les paramètres de chaque moteur : Edge, Sapi5 et Sapi4.
+• Ajout d’une balise pour insérer des pauses, directement depuis les options ou depuis le panneau des voix en appuyant sur Tab depuis l’éditeur. Les choix disponibles sont : 250 ms, 500 ms, 1 seconde, 2 secondes ou durée personnalisée.
+• Correction du comportement lors de la lecture d’une vidéo YouTube et du lancement de la transcription. Désormais, en revenant avec Alt+Tab, le focus sera correctement placé sur le bouton Annuler de la transcription en cours.
+• Les transcriptions sont désormais enregistrées automatiquement à la fin du processus.
+• Amélioration de l’importation depuis Wikipédia. Il est possible de choisir de lire seulement une section puis, depuis l’article, de revenir à la recherche avec Échap, ou bien d’importer l’article complet. Il est également possible de choisir la langue de Wikipédia à consulter.
+• Ajout d’une section de radios du monde entier, où il sera possible de rechercher une radio par pays, langue et genre. Il sera également possible d’ajouter des radios locales à la base de données de Sonarpad, afin que d’autres utilisateurs puissent les écouter. Il est aussi possible d’ajouter une radio aux favoris.
+• Ajout d’une section d’itinéraires pour calculer des parcours en choisissant le mode : à pied, à vélo, en voiture ou en fauteuil roulant. Il est possible de choisir l’itinéraire le plus court ou le plus rapide et d’afficher les communes traversées. Une fois l’itinéraire importé, il sera aussi possible d’enregistrer la carte visuelle depuis le menu Fichier, Enregistrer l’image.
+• Ajout de l’option Imprimer dans le menu Fichier. Sonarpad imprimera les fichiers TXT avec son propre système et utilisera le programme associé pour les autres fichiers, comme DOCX, PDF et formats similaires, afin de préserver autant que possible la mise en page originale.
+• Intégration dans Sonarpad d’un service de traduction pour chaque document, accessible depuis le menu contextuel de l’éditeur. L’utilisateur pourra utiliser gratuitement DeepL et Google Translate sans saisir de clé API ; en saisissant une clé API Gemini, il pourra traduire avec Gemini.
+• Dans le menu de traduction, l’utilisateur pourra choisir la langue de destination. Le menu se réorganise automatiquement : si un utilisateur choisit d’abord l’anglais, puis le français et enfin l’italien, ces trois options apparaîtront en haut du menu des langues.
+• Si l’utilisateur saisit sa clé API Gemini, il pourra également accéder à la fonction Résumer le texte, toujours disponible dans le menu contextuel, pour résumer n’importe quel article.
+• Ajout dans le menu Lecture, visible pendant la lecture d’un fichier multimédia, d’un menu permettant de diviser le média en cours. Il fonctionne avec MP3, MP4 et d’autres formats, en divisant par nombre de parties ou selon la durée de chaque partie.
+
 Version 0.7.0 – 2026-04-25
 
 Nouveautés

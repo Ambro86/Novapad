@@ -1586,6 +1586,7 @@
   "stream_audio.auth_prompt": "इस साइट द्वारा मांगे गए क्रेडेंशियल दर्ज करें:",
   "editor.translation.canceling": "अनुवाद रद्द किया जा रहा है...",
   "editor.summary.canceling": "सारांश रद्द किया जा रहा है...",
+  "summary.partial_created_error": "आंशिक सारांश बनाया गया. त्रुटि के कारण पाठ का एक भाग सारांशित नहीं किया गया.",
   "editor.translation.error": "अनुवाद के दौरान त्रुटि: {err}",
   "document.translation.title": "अनुवाद"
 }

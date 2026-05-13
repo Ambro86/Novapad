@@ -1586,6 +1586,7 @@
   "stream_audio.auth_prompt": "Enter the credentials required by this site:",
   "editor.translation.canceling": "Canceling translation...",
   "editor.summary.canceling": "Canceling summary...",
+  "summary.partial_created_error": "Partial summary created. Part of the text was not summarized because of an error.",
   "editor.translation.error": "Error while translating: {err}",
   "document.translation.title": "Translation"
 }

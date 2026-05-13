@@ -103,7 +103,7 @@ jobs:
         mkdir -p release_files
         for artifact_dir in ./artifacts/*/; do
           if [ -d "$artifact_dir" ]; then
-            find "$artifact_dir" -type f \( -name "*.exe" -o -name "*.msi" \) -print -exec cp "{}" release_files/ \;
+            find "$artifact_dir" -type f \( -name "*.exe" -o -name "*.msi" -o -name "SHA256SUMS.txt" -o -name "GITHUB_BUILD_INFO.txt" \) -print -exec cp "{}" release_files/ \;
           fi
         done
 

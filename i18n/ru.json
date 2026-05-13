@@ -1586,6 +1586,7 @@
   "stream_audio.auth_prompt": "Введите учетные данные, требуемые этим сайтом:",
   "editor.translation.canceling": "Отмена перевода...",
   "editor.summary.canceling": "Отмена краткого изложения...",
+  "summary.partial_created_error": "Создано частичное краткое изложение. Часть текста не была обобщена из-за ошибки.",
   "editor.translation.error": "Ошибка при переводе: {err}",
   "document.translation.title": "Перевод"
 }

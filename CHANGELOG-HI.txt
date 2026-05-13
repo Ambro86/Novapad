@@ -1,5 +1,27 @@
 # परिवर्तन सूची
 
+Version 0.7.1 – 2026-05-13
+
+नई सुविधाएँ और सुधार
+• वह समस्या ठीक की गई जिसमें उच्चारण चिह्नों या विशेष वर्णों वाले फ़ाइलों पर वॉइस ट्रांसक्रिप्शन शुरू करने पर त्रुटि आती थी।
+• अब से, दृश्य मेनू में Automatic word wrap और Show video during playback जैसे विकल्प हमेशा सही स्थिति दिखाएंगे, यानी चालू या बंद।
+• YouTube खोज को बेहतर किया गया है, जिससे Esc दबाकर पिछली पेज या स्क्रीन पर वापस जाया जा सकता है।
+• यह जांचने के लिए प्रारंभिक नियंत्रण जोड़ा गया है कि कोई वीडियो चलाया जा सकता है या नहीं। प्लेबैक भी बेहतर किया गया है: Sonarpad अब उन वीडियो या playlists को भी चला सकता है जिन्हें mix के रूप में चिह्नित किया गया है और जो पहले नहीं चलते थे।
+• स्वचालित बुकमार्क प्रबंधन बेहतर किया गया है। पहले, यदि Automatic bookmarks विकल्प चालू था और फिर बंद किया गया, तो वे बुकमार्क बने रहते थे; अब प्रोग्राम उन्हें सही तरीके से अनदेखा करता है जब तक विकल्प फिर से चालू न हो। इसके अलावा, जब मीडिया फ़ाइल के अंत तक पहुंचा जाता है, तो बुकमार्क अपने-आप हट जाता है।
+• सक्रिय संवादों के साथ टैग प्रबंधन बेहतर किया गया है। Sonarpad अब दोनों सुविधाओं को सही तरीके से संभालता है, जिससे dialog विकल्प चालू होने पर भी टैग डाले जा सकते हैं।
+• आवाज़ सेटिंग्स को बेहतर किया गया है, हर इंजन को स्पष्ट रूप से अलग करके, ताकि समायोजन अधिक सटीक हो। Voice profiles अब हर अलग इंजन के लिए सेटिंग्स सही तरीके से रखते हैं: Edge, Sapi5 और Sapi4।
+• Pause डालने के लिए एक टैग जोड़ा गया है, सीधे options से या editor से Tab दबाकर voices panel से। विकल्प हैं: 250 ms, 500 ms, 1 second, 2 seconds या custom duration।
+• YouTube वीडियो चलाते समय और transcription शुरू करते समय व्यवहार ठीक किया गया है। अब Alt+Tab से वापस आने पर focus सही तरीके से चल रही transcription के Cancel बटन पर होगा।
+• अब transcription प्रक्रिया पूरी होने पर अपने-आप सेव हो जाती है।
+• Wikipedia से import बेहतर किया गया है। अब केवल एक section पढ़ने का विकल्प चुना जा सकता है और फिर article से Esc दबाकर search पर वापस जाया जा सकता है, या पूरा article import किया जा सकता है। Wikipedia की भाषा भी चुनी जा सकती है।
+• दुनिया भर की radio stations के लिए एक section जोड़ा गया है, जहां country, language और genre के आधार पर radio खोजा जा सकता है। Local radio stations को Sonarpad database में भी जोड़ा जा सकता है, ताकि अन्य users भी उन्हें सुन सकें। Radio को favorites में भी जोड़ा जा सकता है।
+• Routes के लिए एक section जोड़ा गया है, जहां travel mode चुनकर रास्ते calculate किए जा सकते हैं: walking, cycling, driving या wheelchair। Shortest या fastest route चुना जा सकता है और crossed municipalities दिखाने का विकल्प भी है। Route import होने के बाद visual map को File menu, Save image से सेव किया जा सकता है।
+• File menu में Print आइटम जोड़ा गया है। Sonarpad TXT files को अपने सिस्टम से print करेगा और DOCX, PDF जैसी अन्य files के लिए associated program का उपयोग करेगा, ताकि original layout अधिकतम सुरक्षित रहे।
+• Sonarpad में हर document के लिए translation service जोड़ी गई है, जो editor context menu से उपलब्ध है। User बिना कोई API key डाले free DeepL और Google Translate services का उपयोग कर सकता है; Gemini API key डालने पर Gemini से translate कर सकता है।
+• Translation menu में user target language चुन सकता है। Menu अपने-आप reorder होता है: यदि user पहले English, फिर French और फिर Italian चुनता है, तो ये तीन options language menu के ऊपर दिखेंगे।
+• यदि user अपनी Gemini API key डालता है, तो वह Summarize text सुविधा भी उपयोग कर सकता है, जो context menu में उपलब्ध है और किसी भी article का summary बना सकती है।
+• Playback menu में, जो media file चलाते समय दिखाई देता है, current media को split करने का menu जोड़ा गया है। यह MP3, MP4 और अन्य formats के साथ काम करता है, number of parts के आधार पर या हर part की duration के आधार पर split कर सकता है।
+
 Version 0.7.0 – 2026-04-25
 
 नया क्या है

@@ -1,5 +1,27 @@
 # Dziennik zmian
 
+Wersja 0.7.1 – 2026-05-13
+
+Nowości i ulepszenia
+• Naprawiono problem, przez który pliki z akcentami lub znakami specjalnymi powodowały błąd podczas uruchamiania transkrypcji głosowej.
+• Od teraz w menu Widok pozycje takie jak Automatyczne zawijanie wierszy i Pokazuj wideo podczas odtwarzania zawsze będą pokazywać prawidłowy stan, włączony lub wyłączony.
+• Ulepszono wyszukiwanie w YouTube, umożliwiając powrót klawiszem Esc do poprzedniej strony lub ekranu.
+• Dodano wstępną kontrolę sprawdzającą, czy wideo można odtworzyć. Ulepszono także odtwarzanie: Sonarpad może teraz odtwarzać również filmy lub playlisty oznaczone jako mix, które wcześniej nie były odtwarzane.
+• Ulepszono obsługę automatycznych zakładek. Wcześniej, jeśli opcja Automatyczne zakładki była włączona, a następnie wyłączona, te zakładki pozostawały; teraz program prawidłowo je ignoruje, dopóki opcja nie zostanie ponownie włączona. Ponadto po dojściu do końca pliku multimedialnego zakładka zostanie automatycznie usunięta.
+• Ulepszono obsługę tagów przy aktywnych dialogach. Sonarpad poprawnie obsługuje teraz obie funkcje, pozwalając wstawiać tagi także wtedy, gdy opcja dialogów jest aktywna.
+• Ulepszono ustawienia głosu, wyraźnie rozdzielając każdy silnik, dzięki czemu regulacja jest dokładniejsza. Profile głosu prawidłowo zachowują ustawienia dla każdego pojedynczego silnika: Edge, Sapi5 i Sapi4.
+• Dodano tag do wstawiania pauz, bezpośrednio z opcji lub z panelu głosów po naciśnięciu Tab z edytora. Dostępne opcje to: 250 ms, 500 ms, 1 sekunda, 2 sekundy lub czas niestandardowy.
+• Naprawiono zachowanie podczas odtwarzania filmu z YouTube i uruchamiania transkrypcji. Teraz po powrocie za pomocą Alt+Tab fokus będzie prawidłowo ustawiony na przycisku Anuluj aktywnej transkrypcji.
+• Transkrypcje są teraz automatycznie zapisywane po zakończeniu procesu.
+• Ulepszono import z Wikipedii. Można wybrać, czy czytać tylko jedną sekcję i potem z artykułu wrócić do wyszukiwania klawiszem Esc, czy zaimportować cały artykuł. Można także wybrać język Wikipedii.
+• Dodano sekcję radia z całego świata, w której można wyszukiwać stacje radiowe według kraju, języka i gatunku. Można także dodawać lokalne stacje radiowe do bazy danych Sonarpada, aby inni użytkownicy również mogli ich słuchać. Radio można też dodać do ulubionych.
+• Dodano sekcję tras do obliczania przejazdów z wyborem środka: pieszo, rowerem, samochodem lub na wózku inwalidzkim. Można wybrać trasę najkrótszą lub najszybszą oraz zdecydować, czy pokazywać mijane gminy. Po zaimportowaniu trasy można także zapisać mapę wizualną z menu Plik, Zapisz obraz.
+• Dodano pozycję Drukuj w menu Plik. Sonarpad będzie drukował pliki TXT własnym systemem, a dla innych plików, takich jak DOCX, PDF i podobne, użyje powiązanego programu, aby jak najlepiej zachować oryginalny układ.
+• Zintegrowano w Sonarpadzie usługę tłumaczenia dla każdego dokumentu, dostępną z menu kontekstowego edytora. Użytkownik może korzystać z bezpłatnych usług DeepL i Google Translate bez podawania żadnego klucza API; po wpisaniu klucza API Gemini może tłumaczyć za pomocą Gemini.
+• W menu tłumaczenia użytkownik może wybrać język docelowy. Menu automatycznie zmienia kolejność: jeśli użytkownik najpierw wybierze angielski, potem francuski, a potem włoski, te trzy opcje będą widoczne na górze menu języków.
+• Jeśli użytkownik wpisze swój klucz API Gemini, będzie mógł także korzystać z funkcji Streść tekst, również dostępnej w menu kontekstowym, aby streszczać dowolny artykuł.
+• Do menu Odtwarzaj, widocznego podczas odtwarzania pliku multimedialnego, dodano menu do dzielenia bieżącego medium. Działa z MP3, MP4 i innymi formatami, dzieląc według liczby części albo według czasu trwania każdej części.
+
 Wersja 0.7.0 – 2026-04-25
 
 Nowości

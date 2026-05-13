@@ -1,5 +1,27 @@
 # Changelog
 
+Version 0.7.1 – 2026-05-13
+
+New features and improvements
+• Fixed an issue where files with accents or special characters caused an error when voice transcription was started.
+• From now on, in the View menu, items such as Word wrap and Show video during playback will always show the correct state, enabled or disabled.
+• Improved YouTube search, allowing users to return to the previous page or screen with Esc.
+• Added a preliminary check to verify whether a video can be played. Playback has also been improved: Sonarpad can now play videos or playlists marked as mixes, which previously could not be played.
+• Improved automatic bookmark management. Previously, if the Automatic bookmarks option was enabled and then disabled, those bookmarks remained; now the program correctly ignores them until the option is enabled again. Also, when the end of a media file is reached, the bookmark is automatically deleted.
+• Improved tag handling when dialogs are enabled. Sonarpad now correctly manages both features, allowing tags to be inserted even when the dialogs option is enabled.
+• Improved voice settings by clearly separating each engine, making adjustments more precise. Voice profiles now correctly keep settings for each individual engine: Edge, Sapi5 and Sapi4.
+• Added a tag for inserting pauses, directly from the options or from the voice panel by pressing Tab from the editor. The available choices are: 250 ms, 500 ms, 1 second, 2 seconds or a custom duration.
+• Fixed the behavior when playing a YouTube video and starting transcription. Now, when returning with Alt+Tab, focus will correctly be on the Cancel button of the active transcription.
+• Transcriptions are now saved automatically when the process is completed.
+• Improved Wikipedia import. You can choose whether to read only one section and then return to the search from the article by pressing Esc, or import the entire article. You can also choose the Wikipedia language to use.
+• Added a worldwide radio section, where you can search for radio stations by country, language and genre. You can also add local radio stations to the Sonarpad database, so other users can listen to them too. Radio stations can also be added to favorites.
+• Added a routes section for calculating routes by choosing the travel mode: walking, cycling, driving or wheelchair. You can choose whether to calculate the shortest or fastest route and whether to show the municipalities crossed. Once the route is imported, you can also save the visual map from the File menu, Save image.
+• Added Print to the File menu. Sonarpad will print TXT files using its own system and will use the associated program for other files, such as DOCX, PDF and similar formats, in order to preserve the original layout as much as possible.
+• Added a translation service for each document, accessible from the editor context menu. Users can use the free DeepL and Google Translate services without entering any API key; by entering a Gemini API key, they can translate using Gemini instead.
+• In the translation menu, users can choose the target language. The menu automatically reorders itself: if a user first chooses English, then French and then Italian, these three options will be shown at the top of the language menu.
+• If users enter their Gemini API key, they can also access the Summarize text feature, also available from the context menu, to summarize any article.
+• Added a menu to the Playback menu, visible while playing a media file, to split the current media. It works with MP3, MP4 and other formats, splitting either by number of parts or by the duration of each part.
+
 Version 0.7.0 – 2026-04-25
 
 What's New

@@ -1586,6 +1586,7 @@
   "stream_audio.auth_prompt": "Įveskite šios svetainės reikalaujamus prisijungimo duomenis:",
   "editor.translation.canceling": "Atšaukiamas vertimas...",
   "editor.summary.canceling": "Atšaukiamas apibendrinimas...",
+  "summary.partial_created_error": "Sukurta dalinė santrauka. Dalis teksto nebuvo apibendrinta dėl klaidos.",
   "editor.translation.error": "Klaida verčiant: {err}",
   "document.translation.title": "Vertimas"
 }

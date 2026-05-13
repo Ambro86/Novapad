@@ -15264,6 +15264,7 @@ fn open_editor_progress_window(
 ) {
     let dialog = app_windows::podcast_save_window::open_with_labels(hwnd, language, labels, true);
     if dialog.0 != 0 {
+        app_windows::podcast_save_window::disable_fake_progress(dialog);
         app_windows::podcast_save_window::focus_cancel_button(dialog);
     }
     with_state(hwnd, |state| {
@@ -15290,20 +15291,45 @@ fn close_editor_translation_progress_window(hwnd: HWND) {
     });
 }
 
-fn post_editor_progress_chunk(dialog_value: isize, completed: usize, total: usize) {
-    if dialog_value == 0 || total == 0 {
+fn post_editor_progress_percent(dialog_value: isize, pct: usize) {
+    if dialog_value == 0 {
         return;
     }
-    let pct = ((completed.saturating_mul(100)) / total).min(100);
     if let Err(err) = post_message_w_safe(
         HWND(dialog_value),
         app_windows::podcast_save_window::WM_PODCAST_SAVE_PROGRESS,
-        WPARAM(pct),
+        WPARAM(pct.min(100)),
         LPARAM(0),
     ) {
-        log_debug(&format!(
-            "Editor progress: failed to post chunk progress: {err}"
-        ));
+        log_debug(&format!("Editor progress: failed to post progress: {err}"));
+    }
+}
+
+struct EditorProgressTracker {
+    dialog_value: isize,
+    last_pct: usize,
+}
+
+impl EditorProgressTracker {
+    fn new(dialog_value: isize) -> Self {
+        Self {
+            dialog_value,
+            last_pct: 0,
+        }
+    }
+
+    fn post_chunk(&mut self, completed: usize, total: usize) {
+        if total == 0 {
+            return;
+        }
+
+        let pct = ((completed.saturating_mul(100)) / total).min(100);
+        if pct < self.last_pct {
+            return;
+        }
+
+        self.last_pct = pct;
+        post_editor_progress_percent(self.dialog_value, pct);
     }
 }
 
@@ -15420,12 +15446,14 @@ fn start_editor_translation_text(
                 .map_err(|err| format!("Runtime traduzione non disponibile: {err}"))
                 .and_then(|runtime| {
                     runtime.block_on(async {
-                        let mut progress_callback = |completed: usize, total: usize| {
-                            post_editor_progress_chunk(progress_dialog_value, completed, total);
-                        };
+                        let mut progress_tracker =
+                            EditorProgressTracker::new(progress_dialog_value);
                         let mut gemini_failed = false;
                         let settings = crate::load_settings();
                         if !settings.gemini_api_key.trim().is_empty() {
+                            let mut progress_callback = |completed: usize, total: usize| {
+                                progress_tracker.post_chunk(completed, total);
+                            };
                             log_debug(&format!(
                                 "Editor translation worker: using Gemini (model={})",
                                 settings.gemini_model
@@ -15473,7 +15501,6 @@ fn start_editor_translation_text(
                                             },
                                         )
                                         .map_err(|err| err.to_string())?;
-                                        post_editor_progress_chunk(progress_dialog_value, 0, 100);
                                         match fallback_gemini
                                             .translate_chunked_cancellable_with_progress(
                                                 &text,
@@ -15517,21 +15544,20 @@ fn start_editor_translation_text(
                                                      text: String,
                                                      fallback_from: &'static str,
                                                      cancel_token: Arc<AtomicBool>,
-                             progress_dialog_value: isize| async move {
+                                                     progress_dialog_value: isize,
+                                                     inherited_progress_pct: usize| async move {
                             log_debug(&format!(
                                 "Editor translation worker: Google fallback source={} target={}",
                                 google_source, target
                             ));
-                            post_editor_progress_chunk(progress_dialog_value, 0, 100);
                             let google_translator =
                                 translator::TranslatorGoogleFree::new(target.clone(), google_source)
                                     .map_err(|err| err.to_string())?;
+                            let mut progress_tracker =
+                                EditorProgressTracker::new(progress_dialog_value);
+                            progress_tracker.last_pct = inherited_progress_pct;
                             let mut progress_callback = |completed: usize, total: usize| {
-                                post_editor_progress_chunk(
-                                    progress_dialog_value,
-                                    completed,
-                                    total,
-                                );
+                                progress_tracker.post_chunk(completed, total);
                             };
                             google_translator
                                 .translate_chunked_cancellable_with_progress(
@@ -15572,6 +15598,7 @@ fn start_editor_translation_text(
                                 fallback_prov,
                                 cancel_token.clone(),
                                 progress_dialog_value,
+                                progress_tracker.last_pct,
                             )
                             .await;
                         }
@@ -15590,14 +15617,20 @@ fn start_editor_translation_text(
                             return Err(translator::TranslatorError::Cancelled.to_string());
                         }
 
-                        post_editor_progress_chunk(progress_dialog_value, 0, 100);
-                        match deepl_translator
-                            .translate_chunked_cancellable_with_progress(
+                        let deepl_result = {
+                            let mut progress_callback = |completed: usize, total: usize| {
+                                progress_tracker.post_chunk(completed, total);
+                            };
+                            deepl_translator
+                                .translate_chunked_cancellable_with_progress(
                                 &text,
                                 Some(cancel_token.as_ref()),
                                 &mut progress_callback,
                             )
                             .await
+                        };
+
+                        match deepl_result
                         {
                             Ok(translated) => Ok(EditorTranslationSuccess {
                                 text: translated,
@@ -15632,6 +15665,7 @@ fn start_editor_translation_text(
                                     },
                                     cancel_token.clone(),
                                     progress_dialog_value,
+                                    progress_tracker.last_pct,
                                 )
                                 .await
                             }
@@ -15813,8 +15847,10 @@ fn start_editor_summary_text(
                 .map_err(|err| format!("Runtime riassunto non disponibile: {err}"))
                 .and_then(|runtime| {
                     runtime.block_on(async {
+                        let mut progress_tracker =
+                            EditorProgressTracker::new(progress_dialog_value);
                         let mut progress_callback = |completed: usize, total: usize| {
-                            post_editor_progress_chunk(progress_dialog_value, completed, total);
+                            progress_tracker.post_chunk(completed, total);
                         };
                         let gemini = translator::TranslatorGemini::new(
                             api_key.clone(),
@@ -15859,7 +15895,6 @@ fn start_editor_summary_text(
                                     None,
                                 )
                                 .map_err(|err| err.to_string())?;
-                                post_editor_progress_chunk(progress_dialog_value, 0, 100);
                                 match fallback_gemini
                                     .summarize_same_language_chunked_cancellable_with_progress(
                                         &text,
@@ -15923,7 +15958,6 @@ fn start_editor_summary_text(
                                     None,
                                 )
                                 .map_err(|err| err.to_string())?;
-                                post_editor_progress_chunk(progress_dialog_value, 0, 100);
                                 match fallback_gemini
                                     .summarize_same_language_chunked_cancellable_with_progress(
                                         &text,
@@ -16024,12 +16058,11 @@ fn apply_editor_summary_result(hwnd: HWND, payload: EditorSummaryResult) {
         }
     };
     if let Some(warning) = success.warning.as_ref() {
-        let message = i18n::tr_f(
-            payload.language,
-            "summarize.error.failed",
-            &[("err", warning)],
-        );
-        show_error(hwnd, payload.language, &message);
+        log_debug(&format!(
+            "Editor summary: partial summary warning: {warning}"
+        ));
+        let message = i18n::tr(payload.language, "summary.partial_created_error");
+        show_info(hwnd, payload.language, &message);
     }
     editor_manager::new_document(hwnd);
     let Some(hwnd_edit) = get_active_edit(hwnd) else {

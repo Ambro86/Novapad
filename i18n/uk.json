@@ -1586,6 +1586,7 @@
   "stream_audio.auth_prompt": "Введіть облікові дані, які вимагає цей сайт:",
   "editor.translation.canceling": "Скасування перекладу...",
   "editor.summary.canceling": "Скасування підсумку...",
+  "summary.partial_created_error": "Створено частковий підсумок. Частину тексту не було підсумовано через помилку.",
   "editor.translation.error": "Помилка під час перекладу: {err}",
   "document.translation.title": "Переклад"
 }

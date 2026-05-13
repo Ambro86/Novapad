@@ -1586,6 +1586,7 @@
   "stream_audio.auth_prompt": "请输入此网站要求的凭据：",
   "editor.translation.canceling": "正在取消翻译...",
   "editor.summary.canceling": "正在取消总结...",
+  "summary.partial_created_error": "已创建部分摘要。由于出错，部分文本未被总结。",
   "editor.translation.error": "翻译时出错：{err}",
   "document.translation.title": "翻译"
 }

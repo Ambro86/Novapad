@@ -1586,6 +1586,7 @@
   "stream_audio.auth_prompt": "Introduce las credenciales requeridas por este sitio:",
   "editor.translation.canceling": "Cancelando traducción...",
   "editor.summary.canceling": "Cancelando resumen...",
+  "summary.partial_created_error": "Se creó un resumen parcial. Una parte del texto no se resumió debido a un error.",
   "editor.translation.error": "Error durante la traducción: {err}",
   "document.translation.title": "Traducción"
 }

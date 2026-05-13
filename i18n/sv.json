@@ -1586,6 +1586,7 @@
   "stream_audio.auth_prompt": "Ange inloggningsuppgifterna som krävs av den här webbplatsen:",
   "editor.translation.canceling": "Avbryter översättning...",
   "editor.summary.canceling": "Avbryter sammanfattning...",
+  "summary.partial_created_error": "Delvis sammanfattning skapades. En del av texten sammanfattades inte på grund av ett fel.",
   "editor.translation.error": "Fel vid översättning: {err}",
   "document.translation.title": "Översättning"
 }

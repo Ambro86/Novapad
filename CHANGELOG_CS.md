@@ -1,5 +1,27 @@
 # Přehled změn
 
+Verze 0.7.1 – 2026-05-13
+
+Novinky a vylepšení
+• Opraven problém, kdy soubory s diakritikou nebo speciálními znaky způsobovaly chybu při spuštění hlasového přepisu.
+• Od nynějška budou v nabídce Zobrazit položky jako Automatické zalamování řádků a Zobrazit video během přehrávání vždy zobrazovat správný stav, zapnuto nebo vypnuto.
+• Vylepšeno vyhledávání na YouTube, s možností vrátit se klávesou Esc na předchozí stránku nebo obrazovku.
+• Přidána předběžná kontrola, zda lze video přehrát. Vylepšeno bylo také přehrávání: Sonarpad nyní dokáže přehrát i videa nebo playlisty označené jako mix, které dříve přehrát nešlo.
+• Vylepšena správa automatických záložek. Dříve, pokud byla možnost Automatické záložky zapnutá a poté vypnutá, tyto záložky zůstávaly; nyní je program správně ignoruje, dokud není možnost znovu zapnuta. Navíc se při dosažení konce mediálního souboru záložka automaticky odstraní.
+• Vylepšena správa značek při zapnutých dialozích. Sonarpad nyní správně zvládá obě funkce a umožňuje vkládat značky i tehdy, když je volba dialogů zapnutá.
+• Vylepšena nastavení hlasu jasným oddělením jednotlivých enginů, takže nastavení je přesnější. Hlasové profily nyní správně ukládají nastavení pro každý engine zvlášť: Edge, Sapi5 a Sapi4.
+• Přidána značka pro vkládání pauz, přímo z možností nebo z panelu hlasů stisknutím Tab z editoru. Dostupné volby jsou: 250 ms, 500 ms, 1 sekunda, 2 sekundy nebo vlastní délka.
+• Opraveno chování při přehrávání videa z YouTube a spuštění přepisu. Nyní se při návratu pomocí Alt+Tab fokus správně nastaví na tlačítko Zrušit probíhajícího přepisu.
+• Přepisy se nyní po dokončení procesu ukládají automaticky.
+• Vylepšen import z Wikipedie. Je možné zvolit, zda číst pouze jednu sekci a poté se z článku klávesou Esc vrátit k vyhledávání, nebo importovat celý článek. Lze také vybrat jazyk Wikipedie.
+• Přidána sekce rádií z celého světa, kde lze vyhledávat rádio podle země, jazyka a žánru. Místní rádia lze také přidat do databáze Sonarpadu, aby je mohli poslouchat i ostatní uživatelé. Rádio lze také přidat do oblíbených.
+• Přidána sekce tras pro výpočet cest podle zvoleného způsobu: pěšky, na kole, autem nebo na invalidním vozíku. Lze zvolit nejkratší nebo nejrychlejší trasu a také zobrazení projetých obcí. Po importu trasy lze vizuální mapu uložit z nabídky Soubor, Uložit obrázek.
+• Do nabídky Soubor byla přidána položka Tisk. Sonarpad bude tisknout TXT soubory vlastním systémem a pro jiné soubory, jako DOCX, PDF a podobné, použije přidružený program, aby bylo co nejvíce zachováno původní rozvržení.
+• Do Sonarpadu byla integrována služba pro překlad každého dokumentu, dostupná z kontextové nabídky editoru. Uživatel může bez zadání API klíče používat bezplatné služby DeepL a Google Translate; po zadání Gemini API klíče může překládat pomocí Gemini.
+• V nabídce překladu si uživatel může zvolit cílový jazyk. Nabídka se automaticky přeuspořádá: pokud uživatel nejprve zvolí angličtinu, potom francouzštinu a potom italštinu, tyto tři volby se zobrazí nahoře v nabídce jazyků.
+• Pokud uživatel zadá svůj Gemini API klíč, získá také přístup k funkci Shrnout text, která je také dostupná v kontextové nabídce a umožňuje shrnout jakýkoli článek.
+• Do nabídky Přehrávání, viditelné při přehrávání mediálního souboru, byla přidána nabídka pro rozdělení aktuálního média. Funguje s MP3, MP4 a dalšími formáty, a umožňuje dělení podle počtu částí nebo podle délky každé části.
+
 Verze 0.7.0 – 2026-04-25
 
 Co je nového

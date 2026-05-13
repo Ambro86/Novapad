@@ -1,5 +1,27 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.7.1 – 2026-05-13
+
+Tính năng mới và cải tiến
+• Đã sửa lỗi khiến các tệp có dấu hoặc ký tự đặc biệt gây lỗi khi bắt đầu phiên âm bằng giọng nói.
+• Từ bây giờ, trong menu Xem, các mục như Tự động xuống dòng và Hiển thị video trong khi phát sẽ luôn hiển thị đúng trạng thái, bật hoặc tắt.
+• Cải thiện tìm kiếm YouTube, cho phép quay lại trang hoặc màn hình trước bằng phím Esc.
+• Thêm kiểm tra sơ bộ để xác minh video có thể phát được hay không. Việc phát cũng được cải thiện: Sonarpad giờ có thể phát cả video hoặc danh sách phát được đánh dấu là mix, vốn trước đây không phát được.
+• Cải thiện quản lý dấu trang tự động. Trước đây, nếu tùy chọn Dấu trang tự động được bật rồi tắt, các dấu trang đó vẫn còn; giờ chương trình sẽ bỏ qua chúng đúng cách cho đến khi tùy chọn được bật lại. Ngoài ra, khi phát đến cuối tệp media, dấu trang sẽ tự động bị xóa.
+• Cải thiện quản lý thẻ khi hộp thoại đang bật. Sonarpad giờ xử lý đúng cả hai chức năng, cho phép chèn thẻ ngay cả khi tùy chọn hộp thoại đang bật.
+• Cải thiện cài đặt giọng nói bằng cách tách rõ từng công cụ, giúp việc điều chỉnh chính xác hơn. Hồ sơ giọng nói giờ lưu đúng cài đặt cho từng công cụ riêng lẻ: Edge, Sapi5 và Sapi4.
+• Thêm thẻ để chèn khoảng dừng, trực tiếp từ tùy chọn hoặc từ bảng giọng nói bằng cách nhấn Tab từ trình soạn thảo. Các lựa chọn gồm: 250 ms, 500 ms, 1 giây, 2 giây hoặc thời lượng tùy chỉnh.
+• Sửa hành vi khi phát video YouTube và bắt đầu phiên âm. Giờ khi quay lại bằng Alt+Tab, tiêu điểm sẽ nằm đúng trên nút Hủy của phiên âm đang chạy.
+• Từ nay, bản phiên âm sẽ được tự động lưu khi quá trình hoàn tất.
+• Cải thiện nhập từ Wikipedia. Có thể chọn chỉ đọc một phần rồi từ bài viết nhấn Esc để quay lại tìm kiếm, hoặc nhập toàn bộ bài viết. Cũng có thể chọn ngôn ngữ Wikipedia cần tra cứu.
+• Thêm mục radio từ khắp thế giới, nơi có thể tìm radio theo quốc gia, ngôn ngữ và thể loại. Cũng có thể thêm radio địa phương vào cơ sở dữ liệu Sonarpad, để người dùng khác cũng có thể nghe. Radio cũng có thể được thêm vào mục yêu thích.
+• Thêm mục tuyến đường để tính đường đi bằng cách chọn phương tiện: đi bộ, xe đạp, ô tô hoặc xe lăn. Có thể chọn tuyến ngắn nhất hoặc nhanh nhất và có hiển thị các đô thị đi qua hay không. Sau khi nhập tuyến đường, cũng có thể lưu bản đồ trực quan từ menu Tệp, Lưu hình ảnh.
+• Thêm mục In trong menu Tệp. Sonarpad sẽ in tệp TXT bằng chính chương trình, và dùng chương trình liên kết cho các tệp khác như DOCX, PDF và tương tự, để giữ bố cục gốc tốt nhất có thể.
+• Tích hợp vào Sonarpad dịch vụ dịch cho từng tài liệu, truy cập từ menu ngữ cảnh của trình soạn thảo. Người dùng có thể dùng miễn phí DeepL và Google Translate mà không cần nhập khóa API; nếu nhập khóa API Gemini, có thể dịch bằng Gemini.
+• Trong menu dịch, người dùng có thể chọn ngôn ngữ đích. Menu sẽ tự sắp xếp lại: nếu người dùng chọn tiếng Anh trước, rồi tiếng Pháp, rồi tiếng Ý, ba tùy chọn này sẽ xuất hiện ở đầu menu ngôn ngữ.
+• Nếu người dùng nhập khóa API Gemini của mình, họ cũng có thể dùng chức năng Tóm tắt văn bản, luôn có trong menu ngữ cảnh, để tóm tắt bất kỳ bài viết nào.
+• Thêm vào menu Phát, xuất hiện khi đang phát tệp media, một menu để chia media hiện tại. Chức năng này hoạt động với MP3, MP4 và các định dạng khác, chia theo số phần hoặc theo thời lượng của mỗi phần.
+
 Phiên bản 0.7.0 – 2026-04-25
 
 Bản mới

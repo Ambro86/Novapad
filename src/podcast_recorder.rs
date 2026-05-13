@@ -309,6 +309,7 @@ pub struct RecorderHandle {
     shared: Arc<SharedState>,
     stop: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
+    single_app_process_id: Option<Arc<AtomicU32>>,
     threads: Vec<JoinHandle<Result<(), String>>>,
     output_path: PathBuf,
     temp_wav: PathBuf,
@@ -385,6 +386,15 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
 
     let stop = Arc::new(AtomicBool::new(false));
     let paused = Arc::new(AtomicBool::new(false));
+    let single_app_process_id =
+        if config.include_system && config.selected_app_process_ids.is_empty() {
+            config
+                .single_app_process_id
+                .filter(|pid| *pid != 0)
+                .map(|pid| Arc::new(AtomicU32::new(pid)))
+        } else {
+            None
+        };
 
     let system_stream_count = if config.include_system {
         let selected_count = config
@@ -421,6 +431,7 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
                 loopback: false,
                 gain: mic_gain,
                 target_process_id: None,
+                dynamic_target_process_id: None,
                 system_stream_index: 0,
                 buffer,
                 shared: shared_state.clone(),
@@ -447,7 +458,10 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
         crate::log_debug("Starting system audio capture thread");
         let mut target_process_ids = config.selected_app_process_ids.clone();
         if target_process_ids.is_empty() {
-            if let Some(pid) = config.single_app_process_id {
+            if let Some(pid) = single_app_process_id
+                .as_ref()
+                .map(|process_id| process_id.load(Ordering::SeqCst))
+            {
                 target_process_ids.push(pid);
             }
         } else {
@@ -469,6 +483,11 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
             let device_id = config.system_device_id.clone();
             let device_name = config.system_device_name.clone();
             let system_gain = config.system_gain;
+            let dynamic_target_process_id = if target_process_id.is_some() {
+                single_app_process_id.clone()
+            } else {
+                None
+            };
             threads.push(thread::spawn(move || {
                 crate::log_debug("System audio capture thread started");
                 let result = capture_source(CaptureOptions {
@@ -478,6 +497,7 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
                     loopback: true,
                     gain: system_gain,
                     target_process_id,
+                    dynamic_target_process_id,
                     system_stream_index,
                     buffer,
                     shared: shared_state.clone(),
@@ -542,6 +562,7 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
         shared,
         stop,
         paused,
+        single_app_process_id,
         threads,
         output_path,
         temp_wav,
@@ -575,6 +596,23 @@ impl RecorderHandle {
                 *status = RecorderStatus::Recording;
             }
         }
+    }
+
+    pub fn update_single_app_process(&self, process_id: u32) -> Result<(), String> {
+        if process_id == 0 {
+            return Err("Invalid target process id.".to_string());
+        }
+        let Some(target) = self.single_app_process_id.as_ref() else {
+            return Err("Current recording is not using single-app capture.".to_string());
+        };
+        let previous = target.swap(process_id, Ordering::SeqCst);
+        if previous != process_id {
+            crate::log_debug(&format!(
+                "Podcast recorder: switching single-app capture from PID {} to PID {}",
+                previous, process_id
+            ));
+        }
+        Ok(())
     }
 
     pub fn stop(self) -> Result<PathBuf, String> {
@@ -992,6 +1030,7 @@ fn write_mixed_audio_mp3(
     Ok(())
 }
 
+#[derive(Clone)]
 struct CaptureOptions {
     kind: SourceKind,
     device_id: String,
@@ -999,6 +1038,7 @@ struct CaptureOptions {
     loopback: bool,
     gain: f32,
     target_process_id: Option<u32>,
+    dynamic_target_process_id: Option<Arc<AtomicU32>>,
     system_stream_index: usize,
     buffer: Arc<MixBuffer>,
     shared: Arc<SharedState>,
@@ -1007,6 +1047,35 @@ struct CaptureOptions {
 }
 
 fn capture_source(options: CaptureOptions) -> Result<(), String> {
+    let Some(dynamic_target) = options.dynamic_target_process_id.clone() else {
+        return capture_source_once(options);
+    };
+    loop {
+        if options.stop.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        let target_process_id = dynamic_target.load(Ordering::SeqCst);
+        if target_process_id == 0 {
+            return Err("Invalid target process id.".to_string());
+        }
+        let mut current_options = options.clone();
+        current_options.target_process_id = Some(target_process_id);
+        let result = capture_source_once(current_options);
+        if options.stop.load(Ordering::SeqCst) {
+            return result;
+        }
+        if dynamic_target.load(Ordering::SeqCst) != target_process_id {
+            crate::log_debug(&format!(
+                "Podcast recorder: restarting single-app capture after PID change from {}",
+                target_process_id
+            ));
+            continue;
+        }
+        return result;
+    }
+}
+
+fn capture_source_once(options: CaptureOptions) -> Result<(), String> {
     let _com = ComGuard::new_mta().map_err(|e| format!("CoInitializeEx failed: {e}"))?;
     crate::log_debug(&format!(
         "capture_source: kind={:?}, device_id='{}', name='{}', loopback={}",
@@ -1124,6 +1193,17 @@ fn capture_source(options: CaptureOptions) -> Result<(), String> {
 
     loop {
         if options.stop.load(Ordering::SeqCst) {
+            break;
+        }
+        if let (Some(dynamic_target), Some(target_process_id)) = (
+            options.dynamic_target_process_id.as_ref(),
+            options.target_process_id,
+        ) && dynamic_target.load(Ordering::SeqCst) != target_process_id
+        {
+            crate::log_debug(&format!(
+                "capture_source: PID change detected for stream_index={}, old_pid={}",
+                options.system_stream_index, target_process_id
+            ));
             break;
         }
         if options.paused.load(Ordering::SeqCst) {

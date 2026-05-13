@@ -1456,6 +1456,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                             if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
                                 restart_single_app_monitor(state);
                             }
+                            update_active_single_app_recording(state);
                         }
                         handled = true;
                     }
@@ -1486,6 +1487,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
                             restart_single_app_monitor(state);
                         }
+                        update_active_single_app_recording(state);
                         handled = true;
                     }
                     PODCAST_ID_FORMAT => {
@@ -2255,6 +2257,61 @@ fn update_recording_controls(state: &PodcastState) {
             windows::Win32::UI::WindowsAndMessaging::SW_HIDE,
         );
         EnableWindow(state.stop_button, recording || paused);
+    }
+}
+
+fn update_active_single_app_recording(state: &mut PodcastState) {
+    if state.recorder.is_none()
+        || !is_checked(state.include_system)
+        || !matches!(
+            selected_capture_mode(state),
+            PodcastSystemCaptureMode::SingleApp
+        )
+    {
+        return;
+    }
+    let labels = labels(state.language);
+    let Some(app) = selected_single_app(state) else {
+        show_error(
+            state.parent,
+            state.language,
+            &labels.error_single_app_required,
+        );
+        return;
+    };
+    if let Err(err) = probe_process_loopback(app.pid) {
+        show_error(
+            state.parent,
+            state.language,
+            &format!("{} {}", labels.error_single_app_unavailable, err),
+        );
+        return;
+    }
+    let update_result = state
+        .recorder
+        .as_ref()
+        .map(|recorder| recorder.update_single_app_process(app.pid));
+    match update_result {
+        Some(Ok(())) => {
+            let mic_name = if is_checked(state.include_mic) {
+                Some(device_display_name(
+                    &state.mic_devices,
+                    &selected_device_id(state, true),
+                    &labels.default_device,
+                ))
+            } else {
+                None
+            };
+            update_source_info_text(state, mic_name, None, Some(app.display_name), None);
+        }
+        Some(Err(err)) => {
+            crate::log_debug(&format!(
+                "Podcast recorder: failed to update single-app capture: {}",
+                err
+            ));
+            show_error(state.parent, state.language, &err);
+        }
+        None => {}
     }
 }
 

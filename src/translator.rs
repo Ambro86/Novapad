@@ -30,6 +30,7 @@ pub enum TranslatorError {
     ParseJson(String),
     MissingTranslatedText,
     Cancelled,
+    PartialSummary { summary: String, error: String },
 }
 
 impl fmt::Display for TranslatorError {
@@ -61,6 +62,9 @@ impl fmt::Display for TranslatorError {
             }
             TranslatorError::Cancelled => {
                 write!(f, "Translation canceled")
+            }
+            TranslatorError::PartialSummary { error, .. } => {
+                write!(f, "{error}")
             }
         }
     }
@@ -201,10 +205,11 @@ impl TranslatorGoogleFree {
         Err(last_error.unwrap_or(TranslatorError::MissingTranslatedText))
     }
 
-    pub async fn translate_chunked_cancellable(
+    pub async fn translate_chunked_cancellable_with_progress(
         &self,
         text: &str,
         cancel: Option<&AtomicBool>,
+        progress: &mut dyn FnMut(usize, usize),
     ) -> Result<String, TranslatorError> {
         const MAX_CHUNK_CHARS: usize = 1_500;
         const MAX_CHUNK_ATTEMPTS: usize = 3;
@@ -241,6 +246,7 @@ impl TranslatorGoogleFree {
                 match self.translate(chunk).await {
                     Ok(translated_chunk) => {
                         translated_text.push_str(&translated_chunk);
+                        progress(index + 1, chunks.len());
                         last_error = None;
                         break;
                     }
@@ -536,10 +542,11 @@ impl TranslatorDeepLFree {
         Self::parse_result(&response_text)
     }
 
-    pub async fn translate_chunked_cancellable(
+    pub async fn translate_chunked_cancellable_with_progress(
         &self,
         text: &str,
         cancel: Option<&AtomicBool>,
+        progress: &mut dyn FnMut(usize, usize),
     ) -> Result<String, TranslatorError> {
         const MAX_CHUNK_CHARS: usize = 3_000;
 
@@ -568,7 +575,10 @@ impl TranslatorDeepLFree {
             }
 
             match self.translate(chunk).await {
-                Ok(translated_chunk) => translated_text.push_str(&translated_chunk),
+                Ok(translated_chunk) => {
+                    translated_text.push_str(&translated_chunk);
+                    progress(index + 1, chunks.len());
+                }
                 Err(err) if !translated_text.trim().is_empty() => {
                     crate::log_debug(&format!(
                         "Google translation: chunk {} failed after partial output: {}",
@@ -743,10 +753,11 @@ impl TranslatorGemini {
         self.generate_text(&prompt).await
     }
 
-    pub async fn summarize_same_language_chunked_cancellable(
+    pub async fn summarize_same_language_chunked_cancellable_with_progress(
         &self,
         text: &str,
         cancel: &AtomicBool,
+        progress: &mut dyn FnMut(usize, usize),
     ) -> Result<String, TranslatorError> {
         const MAX_CHUNK_CHARS: usize = 6_000;
 
@@ -776,15 +787,22 @@ impl TranslatorGemini {
                 chunk.chars().count()
             ));
             match self.summarize_same_language(&chunk, cancel).await {
-                Ok(summary) => partial_summaries.push(summary),
+                Ok(summary) => {
+                    partial_summaries.push(summary);
+                    progress(index + 1, chunk_count);
+                }
                 Err(TranslatorError::Cancelled) => return Err(TranslatorError::Cancelled),
                 Err(err) if !partial_summaries.is_empty() => {
                     crate::log_debug(&format!(
-                        "Gemini summary: chunk {} failed after partial output: {}",
+                        "Gemini summary: chunk {} failed after {} completed chunks: {}",
                         index + 1,
+                        partial_summaries.len(),
                         err
                     ));
-                    return Ok(partial_summaries.join("\n\n"));
+                    return Err(TranslatorError::PartialSummary {
+                        summary: partial_summaries.join("\n\n"),
+                        error: err.to_string(),
+                    });
                 }
                 Err(err) => return Err(err),
             }
@@ -796,10 +814,11 @@ impl TranslatorGemini {
         Ok(partial_summaries.join("\n\n"))
     }
 
-    pub async fn translate_chunked_cancellable(
+    pub async fn translate_chunked_cancellable_with_progress(
         &self,
         text: &str,
         cancel: &AtomicBool,
+        progress: &mut dyn FnMut(usize, usize),
     ) -> Result<String, TranslatorError> {
         const MAX_CHUNK_CHARS: usize = 6_000;
 
@@ -808,6 +827,7 @@ impl TranslatorGemini {
             return self.translate(text, cancel).await;
         }
 
+        let chunk_count = chunks.len();
         let mut translated_text = String::new();
         for (index, chunk) in chunks.into_iter().enumerate() {
             if cancel.load(Ordering::Relaxed) {
@@ -818,7 +838,10 @@ impl TranslatorGemini {
                 continue;
             }
             match self.translate(&chunk, cancel).await {
-                Ok(translated_chunk) => translated_text.push_str(&translated_chunk),
+                Ok(translated_chunk) => {
+                    translated_text.push_str(&translated_chunk);
+                    progress(index + 1, chunk_count);
+                }
                 Err(TranslatorError::Cancelled) => return Err(TranslatorError::Cancelled),
                 Err(err) if !translated_text.trim().is_empty() => {
                     crate::log_debug(&format!(

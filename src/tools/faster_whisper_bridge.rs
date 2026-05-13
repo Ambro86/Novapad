@@ -443,6 +443,28 @@ fn remove_case_insensitive_all(input: &str, needle: &str) -> String {
     output
 }
 
+fn remove_spaced_dot_runs(line: &str) -> String {
+    let tokens = line.split_whitespace().collect::<Vec<_>>();
+    let mut output = Vec::new();
+    let mut index = 0usize;
+    while index < tokens.len() {
+        if tokens[index] == "." {
+            let start = index;
+            while index < tokens.len() && tokens[index] == "." {
+                index += 1;
+            }
+            if index - start >= 3 {
+                continue;
+            }
+            output.extend_from_slice(&tokens[start..index]);
+        } else {
+            output.push(tokens[index]);
+            index += 1;
+        }
+    }
+    output.join(" ")
+}
+
 fn strip_hallucinations(text: &str) -> String {
     let mut cleaned = text.to_string();
 
@@ -482,7 +504,7 @@ fn strip_hallucinations(text: &str) -> String {
 
     cleaned
         .lines()
-        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .map(remove_spaced_dot_runs)
         .filter(|line| !line.is_empty() && !line.replace('.', "").trim().is_empty())
         .collect::<Vec<_>>()
         .join("\n")

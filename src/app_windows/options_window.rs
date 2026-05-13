@@ -213,11 +213,11 @@ const OPTIONS_TAB_RSS_PODCAST: i32 = 4;
 const OPTIONS_TAB_AI_TRANSCRIPTION: i32 = 5;
 const OPTIONS_TAB_SHORTCUTS: i32 = 6;
 const OPTIONS_TAB_COUNT: i32 = 7;
-const OPTIONS_DIALOG_WIDTH: i32 = 820;
+const OPTIONS_DIALOG_WIDTH: i32 = 900;
 const OPTIONS_DIALOG_HEIGHT: i32 = 760;
 const OPTIONS_TABS_X: i32 = 16;
 const OPTIONS_TABS_Y: i32 = 10;
-const OPTIONS_TABS_WIDTH: i32 = 788;
+const OPTIONS_TABS_WIDTH: i32 = 868;
 const OPTIONS_TABS_HEIGHT: i32 = 30;
 const OPTIONS_CONTENT_TOP: i32 = 50;
 const OPTIONS_MARGIN_X: i32 = 20;
@@ -13996,6 +13996,12 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.checkbox_whisper_include_timestamps,
             state.label_dictation_microphone,
             state.combo_dictation_microphone,
+            state.label_gemini_api_key,
+            state.edit_gemini_api_key,
+            state.button_gemini_get_key,
+            state.label_gemini_model,
+            state.combo_gemini_model,
+            state.button_gemini_refresh_models,
         ] {
             crate::show_window_safe(
                 control,

@@ -1585,5 +1585,6 @@
   "stream_audio.auth_prompt": "Wprowadź dane logowania wymagane przez tę stronę:",
   "editor.translation.canceling": "Anulowanie tłumaczenia...",
   "editor.summary.canceling": "Anulowanie streszczenia...",
-  "editor.translation.error": "Błąd podczas tłumaczenia: {err}"
+  "editor.translation.error": "Błąd podczas tłumaczenia: {err}",
+  "document.translation.title": "Tłumaczenie"
 }

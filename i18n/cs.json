@@ -1585,5 +1585,6 @@
   "stream_audio.auth_prompt": "Zadejte přihlašovací údaje požadované tímto webem:",
   "editor.translation.canceling": "Rušení překladu...",
   "editor.summary.canceling": "Rušení shrnutí...",
-  "editor.translation.error": "Chyba při překladu: {err}"
+  "editor.translation.error": "Chyba při překladu: {err}",
+  "document.translation.title": "Překlad"
 }

@@ -1585,5 +1585,6 @@
   "stream_audio.auth_prompt": "Introduce las credenciales requeridas por este sitio:",
   "editor.translation.canceling": "Cancelando traducción...",
   "editor.summary.canceling": "Cancelando resumen...",
-  "editor.translation.error": "Error durante la traducción: {err}"
+  "editor.translation.error": "Error durante la traducción: {err}",
+  "document.translation.title": "Traducción"
 }

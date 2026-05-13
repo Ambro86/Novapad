@@ -261,14 +261,6 @@ impl TranslatorGoogleFree {
             }
 
             if let Some(err) = last_error {
-                if !translated_text.trim().is_empty() {
-                    crate::log_debug(&format!(
-                        "DeepL translation: chunk {} failed after partial output: {}",
-                        index + 1,
-                        err
-                    ));
-                    return Ok(translated_text);
-                }
                 return Err(err);
             }
         }
@@ -843,14 +835,6 @@ impl TranslatorGemini {
                     progress(index + 1, chunk_count);
                 }
                 Err(TranslatorError::Cancelled) => return Err(TranslatorError::Cancelled),
-                Err(err) if !translated_text.trim().is_empty() => {
-                    crate::log_debug(&format!(
-                        "Gemini translation: chunk {} failed after partial output: {}",
-                        index + 1,
-                        err
-                    ));
-                    return Ok(translated_text);
-                }
                 Err(err) => return Err(err),
             }
         }

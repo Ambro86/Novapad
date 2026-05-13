@@ -1585,5 +1585,6 @@
   "stream_audio.auth_prompt": "Введіть облікові дані, які вимагає цей сайт:",
   "editor.translation.canceling": "Скасування перекладу...",
   "editor.summary.canceling": "Скасування підсумку...",
-  "editor.translation.error": "Помилка під час перекладу: {err}"
+  "editor.translation.error": "Помилка під час перекладу: {err}",
+  "document.translation.title": "Переклад"
 }

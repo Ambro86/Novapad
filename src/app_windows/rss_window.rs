@@ -3317,6 +3317,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
             WM_RSS_IMPORT_COMPLETE => {
                 let ptr = lparam.0 as *mut ImportResult;
                 let res = Box::from_raw(ptr);
+                crate::log_debug("WM_RSS_IMPORT_COMPLETE received");
 
                 let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                 let language =

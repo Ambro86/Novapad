@@ -1585,5 +1585,6 @@
   "stream_audio.auth_prompt": "Saisissez les identifiants requis par ce site :",
   "editor.translation.canceling": "Annulation de la traduction...",
   "editor.summary.canceling": "Annulation du résumé...",
-  "editor.translation.error": "Erreur lors de la traduction : {err}"
+  "editor.translation.error": "Erreur lors de la traduction : {err}",
+  "document.translation.title": "Traduction"
 }

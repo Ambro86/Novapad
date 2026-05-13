@@ -1585,5 +1585,6 @@
   "stream_audio.auth_prompt": "Введите учетные данные, требуемые этим сайтом:",
   "editor.translation.canceling": "Отмена перевода...",
   "editor.summary.canceling": "Отмена краткого изложения...",
-  "editor.translation.error": "Ошибка при переводе: {err}"
+  "editor.translation.error": "Ошибка при переводе: {err}",
+  "document.translation.title": "Перевод"
 }

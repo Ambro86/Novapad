@@ -1585,5 +1585,6 @@
   "stream_audio.auth_prompt": "Įveskite šios svetainės reikalaujamus prisijungimo duomenis:",
   "editor.translation.canceling": "Atšaukiamas vertimas...",
   "editor.summary.canceling": "Atšaukiamas apibendrinimas...",
-  "editor.translation.error": "Klaida verčiant: {err}"
+  "editor.translation.error": "Klaida verčiant: {err}",
+  "document.translation.title": "Vertimas"
 }

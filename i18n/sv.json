@@ -1585,5 +1585,6 @@
   "stream_audio.auth_prompt": "Ange inloggningsuppgifterna som krävs av den här webbplatsen:",
   "editor.translation.canceling": "Avbryter översättning...",
   "editor.summary.canceling": "Avbryter sammanfattning...",
-  "editor.translation.error": "Fel vid översättning: {err}"
+  "editor.translation.error": "Fel vid översättning: {err}",
+  "document.translation.title": "Översättning"
 }

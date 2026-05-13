@@ -1585,5 +1585,6 @@
   "stream_audio.auth_prompt": "Nhập thông tin đăng nhập mà trang web này yêu cầu:",
   "editor.translation.canceling": "Đang hủy dịch...",
   "editor.summary.canceling": "Đang hủy tóm tắt...",
-  "editor.translation.error": "Lỗi khi dịch: {err}"
+  "editor.translation.error": "Lỗi khi dịch: {err}",
+  "document.translation.title": "Bản dịch"
 }

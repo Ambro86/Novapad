@@ -1585,5 +1585,6 @@
   "stream_audio.auth_prompt": "请输入此网站要求的凭据：",
   "editor.translation.canceling": "正在取消翻译...",
   "editor.summary.canceling": "正在取消总结...",
-  "editor.translation.error": "翻译时出错：{err}"
+  "editor.translation.error": "翻译时出错：{err}",
+  "document.translation.title": "翻译"
 }

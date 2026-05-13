@@ -319,9 +319,6 @@ const EDITOR_TRANSLATE_LANGUAGES: [EditorTranslateLanguage; menu::IDM_EDIT_TRANS
 ];
 
 struct EditorTranslationResult {
-    hwnd_edit: isize,
-    cp_min: i32,
-    cp_max: i32,
     language: Language,
     result: Result<EditorTranslationSuccess, String>,
 }
@@ -15372,7 +15369,7 @@ fn start_editor_selection_translation(
 
 fn start_editor_translation_text(
     hwnd: HWND,
-    hwnd_edit: HWND,
+    _hwnd_edit: HWND,
     cp_min: i32,
     cp_max: i32,
     text: String,
@@ -15380,7 +15377,6 @@ fn start_editor_translation_text(
     language: Language,
 ) {
     let hwnd_value = hwnd.0;
-    let hwnd_edit_value = hwnd_edit.0;
     let target = target_lang.to_string();
     let source = "auto".to_string();
     let original_chars = text.chars().count();
@@ -15424,6 +15420,7 @@ fn start_editor_translation_text(
                         let mut progress_callback = |completed: usize, total: usize| {
                             post_editor_progress_chunk(progress_dialog_value, completed, total);
                         };
+                        let mut gemini_failed = false;
                         let settings = crate::load_settings();
                         if !settings.gemini_api_key.trim().is_empty() {
                             log_debug(&format!(
@@ -15500,6 +15497,7 @@ fn start_editor_translation_text(
                                     log_debug(&format!(
                                         "Editor translation worker: Gemini failed: {err}, falling back to DeepL/Google"
                                     ));
+                                    gemini_failed = true;
                                 }
                             }
                         }
@@ -15555,6 +15553,11 @@ fn start_editor_translation_text(
                         if cooldown_remaining > 0 {
                             let deepl_status =
                                 format!("DeepL cooldown active for {cooldown_remaining}s");
+                            let fallback_prov = if gemini_failed {
+                                "Gemini"
+                            } else {
+                                "DeepL"
+                            };
                             log_debug(&format!(
                                 "Editor translation worker: {deepl_status}, using Google fallback directly"
                             ));
@@ -15563,7 +15566,7 @@ fn start_editor_translation_text(
                                 google_source,
                                 target,
                                 text,
-                                "DeepL",
+                                fallback_prov,
                                 cancel_token.clone(),
                                 progress_dialog_value,
                             )
@@ -15642,9 +15645,6 @@ fn start_editor_translation_text(
                 Err(err) => log_debug(&format!("Editor translation worker: request failed: {err}")),
             }
             let payload = Box::new(EditorTranslationResult {
-                hwnd_edit: hwnd_edit_value,
-                cp_min,
-                cp_max,
                 language,
                 result,
             });
@@ -16047,8 +16047,6 @@ fn apply_editor_summary_result(hwnd: HWND, payload: EditorSummaryResult) {
 
 fn apply_editor_translation_result(hwnd: HWND, payload: EditorTranslationResult) {
     close_editor_translation_progress_window(hwnd);
-    let cp_min = payload.cp_min;
-    let cp_max = payload.cp_max;
     let success = match payload.result {
         Ok(success) => success,
         Err(err) => {
@@ -16068,59 +16066,16 @@ fn apply_editor_translation_result(hwnd: HWND, payload: EditorTranslationResult)
         }
     };
     let translated_text = success.text;
-    let hwnd_edit = HWND(payload.hwnd_edit);
-    if hwnd_edit.0 == 0 || !is_window_handle_valid(hwnd_edit) {
-        log_debug("Editor translation: target editor is no longer valid");
+    editor_manager::new_document(hwnd);
+    let Some(hwnd_edit) = get_active_edit(hwnd) else {
+        log_debug("Editor translation: no active editor for translation result");
         return;
-    }
-    log_debug(&format!(
-        "Editor translation: applying result range={}..{} translated_chars={}",
-        cp_min,
-        cp_max,
-        translated_text.chars().count()
-    ));
-
-    let before_text = editor_manager::get_edit_text(hwnd_edit);
-    search::replace_range_text(hwnd_edit, cp_min, cp_max, &translated_text);
-    let after_text = editor_manager::get_edit_text(hwnd_edit);
-    log_debug(&format!(
-        "Editor translation: replace_range_text changed={} chars_before={} chars_after={}",
-        after_text != before_text,
-        before_text.chars().count(),
-        after_text.chars().count()
-    ));
-    if after_text == before_text {
-        if translated_text == before_text {
-            log_debug("Editor translation: translated text is identical to current editor text");
-            announce_editor_translation_completed(
-                hwnd,
-                payload.language,
-                success.provider,
-                success.fallback_from,
-            );
-            return;
-        }
-        log_debug("Editor translation: replace_range_text unchanged, using set_edit_text fallback");
-        if !replace_editor_text_with_set_text(
-            hwnd_edit,
-            &before_text,
-            &translated_text,
-            cp_min,
-            cp_max,
-        ) {
-            log_debug("Editor translation: set_edit_text fallback failed");
-            return;
-        }
-        let verified_text = editor_manager::get_edit_text(hwnd_edit);
-        log_debug(&format!(
-            "Editor translation: set_edit_text fallback changed={}",
-            verified_text != before_text
-        ));
-        if verified_text == before_text {
-            return;
-        }
-    }
-    send_message_w_safe(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+    };
+    editor_manager::set_current_document_title(
+        hwnd,
+        &i18n::tr(payload.language, "document.translation.title"),
+    );
+    editor_manager::set_edit_text(hwnd_edit, &translated_text);
     editor_manager::mark_dirty_from_edit(hwnd, hwnd_edit);
     set_focus_safe(hwnd_edit);
     announce_editor_translation_completed(
@@ -16185,32 +16140,6 @@ fn set_main_status_message(hwnd: HWND, message: &str) {
         WPARAM(0),
         LPARAM(message_wide.as_ptr() as isize),
     );
-}
-
-fn replace_editor_text_with_set_text(
-    hwnd_edit: HWND,
-    before_text: &str,
-    translated_text: &str,
-    cp_min: i32,
-    cp_max: i32,
-) -> bool {
-    if cp_max < 0 {
-        editor_manager::set_edit_text(hwnd_edit, translated_text);
-        return true;
-    }
-
-    let mut utf16 = before_text.encode_utf16().collect::<Vec<_>>();
-    let start = cp_min.min(cp_max).max(0) as usize;
-    let end = cp_min.max(cp_max).max(0) as usize;
-    if start >= utf16.len() {
-        return false;
-    }
-    let end = end.min(utf16.len());
-    let translated = translated_text.encode_utf16().collect::<Vec<_>>();
-    utf16.splice(start..end, translated);
-    let updated = String::from_utf16_lossy(&utf16);
-    editor_manager::set_edit_text(hwnd_edit, &updated);
-    true
 }
 
 fn open_dictionary_lookup(hwnd: HWND) {

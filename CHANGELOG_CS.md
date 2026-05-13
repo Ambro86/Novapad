@@ -3,6 +3,7 @@
 Verze 0.7.1 – 2026-05-13
 
 Novinky a vylepšení
+• Vytvořen oficiální web sonarpad.com, nové referenční místo pro sledování nejnovějších novinek, stažení nejnovější verze programu, čtení komentářů návštěvníků a v budoucnu také poslech všech podcastů Sonarpadu. Do nabídky Nápověda byla také přidána položka „Navštívit sonarpad.com“, která umožňuje rychle otevřít oficiální web.
 • Opraven problém, kdy soubory s diakritikou nebo speciálními znaky způsobovaly chybu při spuštění hlasového přepisu.
 • Od nynějška budou v nabídce Zobrazit položky jako Automatické zalamování řádků a Zobrazit video během přehrávání vždy zobrazovat správný stav, zapnuto nebo vypnuto.
 • Vylepšeno vyhledávání na YouTube, s možností vrátit se klávesou Esc na předchozí stránku nebo obrazovku.

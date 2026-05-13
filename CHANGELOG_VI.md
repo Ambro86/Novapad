@@ -3,6 +3,7 @@
 Phiên bản 0.7.1 – 2026-05-13
 
 Tính năng mới và cải tiến
+• Đã tạo trang web chính thức sonarpad.com, một điểm tham khảo mới để theo dõi những tin tức mới nhất, tải xuống phiên bản mới nhất của chương trình, đọc bình luận của khách truy cập và, trong tương lai, nghe tất cả podcast của Sonarpad. Mục “Truy cập sonarpad.com” cũng đã được thêm vào menu Trợ giúp, để mở nhanh trang web chính thức.
 • Đã sửa lỗi khiến các tệp có dấu hoặc ký tự đặc biệt gây lỗi khi bắt đầu phiên âm bằng giọng nói.
 • Từ bây giờ, trong menu Xem, các mục như Tự động xuống dòng và Hiển thị video trong khi phát sẽ luôn hiển thị đúng trạng thái, bật hoặc tắt.
 • Cải thiện tìm kiếm YouTube, cho phép quay lại trang hoặc màn hình trước bằng phím Esc.

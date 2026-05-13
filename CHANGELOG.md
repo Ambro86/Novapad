@@ -3,6 +3,7 @@
 Version 0.7.1 – 2026-05-13
 
 New features and improvements
+• Created the official website sonarpad.com, a new reference point for following the latest news, downloading the latest version of the program, reading visitor comments and, in the future, listening to all Sonarpad podcasts. The Help menu now also includes “Visit sonarpad.com”, allowing users to quickly open the official website.
 • Fixed an issue where files with accents or special characters caused an error when voice transcription was started.
 • From now on, in the View menu, items such as Word wrap and Show video during playback will always show the correct state, enabled or disabled.
 • Improved YouTube search, allowing users to return to the previous page or screen with Esc.

@@ -164,6 +164,7 @@ pub const IDM_HELP_CHANGELOG: usize = 7004;
 pub const IDM_HELP_FEEDBACK: usize = 7005;
 pub const IDM_HELP_DONATIONS: usize = 7006;
 pub const IDM_HELP_EXPORT_DIAGNOSTICS: usize = 7007;
+pub const IDM_HELP_VISIT_SONARPAD: usize = 7008;
 pub const MAX_RECENT: usize = 5;
 
 pub struct MenuLabels {
@@ -273,6 +274,7 @@ pub struct MenuLabels {
     pub window_close_all: String,
     pub help_guide: String,
     pub help_changelog: String,
+    pub help_visit_sonarpad: String,
     pub help_feedback: String,
     pub help_export_diagnostics: String,
     pub help_donations: String,
@@ -413,6 +415,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         window_close_all: i18n::tr(language, "window.close_all"),
         help_guide: i18n::tr(language, "help.guide"),
         help_changelog: i18n::tr(language, "help.changelog"),
+        help_visit_sonarpad: i18n::tr(language, "help.visit_sonarpad"),
         help_feedback: i18n::tr(language, "help.feedback"),
         help_export_diagnostics: i18n::tr(language, "help.export_diagnostics"),
         help_donations: i18n::tr(language, "help.donations"),
@@ -1540,6 +1543,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             MF_STRING,
             IDM_HELP_CHANGELOG,
             &labels.help_changelog,
+        );
+        append_menu_string(
+            help_menu,
+            MF_STRING,
+            IDM_HELP_VISIT_SONARPAD,
+            &labels.help_visit_sonarpad,
         );
         append_menu_string(
             help_menu,

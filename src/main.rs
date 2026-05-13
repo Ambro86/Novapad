@@ -11071,6 +11071,25 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         app_windows::help_window::open_changelog(hwnd);
                         LRESULT(0)
                     }
+                    IDM_HELP_VISIT_SONARPAD => {
+                        log_debug("Menu: Visit sonarpad.com");
+                        let url = to_wide("https://sonarpad.com");
+                        let res = ShellExecuteW(
+                            hwnd,
+                            w!("open"),
+                            PCWSTR(url.as_ptr()),
+                            PCWSTR::null(),
+                            PCWSTR::null(),
+                            SW_SHOWNORMAL,
+                        );
+                        if res.0 as isize <= 32 {
+                            log_debug(&format!(
+                                "ShellExecuteW failed to open sonarpad.com: {}",
+                                res.0
+                            ));
+                        }
+                        LRESULT(0)
+                    }
                     IDM_HELP_FEEDBACK => {
                         log_debug("Menu: Feedback");
                         app_windows::feedback_window::open(hwnd);

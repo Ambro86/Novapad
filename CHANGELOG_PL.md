@@ -3,6 +3,7 @@
 Wersja 0.7.1 – 2026-05-13
 
 Nowości i ulepszenia
+• Utworzono oficjalną stronę sonarpad.com, nowe miejsce odniesienia do śledzenia najnowszych informacji, pobierania najnowszej wersji programu, czytania komentarzy odwiedzających oraz, w przyszłości, słuchania wszystkich podcastów Sonarpad. Do menu Pomoc dodano także pozycję „Odwiedź sonarpad.com”, która pozwala szybko otworzyć oficjalną stronę.
 • Naprawiono problem, przez który pliki z akcentami lub znakami specjalnymi powodowały błąd podczas uruchamiania transkrypcji głosowej.
 • Od teraz w menu Widok pozycje takie jak Automatyczne zawijanie wierszy i Pokazuj wideo podczas odtwarzania zawsze będą pokazywać prawidłowy stan, włączony lub wyłączony.
 • Ulepszono wyszukiwanie w YouTube, umożliwiając powrót klawiszem Esc do poprzedniej strony lub ekranu.

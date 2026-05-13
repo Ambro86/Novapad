@@ -3,6 +3,7 @@
 Versão 0.7.1 – 2026-05-13
 
 Novidades e melhorias
+• Criado o site oficial sonarpad.com, um novo ponto de referência para acompanhar as últimas novidades, descarregar a versão mais recente do programa, ler os comentários dos visitantes e, no futuro, ouvir também todos os podcasts do Sonarpad. No menu Ajuda também foi adicionada a opção “Visitar sonarpad.com”, para abrir rapidamente o site oficial.
 • Corrigido o problema em que ficheiros com acentos ou caracteres especiais causavam erro ao iniciar a transcrição de voz.
 • A partir de agora, no menu Ver, opções como Quebra automática de linha e Mostrar vídeo durante a reprodução irão aparecer sempre com o estado correto, ativadas ou desativadas.
 • Melhorada a pesquisa no YouTube, permitindo voltar com Esc à página ou ao ecrã anterior.

@@ -27,6 +27,15 @@ Raccourcis clavier du lecteur :
  Ctrl+B : Insérer un signet au temps exact.
 La durée du saut dans le fichier peut être configurée dans la section audio des paramètres.
 
+Division du média courant :
+Lorsqu’un fichier multimédia local est ouvert, la fonction Diviser le média est disponible dans le menu Lecture.
+Il est possible de diviser le fichier de deux façons :
+- En parties : choisissez en combien de parties diviser le fichier, de 2 à 999.
+- Par durée : choisissez la durée de chaque partie, au format secondes, mm:ss ou hh:mm:ss.
+Cette fonction est disponible pour les fichiers locaux, par exemple MP3, MP4 et les autres formats pris en charge.
+Pendant la division, Sonarpad affiche la progression en pourcentage.
+À la fin, les fichiers obtenus sont enregistrés dans le dossier indiqué par le programme.
+
 Menu Édition :
 
  Annuler : Annule la dernière opération (Ctrl+Z).
@@ -95,6 +104,11 @@ Menu Outils :
  Rechercher et importer depuis Wikipédia : Trouve un article sur Wikipédia et importe son texte dans l'éditeur (Alt+Maj+W).
  Dictionnaire en ligne : recherche des définitions et des traductions dans le Wiktionnaire en ligne (Alt+Maj+D).
 Lire un flux audio (Alt+Maj+S) : Lit de l’audio depuis des sites de streaming comme YouTube, permet de choisir le format et la qualité, et permet l’écoute sans téléchargement (par exemple pour la radio en ligne).
+
+ Radios du monde entier (Alt+Maj+R) : ouvre la fenêtre permettant de rechercher et d’écouter des radios en ligne de différents pays. Il est possible de rechercher des radios par nom, pays, langue et genre. Dans la liste des résultats, appuyez sur Entrée pour lancer la lecture de la radio sélectionnée. Vous pouvez aussi ajouter une radio aux favoris afin de la retrouver plus facilement par la suite. Sonarpad permet également d’ajouter des radios locales à la base de données partagée du programme, afin que les autres utilisateurs puissent les trouver et les écouter. Lors de l’ajout d’une radio, il faut indiquer au minimum le nom de la radio et l’adresse du flux.
+
+ Itinéraires et navigation (Alt+Maj+N) : ouvre la fenêtre permettant de calculer un itinéraire entre deux adresses. Saisissez le point de départ et la destination, puis choisissez le mode de déplacement : à pied, à vélo, en voiture ou en fauteuil roulant. Il est possible de choisir le type d’itinéraire, le plus rapide ou le plus court. Pour les itinéraires en voiture, il est aussi possible de choisir d’éviter les autoroutes, les péages ou les deux. Vous pouvez activer l’option permettant d’inclure dans le résultat les communes traversées. Après le calcul, Sonarpad affiche l’itinéraire principal et, lorsqu’ils sont disponibles, les itinéraires alternatifs. L’itinéraire est importé dans l’éditeur sous forme de texte, avec le point de départ, la destination, la distance, la durée estimée et les indications étape par étape. Lorsqu’une carte de l’itinéraire est disponible, vous pouvez enregistrer la carte visuelle au format PNG depuis le menu Fichier, Enregistrer l’image.
+
  Terminal accessible : ouvre un terminal dédié avec une sortie stable pour les lecteurs d'écran (Ctrl+Maj+T).
  Raccourcis : Alt+I place le focus sur le champ d'entrée, Alt+O place le focus sur le champ de sortie, Tab/Maj+Tab déplace entre l'entrée, la sortie et les options.
  Entrée envoie la commande. Ctrl+C copie la sortie (ou envoie Ctrl+C au programme). Ctrl+L efface la sortie avec confirmation.

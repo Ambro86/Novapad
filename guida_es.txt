@@ -34,7 +34,17 @@ CTRL+I: Anunciar el tiempo de reproducción.
 CTRL+T: Ir a un tiempo específico.
 • 
 CTRL+B: Insertar un marcador en el tiempo exacto.
- 
+
+
+División del medio actual:
+Cuando hay abierto un archivo multimedia local, la función Dividir medio está disponible desde el menú Reproducir.
+Es posible dividir el archivo de dos maneras:
+- En partes: elige en cuántas partes dividir el archivo, de 2 a 999.
+- Por tiempo: elige la duración de cada parte, usando el formato segundos, mm:ss o hh:mm:ss.
+Esta función está disponible para archivos locales, por ejemplo MP3, MP4 y otros formatos compatibles.
+Durante la división, Sonarpad muestra el progreso en porcentaje.
+Al finalizar, los archivos resultantes se guardan en la carpeta indicada por el programa.
+
 Edición:
 Deshacer: Deshacer la última operación (Ctrl+Z).
 Cortar: Eliminar el texto seleccionado y copiarlo al portapapeles (Ctrl+X).
@@ -100,6 +110,11 @@ Importar transcripción de YouTube: Pegar una URL, elegir el idioma e importar e
 Buscar e importar desde Wikipedia: Buscar un artículo en Wikipedia e importar su texto al editor (Alt+Shift+W).
 Diccionario en línea: Buscar definiciones y traducciones en el Wikcionario en línea (Alt+Shift+D).
 Reproducir streaming de audio (Alt+Shift+S): Reproduce audio desde sitios de streaming como YouTube, permite elegir el formato y la calidad, y permite escuchar sin descargar (por ejemplo, para radio en línea).
+
+Radio de todo el mundo (Alt+Shift+R): abre la ventana para buscar y escuchar emisoras de radio en línea de diferentes países. Es posible buscar emisoras por nombre, país, idioma y género. En la lista de resultados, pulsa Enter para iniciar la reproducción de la emisora seleccionada. También puedes añadir una emisora a favoritos para encontrarla más fácilmente después. Sonarpad permite además añadir emisoras locales a la base de datos compartida del programa, para que otros usuarios puedan encontrarlas y escucharlas. Al añadir una emisora, es necesario introducir al menos el nombre de la radio y la dirección de streaming.
+
+Rutas y navegación (Alt+Shift+N): abre la ventana para calcular una ruta entre dos direcciones. Introduce el punto de partida y el destino, y luego elige el medio de desplazamiento: a pie, en bicicleta, en coche o en silla de ruedas. Es posible elegir el tipo de ruta, más rápida o más corta. Para rutas en coche también se puede elegir si evitar autopistas, peajes o ambos. Se puede activar la opción para incluir en el resultado los municipios atravesados. Después del cálculo, Sonarpad muestra la ruta principal y, cuando están disponibles, también rutas alternativas. La ruta se importa en el editor como texto, con punto de partida, destino, distancia, duración estimada e indicaciones paso a paso. Cuando hay un mapa de la ruta disponible, se puede guardar el mapa visual en formato PNG desde el menú Archivo, Guardar imagen.
+
 Terminal accesible: Abrir un terminal dedicado con salida estable para lectores de pantalla (Ctrl+Shift+T).
 Atajos: Alt+I enfoca la entrada, Alt+O enfoca la salida, Tab/Shift+Tab mueve entre entrada, salida y opciones.
 Enter envía la entrada. Ctrl+C copia la salida (o envía Ctrl+C al programa). Ctrl+L limpia la salida con confirmación.

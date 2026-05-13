@@ -1,5 +1,31 @@
 # Changelog
 
+Versione 0.7.1 – 2026-05-13
+
+Novità e miglioramenti
+• Corretto il problema per cui i file con accenti o caratteri speciali davano errore quando veniva avviata la trascrizione vocale.
+• Da ora, nel menu Visualizza, le voci come A capo automatico e Mostra video durante la riproduzione appariranno sempre con lo stato corretto, attivate o disattivate.
+• Migliorata la ricerca in YouTube, permettendo di tornare con Esc alla pagina o schermata precedente.
+• Aggiunto un controllo preliminare per verificare se un video è riproducibile. Migliorata anche la riproduzione: Sonarpad ora può riprodurre anche video o playlist contrassegnati come mix, che prima non venivano riprodotti.
+• Migliorata la gestione dei segnalibri automatici. Prima, se l’opzione Segnalibri automatici era attiva e poi veniva disattivata, quei segnalibri rimanevano; ora il programma li ignora correttamente finché l’opzione non viene riattivata. Inoltre, quando si arriva alla fine di un file multimediale, il segnalibro viene cancellato automaticamente.
+• Corretto il problema per cui su RaiPlaySound non veniva salvato il segnalibro automatico quando l'opzione era attiva.
+• Su RaiPlaySound è stata aggiunta nel menu contestuale la possibilità di inserire il podcast tra i preferiti, direttamente nella libreria dei podcast. Così si resterà aggiornati anche sulle nuove puntate. Occorre andare sulla puntata interessata e premere il tasto Applicazioni: si troverà la voce Aggiungi ai podcast.
+• Nel download di un MP3 da RaiPlay viene preferita la traccia audiodescritta, quando disponibile.
+• Da ora, accedendo alla biblioteca BdCiechi e scaricando un libro, si verrà sempre aggiornati su quanti download rimangono nel mese corrente.
+• Migliorata la gestione dei tag con i dialoghi attivi. Ora Sonarpad gestisce correttamente entrambe le funzioni, permettendo di inserire i tag anche se l’opzione dialoghi è attiva.
+• Migliorate le impostazioni voce, separando chiaramente ogni motore, così la regolazione è più precisa. I profili voce conservano correttamente le impostazioni per ogni singolo motore: Edge, Sapi5 e Sapi4.
+• Aggiunto un tag per inserire pause, direttamente dalle opzioni o dal pannello voci premendo Tab dall’editor. Le scelte sono: 250 ms, 500 ms, 1 secondo, 2 secondi o durata personalizzata.
+• Corretto il comportamento quando si riproduce un video da YouTube e si avvia la trascrizione. Ora, tornando con Alt+Tab, il focus sarà correttamente sul pulsante Annulla della trascrizione in corso.
+• Da ora le trascrizioni vengono salvate automaticamente al termine del processo.
+• Migliorata l’importazione da Wikipedia. Si può scegliere se leggere soltanto una sezione e poi, dall’articolo, premendo Esc si tornerà alla ricerca, oppure importare tutto l’articolo. Si può scegliere anche la lingua di Wikipedia da consultare.
+• Aggiunta una sezione con le radio da tutto il mondo, dove si potrà cercare una radio in base a paese, lingua e genere. Si potranno anche aggiungere radio locali al database di Sonarpad, così anche gli altri utenti potranno ascoltarle. È possibile anche aggiungere una radio ai preferiti.
+• Aggiunta una sezione sui percorsi stradali per calcolare percorsi scegliendo il mezzo: a piedi, in bici, in auto e in sedia a rotelle. Si può scegliere se calcolare il percorso più breve o più veloce e se mostrare i comuni attraversati. Una volta importato il percorso, si potrà anche salvare la mappa visiva dal menu File, Salva immagine.
+• Aggiunta la voce Stampa nel menu File. Sonarpad stamperà i file TXT usando il programma stesso e userà il programma associato per gli altri file, come DOCX, PDF e simili, così da preservare il più possibile il layout originale.
+• Integrato in Sonarpad un servizio di traduzione per ogni documento, accessibile dal menu contestuale dell’editor. L’utente potrà usare senza inserire alcuna API key i servizi gratuiti DeepL e Google Translate; inserendo invece una API key Gemini, potrà tradurre usando Gemini.
+• Nel menu di traduzione l’utente potrà scegliere la lingua di destinazione. Il menu si riordina automaticamente: se un utente sceglie prima inglese, poi francese e poi italiano, queste tre opzioni saranno mostrate in cima al menu delle lingue.
+• Se l’utente inserisce la propria API key Gemini, potrà inoltre accedere alla funzione Riassumi testo, sempre presente nel menu contestuale, per riassumere qualunque articolo.
+• Aggiunto nel menu Riproduci, visibile quando si riproduce un file multimediale, un menu per dividere il media corrente. Funziona con MP3, MP4 e altri formati, dividendo per numero di parti oppure in base alla durata di ogni parte.
+
 Versione 0.7.0 – 2026-04-25
 
 Novità

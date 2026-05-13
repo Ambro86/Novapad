@@ -27,6 +27,15 @@ Klávesové zkratky přehrávače:
  CTRL+B: Vložit záložku v přesný čas.
 Délku posuvu v souboru lze nastavit v sekci audio v nastavení
 
+Rozdělení aktuálního média:
+Když je otevřen místní multimediální soubor, je v nabídce Přehrávání dostupná funkce Rozdělit média.
+Soubor lze rozdělit dvěma způsoby:
+- Na části: zvolte, na kolik částí se má soubor rozdělit, od 2 do 999.
+- Podle času: zvolte délku každé části ve formátu sekundy, mm:ss nebo hh:mm:ss.
+Tato funkce je dostupná pro místní soubory, například MP3, MP4 a další podporované formáty.
+Během dělení Sonarpad zobrazuje průběh v procentech.
+Po dokončení se výsledné soubory uloží do složky uvedené programem.
+
 Menu Úpravy:
 
  Zpět: Vrátí zpět poslední operaci (Ctrl+Z).
@@ -97,6 +106,11 @@ Menu Nástroje:
  Hledat a importovat z Wikipedie: Najde článek na Wikipedii a importuje jeho text do editoru (Alt+Shift+W).
  Online slovník: hledá definice a překlady v online Wikislovníku (Alt+Shift+D).
 Přehrát streamované audio (Alt+Shift+S): Přehrává audio ze streamovacích webů jako je YouTube, umožňuje zvolit formát a kvalitu a umožňuje poslech bez stahování (například pro online rádio).
+
+Rádia z celého světa (Alt+Shift+R): otevře okno pro vyhledávání a poslech online rádií z různých zemí. Rádia lze vyhledávat podle názvu, země, jazyka a žánru. V seznamu výsledků stiskněte Enter pro spuštění vybraného rádia. Rádio lze také přidat do oblíbených, aby bylo později snadněji dostupné. Sonarpad umožňuje také přidávat místní rádia do sdílené databáze programu, aby je mohli najít a poslouchat i ostatní uživatelé. Při přidávání rádia je nutné zadat alespoň název rádia a adresu streamu.
+
+Trasy a navigace (Alt+Shift+N): otevře okno pro výpočet trasy mezi dvěma adresami. Zadejte výchozí bod a cíl, poté zvolte způsob dopravy: pěšky, na kole, autem nebo na invalidním vozíku. Lze zvolit typ trasy, nejrychlejší nebo nejkratší. U tras autem lze také vybrat, zda se mají vyhnout dálnicím, placeným úsekům nebo obojímu. Je možné zapnout volbu pro zahrnutí obcí, kterými trasa prochází, do výsledku. Po výpočtu Sonarpad zobrazí hlavní trasu a, pokud jsou dostupné, také alternativní trasy. Trasa se importuje do editoru jako text s výchozím bodem, cílem, vzdáleností, odhadovanou dobou a podrobnými pokyny. Pokud je k dispozici mapa trasy, lze vizuální mapu uložit jako PNG z nabídky Soubor, Uložit obrázek.
+
  Přístupný terminál: otevře vyhrazený terminál se stabilním výstupem pro čtečky obrazovky (Ctrl+Shift+T).
  Zkratky: Alt+I zaměří fokus na vstupní políčko, Alt+O zaměří fokus na výstupní pole, Tab/Shift+Tab přesouvá mezi vstupem, výstupem a možnostmi.
  Enter odešle vstup. Ctrl+C zkopíruje výstup (nebo odešle Ctrl+C do programu). Ctrl+L vymaže výstup s potvrzením.

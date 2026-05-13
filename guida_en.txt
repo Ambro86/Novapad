@@ -24,6 +24,15 @@ Keyboard controls:
 - CTRL+T: Go to a specific time.
 - CTRL+B: Insert a bookmark at the exact time.
 
+Current media splitting:
+When a local multimedia file is open, the Split media command is available from the Playback menu.
+You can split the file in two ways:
+- Into parts: choose how many parts to split the file into, from 2 to 999.
+- By time: choose the duration of each part, using seconds, mm:ss, or hh:mm:ss format.
+This feature is available for local files, such as MP3, MP4, and other supported formats.
+During splitting, Sonarpad shows the progress percentage.
+When the process is completed, the resulting files are saved in the folder indicated by the program.
+
 Edit:
 Undo: Undo the last operation (Ctrl+Z).
 Cut: Remove selected text and copy it to clipboard (Ctrl+X).
@@ -85,6 +94,11 @@ Import YouTube transcript: paste a URL, choose the language, and import the text
 Search and import from Wikipedia: search for an article on Wikipedia and import its text into the editor (Alt+Shift+W).
 Online dictionary: search for definitions and translations in the online Wiktionary (Alt+Shift+D).
 Play Streaming Audio (Alt+Shift+S): Plays audio from streaming websites such as YouTube, allows you to choose the format and quality, and lets you listen without downloading (for example, for online radio).
+
+Worldwide Radio (Alt+Shift+R): Opens the window to search for and listen to online radio stations from different countries. You can search for radio stations by name, country, language, and genre. From the results list, press Enter to start playing the selected radio station. You can add a radio station to favorites, so you can find it more easily later. Sonarpad also lets you add local radio stations to the shared program database, so other users can find and listen to them too. When adding a radio station, you must enter at least the radio name and the streaming address.
+
+Routes and navigation (Alt+Shift+N): Opens the window to calculate a route between two addresses. Enter the starting point and the destination, then choose the travel mode: walking, cycling, driving, or wheelchair. You can choose the route type, fastest or shortest. For driving routes, you can also choose whether to avoid highways, tollways, or both. You can enable the option to include the municipalities crossed in the result. After calculation, Sonarpad shows the main route and, when available, alternative routes too. The route is imported into the editor as text, with starting point, destination, distance, estimated duration, and step-by-step directions. When a route map is available, you can save the visual map as a PNG image from the File menu, Save image.
+
 Accessible Terminal: Opens a dedicated terminal with stable output for screen readers (Ctrl+Shift+T).
 Shortcuts: Alt+I focuses input, Alt+O focuses output, Tab/Shift+Tab moves between input, output, and options.
 Enter sends the input. Ctrl+C copies the output (or sends Ctrl+C to the program). Ctrl+L clears the output with confirmation.

@@ -24,6 +24,15 @@ Klaviatūros valdymas:
 - CTRL+T: Pereiti prie konkretaus laiko.
 - CTRL+B: įterpti žymę tiksliu laiku.
 
+Dabartinės medijos padalijimas:
+Kai atidarytas vietinis multimedijos failas, meniu Atkūrimas galima naudoti funkciją Padalyti mediją.
+Failą galima padalyti dviem būdais:
+- Į dalis: pasirinkite, į kiek dalių padalyti failą, nuo 2 iki 999.
+- Pagal laiką: pasirinkite kiekvienos dalies trukmę, naudodami sekundžių, mm:ss arba hh:mm:ss formatą.
+Ši funkcija pasiekiama vietiniams failams, pavyzdžiui, MP3, MP4 ir kitiems palaikomiems formatams.
+Dalijimo metu Sonarpad rodo eigą procentais.
+Baigus procesą, sukurti failai išsaugomi programos nurodytame aplanke.
+
 Redaguoti:
 Atšaukti: Atšaukti paskutinį veiksmą (Ctrl+Z).
 Iškirpti: pašalinti pažymėtą tekstą ir nukopijuoti jį į iškarpinę (Ctrl+X).
@@ -85,6 +94,11 @@ Importuokite „YouTube“ transkriptą: įklijuokite URL adresą, pasirinkite k
 Paieška ir importavimas iš Vikipedijos: ieškokite straipsnio Vikipedijoje ir importuokite jo tekstą į redaktorių (Alt+Shift+W).
 Internetinis žodynas: ieškokite apibrėžimų ir vertimų internetiniame Vikisłowniku (Alt+Shift+D).
 Paleisti srautinį garso įrašą (Alt+Shift+S): Paleidžia garsą iš srautinių svetainių, tokių kaip YouTube, leidžia pasirinkti formatą ir kokybę bei klausytis be atsisiuntimo (pavyzdžiui, internetinei radijai).
+
+Radijas iš viso pasaulio (Alt+Shift+R): atidaro langą, kuriame galima ieškoti ir klausytis internetinių radijo stočių iš skirtingų šalių. Radijo stočių galima ieškoti pagal pavadinimą, šalį, kalbą ir žanrą. Rezultatų sąraše paspauskite Enter, kad pradėtumėte leisti pasirinktą radijo stotį. Radijo stotį taip pat galima pridėti prie mėgstamiausių, kad vėliau ją būtų lengviau rasti. Sonarpad taip pat leidžia pridėti vietines radijo stotis į bendrą programos duomenų bazę, kad jas galėtų rasti ir klausytis kiti naudotojai. Pridedant radijo stotį, būtina įvesti bent radijo pavadinimą ir transliacijos adresą.
+
+Maršrutai ir navigacija (Alt+Shift+N): atidaro langą maršrutui tarp dviejų adresų apskaičiuoti. Įveskite išvykimo vietą ir paskirties vietą, tada pasirinkite keliavimo būdą: pėsčiomis, dviračiu, automobiliu arba neįgaliojo vežimėliu. Galima pasirinkti maršruto tipą: greičiausią arba trumpiausią. Automobilių maršrutams taip pat galima pasirinkti, ar vengti greitkelių, mokamų kelių arba abiejų. Galima įjungti parinktį į rezultatą įtraukti savivaldybes, per kurias eina maršrutas. Po skaičiavimo Sonarpad parodo pagrindinį maršrutą ir, jei yra, alternatyvius maršrutus. Maršrutas importuojamas į redaktorių kaip tekstas su išvykimo vieta, paskirties vieta, atstumu, numatoma trukme ir žingsnis po žingsnio pateikiamomis nuorodomis. Kai maršruto žemėlapis yra prieinamas, vaizdinį žemėlapį galima išsaugoti PNG formatu iš meniu Failas, Išsaugoti vaizdą.
+
 Prieinamas terminalas: atidaro specialų terminalą su stabiliu išvesties ekranų skaitytuvams (Ctrl+Shift+T).
 Spartieji klavišai: Alt+I fokusuoja įvestį, Alt+O fokusuoja išvestį, Tab/Shift+Tab perkelia tarp įvesties, išvesties ir parinkčių.
 Enter siunčia įvestį. Ctrl+C kopijuoja išvestį (arba siunčia Ctrl+C į programą). Ctrl+L išvalo išvestį su patvirtinimu.

@@ -1,4 +1,3 @@
-
 VODIČ ZA PROGRAM
 
 Datoteka: 
@@ -24,6 +23,15 @@ Strelica dole: Smanjuje zvuk.
 Ctrl+I: Najavljuje trenutno vreme reprodukcije. 
 Ctrl+T: Ide na određeno vreme. 
 Ctrl+B: Ubacuje obeleživač na trenutno vreme.
+
+Podela trenutnog medija:
+Kada je otvoren lokalni multimedijalni fajl, u meniju Reprodukcija dostupna je funkcija Podeli medij.
+Fajl može da se podeli na dva načina:
+- Na delove: izaberi na koliko delova želiš da podeliš fajl, od 2 do 999.
+- Po vremenu: izaberi trajanje svakog dela, u formatu sekunde, mm:ss ili hh:mm:ss.
+Ova funkcija je dostupna za lokalne fajlove, na primer MP3, MP4 i druge podržane formate.
+Tokom podele Sonarpad prikazuje napredak u procentima.
+Kada se proces završi, dobijeni fajlovi se čuvaju u fascikli koju program prikaže.
 
 Uređivanje: 
 Poništi: Poništava poslednju radnju (Ctrl+Z). 
@@ -86,6 +94,11 @@ Uvezi YouTube transkript: nalepi link, izaberi jezik i uvezi tekst u uređivač 
 Pretraga i uvoz sa Wikipedije: pretraga članka i uvoz teksta u uređivač (Alt+Shift+W). 
 Mrežni rečnik: pretraga definicija i prevoda na servisu Wiktionary (Alt+Shift+D).
 Reprodukuj striming audio (Alt+Shift+S): Reprodukuje audio sa streaming sajtova kao što je YouTube, omogućava izbor formata i kvaliteta i omogućava slušanje bez preuzimanja (na primer za onlajn radio).
+
+Radio iz celog sveta (Alt+Shift+R): otvara prozor za pretragu i slušanje onlajn radio stanica iz različitih zemalja. Radio stanice mogu da se pretražuju po nazivu, zemlji, jeziku i žanru. U listi rezultata pritisni Enter da pokreneš izabranu radio stanicu. Radio stanicu možeš da dodaš i u omiljene, da bi je kasnije lakše pronašao. Sonarpad takođe omogućava dodavanje lokalnih radio stanica u zajedničku bazu programa, kako bi ih i drugi korisnici mogli pronaći i slušati. Prilikom dodavanja radio stanice potrebno je uneti najmanje naziv radija i adresu striminga.
+
+Rute i navigacija (Alt+Shift+N): otvara prozor za izračunavanje rute između dve adrese. Unesi polaznu tačku i odredište, zatim izaberi način kretanja: peške, biciklom, automobilom ili invalidskim kolicima. Možeš izabrati tip rute: najbržu ili najkraću. Za rute automobilom moguće je izabrati i izbegavanje autoputeva, putarina ili obe opcije. Može se uključiti opcija za dodavanje u rezultat opština kroz koje ruta prolazi. Nakon izračunavanja, Sonarpad prikazuje glavnu rutu i, kada su dostupne, alternativne rute. Ruta se uvozi u uređivač kao tekst, sa polaznom tačkom, odredištem, udaljenošću, procenjenim trajanjem i uputstvima korak po korak. Kada je dostupna mapa rute, vizuelna mapa može da se sačuva kao PNG iz menija Datoteka, Sačuvaj sliku.
+
 Pristupačni terminal: Otvara terminal sa stabilnim izlazom za čitače ekrana (Ctrl+Shift+T). 
 Prečice: Alt+I fokusira unos, Alt+O fokusira izlaz, Tab/Shift+Tab prelazi između unosa, izlaza i opcija. 
 Enter šalje unos. Ctrl+C kopira izlaz (ili prosleđuje komandu za kopiranje programu). Ctrl+L briše izlaz uz potvrdu.

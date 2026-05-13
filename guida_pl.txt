@@ -26,6 +26,16 @@ Sterowanie klawiaturą:
  CTRL+T: Idź do określonego czasu.
  CTRL+B: Wstaw zakładkę w dokładnym czasie.
 
+Dzielenie bieżącego medium:
+Gdy otwarty jest lokalny plik multimedialny, w menu Odtwarzanie dostępna jest funkcja Podziel medium.
+Plik można podzielić na dwa sposoby:
+- Na części: wybierz, na ile części podzielić plik, od 2 do 999.
+- Według czasu: wybierz czas trwania każdej części, używając formatu sekundy, mm:ss albo hh:mm:ss.
+Funkcja jest dostępna dla plików lokalnych, na przykład MP3, MP4 i innych obsługiwanych formatów.
+Podczas dzielenia Sonarpad pokazuje postęp w procentach.
+Po zakończeniu utworzone pliki zostaną zapisane w folderze wskazanym przez program.
+
+
 Edycja:
 
  Cofnij: Cofnij ostatnią operację (Ctrl+Z).
@@ -96,6 +106,11 @@ Narzędzia:
  Szukaj i importuj z Wikipedii: wyszukaj artykuł w Wikipedii i zaimportuj jego tekst do edytora (Alt+Shift+W).
  Słownik online: szukaj definicji i tłumaczeń w internetowym Wikisłowniku (Alt+Shift+D).
 Odtwarzaj strumieniowe audio (Alt+Shift+S): Odtwarza dźwięk z serwisów streamingowych takich jak YouTube, umożliwia wybór formatu i jakości oraz pozwala słuchać bez pobierania (na przykład radia internetowego).
+
+Radio z całego świata (Alt+Shift+R): otwiera okno do wyszukiwania i słuchania internetowych stacji radiowych z różnych krajów. Stacje można wyszukiwać według nazwy, kraju, języka i gatunku. Na liście wyników naciśnij Enter, aby rozpocząć odtwarzanie wybranej stacji. Stację radiową można także dodać do ulubionych, aby łatwiej znaleźć ją później. Sonarpad pozwala również dodawać lokalne stacje radiowe do wspólnej bazy danych programu, aby inni użytkownicy mogli je znaleźć i słuchać. Podczas dodawania stacji należy podać co najmniej nazwę radia i adres strumienia.
+
+Trasy i nawigacja (Alt+Shift+N): otwiera okno do obliczania trasy między dwoma adresami. Wpisz punkt początkowy i miejsce docelowe, a następnie wybierz sposób poruszania się: pieszo, rowerem, samochodem albo na wózku inwalidzkim. Można wybrać typ trasy: najszybszą albo najkrótszą. Dla tras samochodowych można także wybrać unikanie autostrad, dróg płatnych albo obu tych opcji. Można włączyć opcję dodawania do wyniku gmin, przez które przebiega trasa. Po obliczeniu Sonarpad pokazuje trasę główną oraz, jeśli są dostępne, trasy alternatywne. Trasa jest importowana do edytora jako tekst, z punktem początkowym, miejscem docelowym, odległością, szacowanym czasem i wskazówkami krok po kroku. Jeśli dostępna jest mapa trasy, można zapisać mapę wizualną jako plik PNG z menu Plik, Zapisz obraz.
+
  Dostępny terminal: otwiera dedykowany terminal ze stabilnym wyjściem dla czytników ekranu (Ctrl+Shift+T).
  Skróty: Alt+I aktywuje wejście, Alt+O aktywuje wyjście, Tab/Shift+Tab przenosi między wejściem, wyjściem i opcjami.
  Enter wysyła wejście. Ctrl+C kopiuje wyjście (lub wysyła Ctrl+C do programu). Ctrl+L czyści wyjście po potwierdzeniu.

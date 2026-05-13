@@ -24,6 +24,15 @@ Controles de teclado:
 - CTRL+T: Ir para um tempo especifico.
 - CTRL+B: Inserir um marcador no tempo exato.
 
+Divisão da mídia atual:
+Quando um arquivo multimídia local está aberto, a função Dividir mídia fica disponível no menu Reproduzir.
+É possível dividir o arquivo de duas formas:
+- Em partes: escolha em quantas partes dividir o arquivo, de 2 a 999.
+- Por tempo: escolha a duração de cada parte, usando o formato segundos, mm:ss ou hh:mm:ss.
+Esta função está disponível para arquivos locais, por exemplo MP3, MP4 e outros formatos suportados.
+Durante a divisão, o Sonarpad mostra o progresso em porcentagem.
+Ao terminar, os arquivos criados são salvos na pasta indicada pelo programa.
+
 Editar:
 Desfazer: desfazer a ultima operacao (Ctrl+Z).
 Cortar: remover o texto selecionado e copiar para a area de transferencia (Ctrl+X).
@@ -85,6 +94,11 @@ Importar transcricao do YouTube: cole uma URL, escolha o idioma e importe o text
 Pesquisar e importar do Wikipedia: pesquisar um artigo na Wikipedia e importar o texto para o editor (Alt+Shift+W).
 Dicionario online: pesquisar definicoes e traducoes no Wiktionary online (Alt+Shift+D).
 Reproduzir áudio em streaming (Alt+Shift+S): Reproduz áudio de sites de streaming como o YouTube, permite escolher o formato e a qualidade e permite ouvir sem baixar (por exemplo, para rádio online).
+
+Rádio do mundo todo (Alt+Shift+R): abre a janela para procurar e ouvir rádios online de diferentes países. É possível procurar rádios por nome, país, idioma e gênero. Na lista de resultados, pressione Enter para iniciar a reprodução da rádio selecionada. Também é possível adicionar uma rádio aos favoritos, para encontrá-la mais facilmente depois. O Sonarpad também permite adicionar rádios locais ao banco de dados compartilhado do programa, para que outros usuários possam encontrá-las e ouvi-las. Ao adicionar uma rádio, é necessário informar pelo menos o nome da rádio e o endereço do streaming.
+
+Rotas e navegação (Alt+Shift+N): abre a janela para calcular uma rota entre dois endereços. Insira o ponto de partida e o destino, depois escolha o meio de deslocamento: a pé, de bicicleta, de carro ou em cadeira de rodas. É possível escolher o tipo de rota, mais rápida ou mais curta. Para rotas de carro, também é possível escolher se deseja evitar rodovias, pedágios ou ambos. É possível ativar a opção para incluir no resultado os municípios atravessados. Depois do cálculo, o Sonarpad mostra a rota principal e, quando disponíveis, também rotas alternativas. A rota é importada para o editor como texto, com ponto de partida, destino, distância, duração estimada e instruções passo a passo. Quando há um mapa da rota disponível, é possível salvar o mapa visual em formato PNG pelo menu Arquivo, Salvar imagem.
+
 Terminal acessivel: abre um terminal dedicado com saida estavel para leitores de tela (Ctrl+Shift+T).
 RSS / Artigos: abre a janela RSS/Artigos, adicione fontes, expanda um feed e pressione Enter para importar um artigo para o editor.
 Na janela RSS, selecione um feed ou site e pressione Delete para remove-lo da biblioteca.

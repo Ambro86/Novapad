@@ -31,6 +31,17 @@ Các phím điều khiển bàn phím:
 
 * CTRL+B: Chèn một dấu trang tại thời điểm chính xác.
 
+
+
+Chia tệp đa phương tiện hiện tại:
+Khi một tệp đa phương tiện cục bộ đang mở, chức năng Chia media sẽ có trong menu Phát.
+Có thể chia tệp theo hai cách:
+* Theo số phần: chọn số phần muốn chia tệp, từ 2 đến 999.
+* Theo thời gian: chọn thời lượng của mỗi phần, theo định dạng giây, mm:ss hoặc hh:mm:ss.
+Chức năng này có sẵn cho các tệp cục bộ, ví dụ MP3, MP4 và các định dạng được hỗ trợ khác.
+Trong khi chia, Sonarpad hiển thị tiến trình theo phần trăm.
+Khi hoàn tất, các tệp được tạo sẽ được lưu trong thư mục do chương trình hiển thị.
+
 Chỉnh sửa: 
 Hoàn tác: Hoàn tác thao tác cuối cùng (Ctrl+Z).
 Cắt: Loại bỏ văn bản đã chọn và sao chép vào bộ nhớ tạm (Ctrl+X).
@@ -99,6 +110,11 @@ Nhập phụ đề từ YouTube: dán một URL, chọn ngôn ngữ và nhập v
 Tìm kiếm và nhập từ Wikipedia: tìm kiếm một bài viết trên Wikipedia và nhập văn bản của nó vào trình soạn thảo (Alt+Shift+W).
 Từ điển trực tuyến: tìm kiếm các định nghĩa và bản dịch trong Wiktionary trực tuyến (Alt+Shift+D).
 Phát âm thanh trực tuyến (Alt+Shift+S): Phát âm thanh từ các trang web streaming như YouTube, cho phép chọn định dạng và chất lượng, và cho phép nghe mà không cần tải xuống (ví dụ cho radio trực tuyến).
+
+Radio từ khắp thế giới (Alt+Shift+R): mở cửa sổ để tìm kiếm và nghe các đài radio trực tuyến từ nhiều quốc gia khác nhau. Có thể tìm radio theo tên, quốc gia, ngôn ngữ và thể loại. Trong danh sách kết quả, nhấn Enter để bắt đầu phát đài radio đã chọn. Bạn cũng có thể thêm radio vào mục yêu thích để dễ tìm lại sau này. Sonarpad cũng cho phép thêm các đài radio địa phương vào cơ sở dữ liệu chung của chương trình, để những người dùng khác cũng có thể tìm và nghe chúng. Khi thêm radio, cần nhập ít nhất tên radio và địa chỉ luồng phát.
+
+Tuyến đường và điều hướng (Alt+Shift+N): mở cửa sổ để tính tuyến đường giữa hai địa chỉ. Nhập điểm xuất phát và điểm đến, sau đó chọn cách di chuyển: đi bộ, đi xe đạp, đi ô tô hoặc xe lăn. Có thể chọn kiểu tuyến đường: nhanh nhất hoặc ngắn nhất. Với tuyến đường bằng ô tô, cũng có thể chọn tránh đường cao tốc, đường thu phí hoặc cả hai. Có thể bật tùy chọn đưa vào kết quả các đô thị mà tuyến đường đi qua. Sau khi tính toán, Sonarpad hiển thị tuyến đường chính và, nếu có, các tuyến đường thay thế. Tuyến đường được nhập vào trình soạn thảo dưới dạng văn bản, gồm điểm xuất phát, điểm đến, khoảng cách, thời gian ước tính và chỉ dẫn từng bước. Khi có bản đồ tuyến đường, có thể lưu bản đồ trực quan dưới dạng PNG từ menu Tệp, Lưu hình ảnh.
+
 Terminal hỗ trợ truy cập: mở một terminal chuyên dụng với đầu ra ổn định cho các trình đọc màn hình (Ctrl+Shift+T).
 Phím tắt: Alt+I tập trung vào ô nhập liệu, Alt+O tập trung vào ô đầu ra, Tab/Shift+Tab di chuyển giữa ô nhập, ô đầu ra và các tùy chọn.
 Enter gửi lệnh nhập liệu.

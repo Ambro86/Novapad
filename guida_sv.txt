@@ -25,6 +25,15 @@ Tangentbordskommandon:
 * CTRL+T: Gå till en specifik tid.
 * CTRL+B: Infoga ett bokmärke vid exakt minut.
 
+Uppdelning av aktuell media:
+När en lokal multimediefil är öppen finns funktionen Dela media i menyn Uppspelning.
+Filen kan delas upp på två sätt:
+* I delar: välj hur många delar filen ska delas upp i, från 2 till 999.
+* Efter tid: välj längden för varje del, i formatet sekunder, mm:ss eller hh:mm:ss.
+Funktionen är tillgänglig för lokala filer, till exempel MP3, MP4 och andra format som stöds.
+Under uppdelningen visar Sonarpad förloppet i procent.
+När processen är klar sparas de skapade filerna i den mapp som programmet anger.
+
 Redigera:
 Ångra: ångrar den senaste åtgärden (Ctrl+Z).
 Klipp ut: tar bort markerad text och kopierar den till urklipp (Ctrl+X).
@@ -87,6 +96,11 @@ Importera transkriptering från YouTube: klistra in en URL, välj språk och imp
 Sök och importera från Wikipedia: söker efter en artikel på Wikipedia och importerar texten till redigeraren (Alt+Shift+W).
 Online-ordlista: sök definitioner och översättningar i Wiktionary online (Alt+Shift+D).
 Spela strömmande ljud (Alt+Shift+S): Spelar ljud från streamingwebbplatser som YouTube, låter dig välja format och kvalitet och gör det möjligt att lyssna utan att ladda ner (till exempel för nätradio).
+
+Radio från hela världen (Alt+Shift+R): öppnar fönstret för att söka efter och lyssna på nätradiostationer från olika länder. Radiostationer kan sökas efter namn, land, språk och genre. I resultatlistan trycker du på Enter för att starta uppspelningen av den valda radiostationen. Du kan också lägga till en radiostation i favoriter, så att den blir lättare att hitta senare. Sonarpad låter dig även lägga till lokala radiostationer i programmets gemensamma databas, så att andra användare kan hitta och lyssna på dem. När du lägger till en radiostation måste du ange minst radions namn och strömningsadressen.
+
+Rutter och navigering (Alt+Shift+N): öppnar fönstret för att beräkna en rutt mellan två adresser. Ange startpunkt och destination och välj sedan färdsätt: till fots, med cykel, med bil eller med rullstol. Du kan välja ruttyp: snabbast eller kortast. För bilrutter kan du också välja om motorvägar, vägtullar eller båda ska undvikas. Det går även att aktivera alternativet för att inkludera de kommuner som rutten passerar. Efter beräkningen visar Sonarpad huvudrutten och, när de finns tillgängliga, även alternativa rutter. Rutten importeras till redigeraren som text, med startpunkt, destination, avstånd, uppskattad tid och stegvisa vägbeskrivningar. När en ruttkarta finns tillgänglig kan den visuella kartan sparas som PNG från menyn Arkiv, Spara bild.
+
 Tillgänglig terminal: öppnar en dedikerad terminal med separat och stabil utdata för skärmläsare (Ctrl+Shift+T).
 Genvägar: Alt+I fokusera inmatning, Alt+O fokusera utdata, Tab/Shift+Tab för att flytta mellan inmatning, utdata och alternativ.
 Enter skickar texten. Ctrl+C kopierar utdata (eller skickar Ctrl+C till programmet). Ctrl+L rensar utdata med bekräftelse.

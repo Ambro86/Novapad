@@ -12,9 +12,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, GWLP_USERDATA,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU, IDC_ARROW, IsWindow,
     LoadCursorW, RegisterClassW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW,
-    SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    SetWindowTextW, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY,
+    WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -351,6 +351,16 @@ fn split_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> 
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
+            WM_ACTIVATE => {
+                if (wparam.0 & 0xffff) != 0 {
+                    focus_initial_input(hwnd);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_SETFOCUS => {
+                focus_initial_input(hwnd);
+                LRESULT(0)
+            }
             WM_SPLIT_PROGRESS => {
                 with_split_state(hwnd, |state| {
                     let pct = wparam.0.min(100);
@@ -570,6 +580,14 @@ fn split_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> 
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
     }
+}
+
+fn focus_initial_input(hwnd: HWND) {
+    with_split_state(hwnd, |state| {
+        if state.input.0 != 0 {
+            crate::set_focus_safe(state.input);
+        }
+    });
 }
 
 fn start_split(hwnd: HWND) {

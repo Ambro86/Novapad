@@ -25,6 +25,15 @@ Comandi da tastiera:
 - CTRL+B: Inserisce un segnalibro nel minuto esatto.
 
 
+Divisione del media corrente:
+Quando è aperto un file multimediale locale, dal menu Riproduci è disponibile la funzione Dividi media.
+È possibile dividere il file in due modi:
+- In parti: scegli in quante parti dividere il file, da 2 a 999.
+- In base al tempo: scegli la durata di ogni parte, usando il formato secondi, mm:ss oppure hh:mm:ss.
+La funzione è disponibile per i file locali, ad esempio MP3, MP4 e altri formati supportati.
+Durante la divisione, Sonarpad mostra l’avanzamento in percentuale.
+Al termine, i file ottenuti vengono salvati nella cartella indicata dal programma.
+
 Modifica:
 Annulla: annulla l'ultima operazione (Ctrl+Z).
 Taglia: rimuove il testo selezionato e lo copia negli appunti (Ctrl+X).
@@ -86,6 +95,22 @@ Importa trascrizione da YouTube: incolla un URL, scegli la lingua e importa il t
 Cerca e importa da Wikipedia: cerca un articolo su Wikipedia e ne importa il testo nell'editor (Alt+Shift+W).
 Dizionario online: cerca definizioni e traduzioni nel Wiktionary online (Alt+Shift+D).
 Riproduci audio da streaming (Alt+Shift+S): Riproduce audio da siti di streaming come YouTube, permette di scegliere formato e qualità e consente l’ascolto senza scaricare (ad esempio per radio online).
+Radio da tutto il mondo (alt + shift + R): apre la finestra per cercare e ascoltare radio online da diversi paesi.
+È possibile cercare le radio in base al nome, al paese, alla lingua e al genere.
+Dall'elenco dei risultati, premi Invio per avviare la riproduzione della radio selezionata.
+È possibile aggiungere una radio ai preferiti, così da ritrovarla più facilmente in seguito.
+Sonarpad consente anche di aggiungere radio locali al database condiviso del programma: in questo modo anche gli altri utenti potranno trovarle e ascoltarle.
+Quando si aggiunge una radio, è necessario inserire almeno il nome della radio e l'indirizzo streaming.
+Le radio preferite e quelle cercate vengono gestite direttamente dalla finestra Radio.
+
+Percorsi e navigazione (alt + shift + N): apre la finestra per calcolare un percorso tra due indirizzi.
+Inserisci il punto di partenza e la destinazione, poi scegli il mezzo di spostamento: a piedi, in bici, in auto o in sedia a rotelle.
+È possibile scegliere il tipo di percorso, più veloce o più breve.
+Per i percorsi in auto è possibile scegliere anche se evitare autostrade, pedaggi oppure entrambi.
+Si può attivare l'opzione per inserire nel risultato anche i comuni attraversati.
+Dopo il calcolo, Sonarpad mostra il percorso principale e, quando disponibili, anche i percorsi alternativi.
+Il percorso viene importato nell'editor come testo, con partenza, arrivo, distanza, durata stimata e indicazioni passo passo.
+Quando è disponibile una mappa del percorso, dal menu File si può usare Salva immagine per salvare la mappa visiva in formato PNG.
 BdCiechi (Alt+Shift+B): Aggiunto il pieno supporto della biblioteca BdCiechi, accessibile da Strumenti o con la scorciatoia Alt+Shift+B. E' possibile cercare, scaricare libri, leggere le ultime novità, scaricare un testo di assaggio. Quando verrà salvato un file è possibile aprirlo direttamente in Sonarpad e leggerlo con le voci di alta qualità presenti nel programma.
 Terminale accessibile: apre un terminale dedicato con output separato e stabile per gli screen reader (Ctrl+Shift+T).
 Scorciatoie: Alt+I sposta il focus sull'input, Alt+O sposta il focus sull'output, Tab/Shift+Tab per spostarsi tra input, output e opzioni.

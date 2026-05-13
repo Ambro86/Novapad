@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "Kelionės tikslo adresui rezultatų nerasta.",
   "route.error.network": "Tinklo klaida:",
   "route.error.invalid_response": "Netinkamas serverio atsakymas:",
+  "route.error.unauthorized_client": "Neautorizuotas klientas.",
   "route.distance.few_meters": "keli metrai",
   "route.distance.meters": "metrų",
   "route.duration.seconds": "sekundžių",

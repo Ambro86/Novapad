@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "Не знайдено результатів для адреси призначення.",
   "route.error.network": "Помилка мережі:",
   "route.error.invalid_response": "Недійсна відповідь сервера:",
+  "route.error.unauthorized_client": "Неавторизований клієнт.",
   "route.distance.few_meters": "кілька метрів",
   "route.distance.meters": "метрів",
   "route.duration.seconds": "секунд",

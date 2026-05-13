@@ -7272,21 +7272,6 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
             WPARAM(0),
             LPARAM(0)
         ));
-        if show_update_completed {
-            let hwnd_val = hwnd.0;
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(1200));
-                if let Err(e) = PostMessageW(
-                    HWND(hwnd_val),
-                    WM_SHOW_UPDATE_COMPLETED,
-                    WPARAM(0),
-                    LPARAM(0),
-                ) {
-                    crate::log_debug(&format!("Failed to post update completed message: {}", e));
-                }
-            });
-        }
-
         let mut show_changelog = false;
         let mut cleanup_legacy_context_menu = false;
         with_state(hwnd, |state| {
@@ -7306,7 +7291,21 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
         if cleanup_legacy_context_menu {
             crate::settings::cleanup_legacy_context_menu_entries();
         }
-        if show_changelog {
+        if show_update_completed {
+            let hwnd_val = hwnd.0;
+            let show_changelog_after_completed = show_changelog;
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(1200));
+                if let Err(e) = PostMessageW(
+                    HWND(hwnd_val),
+                    WM_SHOW_UPDATE_COMPLETED,
+                    WPARAM(0),
+                    LPARAM(show_changelog_after_completed as isize),
+                ) {
+                    crate::log_debug(&format!("Failed to post update completed message: {}", e));
+                }
+            });
+        } else if show_changelog {
             let hwnd_val = hwnd.0;
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(1));
@@ -9678,8 +9677,12 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 LRESULT(0)
             }
             WM_SHOW_UPDATE_COMPLETED => {
+                let show_changelog_after_completed = lparam.0 != 0;
                 bring_window_to_foreground(hwnd);
                 updater::show_update_completed_dialog(hwnd);
+                if show_changelog_after_completed && !has_secondary_window_open(hwnd) {
+                    app_windows::help_window::open_changelog(hwnd);
+                }
                 LRESULT(0)
             }
             search::WM_REPLACE_ALL_DONE => {

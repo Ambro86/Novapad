@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "Aucun résultat trouvé pour l’adresse d’arrivée.",
   "route.error.network": "Erreur réseau :",
   "route.error.invalid_response": "Réponse non valide du serveur :",
+  "route.error.unauthorized_client": "Client non autorisé.",
   "route.distance.few_meters": "quelques mètres",
   "route.distance.meters": "mètres",
   "route.duration.seconds": "secondes",

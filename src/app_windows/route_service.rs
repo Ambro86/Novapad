@@ -7,6 +7,12 @@ use crate::settings::Language;
 
 const DEFAULT_BASE_URL: &str = "https://sonarpad.com/api";
 const USER_AGENT: &str = concat!("Sonarpad/", env!("CARGO_PKG_VERSION"));
+const ROUTE_API_CLIENT_TOKEN: &str = match option_env!("SONARPAD_ROUTE_CLIENT_TOKEN") {
+    Some(token) => token,
+    None => "",
+};
+const ROUTE_API_TOKEN_HEADER: &str = "X-Sonarpad-Route-Token";
+const SERVER_UNAUTHORIZED_CLIENT_ERROR: &str = "Client non autorizzato.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RouteProfile {
@@ -183,6 +189,7 @@ impl RouteClient {
         let response: GeocodeApiResponse = self
             .client
             .get(url)
+            .header(ROUTE_API_TOKEN_HEADER, ROUTE_API_CLIENT_TOKEN)
             .query(&[
                 ("q", q),
                 ("size", "20"),
@@ -197,9 +204,11 @@ impl RouteClient {
             .map_err(|error| route_invalid_response_error(language, error.to_string()))?;
 
         if !response.ok {
-            return Err(RouteError::Server(response.error.unwrap_or_else(|| {
-                i18n::tr(language, "route.error.address_search")
-            })));
+            return Err(RouteError::Server(route_server_error(
+                language,
+                response.error,
+                "route.error.address_search",
+            )));
         }
 
         Ok(response.results)
@@ -217,6 +226,7 @@ impl RouteClient {
         let response: RouteApiResponse = self
             .client
             .get(url)
+            .header(ROUTE_API_TOKEN_HEADER, ROUTE_API_CLIENT_TOKEN)
             .query(&[
                 ("from_lat", from.latitude.to_string()),
                 ("from_lon", from.longitude.to_string()),
@@ -246,9 +256,11 @@ impl RouteClient {
             .map_err(|error| route_invalid_response_error(options.language, error.to_string()))?;
 
         if !response.ok {
-            return Err(RouteError::Server(response.error.unwrap_or_else(|| {
-                i18n::tr(options.language, "route.error.calculation")
-            })));
+            return Err(RouteError::Server(route_server_error(
+                options.language,
+                response.error,
+                "route.error.calculation",
+            )));
         }
 
         Ok(RouteResult {
@@ -727,6 +739,16 @@ fn route_invalid_response_error(language: Language, message: String) -> RouteErr
         i18n::tr(language, "route.error.invalid_response"),
         message
     ))
+}
+
+fn route_server_error(language: Language, message: Option<String>, fallback_key: &str) -> String {
+    match message {
+        Some(message) if message.trim() == SERVER_UNAUTHORIZED_CLIENT_ERROR => {
+            i18n::tr(language, "route.error.unauthorized_client")
+        }
+        Some(message) => message,
+        None => i18n::tr(language, fallback_key),
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -1582,6 +1582,7 @@
   "route.error.to_not_found": "Nessun risultato trovato per l'indirizzo di arrivo.",
   "route.error.network": "Errore di rete:",
   "route.error.invalid_response": "Risposta non valida dal server:",
+  "route.error.unauthorized_client": "Client non autorizzato.",
   "route.distance.few_meters": "pochi metri",
   "route.distance.meters": "metri",
   "route.duration.seconds": "secondi",

@@ -15,6 +15,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   SONARPAD_RELEASE_TAG: v0.7.0
+  SONARPAD_ROUTE_CLIENT_TOKEN: ${{ secrets.SONARPAD_ROUTE_CLIENT_TOKEN }}
 
 jobs:
   build-windows:
@@ -27,6 +28,14 @@ jobs:
 
     - name: Set up Rust
       uses: dtolnay/rust-toolchain@stable
+
+    - name: Validate route token secret
+      if: github.event_name != 'pull_request'
+      shell: powershell
+      run: |
+        if ([string]::IsNullOrWhiteSpace($env:SONARPAD_ROUTE_CLIENT_TOKEN)) {
+          throw "Missing repository secret SONARPAD_ROUTE_CLIENT_TOKEN."
+        }
 
     - name: Rust Cache
       uses: swatinem/rust-cache@v2

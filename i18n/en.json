@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "No result found for the destination address.",
   "route.error.network": "Network error:",
   "route.error.invalid_response": "Invalid response from server:",
+  "route.error.unauthorized_client": "Unauthorized client.",
   "route.distance.few_meters": "a few meters",
   "route.distance.meters": "meters",
   "route.duration.seconds": "seconds",

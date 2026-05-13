@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "Для адреса назначения ничего не найдено.",
   "route.error.network": "Ошибка сети:",
   "route.error.invalid_response": "Недопустимый ответ сервера:",
+  "route.error.unauthorized_client": "Неавторизованный клиент.",
   "route.distance.few_meters": "несколько метров",
   "route.distance.meters": "метров",
   "route.duration.seconds": "секунд",

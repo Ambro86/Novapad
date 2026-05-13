@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "Nie znaleziono wyniku dla adresu docelowego.",
   "route.error.network": "Błąd sieci:",
   "route.error.invalid_response": "Nieprawidłowa odpowiedź serwera:",
+  "route.error.unauthorized_client": "Nieautoryzowany klient.",
   "route.distance.few_meters": "kilka metrów",
   "route.distance.meters": "metrów",
   "route.duration.seconds": "sekund",

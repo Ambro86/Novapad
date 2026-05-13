@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "गंतव्य पते के लिए कोई परिणाम नहीं मिला।",
   "route.error.network": "नेटवर्क त्रुटि:",
   "route.error.invalid_response": "सर्वर से अमान्य उत्तर:",
+  "route.error.unauthorized_client": "अनधिकृत क्लाइंट.",
   "route.distance.few_meters": "कुछ मीटर",
   "route.distance.meters": "मीटर",
   "route.duration.seconds": "सेकंड",

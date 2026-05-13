@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "Không tìm thấy kết quả cho địa chỉ đích.",
   "route.error.network": "Lỗi mạng:",
   "route.error.invalid_response": "Phản hồi không hợp lệ từ máy chủ:",
+  "route.error.unauthorized_client": "Máy khách không được ủy quyền.",
   "route.distance.few_meters": "vài mét",
   "route.distance.meters": "mét",
   "route.duration.seconds": "giây",

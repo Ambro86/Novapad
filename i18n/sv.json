@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "Inget resultat hittades för destinationsadressen.",
   "route.error.network": "Nätverksfel:",
   "route.error.invalid_response": "Ogiltigt svar från servern:",
+  "route.error.unauthorized_client": "Obehörig klient.",
   "route.distance.few_meters": "några meter",
   "route.distance.meters": "meter",
   "route.duration.seconds": "sekunder",

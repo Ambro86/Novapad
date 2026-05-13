@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "未找到目的地地址的结果。",
   "route.error.network": "网络错误：",
   "route.error.invalid_response": "服务器响应无效：",
+  "route.error.unauthorized_client": "未授权的客户端。",
   "route.distance.few_meters": "几米",
   "route.distance.meters": "米",
   "route.duration.seconds": "秒",

@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "Nije pronađen rezultat za adresu dolaska.",
   "route.error.network": "Mrežna greška:",
   "route.error.invalid_response": "Nevažeći odgovor servera:",
+  "route.error.unauthorized_client": "Neovlašćeni klijent.",
   "route.distance.few_meters": "nekoliko metara",
   "route.distance.meters": "metara",
   "route.duration.seconds": "sekundi",

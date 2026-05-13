@@ -1530,6 +1530,7 @@
   "route.error.to_not_found": "Pro cílovou adresu nebyl nalezen žádný výsledek.",
   "route.error.network": "Chyba sítě:",
   "route.error.invalid_response": "Neplatná odpověď ze serveru:",
+  "route.error.unauthorized_client": "Neautorizovaný klient.",
   "route.distance.few_meters": "několik metrů",
   "route.distance.meters": "metrů",
   "route.duration.seconds": "sekund",

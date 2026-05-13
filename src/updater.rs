@@ -1084,6 +1084,36 @@ fn quote_arg(arg: &str) -> String {
     }
 }
 
+fn launch_updater_elevated(updater_exe: &Path, args: &[String]) -> io::Result<()> {
+    let exe_w = to_wide(&updater_exe.to_string_lossy());
+    let params = args
+        .iter()
+        .map(|arg| quote_arg(arg))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let params_w = to_wide(&params);
+    let verb = to_wide("runas");
+
+    unsafe {
+        let result = ShellExecuteW(
+            HWND(0),
+            PCWSTR(verb.as_ptr()),
+            PCWSTR(exe_w.as_ptr()),
+            PCWSTR(params_w.as_ptr()),
+            PCWSTR::null(),
+            SW_SHOW,
+        );
+
+        if result.0 as isize <= 32 {
+            let err = io::Error::last_os_error();
+            log_win32_error("Update launch: elevated runner failed", &err);
+            return Err(err);
+        }
+    }
+
+    Ok(())
+}
+
 fn launch_self_updater(
     current_exe: &Path,
     new_exe: &Path,
@@ -1103,24 +1133,35 @@ fn launch_self_updater(
                     current_exe.display(),
                     new_exe.display()
                 ));
-                let mut command = std::process::Command::new(updater_exe);
-                command
-                    .arg("--self-update")
-                    .arg("--pid")
-                    .arg(pid.to_string())
-                    .arg("--current")
-                    .arg(current_exe)
-                    .arg("--new")
-                    .arg(new_exe)
-                    .arg("--restart");
+                let mut args = vec![
+                    "--self-update".to_string(),
+                    "--pid".to_string(),
+                    pid.to_string(),
+                    "--current".to_string(),
+                    current_exe.to_string_lossy().into_owned(),
+                    "--new".to_string(),
+                    new_exe.to_string_lossy().into_owned(),
+                    "--restart".to_string(),
+                ];
                 if let Some(tag) = release_tag {
                     let value = tag.trim();
                     if !value.is_empty() {
-                        command.arg("--release-tag").arg(value);
+                        args.push("--release-tag".to_string());
+                        args.push(value.to_string());
                     }
                 }
-                command.spawn()?;
-                return Ok(());
+
+                let mut command = std::process::Command::new(&updater_exe);
+                command.args(&args);
+                match command.spawn() {
+                    Ok(_) => return Ok(()),
+                    Err(err) if err.raw_os_error() == Some(740) => {
+                        log_debug("Update launch: elevation required, retrying with UAC prompt");
+                        launch_updater_elevated(&updater_exe, &args)?;
+                        return Ok(());
+                    }
+                    Err(err) => return Err(err),
+                }
             }
             Err(err) => {
                 log_win32_error("Update launch: runner copy failed", &err);

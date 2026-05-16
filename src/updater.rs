@@ -707,6 +707,7 @@ fn classify_win32_code(code: i32) -> &'static str {
     match code {
         5 => "PERMISSION",
         32 | 33 => "LOCK",
+        740 => "ELEVATION_REQUIRED",
         _ => "OTHER",
     }
 }
@@ -1156,11 +1157,17 @@ fn launch_self_updater(
                 match command.spawn() {
                     Ok(_) => return Ok(()),
                     Err(err) if err.raw_os_error() == Some(740) => {
-                        log_debug("Update launch: elevation required, retrying with UAC prompt");
+                        log_win32_error(
+                            "Update launch: runner spawn requires elevation; retrying with UAC prompt",
+                            &err,
+                        );
                         launch_updater_elevated(&updater_exe, &args)?;
                         return Ok(());
                     }
-                    Err(err) => return Err(err),
+                    Err(err) => {
+                        log_win32_error("Update launch: runner spawn failed", &err);
+                        return Err(err);
+                    }
                 }
             }
             Err(err) => {
@@ -1543,7 +1550,9 @@ fn replace_with_win32(target: &Path, source: &Path, backup: &Path) -> io::Result
         )
         .is_err()
         {
-            return Err(io::Error::last_os_error());
+            let move_err = io::Error::last_os_error();
+            log_win32_error("Replace: MoveFileEx target-to-backup failed", &move_err);
+            return Err(move_err);
         }
         if MoveFileExW(
             PCWSTR(source_w.as_ptr()),
@@ -1553,6 +1562,7 @@ fn replace_with_win32(target: &Path, source: &Path, backup: &Path) -> io::Result
         .is_err()
         {
             let move_err = io::Error::last_os_error();
+            log_win32_error("Replace: MoveFileEx source-to-target failed", &move_err);
             crate::log_if_err!(MoveFileExW(
                 PCWSTR(backup_w.as_ptr()),
                 PCWSTR(target_w.as_ptr()),

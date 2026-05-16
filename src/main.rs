@@ -2633,9 +2633,18 @@ fn send_mpv_ipc_request_with_pipe(
     pipe: &mut std::fs::File,
     command_json: &str,
 ) -> Result<serde_json::Value, String> {
+    let request_id = next_mpv_request_id(hwnd)?;
+    send_mpv_ipc_request_with_id(ipc_path, pipe, command_json, request_id)
+}
+
+fn send_mpv_ipc_request_with_id(
+    ipc_path: &Path,
+    pipe: &mut std::fs::File,
+    command_json: &str,
+    request_id: u64,
+) -> Result<serde_json::Value, String> {
     use std::io::Write as _;
 
-    let request_id = next_mpv_request_id(hwnd)?;
     let message = build_mpv_ipc_message(command_json, request_id)?;
     log_debug(&format!(
         "Managed mpv IPC request send: pipe={} command={}",
@@ -2785,7 +2794,7 @@ fn query_managed_mpv_property_transient(
         .ok_or_else(|| "Nessuna riproduzione mpv attiva.".to_string())?;
     let request = format!(r#"{{"command":["get_property","{}"]}}"#, property);
     let mut pipe = open_mpv_ipc_pipe(&session.ipc_path)?;
-    let response = send_mpv_ipc_request_with_pipe(hwnd, &session.ipc_path, &mut pipe, &request)?;
+    let response = send_mpv_ipc_request_with_id(&session.ipc_path, &mut pipe, &request, 1)?;
     Ok(response
         .get("data")
         .cloned()
@@ -3725,7 +3734,7 @@ fn start_local_mpv_subtitle_reader(hwnd: HWND, path: PathBuf, process_id: u32) {
                 break;
             }
 
-            let paused = query_managed_mpv_property(hwnd, "pause")
+            let paused = query_managed_mpv_property_transient(hwnd, "pause")
                 .ok()
                 .and_then(|value| value.as_bool())
                 .unwrap_or(false);
@@ -3734,7 +3743,7 @@ fn start_local_mpv_subtitle_reader(hwnd: HWND, path: PathBuf, process_id: u32) {
                 continue;
             }
 
-            let text = query_managed_mpv_property(hwnd, "sub-text")
+            let text = query_managed_mpv_property_transient(hwnd, "sub-text")
                 .ok()
                 .and_then(|value| value.as_str().map(normalize_mpv_subtitle_text))
                 .unwrap_or_default();

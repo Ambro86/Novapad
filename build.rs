@@ -6,6 +6,7 @@ fn main() {
     println!("cargo:rustc-env=SONARPAD_RELEASE_TAG={release_tag}");
 
     let root = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    embed_windows_manifest(&root);
     let lib_dir = std::path::Path::new(&root).join("lib64");
     let dll_dir = std::path::Path::new(&root).join("dll");
 
@@ -71,6 +72,22 @@ fn main() {
 
     // Generate minimal FFmpeg bindings for runtime dynamic loading.
     generate_ffmpeg_bindings();
+}
+
+fn embed_windows_manifest(root: &str) {
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    if target_os != "windows" || target_env != "msvc" {
+        return;
+    }
+
+    let manifest = std::path::Path::new(root).join("app.manifest");
+    println!("cargo:rerun-if-changed={}", manifest.display());
+    println!("cargo:rustc-link-arg-bins=/MANIFEST:EMBED");
+    println!(
+        "cargo:rustc-link-arg-bins=/MANIFESTINPUT:{}",
+        manifest.display()
+    );
 }
 
 fn generate_ffmpeg_bindings() {

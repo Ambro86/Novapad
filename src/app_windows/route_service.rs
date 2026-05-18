@@ -1,6 +1,7 @@
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use url::Url;
 
 use crate::i18n;
 use crate::settings::Language;
@@ -220,14 +221,10 @@ impl RouteClient {
         to: &GeocodeCandidate,
         options: RouteOptions,
     ) -> Result<RouteResult, RouteError> {
-        let url = format!("{}/ors_route.php", self.base_url);
         let boundary_country = route_country_alpha3(&options.country);
-
-        let response: RouteApiResponse = self
-            .client
-            .get(url)
-            .header(ROUTE_API_TOKEN_HEADER, ROUTE_API_CLIENT_TOKEN)
-            .query(&[
+        let url = route_endpoint_url(
+            &self.base_url,
+            &[
                 ("from_lat", from.latitude.to_string()),
                 ("from_lon", from.longitude.to_string()),
                 ("to_lat", to.latitude.to_string()),
@@ -249,7 +246,14 @@ impl RouteClient {
                     route_backend_language(options.language).to_string(),
                 ),
                 ("boundary.country", boundary_country.to_string()),
-            ])
+            ],
+        )
+        .map_err(|error| route_network_error(options.language, error.to_string()))?;
+
+        let response: RouteApiResponse = self
+            .client
+            .get(url)
+            .header(ROUTE_API_TOKEN_HEADER, ROUTE_API_CLIENT_TOKEN)
             .send()
             .map_err(|error| route_network_error(options.language, error.to_string()))?
             .json()
@@ -312,6 +316,13 @@ impl RouteClient {
 
         Ok(RouteRequestResult::Ready(route))
     }
+}
+
+fn route_endpoint_url(base_url: &str, params: &[(&str, String)]) -> Result<Url, url::ParseError> {
+    let mut url = Url::parse(&format!("{}/ors_route.php", base_url.trim_end_matches('/')))?;
+    url.query_pairs_mut()
+        .extend_pairs(params.iter().map(|(key, value)| (*key, value)));
+    Ok(url)
 }
 
 #[derive(Debug, Clone)]

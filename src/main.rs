@@ -3074,6 +3074,63 @@ fn saved_audio_bookmark_position_secs(hwnd: HWND, path: &Path, title: Option<&st
     .unwrap_or(0)
 }
 
+fn next_mpv_playback_generation(hwnd: HWND, reason: &str) -> u64 {
+    with_state(hwnd, |state| {
+        state.active_mpv_playback_generation = state.active_mpv_playback_generation.wrapping_add(1);
+        let generation = state.active_mpv_playback_generation;
+        log_debug(&format!(
+            "Managed mpv: playback generation {} ({})",
+            generation, reason
+        ));
+        generation
+    })
+    .unwrap_or(0)
+}
+
+fn is_current_mpv_playback_generation(hwnd: HWND, generation: u64) -> bool {
+    with_state(hwnd, |state| {
+        state.active_mpv_playback_generation == generation
+    })
+    .unwrap_or(false)
+}
+
+fn stop_obsolete_mpv_child(
+    hwnd: HWND,
+    generation: u64,
+    child: &mut std::process::Child,
+    context: &str,
+) -> bool {
+    if is_current_mpv_playback_generation(hwnd, generation) {
+        return false;
+    }
+    log_debug(&format!(
+        "Managed mpv: obsolete playback generation {} at {}; killing pid {} before activation",
+        generation,
+        context,
+        child.id()
+    ));
+    if let Err(err) = child.kill() {
+        log_debug(&format!(
+            "Managed mpv: failed to kill obsolete playback generation {} pid {} at {}: {}",
+            generation,
+            child.id(),
+            context,
+            err
+        ));
+    }
+    if let Err(err) = child.wait() {
+        log_debug(&format!(
+            "Managed mpv: failed to wait obsolete playback generation {} pid {} at {}: {}",
+            generation,
+            child.id(),
+            context,
+            err
+        ));
+    }
+    prevent_sleep(false);
+    true
+}
+
 fn sync_mpv_sleep_prevention(hwnd: HWND) {
     let paused = query_managed_mpv_property(hwnd, "pause")
         .ok()
@@ -3084,6 +3141,7 @@ fn sync_mpv_sleep_prevention(hwnd: HWND) {
 }
 
 pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
+    next_mpv_playback_generation(hwnd, "stop");
     clear_active_audiobook_bookmark(hwnd);
     set_local_mpv_video_mode(hwnd, false);
     let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
@@ -3162,6 +3220,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
     if with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false) {
         crate::audio_player::stop_audiobook_playback(hwnd);
     }
+    let mpv_generation = next_mpv_playback_generation(hwnd, "start rai");
 
     let show_video =
         with_state(hwnd, |state| state.settings.show_video_during_playback).unwrap_or(false);
@@ -3239,6 +3298,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
         .current_dir(&mpv_dir)
         .arg("--no-terminal")
         .arg("--volume-max=300")
+        .arg("--pause=yes")
         .arg(&playback_url)
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
     if let Some(audio_url) = external_audio_url.as_deref() {
@@ -3266,12 +3326,16 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
     if let Some(title) = title.filter(|value| !value.trim().is_empty()) {
         command.arg(format!("--title={title}"));
     }
-    let child = command.spawn().map_err(|err| {
+    let mut child = command.spawn().map_err(|err| {
         set_local_mpv_video_mode(hwnd, false);
         format!("Impossibile avviare mpv: {err}")
     })?;
     for _ in 0..40 {
         if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
+            if stop_obsolete_mpv_child(hwnd, mpv_generation, &mut child, "rai ipc ready") {
+                set_local_mpv_video_mode(hwnd, false);
+                return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
+            }
             let playback_path = PathBuf::from(url);
             if let Some(index) = editor_manager::ensure_audio_document_tab(hwnd, &playback_path) {
                 editor_manager::select_tab(hwnd, index);
@@ -3319,6 +3383,18 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
                 title.map(ToOwned::to_owned),
                 None,
             );
+            if stop_obsolete_mpv_child(hwnd, mpv_generation, &mut child, "before unpause") {
+                set_local_mpv_video_mode(hwnd, false);
+                return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
+            }
+            if let Err(err) =
+                send_mpv_ipc_command(&ipc_path, r#"{"command":["set_property","pause",false]}"#)
+            {
+                log_debug(&format!(
+                    "Managed mpv: failed to unpause generation {}: {}",
+                    mpv_generation, err
+                ));
+            }
             prevent_sleep(true);
             menu::update_playback_menu(hwnd, true);
             return Ok(());
@@ -3359,6 +3435,7 @@ pub(crate) fn launch_stream_url_in_mpv(
         crate::audio_player::stop_audiobook_playback(hwnd);
     }
     focus_editor(hwnd);
+    let mpv_generation = next_mpv_playback_generation(hwnd, "start stream");
 
     let bookmark_start_secs = saved_audio_bookmark_position_secs(hwnd, &PathBuf::from(url), title);
     let hwnd_video = with_state(hwnd, |state| {
@@ -3379,6 +3456,7 @@ pub(crate) fn launch_stream_url_in_mpv(
         .arg(url)
         .arg("--no-terminal")
         .arg("--volume-max=300")
+        .arg("--pause=yes")
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
     if hwnd_video.0 != 0 {
         command
@@ -3419,12 +3497,16 @@ pub(crate) fn launch_stream_url_in_mpv(
     }
     command.creation_flags(CREATE_NO_WINDOW_FLAGS);
 
-    let child = command.spawn().map_err(|err| {
+    let mut child = command.spawn().map_err(|err| {
         set_local_mpv_video_mode(hwnd, false);
         format!("Impossibile avviare mpv: {err}")
     })?;
     for _ in 0..40 {
         if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
+            if stop_obsolete_mpv_child(hwnd, mpv_generation, &mut child, "stream ipc ready") {
+                set_local_mpv_video_mode(hwnd, false);
+                return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
+            }
             let playback_path = PathBuf::from(url);
             if let Some(index) = editor_manager::ensure_audio_document_tab(hwnd, &playback_path) {
                 editor_manager::select_tab(hwnd, index);
@@ -3462,6 +3544,18 @@ pub(crate) fn launch_stream_url_in_mpv(
             {
                 log_debug("Failed to persist stream mpv state");
             }
+            if stop_obsolete_mpv_child(hwnd, mpv_generation, &mut child, "before unpause") {
+                set_local_mpv_video_mode(hwnd, false);
+                return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
+            }
+            if let Err(err) =
+                send_mpv_ipc_command(&ipc_path, r#"{"command":["set_property","pause",false]}"#)
+            {
+                log_debug(&format!(
+                    "Managed mpv: failed to unpause generation {}: {}",
+                    mpv_generation, err
+                ));
+            }
             prevent_sleep(true);
             menu::update_playback_menu(hwnd, true);
             focus_editor(hwnd);
@@ -3496,6 +3590,7 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
     if with_state(hwnd, |state| state.active_audiobook.is_some()).unwrap_or(false) {
         crate::audio_player::stop_audiobook_playback(hwnd);
     }
+    let mpv_generation = next_mpv_playback_generation(hwnd, "start local");
 
     let title = path
         .file_name()
@@ -3519,6 +3614,7 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
         .arg(path)
         .arg("--no-terminal")
         .arg("--volume-max=300")
+        .arg("--pause=yes")
         .arg(format!("--input-ipc-server={}", ipc_path.display()))
         .arg(format!("--title={title}"));
     if hwnd_video.0 != 0 {
@@ -3535,7 +3631,7 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
         command.arg(format!("--start={bookmark_start_secs}"));
     }
 
-    let child = match command.spawn() {
+    let mut child = match command.spawn() {
         Ok(child) => child,
         Err(err) => {
             set_local_mpv_video_mode(hwnd, false);
@@ -3544,6 +3640,10 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
     };
     for _ in 0..40 {
         if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
+            if stop_obsolete_mpv_child(hwnd, mpv_generation, &mut child, "local ipc ready") {
+                set_local_mpv_video_mode(hwnd, false);
+                return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
+            }
             if let Some(index) = editor_manager::ensure_audio_document_tab(hwnd, path) {
                 editor_manager::select_tab(hwnd, index);
             }
@@ -3576,6 +3676,18 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
             .is_none()
             {
                 log_debug("Failed to persist local mpv state");
+            }
+            if stop_obsolete_mpv_child(hwnd, mpv_generation, &mut child, "before unpause") {
+                set_local_mpv_video_mode(hwnd, false);
+                return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
+            }
+            if let Err(err) =
+                send_mpv_ipc_command(&ipc_path, r#"{"command":["set_property","pause",false]}"#)
+            {
+                log_debug(&format!(
+                    "Managed mpv: failed to unpause generation {}: {}",
+                    mpv_generation, err
+                ));
             }
             prevent_sleep(true);
             menu::update_playback_menu(hwnd, true);
@@ -6983,6 +7095,7 @@ pub(crate) struct AppState {
     active_audiobook: Option<AudiobookPlayer>,
     active_audiobook_bookmark: Option<(String, i32)>,
     audiobook_session_id: u64,
+    audiobook_playback_generation: u64,
     last_stopped_audiobook: Option<std::path::PathBuf>,
     last_stopped_audiobook_position_secs: Option<u64>,
     stopped_audiobook_positions: HashMap<PathBuf, u64>,
@@ -6994,6 +7107,7 @@ pub(crate) struct AppState {
     active_podcast_episode_from_rai: RaiAudioOrigin,
     raiplay_live_audio_variants: Vec<RaiPlayLiveAudioVariant>,
     active_mpv_session: Option<MpvPlaybackSession>,
+    active_mpv_playback_generation: u64,
     active_mpv_ipc: Option<std::fs::File>,
     active_mpv_subtitle_generation: u64,
     next_mpv_request_id: u64,
@@ -8676,6 +8790,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_audiobook: None,
                     active_audiobook_bookmark: None,
                     audiobook_session_id: 0,
+                    audiobook_playback_generation: 0,
                     last_stopped_audiobook: None,
                     last_stopped_audiobook_position_secs: None,
                     stopped_audiobook_positions: HashMap::new(),
@@ -8687,6 +8802,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_podcast_episode_from_rai: RaiAudioOrigin::None,
                     raiplay_live_audio_variants: Vec::new(),
                     active_mpv_session: None,
+                    active_mpv_playback_generation: 0,
                     active_mpv_ipc: None,
                     active_mpv_subtitle_generation: 0,
                     next_mpv_request_id: 1,

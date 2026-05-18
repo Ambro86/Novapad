@@ -673,6 +673,47 @@ struct AudiobookPlaybackOptions {
 
 const MAX_AUDIOBOOK_PLAYBACK_VOLUME: f32 = 3.0;
 
+fn next_audiobook_playback_generation(hwnd: HWND, reason: &str) -> u64 {
+    with_state(hwnd, |state| {
+        state.audiobook_playback_generation = state.audiobook_playback_generation.wrapping_add(1);
+        let generation = state.audiobook_playback_generation;
+        log_debug(&format!(
+            "Audio player: playback generation {} ({})",
+            generation, reason
+        ));
+        generation
+    })
+    .unwrap_or(0)
+}
+
+fn is_current_audiobook_playback_generation(hwnd: HWND, generation: u64) -> bool {
+    with_state(hwnd, |state| {
+        state.audiobook_playback_generation == generation
+    })
+    .unwrap_or(false)
+}
+
+fn stop_obsolete_audiobook_output(
+    hwnd: HWND,
+    generation: u64,
+    path: &Path,
+    output: &BassOutput,
+    stage: &str,
+) -> bool {
+    if is_current_audiobook_playback_generation(hwnd, generation) {
+        return false;
+    }
+    log_debug(&format!(
+        "Audio player: obsolete playback generation {} for {} at {}; stopping before activation",
+        generation,
+        path.display(),
+        stage
+    ));
+    crate::tts_engine::prevent_sleep(false);
+    output.stop();
+    true
+}
+
 fn start_audiobook_at_with_options(
     hwnd: HWND,
     path: PathBuf,
@@ -680,7 +721,16 @@ fn start_audiobook_at_with_options(
     options: AudiobookPlaybackOptions,
 ) {
     let hwnd_main = hwnd;
+    let playback_generation = next_audiobook_playback_generation(hwnd_main, "start");
     std::thread::spawn(move || {
+        if !is_current_audiobook_playback_generation(hwnd_main, playback_generation) {
+            log_debug(&format!(
+                "Audio player: generation {} for {} cancelled before thread start",
+                playback_generation,
+                path.display()
+            ));
+            return;
+        }
         let settings =
             { with_state(hwnd_main, |state| state.settings.clone()) }.unwrap_or_default();
         let want_mix = (settings.subtitle_read_mode == SubtitleReadMode::Record
@@ -815,7 +865,7 @@ fn start_audiobook_at_with_options(
                 effective_speed,
                 options.pitch,
                 initial_volume,
-                effective_paused,
+                true,
                 options.audio_track,
             ) {
                 Ok(output) => {
@@ -834,7 +884,7 @@ fn start_audiobook_at_with_options(
                             effective_speed,
                             options.pitch,
                             initial_volume,
-                            effective_paused,
+                            true,
                         ) {
                             Ok(output) => {
                                 log_debug("Audio player: forced FFmpeg fallback to WAV succeeded");
@@ -865,7 +915,7 @@ fn start_audiobook_at_with_options(
                 effective_speed,
                 options.pitch,
                 initial_volume,
-                effective_paused,
+                true,
             ) {
                 Ok(output) => output,
                 Err(err) => {
@@ -878,7 +928,7 @@ fn start_audiobook_at_with_options(
                                 effective_speed,
                                 options.pitch,
                                 initial_volume,
-                                effective_paused,
+                                true,
                             ) {
                                 Ok(output) => {
                                     log_debug(
@@ -910,7 +960,7 @@ fn start_audiobook_at_with_options(
                             effective_speed,
                             options.pitch,
                             initial_volume,
-                            effective_paused,
+                            true,
                             options.audio_track,
                         ) {
                             Ok(output) => {
@@ -939,7 +989,7 @@ fn start_audiobook_at_with_options(
                                         effective_speed,
                                         options.pitch,
                                         initial_volume,
-                                        effective_paused,
+                                        true,
                                     ) {
                                         Ok(output) => output,
                                         Err(err) => {
@@ -965,9 +1015,44 @@ fn start_audiobook_at_with_options(
             }
         };
 
-        log_debug("Audio player: Playback started");
+        if stop_obsolete_audiobook_output(
+            hwnd_main,
+            playback_generation,
+            &final_path,
+            &output,
+            "after open",
+        ) {
+            return;
+        }
+
         if !effective_paused {
-            crate::tts_engine::prevent_sleep(true);
+            if output.play() {
+                log_debug(&format!(
+                    "Audio player: Playback started (generation {})",
+                    playback_generation
+                ));
+                crate::tts_engine::prevent_sleep(true);
+            } else {
+                log_debug(&format!(
+                    "Audio player: failed to start playback (generation {})",
+                    playback_generation
+                ));
+            }
+        } else {
+            log_debug(&format!(
+                "Audio player: Playback prepared paused (generation {})",
+                playback_generation
+            ));
+        }
+
+        if stop_obsolete_audiobook_output(
+            hwnd_main,
+            playback_generation,
+            &final_path,
+            &output,
+            "after play",
+        ) {
+            return;
         }
 
         let session_id = {
@@ -1005,15 +1090,29 @@ fn start_audiobook_at_with_options(
             session_id,
         };
 
-        {
-            if with_state(hwnd_main, |state| {
-                state.active_audiobook = Some(player);
-            })
-            .is_none()
-            {
-                crate::log_debug("Failed to access audio player state");
+        let mut pending_player = Some(player);
+        let activated = with_state(hwnd_main, |state| {
+            if state.audiobook_playback_generation == playback_generation {
+                state.active_audiobook = pending_player.take();
+                true
+            } else {
+                false
             }
+        })
+        .unwrap_or(false);
+
+        if !activated {
+            log_debug(&format!(
+                "Audio player: generation {} became obsolete before state activation",
+                playback_generation
+            ));
+            if let Some(player) = pending_player {
+                crate::tts_engine::prevent_sleep(false);
+                player.stop();
+            }
+            return;
         }
+
         start_subtitle_reader(hwnd_main, subtitle_path, subtitle_cancel, cached_subtitles);
     });
 }
@@ -1656,6 +1755,7 @@ pub fn stop_audiobook_playback(hwnd: HWND) {
             caller.file(),
             caller.line()
         ));
+        next_audiobook_playback_generation(hwnd, "stop");
         if with_state(hwnd, |state| {
             state.active_audiobook_bookmark = None;
             if let Some(player) = state.active_audiobook.take() {

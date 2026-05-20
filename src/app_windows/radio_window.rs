@@ -395,6 +395,9 @@ pub fn open(parent: HWND) {
             if handle_escape_key(hwnd, &msg) {
                 continue;
             }
+            if crate::handle_focused_edit_shortcut(&msg) {
+                continue;
+            }
             if !IsDialogMessageW(hwnd, &msg).as_bool() {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
@@ -871,6 +874,9 @@ fn open_add_community_radio_dialog(parent: HWND) {
                 if let Some(p) = parent {
                     schedule_favorites_refocus(p);
                 }
+                continue;
+            }
+            if crate::handle_focused_edit_shortcut(&msg) {
                 continue;
             }
             if !IsDialogMessageW(hwnd, &msg).as_bool() {

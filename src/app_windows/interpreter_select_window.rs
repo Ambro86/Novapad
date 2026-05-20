@@ -519,6 +519,9 @@ fn select_interpreter_internal(
                 DispatchMessageW(&msg);
                 continue;
             }
+            if crate::handle_focused_edit_shortcut(&msg) {
+                continue;
+            }
             if IsDialogMessageW(hwnd, &msg).as_bool() {
                 continue;
             }

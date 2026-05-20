@@ -1220,7 +1220,7 @@ fn is_edit_control(hwnd: HWND) -> bool {
     is_edit
 }
 
-fn handle_focused_edit_shortcut(msg: &MSG) -> bool {
+pub(crate) fn handle_focused_edit_shortcut(msg: &MSG) -> bool {
     if msg.message != WM_KEYDOWN {
         return false;
     }

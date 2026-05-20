@@ -425,6 +425,9 @@ fn show_import_dialog(
                     continue;
                 }
             }
+            if crate::handle_focused_edit_shortcut(&msg) {
+                continue;
+            }
             if IsDialogMessageW(hwnd, &msg).as_bool() {
                 continue;
             }
@@ -2758,6 +2761,9 @@ fn open_youtube_comments_window_with_mode(
                 if should_capture {
                     continue;
                 }
+            }
+            if crate::handle_focused_edit_shortcut(&msg) {
+                continue;
             }
             if IsDialogMessageW(hwnd, &msg).as_bool() {
                 crate::log_debug(&format!(
@@ -6375,6 +6381,9 @@ fn show_stream_dialog(
             break;
         }
         unsafe {
+            if crate::handle_focused_edit_shortcut(&msg) {
+                continue;
+            }
             if IsDialogMessageW(hwnd, &msg).as_bool() {
                 continue;
             }

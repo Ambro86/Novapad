@@ -368,6 +368,9 @@ pub fn prompt_user_with_options(
                 SendMessageW(hwnd, WM_KEYDOWN, msg.wParam, msg.lParam);
                 continue;
             }
+            if crate::handle_focused_edit_shortcut(&msg) {
+                continue;
+            }
             if !IsDialogMessageW(hwnd, &msg).as_bool() {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);
@@ -471,6 +474,9 @@ pub fn prompt_credentials(
         while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
                 SendMessageW(hwnd, WM_KEYDOWN, msg.wParam, msg.lParam);
+                continue;
+            }
+            if crate::handle_focused_edit_shortcut(&msg) {
                 continue;
             }
             if !IsDialogMessageW(hwnd, &msg).as_bool() {
@@ -602,6 +608,9 @@ pub fn prompt_directory_search(
         while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
                 SendMessageW(hwnd, WM_KEYDOWN, msg.wParam, msg.lParam);
+                continue;
+            }
+            if crate::handle_focused_edit_shortcut(&msg) {
                 continue;
             }
             if !IsDialogMessageW(hwnd, &msg).as_bool() {

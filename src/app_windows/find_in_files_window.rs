@@ -242,6 +242,9 @@ fn open_find_in_files_dialog_internal(parent: HWND, focus_results_on_open: bool)
                 }
                 continue;
             }
+            if crate::handle_focused_edit_shortcut(&msg) {
+                continue;
+            }
             if IsDialogMessageW(hwnd, &msg).as_bool() {
                 continue;
             }

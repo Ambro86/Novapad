@@ -805,6 +805,9 @@ fn request_code_contact(parent: HWND, language: Language) -> Option<(String, Str
                     continue;
                 }
             }
+            if crate::handle_focused_edit_shortcut(&msg) {
+                continue;
+            }
             if !IsDialogMessageW(hwnd, &msg).as_bool() {
                 windows::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
                 windows::Win32::UI::WindowsAndMessaging::DispatchMessageW(&msg);

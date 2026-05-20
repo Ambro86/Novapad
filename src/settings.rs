@@ -34,7 +34,7 @@ pub const DRIVE_REMOVABLE: u32 = 2;
 pub const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 pub const VOICE_LIST_URL: &str =
     "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list";
-pub const DEFAULT_GEMINI_MODEL: &str = "gemini-3-flash-preview";
+pub const DEFAULT_GEMINI_MODEL: &str = "gemini-3.5-flash";
 
 static RAI_LUCE_CODE_CACHE: OnceLock<RwLock<Option<String>>> = OnceLock::new();
 static RAI_LUCE_EXPLICIT_CLEAR_PENDING: AtomicBool = AtomicBool::new(false);

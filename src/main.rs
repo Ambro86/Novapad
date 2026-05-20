@@ -7949,7 +7949,8 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     continue;
                 }
             }
-            if handle_focused_edit_shortcut(&msg) {
+            let main_editor_focused = get_active_edit(hwnd).is_some_and(|edit| GetFocus() == edit);
+            if !main_editor_focused && handle_focused_edit_shortcut(&msg) {
                 continue;
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F1.0) {

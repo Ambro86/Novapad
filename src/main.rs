@@ -168,8 +168,10 @@ const EM_LINEFROMCHAR: u32 = 0x00C9;
 const EM_LINEINDEX: u32 = 0x00BB;
 const EM_LINELENGTH: u32 = 0x00C1;
 const EM_SETSEL: u32 = 0x00B1;
+const EM_REDO: u32 = 0x0454;
 const EM_CANUNDO: u32 = 0x00C6;
 const EM_FORMATRANGE: u32 = 0x0439;
+const WM_UNDO_MSG: u32 = 0x0304;
 const TWIPS_PER_INCH: i32 = 1440;
 const PRINT_MARGIN_TWIPS: i32 = 720;
 const APPCOMMAND_MEDIA_PLAY_PAUSE: usize = 14;
@@ -1191,6 +1193,99 @@ fn persist_media_playback_volume(hwnd: HWND, volume: f32) {
     .is_none()
     {
         log_debug("Failed to persist media playback volume setting");
+    }
+}
+
+fn is_edit_control(hwnd: HWND) -> bool {
+    if hwnd.0 == 0 {
+        log_debug("edit shortcut: focus hwnd is null");
+        return false;
+    }
+    let mut class_name = [0u16; 64];
+    let len = get_class_name_w_safe(hwnd, &mut class_name);
+    if len <= 0 {
+        log_debug(&format!(
+            "edit shortcut: GetClassName failed for focus {:?}",
+            hwnd
+        ));
+        return false;
+    }
+    let class_name = String::from_utf16_lossy(&class_name[..len as usize]);
+    let class_name = class_name.to_ascii_lowercase();
+    let is_edit = class_name == "edit" || class_name.contains("richedit");
+    log_debug(&format!(
+        "edit shortcut: focus={:?} class={} is_edit={}",
+        hwnd, class_name, is_edit
+    ));
+    is_edit
+}
+
+fn handle_focused_edit_shortcut(msg: &MSG) -> bool {
+    if msg.message != WM_KEYDOWN {
+        return false;
+    }
+    let ctrl_down = (get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+    let shift_down = (get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+    let alt_down = (get_key_state_safe(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+    if !ctrl_down || shift_down || alt_down {
+        return false;
+    }
+
+    let key = msg.wParam.0 as u32;
+    let is_standard_edit_shortcut = matches!(
+        key,
+        key if key == 'A' as u32
+            || key == 'C' as u32
+            || key == 'X' as u32
+            || key == 'V' as u32
+            || key == 'Z' as u32
+            || key == 'Y' as u32
+    );
+    if !is_standard_edit_shortcut {
+        return false;
+    }
+
+    let focus = get_focus_safe();
+    log_debug(&format!(
+        "edit shortcut: candidate key={} msg_hwnd={:?} focus={:?}",
+        key as u8 as char, msg.hwnd, focus
+    ));
+    if !is_edit_control(focus) {
+        return false;
+    }
+
+    match key {
+        key if key == 'A' as u32 => {
+            log_debug("edit shortcut: Ctrl+A -> focused edit");
+            send_message_w_safe(focus, EM_SETSEL, WPARAM(0), LPARAM(-1));
+            true
+        }
+        key if key == 'C' as u32 => {
+            log_debug("edit shortcut: Ctrl+C -> focused edit");
+            send_message_w_safe(focus, WM_COPY, WPARAM(0), LPARAM(0));
+            true
+        }
+        key if key == 'X' as u32 => {
+            log_debug("edit shortcut: Ctrl+X -> focused edit");
+            send_message_w_safe(focus, WM_CUT, WPARAM(0), LPARAM(0));
+            true
+        }
+        key if key == 'V' as u32 => {
+            log_debug("edit shortcut: Ctrl+V -> focused edit");
+            send_message_w_safe(focus, WM_PASTE, WPARAM(0), LPARAM(0));
+            true
+        }
+        key if key == 'Z' as u32 => {
+            log_debug("edit shortcut: Ctrl+Z -> focused edit");
+            send_message_w_safe(focus, WM_UNDO_MSG, WPARAM(0), LPARAM(0));
+            true
+        }
+        key if key == 'Y' as u32 => {
+            log_debug("edit shortcut: Ctrl+Y -> focused edit");
+            send_message_w_safe(focus, EM_REDO, WPARAM(0), LPARAM(0));
+            true
+        }
+        _ => false,
     }
 }
 
@@ -7854,6 +7949,9 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                     continue;
                 }
             }
+            if handle_focused_edit_shortcut(&msg) {
+                continue;
+            }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == u32::from(VK_F1.0) {
                 app_windows::help_window::open(hwnd);
                 continue;
@@ -8317,6 +8415,30 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
                 continue;
             }
             if accel.0 != 0 && TranslateAcceleratorW(hwnd, accel, &msg) != 0 {
+                if msg.message == WM_KEYDOWN {
+                    let key = msg.wParam.0 as u32;
+                    let ctrl_down =
+                        (get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+                    if ctrl_down
+                        && matches!(
+                            key,
+                            key if key == 'A' as u32
+                                || key == 'C' as u32
+                                || key == 'H' as u32
+                                || key == 'V' as u32
+                                || key == 'X' as u32
+                                || key == 'Y' as u32
+                                || key == 'Z' as u32
+                        )
+                    {
+                        log_debug(&format!(
+                            "edit shortcut: accelerator consumed Ctrl+{} msg_hwnd={:?} focus={:?}",
+                            key as u8 as char,
+                            msg.hwnd,
+                            get_focus_safe()
+                        ));
+                    }
+                }
                 continue;
             }
             TranslateMessage(&msg);

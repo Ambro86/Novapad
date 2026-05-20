@@ -4435,6 +4435,7 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
             }
             let language = state.settings.language;
             let text = get_edit_text(state.docs[index].hwnd_edit);
+            let original_path = state.docs[index].path.clone();
             let prefer_title_for_save_suggestion =
                 state.docs[index].prefer_title_for_save_suggestion;
             let is_lossy_doc = matches!(
@@ -4528,7 +4529,42 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                     .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("Sonarpad Document");
-                if let Err(message) =
+                if crate::file_handler::text_has_pdf_form_values(&text) {
+                    let Some(source_path) = original_path.as_deref() else {
+                        crate::show_error(
+                            hwnd,
+                            language,
+                            &crate::settings::error_save_file_message(
+                                language,
+                                "Original PDF form not found",
+                            ),
+                        );
+                        return None;
+                    };
+                    match crate::file_handler::write_pdf_form_values_from_text(
+                        source_path,
+                        &path,
+                        &text,
+                        language,
+                    ) {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            crate::show_error(
+                                hwnd,
+                                language,
+                                &crate::settings::error_save_file_message(
+                                    language,
+                                    "No matching PDF form fields were found",
+                                ),
+                            );
+                            return None;
+                        }
+                        Err(message) => {
+                            crate::show_error(hwnd, language, &message);
+                            return None;
+                        }
+                    }
+                } else if let Err(message) =
                     crate::file_handler::write_pdf_text(&path, pdf_title, &text, language)
                 {
                     crate::show_error(hwnd, language, &message);

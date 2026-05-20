@@ -4834,7 +4834,7 @@ pub fn split_into_tts_chunks(
             let chars: Vec<char> = span_text.chars().collect();
             for (idx, ch) in chars.iter().copied().enumerate() {
                 current_sentence.push(ch);
-                current_len += 1;
+                current_len += ch.len_utf16();
                 let is_terminal = matches!(ch, '.' | '!' | '?' | ';' | ':');
                 let next_ch = chars.get(idx + 1).copied();
                 let edge_dot_run =
@@ -4856,16 +4856,16 @@ pub fn split_into_tts_chunks(
             let extra_len = span_orig_len.saturating_sub(utf16_len(&span_text));
             let mut pending_len = extra_len;
 
-            for (s_text, _s_len) in sentences.into_iter() {
+            for (s_text, s_len) in sentences.into_iter() {
                 let cleaned = strip_dashed_lines(&s_text);
                 let dict_segments = split_by_custom_dictionary(&cleaned, &[]);
-                for (dict_text, _override_voice, dict_len) in dict_segments {
+                for (dict_text, _override_voice, _dict_len) in dict_segments {
                     let prepared = prepare_tts_text(&dict_text, split_on_newline, dictionary);
                     if prepared.trim().is_empty() {
-                        pending_len += dict_len;
+                        pending_len += s_len;
                         continue;
                     }
-                    let orig_len = dict_len + pending_len;
+                    let orig_len = s_len + pending_len;
                     pending_len = 0;
                     if span_engine == TtsEngine::Edge {
                         let parts = split_text_edge(&prepared);
@@ -6233,6 +6233,7 @@ mod tests {
         render_edge_ssml_text_with_pause_tags, render_sapi_ssml_text_with_pause_tags,
         sanitize_edge_text, split_into_tts_chunks, split_long_sentence_edge_with_limit,
         split_sentences, split_text_for_engine, split_voice_tag_spans, strip_dashed_lines,
+        utf16_len,
     };
 
     #[test]
@@ -6305,6 +6306,22 @@ mod tests {
             split_into_tts_chunks("Ciao <pause ms=\"500\"/> dopo", true, &[], TtsEngine::Sapi4);
         assert_eq!(chunks.len(), 3);
         assert_eq!(chunks[1].pause_ms, Some(500));
+    }
+
+    #[test]
+    fn chunk_original_lengths_track_utf16_editor_offsets() {
+        let text = "Prima riga.\r\nSeconda riga 😀.\r\nFine.";
+        let chunks = split_into_tts_chunks(text, true, &[], TtsEngine::Sapi5);
+        let total_original_len: usize = chunks.iter().map(|chunk| chunk.original_len).sum();
+        assert_eq!(total_original_len, utf16_len(text));
+    }
+
+    #[test]
+    fn chunk_original_lengths_preserve_offsets_when_newlines_are_normalized() {
+        let text = "Prima riga.\r\nSeconda riga.\r\nFine.";
+        let chunks = split_into_tts_chunks(text, false, &[], TtsEngine::Sapi5);
+        let total_original_len: usize = chunks.iter().map(|chunk| chunk.original_len).sum();
+        assert_eq!(total_original_len, utf16_len(text));
     }
 
     #[test]

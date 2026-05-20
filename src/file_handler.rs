@@ -7,6 +7,7 @@ use docx_rs::{
     read_docx,
 };
 use encoding_rs::{Encoding, WINDOWS_1250, WINDOWS_1252};
+use lopdf::{Dictionary as LoDictionary, Document as LoDocument, Object as LoObject, StringFormat};
 use pdf_extract::extract_text;
 use pdfium_render::prelude::*;
 use printpdf::{
@@ -2227,6 +2228,21 @@ pub enum PdfTextResult {
     NoText,
 }
 
+const PDF_FORM_SECTION_TITLE: &str = "=== SONARPAD PDF FORM FIELDS ===";
+const PDF_FORM_SECTION_BEGIN: &str = "\n\n=== SONARPAD PDF FORM FIELDS ===\n";
+const PDF_FORM_SECTION_END: &str = "=== END SONARPAD PDF FORM FIELDS ===\n";
+const PDF_FIELD_BEGIN_PREFIX: &str = "[[PDF_FIELD:";
+const PDF_FIELD_BEGIN_SUFFIX: &str = "]]";
+const PDF_FIELD_END_PREFIX: &str = "[[/PDF_FIELD:";
+const PDF_FIELD_END_SUFFIX: &str = "]]";
+
+#[derive(Debug, Clone)]
+struct PdfFormField {
+    name: String,
+    field_type: String,
+    value: String,
+}
+
 static PDF_EXTRACT_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfTextResult, String> {
@@ -2250,21 +2266,25 @@ pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfT
                 text.len()
             ));
 
-            // Handle empty or whitespace-only PDFs
-            if text.trim().is_empty() {
-                crate::log_debug("PDF: No text extracted.");
-                return Ok(PdfTextResult::NoText);
-            }
-
             let norm_start = std::time::Instant::now();
-            let normalized = normalize_pdf_paragraphs(&text);
+            let normalized = if text.trim().is_empty() {
+                crate::log_debug("PDF: No text extracted; checking form fields.");
+                String::new()
+            } else {
+                normalize_pdf_paragraphs(&text)
+            };
+            let normalized = append_pdf_form_fields_if_any(path, normalized, language);
             crate::log_debug(&format!(
                 "PDF: Normalization completed in {:?}, final length={}",
                 norm_start.elapsed(),
                 normalized.len()
             ));
 
-            Ok(PdfTextResult::Text(normalized))
+            if normalized.trim().is_empty() {
+                Ok(PdfTextResult::NoText)
+            } else {
+                Ok(PdfTextResult::Text(normalized))
+            }
         })
     }));
 
@@ -2276,10 +2296,16 @@ pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfT
             match extract_pdf_text_pdfium(path) {
                 Ok(text) => {
                     crate::log_debug("PDF: pdfium extraction succeeded after panic.");
-                    if text.trim().is_empty() {
+                    let normalized = if text.trim().is_empty() {
+                        String::new()
+                    } else {
+                        normalize_pdf_paragraphs(&text)
+                    };
+                    let normalized = append_pdf_form_fields_if_any(path, normalized, language);
+                    if normalized.trim().is_empty() {
                         Ok(PdfTextResult::NoText)
                     } else {
-                        Ok(PdfTextResult::Text(normalize_pdf_paragraphs(&text)))
+                        Ok(PdfTextResult::Text(normalized))
                     }
                 }
                 Err(pdfium_err) => {
@@ -2302,6 +2328,383 @@ pub fn read_pdf_text(path: &Path, language: Language) -> Result<String, String> 
     match read_pdf_text_with_status(path, language)? {
         PdfTextResult::Text(text) => Ok(text),
         PdfTextResult::NoText => Ok(i18n::tr(language, "file_handler.pdf_no_text")),
+    }
+}
+
+fn append_pdf_form_fields_if_any(path: &Path, mut text: String, language: Language) -> String {
+    match read_pdf_form_fields(path) {
+        Ok(fields) if !fields.is_empty() => {
+            crate::log_debug(&format!(
+                "PDF form: found {} AcroForm field(s) in {}",
+                fields.len(),
+                path.display()
+            ));
+            text.push_str(PDF_FORM_SECTION_BEGIN);
+            text.push_str(pdf_form_instruction(language));
+            for field in fields {
+                text.push_str(&format!(
+                    "Campo: {} ({})
+{}{}{}
+{}
+{}{}{}
+
+",
+                    field.name,
+                    field.field_type,
+                    PDF_FIELD_BEGIN_PREFIX,
+                    field.name,
+                    PDF_FIELD_BEGIN_SUFFIX,
+                    field.value,
+                    PDF_FIELD_END_PREFIX,
+                    field.name,
+                    PDF_FIELD_END_SUFFIX
+                ));
+            }
+            text.push_str(PDF_FORM_SECTION_END);
+            text
+        }
+        Ok(_) => text,
+        Err(err) => {
+            crate::log_debug(&format!("PDF form: unable to read form fields: {err}"));
+            text
+        }
+    }
+}
+
+fn pdf_form_instruction(language: Language) -> &'static str {
+    match language {
+        Language::Italian => {
+            "Compila i valori tra i marcatori PDF_FIELD e poi salva il PDF. Non modificare i nomi dei campi tra parentesi quadre.\n\n"
+        }
+        _ => {
+            "Fill in the values between the PDF_FIELD markers, then save the PDF. Do not change the field names inside the square brackets.\n\n"
+        }
+    }
+}
+
+pub fn text_has_pdf_form_values(text: &str) -> bool {
+    text.contains(PDF_FORM_SECTION_TITLE) && text.contains(PDF_FIELD_BEGIN_PREFIX)
+}
+
+pub fn write_pdf_form_values_from_text(
+    source_path: &Path,
+    output_path: &Path,
+    text: &str,
+    language: Language,
+) -> Result<bool, String> {
+    let values = parse_pdf_form_values(text);
+    if values.is_empty() {
+        return Ok(false);
+    }
+    fill_pdf_form_fields(source_path, output_path, &values, language)
+}
+
+fn parse_pdf_form_values(text: &str) -> Vec<(String, String)> {
+    let Some(section_title_start) = text.find(PDF_FORM_SECTION_TITLE) else {
+        return Vec::new();
+    };
+    let after_title = &text[section_title_start + PDF_FORM_SECTION_TITLE.len()..];
+    let section = after_title
+        .strip_prefix("\r\n")
+        .or_else(|| after_title.strip_prefix('\n'))
+        .unwrap_or(after_title);
+    let section = match section.find(PDF_FORM_SECTION_END) {
+        Some(end) => &section[..end],
+        None => section,
+    };
+
+    let mut values = Vec::new();
+    let mut rest = section;
+    while let Some(begin_pos) = rest.find(PDF_FIELD_BEGIN_PREFIX) {
+        let after_begin_prefix = &rest[begin_pos + PDF_FIELD_BEGIN_PREFIX.len()..];
+        let Some(name_end) = after_begin_prefix.find(PDF_FIELD_BEGIN_SUFFIX) else {
+            break;
+        };
+        let name = after_begin_prefix[..name_end].trim().to_string();
+        let next_start = name_end + PDF_FIELD_BEGIN_SUFFIX.len();
+        if name.is_empty() {
+            rest = &after_begin_prefix[next_start..];
+            continue;
+        }
+        let after_begin = &after_begin_prefix[next_start..];
+        let end_marker = format!("{}{}{}", PDF_FIELD_END_PREFIX, name, PDF_FIELD_END_SUFFIX);
+        let Some(value_end) = after_begin.find(&end_marker) else {
+            break;
+        };
+        let value = after_begin[..value_end]
+            .trim_matches(|ch| ch == '\r' || ch == '\n')
+            .to_string();
+        values.push((name, value));
+        rest = &after_begin[value_end + end_marker.len()..];
+    }
+    values
+}
+
+fn fill_pdf_form_fields(
+    source_path: &Path,
+    output_path: &Path,
+    values: &[(String, String)],
+    language: Language,
+) -> Result<bool, String> {
+    if values.is_empty() || !source_path.exists() {
+        return Ok(false);
+    }
+
+    let mut doc = LoDocument::load(source_path).map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_save_error",
+            &[("err", &format!("PDF form load failed: {err}"))],
+        )
+    })?;
+
+    let acro_form_obj = {
+        let catalog = doc.catalog().map_err(|err| {
+            i18n::tr_f(
+                language,
+                "file_handler.file_save_error",
+                &[("err", &format!("PDF form catalog failed: {err}"))],
+            )
+        })?;
+        match catalog.get(b"AcroForm") {
+            Ok(obj) => obj.clone(),
+            Err(_) => return Ok(false),
+        }
+    };
+    let acro_form_id = match acro_form_obj {
+        LoObject::Reference(id) => id,
+        _ => return Ok(false),
+    };
+
+    if let Ok(acro_form_dict) = doc.get_dictionary_mut(acro_form_id) {
+        acro_form_dict.set("NeedAppearances", LoObject::Boolean(true));
+    }
+
+    let fields = match doc
+        .get_dictionary(acro_form_id)
+        .ok()
+        .and_then(|dict| dict.get(b"Fields").ok())
+    {
+        Some(LoObject::Array(fields)) => fields.clone(),
+        _ => return Ok(false),
+    };
+
+    let mut changed = 0usize;
+    for field in fields {
+        changed += fill_pdf_form_field_recursive(&mut doc, &field, None, values);
+    }
+
+    if changed == 0 {
+        return Ok(false);
+    }
+
+    save_pdf_document_atomically(&mut doc, output_path, language)?;
+    crate::log_debug(&format!(
+        "PDF form: saved {changed} field(s) to {}",
+        output_path.display()
+    ));
+    Ok(true)
+}
+
+fn fill_pdf_form_field_recursive(
+    doc: &mut LoDocument,
+    obj: &LoObject,
+    parent_name: Option<&str>,
+    values: &[(String, String)],
+) -> usize {
+    let field_id = match obj {
+        LoObject::Reference(id) => Some(*id),
+        _ => None,
+    };
+    let dict_clone = match field_id {
+        Some(id) => match doc.get_dictionary(id) {
+            Ok(dict) => dict.clone(),
+            Err(_) => return 0,
+        },
+        None => match obj {
+            LoObject::Dictionary(dict) => dict.clone(),
+            _ => return 0,
+        },
+    };
+
+    let own_name = pdf_dict_text(&dict_clone, b"T");
+    let full_name = match (parent_name, own_name.as_deref()) {
+        (Some(parent), Some(name)) if !parent.is_empty() && !name.is_empty() => {
+            Some(format!("{parent}.{name}"))
+        }
+        (_, Some(name)) if !name.is_empty() => Some(name.to_string()),
+        (Some(parent), _) if !parent.is_empty() => Some(parent.to_string()),
+        _ => None,
+    };
+
+    let kids = match dict_clone.get(b"Kids") {
+        Ok(LoObject::Array(kids)) => kids.clone(),
+        _ => Vec::new(),
+    };
+
+    let mut changed = 0usize;
+    for kid in kids {
+        changed += fill_pdf_form_field_recursive(doc, &kid, full_name.as_deref(), values);
+    }
+
+    let Some(name) = full_name else {
+        return changed;
+    };
+    let Some((_, value)) = values.iter().find(|(field_name, _)| field_name == &name) else {
+        return changed;
+    };
+
+    let value_obj = LoObject::String(value.as_bytes().to_vec(), StringFormat::Literal);
+    if let Some(id) = field_id
+        && let Ok(dict) = doc.get_dictionary_mut(id)
+    {
+        dict.set("V", value_obj.clone());
+        dict.set("DV", value_obj);
+        dict.remove(b"AP");
+        changed += 1;
+    }
+    changed
+}
+
+fn save_pdf_document_atomically(
+    doc: &mut LoDocument,
+    output_path: &Path,
+    language: Language,
+) -> Result<(), String> {
+    let tmp_path = output_path.with_extension("pdf.sonarpad.tmp");
+    doc.save(&tmp_path).map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_save_error",
+            &[("err", &format!("PDF form save failed: {err}"))],
+        )
+    })?;
+    let copy_result = std::fs::copy(&tmp_path, output_path);
+    let cleanup_result = std::fs::remove_file(&tmp_path);
+    if let Err(err) = cleanup_result {
+        crate::log_debug(&format!(
+            "PDF form: failed to remove temporary file {}: {}",
+            tmp_path.display(),
+            err
+        ));
+    }
+    copy_result.map_err(|err| {
+        i18n::tr_f(
+            language,
+            "file_handler.file_save_error",
+            &[("err", &err.to_string())],
+        )
+    })?;
+    Ok(())
+}
+
+fn read_pdf_form_fields(path: &Path) -> Result<Vec<PdfFormField>, String> {
+    let doc = LoDocument::load(path).map_err(|err| format!("PDF form load failed: {err}"))?;
+    let catalog = doc
+        .catalog()
+        .map_err(|err| format!("PDF form catalog failed: {err}"))?;
+    let acro_form = match catalog.get(b"AcroForm") {
+        Ok(obj) => obj,
+        Err(_) => return Ok(Vec::new()),
+    };
+    let Some(acro_dict) = resolve_pdf_dict(&doc, acro_form) else {
+        return Ok(Vec::new());
+    };
+    let fields_obj = match acro_dict.get(b"Fields") {
+        Ok(obj) => obj,
+        Err(_) => return Ok(Vec::new()),
+    };
+    let LoObject::Array(fields) = fields_obj else {
+        return Ok(Vec::new());
+    };
+
+    let mut output = Vec::new();
+    for field in fields {
+        collect_pdf_form_fields(&doc, field, None, None, &mut output);
+    }
+    Ok(output)
+}
+
+fn collect_pdf_form_fields(
+    doc: &LoDocument,
+    obj: &LoObject,
+    parent_name: Option<&str>,
+    inherited_type: Option<&str>,
+    output: &mut Vec<PdfFormField>,
+) {
+    let Some(dict) = resolve_pdf_dict(doc, obj) else {
+        return;
+    };
+
+    let own_name = pdf_dict_text(dict, b"T");
+    let full_name = match (parent_name, own_name.as_deref()) {
+        (Some(parent), Some(name)) if !parent.is_empty() && !name.is_empty() => {
+            Some(format!("{parent}.{name}"))
+        }
+        (_, Some(name)) if !name.is_empty() => Some(name.to_string()),
+        (Some(parent), _) if !parent.is_empty() => Some(parent.to_string()),
+        _ => None,
+    };
+
+    let own_type = pdf_dict_name(dict, b"FT");
+    let field_type = own_type.as_deref().or(inherited_type);
+
+    if let Ok(LoObject::Array(kids)) = dict.get(b"Kids") {
+        for kid in kids {
+            collect_pdf_form_fields(doc, kid, full_name.as_deref(), field_type, output);
+        }
+    }
+
+    let Some(name) = full_name else {
+        return;
+    };
+    let Some(field_type) = field_type else {
+        return;
+    };
+    if field_type.eq_ignore_ascii_case("Sig") {
+        return;
+    }
+    if output.iter().any(|field| field.name == name) {
+        return;
+    }
+
+    output.push(PdfFormField {
+        name,
+        field_type: field_type.to_string(),
+        value: pdf_dict_text(dict, b"V").unwrap_or_default(),
+    });
+}
+
+fn resolve_pdf_dict<'a>(doc: &'a LoDocument, obj: &'a LoObject) -> Option<&'a LoDictionary> {
+    match obj {
+        LoObject::Dictionary(dict) => Some(dict),
+        LoObject::Reference(id) => match doc.get_object(*id).ok()? {
+            LoObject::Dictionary(dict) => Some(dict),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn pdf_dict_text(dict: &LoDictionary, key: &[u8]) -> Option<String> {
+    pdf_object_text(dict.get(key).ok()?)
+}
+
+fn pdf_dict_name(dict: &LoDictionary, key: &[u8]) -> Option<String> {
+    match dict.get(key).ok()? {
+        LoObject::Name(bytes) => Some(String::from_utf8_lossy(bytes).into_owned()),
+        other => pdf_object_text(other),
+    }
+}
+
+fn pdf_object_text(obj: &LoObject) -> Option<String> {
+    match obj {
+        LoObject::String(bytes, _) => Some(String::from_utf8_lossy(bytes).into_owned()),
+        LoObject::Name(bytes) => Some(String::from_utf8_lossy(bytes).into_owned()),
+        LoObject::Integer(value) => Some(value.to_string()),
+        LoObject::Real(value) => Some(value.to_string()),
+        LoObject::Boolean(value) => Some(value.to_string()),
+        _ => None,
     }
 }
 

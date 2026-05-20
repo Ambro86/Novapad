@@ -760,6 +760,13 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
                 != 0;
             let parent = crate::get_parent_safe(hwnd);
             if parent.0 != 0 {
+                crate::log_debug(&format!(
+                    "wikipedia_tab_keydown: hwnd={:?} id={} shift={} focus_before={:?}",
+                    hwnd,
+                    crate::get_dlg_ctrl_id_safe(hwnd),
+                    shift_down,
+                    crate::get_focus_safe()
+                ));
                 log_wikipedia_tab(parent, hwnd, shift_down);
                 focus_next_control(parent, hwnd, shift_down);
                 return LRESULT(0);
@@ -775,6 +782,23 @@ fn tab_subclass_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM)
         && handle_enter_key(hwnd)
     {
         return LRESULT(0);
+    }
+    if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR && wparam.0 == 9 {
+        crate::log_debug(&format!(
+            "wikipedia_tab_char: hwnd={:?} id={} focus={:?}",
+            hwnd,
+            crate::get_dlg_ctrl_id_safe(hwnd),
+            crate::get_focus_safe()
+        ));
+        return LRESULT(0);
+    }
+    if msg == WM_SETFOCUS {
+        crate::log_debug(&format!(
+            "wikipedia_control_focus: hwnd={:?} id={} previous={:?}",
+            hwnd,
+            crate::get_dlg_ctrl_id_safe(hwnd),
+            HWND(wparam.0 as isize)
+        ));
     }
     if msg == windows::Win32::UI::WindowsAndMessaging::WM_GETDLGCODE {
         let id = crate::get_dlg_ctrl_id_safe(hwnd);

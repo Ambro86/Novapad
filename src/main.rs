@@ -3507,9 +3507,10 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
                 set_local_mpv_video_mode(hwnd, false);
                 return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
             }
-            if let Err(err) =
-                send_mpv_ipc_command(&ipc_path, r#"{"command":["set_property","pause",false]}"#)
-            {
+            if let Err(err) = try_send_command_to_managed_mpv(
+                hwnd,
+                r#"{"command":["set_property","pause",false]}"#,
+            ) {
                 log_debug(&format!(
                     "Managed mpv: failed to unpause generation {}: {}",
                     mpv_generation, err
@@ -3671,9 +3672,10 @@ pub(crate) fn launch_stream_url_in_mpv(
                 set_local_mpv_video_mode(hwnd, false);
                 return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
             }
-            if let Err(err) =
-                send_mpv_ipc_command(&ipc_path, r#"{"command":["set_property","pause",false]}"#)
-            {
+            if let Err(err) = try_send_command_to_managed_mpv(
+                hwnd,
+                r#"{"command":["set_property","pause",false]}"#,
+            ) {
                 log_debug(&format!(
                     "Managed mpv: failed to unpause generation {}: {}",
                     mpv_generation, err
@@ -3807,9 +3809,10 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
                 set_local_mpv_video_mode(hwnd, false);
                 return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
             }
-            if let Err(err) =
-                send_mpv_ipc_command(&ipc_path, r#"{"command":["set_property","pause",false]}"#)
-            {
+            if let Err(err) = try_send_command_to_managed_mpv(
+                hwnd,
+                r#"{"command":["set_property","pause",false]}"#,
+            ) {
                 log_debug(&format!(
                     "Managed mpv: failed to unpause generation {}: {}",
                     mpv_generation, err

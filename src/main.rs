@@ -1172,6 +1172,28 @@ struct MpvPlaybackStatus {
     pitch: f32,
 }
 
+fn media_playback_volume_from_settings(hwnd: HWND) -> f32 {
+    with_state(hwnd, |state| state.settings.audiobook_playback_volume)
+        .unwrap_or(1.0)
+        .clamp(0.0, 3.0)
+}
+
+fn media_playback_volume_to_mpv(volume: f32) -> f32 {
+    (volume * 100.0).clamp(0.0, 300.0)
+}
+
+fn persist_media_playback_volume(hwnd: HWND, volume: f32) {
+    let volume = volume.clamp(0.0, 3.0);
+    if with_state(hwnd, |state| {
+        state.settings.audiobook_playback_volume = volume;
+        crate::settings::save_settings(state.settings.clone());
+    })
+    .is_none()
+    {
+        log_debug("Failed to persist media playback volume setting");
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum RaiAudioOrigin {
     #[default]
@@ -3292,12 +3314,15 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
     if hwnd_video.0 != 0 {
         set_local_mpv_video_mode(hwnd, true);
     }
+    let initial_mpv_volume =
+        media_playback_volume_to_mpv(media_playback_volume_from_settings(hwnd));
 
     let mut command = std::process::Command::new(&mpv_exe);
     command
         .current_dir(&mpv_dir)
         .arg("--no-terminal")
         .arg("--volume-max=300")
+        .arg(format!("--volume={initial_mpv_volume:.3}"))
         .arg("--pause=yes")
         .arg(&playback_url)
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
@@ -3353,7 +3378,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
                 });
                 state.active_mpv_ipc = persistent_pipe;
                 state.active_mpv_status = Some(MpvPlaybackStatus {
-                    volume: 100.0,
+                    volume: initial_mpv_volume,
                     speed: 1.0,
                     pitch: 0.0,
                 });
@@ -3449,6 +3474,8 @@ pub(crate) fn launch_stream_url_in_mpv(
     if hwnd_video.0 != 0 {
         set_local_mpv_video_mode(hwnd, true);
     }
+    let initial_mpv_volume =
+        media_playback_volume_to_mpv(media_playback_volume_from_settings(hwnd));
 
     let mut command = std::process::Command::new(&mpv_exe);
     command
@@ -3456,6 +3483,7 @@ pub(crate) fn launch_stream_url_in_mpv(
         .arg(url)
         .arg("--no-terminal")
         .arg("--volume-max=300")
+        .arg(format!("--volume={initial_mpv_volume:.3}"))
         .arg("--pause=yes")
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
     if hwnd_video.0 != 0 {
@@ -3524,7 +3552,7 @@ pub(crate) fn launch_stream_url_in_mpv(
                 });
                 state.active_mpv_ipc = persistent_pipe;
                 state.active_mpv_status = Some(MpvPlaybackStatus {
-                    volume: 100.0,
+                    volume: initial_mpv_volume,
                     speed: 1.0,
                     pitch: 0.0,
                 });
@@ -3608,12 +3636,15 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
     if hwnd_video.0 != 0 {
         set_local_mpv_video_mode(hwnd, true);
     }
+    let initial_mpv_volume =
+        media_playback_volume_to_mpv(media_playback_volume_from_settings(hwnd));
     let mut command = std::process::Command::new(&mpv_exe);
     command
         .current_dir(&mpv_dir)
         .arg(path)
         .arg("--no-terminal")
         .arg("--volume-max=300")
+        .arg(format!("--volume={initial_mpv_volume:.3}"))
         .arg("--pause=yes")
         .arg(format!("--input-ipc-server={}", ipc_path.display()))
         .arg(format!("--title={title}"));
@@ -3657,7 +3688,7 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
                 });
                 state.active_mpv_ipc = persistent_pipe;
                 state.active_mpv_status = Some(MpvPlaybackStatus {
-                    volume: 100.0,
+                    volume: initial_mpv_volume,
                     speed: 1.0,
                     pitch: 0.0,
                 });
@@ -4808,6 +4839,9 @@ fn announce_mpv_volume(hwnd: HWND) {
             .is_none()
             {
                 log_debug("Failed to persist managed mpv volume state");
+            }
+            if !is_muted {
+                persist_media_playback_volume(hwnd, volume / 100.0);
             }
             volume
         }

@@ -4,7 +4,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::System::Com::StructuredStorage::PropVariantClear;
-use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize};
+use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoUninitialize};
 use windows::Win32::UI::Controls::RichEdit::{EDITSTREAM, EM_STREAMOUT, SF_RTF};
 use windows::Win32::UI::Shell::PropertiesSystem::{
     GPS_READWRITE, IPropertyStore, PROPERTYKEY, SHGetPropertyStoreFromParsingName,
@@ -317,14 +317,21 @@ pub fn set_file_metadata(
     author: Option<&str>,
     comment: Option<&str>,
 ) -> Result<(), String> {
-    unsafe {
-        let _hr = CoInitializeEx(None, COINIT_MULTITHREADED);
+    let init_res = crate::com_guard::co_initialize_ex_safe(None, COINIT_MULTITHREADED);
+    if let Err(e) = init_res.ok() {
+        crate::log_debug(&format!(
+            "CoInitializeEx failed while setting metadata: {e}"
+        ));
+    }
+    let should_uninit = init_res.is_ok();
 
+    let result = (|| {
         let path_wide = to_wide(path.to_str().ok_or("Invalid path")?);
 
-        let store: IPropertyStore =
+        let store: IPropertyStore = unsafe {
             SHGetPropertyStoreFromParsingName(PCWSTR(path_wide.as_ptr()), None, GPS_READWRITE)
-                .map_err(|e| format!("SHGetPropertyStoreFromParsingName failed: {}", e))?;
+        }
+        .map_err(|e| format!("SHGetPropertyStoreFromParsingName failed: {}", e))?;
 
         if let Some(t) = title {
             set_prop(&store, &PKEY_TITLE, t)?;
@@ -336,12 +343,14 @@ pub fn set_file_metadata(
             set_prop(&store, &PKEY_COMMENT, c)?;
         }
 
-        store
-            .Commit()
-            .map_err(|e| format!("IPropertyStore::Commit failed: {}", e))?;
-        CoUninitialize();
+        unsafe { store.Commit() }.map_err(|e| format!("IPropertyStore::Commit failed: {}", e))
+    })();
+
+    if should_uninit {
+        unsafe { CoUninitialize() };
     }
-    Ok(())
+
+    result
 }
 
 #[repr(C)]
@@ -355,25 +364,25 @@ struct MyPropVariant {
 }
 
 fn set_prop(store: &IPropertyStore, key: &PROPERTYKEY, value: &str) -> Result<(), String> {
-    unsafe {
-        let wide = to_wide(value);
-        let psz =
-            SHStrDupW(PCWSTR(wide.as_ptr())).map_err(|e: windows::core::Error| e.to_string())?;
+    let wide = to_wide(value);
+    let psz = unsafe { SHStrDupW(PCWSTR(wide.as_ptr())) }
+        .map_err(|e: windows::core::Error| e.to_string())?;
 
-        let mut pv = MyPropVariant {
-            vt: VT_LPWSTR,
-            w_reserved1: 0,
-            w_reserved2: 0,
-            w_reserved3: 0,
-            pwsz_value: psz,
-            _padding: [0; 8],
-        };
+    let mut pv = MyPropVariant {
+        vt: VT_LPWSTR,
+        w_reserved1: 0,
+        w_reserved2: 0,
+        w_reserved3: 0,
+        pwsz_value: psz,
+        _padding: [0; 8],
+    };
 
-        let res = store.SetValue(key, &pv as *const MyPropVariant as *const PROPVARIANT);
-        PropVariantClear(&mut pv as *mut MyPropVariant as *mut PROPVARIANT).ok();
+    let res = unsafe { store.SetValue(key, &pv as *const MyPropVariant as *const PROPVARIANT) };
+    crate::log_if_err!(unsafe {
+        PropVariantClear(&mut pv as *mut MyPropVariant as *mut PROPVARIANT)
+    });
 
-        res.map_err(|e| format!("IPropertyStore::SetValue failed: {}", e))
-    }
+    res.map_err(|e| format!("IPropertyStore::SetValue failed: {}", e))
 }
 
 pub fn write_rtf_text(path: &Path, hwnd_edit: HWND) -> Result<(), String> {

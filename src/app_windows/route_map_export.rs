@@ -11,7 +11,7 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{HINSTANCE, HWND};
-use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance};
+use windows::Win32::System::Com::CLSCTX_ALL;
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
     FileSaveDialog, IFileSaveDialog, IShellItem, SHCreateItemFromParsingName, SIGDN_FILESYSPATH,
@@ -70,11 +70,10 @@ fn save_route_map_dialog(
         }
     };
 
-    unsafe {
-        // SAFETY: The current thread has COM initialized above; FileSaveDialog is a COM coclass
-        // designed to be created on an STA UI thread.
-        let dialog: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
+    let dialog: IFileSaveDialog =
+        crate::co_create_instance_safe(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
 
+    unsafe {
         let filter_name = to_wide("PNG (*.png)");
         let filter_spec = to_wide("*.png");
         let filters = [COMDLG_FILTERSPEC {

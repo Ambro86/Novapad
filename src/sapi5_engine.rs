@@ -23,7 +23,7 @@ use windows::Win32::Media::Speech::{
     SPFM_CREATE_ALWAYS, SPRS_DONE, SPVOICESTATUS, SpFileStream, SpMMAudioOut,
     SpObjectTokenCategory, SpVoice,
 };
-use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree};
+use windows::Win32::System::Com::{CLSCTX_ALL, CoTaskMemFree};
 use windows::core::{BSTR, GUID, Interface, PCWSTR, w};
 
 // SPDFID_WaveFormatEx: {C31ADBAE-527F-4ff5-A230-F62BB61FF70C}
@@ -205,10 +205,8 @@ fn speech_category_enumerate_tokens_safe(
 
 fn collect_voice_descriptions_from_speech_voice() -> Result<Vec<String>, String> {
     let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
-    let voice: ISpeechVoice = unsafe {
-        CoCreateInstance(&SpVoice, None, CLSCTX_ALL)
-            .map_err(|e| format!("CoCreateInstance(ISpeechVoice) failed: {}", e))?
-    };
+    let voice: ISpeechVoice = crate::co_create_instance_safe(&SpVoice, None, CLSCTX_ALL)
+        .map_err(|e| format!("CoCreateInstance(ISpeechVoice) failed: {}", e))?;
     let required = BSTR::from("");
     let optional = BSTR::from("");
     let tokens = unsafe { voice.GetVoices(&required, &optional) }
@@ -230,10 +228,9 @@ fn collect_voice_descriptions_from_speech_category(
     category_id: &str,
 ) -> Result<Vec<String>, String> {
     let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {}", e))?;
-    let category: ISpeechObjectTokenCategory = unsafe {
-        CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL)
-            .map_err(|e| format!("CoCreateInstance(ISpeechObjectTokenCategory) failed: {}", e))?
-    };
+    let category: ISpeechObjectTokenCategory =
+        crate::co_create_instance_safe(&SpObjectTokenCategory, None, CLSCTX_ALL)
+            .map_err(|e| format!("CoCreateInstance(ISpeechObjectTokenCategory) failed: {}", e))?;
     let category_id = BSTR::from(category_id);
     speech_category_set_id_safe(&category, &category_id, VARIANT_BOOL(0))
         .map_err(|e| format!("ISpeechObjectTokenCategory.SetId failed: {}", e))?;
@@ -259,7 +256,7 @@ fn find_voice_token_in_speech_category(
     voice_name: &str,
 ) -> Option<ISpObjectToken> {
     let category: ISpeechObjectTokenCategory =
-        unsafe { CoCreateInstance(&SpObjectTokenCategory, None, CLSCTX_ALL).ok()? };
+        crate::co_create_instance_safe(&SpObjectTokenCategory, None, CLSCTX_ALL).ok()?;
     let category_id = BSTR::from(category_id);
     speech_category_set_id_safe(&category, &category_id, VARIANT_BOOL(0)).ok()?;
     let required = BSTR::from("");
@@ -495,7 +492,7 @@ pub fn play_sapi(
 
         unsafe {
             let voice_res: windows::core::Result<ISpVoice> =
-                CoCreateInstance(&SpVoice, None, CLSCTX_ALL);
+                crate::co_create_instance_safe(&SpVoice, None, CLSCTX_ALL);
             let voice = match voice_res {
                 Ok(v) => v,
                 Err(e) => {
@@ -515,21 +512,22 @@ pub fn play_sapi(
             if let Err(e) = voice.SetVolume(map_sapi_volume(tts_volume)) {
                 crate::log_debug(&format!("Failed to set SAPI5 volume: {}", e));
             }
-            let audio_output: Option<ISpMMSysAudio> =
-                match CoCreateInstance::<_, ISpMMSysAudio>(&SpMMAudioOut, None, CLSCTX_ALL) {
-                    Ok(audio) => {
-                        if let Err(e) = voice.SetOutput(&audio, true) {
-                            crate::log_debug(&format!("Failed to set SAPI5 audio output: {}", e));
-                            None
-                        } else {
-                            Some(audio)
-                        }
-                    }
-                    Err(e) => {
-                        crate::log_debug(&format!("Failed to create SAPI5 MM audio output: {}", e));
+            let audio_res: windows::core::Result<ISpMMSysAudio> =
+                crate::co_create_instance_safe(&SpMMAudioOut, None, CLSCTX_ALL);
+            let audio_output: Option<ISpMMSysAudio> = match audio_res {
+                Ok(audio) => {
+                    if let Err(e) = voice.SetOutput(&audio, true) {
+                        crate::log_debug(&format!("Failed to set SAPI5 audio output: {}", e));
                         None
+                    } else {
+                        Some(audio)
                     }
-                };
+                }
+                Err(e) => {
+                    crate::log_debug(&format!("Failed to create SAPI5 MM audio output: {}", e));
+                    None
+                }
+            };
             let event_source = match voice.cast::<ISpEventSource>() {
                 Ok(source) => {
                     let mask = word_boundary_interest_mask();
@@ -945,8 +943,9 @@ fn speak_sapi_to_file_with_voice(
                 let part_wav = temp_root.join(format!("part_{:06}.wav", part_no));
                 let part_mp3 = temp_root.join(format!("part_{:06}.mp3", part_no));
 
-                let stream: ISpStream = CoCreateInstance(&SpFileStream, None, CLSCTX_ALL)
-                    .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
+                let stream: ISpStream =
+                    crate::co_create_instance_safe(&SpFileStream, None, CLSCTX_ALL)
+                        .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
                 let path_wide = to_wide(part_wav.to_str().ok_or("Invalid path")?);
                 let mut bind_ok = false;
                 let mut bind_err = String::new();
@@ -1081,7 +1080,7 @@ fn speak_sapi_to_file_with_voice(
         } else {
             let wav_path = options.output_path.to_path_buf();
             crate::log_debug(&format!("SAPI: Target wav_path={:?}", wav_path));
-            let stream: ISpStream = CoCreateInstance(&SpFileStream, None, CLSCTX_ALL)
+            let stream: ISpStream = crate::co_create_instance_safe(&SpFileStream, None, CLSCTX_ALL)
                 .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
             let path_wide = to_wide(wav_path.to_str().ok_or("Invalid path")?);
             stream

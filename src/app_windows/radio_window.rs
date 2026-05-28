@@ -80,7 +80,11 @@ struct CommunityRadioApiResponse {
     #[serde(default)]
     ok: bool,
     #[serde(default)]
+    message_code: String,
+    #[serde(default)]
     message: String,
+    #[serde(default)]
+    error_code: String,
     #[serde(default)]
     error: String,
 }
@@ -340,6 +344,51 @@ const COMMUNITY_LANGUAGE_OPTIONS: &[CommunityLanguageOption] = &[
         key: "radio.community_lang.pt",
         label: "Portoghese",
         value: "portuguese",
+    },
+    CommunityLanguageOption {
+        key: "radio.lang.sv",
+        label: "Svedese",
+        value: "swedish",
+    },
+    CommunityLanguageOption {
+        key: "radio.lang.vi",
+        label: "Vietnamita",
+        value: "vietnamese",
+    },
+    CommunityLanguageOption {
+        key: "radio.lang.cs",
+        label: "Ceco",
+        value: "czech",
+    },
+    CommunityLanguageOption {
+        key: "radio.lang.pl",
+        label: "Polacco",
+        value: "polish",
+    },
+    CommunityLanguageOption {
+        key: "radio.lang.sr",
+        label: "Serbo",
+        value: "serbian",
+    },
+    CommunityLanguageOption {
+        key: "radio.lang.uk",
+        label: "Ucraino",
+        value: "ukrainian",
+    },
+    CommunityLanguageOption {
+        key: "radio.lang.lt",
+        label: "Lituano",
+        value: "lithuanian",
+    },
+    CommunityLanguageOption {
+        key: "radio.lang.ru",
+        label: "Russo",
+        value: "russian",
+    },
+    CommunityLanguageOption {
+        key: "radio.lang.zh",
+        label: "Cinese",
+        value: "chinese",
     },
     CommunityLanguageOption {
         key: "radio.community_lang.hi",
@@ -1194,6 +1243,7 @@ fn post_community_radio(
             ("url", url),
             ("language", language),
             ("genre", genre),
+            ("ui_language", app_language_code(app_language)),
         ])
         .send()
         .map_err(|e| e.to_string())?;
@@ -1232,6 +1282,13 @@ fn post_community_radio(
     };
 
     if response.ok {
+        if !response.message_code.trim().is_empty() {
+            crate::log_debug(&format!(
+                "Community radio API success code: {}",
+                response.message_code.trim()
+            ));
+        }
+
         if response.message.trim().is_empty() {
             Ok(tr(
                 app_language,
@@ -1244,7 +1301,34 @@ fn post_community_radio(
     } else if response.error.trim().is_empty() {
         Err(i18n::tr(app_language, "radio.community_add_error"))
     } else {
+        if !response.error_code.trim().is_empty() {
+            crate::log_debug(&format!(
+                "Community radio API error code: {}",
+                response.error_code.trim()
+            ));
+        }
+
         Err(response.error)
+    }
+}
+
+fn app_language_code(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "it",
+        Language::English => "en",
+        Language::Spanish => "es",
+        Language::Portuguese => "pt",
+        Language::Swedish => "sv",
+        Language::Vietnamese => "vi",
+        Language::Czech => "cs",
+        Language::Polish => "pl",
+        Language::French => "fr",
+        Language::Serbian => "sr",
+        Language::Ukrainian => "uk",
+        Language::Lithuanian => "lt",
+        Language::Russian => "ru",
+        Language::Chinese => "zh",
+        Language::Hindi => "hi",
     }
 }
 
@@ -2325,6 +2409,16 @@ fn community_language_from_radio_code(code: &str) -> Option<&'static str> {
         "es" => Some("spanish"),
         "fr" => Some("french"),
         "pt" => Some("portuguese"),
+        "sv" => Some("swedish"),
+        "vi" => Some("vietnamese"),
+        "cs" => Some("czech"),
+        "pl" => Some("polish"),
+        "sr" => Some("serbian"),
+        "uk" => Some("ukrainian"),
+        "lt" => Some("lithuanian"),
+        "ru" => Some("russian"),
+        "zh" => Some("chinese"),
+        "hi" => Some("hindi"),
         "country:de" | "de" => Some("german"),
         _ => None,
     }

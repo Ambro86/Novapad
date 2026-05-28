@@ -365,10 +365,8 @@ fn jaws_invoke_saystring(
         invoke_res.map(|_| ())
     })();
 
-    unsafe {
-        if should_uninit {
-            CoUninitialize();
-        }
+    if should_uninit {
+        unsafe { CoUninitialize() };
     }
 
     result
@@ -456,10 +454,8 @@ fn jaws_invoke_braille_message(text: &str, log_failures: bool) -> windows::core:
         invoke_res.map(|_| ())
     })();
 
-    unsafe {
-        if should_uninit {
-            CoUninitialize();
-        }
+    if should_uninit {
+        unsafe { CoUninitialize() };
     }
 
     result

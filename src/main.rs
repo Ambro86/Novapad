@@ -10642,11 +10642,13 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     }
                     IDM_FILE_AUDIOBOOK => {
                         log_debug("Menu: Record audiobook");
+                        telemetry::record_action("audiobook_record", "document");
                         tts_engine::start_audiobook(hwnd);
                         LRESULT(0)
                     }
                     IDM_EDIT_AUDIOBOOK_SELECTION => {
                         log_debug("Menu: Record audiobook from selection");
+                        telemetry::record_action("audiobook_record", "selection");
                         tts_engine::start_audiobook_from_selection(hwnd);
                         LRESULT(0)
                     }
@@ -19969,7 +19971,9 @@ pub(crate) fn save_audio_dialog(
         .into();
         let cookie = pfd.Advise(&handler).ok()?;
 
+        watchdog::enter_modal_dialog();
         let show_ok = pfd.Show(hwnd).is_ok();
+        watchdog::exit_modal_dialog();
         pfd.Unadvise(cookie).ok()?;
 
         if show_ok {

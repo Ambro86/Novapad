@@ -11,7 +11,7 @@ use windows::Win32::Media::Audio::{
     AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK, IAudioCaptureClient, IAudioClient,
     IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, eConsole, eRender,
 };
-use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance};
+use windows::Win32::System::Com::CLSCTX_ALL;
 
 /// Audio sample without timestamp (will be calculated by encoder)
 #[derive(Clone)]
@@ -169,29 +169,24 @@ pub fn start_audio_recording() -> Result<AudioRecorderHandle, String> {
 fn get_audio_format() -> Result<(u32, u16), String> {
     let _com = ComGuard::new_sta().map_err(|e| format!("CoInitializeEx failed: {:?}", e))?;
 
-    unsafe {
-        let enumerator: IMMDeviceEnumerator =
-            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
-                .map_err(|e| format!("Failed to create device enumerator: {}", e))?;
+    let enumerator: IMMDeviceEnumerator =
+        crate::co_create_instance_safe(&MMDeviceEnumerator, None, CLSCTX_ALL)
+            .map_err(|e| format!("Failed to create device enumerator: {}", e))?;
 
-        let device: IMMDevice = enumerator
-            .GetDefaultAudioEndpoint(eRender, eConsole)
-            .map_err(|e| format!("Failed to get default audio endpoint: {}", e))?;
+    let device: IMMDevice = unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) }
+        .map_err(|e| format!("Failed to get default audio endpoint: {}", e))?;
 
-        let audio_client: IAudioClient = device
-            .Activate(CLSCTX_ALL, None)
-            .map_err(|e| format!("Failed to activate audio client: {}", e))?;
+    let audio_client: IAudioClient = unsafe { device.Activate(CLSCTX_ALL, None) }
+        .map_err(|e| format!("Failed to activate audio client: {}", e))?;
 
-        let format_ptr = audio_client
-            .GetMixFormat()
-            .map_err(|e| format!("GetMixFormat failed: {}", e))?;
-        let format = &*format_ptr;
+    let format_ptr = unsafe { audio_client.GetMixFormat() }
+        .map_err(|e| format!("GetMixFormat failed: {}", e))?;
+    let format = unsafe { &*format_ptr };
 
-        let sample_rate = format.nSamplesPerSec;
-        let channels = format.nChannels;
+    let sample_rate = format.nSamplesPerSec;
+    let channels = format.nChannels;
 
-        Ok((sample_rate, channels))
-    }
+    Ok((sample_rate, channels))
 }
 
 fn audio_capture_loop(audio_queue: Arc<AudioQueue>, stop: Arc<AtomicBool>) -> Result<(), String> {
@@ -205,109 +200,103 @@ fn audio_capture_loop_impl(
     audio_queue: Arc<AudioQueue>,
     stop: Arc<AtomicBool>,
 ) -> Result<(), String> {
-    unsafe {
-        crate::log_debug("Audio capture loop started");
+    crate::log_debug("Audio capture loop started");
 
-        // Get default audio endpoint (speakers/headphones for loopback)
-        let enumerator: IMMDeviceEnumerator =
-            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
-                .map_err(|e| format!("Failed to create device enumerator: {}", e))?;
+    // Get default audio endpoint (speakers/headphones for loopback)
+    let enumerator: IMMDeviceEnumerator =
+        crate::co_create_instance_safe(&MMDeviceEnumerator, None, CLSCTX_ALL)
+            .map_err(|e| format!("Failed to create device enumerator: {}", e))?;
 
-        let device: IMMDevice = enumerator
-            .GetDefaultAudioEndpoint(eRender, eConsole)
-            .map_err(|e| format!("Failed to get default audio endpoint: {}", e))?;
+    let device: IMMDevice = unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) }
+        .map_err(|e| format!("Failed to get default audio endpoint: {}", e))?;
 
-        let audio_client: IAudioClient = device
-            .Activate(CLSCTX_ALL, None)
-            .map_err(|e| format!("Failed to activate audio client: {}", e))?;
+    let audio_client: IAudioClient = unsafe { device.Activate(CLSCTX_ALL, None) }
+        .map_err(|e| format!("Failed to activate audio client: {}", e))?;
 
-        // Get mix format
-        let format_ptr = audio_client
-            .GetMixFormat()
-            .map_err(|e| format!("GetMixFormat failed: {}", e))?;
-        let format = &*format_ptr;
+    // Get mix format
+    let format_ptr = unsafe { audio_client.GetMixFormat() }
+        .map_err(|e| format!("GetMixFormat failed: {}", e))?;
+    let format = unsafe { &*format_ptr };
 
-        // Initialize audio client for loopback capture
-        let buffer_duration = 10_000_000; // 1 second in 100ns units
-        audio_client
-            .Initialize(
-                AUDCLNT_SHAREMODE_SHARED,
-                AUDCLNT_STREAMFLAGS_LOOPBACK,
-                buffer_duration,
-                0,
-                format,
-                None,
-            )
-            .map_err(|e| format!("Initialize failed: {}", e))?;
+    // Initialize audio client for loopback capture
+    let buffer_duration = 10_000_000; // 1 second in 100ns units
+    let init_res = unsafe {
+        audio_client.Initialize(
+            AUDCLNT_SHAREMODE_SHARED,
+            AUDCLNT_STREAMFLAGS_LOOPBACK,
+            buffer_duration,
+            0,
+            format,
+            None,
+        )
+    };
+    init_res.map_err(|e| format!("Initialize failed: {}", e))?;
 
-        let capture_client: IAudioCaptureClient = audio_client
-            .GetService()
-            .map_err(|e| format!("GetService failed: {}", e))?;
+    let capture_client: IAudioCaptureClient = unsafe { audio_client.GetService() }
+        .map_err(|e| format!("GetService failed: {}", e))?;
 
-        // Start capture
-        audio_client
-            .Start()
-            .map_err(|e| format!("Start failed: {}", e))?;
+    // Start capture
+    unsafe { audio_client.Start() }.map_err(|e| format!("Start failed: {}", e))?;
 
-        // Copy packed struct fields to avoid unaligned reference errors
-        let sample_rate = format.nSamplesPerSec;
-        let channels = format.nChannels;
-        let bits_per_sample = format.wBitsPerSample;
-        let bytes_per_sample = (bits_per_sample / 8) as usize;
+    // Copy packed struct fields to avoid unaligned reference errors
+    let sample_rate = format.nSamplesPerSec;
+    let channels = format.nChannels;
+    let bits_per_sample = format.wBitsPerSample;
+    let bytes_per_sample = (bits_per_sample / 8) as usize;
 
-        crate::log_debug(&format!(
-            "Audio format: {} Hz, {} channels, {} bits",
-            sample_rate, channels, bits_per_sample
-        ));
+    crate::log_debug(&format!(
+        "Audio format: {} Hz, {} channels, {} bits",
+        sample_rate, channels, bits_per_sample
+    ));
 
-        let mut qpc_freq = 0i64;
-        windows::Win32::System::Performance::QueryPerformanceFrequency(&mut qpc_freq)
-            .ok()
-            .ok_or("QueryPerformanceFrequency failed")?;
+    let mut qpc_freq = 0i64;
+    unsafe { windows::Win32::System::Performance::QueryPerformanceFrequency(&mut qpc_freq) }
+        .ok()
+        .ok_or("QueryPerformanceFrequency failed")?;
 
-        let mut start_qpc = 0i64;
-        windows::Win32::System::Performance::QueryPerformanceCounter(&mut start_qpc)
-            .ok()
-            .ok_or("QueryPerformanceCounter failed")?;
+    let mut start_qpc = 0i64;
+    unsafe { windows::Win32::System::Performance::QueryPerformanceCounter(&mut start_qpc) }
+        .ok()
+        .ok_or("QueryPerformanceCounter failed")?;
 
-        // Capture loop
-        while !stop.load(Ordering::SeqCst) {
-            // Reduced sleep for faster audio capture - was 10ms, now 5ms
-            thread::sleep(Duration::from_millis(5));
+    // Capture loop
+    while !stop.load(Ordering::SeqCst) {
+        // Reduced sleep for faster audio capture - was 10ms, now 5ms
+        thread::sleep(Duration::from_millis(5));
 
-            let packet_length = match capture_client.GetNextPacketSize() {
-                Ok(len) => len,
-                Err(_) => continue,
+        let packet_length = match unsafe { capture_client.GetNextPacketSize() } {
+            Ok(len) => len,
+            Err(_) => continue,
+        };
+
+        let mut current_packet_length = packet_length;
+        while current_packet_length > 0 {
+            let mut buffer_ptr: *mut u8 = std::ptr::null_mut();
+            let mut num_frames = 0u32;
+            let mut flags = 0u32;
+
+            let get_buffer_res = unsafe {
+                capture_client.GetBuffer(&mut buffer_ptr, &mut num_frames, &mut flags, None, None)
             };
+            if get_buffer_res.is_err() {
+                break;
+            }
 
-            let mut current_packet_length = packet_length;
-            while current_packet_length > 0 {
-                let mut buffer_ptr: *mut u8 = std::ptr::null_mut();
-                let mut num_frames = 0u32;
-                let mut flags = 0u32;
-
-                if capture_client
-                    .GetBuffer(&mut buffer_ptr, &mut num_frames, &mut flags, None, None)
-                    .is_err()
-                {
-                    break;
-                }
-
-                if num_frames > 0 && !buffer_ptr.is_null() {
+            if num_frames > 0 && !buffer_ptr.is_null() {
                 // Convert to 16-bit PCM stereo
-                    let frame_size = (channels as usize) * bytes_per_sample;
-                    let total_bytes = (num_frames as usize) * frame_size;
-                    let buffer_slice = std::slice::from_raw_parts(buffer_ptr, total_bytes);
+                let frame_size = (channels as usize) * bytes_per_sample;
+                let total_bytes = (num_frames as usize) * frame_size;
+                let buffer_slice = unsafe { std::slice::from_raw_parts(buffer_ptr, total_bytes) };
 
-                    let mut samples = Vec::with_capacity(num_frames as usize * 2); // stereo
+                let mut samples = Vec::with_capacity(num_frames as usize * 2); // stereo
 
-                    if bits_per_sample == 16 {
+                if bits_per_sample == 16 {
                     // Already 16-bit PCM
                     for chunk in buffer_slice.chunks_exact(2) {
                         let sample = i16::from_le_bytes([chunk[0], chunk[1]]);
                         samples.push(sample);
                     }
-                    } else if bits_per_sample == 32 {
+                } else if bits_per_sample == 32 {
                     // Convert 32-bit float to 16-bit PCM
                     for chunk in buffer_slice.chunks_exact(4) {
                         let float_val =
@@ -318,38 +307,35 @@ fn audio_capture_loop_impl(
                 }
 
                 // If mono, duplicate to stereo
-                    if channels == 1 {
-                        let mut stereo_samples = Vec::with_capacity(samples.len() * 2);
-                        for sample in samples {
-                            stereo_samples.push(sample);
-                            stereo_samples.push(sample);
-                        }
-                        samples = stereo_samples;
+                if channels == 1 {
+                    let mut stereo_samples = Vec::with_capacity(samples.len() * 2);
+                    for sample in samples {
+                        stereo_samples.push(sample);
+                        stereo_samples.push(sample);
                     }
-
-                    let audio_sample = AudioSample {
-                        data: samples,
-                        sample_rate,
-                        channels: 2, // Always output stereo
-                    };
-
-                    audio_queue.push(audio_sample);
+                    samples = stereo_samples;
                 }
 
-                crate::log_if_err!(capture_client.ReleaseBuffer(num_frames));
-
-                current_packet_length = match capture_client.GetNextPacketSize() {
-                    Ok(len) => len,
-                    Err(_) => break,
+                let audio_sample = AudioSample {
+                    data: samples,
+                    sample_rate,
+                    channels: 2, // Always output stereo
                 };
+
+                audio_queue.push(audio_sample);
             }
+
+            crate::log_if_err!(unsafe { capture_client.ReleaseBuffer(num_frames) });
+
+            current_packet_length = match unsafe { capture_client.GetNextPacketSize() } {
+                Ok(len) => len,
+                Err(_) => break,
+            };
         }
-
-        audio_client
-            .Stop()
-            .map_err(|e| format!("Stop failed: {}", e))?;
-
-        crate::log_debug("Audio capture loop stopped");
-        Ok(())
     }
+
+    unsafe { audio_client.Stop() }.map_err(|e| format!("Stop failed: {}", e))?;
+
+    crate::log_debug("Audio capture loop stopped");
+    Ok(())
 }

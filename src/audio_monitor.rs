@@ -19,7 +19,7 @@ use windows::Win32::Media::Audio::{
 use windows::Win32::Media::KernelStreaming::WAVE_FORMAT_EXTENSIBLE;
 use windows::Win32::Media::Multimedia::{KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, WAVE_FORMAT_IEEE_FLOAT};
 use windows::Win32::System::Com::StructuredStorage::PropVariantToStringAlloc;
-use windows::Win32::System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree, STGM_READ};
+use windows::Win32::System::Com::{CLSCTX_ALL, CoTaskMemFree, STGM_READ};
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 use windows::core::PCWSTR;
 
@@ -239,10 +239,9 @@ fn start_monitoring_sources(
 }
 
 fn resolve_input_device(device_id: &str) -> Result<IMMDevice, String> {
-    let enumerator: IMMDeviceEnumerator = unsafe {
-        CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
-            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
-    };
+    let enumerator: IMMDeviceEnumerator =
+        crate::co_create_instance_safe(&MMDeviceEnumerator, None, CLSCTX_ALL)
+            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?;
 
     if device_id.is_empty() || device_id == PODCAST_DEVICE_DEFAULT {
         crate::log_debug("Monitor: using default input device");
@@ -267,10 +266,9 @@ fn resolve_input_device(device_id: &str) -> Result<IMMDevice, String> {
 }
 
 fn resolve_output_loopback_device(device_id: &str, device_name: &str) -> Result<IMMDevice, String> {
-    let enumerator: IMMDeviceEnumerator = unsafe {
-        CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
-            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
-    };
+    let enumerator: IMMDeviceEnumerator =
+        crate::co_create_instance_safe(&MMDeviceEnumerator, None, CLSCTX_ALL)
+            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?;
 
     if device_id.is_empty() || device_id == PODCAST_DEVICE_DEFAULT {
         crate::log_debug("Monitor: using default output device for loopback");
@@ -347,10 +345,9 @@ fn device_friendly_name(device: &IMMDevice) -> Option<String> {
 }
 
 fn resolve_output_device(preferred_name: Option<&str>) -> Result<IMMDevice, String> {
-    let enumerator: IMMDeviceEnumerator = unsafe {
-        CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
-            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?
-    };
+    let enumerator: IMMDeviceEnumerator =
+        crate::co_create_instance_safe(&MMDeviceEnumerator, None, CLSCTX_ALL)
+            .map_err(|e| format!("MMDeviceEnumerator failed: {e}"))?;
 
     if let Some(name) = preferred_name {
         let needle = name.trim();

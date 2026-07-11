@@ -269,6 +269,7 @@ fn handle_selection_and_route(
                 context_actions: Vec::new(),
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
+                escape_stops_active_player: false,
             },
         ) {
             MultilineSelectionResult::Selected(id_str) => {
@@ -306,6 +307,7 @@ fn handle_selection_and_route(
                 context_actions: Vec::new(),
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
+                escape_stops_active_player: false,
             },
         ) {
             MultilineSelectionResult::Selected(id_str) => {
@@ -369,6 +371,7 @@ fn select_route_path(parent: HWND, language: Language, route: RouteResult) -> Op
             context_actions: Vec::new(),
             right_arrow_accepts_selection: true,
             left_arrow_closes: true,
+            escape_stops_active_player: false,
         },
     );
 

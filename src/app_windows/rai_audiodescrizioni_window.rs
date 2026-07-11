@@ -787,6 +787,9 @@ fn request_code_contact(parent: HWND, language: Language) -> Option<(String, Str
             {
                 break;
             }
+            if crate::app_windows::calendar_window::handle_reminder_alert_message(&msg) {
+                continue;
+            }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u16 == VK_RETURN.0 {
                 let handled_enter = request_code_state_mut(hwnd).is_some_and(|state| {
                     let focus = windows::Win32::UI::Input::KeyboardAndMouse::GetFocus();

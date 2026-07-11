@@ -7,3 +7,4 @@ pub mod raiplay;
 pub mod raiplaysound;
 pub mod reader;
 pub mod rss;
+pub mod tv;

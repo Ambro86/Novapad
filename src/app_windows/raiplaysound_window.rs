@@ -194,6 +194,7 @@ fn browse_page(
                 context_actions: vec![copy_context_action, add_to_podcasts_context_action],
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
+                escape_stops_active_player: false,
             },
         );
         let selected_item_id = match selection {

@@ -4,15 +4,15 @@ use std::io::{BufRead, BufReader, Read};
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use encoding_rs::WINDOWS_1252;
 use windows::Win32::Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    BeginPaint, COLOR_HIGHLIGHT, COLOR_WINDOW, DT_CALCRECT, DT_NOPREFIX, DT_WORDBREAK, DrawTextW,
-    EndPaint, FillRect, GetDC, HBRUSH, HFONT, HGDIOBJ, InvalidateRect, PAINTSTRUCT, ReleaseDC,
-    SelectObject, SetBkMode, TRANSPARENT,
+    BeginPaint, COLOR_HIGHLIGHT, COLOR_WINDOW, DEFAULT_GUI_FONT, DT_CALCRECT, DT_NOPREFIX,
+    DT_WORDBREAK, DrawTextW, EndPaint, FillRect, GetDC, HBRUSH, HFONT, HGDIOBJ, InvalidateRect,
+    PAINTSTRUCT, ReleaseDC, SelectObject, SetBkMode, TRANSPARENT,
 };
 use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
@@ -40,12 +40,16 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD,
     TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
     WM_CREATE, WM_DESTROY, WM_GETDLGCODE, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MOUSEWHEEL, WM_NCDESTROY,
-    WM_PAINT, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_VSCROLL, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    WM_NEXTDLGCTL, WM_PAINT, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_VSCROLL, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
-use crate::accessibility::{EM_REPLACESEL, screen_reader_speak, to_wide, to_wide_normalized};
+use crate::accessibility::{
+    EM_REPLACESEL, PlayerCommand, handle_player_keyboard, screen_reader_speak, to_wide,
+    to_wide_normalized,
+};
 use crate::app_windows::prompt_window;
 use crate::editor_manager::get_edit_text;
 use crate::i18n;
@@ -93,6 +97,12 @@ const WM_YT_LOAD_COMPLETE: u32 = WM_APP + 40;
 const WM_YT_TEXT_COMPLETE: u32 = WM_APP + 41;
 const WM_YT_LOAD_CANCEL: u32 = WM_APP + 42;
 const WM_YT_TEXT_CANCEL: u32 = WM_APP + 43;
+const WM_YT_REFOCUS_FLAT_LIST: u32 = WM_APP + 44;
+
+// When a TV channel or recording is playing, its selection list remains alive
+// but hidden behind the visible mpv surface. Esc stops mpv and restores this list.
+static ACTIVE_PLAYER_RETURN_FLAT_LIST: AtomicIsize = AtomicIsize::new(0);
+static ACTIVE_PLAYER_RETURN_PARENT: AtomicIsize = AtomicIsize::new(0);
 const EVENT_OBJECT_FOCUS: u32 = 0x8005;
 const EVENT_OBJECT_VALUECHANGE: u32 = 0x800E;
 const OBJID_CLIENT: i32 = -4;
@@ -209,6 +219,37 @@ fn labels(language: Language) -> Labels {
         ),
         ytdlp_path_update_keep_system: i18n::tr(language, "youtube.ytdlp_path_update_keep_system"),
     }
+}
+
+pub(crate) fn play_youtube_video_in_mpv(
+    parent: HWND,
+    url: &str,
+    title: &str,
+) -> Result<(), String> {
+    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+    let normalized = normalize_youtube_input_for_download(url)
+        .ok_or_else(|| i18n::tr(language, "youtube.invalid_url"))?;
+    if !is_youtube_stream_url(&normalized) {
+        return Err(i18n::tr(language, "youtube.invalid_url"));
+    }
+
+    let labels_data = labels(language);
+    let Some(ytdlp_path) = ensure_ytdlp_available(parent, language, &labels_data, None)? else {
+        return Ok(());
+    };
+
+    if let Err(error) = probe_youtube_stream_playable(&ytdlp_path, &normalized) {
+        crate::log_debug(&format!("Cinema YouTube trailer preflight failed: {error}"));
+    }
+
+    crate::launch_video_stream_in_mpv(
+        parent,
+        &normalized,
+        title,
+        Some(&ytdlp_path),
+        Some(YOUTUBE_MPV_STREAM_FORMAT),
+        None,
+    )
 }
 
 fn ytdlp_command(path: &Path) -> Command {
@@ -1828,6 +1869,7 @@ struct YoutubeCommentsDialogInit {
         Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     right_arrow_accepts_selection: bool,
     left_arrow_closes: bool,
+    escape_stops_active_player: bool,
 }
 
 #[derive(Default)]
@@ -1841,6 +1883,7 @@ struct YoutubeCommentsDialogMode {
         Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     right_arrow_accepts_selection: bool,
     left_arrow_closes: bool,
+    escape_stops_active_player: bool,
 }
 
 #[derive(Clone, Copy, Default, Eq, PartialEq)]
@@ -1866,6 +1909,7 @@ struct YoutubeCommentRow {
 }
 
 struct YoutubeCommentsDialogState {
+    parent: HWND,
     language: Language,
     title_label: HWND,
     search_label: HWND,
@@ -1894,6 +1938,7 @@ struct YoutubeCommentsDialogState {
         Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     right_arrow_accepts_selection: bool,
     left_arrow_closes: bool,
+    escape_stops_active_player: bool,
 }
 
 #[derive(Clone)]
@@ -1912,6 +1957,7 @@ pub(crate) struct MultilineSearchOptions {
         Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     pub(crate) right_arrow_accepts_selection: bool,
     pub(crate) left_arrow_closes: bool,
+    pub(crate) escape_stops_active_player: bool,
 }
 
 struct YoutubeFlatSelectionInit {
@@ -2339,6 +2385,89 @@ fn show_youtube_comments_for_stream_entry(
     }
 }
 
+fn register_active_player_return_list(dialog: HWND, parent: HWND) {
+    ACTIVE_PLAYER_RETURN_PARENT.store(parent.0, Ordering::SeqCst);
+    ACTIVE_PLAYER_RETURN_FLAT_LIST.store(dialog.0, Ordering::SeqCst);
+    crate::log_debug(&format!(
+        "Registered active player return list dialog={:?} parent={:?}",
+        dialog, parent
+    ));
+}
+
+fn clear_active_player_return_list(dialog: HWND) {
+    if ACTIVE_PLAYER_RETURN_FLAT_LIST
+        .compare_exchange(dialog.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        ACTIVE_PLAYER_RETURN_PARENT.store(0, Ordering::SeqCst);
+        crate::log_debug(&format!(
+            "Cleared active player return list dialog={:?}",
+            dialog
+        ));
+    }
+}
+
+pub(crate) fn has_active_player_return_list(parent: HWND) -> bool {
+    let registered_parent = HWND(ACTIVE_PLAYER_RETURN_PARENT.load(Ordering::SeqCst));
+    let dialog = HWND(ACTIVE_PLAYER_RETURN_FLAT_LIST.load(Ordering::SeqCst));
+    parent.0 != 0
+        && registered_parent == parent
+        && dialog.0 != 0
+        && crate::is_window_handle_valid(dialog)
+}
+
+pub(crate) fn restore_active_player_return_list(parent: HWND) -> bool {
+    let registered_parent = HWND(ACTIVE_PLAYER_RETURN_PARENT.load(Ordering::SeqCst));
+    let dialog = HWND(ACTIVE_PLAYER_RETURN_FLAT_LIST.load(Ordering::SeqCst));
+    if parent.0 == 0
+        || registered_parent != parent
+        || dialog.0 == 0
+        || !crate::is_window_handle_valid(dialog)
+    {
+        return false;
+    }
+
+    crate::log_debug(&format!(
+        "Restoring active player return list dialog={:?} parent={:?}",
+        dialog, parent
+    ));
+    unsafe {
+        EnableWindow(parent, true);
+        ShowWindow(dialog, SW_SHOW);
+    }
+    crate::set_foreground_window_safe(dialog);
+    focus_youtube_flat_list(dialog);
+    crate::log_if_err!(crate::post_message_w_safe(
+        dialog,
+        WM_YT_REFOCUS_FLAT_LIST,
+        WPARAM(0),
+        LPARAM(0),
+    ));
+    schedule_youtube_flat_list_refocus(dialog);
+    true
+}
+
+fn route_active_player_keyboard_from_flat_list(parent: HWND, message: &MSG) -> bool {
+    if message.message != WM_KEYDOWN || parent.0 == 0 || !crate::is_mpv_playback_active(parent) {
+        return false;
+    }
+    let skip_seconds =
+        crate::with_state(parent, |state| state.settings.audiobook_skip_seconds).unwrap_or(30);
+    let command = handle_player_keyboard(message, skip_seconds);
+    if matches!(command, PlayerCommand::None) {
+        return false;
+    }
+    if matches!(command, PlayerCommand::BlockNavigation) {
+        return true;
+    }
+    crate::log_debug(&format!(
+        "Flat list routes active-player key={} command={:?}",
+        message.wParam.0, command
+    ));
+    crate::handle_player_command(parent, command);
+    true
+}
+
 pub(crate) fn select_multiline_items_with_search(
     parent: HWND,
     language: Language,
@@ -2383,12 +2512,18 @@ pub(crate) fn select_multiline_items_with_search(
                 initial_selected_id,
                 result: Arc::clone(&selection_result),
             }),
-            flat_search: Some(YoutubeFlatSearchInit {
-                initial_query: search_options.initial_query,
-                button_label: search_options.search_button_label,
-                result: Arc::clone(&search_result),
-                show_edit: search_options.show_search_edit,
-            }),
+            flat_search: if search_options.show_search_edit
+                || !search_options.search_button_label.trim().is_empty()
+            {
+                Some(YoutubeFlatSearchInit {
+                    initial_query: search_options.initial_query,
+                    button_label: search_options.search_button_label,
+                    result: Arc::clone(&search_result),
+                    show_edit: search_options.show_search_edit,
+                })
+            } else {
+                None
+            },
             flat_secondary_action: search_options.secondary_action_label.map(|label| {
                 YoutubeFlatSecondaryActionInit {
                     button_label: label,
@@ -2399,6 +2534,7 @@ pub(crate) fn select_multiline_items_with_search(
             flat_context_actions: search_options.context_actions,
             right_arrow_accepts_selection: search_options.right_arrow_accepts_selection,
             left_arrow_closes: search_options.left_arrow_closes,
+            escape_stops_active_player: search_options.escape_stops_active_player,
         },
     );
     if let Some(value) = selection_result
@@ -2532,6 +2668,10 @@ fn open_youtube_comments_window_with_mode(
     crate::register_class_w_safe(&view_wc);
 
     let action_result = Arc::new(Mutex::new(YoutubeCommentsDialogAction::None));
+    let is_flat_selection = mode.flat_selection.is_some();
+    let keep_parent_enabled_for_player = is_flat_selection
+        && mode.escape_stops_active_player
+        && crate::is_mpv_playback_active(parent);
     let init = Box::new(YoutubeCommentsDialogInit {
         parent,
         language,
@@ -2546,6 +2686,7 @@ fn open_youtube_comments_window_with_mode(
         flat_context_actions: mode.flat_context_actions,
         right_arrow_accepts_selection: mode.right_arrow_accepts_selection,
         left_arrow_closes: mode.left_arrow_closes,
+        escape_stops_active_player: mode.escape_stops_active_player,
     });
     let window_title = if init.flat_selection.is_some() {
         init.title.clone()
@@ -2577,11 +2718,25 @@ fn open_youtube_comments_window_with_mode(
         return YoutubeCommentsDialogAction::None;
     }
 
-    unsafe {
-        EnableWindow(parent, false);
-        SetForegroundWindow(hwnd);
+    if keep_parent_enabled_for_player {
+        register_active_player_return_list(hwnd, parent);
+        unsafe {
+            EnableWindow(parent, true);
+            ShowWindow(hwnd, SW_HIDE);
+        }
+        crate::bring_window_to_foreground(parent);
+        crate::set_focus_safe(parent);
+        crate::log_debug(&format!(
+            "Flat list hidden behind active player dialog={:?} parent={:?}",
+            hwnd, parent
+        ));
+    } else {
+        unsafe {
+            EnableWindow(parent, false);
+            SetForegroundWindow(hwnd);
+        }
+        pin_stream_modal_window(hwnd);
     }
-    pin_stream_modal_window(hwnd);
 
     let mut msg = MSG::default();
     loop {
@@ -2594,6 +2749,21 @@ fn open_youtube_comments_window_with_mode(
         }
         unsafe {
             if msg.message == WM_KEYDOWN {
+                if keep_parent_enabled_for_player
+                    && crate::is_mpv_playback_active(parent)
+                    && msg.wParam.0 as u32 != VK_ESCAPE.0 as u32
+                {
+                    // This is a nested message loop, so merely dispatching the key to
+                    // the main window would bypass the normal player-key routing in
+                    // Sonarpad's outer loop. Route Space, arrows, M, +/- and the other
+                    // player commands explicitly, exactly as the Radio window does.
+                    if route_active_player_keyboard_from_flat_list(parent, &msg) {
+                        continue;
+                    }
+                    TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
+                    continue;
+                }
                 let focus = GetFocus();
                 crate::log_debug(&format!(
                     "YT comments loop WM_KEYDOWN key={} focus={:?} hwnd={:?} msg_hwnd={:?}",
@@ -2673,6 +2843,12 @@ fn open_youtube_comments_window_with_mode(
                     continue;
                 }
                 if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    if stop_active_player_and_refocus_flat_list(hwnd, parent) {
+                        crate::log_debug(
+                            "YT comments loop handling ESC as player stop and list refocus",
+                        );
+                        continue;
+                    }
                     crate::log_debug("YT comments loop handling ESC as close");
                     crate::send_message_w_safe(
                         hwnd,
@@ -2777,6 +2953,7 @@ fn open_youtube_comments_window_with_mode(
         }
     }
 
+    clear_active_player_return_list(hwnd);
     unsafe {
         EnableWindow(parent, true);
     }
@@ -2788,7 +2965,18 @@ fn open_youtube_comments_window_with_mode(
         ));
         crate::set_foreground_window_safe(parent);
     }
-    restore_stream_dialog_focus(parent);
+    if is_flat_selection {
+        crate::log_debug(&format!(
+            "generic flat selection closed: restoring parent without stream-state access parent={:?}",
+            parent
+        ));
+        if crate::is_window_handle_valid(parent) {
+            crate::set_foreground_window_safe(parent);
+            crate::set_focus_safe(parent);
+        }
+    } else {
+        restore_stream_dialog_focus(parent);
+    }
     *action_result.lock().unwrap_or_else(|e| e.into_inner())
 }
 
@@ -2822,7 +3010,10 @@ fn youtube_comments_dialog_wndproc_inner(
                 return LRESULT(0);
             }
             let init = crate::box_from_raw_safe(init_ptr);
-            let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
+            // This dialog is also reused as a generic flat-list selector by Weather,
+            // Cinema and other tools. Never cast the parent GWLP_USERDATA to the
+            // main application state: a tool window owns a different state type.
+            let hfont = HFONT(crate::get_stock_object_safe(DEFAULT_GUI_FONT).0);
             let view_class_name = to_wide(YOUTUBE_COMMENTS_VIEW_CLASS_NAME);
 
             let title_label = unsafe {
@@ -3039,6 +3230,7 @@ fn youtube_comments_dialog_wndproc_inner(
                 children_by_parent.len()
             ));
             let mut state = Box::new(YoutubeCommentsDialogState {
+                parent: init.parent,
                 language: init.language,
                 title_label,
                 search_label,
@@ -3074,6 +3266,7 @@ fn youtube_comments_dialog_wndproc_inner(
                 flat_context_actions: init.flat_context_actions,
                 right_arrow_accepts_selection: init.right_arrow_accepts_selection,
                 left_arrow_closes: init.left_arrow_closes,
+                escape_stops_active_player: init.escape_stops_active_player,
             });
             if let Some(selection) = flat_selection.as_ref()
                 && let Some(index) = state.comments.iter().position(|comment| {
@@ -3103,6 +3296,10 @@ fn youtube_comments_dialog_wndproc_inner(
             relayout_youtube_comments_dialog(hwnd);
             LRESULT(0)
         }
+        WM_YT_REFOCUS_FLAT_LIST => {
+            focus_youtube_flat_list(hwnd);
+            LRESULT(0)
+        }
         WM_SETFOCUS => {
             with_youtube_comments_state(hwnd, |state| {
                 let target = if crate::is_window_handle_valid(state.accessibility_proxy) {
@@ -3129,6 +3326,14 @@ fn youtube_comments_dialog_wndproc_inner(
                 unsafe { GetFocus() }
             ));
             if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                let parent =
+                    with_youtube_comments_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+                if stop_active_player_and_refocus_flat_list(hwnd, parent) {
+                    crate::log_debug(
+                        "YT comments dialog handling ESC as player stop and list refocus",
+                    );
+                    return LRESULT(0);
+                }
                 crate::log_debug("YT comments dialog handling ESC as close");
                 crate::send_message_w_safe(
                     hwnd,
@@ -3309,6 +3514,71 @@ fn request_youtube_comments_load_all(state: &YoutubeCommentsDialogState) -> bool
     }
     *action = YoutubeCommentsDialogAction::LoadAll;
     true
+}
+
+fn stop_active_player_and_refocus_flat_list(hwnd: HWND, parent: HWND) -> bool {
+    let enabled = with_youtube_comments_state(hwnd, |state| {
+        state.flat_list_mode && state.escape_stops_active_player
+    })
+    .unwrap_or(false);
+    if !enabled || parent.0 == 0 || !crate::is_mpv_playback_active(parent) {
+        return false;
+    }
+
+    crate::log_debug(&format!(
+        "Flat list: ESC stops mpv and returns to list hwnd={:?} parent={:?}",
+        hwnd, parent
+    ));
+    crate::stop_managed_mpv_playback(parent);
+    // Focus once before and once after closing the temporary player document,
+    // because closing it can post a delayed focus request to the editor.
+    focus_youtube_flat_list(hwnd);
+    crate::editor_manager::close_current_document(parent);
+    focus_youtube_flat_list(hwnd);
+    crate::log_if_err!(crate::post_message_w_safe(
+        hwnd,
+        WM_YT_REFOCUS_FLAT_LIST,
+        WPARAM(0),
+        LPARAM(0),
+    ));
+    schedule_youtube_flat_list_refocus(hwnd);
+    true
+}
+
+fn focus_youtube_flat_list(hwnd: HWND) {
+    if !crate::is_window_handle_valid(hwnd) {
+        return;
+    }
+    crate::set_foreground_window_safe(hwnd);
+    let _state_access = with_youtube_comments_state(hwnd, |state| {
+        let target = if crate::is_window_handle_valid(state.accessibility_proxy) {
+            state.accessibility_proxy
+        } else {
+            state.view
+        };
+        if target.0 != 0 {
+            crate::set_focus_safe(target);
+            crate::send_message_w_safe(hwnd, WM_NEXTDLGCTL, WPARAM(target.0 as usize), LPARAM(1));
+        }
+    });
+}
+
+fn schedule_youtube_flat_list_refocus(hwnd: HWND) {
+    let hwnd_value = hwnd.0;
+    std::thread::spawn(move || {
+        for delay in [40_u64, 150, 500, 900] {
+            std::thread::sleep(std::time::Duration::from_millis(delay));
+            let hwnd = HWND(hwnd_value);
+            if crate::is_window_handle_valid(hwnd) {
+                crate::log_if_err!(crate::post_message_w_safe(
+                    hwnd,
+                    WM_YT_REFOCUS_FLAT_LIST,
+                    WPARAM(0),
+                    LPARAM(0),
+                ));
+            }
+        }
+    });
 }
 
 fn accept_youtube_comments_flat_selection(hwnd: HWND) -> bool {
@@ -4101,6 +4371,17 @@ fn youtube_comments_view_wndproc_inner(
                 "YT comments view WM_KEYDOWN key={} hwnd={:?}",
                 wparam.0, hwnd
             ));
+            if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                let dialog = unsafe { GetParent(hwnd) };
+                let parent =
+                    with_youtube_comments_state(dialog, |state| state.parent).unwrap_or(HWND(0));
+                if stop_active_player_and_refocus_flat_list(dialog, parent) {
+                    crate::log_debug(
+                        "YT comments view handling ESC as player stop and list refocus",
+                    );
+                    return LRESULT(0);
+                }
+            }
             if handle_youtube_comments_keydown(hwnd, wparam.0 as u32) {
                 return LRESULT(0);
             }
@@ -7707,7 +7988,10 @@ fn stream_track_dialog_wndproc_inner(
                     return LRESULT(0);
                 }
                 let init = Box::from_raw(init_ptr);
-                let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
+                // This dialog is reused by tool windows such as Weather.  The parent's
+                // GWLP_USERDATA is not necessarily the main Sonarpad state, so never cast it
+                // through `with_state` merely to obtain a font.
+                let hfont = HFONT(crate::get_stock_object_safe(DEFAULT_GUI_FONT).0);
 
                 let label = CreateWindowExW(
                     Default::default(),
@@ -7876,6 +8160,7 @@ fn stream_track_dialog_wndproc_inner(
             WM_NCDESTROY => {
                 let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamTrackDialogState;
                 if !ptr.is_null() {
+                    SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
                     let _unused = Box::from_raw(ptr);
                 }
                 LRESULT(0)

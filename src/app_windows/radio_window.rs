@@ -2,6 +2,7 @@ use crate::accessibility::{PlayerCommand, handle_player_keyboard, to_wide};
 use crate::i18n;
 use crate::launch_stream_url_in_mpv;
 use crate::settings::{Language, RadioFavorite, load_settings, save_settings};
+use crate::stream_recording::{self, StreamRecordingKind};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::time::Duration;
@@ -14,11 +15,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW,
     DefWindowProcW, DestroyMenu, DestroyWindow, DispatchMessageW, ES_AUTOHSCROLL, GWLP_USERDATA,
     GetCursorPos, GetMessageW, GetWindowLongPtrW, HMENU, IDC_ARROW, IsDialogMessageW, IsWindow,
-    LoadCursorW, MB_ICONINFORMATION, MB_OK, MF_STRING, MoveWindow, RegisterClassW, SW_SHOW,
-    SetWindowLongPtrW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu, TranslateMessage,
-    WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
-    WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME,
+    LoadCursorW, MB_ICONINFORMATION, MB_OK, MF_STRING, MoveWindow, RegisterClassW, SW_HIDE,
+    SW_SHOW, SetWindowLongPtrW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu,
+    TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
+    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_SETFOCUS, WM_SETFONT,
+    WM_SIZE, WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME,
     WS_OVERLAPPED, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
@@ -36,6 +37,15 @@ const ID_BUTTON_SEARCH: usize = 1005;
 const ID_LIST_FAVORITES: usize = 1008;
 const ID_BUTTON_CLOSE: usize = 1011;
 const ID_BUTTON_ADD_COMMUNITY: usize = 1017;
+const ID_COMBO_BROWSE_MODE: usize = 1018;
+const ID_COMBO_COUNTRY: usize = 1019;
+const ID_EDIT_CITY: usize = 1020;
+const ID_BUTTON_RECORDINGS: usize = 1021;
+const ID_BUTTON_RESET_FILTERS: usize = 1022;
+const ID_LABEL_BROWSE_MODE: usize = 1023;
+const ID_LABEL_COUNTRY: usize = 1024;
+const ID_LABEL_CITY: usize = 1025;
+const ID_LABEL_RESULTS: usize = 1026;
 
 const ADD_RADIO_CLASS_NAME: &str = "SonarpadAddCommunityRadioWindow";
 const ID_ADD_NAME: usize = 2101;
@@ -68,6 +78,7 @@ const RADIO_REFOCUS_DELAYS_MS: &[u64] = &[150, 500];
 const ID_CONTEXT_ADD_FAVORITE: usize = 1;
 const ID_CONTEXT_REMOVE_FAVORITE: usize = 2;
 const ID_CONTEXT_COPY_STREAM_URL: usize = 3;
+const ID_CONTEXT_RECORD_AND_PLAY: usize = 4;
 
 #[derive(Clone, Deserialize)]
 struct RadioStation {
@@ -130,7 +141,10 @@ struct RadioDialogState {
     parent: HWND,
     language: Language,
     edit_search: HWND,
+    combo_browse_mode: HWND,
     combo_language: HWND,
+    combo_country: HWND,
+    edit_city: HWND,
     combo_genre: HWND,
     list_favorites: HWND,
     list_results: HWND,
@@ -139,11 +153,20 @@ struct RadioDialogState {
     all_results: Vec<RadioFavorite>,
     page: usize,
     languages: Vec<(String, String)>,
+    countries: Vec<(String, String)>,
 }
 
 struct RadioSearchComplete {
     language: Language,
     result: Result<Vec<RadioFavorite>, String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RadioBrowseMode {
+    Language,
+    Country,
+    City,
+    Genre,
 }
 
 #[derive(Clone, Copy)]
@@ -326,6 +349,11 @@ const COMMUNITY_LANGUAGE_OPTIONS: &[CommunityLanguageOption] = &[
         value: "english",
     },
     CommunityLanguageOption {
+        key: "radio.lang.tr",
+        label: "Turco",
+        value: "turkish",
+    },
+    CommunityLanguageOption {
         key: "radio.community_lang.es",
         label: "Spagnolo",
         value: "spanish",
@@ -420,8 +448,8 @@ pub fn open(parent: HWND) {
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_POPUP | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            760,
-            430,
+            820,
+            620,
             parent,
             HMENU(0),
             hinstance,
@@ -434,6 +462,9 @@ pub fn open(parent: HWND) {
 
         let mut msg = Default::default();
         while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).as_bool() {
+            if crate::app_windows::calendar_window::handle_reminder_alert_message(&msg) {
+                continue;
+            }
             match route_player_keyboard(hwnd, parent, &msg) {
                 RadioLoopAction::NotHandled => {}
                 RadioLoopAction::Handled => continue,
@@ -469,10 +500,14 @@ fn handle_enter_key(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessaging::M
             Some(RadioEnterTarget::Favorites)
         } else if msg.hwnd == state.list_results {
             Some(RadioEnterTarget::Results)
-        } else if msg.hwnd == state.edit_search {
+        } else if msg.hwnd == state.edit_search || msg.hwnd == state.edit_city {
             Some(RadioEnterTarget::Search)
-        } else if msg.hwnd == state.combo_language
+        } else if msg.hwnd == state.combo_browse_mode
+            || crate::is_child_safe(state.combo_browse_mode, msg.hwnd)
+            || msg.hwnd == state.combo_language
             || crate::is_child_safe(state.combo_language, msg.hwnd)
+            || msg.hwnd == state.combo_country
+            || crate::is_child_safe(state.combo_country, msg.hwnd)
             || msg.hwnd == state.combo_genre
             || crate::is_child_safe(state.combo_genre, msg.hwnd)
         {
@@ -579,6 +614,31 @@ fn schedule_results_refocus(hwnd: HWND) {
             ));
         }
     });
+}
+
+fn focus_search_edit(hwnd: HWND) {
+    crate::set_foreground_window_safe(hwnd);
+    if let Some(edit_search) = with_radio_state(hwnd, |state| state.edit_search) {
+        crate::log_debug(&format!(
+            "Radio: focus search field hwnd={:?} edit={:?} before={:?}",
+            hwnd,
+            edit_search,
+            crate::get_focus_safe()
+        ));
+        crate::set_focus_safe(edit_search);
+        crate::send_message_w_safe(
+            hwnd,
+            WM_NEXTDLGCTL,
+            WPARAM(edit_search.0 as usize),
+            LPARAM(1),
+        );
+        crate::log_debug(&format!(
+            "Radio: focus search field after={:?}",
+            crate::get_focus_safe()
+        ));
+    } else {
+        crate::log_debug("Radio: focus search field failed, state unavailable");
+    }
 }
 
 fn focus_results_list(hwnd: HWND) {
@@ -709,6 +769,24 @@ fn show_station_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> bool
         }
     }
 
+    let record_label = to_wide(&tr(
+        language,
+        "radio.record_and_play",
+        "Registra e riproduci radio",
+    ));
+    if let Err(err) = unsafe {
+        AppendMenuW(
+            menu,
+            MF_STRING,
+            ID_CONTEXT_RECORD_AND_PLAY,
+            PCWSTR(record_label.as_ptr()),
+        )
+    } {
+        crate::log_debug(&format!("Radio: AppendMenuW record failed: {}", err));
+        crate::log_if_err!(unsafe { DestroyMenu(menu) });
+        return false;
+    }
+
     let copy_label = to_wide(&tr(language, "radio.copy_audio_url", "Copia URL audio"));
     if let Err(err) = unsafe {
         AppendMenuW(
@@ -758,6 +836,7 @@ fn show_station_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> bool
         ID_CONTEXT_ADD_FAVORITE => add_selected_favorite(hwnd),
         ID_CONTEXT_REMOVE_FAVORITE => remove_selected_favorite(hwnd),
         ID_CONTEXT_COPY_STREAM_URL => copy_selected_stream_url(hwnd),
+        ID_CONTEXT_RECORD_AND_PLAY => record_and_play_selected_radio(hwnd),
         0 => {}
         other => crate::log_debug(&format!("Radio: unknown context menu command {}", other)),
     }
@@ -810,6 +889,12 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
+                let notification = (wparam.0 >> 16) & 0xffff;
+                if id == ID_COMBO_BROWSE_MODE && notification == 1 {
+                    update_browse_filter_visibility(hwnd);
+                    layout(hwnd);
+                    return LRESULT(0);
+                }
                 match id {
                     ID_BUTTON_SEARCH => {
                         search(hwnd);
@@ -817,6 +902,22 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     }
                     ID_BUTTON_ADD_COMMUNITY => {
                         open_add_community_radio_dialog(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_BUTTON_RECORDINGS => {
+                        let Some(language) = with_radio_state(hwnd, |state| state.language) else {
+                            return LRESULT(0);
+                        };
+                        stream_recording::open_recordings(
+                            hwnd,
+                            language,
+                            StreamRecordingKind::Radio,
+                        );
+                        focus_search_edit(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_BUTTON_RESET_FILTERS => {
+                        reset_filters(hwnd);
                         LRESULT(0)
                     }
                     ID_BUTTON_CLOSE => {
@@ -917,6 +1018,9 @@ fn open_add_community_radio_dialog(parent: HWND) {
 
         let mut msg = Default::default();
         while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).as_bool() {
+            if crate::app_windows::calendar_window::handle_reminder_alert_message(&msg) {
+                continue;
+            }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
                 let parent = with_add_radio_state(hwnd, |s| s.parent);
                 crate::log_if_err!(DestroyWindow(hwnd));
@@ -1336,6 +1440,7 @@ fn create_controls(hwnd: HWND, parent: HWND) {
     let language = load_settings().language;
     let font = HFONT(crate::get_stock_object_safe(DEFAULT_GUI_FONT).0);
     let languages = radio_menu_languages(language);
+    let countries = radio_menu_countries(language);
 
     let label_favorites = create_static(
         hwnd,
@@ -1349,18 +1454,37 @@ fn create_controls(hwnd: HWND, parent: HWND) {
         ID_LABEL_SEARCH,
     );
     let edit_search = create_edit(hwnd, ID_EDIT_SEARCH);
+    let label_mode = create_static(
+        hwnd,
+        &tr(language, "radio.browse_mode", "Cerca per:"),
+        ID_LABEL_BROWSE_MODE,
+    );
+    let combo_browse_mode = create_combo(hwnd, ID_COMBO_BROWSE_MODE);
     let label_lang = create_static(
         hwnd,
         &tr(language, "radio.language", "Lingua:"),
         ID_LABEL_LANGUAGE,
     );
     let combo_language = create_combo(hwnd, ID_COMBO_LANGUAGE);
+    let label_country = create_static(
+        hwnd,
+        &tr(language, "radio.country", "Nazione:"),
+        ID_LABEL_COUNTRY,
+    );
+    let combo_country = create_combo(hwnd, ID_COMBO_COUNTRY);
+    let label_city = create_static(hwnd, &tr(language, "radio.city", "Città:"), ID_LABEL_CITY);
+    let edit_city = create_edit(hwnd, ID_EDIT_CITY);
     let label_genre = create_static(
         hwnd,
         &tr(language, "radio.genre", "Genere:"),
         ID_LABEL_GENRE,
     );
     let combo_genre = create_combo(hwnd, ID_COMBO_GENRE);
+    let label_results = create_static(
+        hwnd,
+        &tr(language, "find_in_files.results", "Risultati:"),
+        ID_LABEL_RESULTS,
+    );
     let list_results = create_listbox(hwnd, ID_LIST_RESULTS);
     let label_page = create_static(hwnd, "", ID_LABEL_PAGE);
     let btn_search = create_button(
@@ -1368,6 +1492,18 @@ fn create_controls(hwnd: HWND, parent: HWND) {
         &tr(language, "radio.search", "Ricerca"),
         ID_BUTTON_SEARCH,
         true,
+    );
+    let btn_reset = create_button(
+        hwnd,
+        &tr(language, "radio.reset_filters", "Reimposta filtri"),
+        ID_BUTTON_RESET_FILTERS,
+        false,
+    );
+    let btn_recordings = create_button(
+        hwnd,
+        &tr(language, "radio.recordings", "Registrazioni radio"),
+        ID_BUTTON_RECORDINGS,
+        false,
     );
     let btn_add = create_button(
         hwnd,
@@ -1387,56 +1523,93 @@ fn create_controls(hwnd: HWND, parent: HWND) {
         list_favorites,
         label_search,
         edit_search,
+        label_mode,
+        combo_browse_mode,
         label_lang,
         combo_language,
+        label_country,
+        combo_country,
+        label_city,
+        edit_city,
         label_genre,
         combo_genre,
+        label_results,
         list_results,
         label_page,
         btn_search,
+        btn_reset,
+        btn_recordings,
         btn_add,
         btn_close,
     ] {
         crate::send_message_w_safe(hwnd_ctrl, WM_SETFONT, WPARAM(font.0 as usize), LPARAM(1));
     }
+
+    for label in [
+        tr(language, "radio.browse_language", "Lingua"),
+        tr(language, "radio.browse_country", "Nazione"),
+        tr(language, "radio.browse_city", "Città"),
+        tr(language, "radio.browse_genre", "Genere"),
+    ] {
+        let wide = to_wide(&label);
+        crate::send_message_w_safe(
+            combo_browse_mode,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
+    crate::send_message_w_safe(combo_browse_mode, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+
     for (_, label) in &languages {
-        let w = to_wide(label);
+        let wide = to_wide(label);
         crate::send_message_w_safe(
             combo_language,
             CB_ADDSTRING,
             WPARAM(0),
-            LPARAM(w.as_ptr() as isize),
+            LPARAM(wide.as_ptr() as isize),
         );
     }
-    let current_code = match language {
-        Language::Italian => "it",
-        Language::English => "en",
-        Language::Spanish => "es",
-        Language::Portuguese => "pt",
-        Language::Swedish => "sv",
-        Language::Vietnamese => "vi",
-        Language::Czech => "cs",
-        Language::Polish => "pl",
-        Language::French => "fr",
-        Language::Serbian => "sr",
-        Language::Ukrainian => "uk",
-        Language::Lithuanian => "lt",
-        Language::Russian => "ru",
-        Language::Chinese => "zh",
-        Language::Hindi => "hi",
-    };
-    let default_idx = languages
+    let current_code = app_language_code(language);
+    let default_language_index = languages
         .iter()
         .position(|(code, _)| code == current_code)
         .unwrap_or(0);
-    crate::send_message_w_safe(combo_language, CB_SETCURSEL, WPARAM(default_idx), LPARAM(0));
+    crate::send_message_w_safe(
+        combo_language,
+        CB_SETCURSEL,
+        WPARAM(default_language_index),
+        LPARAM(0),
+    );
+
+    for (_, label) in &countries {
+        let wide = to_wide(label);
+        crate::send_message_w_safe(
+            combo_country,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
+    let default_country = default_country_code(language);
+    let default_country_index = countries
+        .iter()
+        .position(|(code, _)| code == default_country)
+        .unwrap_or(0);
+    crate::send_message_w_safe(
+        combo_country,
+        CB_SETCURSEL,
+        WPARAM(default_country_index),
+        LPARAM(0),
+    );
+
     for genre in GENRE_OPTIONS {
-        let w = to_wide(&tr(language, genre.key, genre.label));
+        let wide = to_wide(&tr(language, genre.key, genre.label));
         crate::send_message_w_safe(
             combo_genre,
             CB_ADDSTRING,
             WPARAM(0),
-            LPARAM(w.as_ptr() as isize),
+            LPARAM(wide.as_ptr() as isize),
         );
     }
     crate::send_message_w_safe(combo_genre, CB_SETCURSEL, WPARAM(0), LPARAM(0));
@@ -1445,7 +1618,10 @@ fn create_controls(hwnd: HWND, parent: HWND) {
         parent,
         language,
         edit_search,
+        combo_browse_mode,
         combo_language,
+        combo_country,
+        edit_city,
         combo_genre,
         list_favorites,
         list_results,
@@ -1454,9 +1630,11 @@ fn create_controls(hwnd: HWND, parent: HWND) {
         all_results: Vec::new(),
         page: 0,
         languages,
+        countries,
     });
     state.favorite_results = initial_results();
     crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+    update_browse_filter_visibility(hwnd);
     populate_favorites(hwnd);
     populate_results(hwnd);
     layout(hwnd);
@@ -1563,61 +1741,148 @@ fn create_button(parent: HWND, text: &str, id: usize, default: bool) -> HWND {
 fn layout(hwnd: HWND) {
     let mut rc = Default::default();
     crate::log_if_err!(crate::get_client_rect_safe(hwnd, &mut rc));
-    let w = rc.right - rc.left;
+    let width = rc.right - rc.left;
     let margin = 10;
-    let label_w = 80;
-    let row_h = 25;
+    let label_width = 95;
+    let row_height = 25;
+    let field_x = margin + label_width;
+    let field_width = width - margin * 2 - label_width;
     let mut y = margin;
-    move_id(hwnd, ID_LABEL_FAVORITES, margin, y + 4, label_w, row_h);
+
     move_id(
         hwnd,
-        ID_LIST_FAVORITES,
-        margin + label_w,
-        y,
-        w - margin * 2 - label_w,
-        90,
+        ID_LABEL_FAVORITES,
+        margin,
+        y + 4,
+        label_width,
+        row_height,
     );
-    y += 100;
-    move_id(hwnd, ID_LABEL_SEARCH, margin, y + 4, label_w, row_h);
+    move_id(hwnd, ID_LIST_FAVORITES, field_x, y, field_width, 82);
+    y += 92;
+
     move_id(
         hwnd,
-        ID_EDIT_SEARCH,
-        margin + label_w,
-        y,
-        w - margin * 2 - label_w,
-        row_h,
+        ID_LABEL_SEARCH,
+        margin,
+        y + 4,
+        label_width,
+        row_height,
     );
-    y += 35;
-    move_id(hwnd, ID_LABEL_LANGUAGE, margin, y + 4, label_w, row_h);
+    move_id(hwnd, ID_EDIT_SEARCH, field_x, y, field_width, row_height);
+    y += 33;
+
     move_id(
         hwnd,
-        ID_COMBO_LANGUAGE,
-        margin + label_w,
+        ID_LABEL_BROWSE_MODE,
+        margin,
+        y + 4,
+        label_width,
+        row_height,
+    );
+    move_id(hwnd, ID_COMBO_BROWSE_MODE, field_x, y, field_width, 120);
+    y += 34;
+
+    let mode = with_radio_state(hwnd, |state| selected_browse_mode(state))
+        .unwrap_or(RadioBrowseMode::Language);
+    let (active_label, active_control, control_height) = match mode {
+        RadioBrowseMode::Language => (ID_LABEL_LANGUAGE, ID_COMBO_LANGUAGE, 180),
+        RadioBrowseMode::Country => (ID_LABEL_COUNTRY, ID_COMBO_COUNTRY, 220),
+        RadioBrowseMode::City => (ID_LABEL_CITY, ID_EDIT_CITY, row_height),
+        RadioBrowseMode::Genre => (ID_LABEL_GENRE, ID_COMBO_GENRE, 210),
+    };
+    move_id(hwnd, active_label, margin, y + 4, label_width, row_height);
+    move_id(
+        hwnd,
+        active_control,
+        field_x,
         y,
-        w - margin * 2 - label_w,
-        140,
+        field_width,
+        control_height,
     );
     y += 38;
-    move_id(hwnd, ID_LABEL_GENRE, margin, y + 4, label_w, row_h);
+
+    let button_gap = 8;
+    let search_width = 90;
+    let reset_width = 125;
+    let recordings_width = 145;
+    let add_width = 125;
+    let total_buttons = search_width + reset_width + recordings_width + add_width + button_gap * 3;
+    let mut button_x = (width - margin - total_buttons).max(margin);
+    move_id(hwnd, ID_BUTTON_SEARCH, button_x, y, search_width, 30);
+    button_x += search_width + button_gap;
+    move_id(hwnd, ID_BUTTON_RESET_FILTERS, button_x, y, reset_width, 30);
+    button_x += reset_width + button_gap;
     move_id(
         hwnd,
-        ID_COMBO_GENRE,
-        margin + label_w,
+        ID_BUTTON_RECORDINGS,
+        button_x,
         y,
-        w - margin * 2 - label_w,
-        180,
+        recordings_width,
+        30,
     );
-    y += 35;
-    move_id(hwnd, ID_BUTTON_SEARCH, w - margin - 240, y, 100, 30);
-    move_id(hwnd, ID_BUTTON_ADD_COMMUNITY, w - margin - 130, y, 130, 30);
+    button_x += recordings_width + button_gap;
+    move_id(hwnd, ID_BUTTON_ADD_COMMUNITY, button_x, y, add_width, 30);
     y += 42;
-    let list_h = (rc.bottom - y - 92).max(80);
-    move_id(hwnd, ID_LIST_RESULTS, margin, y, w - margin * 2, list_h);
-    y += list_h + 8;
-    move_id(hwnd, ID_LABEL_PAGE, margin, y + 5, w - margin * 2, 28);
-    y += 36;
-    move_id(hwnd, ID_BUTTON_CLOSE, w - margin - 90, y, 90, 30);
+
+    move_id(
+        hwnd,
+        ID_LABEL_RESULTS,
+        margin,
+        y + 4,
+        label_width,
+        row_height,
+    );
+    y += 25;
+    let list_height = (rc.bottom - y - 72).max(80);
+    move_id(
+        hwnd,
+        ID_LIST_RESULTS,
+        margin,
+        y,
+        width - margin * 2,
+        list_height,
+    );
+    y += list_height + 6;
+    move_id(hwnd, ID_LABEL_PAGE, margin, y + 4, width - margin * 2, 26);
+    y += 32;
+    move_id(hwnd, ID_BUTTON_CLOSE, width - margin - 90, y, 90, 30);
 }
+
+fn update_browse_filter_visibility(hwnd: HWND) {
+    let mode = with_radio_state(hwnd, |state| selected_browse_mode(state))
+        .unwrap_or(RadioBrowseMode::Language);
+    for (label_id, control_id, visible) in [
+        (
+            ID_LABEL_LANGUAGE,
+            ID_COMBO_LANGUAGE,
+            mode == RadioBrowseMode::Language,
+        ),
+        (
+            ID_LABEL_COUNTRY,
+            ID_COMBO_COUNTRY,
+            mode == RadioBrowseMode::Country,
+        ),
+        (ID_LABEL_CITY, ID_EDIT_CITY, mode == RadioBrowseMode::City),
+        (
+            ID_LABEL_GENRE,
+            ID_COMBO_GENRE,
+            mode == RadioBrowseMode::Genre,
+        ),
+    ] {
+        set_control_visible(hwnd, label_id, visible);
+        set_control_visible(hwnd, control_id, visible);
+    }
+}
+
+fn set_control_visible(hwnd: HWND, id: usize, visible: bool) {
+    let control = crate::get_dlg_item_safe(hwnd, id as i32);
+    if control.0 != 0 {
+        unsafe {
+            ShowWindow(control, if visible { SW_SHOW } else { SW_HIDE });
+        }
+    }
+}
+
 fn move_id(hwnd: HWND, id: usize, x: i32, y: i32, w: i32, h: i32) {
     let child = crate::get_dlg_item_safe(hwnd, id as i32);
     if child.0 != 0 {
@@ -1660,28 +1925,107 @@ fn get_edit_text(hwnd: HWND) -> String {
 }
 
 fn radio_menu_languages(language: Language) -> Vec<(String, String)> {
-    vec![
-        ("it".into(), tr(language, "radio.lang.it", "Italiano")),
-        ("en".into(), tr(language, "radio.lang.en", "Inglese")),
-        ("de".into(), tr(language, "radio.lang.de", "Tedesco")),
-        ("hi".into(), tr(language, "radio.lang.hi", "Hindi")),
-        (
-            "country:ch".into(),
-            tr(language, "radio.lang.ch", "Svizzera"),
-        ),
-        ("es".into(), tr(language, "radio.lang.es", "Spagnolo")),
-        ("pt".into(), tr(language, "radio.lang.pt", "Portoghese")),
-        ("sv".into(), tr(language, "radio.lang.sv", "Svedese")),
-        ("vi".into(), tr(language, "radio.lang.vi", "Vietnamita")),
-        ("cs".into(), tr(language, "radio.lang.cs", "Ceco")),
-        ("pl".into(), tr(language, "radio.lang.pl", "Polacco")),
-        ("fr".into(), tr(language, "radio.lang.fr", "Francese")),
-        ("sr".into(), tr(language, "radio.lang.sr", "Serbo")),
-        ("uk".into(), tr(language, "radio.lang.uk", "Ucraino")),
-        ("lt".into(), tr(language, "radio.lang.lt", "Lituano")),
-        ("ru".into(), tr(language, "radio.lang.ru", "Russo")),
-        ("zh".into(), tr(language, "radio.lang.zh", "Cinese")),
+    [
+        ("it", "radio.lang.it", "Italiano"),
+        ("en", "radio.lang.en", "Inglese"),
+        ("tr", "radio.lang.tr", "Turco"),
+        ("de", "radio.lang.de", "Tedesco"),
+        ("es", "radio.lang.es", "Spagnolo"),
+        ("pt", "radio.lang.pt", "Portoghese"),
+        ("sv", "radio.lang.sv", "Svedese"),
+        ("vi", "radio.lang.vi", "Vietnamita"),
+        ("cs", "radio.lang.cs", "Ceco"),
+        ("pl", "radio.lang.pl", "Polacco"),
+        ("fr", "radio.lang.fr", "Francese"),
+        ("sr", "radio.lang.sr", "Serbo"),
+        ("uk", "radio.lang.uk", "Ucraino"),
+        ("hi", "radio.lang.hi", "Hindi"),
+        ("lt", "radio.lang.lt", "Lituano"),
+        ("ru", "radio.lang.ru", "Russo"),
+        ("zh", "radio.lang.zh", "Cinese"),
     ]
+    .into_iter()
+    .map(|(code, key, fallback)| (code.to_string(), tr(language, key, fallback)))
+    .collect()
+}
+
+fn radio_menu_countries(language: Language) -> Vec<(String, String)> {
+    [
+        "it", "us", "gb", "tr", "fr", "es", "de", "ch", "at", "be", "nl", "pt", "br", "ar", "mx",
+        "ca", "au", "ie", "se", "pl", "jp", "cn", "in", "cz", "ru", "lt", "ua",
+    ]
+    .into_iter()
+    .map(|code| {
+        let key = format!("options.podcast_country.{code}");
+        let translated = i18n::tr(language, &key);
+        let label = if translated == key {
+            code.to_uppercase()
+        } else {
+            translated
+        };
+        (code.to_string(), label)
+    })
+    .collect()
+}
+
+fn default_country_code(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "it",
+        Language::English => "us",
+        Language::Spanish => "es",
+        Language::Portuguese => "pt",
+        Language::Swedish => "se",
+        Language::Polish => "pl",
+        Language::French => "fr",
+        Language::Czech => "cz",
+        Language::Ukrainian => "ua",
+        Language::Lithuanian => "lt",
+        Language::Russian => "ru",
+        Language::Chinese => "cn",
+        Language::Hindi => "in",
+        _ => "it",
+    }
+}
+
+fn selected_browse_mode(state: &RadioDialogState) -> RadioBrowseMode {
+    match crate::send_message_w_safe(state.combo_browse_mode, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0
+    {
+        1 => RadioBrowseMode::Country,
+        2 => RadioBrowseMode::City,
+        3 => RadioBrowseMode::Genre,
+        _ => RadioBrowseMode::Language,
+    }
+}
+
+fn selected_country_code(state: &RadioDialogState) -> String {
+    let index = crate::send_message_w_safe(state.combo_country, CB_GETCURSEL, WPARAM(0), LPARAM(0))
+        .0
+        .max(0) as usize;
+    state
+        .countries
+        .get(index)
+        .map(|(code, _)| code.clone())
+        .unwrap_or_else(|| "it".to_string())
+}
+
+fn selected_browse_code(state: &RadioDialogState) -> Result<String, String> {
+    match selected_browse_mode(state) {
+        RadioBrowseMode::Language => Ok(selected_language_code(state)),
+        RadioBrowseMode::Country => Ok(format!("country:{}", selected_country_code(state))),
+        RadioBrowseMode::City => {
+            let city = get_edit_text(state.edit_city).trim().to_string();
+            if city.is_empty() {
+                Err(tr(
+                    state.language,
+                    "radio.city_required",
+                    "Inserisci il nome della città.",
+                ))
+            } else {
+                Ok(format!("city:{city}"))
+            }
+        }
+        RadioBrowseMode::Genre => Ok("all".to_string()),
+    }
 }
 
 fn initial_results() -> Vec<RadioFavorite> {
@@ -1744,17 +2088,72 @@ fn search(hwnd: HWND) {
     start_radio_search(hwnd, name_query);
 }
 
+fn reset_filters(hwnd: HWND) {
+    with_radio_state(hwnd, |state| {
+        crate::send_message_w_safe(state.combo_browse_mode, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        let language_index = state
+            .languages
+            .iter()
+            .position(|(code, _)| code == app_language_code(state.language))
+            .unwrap_or(0);
+        crate::send_message_w_safe(
+            state.combo_language,
+            CB_SETCURSEL,
+            WPARAM(language_index),
+            LPARAM(0),
+        );
+        let country_index = state
+            .countries
+            .iter()
+            .position(|(code, _)| code == default_country_code(state.language))
+            .unwrap_or(0);
+        crate::send_message_w_safe(
+            state.combo_country,
+            CB_SETCURSEL,
+            WPARAM(country_index),
+            LPARAM(0),
+        );
+        crate::send_message_w_safe(state.combo_genre, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        let empty = to_wide("");
+        crate::log_if_err!(crate::set_window_text_w_safe(
+            state.edit_search,
+            PCWSTR(empty.as_ptr())
+        ));
+        crate::log_if_err!(crate::set_window_text_w_safe(
+            state.edit_city,
+            PCWSTR(empty.as_ptr())
+        ));
+    });
+    update_browse_filter_visibility(hwnd);
+    layout(hwnd);
+    show_all(hwnd);
+}
+
 fn start_radio_search(hwnd: HWND, name_query: Option<String>) {
-    let Some((language, code, genre)) = with_radio_state(hwnd, |state| {
-        show_loading_in_results(state);
+    let Some((language, code_result, genre)) = with_radio_state(hwnd, |state| {
+        let mode = selected_browse_mode(state);
         (
             state.language,
-            selected_language_code(state),
-            selected_genre_tag(state),
+            selected_browse_code(state),
+            if mode == RadioBrowseMode::Genre {
+                selected_genre_tag(state)
+            } else {
+                None
+            },
         )
     }) else {
         return;
     };
+    let code = match code_result {
+        Ok(code) => code,
+        Err(message_text) => {
+            message(hwnd, "Radio", &message_text);
+            return;
+        }
+    };
+    if with_radio_state(hwnd, show_loading_in_results).is_none() {
+        crate::log_debug("Radio: unable to show loading state because dialog state is unavailable");
+    }
     let hwnd_value = hwnd.0;
     std::thread::spawn(move || {
         let result = run_radio_search(&code, name_query.as_deref(), genre.as_deref());
@@ -1827,7 +2226,23 @@ fn run_radio_search(
             .cmp(&radio_search_rank(&b.name, &keyword))
             .then_with(|| a.name.cmp(&b.name))
     });
-    Ok(normalize_favorites(results))
+    let normalized = normalize_favorites(results);
+    if normalized.is_empty() && genre.is_some() && name_query.is_some() {
+        let mut retry_stations =
+            fetch_radio_browser_stations(code, name_query, None).unwrap_or_default();
+        if let Ok(mut community_stations) = fetch_community_radio_stations(code, name_query, None) {
+            retry_stations.append(&mut community_stations);
+        }
+        let retry_results = retry_stations
+            .iter()
+            .filter(|station| {
+                keyword.is_empty() || radio_name_matches_keyword(&station.name, &keyword)
+            })
+            .map(|station| favorite_from_station(code, station))
+            .collect::<Vec<_>>();
+        return Ok(normalize_favorites(retry_results));
+    }
+    Ok(normalized)
 }
 
 fn finish_radio_search(hwnd: HWND, complete: RadioSearchComplete) {
@@ -2171,6 +2586,47 @@ fn remove_selected_favorite(hwnd: HWND) {
     }
 }
 
+fn record_and_play_selected_radio(hwnd: HWND) {
+    let Some(kind) = selected_radio_list_kind(hwnd) else {
+        return;
+    };
+    let Some(item) = selected_result(hwnd, kind) else {
+        return;
+    };
+    let Some((parent, language)) = with_radio_state(hwnd, |state| (state.parent, state.language))
+    else {
+        return;
+    };
+    let recording_folder = stream_recording::recordings_folder(StreamRecordingKind::Radio);
+    let recording_folder_text = recording_folder.to_string_lossy().to_string();
+    let destination_announcement = tr_fallback(
+        language,
+        "radio.recording_destination",
+        &[("path", recording_folder_text.as_str())],
+        "La registrazione radio verrà salvata in {path}.",
+    );
+    crate::screen_reader_speak(&destination_announcement);
+
+    match stream_recording::start_radio_recording_and_playback(
+        parent,
+        &item.stream_url,
+        &item.name,
+        language,
+    ) {
+        Ok(path) => {
+            let path_text = path.to_string_lossy().to_string();
+            let text = tr_fallback(
+                language,
+                "radio.recording_started",
+                &[("name", item.name.as_str()), ("path", path_text.as_str())],
+                "Registrazione di {name} avviata. Il file sarà salvato in {path}. La registrazione terminerà chiudendo il player.",
+            );
+            crate::screen_reader_speak(&text);
+        }
+        Err(err) => message(hwnd, "Radio", &err),
+    }
+}
+
 fn copy_selected_stream_url(hwnd: HWND) {
     let Some(kind) = selected_radio_list_kind(hwnd) else {
         return;
@@ -2213,7 +2669,11 @@ fn normalize_favorites(mut items: Vec<RadioFavorite>) -> Vec<RadioFavorite> {
     items
 }
 fn radio_label(f: &RadioFavorite, language: Language) -> String {
-    if f.language_code == "custom" || f.language_code == "it" {
+    if f.language_code == "custom"
+        || f.language_code == "it"
+        || f.language_code.starts_with("country:")
+        || f.language_code.starts_with("city:")
+    {
         f.name.clone()
     } else {
         format!(
@@ -2323,9 +2783,11 @@ fn radio_name_matches_keyword(name: &str, keyword: &str) -> bool {
 fn radio_browser_language_name(code: &str) -> &str {
     match code {
         "cs" => "czech",
+        "de" => "german",
         "en" => "english",
         "es" => "spanish",
         "fr" => "french",
+        "hi" => "hindi",
         "it" => "italian",
         "lt" => "lithuanian",
         "pl" => "polish",
@@ -2333,6 +2795,7 @@ fn radio_browser_language_name(code: &str) -> &str {
         "ru" => "russian",
         "sr" => "serbian",
         "sv" => "swedish",
+        "tr" => "turkish",
         "uk" => "ukrainian",
         "vi" => "vietnamese",
         "zh" => "chinese",
@@ -2357,20 +2820,27 @@ fn fetch_community_radio_stations(
         .and_then(|r| r.json::<Vec<CommunityRadioStation>>())
         .map_err(|e| e.to_string())?;
 
-    let Some(wanted_language) = community_language_from_radio_code(language_code) else {
-        return Ok(Vec::new());
-    };
-    let keyword = name_query.unwrap_or_default();
+    let global_search = name_query
+        .map(str::trim)
+        .is_some_and(|query| !query.is_empty());
+    let wanted_language = community_language_from_radio_code(language_code);
     let wanted_genre = genre.unwrap_or_default().trim();
+    if !global_search && wanted_language.is_none() && wanted_genre.is_empty() {
+        return Ok(Vec::new());
+    }
+    let keyword = name_query.unwrap_or_default();
 
     let mut seen = HashSet::new();
     let results = stations
         .into_iter()
         .filter(|station| {
-            station
-                .language
-                .trim()
-                .eq_ignore_ascii_case(wanted_language)
+            global_search
+                || wanted_language.is_none_or(|wanted_language| {
+                    station
+                        .language
+                        .trim()
+                        .eq_ignore_ascii_case(wanted_language)
+                })
         })
         .filter(|station| {
             wanted_genre.is_empty() || station.genre.trim().eq_ignore_ascii_case(wanted_genre)
@@ -2404,22 +2874,25 @@ fn fetch_community_radio_stations(
 
 fn community_language_from_radio_code(code: &str) -> Option<&'static str> {
     match code {
-        "it" => Some("italian"),
-        "en" => Some("english"),
-        "es" => Some("spanish"),
-        "fr" => Some("french"),
-        "pt" => Some("portuguese"),
-        "sv" => Some("swedish"),
+        "it" | "country:it" => Some("italian"),
+        "en" | "country:us" | "country:gb" | "country:ca" | "country:au" | "country:ie" => {
+            Some("english")
+        }
+        "es" | "country:es" | "country:mx" | "country:ar" => Some("spanish"),
+        "fr" | "country:fr" | "country:be" | "country:ch" => Some("french"),
+        "pt" | "country:pt" | "country:br" => Some("portuguese"),
+        "sv" | "country:se" => Some("swedish"),
+        "tr" | "country:tr" => Some("turkish"),
         "vi" => Some("vietnamese"),
-        "cs" => Some("czech"),
-        "pl" => Some("polish"),
+        "cs" | "country:cz" => Some("czech"),
+        "pl" | "country:pl" => Some("polish"),
         "sr" => Some("serbian"),
-        "uk" => Some("ukrainian"),
-        "lt" => Some("lithuanian"),
-        "ru" => Some("russian"),
-        "zh" => Some("chinese"),
-        "hi" => Some("hindi"),
-        "country:de" | "de" => Some("german"),
+        "uk" | "country:ua" => Some("ukrainian"),
+        "lt" | "country:lt" => Some("lithuanian"),
+        "ru" | "country:ru" => Some("russian"),
+        "zh" | "country:cn" => Some("chinese"),
+        "hi" | "country:in" => Some("hindi"),
+        "de" | "country:de" | "country:at" => Some("german"),
         _ => None,
     }
 }
@@ -2449,17 +2922,24 @@ fn fetch_radio_browser_stations(
             query.append_pair("order", "votes");
             query.append_pair("reverse", "true");
             query.append_pair("limit", RADIO_BROWSER_LIMIT);
+            let global_search = name_query
+                .map(str::trim)
+                .is_some_and(|name| !name.is_empty());
             if let Some(name) = name_query.map(str::trim).filter(|s| !s.is_empty()) {
                 query.append_pair("name", name);
             }
             if let Some(tag) = genre.map(str::trim).filter(|s| !s.is_empty()) {
                 query.append_pair("tag", tag);
             }
-            if let Some(country) = language_code.strip_prefix("country:") {
-                query.append_pair("countrycode", country);
-            } else {
-                query.append_pair("language", radio_browser_language_name(language_code));
-                query.append_pair("languageExact", "true");
+            if !global_search {
+                if let Some(country) = language_code.strip_prefix("country:") {
+                    query.append_pair("countrycode", &country.to_uppercase());
+                } else if let Some(city) = language_code.strip_prefix("city:") {
+                    query.append_pair("state", city);
+                } else if language_code != "all" {
+                    query.append_pair("language", radio_browser_language_name(language_code));
+                    query.append_pair("languageExact", "true");
+                }
             }
         }
         let request_url = url.to_string();

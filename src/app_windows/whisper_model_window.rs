@@ -313,6 +313,9 @@ pub fn choose_whisper_model(parent: HWND, language: Language) -> Option<String> 
             if gm.0 == 0 || gm.0 == -1 {
                 break;
             }
+            if crate::app_windows::calendar_window::handle_reminder_alert_message(&msg) {
+                continue;
+            }
             if IsDialogMessageW(hwnd, &msg).as_bool() {
                 continue;
             }

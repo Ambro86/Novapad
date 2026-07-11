@@ -157,6 +157,10 @@ pub const IDM_TOOLS_RAIPLAY: usize = 5014;
 pub const IDM_TOOLS_ITALIAONLINE: usize = 5015;
 pub const IDM_TOOLS_RADIO: usize = 5016;
 pub const IDM_TOOLS_PATHS_NAVIGATION: usize = 5017;
+pub const IDM_TOOLS_TV: usize = 5018;
+pub const IDM_TOOLS_WEATHER: usize = 5019;
+pub const IDM_TOOLS_CINEMA: usize = 5020;
+pub const IDM_TOOLS_CALENDAR: usize = 5021;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -186,6 +190,10 @@ pub struct MenuLabels {
     pub menu_rai_audiodescrizioni: String,
     pub menu_raiplay: String,
     pub menu_raiplaysound: String,
+    pub menu_tv: String,
+    pub menu_weather: String,
+    pub menu_cinema: String,
+    pub menu_calendar: String,
     pub menu_italiaonline: String,
     pub menu_radio: String,
     pub menu_prompt: String,
@@ -320,6 +328,14 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         } else {
             String::new()
         },
+        menu_tv: if language == Language::Italian {
+            "TV...\tAlt+Shift+V".to_string()
+        } else {
+            String::new()
+        },
+        menu_weather: i18n::tr(language, "menu.weather"),
+        menu_cinema: i18n::tr(language, "menu.cinema"),
+        menu_calendar: i18n::tr(language, "menu.calendar"),
         menu_italiaonline: if language == Language::Italian {
             "Pagine Bianche e Gialle...\tAlt+Shift+G".to_string()
         } else {
@@ -1508,6 +1524,7 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 IDM_TOOLS_RAIPLAYSOUND,
                 &labels.menu_raiplaysound,
             );
+            append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_TV, &labels.menu_tv);
             append_menu_string(
                 tools_menu,
                 MF_STRING,
@@ -1521,6 +1538,19 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 &labels.menu_bdciechi,
             );
         }
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_CALENDAR,
+            &labels.menu_calendar,
+        );
+        append_menu_string(
+            tools_menu,
+            MF_STRING,
+            IDM_TOOLS_WEATHER,
+            &labels.menu_weather,
+        );
+        append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_CINEMA, &labels.menu_cinema);
         append_menu_string(
             tools_menu,
             MF_STRING,

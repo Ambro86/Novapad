@@ -364,6 +364,9 @@ pub fn prompt_user_with_options(
 
         let mut msg = MSG::default();
         while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
+            if crate::app_windows::calendar_window::handle_reminder_alert_message(&msg) {
+                continue;
+            }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
                 SendMessageW(hwnd, WM_KEYDOWN, msg.wParam, msg.lParam);
                 continue;
@@ -472,6 +475,9 @@ pub fn prompt_credentials(
 
         let mut msg = MSG::default();
         while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
+            if crate::app_windows::calendar_window::handle_reminder_alert_message(&msg) {
+                continue;
+            }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
                 SendMessageW(hwnd, WM_KEYDOWN, msg.wParam, msg.lParam);
                 continue;
@@ -606,6 +612,9 @@ pub fn prompt_directory_search(
 
         let mut msg = MSG::default();
         while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
+            if crate::app_windows::calendar_window::handle_reminder_alert_message(&msg) {
+                continue;
+            }
             if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
                 SendMessageW(hwnd, WM_KEYDOWN, msg.wParam, msg.lParam);
                 continue;

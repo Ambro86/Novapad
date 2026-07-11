@@ -429,7 +429,7 @@ fn normalize_search_text(text: &str) -> String {
 
 fn tokenize_search_terms(text: &str) -> Vec<String> {
     normalize_search_text(text)
-        .split_whitespace()
+        .split(|ch: char| ch.is_whitespace() || ch == ',')
         .map(str::trim)
         .filter(|term| !term.is_empty())
         .map(ToOwned::to_owned)
@@ -2097,6 +2097,16 @@ mod tests {
     #[test]
     fn bdciechi_search_matches_rows_without_diacritic_input() {
         let terms = tokenize_search_terms("giosue citta");
+        assert!(row_matches_query(
+            "Giosuè Carducci - Le città invisibili",
+            &terms
+        ));
+    }
+
+    #[test]
+    fn bdciechi_search_treats_comma_as_term_separator() {
+        let terms = tokenize_search_terms("Giosuè Carducci, Le città invisibili");
+        assert_eq!(terms, ["giosue", "carducci", "le", "citta", "invisibili"]);
         assert!(row_matches_query(
             "Giosuè Carducci - Le città invisibili",
             &terms

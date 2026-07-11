@@ -614,6 +614,50 @@ pub struct RadioFavorite {
     pub stream_url: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct WeatherCity {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub admin1: String,
+    #[serde(default)]
+    pub country: String,
+    #[serde(default)]
+    pub latitude: f64,
+    #[serde(default)]
+    pub longitude: f64,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum WeatherTemperatureUnit {
+    #[serde(rename = "celsius")]
+    #[default]
+    Celsius,
+    #[serde(rename = "fahrenheit")]
+    Fahrenheit,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TvFavorite {
+    pub name: String,
+    pub url: String,
+    pub category: String,
+    #[serde(default)]
+    pub stream_resolver: Option<String>,
+    #[serde(default)]
+    pub resolver_endpoint: Option<String>,
+    #[serde(default)]
+    pub resolver_realm: Option<String>,
+    #[serde(default)]
+    pub resolver_channel_id: Option<String>,
+    #[serde(default)]
+    pub tvg_id: String,
+    #[serde(default)]
+    pub tvg_name: String,
+    #[serde(default)]
+    pub http_user_agent: String,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AppSettings {
@@ -741,6 +785,14 @@ pub struct AppSettings {
     pub podcast_search_provider: PodcastSearchProvider,
     #[serde(default)]
     pub radio_favorites: Vec<RadioFavorite>,
+    #[serde(default)]
+    pub tv_favorites: Vec<TvFavorite>,
+    #[serde(default)]
+    pub weather_city: Option<WeatherCity>,
+    #[serde(default)]
+    pub weather_recent_cities: Vec<WeatherCity>,
+    #[serde(default)]
+    pub weather_temperature_unit: WeatherTemperatureUnit,
     #[serde(default)]
     pub gemini_api_key: String,
     #[serde(default = "default_gemini_model")]
@@ -1148,6 +1200,10 @@ impl Default for AppSettings {
             show_media_save_confirmation: true,
             podcast_index_api_key: String::new(),
             radio_favorites: Vec::new(),
+            tv_favorites: Vec::new(),
+            weather_city: None,
+            weather_recent_cities: Vec::new(),
+            weather_temperature_unit: WeatherTemperatureUnit::Celsius,
             podcast_index_api_secret: String::new(),
             rai_luce_code: String::new(),
             podcast_directory_country: String::new(),
@@ -2038,6 +2094,37 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
         .trim()
         .to_ascii_lowercase();
     settings.route_country = settings.route_country.trim().to_ascii_lowercase();
+    let invalid_weather_city = if let Some(city) = settings.weather_city.as_mut() {
+        city.name = city.name.trim().to_string();
+        city.admin1 = city.admin1.trim().to_string();
+        city.country = city.country.trim().to_string();
+        city.name.is_empty() || !city.latitude.is_finite() || !city.longitude.is_finite()
+    } else {
+        false
+    };
+    if invalid_weather_city {
+        settings.weather_city = None;
+    }
+    let mut normalized_weather_cities: Vec<WeatherCity> = Vec::new();
+    for mut city in settings.weather_recent_cities.drain(..) {
+        city.name = city.name.trim().to_string();
+        city.admin1 = city.admin1.trim().to_string();
+        city.country = city.country.trim().to_string();
+        if city.name.is_empty() || !city.latitude.is_finite() || !city.longitude.is_finite() {
+            continue;
+        }
+        if normalized_weather_cities.iter().any(|existing| {
+            (existing.latitude - city.latitude).abs() < 0.000_001
+                && (existing.longitude - city.longitude).abs() < 0.000_001
+        }) {
+            continue;
+        }
+        normalized_weather_cities.push(city);
+        if normalized_weather_cities.len() >= 50 {
+            break;
+        }
+    }
+    settings.weather_recent_cities = normalized_weather_cities;
     if !settings.remember_bdciechi_credentials {
         settings.bdciechi_username.clear();
         settings.bdciechi_password.clear();

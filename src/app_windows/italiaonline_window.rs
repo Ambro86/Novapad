@@ -350,6 +350,7 @@ fn browse_results(
                 context_actions: Vec::new(),
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: false,
+                escape_stops_active_player: false,
             },
         ) {
             MultilineSelectionResult::Selected(id) => {

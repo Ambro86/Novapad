@@ -95,6 +95,9 @@ pub fn open(options_parent: HWND, app_parent: HWND) {
 
         let mut msg = MSG::default();
         while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
+            if crate::app_windows::calendar_window::handle_reminder_alert_message(&msg) {
+                continue;
+            }
             if !IsDialogMessageW(hwnd, &msg).as_bool() {
                 TranslateMessage(&msg);
                 DispatchMessageW(&msg);

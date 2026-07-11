@@ -44,6 +44,7 @@ mod editor_manager;
 mod ffmpeg_dyn;
 mod ffmpeg_export;
 mod ffmpeg_source;
+mod stream_recording;
 mod subtitle_wasapi;
 mod subtitles;
 use editor_manager::*;
@@ -355,6 +356,7 @@ const AUDIO_PLAYLIST_TIMER_ID: usize = 7;
 const SPELLCHECK_HIGHLIGHT_DEBOUNCE_MS: u32 = 100;
 const PDF_OCR_PROMPT_TIMEOUT_COPYDATA_SECS: u64 = 30;
 const COPYDATA_OPEN_FILE: usize = 1;
+const COPYDATA_CALENDAR_REMINDER: usize = 2;
 const VOICE_PANEL_ID_ENGINE: usize = 21001;
 const VOICE_PANEL_ID_LANGUAGE: usize = 21012;
 const VOICE_PANEL_ID_VOICE: usize = 21002;
@@ -3291,8 +3293,11 @@ pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
         taskkill_mpv_process(session.process_id, "after quit failure");
     }
     clear_managed_mpv_state(hwnd);
+    let restored_return_list =
+        app_windows::youtube_transcript_window::restore_active_player_return_list(hwnd);
     log_debug(&format!(
-        "stop_managed_mpv_playback: foreground_after={:?} focus_after={:?}",
+        "stop_managed_mpv_playback: restored_return_list={} foreground_after={:?} focus_after={:?}",
+        restored_return_list,
         unsafe { GetForegroundWindow() },
         unsafe { GetFocus() }
     ));
@@ -3526,6 +3531,49 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
     Err("Impossibile inizializzare il controllo di mpv.".to_string())
 }
 
+pub(crate) fn active_mpv_process_id(hwnd: HWND) -> Option<u32> {
+    with_state(hwnd, |state| {
+        state
+            .active_mpv_session
+            .as_ref()
+            .map(|session| session.process_id)
+    })
+    .flatten()
+}
+
+/// Attende che il player mpv abbia realmente aperto il flusso e pubblicato
+/// almeno una traccia. Il processo e il pipe IPC possono esistere alcuni
+/// secondi prima che un HLS dinamico (in particolare RAI) sia pronto.
+pub(crate) fn wait_for_active_mpv_tracks(hwnd: HWND, timeout: std::time::Duration) -> bool {
+    let started = std::time::Instant::now();
+    let mut attempt = 0u32;
+    while started.elapsed() < timeout {
+        attempt = attempt.saturating_add(1);
+        if active_mpv_process_id(hwnd).is_none() {
+            log_debug("wait_for_active_mpv_tracks: player process is no longer active");
+            return false;
+        }
+        if let Ok(track_list) = query_managed_mpv_property_transient(hwnd, "track-list")
+            && track_list
+                .as_array()
+                .map(|tracks| !tracks.is_empty())
+                .unwrap_or(false)
+        {
+            log_debug(&format!(
+                "wait_for_active_mpv_tracks: media ready after {} ms (attempt={attempt})",
+                started.elapsed().as_millis()
+            ));
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    log_debug(&format!(
+        "wait_for_active_mpv_tracks: timed out after {} ms",
+        started.elapsed().as_millis()
+    ));
+    false
+}
+
 pub(crate) fn launch_stream_url_in_mpv(
     hwnd: HWND,
     url: &str,
@@ -3534,6 +3582,225 @@ pub(crate) fn launch_stream_url_in_mpv(
     ytdl_format: Option<&str>,
     ytdlp_credentials: Option<(&str, &str)>,
 ) -> Result<(), String> {
+    launch_stream_url_in_mpv_with_options(
+        hwnd,
+        url,
+        StreamMpvOptions {
+            title,
+            ytdlp_path,
+            ytdl_format,
+            ytdlp_credentials,
+            user_agent: None,
+            prefer_audio_description: false,
+            allow_bookmark_resume: true,
+            force_video: false,
+        },
+    )
+}
+
+pub(crate) fn launch_tv_stream_in_mpv(
+    hwnd: HWND,
+    url: &str,
+    title: &str,
+    user_agent: &str,
+    prefer_audio_description: bool,
+) -> Result<(), String> {
+    launch_stream_url_in_mpv_with_options(
+        hwnd,
+        url,
+        StreamMpvOptions {
+            title: Some(title),
+            ytdlp_path: None,
+            ytdl_format: None,
+            ytdlp_credentials: None,
+            user_agent: Some(user_agent),
+            prefer_audio_description,
+            allow_bookmark_resume: false,
+            force_video: true,
+        },
+    )
+}
+
+pub(crate) fn launch_video_stream_in_mpv(
+    hwnd: HWND,
+    url: &str,
+    title: &str,
+    ytdlp_path: Option<&Path>,
+    ytdl_format: Option<&str>,
+    ytdlp_credentials: Option<(&str, &str)>,
+) -> Result<(), String> {
+    launch_stream_url_in_mpv_with_options(
+        hwnd,
+        url,
+        StreamMpvOptions {
+            title: Some(title),
+            ytdlp_path,
+            ytdl_format,
+            ytdlp_credentials,
+            user_agent: None,
+            prefer_audio_description: false,
+            allow_bookmark_resume: false,
+            force_video: true,
+        },
+    )
+}
+
+fn is_mediaset_cdn_stream(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    lower.contains("mediaset.net") || lower.contains("mediaset.it") || lower.contains("msf.cdn")
+}
+
+fn configure_tv_tracks_after_load(hwnd: HWND, url: &str, generation: u64) {
+    let mediaset = is_mediaset_cdn_stream(url);
+
+    // Il pipe IPC è disponibile prima che mpv abbia realmente caricato il file.
+    // Alcuni HLS (in particolare Mediaset) impiegano diversi secondi: attendiamo
+    // la comparsa effettiva delle tracce, poi selezioniamo esplicitamente video
+    // e audio se mpv non lo ha già fatto.
+    for attempt in 1..=60 {
+        if !is_current_mpv_playback_generation(hwnd, generation) {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+
+        let Ok(track_list) = query_managed_mpv_property_transient(hwnd, "track-list") else {
+            continue;
+        };
+        let Some(tracks) = track_list.as_array() else {
+            continue;
+        };
+        if tracks.is_empty() {
+            if mediaset && attempt % 8 == 0 {
+                log_debug(&format!(
+                    "Mediaset mpv waiting for file-loaded attempt={attempt} tracks=0"
+                ));
+            }
+            continue;
+        }
+
+        let summarize = |track: &serde_json::Value| {
+            let kind = track
+                .get("type")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("?");
+            let id = track
+                .get("id")
+                .and_then(serde_json::Value::as_i64)
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "?".to_string());
+            let codec = track
+                .get("codec")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("?");
+            let selected = track
+                .get("selected")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false);
+            format!("type={kind},id={id},codec={codec},selected={selected}")
+        };
+        let summary = tracks.iter().map(summarize).collect::<Vec<_>>().join("; ");
+        log_debug(&format!(
+            "TV mpv tracks ready attempt={attempt} mediaset={mediaset}: {summary}"
+        ));
+
+        let video_tracks = tracks
+            .iter()
+            .filter(|track| track.get("type").and_then(serde_json::Value::as_str) == Some("video"))
+            .collect::<Vec<_>>();
+        if !video_tracks.iter().any(|track| {
+            track
+                .get("selected")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+        }) && let Some(video_id) = video_tracks
+            .first()
+            .and_then(|track| track.get("id"))
+            .and_then(serde_json::Value::as_i64)
+        {
+            let command = format!(r#"{{"command":["set_property","vid",{}]}}"#, video_id);
+            match try_send_command_to_managed_mpv_transient(hwnd, &command) {
+                Ok(()) => log_debug(&format!("TV mpv selected first video track id={video_id}")),
+                Err(err) => log_debug(&format!(
+                    "TV mpv failed to select video track id={video_id}: {err}"
+                )),
+            }
+        }
+
+        let audio_tracks = tracks
+            .iter()
+            .filter(|track| track.get("type").and_then(serde_json::Value::as_str) == Some("audio"))
+            .collect::<Vec<_>>();
+        if !audio_tracks.iter().any(|track| {
+            track
+                .get("selected")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+        }) && let Some(audio_id) = audio_tracks
+            .first()
+            .and_then(|track| track.get("id"))
+            .and_then(serde_json::Value::as_i64)
+        {
+            let command = format!(r#"{{"command":["set_property","aid",{}]}}"#, audio_id);
+            match try_send_command_to_managed_mpv_transient(hwnd, &command) {
+                Ok(()) => log_debug(&format!("TV mpv selected first audio track id={audio_id}")),
+                Err(err) => log_debug(&format!(
+                    "TV mpv failed to select audio track id={audio_id}: {err}"
+                )),
+            }
+        }
+
+        match query_managed_mpv_property_transient(hwnd, "video-params") {
+            Ok(params) => log_debug(&format!("TV mpv video-params ready: {params}")),
+            Err(err) => log_debug(&format!("TV mpv video-params unavailable: {err}")),
+        }
+        return;
+    }
+
+    log_debug(&format!(
+        "TV mpv track discovery timed out mediaset={mediaset} url_host={}",
+        url::Url::parse(url)
+            .ok()
+            .and_then(|parsed| parsed.host_str().map(ToOwned::to_owned))
+            .unwrap_or_else(|| "local-or-invalid".to_string())
+    ));
+}
+
+fn schedule_tv_track_configuration(hwnd: HWND, url: &str, generation: u64) {
+    // Passiamo al thread soltanto il valore numerico dell'handle: in alcune
+    // versioni del crate windows HWND contiene un puntatore grezzo non Send.
+    let hwnd_value = hwnd.0;
+    let url = url.to_string();
+    std::thread::spawn(move || {
+        configure_tv_tracks_after_load(HWND(hwnd_value), &url, generation);
+    });
+}
+
+struct StreamMpvOptions<'a> {
+    title: Option<&'a str>,
+    ytdlp_path: Option<&'a Path>,
+    ytdl_format: Option<&'a str>,
+    ytdlp_credentials: Option<(&'a str, &'a str)>,
+    user_agent: Option<&'a str>,
+    prefer_audio_description: bool,
+    allow_bookmark_resume: bool,
+    force_video: bool,
+}
+
+fn launch_stream_url_in_mpv_with_options(
+    hwnd: HWND,
+    url: &str,
+    options: StreamMpvOptions<'_>,
+) -> Result<(), String> {
+    let StreamMpvOptions {
+        title,
+        ytdlp_path,
+        ytdl_format,
+        ytdlp_credentials,
+        user_agent,
+        prefer_audio_description,
+        allow_bookmark_resume,
+        force_video,
+    } = options;
     let mpv_exe = ensure_mpv_runtime_available(hwnd)?;
     let mpv_dir = mpv_exe
         .parent()
@@ -3558,9 +3825,13 @@ pub(crate) fn launch_stream_url_in_mpv(
     focus_editor(hwnd);
     let mpv_generation = next_mpv_playback_generation(hwnd, "start stream");
 
-    let bookmark_start_secs = saved_audio_bookmark_position_secs(hwnd, &PathBuf::from(url), title);
+    let bookmark_start_secs = if allow_bookmark_resume {
+        saved_audio_bookmark_position_secs(hwnd, &PathBuf::from(url), title)
+    } else {
+        0
+    };
     let hwnd_video = with_state(hwnd, |state| {
-        if state.settings.show_video_during_playback {
+        if force_video || state.settings.show_video_during_playback {
             state.local_mpv_video_hwnd
         } else {
             HWND(0)
@@ -3582,6 +3853,17 @@ pub(crate) fn launch_stream_url_in_mpv(
         .arg(format!("--volume={initial_mpv_volume:.3}"))
         .arg("--pause=yes")
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
+    if let Some(user_agent) = user_agent.map(str::trim).filter(|value| !value.is_empty()) {
+        command.arg(format!("--user-agent={user_agent}"));
+    }
+    if force_video {
+        command.arg("--aid=auto").arg("--audio-channels=stereo");
+    }
+    if force_video && url.to_ascii_lowercase().contains(".m3u8") {
+        // Come i player mobile, preferiamo una variante HLS contenente video
+        // invece di lasciare che una playlist audio-only venga scelta per prima.
+        command.arg("--hls-bitrate=max");
+    }
     if hwnd_video.0 != 0 {
         command
             .arg(format!("--wid={}", hwnd_video.0))
@@ -3668,6 +3950,9 @@ pub(crate) fn launch_stream_url_in_mpv(
             {
                 log_debug("Failed to persist stream mpv state");
             }
+            if prefer_audio_description {
+                select_raiplay_mpv_audio_track(hwnd);
+            }
             if stop_obsolete_mpv_child(hwnd, mpv_generation, &mut child, "before unpause") {
                 set_local_mpv_video_mode(hwnd, false);
                 return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
@@ -3681,6 +3966,9 @@ pub(crate) fn launch_stream_url_in_mpv(
                     mpv_generation, err
                 ));
             }
+            if force_video {
+                schedule_tv_track_configuration(hwnd, url, mpv_generation);
+            }
             prevent_sleep(true);
             menu::update_playback_menu(hwnd, true);
             focus_editor(hwnd);
@@ -3691,6 +3979,28 @@ pub(crate) fn launch_stream_url_in_mpv(
 
     set_local_mpv_video_mode(hwnd, false);
     Err("Impossibile inizializzare il controllo di mpv.".to_string())
+}
+
+pub(crate) fn launch_local_tv_recording_in_mpv(hwnd: HWND, path: &Path) -> Result<(), String> {
+    let title = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("Registrazione TV");
+    let path_text = path.to_string_lossy().to_string();
+    launch_stream_url_in_mpv_with_options(
+        hwnd,
+        &path_text,
+        StreamMpvOptions {
+            title: Some(title),
+            ytdlp_path: None,
+            ytdl_format: None,
+            ytdlp_credentials: None,
+            user_agent: None,
+            prefer_audio_description: false,
+            allow_bookmark_resume: false,
+            force_video: true,
+        },
+    )
 }
 
 pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), String> {
@@ -6941,6 +7251,9 @@ pub(crate) fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
 }
 
 fn has_secondary_window_open(hwnd: HWND) -> bool {
+    if app_windows::calendar_window::has_active_reminder_alert() {
+        return true;
+    }
     {
         with_state(hwnd, |state| {
             state.blocking_modal.active.is_some()
@@ -7385,10 +7698,27 @@ fn main() -> windows::core::Result<()> {
         std::process::exit(0);
     }
     let show_update_completed = args.iter().any(|arg| arg == "--after-update-completed");
-    let filtered_args: Vec<String> = args
-        .into_iter()
-        .filter(|arg| arg != "--after-update-completed")
-        .collect();
+    let mut calendar_reminder_id = None;
+    let mut filtered_args = Vec::with_capacity(args.len());
+    let mut index = 0usize;
+    while index < args.len() {
+        let argument = &args[index];
+        if argument == "--after-update-completed" {
+            index += 1;
+            continue;
+        }
+        if argument == "--calendar-reminder" {
+            if let Some(value) = args.get(index + 1) {
+                calendar_reminder_id = Some(value.clone());
+                index += 2;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+        filtered_args.push(argument.clone());
+        index += 1;
+    }
     updater::cleanup_backup_on_start();
     updater::cleanup_update_lock_on_start();
     updater::cleanup_update_temp_on_start();
@@ -7406,7 +7736,11 @@ fn main() -> windows::core::Result<()> {
     sentry_integration::install_panic_hook();
 
     // Error boundary: cattura errori fatali
-    if let Err(e) = run_app(&filtered_args, show_update_completed) {
+    if let Err(e) = run_app(
+        &filtered_args,
+        show_update_completed,
+        calendar_reminder_id.as_deref(),
+    ) {
         sentry_integration::capture_fatal_windows_error("run_app", &e);
         sentry_integration::flush(2);
         return Err(e);
@@ -7440,7 +7774,11 @@ fn is_large_text_editor(hwnd: HWND, hwnd_edit: HWND) -> bool {
 }
 
 /// Core dell'applicazione - separato per error boundary
-fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Result<()> {
+fn run_app(
+    args: &[String],
+    show_update_completed: bool,
+    calendar_reminder_id: Option<&str>,
+) -> windows::core::Result<()> {
     unsafe {
         crate::log_if_err!(LoadLibraryW(w!("Msftedit.dll")));
         let hinstance = HINSTANCE(GetModuleHandleW(None)?.0);
@@ -7471,6 +7809,33 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
             save_settings(settings.clone());
         }
         crate::settings::sync_start_menu_shortcuts(&settings);
+        if let Some(reminder_id) = calendar_reminder_id.filter(|value| !value.trim().is_empty()) {
+            let existing = FindWindowW(class_name, PCWSTR::null());
+            if existing.0 != 0 {
+                let wide = to_wide(reminder_id.trim());
+                let mut cds = COPYDATASTRUCT {
+                    dwData: COPYDATA_CALENDAR_REMINDER,
+                    cbData: (wide.len() * 2) as u32,
+                    lpData: wide.as_ptr() as *mut std::ffi::c_void,
+                };
+                let mut existing_pid = 0u32;
+                let existing_thread = GetWindowThreadProcessId(existing, Some(&mut existing_pid));
+                if existing_thread == 0 {
+                    log_debug(
+                        "GetWindowThreadProcessId failed for existing calendar reminder window",
+                    );
+                } else if existing_pid != 0 {
+                    crate::log_if_err!(AllowSetForegroundWindow(existing_pid));
+                }
+                SendMessageW(
+                    existing,
+                    WM_COPYDATA,
+                    WPARAM(0),
+                    LPARAM(&mut cds as *mut _ as isize),
+                );
+                return Ok(());
+            }
+        }
         if !extra_paths.is_empty() && settings.open_behavior == OpenBehavior::NewTab {
             let existing = FindWindowW(class_name, PCWSTR::null());
             if existing.0 != 0 {
@@ -7521,6 +7886,7 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
             return Ok(());
         }
         refresh_voice_panel(hwnd);
+        app_windows::calendar_window::initialize_reminder_system(hwnd, calendar_reminder_id);
         crate::log_if_err!(PostMessageW(
             hwnd,
             WM_CHECK_PENDING_UPDATE,
@@ -7595,6 +7961,9 @@ fn run_app(args: &[String], show_update_completed: bool) -> windows::core::Resul
         while GetMessageW(&mut msg, HWND(0), 0, 0).into() {
             // Keep the watchdog aligned with UI message-loop activity.
             watchdog.heartbeat();
+            if app_windows::calendar_window::handle_reminder_alert_message(&msg) {
+                continue;
+            }
             log_alt_raw_key_probe(hwnd, &msg);
             // Priority 1: Global navigation keys (Ctrl+Tab)
             if msg.message == WM_KEYDOWN
@@ -9359,6 +9728,24 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 {
                     log_foreground_snapshot(&format!("focus_timer.before.{}", wparam.0));
                     kill_timer_best_effort(hwnd, wparam.0, "KillTimer FOCUS_EDITOR");
+                    if !is_mpv_playback_active(hwnd)
+                        && app_windows::youtube_transcript_window::has_active_player_return_list(
+                            hwnd,
+                        )
+                        && app_windows::youtube_transcript_window::restore_active_player_return_list(
+                            hwnd,
+                        )
+                    {
+                        log_debug(&format!(
+                            "focus timer {} suppressed because a TV/recordings return list is active",
+                            wparam.0
+                        ));
+                        log_foreground_snapshot(&format!(
+                            "focus_timer.after_return_list.{}",
+                            wparam.0
+                        ));
+                        return LRESULT(0);
+                    }
                     force_active_editor_focus(hwnd);
                     log_foreground_snapshot(&format!("focus_timer.after.{}", wparam.0));
                     return LRESULT(0);
@@ -9435,6 +9822,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 if wparam.0 == AUDIO_PLAYLIST_TIMER_ID {
                     handle_audio_playlist_timer(hwnd);
+                    return LRESULT(0);
+                }
+                if app_windows::calendar_window::handle_reminder_timer(hwnd, wparam.0) {
                     return LRESULT(0);
                 }
                 handle_pdf_loading_timer(hwnd, wparam.0);
@@ -10180,6 +10570,17 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 LRESULT(0)
             }
             WM_FOCUS_EDITOR => {
+                if !is_mpv_playback_active(hwnd)
+                    && app_windows::youtube_transcript_window::has_active_player_return_list(hwnd)
+                    && app_windows::youtube_transcript_window::restore_active_player_return_list(
+                        hwnd,
+                    )
+                {
+                    log_debug(
+                        "WM_FOCUS_EDITOR suppressed because a TV/recordings return list is active",
+                    );
+                    return LRESULT(0);
+                }
                 log_debug(&format!(
                     "WM_FOCUS_EDITOR received: hwnd={:?} foreground_before={:?} focus_before={:?} should_force={} has_secondary={}",
                     hwnd,
@@ -11338,9 +11739,29 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         app_windows::raiplay_window::open(hwnd);
                         LRESULT(0)
                     }
+                    IDM_TOOLS_TV => {
+                        log_debug("Menu: TV");
+                        app_windows::tv_window::open(hwnd);
+                        LRESULT(0)
+                    }
                     IDM_TOOLS_ITALIAONLINE => {
                         log_debug("Menu: Italiaonline directories");
                         app_windows::italiaonline_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_CALENDAR => {
+                        log_debug("Menu: Calendar");
+                        app_windows::calendar_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_WEATHER => {
+                        log_debug("Menu: Weather");
+                        app_windows::weather_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_CINEMA => {
+                        log_debug("Menu: Cinema");
+                        app_windows::cinema_window::open(hwnd);
                         LRESULT(0)
                     }
                     IDM_TOOLS_PATHS_NAVIGATION => {
@@ -11451,6 +11872,18 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
             }
             WM_COPYDATA => {
                 let cds_ptr = lparam.0 as *const COPYDATASTRUCT;
+                if !cds_ptr.is_null() && (*cds_ptr).dwData == COPYDATA_CALENDAR_REMINDER {
+                    let Some(reminder_id) =
+                        copydata_utf16_payload(cds_ptr, "WM_COPYDATA calendar reminder")
+                    else {
+                        return LRESULT(1);
+                    };
+                    let reminder_id = reminder_id.trim();
+                    if !reminder_id.is_empty() {
+                        app_windows::calendar_window::show_reminder_by_id(hwnd, reminder_id);
+                    }
+                    return LRESULT(1);
+                }
                 if !cds_ptr.is_null() && (*cds_ptr).dwData == COPYDATA_OPEN_FILE {
                     let Some(joined_paths) =
                         copydata_utf16_payload(cds_ptr, "WM_COPYDATA open files")
@@ -17352,6 +17785,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     }
     if key == 'P' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_RAIPLAY);
+        return true;
+    }
+    if key == 'V' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_TV);
         return true;
     }
     if key == 'T' as u16 && !ctrl_down && shift_down && alt_down {

@@ -468,6 +468,8 @@
   "options.choice.default_save_folder.audiobooks": "Ljudböcker",
   "options.choice.default_save_folder.documents": "Dokument",
   "options.choice.default_save_folder.media": "Media",
+  "options.choice.default_save_folder.radio": "Radioinspelningar",
+  "options.choice.default_save_folder.tv": "TV-inspelningar",
   "options.confirm_delete.article": "Artikel",
   "options.confirm_delete.both": "Båda",
   "options.confirm_delete.episode": "Avsnitt",

@@ -562,7 +562,7 @@ fn is_valid_bridge_exe(path: &Path) -> Result<bool, String> {
     if read < 2 {
         return Ok(false);
     }
-    Ok(header == [b'M', b'Z'])
+    Ok(header == *b"MZ")
 }
 
 fn download_file_from_url(

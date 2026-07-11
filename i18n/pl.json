@@ -468,6 +468,8 @@
   "options.choice.default_save_folder.audiobooks": "Audiobooki",
   "options.choice.default_save_folder.documents": "Dokumenty",
   "options.choice.default_save_folder.media": "Multimedia",
+  "options.choice.default_save_folder.radio": "Nagrania radiowe",
+  "options.choice.default_save_folder.tv": "Nagrania telewizyjne",
   "options.confirm_delete.article": "Artykuł",
   "options.confirm_delete.both": "Oba",
   "options.confirm_delete.episode": "Odcinek",

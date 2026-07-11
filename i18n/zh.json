@@ -468,6 +468,8 @@
   "options.choice.default_save_folder.audiobooks": "有声书",
   "options.choice.default_save_folder.documents": "文档",
   "options.choice.default_save_folder.media": "媒体",
+  "options.choice.default_save_folder.radio": "电台录音",
+  "options.choice.default_save_folder.tv": "电视录制",
   "options.confirm_delete.article": "文章",
   "options.confirm_delete.both": "两者",
   "options.confirm_delete.episode": "剧集",

@@ -65,11 +65,8 @@ impl SpellcheckManager {
                 effective = "en-US".to_string();
             } else {
                 let mut languages = self.checker.supported_languages();
-                if let Some(first) = languages.pop() {
-                    effective = first;
-                } else {
-                    return None;
-                }
+                let first = languages.pop()?;
+                effective = first;
             }
         }
 

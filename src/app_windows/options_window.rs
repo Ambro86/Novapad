@@ -238,6 +238,8 @@ const OPTIONS_WHEEL_DELTA: i32 = 120;
 const DEFAULT_SAVE_FOLDER_AUDIOBOOK: u32 = 0;
 const DEFAULT_SAVE_FOLDER_MEDIA: u32 = 1;
 const DEFAULT_SAVE_FOLDER_DOCUMENTS: u32 = 2;
+const DEFAULT_SAVE_FOLDER_RADIO: u32 = 3;
+const DEFAULT_SAVE_FOLDER_TV: u32 = 4;
 
 struct GeminiModelsPayload {
     result: Result<Vec<String>, String>,
@@ -1108,6 +1110,8 @@ struct OptionsDialogState {
     default_save_folder_audiobook: String,
     default_save_folder_media: String,
     default_save_folder_documents: String,
+    default_save_folder_radio: String,
+    default_save_folder_tv: String,
     ok_button: HWND,
     cancel_button: HWND,
 }
@@ -1202,6 +1206,8 @@ struct OptionsLabels {
     option_default_save_folder_audiobooks: String,
     option_default_save_folder_media: String,
     option_default_save_folder_documents: String,
+    option_default_save_folder_radio: String,
+    option_default_save_folder_tv: String,
     label_audiobook_save_folder: String,
     label_audiobook_save_folder_browse: String,
     label_show_media_save_confirmation: String,
@@ -1463,6 +1469,22 @@ fn options_labels(language: Language) -> OptionsLabels {
             let value = i18n::tr(language, "options.choice.default_save_folder.documents");
             if value == "options.choice.default_save_folder.documents" {
                 "Documents".to_string()
+            } else {
+                value
+            }
+        },
+        option_default_save_folder_radio: {
+            let value = i18n::tr(language, "options.choice.default_save_folder.radio");
+            if value == "options.choice.default_save_folder.radio" {
+                "Radio recordings".to_string()
+            } else {
+                value
+            }
+        },
+        option_default_save_folder_tv: {
+            let value = i18n::tr(language, "options.choice.default_save_folder.tv");
+            if value == "options.choice.default_save_folder.tv" {
+                "TV recordings".to_string()
             } else {
                 value
             }
@@ -6418,6 +6440,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     default_save_folder_audiobook: String::new(),
                     default_save_folder_media: String::new(),
                     default_save_folder_documents: String::new(),
+                    default_save_folder_radio: String::new(),
+                    default_save_folder_tv: String::new(),
                     ok_button,
                     cancel_button,
                 });
@@ -8712,6 +8736,8 @@ fn initialize_options_dialog(hwnd: HWND) {
             state.default_save_folder_audiobook = settings.audiobook_save_folder.clone();
             state.default_save_folder_media = settings.media_save_folder.clone();
             state.default_save_folder_documents = settings.documents_save_folder.clone();
+            state.default_save_folder_radio = settings.radio_save_folder.clone();
+            state.default_save_folder_tv = settings.tv_save_folder.clone();
         })
         .is_none()
         {
@@ -8723,7 +8749,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             WPARAM(0),
             LPARAM(0),
         );
-        for (kind, label) in [
+        let mut default_save_folder_kinds = vec![
             (
                 DEFAULT_SAVE_FOLDER_AUDIOBOOK,
                 labels.option_default_save_folder_audiobooks.clone(),
@@ -8736,7 +8762,18 @@ fn initialize_options_dialog(hwnd: HWND) {
                 DEFAULT_SAVE_FOLDER_DOCUMENTS,
                 labels.option_default_save_folder_documents.clone(),
             ),
-        ] {
+            (
+                DEFAULT_SAVE_FOLDER_RADIO,
+                labels.option_default_save_folder_radio.clone(),
+            ),
+        ];
+        if settings.language == Language::Italian {
+            default_save_folder_kinds.push((
+                DEFAULT_SAVE_FOLDER_TV,
+                labels.option_default_save_folder_tv.clone(),
+            ));
+        }
+        for (kind, label) in default_save_folder_kinds {
             let idx = SendMessageW(
                 combo_default_save_folder_kind,
                 CB_ADDSTRING,
@@ -12034,16 +12071,20 @@ fn apply_options_dialog(hwnd: HWND) {
             settings.audiobook_split_text = text;
         }
         persist_default_save_folder_edit(hwnd);
-        if let Some((audiobook, media, documents)) = with_options_state(hwnd, |state| {
+        if let Some((audiobook, media, documents, radio, tv)) = with_options_state(hwnd, |state| {
             (
                 state.default_save_folder_audiobook.clone(),
                 state.default_save_folder_media.clone(),
                 state.default_save_folder_documents.clone(),
+                state.default_save_folder_radio.clone(),
+                state.default_save_folder_tv.clone(),
             )
         }) {
             settings.audiobook_save_folder = audiobook.trim().to_string();
             settings.media_save_folder = media.trim().to_string();
             settings.documents_save_folder = documents.trim().to_string();
+            settings.radio_save_folder = radio.trim().to_string();
+            settings.tv_save_folder = tv.trim().to_string();
         } else {
             let audiobook_folder_len = GetWindowTextLengthW(edit_audiobook_save_folder);
             if audiobook_folder_len >= 0 {
@@ -14268,6 +14309,8 @@ fn persist_default_save_folder_edit(hwnd: HWND) {
     let _updated = with_options_state(hwnd, |state| match state.default_save_folder_selection {
         DEFAULT_SAVE_FOLDER_MEDIA => state.default_save_folder_media = text,
         DEFAULT_SAVE_FOLDER_DOCUMENTS => state.default_save_folder_documents = text,
+        DEFAULT_SAVE_FOLDER_RADIO => state.default_save_folder_radio = text,
+        DEFAULT_SAVE_FOLDER_TV => state.default_save_folder_tv = text,
         _ => state.default_save_folder_audiobook = text,
     });
 }
@@ -14277,6 +14320,8 @@ fn refresh_default_save_folder_edit(hwnd: HWND) {
         let text = match state.default_save_folder_selection {
             DEFAULT_SAVE_FOLDER_MEDIA => state.default_save_folder_media.clone(),
             DEFAULT_SAVE_FOLDER_DOCUMENTS => state.default_save_folder_documents.clone(),
+            DEFAULT_SAVE_FOLDER_RADIO => state.default_save_folder_radio.clone(),
+            DEFAULT_SAVE_FOLDER_TV => state.default_save_folder_tv.clone(),
             _ => state.default_save_folder_audiobook.clone(),
         };
         (state.edit_audiobook_save_folder, text)

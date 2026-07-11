@@ -521,7 +521,27 @@ fn next_recording_path(
     )))
 }
 
-pub(crate) fn recordings_folder(_kind: StreamRecordingKind) -> PathBuf {
+pub(crate) fn recordings_folder(kind: StreamRecordingKind) -> PathBuf {
+    let settings = crate::settings::load_settings();
+    match kind {
+        StreamRecordingKind::Radio => {
+            if settings.radio_save_folder.trim().is_empty() {
+                PathBuf::from(crate::settings::default_radio_save_folder())
+            } else {
+                PathBuf::from(settings.radio_save_folder)
+            }
+        }
+        StreamRecordingKind::Tv => {
+            if settings.tv_save_folder.trim().is_empty() {
+                PathBuf::from(crate::settings::default_tv_save_folder())
+            } else {
+                PathBuf::from(settings.tv_save_folder)
+            }
+        }
+    }
+}
+
+fn mixed_legacy_recordings_folder() -> PathBuf {
     let settings = crate::settings::load_settings();
     if settings.podcast_save_folder.trim().is_empty() {
         PathBuf::from(crate::settings::default_podcast_save_folder())
@@ -692,9 +712,14 @@ pub(crate) fn open_recordings(parent: HWND, language: Language, kind: StreamReco
 
 fn list_recordings(kind: StreamRecordingKind) -> Vec<PathBuf> {
     let mut folders = vec![recordings_folder(kind)];
-    let legacy = legacy_recordings_folder(kind);
-    if !folders.iter().any(|folder| folder == &legacy) {
-        folders.push(legacy);
+    for legacy in [
+        mixed_legacy_recordings_folder(),
+        PathBuf::from(crate::settings::default_podcast_save_folder()),
+        legacy_recordings_folder(kind),
+    ] {
+        if !folders.iter().any(|folder| folder == &legacy) {
+            folders.push(legacy);
+        }
     }
 
     let mut files = folders
@@ -709,7 +734,7 @@ fn list_recordings(kind: StreamRecordingKind) -> Vec<PathBuf> {
                 .collect::<Vec<_>>()
         })
         .filter(|path| path.is_file())
-        .filter(|path| kind != StreamRecordingKind::Radio || !is_podcast_recording_file(path))
+        .filter(|path| !is_podcast_recording_file(path))
         .filter(|path| {
             let extension = path
                 .extension()

@@ -468,6 +468,8 @@
   "options.choice.default_save_folder.audiobooks": "Audio knjige",
   "options.choice.default_save_folder.documents": "Dokumenti",
   "options.choice.default_save_folder.media": "Mediji",
+  "options.choice.default_save_folder.radio": "Radio snimci",
+  "options.choice.default_save_folder.tv": "TV snimci",
   "options.confirm_delete.article": "Članak",
   "options.confirm_delete.both": "Oboje",
   "options.confirm_delete.episode": "Epizoda",

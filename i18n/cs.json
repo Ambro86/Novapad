@@ -468,6 +468,8 @@
   "options.choice.default_save_folder.audiobooks": "Audioknihy",
   "options.choice.default_save_folder.documents": "Dokumenty",
   "options.choice.default_save_folder.media": "Média",
+  "options.choice.default_save_folder.radio": "Rozhlasové nahrávky",
+  "options.choice.default_save_folder.tv": "Televizní nahrávky",
   "options.confirm_delete.article": "Článek",
   "options.confirm_delete.both": "Obojí",
   "options.confirm_delete.episode": "Epizoda",

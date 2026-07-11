@@ -468,6 +468,8 @@
   "options.choice.default_save_folder.audiobooks": "Audiolivros",
   "options.choice.default_save_folder.documents": "Documentos",
   "options.choice.default_save_folder.media": "Mídia",
+  "options.choice.default_save_folder.radio": "Gravações de rádio",
+  "options.choice.default_save_folder.tv": "Gravações de TV",
   "options.confirm_delete.article": "Artigo",
   "options.confirm_delete.both": "Ambos",
   "options.confirm_delete.episode": "Episódio",

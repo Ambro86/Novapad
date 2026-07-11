@@ -762,6 +762,10 @@ pub struct AppSettings {
     pub podcast_output_format: PodcastFormat,
     pub podcast_mp3_bitrate: u32,
     pub podcast_save_folder: String,
+    #[serde(default)]
+    pub radio_save_folder: String,
+    #[serde(default)]
+    pub tv_save_folder: String,
     #[serde(default = "default_audiobook_save_folder")]
     pub audiobook_save_folder: String,
     #[serde(default = "default_media_save_folder")]
@@ -1191,6 +1195,8 @@ impl Default for AppSettings {
             podcast_output_format: PodcastFormat::Mp3,
             podcast_mp3_bitrate: 128,
             podcast_save_folder: default_podcast_save_folder(),
+            radio_save_folder: default_radio_save_folder(),
+            tv_save_folder: default_tv_save_folder(),
             audiobook_save_folder: default_audiobook_save_folder(),
             media_save_folder: default_media_save_folder(),
             documents_save_folder: default_documents_save_folder(),
@@ -1705,6 +1711,20 @@ pub fn default_podcast_save_folder() -> String {
     base.to_string_lossy().to_string()
 }
 
+pub fn default_radio_save_folder() -> String {
+    PathBuf::from(default_podcast_save_folder())
+        .join("Radio")
+        .to_string_lossy()
+        .to_string()
+}
+
+pub fn default_tv_save_folder() -> String {
+    PathBuf::from(default_podcast_save_folder())
+        .join("TV")
+        .to_string_lossy()
+        .to_string()
+}
+
 pub fn default_audiobook_save_folder() -> String {
     let mut base = sonarpad_documents_root();
     base.push("Audiobooks");
@@ -2147,6 +2167,20 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     }
     if settings.podcast_save_folder.trim().is_empty() {
         settings.podcast_save_folder = default_podcast_save_folder();
+    }
+    settings.radio_save_folder = settings.radio_save_folder.trim().to_string();
+    if settings.radio_save_folder.is_empty() {
+        settings.radio_save_folder = PathBuf::from(settings.podcast_save_folder.as_str())
+            .join("Radio")
+            .to_string_lossy()
+            .to_string();
+    }
+    settings.tv_save_folder = settings.tv_save_folder.trim().to_string();
+    if settings.tv_save_folder.is_empty() {
+        settings.tv_save_folder = PathBuf::from(settings.podcast_save_folder.as_str())
+            .join("TV")
+            .to_string_lossy()
+            .to_string();
     }
     if settings.audiobook_save_folder.trim().is_empty() {
         settings.audiobook_save_folder = default_audiobook_save_folder();

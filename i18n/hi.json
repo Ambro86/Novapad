@@ -468,6 +468,8 @@
   "options.choice.default_save_folder.audiobooks": "ऑडियोबुक",
   "options.choice.default_save_folder.documents": "दस्तावेज़",
   "options.choice.default_save_folder.media": "मीडिया",
+  "options.choice.default_save_folder.radio": "रेडियो रिकॉर्डिंग",
+  "options.choice.default_save_folder.tv": "टीवी रिकॉर्डिंग",
   "options.confirm_delete.article": "लेख",
   "options.confirm_delete.both": "दोनों",
   "options.confirm_delete.episode": "एपिसोड",

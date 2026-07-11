@@ -468,6 +468,8 @@
   "options.choice.default_save_folder.audiobooks": "Аудіокниги",
   "options.choice.default_save_folder.documents": "Документи",
   "options.choice.default_save_folder.media": "Медіа",
+  "options.choice.default_save_folder.radio": "Радіозаписи",
+  "options.choice.default_save_folder.tv": "Телезаписи",
   "options.confirm_delete.article": "Стаття",
   "options.confirm_delete.both": "Обидва",
   "options.confirm_delete.episode": "Епізод",

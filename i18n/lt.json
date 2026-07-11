@@ -468,6 +468,8 @@
   "options.choice.default_save_folder.audiobooks": "Garso knygos",
   "options.choice.default_save_folder.documents": "Dokumentai",
   "options.choice.default_save_folder.media": "Medija",
+  "options.choice.default_save_folder.radio": "Radijo įrašai",
+  "options.choice.default_save_folder.tv": "TV įrašai",
   "options.confirm_delete.article": "Straipsnis",
   "options.confirm_delete.both": "Abu",
   "options.confirm_delete.episode": "Epizodas",

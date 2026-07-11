@@ -411,7 +411,7 @@ fn find_in_files_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
-                    PCWSTR(to_wide(&format!("{} 0%", &labels.progress)).as_ptr()),
+                    PCWSTR(to_wide(&format!("{} 0%", labels.progress)).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
                     126,

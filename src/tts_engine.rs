@@ -2234,14 +2234,14 @@ async fn download_edge_chunks_ws(
                 .override_voice
                 .as_ref()
                 .map(|ov| (ov.rate, ov.pitch, ov.volume)),
-            &chunk.text_to_read,
+            chunk.text_to_read,
         ));
         let req_id = Uuid::new_v4().simple().to_string();
         let sanitized_text = sanitize_edge_text(&chunk.text_to_read);
         if !is_edge_text_usable(&sanitized_text) {
             crate::log_debug(&format!(
                 "Edge WS: skipping unusable chunk {} text={:?}",
-                idx, &chunk.text_to_read
+                idx, chunk.text_to_read
             ));
             processed_count = processed_count.saturating_add(1);
             continue;

@@ -468,6 +468,8 @@
   "options.choice.default_save_folder.audiobooks": "Sách nói",
   "options.choice.default_save_folder.documents": "Tài liệu",
   "options.choice.default_save_folder.media": "Đa phương tiện",
+  "options.choice.default_save_folder.radio": "Bản ghi radio",
+  "options.choice.default_save_folder.tv": "Bản ghi TV",
   "options.confirm_delete.article": "Bài viết",
   "options.confirm_delete.both": "Cả hai",
   "options.confirm_delete.episode": "Tập",

@@ -6217,6 +6217,8 @@ var _GoogleTtsShutdown = Module["_GoogleTtsShutdown"] = makeInvalidEarlyAccess("
 
 var _GoogleTtsInstallVoice = Module["_GoogleTtsInstallVoice"] = makeInvalidEarlyAccess("_GoogleTtsInstallVoice");
 
+var _GoogleTtsSetPitchScale = Module["_GoogleTtsSetPitchScale"] = makeInvalidEarlyAccess("_GoogleTtsSetPitchScale");
+
 var _GoogleTtsInitBuffered = Module["_GoogleTtsInitBuffered"] = makeInvalidEarlyAccess("_GoogleTtsInitBuffered");
 
 var _GoogleTtsReadBuffered = Module["_GoogleTtsReadBuffered"] = makeInvalidEarlyAccess("_GoogleTtsReadBuffered");
@@ -6543,6 +6545,7 @@ function assignWasmExports(wasmExports) {
   _GoogleTtsInit = Module["_GoogleTtsInit"] = createExportWrapper("GoogleTtsInit", 2);
   _GoogleTtsShutdown = Module["_GoogleTtsShutdown"] = createExportWrapper("GoogleTtsShutdown", 0);
   _GoogleTtsInstallVoice = Module["_GoogleTtsInstallVoice"] = createExportWrapper("GoogleTtsInstallVoice", 3);
+  _GoogleTtsSetPitchScale = Module["_GoogleTtsSetPitchScale"] = createExportWrapper("GoogleTtsSetPitchScale", 1);
   _GoogleTtsInitBuffered = Module["_GoogleTtsInitBuffered"] = createExportWrapper("GoogleTtsInitBuffered", 4);
   _GoogleTtsReadBuffered = Module["_GoogleTtsReadBuffered"] = createExportWrapper("GoogleTtsReadBuffered", 0);
   _GoogleTtsFinalizeBuffered = Module["_GoogleTtsFinalizeBuffered"] = createExportWrapper("GoogleTtsFinalizeBuffered", 0);

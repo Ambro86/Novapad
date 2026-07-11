@@ -916,22 +916,11 @@ impl GoogleTtsRuntime {
         let synthesis_started = Instant::now();
         let mapped_rate = google_rate(rate);
         let pitch_percent = google_pitch_percent_from_internal(pitch);
-        let requested_pitch = google_pitch(pitch);
-        let uses_natural_model = speaker.id.contains("-seanet:");
-        let engine_pitch = if uses_natural_model {
-            1.0
-        } else {
-            requested_pitch
-        };
-        let pcm_pitch_semitones = if uses_natural_model {
-            -12.0 + 24.0 * pitch_percent as f32 / 100.0
-        } else {
-            0.0
-        };
+        let mapped_pitch = google_pitch(pitch);
         let mapped_volume = (volume as f64 / 100.0).clamp(0.0, 1.0);
         let output_gain = (volume as f64 / 50.0).clamp(0.0, 2.0);
         crate::log_debug(&format!(
-            "Google TTS synth start: voice_id={} voice_name={:?} text_chars={} rate={} mapped_rate={:.4} pitch_internal={} pitch_percent={} requested_pitch={:.4} engine_pitch={:.4} natural_model={} pcm_pitch_semitones={:.3} volume={} mapped_volume={:.3}",
+            "Google TTS synth start: voice_id={} voice_name={:?} text_chars={} rate={} mapped_rate={:.4} pitch_internal={} pitch_percent={} mapped_pitch={:.4} volume={} mapped_volume={:.3}",
             speaker.id,
             speaker.name,
             text.chars().count(),
@@ -939,10 +928,7 @@ impl GoogleTtsRuntime {
             mapped_rate,
             pitch,
             pitch_percent,
-            requested_pitch,
-            engine_pitch,
-            uses_natural_model,
-            pcm_pitch_semitones,
+            mapped_pitch,
             volume,
             mapped_volume
         ));
@@ -953,7 +939,7 @@ impl GoogleTtsRuntime {
             "voiceName": speaker.name.clone(),
             "lang": speaker.language.clone(),
             "rate": mapped_rate,
-            "pitch": engine_pitch,
+            "pitch": mapped_pitch,
             "volume": mapped_volume,
             "outputGain": output_gain
         });
@@ -1034,27 +1020,11 @@ impl GoogleTtsRuntime {
         if !completed && pcm.is_empty() {
             return Err("Google TTS produced no audio.".to_string());
         }
-        let raw_pcm_len = pcm.len();
-        let pitch_processing_started = Instant::now();
-        let pcm = if pcm_pitch_semitones.abs() < 0.01 {
-            pcm
-        } else {
-            crate::bass_output::pitch_shift_google_pcm(&pcm, pcm_pitch_semitones).map_err(
-                |err| {
-                    format!(
-                        "Google Natural voice pitch processing failed for {}% ({:.3} semitones): {}",
-                        pitch_percent, pcm_pitch_semitones, err
-                    )
-                },
-            )?
-        };
         crate::log_debug(&format!(
-            "Google TTS synth complete: session={} elapsed_ms={} raw_pcm_bytes={} final_pcm_bytes={} pitch_process_ms={} completed_event={}",
+            "Google TTS synth complete: session={} elapsed_ms={} pcm_bytes={} completed_event={}",
             session_id,
             synthesis_started.elapsed().as_millis(),
-            raw_pcm_len,
             pcm.len(),
-            pitch_processing_started.elapsed().as_millis(),
             completed
         ));
         Ok(wav_from_pcm(&pcm))

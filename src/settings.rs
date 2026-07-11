@@ -187,6 +187,8 @@ pub enum TtsEngine {
     Sapi5,
     #[serde(rename = "sapi4")]
     Sapi4,
+    #[serde(rename = "google")]
+    Google,
 }
 
 pub const DEFAULT_VOICE_PROFILE_NAME: &str = "Default";
@@ -235,6 +237,7 @@ pub struct VoiceProfile {
     pub tts_pitch: i32,
     pub tts_volume: i32,
     pub edge_tts_tuning: TtsTuning,
+    pub google_tts_tuning: TtsTuning,
     pub sapi5_tts_tuning: TtsTuning,
     pub sapi4_tts_tuning: TtsTuning,
     pub use_dialogue_voice: bool,
@@ -263,6 +266,7 @@ impl Default for VoiceProfile {
             tts_pitch: 0,
             tts_volume: 100,
             edge_tts_tuning: TtsTuning::default(),
+            google_tts_tuning: TtsTuning::default(),
             sapi5_tts_tuning: TtsTuning::default(),
             sapi4_tts_tuning: TtsTuning::default(),
             use_dialogue_voice: false,
@@ -835,6 +839,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub edge_tts_tuning: TtsTuning,
     #[serde(default)]
+    pub google_tts_tuning: TtsTuning,
+    #[serde(default)]
     pub sapi5_tts_tuning: TtsTuning,
     #[serde(default)]
     pub sapi4_tts_tuning: TtsTuning,
@@ -1001,6 +1007,7 @@ pub fn voice_profile_from_settings_fields(name: String, settings: &AppSettings) 
         tts_pitch: settings.tts_pitch,
         tts_volume: settings.tts_volume,
         edge_tts_tuning: settings.edge_tts_tuning,
+        google_tts_tuning: settings.google_tts_tuning,
         sapi5_tts_tuning: settings.sapi5_tts_tuning,
         sapi4_tts_tuning: settings.sapi4_tts_tuning,
         use_dialogue_voice: settings.use_dialogue_voice,
@@ -1024,6 +1031,7 @@ pub fn apply_voice_profile_to_settings_fields(settings: &mut AppSettings, profil
     settings.tts_only_multilingual = profile.tts_only_multilingual;
     settings.tts_manual_tuning = profile.tts_manual_tuning;
     settings.edge_tts_tuning = profile.edge_tts_tuning;
+    settings.google_tts_tuning = profile.google_tts_tuning;
     settings.sapi5_tts_tuning = profile.sapi5_tts_tuning;
     settings.sapi4_tts_tuning = profile.sapi4_tts_tuning;
     let active_tuning = tts_tuning_for_engine(settings, profile.tts_engine);
@@ -1047,6 +1055,7 @@ pub fn apply_voice_profile_to_settings_fields(settings: &mut AppSettings, profil
 pub fn tts_tuning_for_engine(settings: &AppSettings, engine: TtsEngine) -> TtsTuning {
     match engine {
         TtsEngine::Edge => settings.edge_tts_tuning,
+        TtsEngine::Google => settings.google_tts_tuning,
         TtsEngine::Sapi5 => settings.sapi5_tts_tuning,
         TtsEngine::Sapi4 => settings.sapi4_tts_tuning,
     }
@@ -1055,6 +1064,7 @@ pub fn tts_tuning_for_engine(settings: &AppSettings, engine: TtsEngine) -> TtsTu
 pub fn set_tts_tuning_for_engine(settings: &mut AppSettings, engine: TtsEngine, tuning: TtsTuning) {
     match engine {
         TtsEngine::Edge => settings.edge_tts_tuning = tuning,
+        TtsEngine::Google => settings.google_tts_tuning = tuning,
         TtsEngine::Sapi5 => settings.sapi5_tts_tuning = tuning,
         TtsEngine::Sapi4 => settings.sapi4_tts_tuning = tuning,
     }
@@ -1239,6 +1249,7 @@ impl Default for AppSettings {
             tts_pitch: 0,
             tts_volume: 100,
             edge_tts_tuning: TtsTuning::default(),
+            google_tts_tuning: TtsTuning::default(),
             sapi5_tts_tuning: TtsTuning::default(),
             sapi4_tts_tuning: TtsTuning::default(),
             voice_profiles: Vec::new(),
@@ -1866,6 +1877,10 @@ fn normalize_voice_profiles(settings: &mut AppSettings) {
         match profile.tts_engine {
             TtsEngine::Edge => {
                 profile.edge_tts_tuning =
+                    TtsTuning::new(profile.tts_rate, profile.tts_pitch, profile.tts_volume);
+            }
+            TtsEngine::Google => {
+                profile.google_tts_tuning =
                     TtsTuning::new(profile.tts_rate, profile.tts_pitch, profile.tts_volume);
             }
             TtsEngine::Sapi5 => {

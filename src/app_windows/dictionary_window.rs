@@ -87,6 +87,7 @@ struct DictionaryLabels {
     engine_edge: String,
     engine_sapi5: String,
     engine_sapi4: String,
+    engine_google: String,
     voices_empty: String,
 }
 
@@ -110,7 +111,8 @@ fn dictionary_labels(language: Language) -> DictionaryLabels {
         entry_preview: i18n::tr(language, "dictionary.entry_preview"),
         engine_edge: i18n::tr(language, "options.engine.edge"),
         engine_sapi5: i18n::tr(language, "options.engine.sapi5"),
-        engine_sapi4: "SAPI 4".to_string(),
+        engine_sapi4: i18n::tr(language, "options.engine.sapi4"),
+        engine_google: i18n::tr(language, "options.engine.google"),
         voices_empty: i18n::tr(language, "voice_panel.voices_empty"),
     }
 }
@@ -797,6 +799,12 @@ fn dictionary_entry_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                     WPARAM(0),
                     LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
                 );
+                SendMessageW(
+                    combo_engine,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(&labels.engine_google).as_ptr() as isize),
+                );
                 SendMessageW(combo_engine, CB_SETCURSEL, WPARAM(0), LPARAM(0));
 
                 let ok_button = CreateWindowExW(
@@ -1108,12 +1116,14 @@ fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
+        3 => TtsEngine::Google,
         _ => TtsEngine::Edge,
     };
 
     let voices: Vec<VoiceInfo> = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Google => crate::google_tts::installed_voices(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
@@ -1141,7 +1151,12 @@ fn populate_entry_voice_combo(hwnd: HWND, selected_voice: Option<&str>) {
     let mut combo_index = 0usize;
 
     for (voice_index, voice) in voices.iter().enumerate() {
-        let label = format!("{} ({})", voice.short_name, voice.locale);
+        let display_name = if engine == TtsEngine::Google {
+            crate::google_tts::voice_display_name(&voice.short_name)
+        } else {
+            voice.short_name.clone()
+        };
+        let label = format!("{} ({})", display_name, voice.locale);
         let wide = to_wide(&label);
         let idx = crate::send_message_w_safe(
             combo_voice,
@@ -1212,12 +1227,14 @@ fn preview_entry_voice(hwnd: HWND) {
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
+        3 => TtsEngine::Google,
         _ => TtsEngine::Edge,
     };
 
     let voices: Vec<VoiceInfo> = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Google => crate::google_tts::installed_voices(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
@@ -1246,7 +1263,7 @@ fn preview_entry_voice(hwnd: HWND) {
     let volume = 100;
 
     match engine {
-        TtsEngine::Edge => {
+        TtsEngine::Edge | TtsEngine::Google => {
             let chunks = tts_engine::split_into_tts_chunks(&text, false, &[], engine);
             let options = tts_engine::TtsPlaybackOptions {
                 hwnd: parent,

@@ -2935,6 +2935,22 @@ fn export_parts(
                 };
                 run_tts_audiobook_part(part_chunks, &mut progress, &options)?;
             }
+            TtsEngine::Google => {
+                let options = crate::tts_engine::AudiobookCommonOptions {
+                    voice: &tts.voice,
+                    output,
+                    progress_hwnd,
+                    cancel: cancel.clone(),
+                    language: tts.language,
+                    part_naming_mode: tts.audiobook_part_naming_mode,
+                    audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
+                    rate: tts.tts_rate,
+                    pitch: tts.tts_pitch,
+                    volume: tts.tts_volume,
+                    sapi4_threads: None,
+                };
+                crate::tts_engine::run_google_audiobook_part(part_chunks, &mut progress, &options)?;
+            }
             TtsEngine::Sapi4 => {
                 let voice_idx = crate::tts_engine::parse_sapi4_voice_index(&tts.voice);
                 let options = crate::tts_engine::AudiobookCommonOptions {

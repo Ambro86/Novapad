@@ -56,10 +56,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS, SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW,
     SW_SHOWNORMAL, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SendMessageW, SetForegroundWindow,
     SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON,
-    TrackPopupMenu, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT,
-    WM_VSCROLL, WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    TrackPopupMenu, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_GETFONT,
+    WM_KEYDOWN, WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS,
+    WM_SETFONT, WM_VSCROLL, WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -195,6 +195,7 @@ const OPTIONS_ID_VOICE_PROFILE: usize = 6115;
 const OPTIONS_ID_RENAME_VOICE_PROFILE: usize = 6116;
 const OPTIONS_ID_ADD_VOICE_PROFILE: usize = 6117;
 const OPTIONS_ID_DELETE_VOICE_PROFILE: usize = 6118;
+const OPTIONS_ID_MANAGE_GOOGLE_VOICES: usize = 6150;
 
 const OPTIONS_ID_OK: usize = 6005;
 const OPTIONS_ID_CANCEL: usize = 6006;
@@ -915,6 +916,7 @@ struct OptionsDialogState {
     button_rename_voice_profile: HWND,
     button_add_voice_profile: HWND,
     button_delete_voice_profile: HWND,
+    button_manage_google_voices: HWND,
     combo_lang: HWND,
     combo_modified_marker_position: HWND,
     combo_open: HWND,
@@ -1101,6 +1103,7 @@ struct OptionsDialogState {
     active_voice_profile_name: String,
     active_tts_engine: TtsEngine,
     edge_tts_tuning: TtsTuning,
+    google_tts_tuning: TtsTuning,
     sapi5_tts_tuning: TtsTuning,
     sapi4_tts_tuning: TtsTuning,
     active_tab: i32,
@@ -1135,6 +1138,7 @@ struct OptionsLabels {
     button_rename_voice_profile: String,
     button_add_voice_profile: String,
     button_delete_voice_profile: String,
+    button_manage_google_voices: String,
     label_multilingual: String,
     label_use_dialogue_voice: String,
     label_dialogue_voice: String,
@@ -1271,6 +1275,7 @@ struct OptionsLabels {
     open_new_tab: String,
     open_new_window: String,
     engine_edge: String,
+    engine_google: String,
     engine_sapi5: String,
     engine_sapi4: String,
     subtitle_mode_off: String,
@@ -1343,6 +1348,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         button_rename_voice_profile: i18n::tr(language, "options.button.apply_selected_profile"),
         button_add_voice_profile: i18n::tr(language, "options.button.add_profile"),
         button_delete_voice_profile: i18n::tr(language, "options.button.delete_profile"),
+        button_manage_google_voices: i18n::tr(language, "menu.google_voices"),
         label_multilingual: i18n::tr(language, "options.label.multilingual"),
         label_use_dialogue_voice: i18n::tr(language, "options.label.use_dialogue_voice"),
         label_dialogue_voice: i18n::tr(language, "options.label.dialogue_voice"),
@@ -1655,6 +1661,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         open_new_tab: i18n::tr(language, "options.open.new_tab"),
         open_new_window: i18n::tr(language, "options.open.new_window"),
         engine_edge: i18n::tr(language, "options.engine.edge"),
+        engine_google: i18n::tr(language, "options.engine.google"),
         engine_sapi5: i18n::tr(language, "options.engine.sapi5"),
         engine_sapi4: "SAPI 4".to_string(),
         subtitle_mode_off: i18n::tr(language, "options.subtitle_mode.off"),
@@ -1843,6 +1850,7 @@ fn update_voice_profile_delete_button_visibility(hwnd: HWND) {
 fn voices_for_engine(parent: HWND, engine: TtsEngine) -> Vec<VoiceInfo> {
     with_state(parent, |state| match engine {
         TtsEngine::Edge => state.edge_voices.clone(),
+        TtsEngine::Google => crate::google_tts::installed_voices(),
         TtsEngine::Sapi5 => state.sapi_voices.clone(),
         TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
     })
@@ -1965,6 +1973,7 @@ fn apply_selected_voice_profile(hwnd: HWND) {
             TtsEngine::Edge => 0,
             TtsEngine::Sapi5 => 1,
             TtsEngine::Sapi4 => 2,
+            TtsEngine::Google => 3,
         };
         SendMessageW(
             combo_tts_engine,
@@ -1977,6 +1986,7 @@ fn apply_selected_voice_profile(hwnd: HWND) {
             TtsEngine::Edge => 0,
             TtsEngine::Sapi5 => 1,
             TtsEngine::Sapi4 => 2,
+            TtsEngine::Google => 3,
         };
         SendMessageW(
             combo_dialogue_engine,
@@ -1989,6 +1999,7 @@ fn apply_selected_voice_profile(hwnd: HWND) {
             TtsEngine::Edge => 0,
             TtsEngine::Sapi5 => 1,
             TtsEngine::Sapi4 => 2,
+            TtsEngine::Google => 3,
         };
         SendMessageW(
             combo_dialogue_secondary_engine,
@@ -2041,17 +2052,22 @@ fn apply_selected_voice_profile(hwnd: HWND) {
 
     let active_tts_tuning = voice_profile_tuning_for_engine(&profile, profile.tts_engine);
     select_combo_value(combo_tts_speed, active_tts_tuning.rate);
-    select_combo_value(combo_tts_pitch, active_tts_tuning.pitch);
+    select_pitch_combo_nearest_value(combo_tts_pitch, profile.tts_engine, active_tts_tuning.pitch);
     select_combo_value(combo_tts_volume, active_tts_tuning.volume);
     select_combo_value(combo_dialogue_voice_rate, profile.dialogue_voice_rate);
-    select_combo_value(combo_dialogue_voice_pitch, profile.dialogue_voice_pitch);
+    select_pitch_combo_nearest_value(
+        combo_dialogue_voice_pitch,
+        profile.dialogue_tts_engine,
+        profile.dialogue_voice_pitch,
+    );
     select_combo_value(combo_dialogue_voice_volume, profile.dialogue_voice_volume);
     select_combo_value(
         combo_dialogue_secondary_voice_rate,
         profile.dialogue_secondary_voice_rate,
     );
-    select_combo_value(
+    select_pitch_combo_nearest_value(
         combo_dialogue_secondary_voice_pitch,
+        profile.dialogue_secondary_tts_engine,
         profile.dialogue_secondary_voice_pitch,
     );
     select_combo_value(
@@ -2067,7 +2083,10 @@ fn apply_selected_voice_profile(hwnd: HWND) {
     }
     if let Err(e) = crate::set_window_text_w_safe(
         edit_tts_pitch,
-        PCWSTR(to_wide(&tts_ui_value_from_internal(active_tts_tuning.pitch).to_string()).as_ptr()),
+        PCWSTR(
+            to_wide(&tts_pitch_ui_value(profile.tts_engine, active_tts_tuning.pitch).to_string())
+                .as_ptr(),
+        ),
     ) {
         crate::log_debug(&format!("Failed to set tts pitch edit from profile: {e}"));
     }
@@ -2090,7 +2109,11 @@ fn apply_selected_voice_profile(hwnd: HWND) {
     if let Err(e) = crate::set_window_text_w_safe(
         edit_dialogue_voice_pitch,
         PCWSTR(
-            to_wide(&tts_ui_value_from_internal(profile.dialogue_voice_pitch).to_string()).as_ptr(),
+            to_wide(
+                &tts_pitch_ui_value(profile.dialogue_tts_engine, profile.dialogue_voice_pitch)
+                    .to_string(),
+            )
+            .as_ptr(),
         ),
     ) {
         crate::log_debug(&format!(
@@ -2120,7 +2143,11 @@ fn apply_selected_voice_profile(hwnd: HWND) {
         edit_dialogue_secondary_voice_pitch,
         PCWSTR(
             to_wide(
-                &tts_ui_value_from_internal(profile.dialogue_secondary_voice_pitch).to_string(),
+                &tts_pitch_ui_value(
+                    profile.dialogue_secondary_tts_engine,
+                    profile.dialogue_secondary_voice_pitch,
+                )
+                .to_string(),
             )
             .as_ptr(),
         ),
@@ -2142,6 +2169,7 @@ fn apply_selected_voice_profile(hwnd: HWND) {
         state.active_voice_profile_name = profile.name.clone();
         state.active_tts_engine = profile.tts_engine;
         state.edge_tts_tuning = profile.edge_tts_tuning;
+        state.google_tts_tuning = profile.google_tts_tuning;
         state.sapi5_tts_tuning = profile.sapi5_tts_tuning;
         state.sapi4_tts_tuning = profile.sapi4_tts_tuning;
     })
@@ -2461,6 +2489,7 @@ pub fn refresh_voices(hwnd: HWND) {
             parent,
             hwnd_tabs,
             combo_voice,
+            button_manage_google_voices,
             combo_dialogue_voice,
             combo_dialogue_secondary_voice,
             combo_engine,
@@ -2482,6 +2511,7 @@ pub fn refresh_voices(hwnd: HWND) {
                 state.parent,
                 state.hwnd_tabs,
                 state.combo_voice,
+                state.button_manage_google_voices,
                 state.combo_dialogue_voice,
                 state.combo_dialogue_secondary_voice,
                 state.combo_tts_engine,
@@ -2514,7 +2544,7 @@ pub fn refresh_voices(hwnd: HWND) {
             match engine_sel {
                 1 => TtsEngine::Sapi5,
                 2 => TtsEngine::Sapi4,
-
+                3 => TtsEngine::Google,
                 _ => TtsEngine::Edge,
             }
         } else {
@@ -2523,6 +2553,7 @@ pub fn refresh_voices(hwnd: HWND) {
 
         let voices = with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Google => crate::google_tts::installed_voices(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
@@ -2533,6 +2564,7 @@ pub fn refresh_voices(hwnd: HWND) {
             match dialogue_engine_sel {
                 1 => TtsEngine::Sapi5,
                 2 => TtsEngine::Sapi4,
+                3 => TtsEngine::Google,
                 _ => TtsEngine::Edge,
             }
         } else {
@@ -2540,6 +2572,7 @@ pub fn refresh_voices(hwnd: HWND) {
         };
         let dialogue_voices = with_state(parent, |state| match dialogue_engine {
             TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Google => crate::google_tts::installed_voices(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
@@ -2555,6 +2588,7 @@ pub fn refresh_voices(hwnd: HWND) {
             match dialogue_secondary_engine_sel {
                 1 => TtsEngine::Sapi5,
                 2 => TtsEngine::Sapi4,
+                3 => TtsEngine::Google,
                 _ => TtsEngine::Edge,
             }
         } else {
@@ -2563,6 +2597,7 @@ pub fn refresh_voices(hwnd: HWND) {
         let dialogue_secondary_voices =
             with_state(parent, |state| match dialogue_secondary_engine {
                 TtsEngine::Edge => state.edge_voices.clone(),
+                TtsEngine::Google => crate::google_tts::installed_voices(),
                 TtsEngine::Sapi5 => state.sapi_voices.clone(),
                 TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
             })
@@ -2639,6 +2674,17 @@ pub fn refresh_voices(hwnd: HWND) {
             },
         );
         EnableWindow(combo_tts_voice_language, show_language_combo);
+
+        let show_manage_google_voices = voice_tab_active && engine == TtsEngine::Google;
+        ShowWindow(
+            button_manage_google_voices,
+            if show_manage_google_voices {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            },
+        );
+        EnableWindow(button_manage_google_voices, show_manage_google_voices);
 
         let show_dialogue_language_combo = voice_tab_active
             && use_dialogue_voice
@@ -2929,6 +2975,7 @@ pub fn refresh_voices(hwnd: HWND) {
         // But we pass settings.tts_voice. If it's an ID from other engine, it won't match, so it selects default/first.
         populate_voice_combo(
             combo_voice,
+            engine,
             &voices,
             &settings.tts_voice,
             filter_multilingual,
@@ -2939,6 +2986,7 @@ pub fn refresh_voices(hwnd: HWND) {
         // Also populate dialogue voice combo
         populate_voice_combo(
             combo_dialogue_voice,
+            dialogue_engine,
             &dialogue_voices,
             &settings.dialogue_voice,
             dialogue_filter_multilingual,
@@ -2947,6 +2995,7 @@ pub fn refresh_voices(hwnd: HWND) {
         );
         populate_voice_combo(
             combo_dialogue_secondary_voice,
+            dialogue_secondary_engine,
             &dialogue_secondary_voices,
             &settings.dialogue_secondary_voice,
             dialogue_secondary_filter_multilingual,
@@ -3278,6 +3327,22 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     None,
                 );
                 y += 40;
+
+                let button_manage_google_voices = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.button_manage_google_voices).as_ptr()),
+                    WS_CHILD | WS_TABSTOP,
+                    170,
+                    y,
+                    300,
+                    26,
+                    hwnd,
+                    HMENU(OPTIONS_ID_MANAGE_GOOGLE_VOICES as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 30;
 
                 let checkbox_multilingual = CreateWindowExW(
                     Default::default(),
@@ -6040,6 +6105,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     button_delete_voice_profile,
                     label_voice,
                     combo_voice,
+                    button_manage_google_voices,
                     label_tts_speed,
                     combo_tts_speed,
                     label_tts_pitch,
@@ -6245,6 +6311,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     button_rename_voice_profile,
                     button_add_voice_profile,
                     button_delete_voice_profile,
+                    button_manage_google_voices,
                     combo_lang,
                     combo_modified_marker_position,
                     combo_open,
@@ -6431,6 +6498,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     active_voice_profile_name: DEFAULT_VOICE_PROFILE_NAME.to_string(),
                     active_tts_engine: TtsEngine::Edge,
                     edge_tts_tuning: TtsTuning::default(),
+                    google_tts_tuning: TtsTuning::default(),
                     sapi5_tts_tuning: TtsTuning::default(),
                     sapi4_tts_tuning: TtsTuning::default(),
                     active_tab: OPTIONS_TAB_GENERAL,
@@ -6515,6 +6583,46 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         }
                         LRESULT(0)
                     }
+                    OPTIONS_ID_MANAGE_GOOGLE_VOICES => {
+                        let Some((parent, combo_voice)) =
+                            with_options_state(hwnd, |state| (state.parent, state.combo_voice))
+                        else {
+                            crate::log_debug(
+                                "Google TTS manager: options state unavailable before opening",
+                            );
+                            return LRESULT(0);
+                        };
+                        let language =
+                            with_state(parent, |state| state.settings.language).unwrap_or_default();
+                        crate::log_debug(
+                            "Options: opening Google voice manager from voice settings",
+                        );
+                        let google_manager_font =
+                            HFONT(SendMessageW(combo_voice, WM_GETFONT, WPARAM(0), LPARAM(0)).0);
+                        crate::app_windows::google_voice_manager_window::open_with_language(
+                            hwnd,
+                            language,
+                            google_manager_font,
+                        );
+                        crate::refresh_google_voice_settings(parent);
+                        refresh_voices(hwnd);
+                        relayout_active_tab_content(hwnd);
+                        crate::set_focus_safe(combo_voice);
+                        if let Err(err) = crate::post_message_w_safe(
+                            hwnd,
+                            WM_NEXTDLGCTL,
+                            WPARAM(combo_voice.0 as usize),
+                            LPARAM(1),
+                        ) {
+                            crate::log_debug(&format!(
+                                "Options: failed to return focus to Google voice list: {err}"
+                            ));
+                        }
+                        crate::log_debug(
+                            "Options: Google voice manager closed; installed voice list refreshed",
+                        );
+                        LRESULT(0)
+                    }
                     OPTIONS_ID_TTS_PREVIEW => {
                         preview_voice(hwnd);
                         LRESULT(0)
@@ -6583,6 +6691,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                             let new_engine = match sel {
                                 1 => TtsEngine::Sapi5,
                                 2 => TtsEngine::Sapi4,
+                                3 => TtsEngine::Google,
                                 _ => TtsEngine::Edge,
                             };
                             let previous_engine = with_options_state(hwnd, |s| s.active_tts_engine)
@@ -7312,6 +7421,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             state.active_voice_profile_name = active_voice_profile_name;
             state.active_tts_engine = settings.tts_engine;
             state.edge_tts_tuning = settings.edge_tts_tuning;
+            state.google_tts_tuning = settings.google_tts_tuning;
             state.sapi5_tts_tuning = settings.sapi5_tts_tuning;
             state.sapi4_tts_tuning = settings.sapi4_tts_tuning;
         })
@@ -7501,11 +7611,18 @@ fn initialize_options_dialog(hwnd: HWND) {
             WPARAM(0),
             LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
         );
+        SendMessageW(
+            combo_tts_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_google).as_ptr() as isize),
+        );
 
         let engine_index = match settings.tts_engine {
             TtsEngine::Edge => 0,
             TtsEngine::Sapi5 => 1,
             TtsEngine::Sapi4 => 2,
+            TtsEngine::Google => 3,
         };
         SendMessageW(
             combo_tts_engine,
@@ -7533,10 +7650,17 @@ fn initialize_options_dialog(hwnd: HWND) {
             WPARAM(0),
             LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
         );
+        SendMessageW(
+            combo_dialogue_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_google).as_ptr() as isize),
+        );
         let dialogue_engine_index = match settings.dialogue_tts_engine {
             TtsEngine::Edge => 0,
             TtsEngine::Sapi5 => 1,
             TtsEngine::Sapi4 => 2,
+            TtsEngine::Google => 3,
         };
         SendMessageW(
             combo_dialogue_engine,
@@ -7568,10 +7692,17 @@ fn initialize_options_dialog(hwnd: HWND) {
             WPARAM(0),
             LPARAM(to_wide(&labels.engine_sapi4).as_ptr() as isize),
         );
+        SendMessageW(
+            combo_dialogue_secondary_engine,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.engine_google).as_ptr() as isize),
+        );
         let dialogue_secondary_engine_index = match settings.dialogue_secondary_tts_engine {
             TtsEngine::Edge => 0,
             TtsEngine::Sapi5 => 1,
             TtsEngine::Sapi4 => 2,
+            TtsEngine::Google => 3,
         };
         SendMessageW(
             combo_dialogue_secondary_engine,
@@ -7705,17 +7836,22 @@ fn initialize_options_dialog(hwnd: HWND) {
         init_tts_combo(combo_dialogue_secondary_voice_pitch, &pitch_items);
         init_tts_combo(combo_dialogue_secondary_voice_volume, &volume_items);
         select_combo_value(combo_tts_speed, settings.tts_rate);
-        select_combo_value(combo_tts_pitch, settings.tts_pitch);
+        select_pitch_combo_nearest_value(combo_tts_pitch, settings.tts_engine, settings.tts_pitch);
         select_combo_value(combo_tts_volume, settings.tts_volume);
         select_combo_value(combo_dialogue_voice_rate, settings.dialogue_voice_rate);
-        select_combo_value(combo_dialogue_voice_pitch, settings.dialogue_voice_pitch);
+        select_pitch_combo_nearest_value(
+            combo_dialogue_voice_pitch,
+            settings.dialogue_tts_engine,
+            settings.dialogue_voice_pitch,
+        );
         select_combo_value(combo_dialogue_voice_volume, settings.dialogue_voice_volume);
         select_combo_value(
             combo_dialogue_secondary_voice_rate,
             settings.dialogue_secondary_voice_rate,
         );
-        select_combo_value(
+        select_pitch_combo_nearest_value(
             combo_dialogue_secondary_voice_pitch,
+            settings.dialogue_secondary_tts_engine,
             settings.dialogue_secondary_voice_pitch,
         );
         select_combo_value(
@@ -7730,7 +7866,10 @@ fn initialize_options_dialog(hwnd: HWND) {
         }
         if let Err(_e) = SetWindowTextW(
             edit_tts_pitch,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(settings.tts_pitch).to_string()).as_ptr()),
+            PCWSTR(
+                to_wide(&tts_pitch_ui_value(settings.tts_engine, settings.tts_pitch).to_string())
+                    .as_ptr(),
+            ),
         ) {
             crate::log_debug(&format!("Failed to set pitch text: {:?}", _e));
         }
@@ -7752,8 +7891,14 @@ fn initialize_options_dialog(hwnd: HWND) {
         if let Err(_e) = SetWindowTextW(
             edit_dialogue_voice_pitch,
             PCWSTR(
-                to_wide(&tts_ui_value_from_internal(settings.dialogue_voice_pitch).to_string())
-                    .as_ptr(),
+                to_wide(
+                    &tts_pitch_ui_value(
+                        settings.dialogue_tts_engine,
+                        settings.dialogue_voice_pitch,
+                    )
+                    .to_string(),
+                )
+                .as_ptr(),
             ),
         ) {
             crate::log_debug(&format!("Failed to set dialogue pitch text: {:?}", _e));
@@ -7782,8 +7927,11 @@ fn initialize_options_dialog(hwnd: HWND) {
             edit_dialogue_secondary_voice_pitch,
             PCWSTR(
                 to_wide(
-                    &tts_ui_value_from_internal(settings.dialogue_secondary_voice_pitch)
-                        .to_string(),
+                    &tts_pitch_ui_value(
+                        settings.dialogue_secondary_tts_engine,
+                        settings.dialogue_secondary_voice_pitch,
+                    )
+                    .to_string(),
                 )
                 .as_ptr(),
             ),
@@ -9125,6 +9273,7 @@ fn initialize_options_dialog(hwnd: HWND) {
 
 fn populate_voice_combo(
     combo_voice: HWND,
+    engine: TtsEngine,
     voices: &[VoiceInfo],
     selected: &str,
     only_multilingual: bool,
@@ -9162,7 +9311,12 @@ fn populate_voice_combo(
                     continue;
                 }
             }
-            let label = format!("{} ({})", voice.short_name, voice.locale);
+            let display_name = if engine == TtsEngine::Google {
+                crate::google_tts::voice_display_name(&voice.short_name)
+            } else {
+                voice.short_name.clone()
+            };
+            let label = format!("{} ({})", display_name, voice.locale);
             let wide = to_wide(&label);
             let idx = SendMessageW(
                 combo_voice,
@@ -9356,6 +9510,14 @@ fn tts_tuning_limits_for_engine(engine: TtsEngine) -> TtsTuningLimits {
             volume_min: EDGE_TTS_VOLUME_MIN,
             volume_max: EDGE_TTS_VOLUME_MAX,
         },
+        TtsEngine::Google => TtsTuningLimits {
+            rate_min: -100,
+            rate_max: 100,
+            pitch_min: crate::google_tts::GOOGLE_PITCH_ENCODE_BASE,
+            pitch_max: crate::google_tts::GOOGLE_PITCH_ENCODE_BASE + 100,
+            volume_min: 0,
+            volume_max: 100,
+        },
         TtsEngine::Sapi5 | TtsEngine::Sapi4 => TtsTuningLimits {
             rate_min: TTS_RATE_MIN,
             rate_max: TTS_RATE_MAX,
@@ -9369,9 +9531,14 @@ fn tts_tuning_limits_for_engine(engine: TtsEngine) -> TtsTuningLimits {
 
 fn clamp_tts_tuning_for_engine(engine: TtsEngine, tuning: TtsTuning) -> TtsTuning {
     let limits = tts_tuning_limits_for_engine(engine);
+    let pitch = if engine == TtsEngine::Google {
+        crate::google_tts::normalize_google_pitch_internal(tuning.pitch)
+    } else {
+        tuning.pitch.clamp(limits.pitch_min, limits.pitch_max)
+    };
     TtsTuning::new(
         tuning.rate.clamp(limits.rate_min, limits.rate_max),
-        tuning.pitch.clamp(limits.pitch_min, limits.pitch_max),
+        pitch,
         tuning.volume.clamp(limits.volume_min, limits.volume_max),
     )
 }
@@ -9380,8 +9547,91 @@ fn selected_tts_engine_from_combo(combo: HWND, fallback: TtsEngine) -> TtsEngine
     match crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
+        3 => TtsEngine::Google,
         0 => TtsEngine::Edge,
         _ => fallback,
+    }
+}
+
+fn pitch_value_from_combo(combo: HWND, engine: TtsEngine) -> i32 {
+    let raw = combo_value(combo);
+    if engine == TtsEngine::Google {
+        crate::google_tts::google_pitch_preset_internal(raw)
+    } else {
+        raw
+    }
+}
+
+fn select_pitch_combo_nearest_value(combo: HWND, engine: TtsEngine, value: i32) {
+    unsafe {
+        let count = SendMessageW(combo, CB_GETCOUNT, WPARAM(0), LPARAM(0)).0;
+        if count <= 0 {
+            return;
+        }
+        let target = if engine == TtsEngine::Google {
+            crate::google_tts::google_pitch_percent_from_internal(value)
+        } else {
+            value
+        };
+        let mut best_idx = 0;
+        let mut best_diff = i32::MAX;
+        for i in 0..count {
+            let raw = SendMessageW(combo, CB_GETITEMDATA, WPARAM(i as usize), LPARAM(0)).0 as i32;
+            let candidate = if engine == TtsEngine::Google {
+                crate::google_tts::google_pitch_percent_from_internal(raw)
+            } else {
+                raw
+            };
+            let diff = (candidate - target).abs();
+            if diff < best_diff {
+                best_diff = diff;
+                best_idx = i;
+            }
+        }
+        SendMessageW(combo, CB_SETCURSEL, WPARAM(best_idx as usize), LPARAM(0));
+    }
+}
+
+fn tts_pitch_ui_value(engine: TtsEngine, value: i32) -> i32 {
+    if engine == TtsEngine::Google {
+        crate::google_tts::google_pitch_percent_from_internal(value)
+    } else {
+        tts_ui_value_from_internal(value)
+    }
+}
+
+fn read_tts_pitch_edit_value(edit: HWND, engine: TtsEngine, fallback_internal: i32) -> i32 {
+    if engine == TtsEngine::Google {
+        let fallback = crate::google_tts::google_pitch_percent_from_internal(fallback_internal);
+        crate::google_tts::google_pitch_percent_to_internal(read_tts_edit_value(
+            edit, fallback, 0, 100,
+        ))
+    } else {
+        let limits = tts_tuning_limits_for_engine(engine);
+        read_tts_tuning_edit_value(edit, fallback_internal, limits.pitch_min, limits.pitch_max)
+    }
+}
+
+fn read_tts_pitch_edit_value_with_clamp(
+    edit: HWND,
+    engine: TtsEngine,
+    fallback_internal: i32,
+) -> (i32, Option<i32>) {
+    if engine == TtsEngine::Google {
+        let fallback = crate::google_tts::google_pitch_percent_from_internal(fallback_internal);
+        let (percent, adjusted) = read_tts_edit_value_with_clamp(edit, fallback, 0, 100);
+        (
+            crate::google_tts::google_pitch_percent_to_internal(percent),
+            adjusted,
+        )
+    } else {
+        let limits = tts_tuning_limits_for_engine(engine);
+        read_tts_tuning_edit_value_with_clamp(
+            edit,
+            fallback_internal,
+            limits.pitch_min,
+            limits.pitch_max,
+        )
     }
 }
 
@@ -9493,12 +9743,7 @@ fn main_tts_tuning_from_controls(
     if manual {
         let (rate, adjusted_rate) =
             read_tts_tuning_edit_value_with_clamp(edit_speed, 0, limits.rate_min, limits.rate_max);
-        let (pitch, adjusted_pitch) = read_tts_tuning_edit_value_with_clamp(
-            edit_pitch,
-            0,
-            limits.pitch_min,
-            limits.pitch_max,
-        );
+        let (pitch, adjusted_pitch) = read_tts_pitch_edit_value_with_clamp(edit_pitch, engine, 0);
         let (volume, adjusted_volume) =
             read_tts_edit_value_with_clamp(edit_volume, 100, limits.volume_min, limits.volume_max);
         let adjusted = adjusted_rate.or(adjusted_pitch).or(adjusted_volume);
@@ -9507,7 +9752,7 @@ fn main_tts_tuning_from_controls(
         Some((
             TtsTuning::new(
                 combo_value(combo_speed).clamp(limits.rate_min, limits.rate_max),
-                combo_value(combo_pitch).clamp(limits.pitch_min, limits.pitch_max),
+                pitch_value_from_combo(combo_pitch, engine),
                 combo_value(combo_volume).clamp(limits.volume_min, limits.volume_max),
             ),
             None,
@@ -9532,7 +9777,7 @@ fn set_main_tts_tuning_controls(hwnd: HWND, engine: TtsEngine, tuning: TtsTuning
     };
     let tuning = clamp_tts_tuning_for_engine(engine, tuning);
     select_combo_nearest_value(combo_speed, tuning.rate);
-    select_combo_nearest_value(combo_pitch, tuning.pitch);
+    select_pitch_combo_nearest_value(combo_pitch, engine, tuning.pitch);
     select_combo_nearest_value(combo_volume, tuning.volume);
     if let Err(e) = crate::set_window_text_w_safe(
         edit_speed,
@@ -9542,7 +9787,7 @@ fn set_main_tts_tuning_controls(hwnd: HWND, engine: TtsEngine, tuning: TtsTuning
     }
     if let Err(e) = crate::set_window_text_w_safe(
         edit_pitch,
-        PCWSTR(to_wide(&tts_ui_value_from_internal(tuning.pitch).to_string()).as_ptr()),
+        PCWSTR(to_wide(&tts_pitch_ui_value(engine, tuning.pitch).to_string()).as_ptr()),
     ) {
         crate::log_debug(&format!("Failed to set tts pitch edit: {e}"));
     }
@@ -9558,6 +9803,7 @@ fn store_main_tts_tuning_draft(hwnd: HWND, engine: TtsEngine) -> Option<Option<i
     let (tuning, adjusted) = main_tts_tuning_from_controls(hwnd, engine)?;
     with_options_state(hwnd, |state| match engine {
         TtsEngine::Edge => state.edge_tts_tuning = tuning,
+        TtsEngine::Google => state.google_tts_tuning = tuning,
         TtsEngine::Sapi5 => state.sapi5_tts_tuning = tuning,
         TtsEngine::Sapi4 => state.sapi4_tts_tuning = tuning,
     })?;
@@ -9567,6 +9813,7 @@ fn store_main_tts_tuning_draft(hwnd: HWND, engine: TtsEngine) -> Option<Option<i
 fn main_tts_tuning_draft(hwnd: HWND, engine: TtsEngine) -> Option<TtsTuning> {
     with_options_state(hwnd, |state| match engine {
         TtsEngine::Edge => state.edge_tts_tuning,
+        TtsEngine::Google => state.google_tts_tuning,
         TtsEngine::Sapi5 => state.sapi5_tts_tuning,
         TtsEngine::Sapi4 => state.sapi4_tts_tuning,
     })
@@ -9575,6 +9822,7 @@ fn main_tts_tuning_draft(hwnd: HWND, engine: TtsEngine) -> Option<TtsTuning> {
 fn voice_profile_tuning_for_engine(profile: &VoiceProfile, engine: TtsEngine) -> TtsTuning {
     match engine {
         TtsEngine::Edge => profile.edge_tts_tuning,
+        TtsEngine::Google => profile.google_tts_tuning,
         TtsEngine::Sapi5 => profile.sapi5_tts_tuning,
         TtsEngine::Sapi4 => profile.sapi4_tts_tuning,
     }
@@ -9644,7 +9892,7 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         == BST_CHECKED.0;
     if manual {
         let rate = combo_value(combo_speed).clamp(limits.rate_min, limits.rate_max);
-        let pitch = combo_value(combo_pitch).clamp(limits.pitch_min, limits.pitch_max);
+        let pitch = pitch_value_from_combo(combo_pitch, engine);
         let volume = combo_value(combo_volume).clamp(limits.volume_min, limits.volume_max);
         if let Err(_e) = crate::set_window_text_w_safe(
             edit_speed,
@@ -9654,7 +9902,7 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         }
         if let Err(_e) = crate::set_window_text_w_safe(
             edit_pitch,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(pitch).to_string()).as_ptr()),
+            PCWSTR(to_wide(&tts_pitch_ui_value(engine, pitch).to_string()).as_ptr()),
         ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
@@ -9666,14 +9914,13 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         }
         let d_rate = combo_value(combo_dialogue_voice_rate)
             .clamp(dialogue_limits.rate_min, dialogue_limits.rate_max);
-        let d_pitch = combo_value(combo_dialogue_voice_pitch)
-            .clamp(dialogue_limits.pitch_min, dialogue_limits.pitch_max);
+        let d_pitch = pitch_value_from_combo(combo_dialogue_voice_pitch, dialogue_engine);
         let d_volume = combo_value(combo_dialogue_voice_volume)
             .clamp(dialogue_limits.volume_min, dialogue_limits.volume_max);
         let sd_rate = combo_value(combo_dialogue_secondary_voice_rate)
             .clamp(secondary_limits.rate_min, secondary_limits.rate_max);
-        let sd_pitch = combo_value(combo_dialogue_secondary_voice_pitch)
-            .clamp(secondary_limits.pitch_min, secondary_limits.pitch_max);
+        let sd_pitch =
+            pitch_value_from_combo(combo_dialogue_secondary_voice_pitch, secondary_engine);
         let sd_volume = combo_value(combo_dialogue_secondary_voice_volume)
             .clamp(secondary_limits.volume_min, secondary_limits.volume_max);
         if let Err(_e) = crate::set_window_text_w_safe(
@@ -9684,7 +9931,7 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         }
         if let Err(_e) = crate::set_window_text_w_safe(
             edit_dialogue_voice_pitch,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(d_pitch).to_string()).as_ptr()),
+            PCWSTR(to_wide(&tts_pitch_ui_value(dialogue_engine, d_pitch).to_string()).as_ptr()),
         ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
@@ -9702,7 +9949,7 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         }
         if let Err(_e) = crate::set_window_text_w_safe(
             edit_dialogue_secondary_voice_pitch,
-            PCWSTR(to_wide(&tts_ui_value_from_internal(sd_pitch).to_string()).as_ptr()),
+            PCWSTR(to_wide(&tts_pitch_ui_value(secondary_engine, sd_pitch).to_string()).as_ptr()),
         ) {
             crate::log_debug(&format!("Error: {:?}", _e));
         }
@@ -9714,7 +9961,7 @@ fn update_tts_manual_visibility(hwnd: HWND) {
         }
     } else {
         let rate = read_tts_tuning_edit_value(edit_speed, 0, limits.rate_min, limits.rate_max);
-        let pitch = read_tts_tuning_edit_value(edit_pitch, 0, limits.pitch_min, limits.pitch_max);
+        let pitch = read_tts_pitch_edit_value(edit_pitch, engine, 0);
         let volume = read_tts_edit_value(edit_volume, 100, limits.volume_min, limits.volume_max);
         let d_rate = read_tts_tuning_edit_value(
             edit_dialogue_voice_rate,
@@ -9722,12 +9969,7 @@ fn update_tts_manual_visibility(hwnd: HWND) {
             dialogue_limits.rate_min,
             dialogue_limits.rate_max,
         );
-        let d_pitch = read_tts_tuning_edit_value(
-            edit_dialogue_voice_pitch,
-            0,
-            dialogue_limits.pitch_min,
-            dialogue_limits.pitch_max,
-        );
+        let d_pitch = read_tts_pitch_edit_value(edit_dialogue_voice_pitch, dialogue_engine, 0);
         let d_volume = read_tts_edit_value(
             edit_dialogue_voice_volume,
             100,
@@ -9740,12 +9982,8 @@ fn update_tts_manual_visibility(hwnd: HWND) {
             secondary_limits.rate_min,
             secondary_limits.rate_max,
         );
-        let sd_pitch = read_tts_tuning_edit_value(
-            edit_dialogue_secondary_voice_pitch,
-            0,
-            secondary_limits.pitch_min,
-            secondary_limits.pitch_max,
-        );
+        let sd_pitch =
+            read_tts_pitch_edit_value(edit_dialogue_secondary_voice_pitch, secondary_engine, 0);
         let sd_volume = read_tts_edit_value(
             edit_dialogue_secondary_voice_volume,
             100,
@@ -9753,13 +9991,17 @@ fn update_tts_manual_visibility(hwnd: HWND) {
             secondary_limits.volume_max,
         );
         select_combo_nearest_value(combo_speed, rate);
-        select_combo_nearest_value(combo_pitch, pitch);
+        select_pitch_combo_nearest_value(combo_pitch, engine, pitch);
         select_combo_nearest_value(combo_volume, volume);
         select_combo_nearest_value(combo_dialogue_voice_rate, d_rate);
-        select_combo_nearest_value(combo_dialogue_voice_pitch, d_pitch);
+        select_pitch_combo_nearest_value(combo_dialogue_voice_pitch, dialogue_engine, d_pitch);
         select_combo_nearest_value(combo_dialogue_voice_volume, d_volume);
         select_combo_nearest_value(combo_dialogue_secondary_voice_rate, sd_rate);
-        select_combo_nearest_value(combo_dialogue_secondary_voice_pitch, sd_pitch);
+        select_pitch_combo_nearest_value(
+            combo_dialogue_secondary_voice_pitch,
+            secondary_engine,
+            sd_pitch,
+        );
         select_combo_nearest_value(combo_dialogue_secondary_voice_volume, sd_volume);
     }
     unsafe {
@@ -10238,11 +10480,13 @@ fn preview_voice(hwnd: HWND) {
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
+        3 => TtsEngine::Google,
         _ => TtsEngine::Edge,
     };
     let voices = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Google => crate::google_tts::installed_voices(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
@@ -10275,9 +10519,9 @@ fn preview_voice(hwnd: HWND) {
         combo_value(combo_tts_speed).clamp(limits.rate_min, limits.rate_max)
     };
     let pitch = if manual {
-        read_tts_tuning_edit_value(edit_tts_pitch, 0, limits.pitch_min, limits.pitch_max)
+        read_tts_pitch_edit_value(edit_tts_pitch, engine, 0)
     } else {
-        combo_value(combo_tts_pitch).clamp(limits.pitch_min, limits.pitch_max)
+        pitch_value_from_combo(combo_tts_pitch, engine)
     };
     let volume = if manual {
         read_tts_edit_value(edit_tts_volume, 100, limits.volume_min, limits.volume_max)
@@ -10285,9 +10529,29 @@ fn preview_voice(hwnd: HWND) {
         combo_value(combo_tts_volume).clamp(limits.volume_min, limits.volume_max)
     };
     let chunks = tts_engine::split_into_tts_chunks(&text, split_on_newline, &dictionary, engine);
+    crate::log_debug(&format!(
+        "Options TTS preview: engine={} voice={:?} manual={} rate={} pitch_internal={} pitch_percent={} volume={} chunks={}",
+        match engine {
+            TtsEngine::Edge => "edge",
+            TtsEngine::Google => "google",
+            TtsEngine::Sapi5 => "sapi5",
+            TtsEngine::Sapi4 => "sapi4",
+        },
+        voice,
+        manual,
+        rate,
+        pitch,
+        if engine == TtsEngine::Google {
+            crate::google_tts::google_pitch_percent_from_internal(pitch)
+        } else {
+            pitch
+        },
+        volume,
+        chunks.len()
+    ));
 
     match engine {
-        TtsEngine::Edge => {
+        TtsEngine::Edge | TtsEngine::Google => {
             let options = tts_engine::TtsPlaybackOptions {
                 hwnd: parent,
                 engine,
@@ -10405,11 +10669,13 @@ fn insert_voice_tag_from_options(hwnd: HWND) {
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
+        3 => TtsEngine::Google,
         _ => TtsEngine::Edge,
     };
     let voices = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Google => crate::google_tts::installed_voices(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
@@ -10445,9 +10711,9 @@ fn insert_voice_tag_from_options(hwnd: HWND) {
         combo_value(combo_speed).clamp(limits.rate_min, limits.rate_max)
     };
     let pitch = if manual {
-        read_tts_tuning_edit_value(edit_pitch, 0, limits.pitch_min, limits.pitch_max)
+        read_tts_pitch_edit_value(edit_pitch, engine, 0)
     } else {
-        combo_value(combo_pitch).clamp(limits.pitch_min, limits.pitch_max)
+        pitch_value_from_combo(combo_pitch, engine)
     };
     let volume = if manual {
         read_tts_edit_value(edit_volume, 100, limits.volume_min, limits.volume_max)
@@ -10583,11 +10849,13 @@ fn preview_dialogue_voice(hwnd: HWND) {
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
+        3 => TtsEngine::Google,
         _ => TtsEngine::Edge,
     };
     let voices = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Google => crate::google_tts::installed_voices(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
@@ -10626,14 +10894,9 @@ fn preview_dialogue_voice(hwnd: HWND) {
         combo_value(combo_dialogue_voice_rate).clamp(limits.rate_min, limits.rate_max)
     };
     let pitch = if manual {
-        read_tts_tuning_edit_value(
-            edit_dialogue_voice_pitch,
-            0,
-            limits.pitch_min,
-            limits.pitch_max,
-        )
+        read_tts_pitch_edit_value(edit_dialogue_voice_pitch, engine, 0)
     } else {
-        combo_value(combo_dialogue_voice_pitch).clamp(limits.pitch_min, limits.pitch_max)
+        pitch_value_from_combo(combo_dialogue_voice_pitch, engine)
     };
     let volume = if manual {
         read_tts_edit_value(
@@ -10647,7 +10910,7 @@ fn preview_dialogue_voice(hwnd: HWND) {
     };
 
     match engine {
-        TtsEngine::Edge => {
+        TtsEngine::Edge | TtsEngine::Google => {
             let chunks = tts_engine::split_into_tts_chunks(&text, false, &[], engine);
             let options = tts_engine::TtsPlaybackOptions {
                 hwnd: parent,
@@ -10779,11 +11042,13 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
     let engine = match engine_sel {
         1 => TtsEngine::Sapi5,
         2 => TtsEngine::Sapi4,
+        3 => TtsEngine::Google,
         _ => TtsEngine::Edge,
     };
     let voices = {
         with_state(parent, |state| match engine {
             TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Google => crate::google_tts::installed_voices(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
@@ -10827,14 +11092,9 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
         combo_value(combo_dialogue_secondary_voice_rate).clamp(limits.rate_min, limits.rate_max)
     };
     let pitch = if manual {
-        read_tts_tuning_edit_value(
-            edit_dialogue_secondary_voice_pitch,
-            0,
-            limits.pitch_min,
-            limits.pitch_max,
-        )
+        read_tts_pitch_edit_value(edit_dialogue_secondary_voice_pitch, engine, 0)
     } else {
-        combo_value(combo_dialogue_secondary_voice_pitch).clamp(limits.pitch_min, limits.pitch_max)
+        pitch_value_from_combo(combo_dialogue_secondary_voice_pitch, engine)
     };
     let volume = if manual {
         read_tts_edit_value(
@@ -10849,7 +11109,7 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
     };
 
     match engine {
-        TtsEngine::Edge => {
+        TtsEngine::Edge | TtsEngine::Google => {
             let chunks = tts_engine::split_into_tts_chunks(&text, false, &[], engine);
             let options = tts_engine::TtsPlaybackOptions {
                 hwnd: parent,
@@ -11265,7 +11525,7 @@ fn apply_options_dialog(hwnd: HWND) {
         settings.tts_engine = match engine_sel {
             1 => TtsEngine::Sapi5,
             2 => TtsEngine::Sapi4,
-
+            3 => TtsEngine::Google,
             _ => TtsEngine::Edge,
         };
 
@@ -11274,6 +11534,7 @@ fn apply_options_dialog(hwnd: HWND) {
         settings.dialogue_tts_engine = match dialogue_engine_sel {
             1 => TtsEngine::Sapi5,
             2 => TtsEngine::Sapi4,
+            3 => TtsEngine::Google,
             _ => TtsEngine::Edge,
         };
         let dialogue_secondary_engine_sel = SendMessageW(
@@ -11286,6 +11547,7 @@ fn apply_options_dialog(hwnd: HWND) {
         settings.dialogue_secondary_tts_engine = match dialogue_secondary_engine_sel {
             1 => TtsEngine::Sapi5,
             2 => TtsEngine::Sapi4,
+            3 => TtsEngine::Google,
             _ => TtsEngine::Edge,
         };
         let mut clamped_manual_value: Option<i32> = None;
@@ -11298,14 +11560,18 @@ fn apply_options_dialog(hwnd: HWND) {
         {
             clamped_manual_value = Some(adjusted);
         }
-        if let Some((edge_tuning, sapi5_tuning, sapi4_tuning)) = with_options_state(hwnd, |state| {
-            (
-                state.edge_tts_tuning,
-                state.sapi5_tts_tuning,
-                state.sapi4_tts_tuning,
-            )
-        }) {
+        if let Some((edge_tuning, google_tuning, sapi5_tuning, sapi4_tuning)) =
+            with_options_state(hwnd, |state| {
+                (
+                    state.edge_tts_tuning,
+                    state.google_tts_tuning,
+                    state.sapi5_tts_tuning,
+                    state.sapi4_tts_tuning,
+                )
+            })
+        {
             settings.edge_tts_tuning = edge_tuning;
+            settings.google_tts_tuning = google_tuning;
             settings.sapi5_tts_tuning = sapi5_tuning;
             settings.sapi4_tts_tuning = sapi4_tuning;
         }
@@ -11313,6 +11579,24 @@ fn apply_options_dialog(hwnd: HWND) {
         settings.tts_rate = active_tuning.rate;
         settings.tts_pitch = active_tuning.pitch;
         settings.tts_volume = active_tuning.volume;
+        crate::log_debug(&format!(
+            "Options TTS apply: engine={} rate={} pitch_internal={} pitch_percent={} volume={} manual={}",
+            match settings.tts_engine {
+                TtsEngine::Edge => "edge",
+                TtsEngine::Google => "google",
+                TtsEngine::Sapi5 => "sapi5",
+                TtsEngine::Sapi4 => "sapi4",
+            },
+            settings.tts_rate,
+            settings.tts_pitch,
+            if settings.tts_engine == TtsEngine::Google {
+                crate::google_tts::google_pitch_percent_from_internal(settings.tts_pitch)
+            } else {
+                settings.tts_pitch
+            },
+            settings.tts_volume,
+            settings.tts_manual_tuning
+        ));
 
         settings.tts_only_multilingual =
             SendMessageW(checkbox_multilingual, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
@@ -11714,12 +11998,14 @@ fn apply_options_dialog(hwnd: HWND) {
 
         let voices = with_state(parent, |state| match settings.tts_engine {
             TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Google => crate::google_tts::installed_voices(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
         .unwrap_or_default();
         let dialogue_voices = with_state(parent, |state| match settings.dialogue_tts_engine {
             TtsEngine::Edge => state.edge_voices.clone(),
+            TtsEngine::Google => crate::google_tts::installed_voices(),
             TtsEngine::Sapi5 => state.sapi_voices.clone(),
             TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
         })
@@ -11727,6 +12013,7 @@ fn apply_options_dialog(hwnd: HWND) {
         let dialogue_secondary_voices = with_state(parent, |state| {
             match settings.dialogue_secondary_tts_engine {
                 TtsEngine::Edge => state.edge_voices.clone(),
+                TtsEngine::Google => crate::google_tts::installed_voices(),
                 TtsEngine::Sapi5 => state.sapi_voices.clone(),
                 TtsEngine::Sapi4 => crate::sapi4_engine::get_voices(),
             }
@@ -11822,11 +12109,10 @@ fn apply_options_dialog(hwnd: HWND) {
             }
             settings.dialogue_voice_rate = dialogue_voice_rate;
             let (dialogue_voice_pitch, adjusted_dialogue_voice_pitch) =
-                read_tts_tuning_edit_value_with_clamp(
+                read_tts_pitch_edit_value_with_clamp(
                     edit_dialogue_voice_pitch,
+                    settings.dialogue_tts_engine,
                     settings.dialogue_voice_pitch,
-                    dialogue_limits.pitch_min,
-                    dialogue_limits.pitch_max,
                 );
             if clamped_manual_value.is_none() {
                 clamped_manual_value = adjusted_dialogue_voice_pitch;
@@ -11855,11 +12141,10 @@ fn apply_options_dialog(hwnd: HWND) {
             }
             settings.dialogue_secondary_voice_rate = dialogue_secondary_voice_rate;
             let (dialogue_secondary_voice_pitch, adjusted_dialogue_secondary_voice_pitch) =
-                read_tts_tuning_edit_value_with_clamp(
+                read_tts_pitch_edit_value_with_clamp(
                     edit_dialogue_secondary_voice_pitch,
+                    settings.dialogue_secondary_tts_engine,
                     settings.dialogue_secondary_voice_pitch,
-                    secondary_limits.pitch_min,
-                    secondary_limits.pitch_max,
                 );
             if clamped_manual_value.is_none() {
                 clamped_manual_value = adjusted_dialogue_secondary_voice_pitch;
@@ -11879,16 +12164,17 @@ fn apply_options_dialog(hwnd: HWND) {
         } else {
             settings.dialogue_voice_rate = combo_value(combo_dialogue_voice_rate)
                 .clamp(dialogue_limits.rate_min, dialogue_limits.rate_max);
-            settings.dialogue_voice_pitch = combo_value(combo_dialogue_voice_pitch)
-                .clamp(dialogue_limits.pitch_min, dialogue_limits.pitch_max);
+            settings.dialogue_voice_pitch =
+                pitch_value_from_combo(combo_dialogue_voice_pitch, settings.dialogue_tts_engine);
             settings.dialogue_voice_volume = combo_value(combo_dialogue_voice_volume)
                 .clamp(dialogue_limits.volume_min, dialogue_limits.volume_max);
             settings.dialogue_secondary_voice_rate =
                 combo_value(combo_dialogue_secondary_voice_rate)
                     .clamp(secondary_limits.rate_min, secondary_limits.rate_max);
-            settings.dialogue_secondary_voice_pitch =
-                combo_value(combo_dialogue_secondary_voice_pitch)
-                    .clamp(secondary_limits.pitch_min, secondary_limits.pitch_max);
+            settings.dialogue_secondary_voice_pitch = pitch_value_from_combo(
+                combo_dialogue_secondary_voice_pitch,
+                settings.dialogue_secondary_tts_engine,
+            );
             settings.dialogue_secondary_voice_volume =
                 combo_value(combo_dialogue_secondary_voice_volume)
                     .clamp(secondary_limits.volume_min, secondary_limits.volume_max);
@@ -12850,6 +13136,11 @@ fn layout_voice_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
         state.combo_voice,
         y,
         OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_button_compact(
+        "button_manage_google_voices",
+        state.button_manage_google_voices,
+        y,
     );
     y = layout_checkbox("checkbox_multilingual", state.checkbox_multilingual, y);
     y = layout_label_control(
@@ -13857,6 +14148,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.button_delete_voice_profile,
             state.label_voice,
             state.combo_voice,
+            state.button_manage_google_voices,
             state.label_tts_speed,
             state.combo_tts_speed,
             state.label_tts_pitch,

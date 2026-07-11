@@ -3557,6 +3557,49 @@ fn start_subtitle_reader(
                                 log_debug("Subtitle: main output missing, skipping cue.");
                             }
                         }
+                        crate::settings::TtsEngine::Google => {
+                            if let Some(pos) = wait_until_target(raw_pos, target) {
+                                raw_pos = pos;
+                            } else {
+                                return;
+                            }
+                            let cancel_flag = Arc::new(AtomicBool::new(false));
+                            if let Some((ref cancel_store, ref command_store)) = speech_handles {
+                                if let Ok(mut guard) = cancel_store.lock() {
+                                    *guard = Some(cancel_flag.clone());
+                                }
+                                if let Ok(mut guard) = command_store.lock() {
+                                    *guard = None;
+                                }
+                            }
+                            match crate::google_tts::synthesize_wav_bytes(
+                                &cue.text,
+                                &settings.tts_voice,
+                                settings.tts_rate,
+                                settings.tts_pitch,
+                                settings.tts_volume,
+                                &cancel_flag,
+                            ) {
+                                Ok(bytes) => {
+                                    let playback_cancel =
+                                        crate::tts_engine::play_edge_bytes_async(bytes, 100);
+                                    if let Some((ref cancel_store, ref command_store)) =
+                                        speech_handles
+                                    {
+                                        if let Ok(mut guard) = cancel_store.lock() {
+                                            *guard = Some(playback_cancel);
+                                        }
+                                        if let Ok(mut guard) = command_store.lock() {
+                                            *guard = None;
+                                        }
+                                    }
+                                    did_emit = true;
+                                }
+                                Err(err) => {
+                                    log_debug(&format!("Subtitle: Google TTS failed: {err}"));
+                                }
+                            }
+                        }
                         crate::settings::TtsEngine::Sapi5 => {
                             if let Some(pos) = wait_until_target(raw_pos, target) {
                                 raw_pos = pos;

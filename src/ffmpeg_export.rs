@@ -85,6 +85,7 @@ fn tts_cache_dir(media_path: &Path, settings: &AppSettings) -> Result<PathBuf, S
         crate::settings::TtsEngine::Edge => "edge",
         crate::settings::TtsEngine::Sapi5 => "sapi5",
         crate::settings::TtsEngine::Sapi4 => "sapi4",
+        crate::settings::TtsEngine::Google => "google",
     };
     hasher.update(engine_key.as_bytes());
     hasher.update(settings.tts_voice.as_bytes());
@@ -184,6 +185,33 @@ fn ensure_tts_cache(
                         }
                     }
                 }
+            }
+            crate::settings::TtsEngine::Google => {
+                let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                let options = tts_engine::AudiobookCommonOptions {
+                    voice: &settings.tts_voice,
+                    output: &path,
+                    progress_hwnd: HWND(0),
+                    cancel,
+                    language: settings.language,
+                    part_naming_mode: crate::settings::AudiobookPartNamingMode::TitleNumber,
+                    audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
+                    rate: settings.tts_rate,
+                    pitch: settings.tts_pitch,
+                    volume: settings.tts_volume,
+                    sapi4_threads: None,
+                };
+                let config = tts_engine::MixedAudiobookConfig {
+                    main_engine: settings.tts_engine,
+                };
+                let mut progress = 0usize;
+                tts_engine::render_mixed_audiobook_part(
+                    &chunks,
+                    &mut progress,
+                    &path,
+                    &options,
+                    &config,
+                )?;
             }
             crate::settings::TtsEngine::Sapi5 => {
                 if has_overrides {

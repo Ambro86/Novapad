@@ -113,6 +113,7 @@ fn parse_voice_tag_override(tag: &str, default_engine: TtsEngine) -> Option<Voic
                 "edge" => Some(TtsEngine::Edge),
                 "sapi4" => Some(TtsEngine::Sapi4),
                 "sapi5" => Some(TtsEngine::Sapi5),
+                "google" => Some(TtsEngine::Google),
                 _ => None,
             };
         }
@@ -176,6 +177,7 @@ fn parse_voice_tag_override(tag: &str, default_engine: TtsEngine) -> Option<Voic
                 "edge" => Some(TtsEngine::Edge),
                 "sapi4" => Some(TtsEngine::Sapi4),
                 "sapi5" => Some(TtsEngine::Sapi5),
+                "google" => Some(TtsEngine::Google),
                 _ => None,
             };
             if engine.is_some() {
@@ -310,6 +312,7 @@ pub(crate) fn split_voice_tag_spans(
                     TtsEngine::Edge => "edge",
                     TtsEngine::Sapi5 => "sapi5",
                     TtsEngine::Sapi4 => "sapi4",
+                    TtsEngine::Google => "google",
                 })
                 .unwrap_or("(none)"),
             ov.as_ref().map(|o| o.voice.as_str()).unwrap_or("(none)"),
@@ -531,7 +534,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     }
 
     match tts_engine {
-        TtsEngine::Edge => queue_tts_playback_from_text(TtsQueuedPlayback {
+        TtsEngine::Edge | TtsEngine::Google => queue_tts_playback_from_text(TtsQueuedPlayback {
             hwnd,
             engine: tts_engine,
             text,
@@ -660,7 +663,7 @@ pub fn speak_text_once(hwnd: HWND, text: String) {
         return;
     }
     match tts_engine {
-        TtsEngine::Edge => queue_tts_playback_from_text(TtsQueuedPlayback {
+        TtsEngine::Edge | TtsEngine::Google => queue_tts_playback_from_text(TtsQueuedPlayback {
             hwnd,
             engine: tts_engine,
             text,
@@ -919,23 +922,51 @@ fn synthesize_sapi4_bytes(
     Ok(bytes)
 }
 
-async fn synthesize_segment_bytes(
+struct SynthesisConfig {
     engine: TtsEngine,
-    text: &str,
-    voice: &str,
+    voice: String,
     rate: i32,
     pitch: i32,
     volume: i32,
     language: Language,
-) -> Result<Vec<u8>, String> {
-    match engine {
+    cancel: Arc<AtomicBool>,
+}
+
+async fn synthesize_segment_bytes(text: &str, config: &SynthesisConfig) -> Result<Vec<u8>, String> {
+    match config.engine {
         TtsEngine::Edge => {
             let request_id = Uuid::new_v4().simple().to_string();
-            download_audio_chunk(text, voice, &request_id, rate, pitch, volume, language).await
+            download_audio_chunk(
+                text,
+                &config.voice,
+                &request_id,
+                config.rate,
+                config.pitch,
+                config.volume,
+                config.language,
+            )
+            .await
+        }
+        TtsEngine::Google => {
+            let text = text.to_string();
+            let voice = config.voice.clone();
+            let rate = config.rate;
+            let pitch = config.pitch;
+            let volume = config.volume;
+            let cancel = config.cancel.clone();
+            tokio::task::spawn_blocking(move || {
+                crate::google_tts::synthesize_wav_bytes(&text, &voice, rate, pitch, volume, &cancel)
+            })
+            .await
+            .map_err(|e| e.to_string())?
         }
         TtsEngine::Sapi5 => {
             let text = text.to_string();
-            let voice = voice.to_string();
+            let voice = config.voice.clone();
+            let rate = config.rate;
+            let pitch = config.pitch;
+            let volume = config.volume;
+            let language = config.language;
             tokio::task::spawn_blocking(move || {
                 synthesize_sapi5_bytes(&text, &voice, rate, pitch, volume, language)
             })
@@ -944,7 +975,10 @@ async fn synthesize_segment_bytes(
         }
         TtsEngine::Sapi4 => {
             let text = text.to_string();
-            let voice = voice.to_string();
+            let voice = config.voice.clone();
+            let rate = config.rate;
+            let pitch = config.pitch;
+            let volume = config.volume;
             tokio::task::spawn_blocking(move || {
                 synthesize_sapi4_bytes(&text, &voice, rate, pitch, volume)
             })
@@ -999,15 +1033,6 @@ fn write_silence_wav(
     write_wav_from_pcm(path, &samples, sample_rate, channels)
 }
 
-struct SynthesisConfig {
-    engine: TtsEngine,
-    voice: String,
-    rate: i32,
-    pitch: i32,
-    volume: i32,
-    language: Language,
-}
-
 #[derive(Clone, Copy)]
 struct TargetAudio {
     sample_rate: u32,
@@ -1020,16 +1045,7 @@ async fn synthesize_segment_to_wav(
     target: TargetAudio,
 ) -> Result<PathBuf, String> {
     let wav_path = temp_wav_path("mix");
-    let bytes = synthesize_segment_bytes(
-        config.engine,
-        text,
-        &config.voice,
-        config.rate,
-        config.pitch,
-        config.volume,
-        config.language,
-    )
-    .await?;
+    let bytes = synthesize_segment_bytes(text, config).await?;
     let (samples, src_rate, src_channels) = if config.engine == TtsEngine::Edge {
         match decode_mp3_to_pcm(&bytes) {
             Ok(v) => v,
@@ -1362,14 +1378,18 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
     };
     let engine_label = match tts_engine {
         TtsEngine::Edge => "edge",
+        TtsEngine::Google => "google",
         TtsEngine::Sapi4 => "sapi4",
         TtsEngine::Sapi5 => "sapi5",
     };
     log_debug(&format!(
-        "TTS start: engine={} voice={voice} chunks={} text_len={}",
+        "TTS start: engine={} voice={voice} chunks={} text_len={} rate={} pitch={} volume={}",
         engine_label,
         chunks.len(),
-        cleaned.len()
+        cleaned.len(),
+        tts_rate,
+        tts_pitch,
+        tts_volume
     ));
     let stream_handle = match OutputStreamBuilder::open_default_stream() {
         Ok(handle) => handle,
@@ -1600,16 +1620,16 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                 } else {
                     (tts_engine, voice_downloader.as_str(), rate, pitch, volume)
                 };
-            let result = synthesize_segment_bytes(
+            let config = SynthesisConfig {
                 engine,
-                &chunk_obj.text_to_read,
-                chunk_voice,
-                chunk_rate,
-                chunk_pitch,
-                chunk_volume,
+                voice: chunk_voice.to_string(),
+                rate: chunk_rate,
+                pitch: chunk_pitch,
+                volume: chunk_volume,
                 language,
-            )
-            .await;
+                cancel: cancel_downloader.clone(),
+            };
+            let result = synthesize_segment_bytes(&chunk_obj.text_to_read, &config).await;
             match result {
                 Ok(data) => {
                     if audio_tx
@@ -3146,15 +3166,16 @@ fn run_split_audiobook_by_time_sapi(
         if options.cancel.load(Ordering::Relaxed) {
             return Err(cancelled_message(options.language));
         }
-        let bytes = rt.block_on(synthesize_segment_bytes(
+        let config = SynthesisConfig {
             engine,
-            chunk,
-            options.voice,
-            options.rate,
-            options.pitch,
-            options.volume,
-            options.language,
-        ))?;
+            voice: options.voice.to_string(),
+            rate: options.rate,
+            pitch: options.pitch,
+            volume: options.volume,
+            language: options.language,
+            cancel: options.cancel.clone(),
+        };
+        let bytes = rt.block_on(synthesize_segment_bytes(chunk, &config))?;
         let (samples, src_rate, src_channels) = decode_wav_to_pcm(&bytes)?;
         let chunk_duration = samples.len() as f64 / (src_rate as f64 * src_channels as f64);
 
@@ -5019,15 +5040,16 @@ fn start_audiobook_with_text(
 
     let cleaned = strip_dashed_lines(&text);
     let use_epub_split = audiobook_split_by_epub_chapter && epub_chapters.as_ref().is_some();
-    let mixed_needed = if use_epub_split {
-        epub_chapters.as_ref().is_some_and(|chapters| {
-            chapters
-                .iter()
-                .any(|chapter| has_voice_tags(chapter) || has_pause_tags(chapter))
-        })
-    } else {
-        has_voice_tags(&cleaned) || has_pause_tags(&cleaned)
-    };
+    let mixed_needed = tts_engine == TtsEngine::Google
+        || if use_epub_split {
+            epub_chapters.as_ref().is_some_and(|chapters| {
+                chapters
+                    .iter()
+                    .any(|chapter| has_voice_tags(chapter) || has_pause_tags(chapter))
+            })
+        } else {
+            has_voice_tags(&cleaned) || has_pause_tags(&cleaned)
+        };
     let mut split_by_time = audiobook_split_by_time;
     let split_minutes = audiobook_split_minutes.clamp(1, 60);
     let split_start_number = audiobook_split_start_number.clamp(1, 99);
@@ -5315,6 +5337,7 @@ fn start_audiobook_with_text(
             TtsEngine::Edge => "edge",
             TtsEngine::Sapi5 => "sapi5",
             TtsEngine::Sapi4 => "sapi4",
+            TtsEngine::Google => "google",
         };
         crate::log_debug(&format!(
             "Audiobook: export start engine={} bitrate={} output={:?}",
@@ -5435,6 +5458,9 @@ fn start_audiobook_with_text(
                             options,
                         )
                     }
+                }
+                TtsEngine::Google => {
+                    Err("Google TTS audiobook export must use the generic renderer.".to_string())
                 }
                 TtsEngine::Sapi5 => {
                     if let Some(ref parts) = marker_parts {
@@ -7278,6 +7304,40 @@ fn run_marker_split_sapi_audiobook(
     Ok(())
 }
 
+pub(crate) fn run_google_audiobook_part(
+    chunks: &[String],
+    current_global_progress: &mut usize,
+    options: &AudiobookCommonOptions,
+) -> Result<(), String> {
+    let generic_chunks: Vec<TtsChunk> = chunks
+        .iter()
+        .filter_map(|chunk| {
+            let normalized =
+                normalize_for_tts_with_profile(chunk, true, TtsSanitizeProfile::Strict);
+            if normalized.trim().is_empty() {
+                None
+            } else {
+                Some(TtsChunk {
+                    original_len: utf16_len(&normalized),
+                    text_to_read: normalized,
+                    override_voice: None,
+                    pause_ms: None,
+                })
+            }
+        })
+        .collect();
+    let config = MixedAudiobookConfig {
+        main_engine: TtsEngine::Google,
+    };
+    render_mixed_audiobook_part(
+        &generic_chunks,
+        current_global_progress,
+        options.output,
+        options,
+        &config,
+    )
+}
+
 pub(crate) fn run_tts_audiobook_part(
     chunks: &[String],
     current_global_progress: &mut usize,
@@ -7718,6 +7778,116 @@ fn resolve_mixed_chunk_synth<'a>(
     }
 }
 
+const GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS: usize = 1_600;
+
+#[derive(Clone, PartialEq, Eq)]
+struct MixedSynthKey {
+    engine: TtsEngine,
+    voice: String,
+    rate: i32,
+    pitch: i32,
+    volume: i32,
+}
+
+#[derive(Clone)]
+struct MixedAudiobookUnit {
+    first_chunk_index: usize,
+    source_chunk_count: usize,
+    chunk: TtsChunk,
+}
+
+fn mixed_synth_key(
+    chunk: &TtsChunk,
+    options: &AudiobookCommonOptions,
+    config: &MixedAudiobookConfig,
+) -> MixedSynthKey {
+    let (engine, voice, rate, pitch, volume) = resolve_mixed_chunk_synth(chunk, options, config);
+    MixedSynthKey {
+        engine,
+        voice: voice.to_string(),
+        rate,
+        pitch,
+        volume,
+    }
+}
+
+fn append_google_batch_text(target: &mut String, incoming: &str) {
+    if target.is_empty() {
+        target.push_str(incoming);
+        return;
+    }
+    let target_has_space = target.chars().next_back().is_some_and(char::is_whitespace);
+    let incoming_has_space = incoming.chars().next().is_some_and(char::is_whitespace);
+    if !target_has_space && !incoming_has_space {
+        target.push(' ');
+    }
+    target.push_str(incoming);
+}
+
+fn coalesce_google_audiobook_chunks(
+    chunks: &[TtsChunk],
+    options: &AudiobookCommonOptions,
+    config: &MixedAudiobookConfig,
+) -> Vec<MixedAudiobookUnit> {
+    let mut units = Vec::with_capacity(chunks.len());
+    let mut index = 0usize;
+    while index < chunks.len() {
+        let first = &chunks[index];
+        let key = mixed_synth_key(first, options, config);
+        if key.engine != TtsEngine::Google || first.pause_ms.is_some() {
+            units.push(MixedAudiobookUnit {
+                first_chunk_index: index,
+                source_chunk_count: 1,
+                chunk: first.clone(),
+            });
+            index += 1;
+            continue;
+        }
+
+        let mut merged = first.clone();
+        let mut source_chunk_count = 1usize;
+        let mut next_index = index + 1;
+        while next_index < chunks.len() {
+            let next = &chunks[next_index];
+            if next.pause_ms.is_some() || mixed_synth_key(next, options, config) != key {
+                break;
+            }
+            let separator_len = usize::from(
+                !merged
+                    .text_to_read
+                    .chars()
+                    .next_back()
+                    .is_some_and(char::is_whitespace)
+                    && !next
+                        .text_to_read
+                        .chars()
+                        .next()
+                        .is_some_and(char::is_whitespace),
+            );
+            let combined_len = merged
+                .text_to_read
+                .chars()
+                .count()
+                .saturating_add(separator_len)
+                .saturating_add(next.text_to_read.chars().count());
+            if combined_len > GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS {
+                break;
+            }
+            append_google_batch_text(&mut merged.text_to_read, &next.text_to_read);
+            merged.original_len = merged.original_len.saturating_add(next.original_len);
+            source_chunk_count = source_chunk_count.saturating_add(1);
+            next_index += 1;
+        }
+        units.push(MixedAudiobookUnit {
+            first_chunk_index: index,
+            source_chunk_count,
+            chunk: merged,
+        });
+        index = next_index;
+    }
+    units
+}
+
 async fn synthesize_mixed_chunk_with_retry(
     chunk_idx: usize,
     chunk: &TtsChunk,
@@ -7733,6 +7903,7 @@ async fn synthesize_mixed_chunk_with_retry(
             TtsEngine::Edge => "edge",
             TtsEngine::Sapi5 => "sapi5",
             TtsEngine::Sapi4 => "sapi4",
+            TtsEngine::Google => "google",
         },
         synth.voice,
         synth.rate,
@@ -7768,6 +7939,7 @@ async fn synthesize_mixed_chunk_with_retry(
                 TtsEngine::Edge => "edge",
                 TtsEngine::Sapi5 => "sapi5",
                 TtsEngine::Sapi4 => "sapi4",
+                TtsEngine::Google => "google",
             },
             synth.voice,
             preview_for_log(&chunk.text_to_read, 120)
@@ -7789,6 +7961,7 @@ async fn synthesize_mixed_chunk_with_retry(
                         TtsEngine::Edge => "edge",
                         TtsEngine::Sapi5 => "sapi5",
                         TtsEngine::Sapi4 => "sapi4",
+                        TtsEngine::Google => "google",
                     },
                     synth.voice,
                     err
@@ -7808,12 +7981,340 @@ async fn synthesize_mixed_chunk_with_retry(
             TtsEngine::Edge => "edge",
             TtsEngine::Sapi5 => "sapi5",
             TtsEngine::Sapi4 => "sapi4",
+            TtsEngine::Google => "google",
         },
         synth.voice,
         preview_for_log(&chunk.text_to_read, 120),
         last_err.unwrap_or_else(|| "unknown error".to_string())
     ));
     None
+}
+
+const GOOGLE_AUDIOBOOK_MAX_WORKERS: usize = 5;
+
+fn google_audiobook_worker_limit() -> usize {
+    if let Ok(raw) = std::env::var("SONARPAD_GOOGLE_TTS_WORKERS")
+        && let Ok(requested) = raw.trim().parse::<usize>()
+    {
+        return requested.clamp(1, GOOGLE_AUDIOBOOK_MAX_WORKERS);
+    }
+    let logical_cores = std::thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(4);
+    match logical_cores {
+        12.. => 5,
+        8..=11 => 4,
+        4..=7 => 3,
+        2..=3 => 2,
+        _ => 1,
+    }
+}
+
+struct GoogleAudiobookTask {
+    order: usize,
+    first_chunk_index: usize,
+    source_chunk_count: usize,
+    chunk: TtsChunk,
+    voice: String,
+    rate: i32,
+    pitch: i32,
+    volume: i32,
+}
+
+struct GoogleAudiobookTaskResult {
+    order: usize,
+    first_chunk_index: usize,
+    source_chunk_count: usize,
+    wav_path: Option<PathBuf>,
+    elapsed_ms: u128,
+}
+
+fn synthesize_google_audiobook_task(
+    worker_id: usize,
+    session: &mut crate::google_tts::GoogleTtsWorkerSession,
+    task: &GoogleAudiobookTask,
+    target: TargetAudio,
+    cancel: &Arc<AtomicBool>,
+) -> Option<PathBuf> {
+    const MAX_ATTEMPTS: usize = 5;
+
+    if let Some(ms) = task.chunk.pause_ms {
+        let path = std::env::temp_dir().join(format!(
+            "sonarpad_google_pause_{}_{}_{}.wav",
+            std::process::id(),
+            worker_id,
+            Uuid::new_v4().simple()
+        ));
+        return match write_silence_wav(&path, ms, target.sample_rate, target.channels) {
+            Ok(()) => Some(path),
+            Err(err) => {
+                crate::log_debug(&format!(
+                    "Google audiobook worker {}: failed to create pause first_chunk={} duration_ms={}: {}",
+                    worker_id, task.first_chunk_index, ms, err
+                ));
+                None
+            }
+        };
+    }
+
+    if !mixed_chunk_has_usable_content(&task.chunk.text_to_read) {
+        crate::log_debug(&format!(
+            "Google audiobook worker {}: dropping non-usable first_chunk={} text_preview={:?}",
+            worker_id,
+            task.first_chunk_index,
+            preview_for_log(&task.chunk.text_to_read, 120)
+        ));
+        return None;
+    }
+
+    let mut last_error = None;
+    for attempt in 1..=MAX_ATTEMPTS {
+        if cancel.load(Ordering::Relaxed) {
+            return None;
+        }
+        crate::log_debug(&format!(
+            "Google audiobook worker {}: synth start order={} first_chunk={} source_chunks={} attempt={}/{} text_chars={} voice={:?} rate={} pitch={} volume={}",
+            worker_id,
+            task.order,
+            task.first_chunk_index,
+            task.source_chunk_count,
+            attempt,
+            MAX_ATTEMPTS,
+            task.chunk.text_to_read.chars().count(),
+            task.voice.as_str(),
+            task.rate,
+            task.pitch,
+            task.volume
+        ));
+        let synth_started = Instant::now();
+        let result = session
+            .synthesize_wav_bytes(
+                &task.chunk.text_to_read,
+                &task.voice,
+                task.rate,
+                task.pitch,
+                task.volume,
+                cancel,
+            )
+            .and_then(|bytes| {
+                let (samples, src_rate, src_channels) = decode_wav_to_pcm(&bytes)?;
+                let resampled = resample_pcm(
+                    &samples,
+                    src_rate,
+                    src_channels,
+                    target.sample_rate,
+                    target.channels,
+                );
+                let path = temp_wav_path("google_parallel");
+                write_wav_from_pcm(&path, &resampled, target.sample_rate, target.channels)?;
+                Ok(path)
+            });
+        match result {
+            Ok(path) => {
+                crate::log_debug(&format!(
+                    "Google audiobook worker {}: synth complete order={} first_chunk={} elapsed_ms={} output={:?}",
+                    worker_id,
+                    task.order,
+                    task.first_chunk_index,
+                    synth_started.elapsed().as_millis(),
+                    path
+                ));
+                return Some(path);
+            }
+            Err(err) => {
+                crate::log_debug(&format!(
+                    "Google audiobook worker {}: synth failed order={} first_chunk={} attempt={}/{} elapsed_ms={} error={}",
+                    worker_id,
+                    task.order,
+                    task.first_chunk_index,
+                    attempt,
+                    MAX_ATTEMPTS,
+                    synth_started.elapsed().as_millis(),
+                    err
+                ));
+                last_error = Some(err);
+                if attempt < MAX_ATTEMPTS && !cancel.load(Ordering::Relaxed) {
+                    std::thread::sleep(Duration::from_millis(250 * attempt as u64));
+                }
+            }
+        }
+    }
+
+    crate::log_debug(&format!(
+        "Google audiobook worker {}: dropping unit order={} first_chunk={} after retries last_error={}",
+        worker_id,
+        task.order,
+        task.first_chunk_index,
+        last_error.unwrap_or_else(|| "unknown error".to_string())
+    ));
+    None
+}
+
+fn render_google_audiobook_units_parallel(
+    units: Vec<MixedAudiobookUnit>,
+    temp_wavs: &mut Vec<PathBuf>,
+    current_global_progress: &mut usize,
+    options: &AudiobookCommonOptions,
+    config: &MixedAudiobookConfig,
+    target: TargetAudio,
+) -> Result<(), String> {
+    if units.is_empty() {
+        return Ok(());
+    }
+
+    let logical_cores = std::thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(1);
+    let worker_count = units.len().min(google_audiobook_worker_limit()).max(1);
+    crate::log_debug(&format!(
+        "Google audiobook parallel mode: units={} workers={} logical_cores={} max_workers={} env_override={:?}",
+        units.len(),
+        worker_count,
+        logical_cores,
+        GOOGLE_AUDIOBOOK_MAX_WORKERS,
+        std::env::var("SONARPAD_GOOGLE_TTS_WORKERS").ok()
+    ));
+
+    let tasks: Vec<GoogleAudiobookTask> = units
+        .into_iter()
+        .enumerate()
+        .map(|(order, unit)| {
+            let chunk = unit.chunk;
+            let (engine, voice, rate, pitch, volume) =
+                resolve_mixed_chunk_synth(&chunk, options, config);
+            let voice = voice.to_string();
+            if engine != TtsEngine::Google {
+                crate::log_debug(&format!(
+                    "Google audiobook parallel mode received non-Google unit order={} engine mismatch",
+                    order
+                ));
+            }
+            GoogleAudiobookTask {
+                order,
+                first_chunk_index: unit.first_chunk_index,
+                source_chunk_count: unit.source_chunk_count,
+                chunk,
+                voice,
+                rate,
+                pitch,
+                volume,
+            }
+        })
+        .collect();
+    let expected_results = tasks.len();
+    let task_iter = Arc::new(Mutex::new(tasks.into_iter()));
+    let (result_rx, handles) = {
+        let (result_tx, result_rx) = std::sync::mpsc::channel::<GoogleAudiobookTaskResult>();
+        let mut handles = Vec::with_capacity(worker_count);
+
+        for worker_offset in 0..worker_count {
+            let worker_id = worker_offset + 1;
+            let task_iter = task_iter.clone();
+            let result_tx = result_tx.clone();
+            let cancel = options.cancel.clone();
+            let handle = std::thread::spawn(move || {
+                let mut session = crate::google_tts::GoogleTtsWorkerSession::new(worker_id);
+                loop {
+                    if cancel.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    let task = {
+                        let mut guard = task_iter.lock().unwrap_or_else(|err| err.into_inner());
+                        guard.next()
+                    };
+                    let Some(task) = task else {
+                        break;
+                    };
+                    let started = Instant::now();
+                    let wav_path = synthesize_google_audiobook_task(
+                        worker_id,
+                        &mut session,
+                        &task,
+                        target,
+                        &cancel,
+                    );
+                    if result_tx
+                        .send(GoogleAudiobookTaskResult {
+                            order: task.order,
+                            first_chunk_index: task.first_chunk_index,
+                            source_chunk_count: task.source_chunk_count,
+                            wav_path,
+                            elapsed_ms: started.elapsed().as_millis(),
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                crate::log_debug(&format!(
+                    "Google audiobook worker {}: stopped cancelled={}",
+                    worker_id,
+                    cancel.load(Ordering::Relaxed)
+                ));
+            });
+            handles.push(handle);
+        }
+        (result_rx, handles)
+    };
+
+    let mut ordered_wavs: Vec<Option<PathBuf>> = vec![None; expected_results];
+    let mut received_results = 0usize;
+    for result in result_rx {
+        received_results = received_results.saturating_add(1);
+        crate::log_debug(&format!(
+            "Google audiobook parallel result: order={} first_chunk={} source_chunks={} elapsed_ms={} produced={}",
+            result.order,
+            result.first_chunk_index,
+            result.source_chunk_count,
+            result.elapsed_ms,
+            result.wav_path.is_some()
+        ));
+        if result.order < ordered_wavs.len() {
+            ordered_wavs[result.order] = result.wav_path;
+        }
+        *current_global_progress =
+            (*current_global_progress).saturating_add(result.source_chunk_count);
+        if options.progress_hwnd.0 != 0 {
+            unsafe {
+                if let Err(err) = PostMessageW(
+                    options.progress_hwnd,
+                    crate::WM_UPDATE_PROGRESS,
+                    WPARAM(*current_global_progress),
+                    LPARAM(0),
+                ) {
+                    crate::log_debug(&format!(
+                        "Failed to post Google parallel WM_UPDATE_PROGRESS: {}",
+                        err
+                    ));
+                }
+            }
+        }
+    }
+
+    for handle in handles {
+        if handle.join().is_err() {
+            crate::log_debug("Google audiobook worker panicked");
+        }
+    }
+
+    if options.cancel.load(Ordering::Relaxed) {
+        for path in ordered_wavs.into_iter().flatten() {
+            crate::log_if_err!(std::fs::remove_file(path));
+        }
+        return Err(cancelled_message(options.language));
+    }
+    if received_results != expected_results {
+        for path in ordered_wavs.into_iter().flatten() {
+            crate::log_if_err!(std::fs::remove_file(path));
+        }
+        return Err(format!(
+            "Google audiobook workers stopped early: received {} of {} results.",
+            received_results, expected_results
+        ));
+    }
+
+    temp_wavs.extend(ordered_wavs.into_iter().flatten());
+    Ok(())
 }
 
 pub(crate) fn render_mixed_audiobook_part(
@@ -7826,6 +8327,21 @@ pub(crate) fn render_mixed_audiobook_part(
     if chunks.is_empty() {
         return Ok(());
     }
+    let render_started = Instant::now();
+    crate::log_debug(&format!(
+        "Mixed audiobook render start: chunks={} output={:?} main_engine={} rate={} pitch={} volume={}",
+        chunks.len(),
+        output,
+        match config.main_engine {
+            TtsEngine::Edge => "edge",
+            TtsEngine::Google => "google",
+            TtsEngine::Sapi5 => "sapi5",
+            TtsEngine::Sapi4 => "sapi4",
+        },
+        options.rate,
+        options.pitch,
+        options.volume
+    ));
     let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
     let extension = output
         .extension()
@@ -7874,6 +8390,7 @@ pub(crate) fn render_mixed_audiobook_part(
                         pitch,
                         volume,
                         language: options.language,
+                        cancel: options.cancel.clone(),
                     };
                     async move {
                         (
@@ -7905,36 +8422,83 @@ pub(crate) fn render_mixed_audiobook_part(
             }
         }
     } else {
-        for (chunk_idx, chunk) in chunks.iter().enumerate() {
-            if options.cancel.load(Ordering::Relaxed) {
-                return Err(cancelled_message(options.language));
-            }
-            let (engine, voice, rate, pitch, volume) =
-                resolve_mixed_chunk_synth(chunk, options, config);
-            let synth = SynthesisConfig {
-                engine,
-                voice: voice.to_string(),
-                rate,
-                pitch,
-                volume,
-                language: options.language,
-            };
-            let wav = rt.block_on(synthesize_mixed_chunk_with_retry(
-                chunk_idx, chunk, &synth, target,
-            ));
-            if let Some(wav_path) = wav {
-                temp_wavs.push(wav_path);
-            }
-            *current_global_progress += 1;
-            if options.progress_hwnd.0 != 0 {
-                unsafe {
-                    if let Err(e) = PostMessageW(
-                        options.progress_hwnd,
-                        crate::WM_UPDATE_PROGRESS,
-                        WPARAM(*current_global_progress),
-                        LPARAM(0),
-                    ) {
-                        crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+        let units = coalesce_google_audiobook_chunks(chunks, options, config);
+        let google_units = units
+            .iter()
+            .filter(|unit| {
+                mixed_synth_key(&unit.chunk, options, config).engine == TtsEngine::Google
+            })
+            .count();
+        crate::log_debug(&format!(
+            "Mixed audiobook: Google batching input_chunks={} synthesis_units={} google_units={} max_chars={}",
+            chunks.len(),
+            units.len(),
+            google_units,
+            GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS
+        ));
+        let google_only = google_units == units.len();
+        if google_only && units.len() > 1 {
+            render_google_audiobook_units_parallel(
+                units,
+                &mut temp_wavs,
+                current_global_progress,
+                options,
+                config,
+                target,
+            )?;
+        } else {
+            for unit in units {
+                if options.cancel.load(Ordering::Relaxed) {
+                    return Err(cancelled_message(options.language));
+                }
+                let chunk = &unit.chunk;
+                let (engine, voice, rate, pitch, volume) =
+                    resolve_mixed_chunk_synth(chunk, options, config);
+                let synth = SynthesisConfig {
+                    engine,
+                    voice: voice.to_string(),
+                    rate,
+                    pitch,
+                    volume,
+                    language: options.language,
+                    cancel: options.cancel.clone(),
+                };
+                let unit_started = Instant::now();
+                let wav = rt.block_on(synthesize_mixed_chunk_with_retry(
+                    unit.first_chunk_index,
+                    chunk,
+                    &synth,
+                    target,
+                ));
+                crate::log_debug(&format!(
+                    "Mixed audiobook unit complete: first_chunk={} source_chunks={} engine={} text_chars={} elapsed_ms={} produced={}",
+                    unit.first_chunk_index,
+                    unit.source_chunk_count,
+                    match engine {
+                        TtsEngine::Edge => "edge",
+                        TtsEngine::Google => "google",
+                        TtsEngine::Sapi5 => "sapi5",
+                        TtsEngine::Sapi4 => "sapi4",
+                    },
+                    chunk.text_to_read.chars().count(),
+                    unit_started.elapsed().as_millis(),
+                    wav.is_some()
+                ));
+                if let Some(wav_path) = wav {
+                    temp_wavs.push(wav_path);
+                }
+                *current_global_progress =
+                    (*current_global_progress).saturating_add(unit.source_chunk_count);
+                if options.progress_hwnd.0 != 0 {
+                    unsafe {
+                        if let Err(e) = PostMessageW(
+                            options.progress_hwnd,
+                            crate::WM_UPDATE_PROGRESS,
+                            WPARAM(*current_global_progress),
+                            LPARAM(0),
+                        ) {
+                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
+                        }
                     }
                 }
             }
@@ -7944,7 +8508,19 @@ pub(crate) fn render_mixed_audiobook_part(
     if temp_wavs.is_empty() {
         return Err("No valid audio segments were produced.".to_string());
     }
+    crate::log_debug(&format!(
+        "Mixed audiobook synthesis phase complete: wav_segments={} elapsed_ms={}",
+        temp_wavs.len(),
+        render_started.elapsed().as_millis()
+    ));
+    let join_started = Instant::now();
     crate::audio_utils::join_wav_files(&temp_wavs, &actual_output).map_err(|e| e.to_string())?;
+    crate::log_debug(&format!(
+        "Mixed audiobook WAV join complete: segments={} elapsed_ms={} output={:?}",
+        temp_wavs.len(),
+        join_started.elapsed().as_millis(),
+        actual_output
+    ));
     for path in temp_wavs {
         if let Err(e) = std::fs::remove_file(&path) {
             crate::log_debug(&format!("Failed to remove temp wav {:?}: {}", path, e));
@@ -7952,6 +8528,7 @@ pub(crate) fn render_mixed_audiobook_part(
     }
 
     if is_aac {
+        let conversion_started = Instant::now();
         let settings = crate::ffmpeg_export::ConvertAudioSettings {
             format: crate::ffmpeg_export::ConvertAudioFormat::Aac,
             quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
@@ -7968,7 +8545,13 @@ pub(crate) fn render_mixed_audiobook_part(
         );
         std::fs::remove_file(&actual_output).ok();
         res?;
+        crate::log_debug(&format!(
+            "Mixed audiobook AAC conversion complete: elapsed_ms={} output={:?}",
+            conversion_started.elapsed().as_millis(),
+            output
+        ));
     } else if is_mp3 {
+        let conversion_started = Instant::now();
         let settings = crate::ffmpeg_export::ConvertAudioSettings {
             format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
             quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
@@ -7985,7 +8568,17 @@ pub(crate) fn render_mixed_audiobook_part(
         );
         std::fs::remove_file(&actual_output).ok();
         res?;
+        crate::log_debug(&format!(
+            "Mixed audiobook MP3 conversion complete: elapsed_ms={} output={:?}",
+            conversion_started.elapsed().as_millis(),
+            output
+        ));
     }
 
+    crate::log_debug(&format!(
+        "Mixed audiobook render complete: total_elapsed_ms={} output={:?}",
+        render_started.elapsed().as_millis(),
+        output
+    ));
     Ok(())
 }

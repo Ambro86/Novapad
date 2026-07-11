@@ -60,6 +60,8 @@ type BassChannelSeconds2Bytes = unsafe extern "C" fn(handle: Dword, pos: f64) ->
 type BassChannelSetAttribute =
     unsafe extern "C" fn(handle: Dword, attrib: Dword, value: f32) -> Bool;
 type BassChannelIsActive = unsafe extern "C" fn(handle: Dword) -> Dword;
+type BassChannelGetData =
+    unsafe extern "C" fn(handle: Dword, buffer: *mut c_void, length: Dword) -> Dword;
 
 type BassStreamCreate = unsafe extern "C" fn(
     freq: Dword,
@@ -90,6 +92,7 @@ pub struct BassApi {
     pub channel_seconds2bytes: BassChannelSeconds2Bytes,
     pub channel_set_attribute: BassChannelSetAttribute,
     pub channel_is_active: BassChannelIsActive,
+    pub channel_get_data: BassChannelGetData,
 }
 
 pub struct BassFxApi {
@@ -134,6 +137,7 @@ fn load_bass_api(path: &Path) -> Result<BassApi, String> {
         channel_seconds2bytes: load_symbol(&lib, b"BASS_ChannelSeconds2Bytes\0")?,
         channel_set_attribute: load_symbol(&lib, b"BASS_ChannelSetAttribute\0")?,
         channel_is_active: load_symbol(&lib, b"BASS_ChannelIsActive\0")?,
+        channel_get_data: load_symbol(&lib, b"BASS_ChannelGetData\0")?,
         _lib: lib,
     })
 }

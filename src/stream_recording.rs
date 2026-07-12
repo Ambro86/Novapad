@@ -145,15 +145,22 @@ fn start_recording_and_playback(
         ));
     }
 
-    let mut recorder =
-        match spawn_ffmpeg_recorder(&ffmpeg, url, &output_path, user_agent, kind, ui_language) {
-            Ok(recorder) => recorder,
-            Err(err) => {
-                crate::stop_managed_mpv_playback(parent);
-                remove_recording_file(&output_path, "FFmpeg launch failure");
-                return Err(err);
-            }
-        };
+    let mut recorder = match spawn_ffmpeg_recorder(
+        &ffmpeg,
+        url,
+        &output_path,
+        user_agent,
+        kind,
+        ui_language,
+        None,
+    ) {
+        Ok(recorder) => recorder,
+        Err(err) => {
+            crate::stop_managed_mpv_playback(parent);
+            remove_recording_file(&output_path, "FFmpeg launch failure");
+            return Err(err);
+        }
+    };
 
     // Verifica rapida: se FFmpeg termina immediatamente, evitiamo di annunciare
     // una registrazione che in realtà non è partita.
@@ -189,6 +196,52 @@ fn start_recording_and_playback(
     Ok(output_path)
 }
 
+pub(crate) fn record_stream_for_duration(
+    url: &str,
+    title: &str,
+    user_agent: Option<&str>,
+    kind: StreamRecordingKind,
+    ui_language: Option<Language>,
+    duration_minutes: u32,
+) -> Result<PathBuf, String> {
+    let url = url.trim();
+    if url.is_empty() {
+        return Err(recording_text(
+            ui_language,
+            "radio.recording_error_empty_url",
+            "L'indirizzo dello stream è vuoto.",
+        ));
+    }
+    if duration_minutes == 0 {
+        return Err("La durata della registrazione deve essere maggiore di zero.".to_string());
+    }
+    let ffmpeg = find_ffmpeg_executable(ui_language)?;
+    let output_path = next_recording_path(kind, title, ui_language)?;
+    let mut recorder = spawn_ffmpeg_recorder(
+        &ffmpeg,
+        url,
+        &output_path,
+        user_agent,
+        kind,
+        ui_language,
+        Some(duration_minutes),
+    )?;
+    let status = recorder.wait().map_err(|error| {
+        remove_recording_file(&output_path, "scheduled recording wait failure");
+        error.to_string()
+    })?;
+    let file_size = fs::metadata(&output_path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
+    if !status.success() || file_size < 1024 {
+        remove_recording_file(&output_path, "scheduled recording failure");
+        return Err(format!(
+            "FFmpeg ha terminato la registrazione programmata con stato {status}."
+        ));
+    }
+    Ok(output_path)
+}
+
 fn spawn_ffmpeg_recorder(
     ffmpeg: &Path,
     url: &str,
@@ -196,6 +249,7 @@ fn spawn_ffmpeg_recorder(
     user_agent: Option<&str>,
     kind: StreamRecordingKind,
     ui_language: Option<Language>,
+    duration_minutes: Option<u32>,
 ) -> Result<Child, String> {
     let mut command = Command::new(ffmpeg);
     command
@@ -269,9 +323,11 @@ fn spawn_ffmpeg_recorder(
                 .arg("mp4");
         }
     }
+    command.arg("-map_metadata").arg("-1");
+    if let Some(minutes) = duration_minutes.filter(|value| *value > 0) {
+        command.arg("-t").arg((u64::from(minutes) * 60).to_string());
+    }
     command
-        .arg("-map_metadata")
-        .arg("-1")
         .arg(output_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())

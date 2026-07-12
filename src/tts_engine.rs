@@ -67,6 +67,7 @@ pub struct TtsSession {
     pub cancel: Arc<AtomicBool>,
     pub paused: bool,
     pub initial_caret_pos: i32,
+    pub source_edit: HWND,
 }
 
 #[derive(Clone)]
@@ -332,6 +333,7 @@ pub struct TtsPlaybackOptions {
     pub voice: String,
     pub chunks: Vec<TtsChunk>,
     pub initial_caret_pos: i32,
+    pub source_edit: HWND,
     pub rate: i32,
     pub pitch: i32,
     pub volume: i32,
@@ -345,6 +347,7 @@ struct TtsQueuedPlayback {
     split_on_newline: bool,
     dictionary: Vec<DictionaryEntry>,
     initial_caret_pos: i32,
+    source_edit: HWND,
     rate: i32,
     pitch: i32,
     volume: i32,
@@ -526,6 +529,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             split_on_newline,
             dictionary,
             initial_caret_pos,
+            source_edit: hwnd_edit,
             rate: tts_rate,
             pitch: tts_pitch,
             volume: tts_volume,
@@ -542,6 +546,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             split_on_newline,
             dictionary,
             initial_caret_pos,
+            source_edit: hwnd_edit,
             rate: tts_rate,
             pitch: tts_pitch,
             volume: tts_volume,
@@ -568,6 +573,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos,
+                        source_edit: hwnd_edit,
                     });
                     state.tts_next_session_id += 1;
                 })
@@ -593,6 +599,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos,
+                        source_edit: hwnd_edit,
                     });
                     state.tts_next_session_id += 1;
                 })
@@ -656,6 +663,7 @@ pub fn speak_text_once(hwnd: HWND, text: String) {
             split_on_newline,
             dictionary,
             initial_caret_pos,
+            source_edit: HWND(0),
             rate: tts_rate,
             pitch: tts_pitch,
             volume: tts_volume,
@@ -671,6 +679,7 @@ pub fn speak_text_once(hwnd: HWND, text: String) {
             split_on_newline,
             dictionary,
             initial_caret_pos,
+            source_edit: HWND(0),
             rate: tts_rate,
             pitch: tts_pitch,
             volume: tts_volume,
@@ -696,6 +705,7 @@ pub fn speak_text_once(hwnd: HWND, text: String) {
                     cancel: cancel.clone(),
                     paused: false,
                     initial_caret_pos,
+                    source_edit: HWND(0),
                 });
                 state.tts_next_session_id += 1;
             })
@@ -718,6 +728,7 @@ pub fn speak_text_once(hwnd: HWND, text: String) {
                     cancel: cancel.clone(),
                     paused: false,
                     initial_caret_pos,
+                    source_edit: HWND(0),
                 });
                 state.tts_next_session_id += 1;
             })
@@ -758,6 +769,7 @@ fn queue_tts_playback_from_text(options: TtsQueuedPlayback) {
             voice: options.voice,
             chunks,
             initial_caret_pos: options.initial_caret_pos,
+            source_edit: options.source_edit,
             rate: options.rate,
             pitch: options.pitch,
             volume: options.volume,
@@ -1099,6 +1111,7 @@ pub fn start_tts_playback_with_chunks(options: TtsPlaybackOptions) {
                 cancel: cancel.clone(),
                 paused: false,
                 initial_caret_pos: options.initial_caret_pos,
+                source_edit: options.source_edit,
             });
             id
         })

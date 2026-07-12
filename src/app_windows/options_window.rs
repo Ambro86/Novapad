@@ -196,6 +196,7 @@ const OPTIONS_ID_RENAME_VOICE_PROFILE: usize = 6116;
 const OPTIONS_ID_ADD_VOICE_PROFILE: usize = 6117;
 const OPTIONS_ID_DELETE_VOICE_PROFILE: usize = 6118;
 const OPTIONS_ID_MANAGE_GOOGLE_VOICES: usize = 6150;
+const OPTIONS_ID_GROUP_TOOLS_MENU_BY_CATEGORY: usize = 6151;
 
 const OPTIONS_ID_OK: usize = 6005;
 const OPTIONS_ID_CANCEL: usize = 6006;
@@ -302,6 +303,9 @@ enum ShortcutAction {
     OpenPodcasts,
     OpenPathsNavigation,
     OpenRadio,
+    OpenCalendar,
+    OpenWeather,
+    OpenCinema,
     OpenDictionary,
     OpenOptions,
     OpenTerminal,
@@ -317,7 +321,7 @@ enum ShortcutAction {
 }
 
 impl ShortcutAction {
-    const ALL: [ShortcutAction; 27] = [
+    const ALL: [ShortcutAction; 30] = [
         ShortcutAction::ReadPauseResume,
         ShortcutAction::ReadStart,
         ShortcutAction::ReadPreviousSentence,
@@ -333,6 +337,9 @@ impl ShortcutAction {
         ShortcutAction::OpenPodcasts,
         ShortcutAction::OpenPathsNavigation,
         ShortcutAction::OpenRadio,
+        ShortcutAction::OpenCalendar,
+        ShortcutAction::OpenWeather,
+        ShortcutAction::OpenCinema,
         ShortcutAction::OpenDictionary,
         ShortcutAction::OpenOptions,
         ShortcutAction::OpenTerminal,
@@ -403,6 +410,9 @@ fn shortcut_action_i18n_key(action: ShortcutAction) -> &'static str {
         ShortcutAction::OpenPodcasts => "options.shortcuts.action.open_podcasts",
         ShortcutAction::OpenPathsNavigation => "options.shortcuts.action.open_paths_navigation",
         ShortcutAction::OpenRadio => "options.shortcuts.action.open_radio",
+        ShortcutAction::OpenCalendar => "options.shortcuts.action.open_calendar",
+        ShortcutAction::OpenWeather => "options.shortcuts.action.open_weather",
+        ShortcutAction::OpenCinema => "options.shortcuts.action.open_cinema",
         ShortcutAction::OpenDictionary => "options.shortcuts.action.open_dictionary",
         ShortcutAction::OpenOptions => "options.shortcuts.action.open_options",
         ShortcutAction::OpenTerminal => "options.shortcuts.action.open_terminal",
@@ -462,6 +472,9 @@ fn shortcut_binding_for_action(
         ShortcutAction::OpenPodcasts => settings.open_podcasts,
         ShortcutAction::OpenPathsNavigation => settings.open_paths_navigation,
         ShortcutAction::OpenRadio => settings.open_radio,
+        ShortcutAction::OpenCalendar => settings.open_calendar,
+        ShortcutAction::OpenWeather => settings.open_weather,
+        ShortcutAction::OpenCinema => settings.open_cinema,
         ShortcutAction::OpenDictionary => settings.open_dictionary,
         ShortcutAction::OpenOptions => settings.open_options,
         ShortcutAction::OpenTerminal => settings.open_terminal,
@@ -498,6 +511,9 @@ fn set_shortcut_binding_for_action(
         ShortcutAction::OpenPodcasts => settings.open_podcasts = binding,
         ShortcutAction::OpenPathsNavigation => settings.open_paths_navigation = binding,
         ShortcutAction::OpenRadio => settings.open_radio = binding,
+        ShortcutAction::OpenCalendar => settings.open_calendar = binding,
+        ShortcutAction::OpenWeather => settings.open_weather = binding,
+        ShortcutAction::OpenCinema => settings.open_cinema = binding,
         ShortcutAction::OpenDictionary => settings.open_dictionary = binding,
         ShortcutAction::OpenOptions => settings.open_options = binding,
         ShortcutAction::OpenTerminal => settings.open_terminal = binding,
@@ -1070,6 +1086,7 @@ struct OptionsDialogState {
     checkbox_send_crash_reports: HWND,
     checkbox_use_legacy_name: HWND,
     checkbox_context_menu: HWND,
+    checkbox_group_tools_menu_by_category: HWND,
     label_confirm_delete_rss_mode: HWND,
     combo_confirm_delete_rss_mode: HWND,
     label_confirm_delete_podcast_mode: HWND,
@@ -1190,6 +1207,7 @@ struct OptionsLabels {
     label_send_crash_reports: String,
     label_use_legacy_name: String,
     label_context_menu: String,
+    label_group_tools_menu_by_category: String,
     label_confirm_delete_rss_mode: String,
     label_confirm_delete_podcast_mode: String,
     label_rss_quick_copy_mode: String,
@@ -1428,6 +1446,10 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_send_crash_reports: i18n::tr(language, "options.label.send_crash_reports"),
         label_use_legacy_name: i18n::tr(language, "options.label.legacy_name"),
         label_context_menu: i18n::tr(language, "options.label.context_menu"),
+        label_group_tools_menu_by_category: i18n::tr(
+            language,
+            "options.label.group_tools_menu_by_category",
+        ),
         label_confirm_delete_rss_mode: i18n::tr(language, "options.label.confirm_delete_rss_mode"),
         label_confirm_delete_podcast_mode: i18n::tr(
             language,
@@ -3161,6 +3183,22 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     None,
                 );
                 y += 40;
+
+                let checkbox_group_tools_menu_by_category = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_group_tools_menu_by_category).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    420,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_GROUP_TOOLS_MENU_BY_CATEGORY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 28;
 
                 let label_voice_profile = CreateWindowExW(
                     Default::default(),
@@ -6259,6 +6297,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_send_crash_reports,
                     checkbox_use_legacy_name,
                     checkbox_context_menu,
+                    checkbox_group_tools_menu_by_category,
                     label_confirm_delete_rss_mode,
                     combo_confirm_delete_rss_mode,
                     label_confirm_delete_podcast_mode,
@@ -6465,6 +6504,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     checkbox_send_crash_reports,
                     checkbox_use_legacy_name,
                     checkbox_context_menu,
+                    checkbox_group_tools_menu_by_category,
                     label_confirm_delete_rss_mode,
                     combo_confirm_delete_rss_mode,
                     label_confirm_delete_podcast_mode,
@@ -7207,6 +7247,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             checkbox_send_crash_reports,
             checkbox_use_legacy_name,
             checkbox_context_menu,
+            checkbox_group_tools_menu_by_category,
             combo_confirm_delete_rss_mode,
             combo_confirm_delete_podcast_mode,
             combo_rss_quick_copy_mode,
@@ -7355,6 +7396,7 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.checkbox_send_crash_reports,
                 state.checkbox_use_legacy_name,
                 state.checkbox_context_menu,
+                state.checkbox_group_tools_menu_by_category,
                 state.combo_confirm_delete_rss_mode,
                 state.combo_confirm_delete_podcast_mode,
                 state.combo_rss_quick_copy_mode,
@@ -8454,6 +8496,16 @@ fn initialize_options_dialog(hwnd: HWND) {
             checkbox_context_menu,
             BM_SETCHECK,
             WPARAM(if settings.context_menu_open_with {
+                BST_CHECKED.0 as usize
+            } else {
+                0
+            }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_group_tools_menu_by_category,
+            BM_SETCHECK,
+            WPARAM(if settings.group_tools_menu_by_category {
                 BST_CHECKED.0 as usize
             } else {
                 0
@@ -10559,6 +10611,7 @@ fn preview_voice(hwnd: HWND) {
                 voice,
                 chunks,
                 initial_caret_pos: 0,
+                source_edit: HWND(0),
                 rate,
                 pitch,
                 volume,
@@ -10587,6 +10640,7 @@ fn preview_voice(hwnd: HWND) {
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos: 0,
+                        source_edit: HWND(0),
                     });
                     state.tts_next_session_id += 1;
                 })
@@ -10611,6 +10665,7 @@ fn preview_voice(hwnd: HWND) {
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos: 0,
+                        source_edit: HWND(0),
                     });
                     state.tts_next_session_id += 1;
                 })
@@ -10919,6 +10974,7 @@ fn preview_dialogue_voice(hwnd: HWND) {
                 voice,
                 chunks,
                 initial_caret_pos: 0,
+                source_edit: HWND(0),
                 rate,
                 pitch,
                 volume,
@@ -10947,6 +11003,7 @@ fn preview_dialogue_voice(hwnd: HWND) {
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos: 0,
+                        source_edit: HWND(0),
                     });
                     state.tts_next_session_id += 1;
                 })
@@ -10971,6 +11028,7 @@ fn preview_dialogue_voice(hwnd: HWND) {
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos: 0,
+                        source_edit: HWND(0),
                     });
                     state.tts_next_session_id += 1;
                 })
@@ -11118,6 +11176,7 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
                 voice,
                 chunks,
                 initial_caret_pos: 0,
+                source_edit: HWND(0),
                 rate,
                 pitch,
                 volume,
@@ -11146,6 +11205,7 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos: 0,
+                        source_edit: HWND(0),
                     });
                     state.tts_next_session_id += 1;
                 })
@@ -11170,6 +11230,7 @@ fn preview_dialogue_secondary_voice(hwnd: HWND) {
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos: 0,
+                        source_edit: HWND(0),
                     });
                     state.tts_next_session_id += 1;
                 })
@@ -11285,6 +11346,7 @@ fn apply_options_dialog(hwnd: HWND) {
             checkbox_send_crash_reports,
             checkbox_use_legacy_name,
             checkbox_context_menu,
+            checkbox_group_tools_menu_by_category,
             combo_confirm_delete_rss_mode,
             combo_confirm_delete_podcast_mode,
             combo_rss_quick_copy_mode,
@@ -11383,6 +11445,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.checkbox_send_crash_reports,
                 state.checkbox_use_legacy_name,
                 state.checkbox_context_menu,
+                state.checkbox_group_tools_menu_by_category,
                 state.combo_confirm_delete_rss_mode,
                 state.combo_confirm_delete_podcast_mode,
                 state.combo_rss_quick_copy_mode,
@@ -11404,6 +11467,7 @@ fn apply_options_dialog(hwnd: HWND) {
         let old_tab_width = settings.indent_tab_width;
         let old_space_width = settings.indent_space_width;
         let old_context_menu = settings.context_menu_open_with;
+        let old_group_tools_menu_by_category = settings.group_tools_menu_by_category;
         let old_use_legacy_name = settings.use_legacy_name;
         let old_spellcheck_enabled = settings.spellcheck_enabled;
         let old_spellcheck_mode = settings.spellcheck_language_mode;
@@ -11821,6 +11885,14 @@ fn apply_options_dialog(hwnd: HWND) {
         settings.context_menu_open_with =
             SendMessageW(checkbox_context_menu, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
                 == BST_CHECKED.0;
+        settings.group_tools_menu_by_category = SendMessageW(
+            checkbox_group_tools_menu_by_category,
+            BM_GETCHECK,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0 as u32
+            == BST_CHECKED.0;
         let rss_confirm_sel = SendMessageW(
             combo_confirm_delete_rss_mode,
             CB_GETCURSEL,
@@ -12574,7 +12646,10 @@ fn apply_options_dialog(hwnd: HWND) {
             update_window_title(parent);
         }
 
-        if old_language != new_language || old_shortcuts != settings.shortcuts {
+        if old_language != new_language
+            || old_shortcuts != settings.shortcuts
+            || old_group_tools_menu_by_category != settings.group_tools_menu_by_category
+        {
             rebuild_menus(parent);
         }
         if old_marker_position != settings.modified_marker_position {
@@ -13018,6 +13093,11 @@ fn layout_general_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
         state.combo_open,
         y,
         OPTIONS_COMBO_HEIGHT,
+    );
+    y = layout_checkbox(
+        "checkbox_group_tools_menu_by_category",
+        state.checkbox_group_tools_menu_by_category,
+        y,
     );
     y = layout_label_control(
         "label_prompt_program",
@@ -14117,6 +14197,7 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_modified_marker_position,
             state.label_open,
             state.combo_open,
+            state.checkbox_group_tools_menu_by_category,
             state.label_prompt_program,
             state.combo_prompt_program,
             state.label_network_proxy,

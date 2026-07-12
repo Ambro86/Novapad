@@ -106,6 +106,7 @@ pub struct GoogleSpeaker {
     pub language: String,
 }
 
+#[derive(Clone)]
 pub struct GoogleVoicePackageStatus {
     pub package: GoogleVoicePackage,
     pub language: String,
@@ -158,8 +159,49 @@ fn runtime_dir() -> PathBuf {
     google_data_dir().join("runtime")
 }
 
-fn chrome_profiles_dir() -> PathBuf {
-    google_data_dir().join("chrome_profiles")
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BrowserRuntime {
+    Chrome,
+    Edge,
+}
+
+impl BrowserRuntime {
+    fn display_name(self) -> &'static str {
+        match self {
+            Self::Chrome => "Google Chrome",
+            Self::Edge => "Microsoft Edge",
+        }
+    }
+
+    fn executable_name(self) -> &'static str {
+        match self {
+            Self::Chrome => "chrome.exe",
+            Self::Edge => "msedge.exe",
+        }
+    }
+
+    fn environment_variable(self) -> &'static str {
+        match self {
+            Self::Chrome => "CHROME_PATH",
+            Self::Edge => "EDGE_PATH",
+        }
+    }
+
+    fn profile_directory_name(self) -> &'static str {
+        match self {
+            Self::Chrome => "chrome_profiles",
+            Self::Edge => "edge_profiles",
+        }
+    }
+}
+
+struct BrowserExecutable {
+    runtime: BrowserRuntime,
+    path: PathBuf,
+}
+
+fn browser_profiles_dir(runtime: BrowserRuntime) -> PathBuf {
+    google_data_dir().join(runtime.profile_directory_name())
 }
 
 fn package_path(package: &GoogleVoicePackage) -> PathBuf {
@@ -698,7 +740,8 @@ fn http_resource(path: &str) -> Result<Option<(&'static str, Vec<u8>)>, String> 
 
 struct GoogleTtsRuntime {
     _server: EmbeddedHttpServer,
-    chrome: Child,
+    browser: Child,
+    browser_name: &'static str,
     profile_dir: PathBuf,
     socket: WebSocket<MaybeTlsStream<TcpStream>>,
     next_message_id: u64,
@@ -710,25 +753,32 @@ impl GoogleTtsRuntime {
             return Err("No Google TTS voice packages are installed.".to_string());
         }
         fs::create_dir_all(runtime_dir()).map_err(|err| err.to_string())?;
-        fs::create_dir_all(chrome_profiles_dir()).map_err(|err| err.to_string())?;
-        cleanup_old_profiles();
-        let server = EmbeddedHttpServer::start()?;
-        let chrome_path = find_chrome().ok_or_else(|| {
-            "Google Chrome was not found. Install Google Chrome or set CHROME_PATH.".to_string()
+        let browser = find_browser().ok_or_else(|| {
+            "Google Chrome and Microsoft Edge were not found. Install one of them, or set CHROME_PATH or EDGE_PATH."
+                .to_string()
         })?;
+        let profiles_dir = browser_profiles_dir(browser.runtime);
+        fs::create_dir_all(&profiles_dir).map_err(|err| err.to_string())?;
+        cleanup_old_profiles(&profiles_dir, browser.runtime.display_name());
+        let server = EmbeddedHttpServer::start()?;
+        crate::log_debug(&format!(
+            "Google TTS browser runtime: {} ({})",
+            browser.runtime.display_name(),
+            browser.path.display()
+        ));
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|value| value.as_nanos())
             .unwrap_or(0);
         let profile_sequence = PROFILE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-        let profile_dir = chrome_profiles_dir().join(format!(
+        let profile_dir = profiles_dir.join(format!(
             "session-{}-{timestamp}-{profile_sequence}",
             std::process::id()
         ));
         fs::create_dir_all(&profile_dir).map_err(|err| err.to_string())?;
         let devtools_file = profile_dir.join("DevToolsActivePort");
         let page_url = format!("http://127.0.0.1:{}/", server.port);
-        let chrome_args = vec![
+        let browser_args = vec![
             "--headless=new".to_string(),
             "--remote-debugging-port=0".to_string(),
             "--remote-allow-origins=*".to_string(),
@@ -742,15 +792,17 @@ impl GoogleTtsRuntime {
             "--autoplay-policy=no-user-gesture-required".to_string(),
             page_url.clone(),
         ];
-        let mut chrome = Command::new(chrome_path)
-            .args(&chrome_args)
+        let browser_name = browser.runtime.display_name();
+        let mut browser_process = Command::new(&browser.path)
+            .args(&browser_args)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .creation_flags(CREATE_NO_WINDOW)
             .spawn()
-            .map_err(|err| format!("Failed to start Google Chrome: {err}"))?;
-        let debug_port = wait_for_devtools_port(&mut chrome, &devtools_file, cancel)?;
+            .map_err(|err| format!("Failed to start {browser_name}: {err}"))?;
+        let debug_port =
+            wait_for_devtools_port(&mut browser_process, browser_name, &devtools_file, cancel)?;
         let websocket_url = wait_for_page_websocket(debug_port, &page_url, cancel)?;
         let (mut socket, _) = connect(websocket_url.as_str())
             .map_err(|err| format!("Google TTS DevTools connection failed: {err}"))?;
@@ -761,7 +813,8 @@ impl GoogleTtsRuntime {
         }
         let mut runtime = Self {
             _server: server,
-            chrome,
+            browser: browser_process,
+            browser_name,
             profile_dir,
             socket,
             next_message_id: 1,
@@ -1034,16 +1087,25 @@ impl GoogleTtsRuntime {
 impl Drop for GoogleTtsRuntime {
     fn drop(&mut self) {
         self.send_stop();
-        if let Err(err) = self.chrome.kill() {
-            crate::log_debug(&format!("Google TTS Chrome shutdown failed: {err}"));
+        if let Err(err) = self.browser.kill() {
+            crate::log_debug(&format!(
+                "Google TTS {} shutdown failed: {err}",
+                self.browser_name
+            ));
         }
-        if let Err(err) = self.chrome.wait() {
-            crate::log_debug(&format!("Google TTS Chrome wait failed: {err}"));
+        if let Err(err) = self.browser.wait() {
+            crate::log_debug(&format!(
+                "Google TTS {} wait failed: {err}",
+                self.browser_name
+            ));
         }
         if let Err(err) = fs::remove_dir_all(&self.profile_dir)
             && err.kind() != std::io::ErrorKind::NotFound
         {
-            crate::log_debug(&format!("Google TTS Chrome profile cleanup failed: {err}"));
+            crate::log_debug(&format!(
+                "Google TTS {} profile cleanup failed: {err}",
+                self.browser_name
+            ));
         }
     }
 }
@@ -1119,7 +1181,7 @@ fn synthesize_with_runtime(
         ));
     } else {
         crate::log_debug(&format!(
-            "Google TTS runtime [{}]: reusing active Chrome session",
+            "Google TTS runtime [{}]: reusing active browser session",
             session_label
         ));
     }
@@ -1134,7 +1196,7 @@ fn synthesize_with_runtime(
         *runtime = None;
         if retry_transient_context {
             crate::log_debug(&format!(
-                "Google TTS runtime [{}]: transient JavaScript context failure; restarting Chrome and retrying once: {}",
+                "Google TTS runtime [{}]: transient JavaScript context failure; restarting the browser runtime and retrying once: {}",
                 session_label, err
             ));
             thread::sleep(Duration::from_millis(100));
@@ -1158,7 +1220,7 @@ fn synthesize_with_runtime(
     result
 }
 
-/// An independent Chrome/WASM session used by Google audiobook workers.
+/// An independent browser/WASM session used by Google audiobook workers.
 /// Each worker owns one instance, so long audiobook blocks can be synthesized
 /// concurrently without contending on the shared interactive TTS runtime.
 pub(crate) struct GoogleTtsWorkerSession {
@@ -1261,47 +1323,75 @@ fn wav_from_pcm(pcm: &[u8]) -> Vec<u8> {
     wav
 }
 
-fn find_chrome() -> Option<PathBuf> {
+fn browser_candidates(runtime: BrowserRuntime) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
-    if let Some(path) = std::env::var_os("CHROME_PATH") {
+    if let Some(path) = std::env::var_os(runtime.environment_variable()) {
         candidates.push(PathBuf::from(path));
     }
     for key in ["PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"] {
-        if let Some(root) = std::env::var_os(key) {
-            candidates.push(
-                PathBuf::from(root)
-                    .join("Google")
+        let Some(root) = std::env::var_os(key) else {
+            continue;
+        };
+        let root = PathBuf::from(root);
+        match runtime {
+            BrowserRuntime::Chrome => candidates.push(
+                root.join("Google")
                     .join("Chrome")
                     .join("Application")
-                    .join("chrome.exe"),
-            );
+                    .join(runtime.executable_name()),
+            ),
+            BrowserRuntime::Edge => candidates.push(
+                root.join("Microsoft")
+                    .join("Edge")
+                    .join("Application")
+                    .join(runtime.executable_name()),
+            ),
         }
     }
     if let Some(path_value) = std::env::var_os("PATH") {
         for directory in std::env::split_paths(&path_value) {
-            candidates.push(directory.join("chrome.exe"));
-            candidates.push(directory.join("chrome"));
+            candidates.push(directory.join(runtime.executable_name()));
+            candidates.push(directory.join(match runtime {
+                BrowserRuntime::Chrome => "chrome",
+                BrowserRuntime::Edge => "msedge",
+            }));
         }
     }
-    candidates.into_iter().find(|path| path.is_file())
+    candidates
+}
+
+fn find_browser() -> Option<BrowserExecutable> {
+    // Preserve Sonarpad's existing behavior: prefer Chrome, then fall back to Edge.
+    for runtime in [BrowserRuntime::Chrome, BrowserRuntime::Edge] {
+        if let Some(path) = browser_candidates(runtime)
+            .into_iter()
+            .find(|path| path.is_file())
+        {
+            return Some(BrowserExecutable { runtime, path });
+        }
+    }
+    None
 }
 
 fn wait_for_devtools_port(
-    chrome: &mut Child,
+    browser: &mut Child,
+    browser_name: &str,
     devtools_file: &Path,
     cancel: &Arc<AtomicBool>,
 ) -> Result<u16, String> {
     for _ in 0..400 {
         if cancel.load(Ordering::Relaxed) {
-            if let Err(err) = chrome.kill() {
-                crate::log_debug(&format!("Google TTS cancelled Chrome kill failed: {err}"));
+            if let Err(err) = browser.kill() {
+                crate::log_debug(&format!(
+                    "Google TTS cancelled {browser_name} kill failed: {err}"
+                ));
             }
             return Err("cancelled".to_string());
         }
-        match chrome.try_wait() {
+        match browser.try_wait() {
             Ok(Some(status)) => {
                 return Err(format!(
-                    "Google Chrome exited before Google TTS started: {status}"
+                    "{browser_name} exited before Google TTS started: {status}"
                 ));
             }
             Ok(None) => {}
@@ -1317,7 +1407,7 @@ fn wait_for_devtools_port(
         }
         thread::sleep(Duration::from_millis(50));
     }
-    Err("Timed out waiting for Google Chrome DevTools.".to_string())
+    Err(format!("Timed out waiting for {browser_name} DevTools."))
 }
 
 fn wait_for_page_websocket(
@@ -1348,12 +1438,11 @@ fn wait_for_page_websocket(
         }
         thread::sleep(Duration::from_millis(50));
     }
-    Err("Could not find the Google TTS Chrome page.".to_string())
+    Err("Could not find the Google TTS browser page.".to_string())
 }
 
-fn cleanup_old_profiles() {
-    let root = chrome_profiles_dir();
-    let Ok(entries) = fs::read_dir(&root) else {
+fn cleanup_old_profiles(root: &Path, browser_name: &str) {
+    let Ok(entries) = fs::read_dir(root) else {
         return;
     };
     let cutoff = SystemTime::now()
@@ -1371,7 +1460,7 @@ fn cleanup_old_profiles() {
             .is_some_and(|modified| modified < cutoff);
         if should_remove && let Err(err) = fs::remove_dir_all(&path) {
             crate::log_debug(&format!(
-                "Google TTS old Chrome profile cleanup failed for {}: {err}",
+                "Google TTS old {browser_name} profile cleanup failed for {}: {err}",
                 path.display()
             ));
         }

@@ -8,6 +8,7 @@ use crate::app_windows::interpreter_select_window::InterpreterContextAction;
 use crate::app_windows::youtube_transcript_window::{
     self, MultilineSearchOptions, MultilineSelectionItem, MultilineSelectionResult,
 };
+use crate::app_windows::{scheduled_recording_window, tv_guide_window};
 use crate::settings::{Language, TvFavorite, load_settings, save_settings};
 use crate::stream_recording::{self, StreamRecordingKind};
 use crate::tools::tv::{self, TvChannel, TvProgram};
@@ -35,6 +36,14 @@ enum TvEntryKind {
 enum TvDeferredAction {
     Refresh,
     Record {
+        channel: Box<TvChannel>,
+        selected_id: String,
+    },
+    Guide {
+        channel: Box<TvChannel>,
+        selected_id: String,
+    },
+    Schedule {
         channel: Box<TvChannel>,
         selected_id: String,
     },
@@ -138,17 +147,28 @@ impl TvCatalog {
     }
 
     fn root_entries(&self) -> Vec<TvEntry> {
-        let mut entries = self
-            .categories
-            .iter()
-            .enumerate()
-            .map(|(index, (name, channels))| TvEntry {
-                id: format!("category:{index}"),
-                title: name.clone(),
-                description: Some(channel_count_description(channels.len())),
-                kind: TvEntryKind::Page(TvPage::Category(name.clone())),
-            })
-            .collect::<Vec<_>>();
+        let mut entries = Vec::new();
+        let favorites = load_settings().tv_favorites;
+        if !favorites.is_empty() {
+            entries.push(TvEntry {
+                id: "favorites".to_string(),
+                title: "Canali preferiti".to_string(),
+                description: Some(channel_count_description(favorites.len())),
+                kind: TvEntryKind::Page(TvPage::Favorites),
+            });
+        }
+        entries.extend(
+            self.categories
+                .iter()
+                .enumerate()
+                .map(|(index, (name, channels))| TvEntry {
+                    id: format!("category:{index}"),
+                    title: name.clone(),
+                    description: Some(channel_count_description(channels.len())),
+                    kind: TvEntryKind::Page(TvPage::Category(name.clone())),
+                })
+                .collect::<Vec<_>>(),
+        );
 
         if !self.regions.is_empty() {
             let channel_count = self
@@ -323,10 +343,7 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
                 initial_query: search_query.clone(),
                 search_button_label: "Cerca".to_string(),
                 show_search_edit: true,
-                secondary_action_label: Some(match page {
-                    TvPage::Favorites => "Registrazioni TV".to_string(),
-                    _ => "Canali preferiti".to_string(),
-                }),
+                secondary_action_label: None,
                 context_actions: tv_context_actions(Arc::clone(&catalog)),
                 right_arrow_accepts_selection: true,
                 // Nelle sottopagine Freccia sinistra torna alla pagina TV
@@ -355,6 +372,22 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
                 record_tv_channel(parent, language, channel.as_ref());
                 continue;
             }
+            Some(TvDeferredAction::Guide {
+                channel,
+                selected_id: guide_id,
+            }) => {
+                selected_id = Some(guide_id);
+                tv_guide_window::open(parent, *channel);
+                continue;
+            }
+            Some(TvDeferredAction::Schedule {
+                channel,
+                selected_id: schedule_id,
+            }) => {
+                selected_id = Some(schedule_id);
+                scheduled_recording_window::open_for_tv(parent, *channel);
+                continue;
+            }
             None => {}
         }
 
@@ -372,14 +405,6 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
                 continue;
             }
             MultilineSelectionResult::SecondaryAction => {
-                if page == TvPage::Favorites {
-                    stream_recording::open_recordings(parent, language, StreamRecordingKind::Tv);
-                } else {
-                    history.push((page.clone(), selected_id.clone()));
-                    page = TvPage::Favorites;
-                    selected_id = None;
-                    search_query.clear();
-                }
                 continue;
             }
             MultilineSelectionResult::Cancelled => {
@@ -564,6 +589,40 @@ fn tv_context_actions(catalog: Arc<TvCatalog>) -> Vec<InterpreterContextAction> 
         close_tv_browser_dialog();
     });
 
+    let guide_catalog = Arc::clone(&catalog);
+    let guide_enabled = Arc::new(move |id: &str| {
+        let Some(channel) = selected_channel_from_id(&guide_catalog, id) else {
+            return false;
+        };
+        tv::current_program_for_channel(&guide_catalog.current_programs, &channel).is_some()
+    });
+    let guide_catalog_handler = Arc::clone(&catalog);
+    let guide_handler = Arc::new(move |id: String| {
+        let Some(channel) = selected_channel_from_id(&guide_catalog_handler, &id) else {
+            return;
+        };
+        set_tv_deferred_action(TvDeferredAction::Guide {
+            channel: Box::new(channel),
+            selected_id: id,
+        });
+        close_tv_browser_dialog();
+    });
+
+    let schedule_catalog = Arc::clone(&catalog);
+    let schedule_enabled =
+        Arc::new(move |id: &str| selected_channel_from_id(&schedule_catalog, id).is_some());
+    let schedule_catalog_handler = Arc::clone(&catalog);
+    let schedule_handler = Arc::new(move |id: String| {
+        let Some(channel) = selected_channel_from_id(&schedule_catalog_handler, &id) else {
+            return;
+        };
+        set_tv_deferred_action(TvDeferredAction::Schedule {
+            channel: Box::new(channel),
+            selected_id: id,
+        });
+        close_tv_browser_dialog();
+    });
+
     vec![
         InterpreterContextAction {
             label: "Aggiungi ai preferiti".to_string(),
@@ -582,6 +641,18 @@ fn tv_context_actions(catalog: Arc<TvCatalog>) -> Vec<InterpreterContextAction> 
             ctrl_c_shortcut: false,
             enabled: record_enabled,
             handler: record_handler,
+        },
+        InterpreterContextAction {
+            label: "Visualizza la guida TV".to_string(),
+            ctrl_c_shortcut: false,
+            enabled: guide_enabled,
+            handler: guide_handler,
+        },
+        InterpreterContextAction {
+            label: "Programma registrazione".to_string(),
+            ctrl_c_shortcut: false,
+            enabled: schedule_enabled,
+            handler: schedule_handler,
         },
     ]
 }

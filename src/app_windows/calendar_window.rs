@@ -1247,7 +1247,7 @@ fn update_reminder_time_controls(hwnd: HWND) {
     }
 }
 
-fn adjust_minute_combo_by_five(combo: HWND, increase: bool) {
+pub(crate) fn adjust_minute_combo_by_five(combo: HWND, increase: bool) {
     let current = selected_combo_index(combo).unwrap_or(0).min(59);
     let adjusted = if increase {
         current.saturating_add(5).min(59)

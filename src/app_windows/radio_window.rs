@@ -1,4 +1,5 @@
 use crate::accessibility::{PlayerCommand, handle_player_keyboard, to_wide};
+use crate::app_windows::scheduled_recording_window;
 use crate::i18n;
 use crate::launch_stream_url_in_mpv;
 use crate::settings::{Language, RadioFavorite, load_settings, save_settings};
@@ -79,6 +80,7 @@ const ID_CONTEXT_ADD_FAVORITE: usize = 1;
 const ID_CONTEXT_REMOVE_FAVORITE: usize = 2;
 const ID_CONTEXT_COPY_STREAM_URL: usize = 3;
 const ID_CONTEXT_RECORD_AND_PLAY: usize = 4;
+const ID_CONTEXT_SCHEDULE_RECORDING: usize = 5;
 
 #[derive(Clone, Deserialize)]
 struct RadioStation {
@@ -787,6 +789,27 @@ fn show_station_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> bool
         return false;
     }
 
+    let schedule_label = to_wide(&tr(
+        language,
+        "scheduled_recording.action",
+        "Programma registrazione",
+    ));
+    if let Err(err) = unsafe {
+        AppendMenuW(
+            menu,
+            MF_STRING,
+            ID_CONTEXT_SCHEDULE_RECORDING,
+            PCWSTR(schedule_label.as_ptr()),
+        )
+    } {
+        crate::log_debug(&format!(
+            "Radio: AppendMenuW schedule recording failed: {}",
+            err
+        ));
+        crate::log_if_err!(unsafe { DestroyMenu(menu) });
+        return false;
+    }
+
     let copy_label = to_wide(&tr(language, "radio.copy_audio_url", "Copia URL audio"));
     if let Err(err) = unsafe {
         AppendMenuW(
@@ -837,6 +860,7 @@ fn show_station_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM) -> bool
         ID_CONTEXT_REMOVE_FAVORITE => remove_selected_favorite(hwnd),
         ID_CONTEXT_COPY_STREAM_URL => copy_selected_stream_url(hwnd),
         ID_CONTEXT_RECORD_AND_PLAY => record_and_play_selected_radio(hwnd),
+        ID_CONTEXT_SCHEDULE_RECORDING => schedule_selected_radio(hwnd),
         0 => {}
         other => crate::log_debug(&format!("Radio: unknown context menu command {}", other)),
     }
@@ -2625,6 +2649,17 @@ fn record_and_play_selected_radio(hwnd: HWND) {
         }
         Err(err) => message(hwnd, "Radio", &err),
     }
+}
+
+fn schedule_selected_radio(hwnd: HWND) {
+    let Some(kind) = selected_radio_list_kind(hwnd) else {
+        return;
+    };
+    let Some(item) = selected_result(hwnd, kind) else {
+        return;
+    };
+    let language = with_radio_state(hwnd, |state| state.language).unwrap_or_default();
+    scheduled_recording_window::open_for_radio(hwnd, language, item);
 }
 
 fn copy_selected_stream_url(hwnd: HWND) {

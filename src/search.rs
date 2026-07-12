@@ -142,6 +142,8 @@ pub fn handle_find_message(hwnd: HWND, lparam: LPARAM) {
                     state.replace_replace = None;
                 }
             });
+            let _unused =
+                crate::post_message_w_safe(hwnd, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
             return;
         }
 
@@ -472,6 +474,7 @@ pub fn find_next(
             );
             SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
             SetFocus(hwnd_edit);
+            crate::notify_editor_caret_changed(hwnd_edit);
             return true;
         }
 
@@ -496,6 +499,7 @@ pub fn find_next(
                 );
                 SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
                 SetFocus(hwnd_edit);
+                crate::notify_editor_caret_changed(hwnd_edit);
                 return true;
             }
         }
@@ -1140,6 +1144,7 @@ fn find_next_regex(
         );
         SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
         SetFocus(hwnd_edit);
+        crate::notify_editor_caret_changed(hwnd_edit);
     }
     true
 }

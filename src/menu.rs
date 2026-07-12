@@ -179,6 +179,9 @@ pub struct MenuLabels {
     pub menu_window: String,
     pub menu_voice_audio: String,
     pub menu_tools: String,
+    pub menu_tools_reading_content: String,
+    pub menu_tools_multimedia: String,
+    pub menu_tools_utilities: String,
     pub menu_help: String,
     pub menu_options: String,
     pub menu_dictionary: String,
@@ -301,6 +304,9 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_window: i18n::tr(language, "menu.window"),
         menu_voice_audio: i18n::tr(language, "menu.voice_audio"),
         menu_tools: i18n::tr(language, "menu.tools"),
+        menu_tools_reading_content: i18n::tr(language, "menu.tools_category.reading_content"),
+        menu_tools_multimedia: i18n::tr(language, "menu.tools_category.multimedia"),
+        menu_tools_utilities: i18n::tr(language, "menu.tools_category.utilities"),
         menu_help: i18n::tr(language, "menu.help"),
         menu_options: i18n::tr(language, "menu.options"),
         menu_dictionary: i18n::tr(language, "menu.dictionary"),
@@ -997,6 +1003,9 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             shortcuts.open_paths_navigation,
         );
         labels.menu_radio = label_with_shortcut(&labels.menu_radio, shortcuts.open_radio);
+        labels.menu_calendar = label_with_shortcut(&labels.menu_calendar, shortcuts.open_calendar);
+        labels.menu_weather = label_with_shortcut(&labels.menu_weather, shortcuts.open_weather);
+        labels.menu_cinema = label_with_shortcut(&labels.menu_cinema, shortcuts.open_cinema);
         labels.menu_dictionary =
             label_with_shortcut(&labels.menu_dictionary, shortcuts.open_dictionary);
         labels.menu_options = label_with_shortcut(&labels.menu_options, shortcuts.open_options);
@@ -1467,103 +1476,255 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             &labels.menu_voice_audio,
         );
 
-        append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_PROMPT, &labels.menu_prompt);
-        append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RSS, &labels.menu_rss);
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_PODCASTS,
-            &labels.menu_podcasts,
-        );
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_DICTIONARY,
-            &labels.menu_dictionary,
-        );
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_DICTIONARY_LOOKUP,
-            &labels.menu_dictionary_lookup,
-        );
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_WIKIPEDIA_IMPORT,
-            &labels.menu_wikipedia_import,
-        );
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_IMPORT_YOUTUBE,
-            &labels.menu_import_youtube,
-        );
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_STREAM_AUDIO,
-            &labels.menu_stream_audio,
-        );
-        if language == Language::Italian {
+        let group_tools_menu_by_category =
+            with_state(hwnd, |state| state.settings.group_tools_menu_by_category).unwrap_or(true);
+
+        if group_tools_menu_by_category {
+            let reading_content_menu = CreateMenu().unwrap_or(HMENU(0));
+            append_menu_string(
+                reading_content_menu,
+                MF_STRING,
+                IDM_TOOLS_PROMPT,
+                &labels.menu_prompt,
+            );
+            append_menu_string(
+                reading_content_menu,
+                MF_STRING,
+                IDM_TOOLS_RSS,
+                &labels.menu_rss,
+            );
+            append_menu_string(
+                reading_content_menu,
+                MF_STRING,
+                IDM_TOOLS_DICTIONARY,
+                &labels.menu_dictionary,
+            );
+            append_menu_string(
+                reading_content_menu,
+                MF_STRING,
+                IDM_TOOLS_DICTIONARY_LOOKUP,
+                &labels.menu_dictionary_lookup,
+            );
+            append_menu_string(
+                reading_content_menu,
+                MF_STRING,
+                IDM_TOOLS_WIKIPEDIA_IMPORT,
+                &labels.menu_wikipedia_import,
+            );
+            if language == Language::Italian {
+                append_menu_string(
+                    reading_content_menu,
+                    MF_STRING,
+                    IDM_TOOLS_BDCIECHI,
+                    &labels.menu_bdciechi,
+                );
+            }
+            append_menu_string(
+                tools_menu,
+                MF_POPUP,
+                reading_content_menu.0 as usize,
+                &labels.menu_tools_reading_content,
+            );
+
+            let multimedia_menu = CreateMenu().unwrap_or(HMENU(0));
+            append_menu_string(
+                multimedia_menu,
+                MF_STRING,
+                IDM_TOOLS_PODCASTS,
+                &labels.menu_podcasts,
+            );
+            append_menu_string(
+                multimedia_menu,
+                MF_STRING,
+                IDM_TOOLS_IMPORT_YOUTUBE,
+                &labels.menu_import_youtube,
+            );
+            append_menu_string(
+                multimedia_menu,
+                MF_STRING,
+                IDM_TOOLS_STREAM_AUDIO,
+                &labels.menu_stream_audio,
+            );
+            if language == Language::Italian {
+                append_menu_string(
+                    multimedia_menu,
+                    MF_STRING,
+                    IDM_TOOLS_RAI_AUDIODESCRIZIONI,
+                    &labels.menu_rai_audiodescrizioni,
+                );
+                append_menu_string(
+                    multimedia_menu,
+                    MF_STRING,
+                    IDM_TOOLS_RAIPLAY,
+                    &labels.menu_raiplay,
+                );
+                append_menu_string(
+                    multimedia_menu,
+                    MF_STRING,
+                    IDM_TOOLS_RAIPLAYSOUND,
+                    &labels.menu_raiplaysound,
+                );
+                append_menu_string(multimedia_menu, MF_STRING, IDM_TOOLS_TV, &labels.menu_tv);
+            }
+            append_menu_string(
+                multimedia_menu,
+                MF_STRING,
+                IDM_TOOLS_CINEMA,
+                &labels.menu_cinema,
+            );
+            append_menu_string(
+                multimedia_menu,
+                MF_STRING,
+                IDM_TOOLS_RADIO,
+                &labels.menu_radio,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_POPUP,
+                multimedia_menu.0 as usize,
+                &labels.menu_tools_multimedia,
+            );
+
+            let utilities_menu = CreateMenu().unwrap_or(HMENU(0));
+            append_menu_string(
+                utilities_menu,
+                MF_STRING,
+                IDM_TOOLS_CALENDAR,
+                &labels.menu_calendar,
+            );
+            append_menu_string(
+                utilities_menu,
+                MF_STRING,
+                IDM_TOOLS_WEATHER,
+                &labels.menu_weather,
+            );
+            append_menu_string(
+                utilities_menu,
+                MF_STRING,
+                IDM_TOOLS_PATHS_NAVIGATION,
+                &labels.menu_paths_navigation,
+            );
+            if language == Language::Italian {
+                append_menu_string(
+                    utilities_menu,
+                    MF_STRING,
+                    IDM_TOOLS_ITALIAONLINE,
+                    &labels.menu_italiaonline,
+                );
+            }
+            append_menu_string(
+                tools_menu,
+                MF_POPUP,
+                utilities_menu.0 as usize,
+                &labels.menu_tools_utilities,
+            );
+
+            crate::log_if_err!(AppendMenuW(tools_menu, MF_SEPARATOR, 0, PCWSTR::null()));
             append_menu_string(
                 tools_menu,
                 MF_STRING,
-                IDM_TOOLS_RAI_AUDIODESCRIZIONI,
-                &labels.menu_rai_audiodescrizioni,
+                IDM_TOOLS_OPTIONS,
+                &labels.menu_options,
+            );
+        } else {
+            append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_PROMPT, &labels.menu_prompt);
+            append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RSS, &labels.menu_rss);
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_PODCASTS,
+                &labels.menu_podcasts,
             );
             append_menu_string(
                 tools_menu,
                 MF_STRING,
-                IDM_TOOLS_RAIPLAY,
-                &labels.menu_raiplay,
+                IDM_TOOLS_DICTIONARY,
+                &labels.menu_dictionary,
             );
             append_menu_string(
                 tools_menu,
                 MF_STRING,
-                IDM_TOOLS_RAIPLAYSOUND,
-                &labels.menu_raiplaysound,
-            );
-            append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_TV, &labels.menu_tv);
-            append_menu_string(
-                tools_menu,
-                MF_STRING,
-                IDM_TOOLS_ITALIAONLINE,
-                &labels.menu_italiaonline,
+                IDM_TOOLS_DICTIONARY_LOOKUP,
+                &labels.menu_dictionary_lookup,
             );
             append_menu_string(
                 tools_menu,
                 MF_STRING,
-                IDM_TOOLS_BDCIECHI,
-                &labels.menu_bdciechi,
+                IDM_TOOLS_WIKIPEDIA_IMPORT,
+                &labels.menu_wikipedia_import,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_IMPORT_YOUTUBE,
+                &labels.menu_import_youtube,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_STREAM_AUDIO,
+                &labels.menu_stream_audio,
+            );
+            if language == Language::Italian {
+                append_menu_string(
+                    tools_menu,
+                    MF_STRING,
+                    IDM_TOOLS_RAI_AUDIODESCRIZIONI,
+                    &labels.menu_rai_audiodescrizioni,
+                );
+                append_menu_string(
+                    tools_menu,
+                    MF_STRING,
+                    IDM_TOOLS_RAIPLAY,
+                    &labels.menu_raiplay,
+                );
+                append_menu_string(
+                    tools_menu,
+                    MF_STRING,
+                    IDM_TOOLS_RAIPLAYSOUND,
+                    &labels.menu_raiplaysound,
+                );
+                append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_TV, &labels.menu_tv);
+                append_menu_string(
+                    tools_menu,
+                    MF_STRING,
+                    IDM_TOOLS_ITALIAONLINE,
+                    &labels.menu_italiaonline,
+                );
+                append_menu_string(
+                    tools_menu,
+                    MF_STRING,
+                    IDM_TOOLS_BDCIECHI,
+                    &labels.menu_bdciechi,
+                );
+            }
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_CALENDAR,
+                &labels.menu_calendar,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_WEATHER,
+                &labels.menu_weather,
+            );
+            append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_CINEMA, &labels.menu_cinema);
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_PATHS_NAVIGATION,
+                &labels.menu_paths_navigation,
+            );
+            append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RADIO, &labels.menu_radio);
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_OPTIONS,
+                &labels.menu_options,
             );
         }
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_CALENDAR,
-            &labels.menu_calendar,
-        );
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_WEATHER,
-            &labels.menu_weather,
-        );
-        append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_CINEMA, &labels.menu_cinema);
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_PATHS_NAVIGATION,
-            &labels.menu_paths_navigation,
-        );
-        append_menu_string(tools_menu, MF_STRING, IDM_TOOLS_RADIO, &labels.menu_radio);
-        append_menu_string(
-            tools_menu,
-            MF_STRING,
-            IDM_TOOLS_OPTIONS,
-            &labels.menu_options,
-        );
         append_menu_string(hmenu, MF_POPUP, tools_menu.0 as usize, &labels.menu_tools);
         append_menu_string(hmenu, MF_POPUP, window_menu.0 as usize, &labels.menu_window);
 

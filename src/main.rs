@@ -164,6 +164,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
 
+const EVENT_OBJECT_LOCATIONCHANGE_ID: u32 = 0x800B;
+const EVENT_OBJECT_TEXTSELECTIONCHANGED_ID: u32 = 0x8014;
+const OBJID_CARET_ID: i32 = -8;
 const EM_SCROLLCARET: u32 = 0x00B7;
 const EM_CHARFROMPOS: u32 = 0x00D7;
 const EM_LINEFROMCHAR: u32 = 0x00C9;
@@ -481,6 +484,7 @@ fn notify_active_editor_focus(hwnd: HWND, notify_when_audiobook: bool) {
                 OBJID_CLIENT.0,
                 CHILDID_SELF as i32,
             );
+            notify_editor_caret_changed(hwnd_edit);
         }
     }
 }
@@ -504,6 +508,26 @@ fn reactivate_batch_audiobooks_window(hwnd: HWND) -> bool {
     show_window_safe(batch_window, SW_SHOW);
     set_foreground_window_safe(batch_window);
     app_windows::batch_audiobooks_window::restore_batch_focus(batch_window)
+}
+
+pub(crate) fn notify_editor_caret_changed(hwnd_edit: HWND) {
+    unsafe {
+        if hwnd_edit.0 == 0 || GetFocus() != hwnd_edit {
+            return;
+        }
+        NotifyWinEvent(
+            EVENT_OBJECT_LOCATIONCHANGE_ID,
+            hwnd_edit,
+            OBJID_CARET_ID,
+            CHILDID_SELF as i32,
+        );
+        NotifyWinEvent(
+            EVENT_OBJECT_TEXTSELECTIONCHANGED_ID,
+            hwnd_edit,
+            OBJID_CLIENT.0,
+            CHILDID_SELF as i32,
+        );
+    }
 }
 
 pub(crate) fn focus_editor(hwnd: HWND) {
@@ -543,6 +567,7 @@ pub(crate) fn focus_editor(hwnd: HWND) {
                 OBJID_CLIENT.0,
                 CHILDID_SELF as i32,
             );
+            notify_editor_caret_changed(hwnd_edit);
         }
     }
 }
@@ -7360,6 +7385,7 @@ fn force_active_editor_focus(hwnd: HWND) {
                 OBJID_CLIENT.0,
                 CHILDID_SELF as i32,
             );
+            notify_editor_caret_changed(hwnd_edit);
         }
     }
 }
@@ -7681,6 +7707,14 @@ fn main() -> windows::core::Result<()> {
     log_debug("Application started.");
 
     let args: Vec<String> = std::env::args().collect();
+    if let Some(index) = args.iter().position(|arg| arg == "--scheduled-recording") {
+        let code = args
+            .get(index + 1)
+            .filter(|value| !value.trim().is_empty())
+            .map(|id| app_windows::scheduled_recording_window::run_scheduled_recording(id.trim()))
+            .unwrap_or(2);
+        std::process::exit(code);
+    }
     if args.iter().any(|arg| arg == "--self-update") {
         match updater::run_self_update(&args) {
             Ok(code) => std::process::exit(code),
@@ -10442,50 +10476,58 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 let session_id = wparam.0 as u64;
                 let offset = lparam.0 as i32;
                 with_state(hwnd, |state| {
-                    if let Some(current) = &state.tts_session
-                        && current.id == session_id
-                    {
-                        let safe_offset = clamp_tts_chunk_offset(state.tts_last_offset, offset);
-                        if safe_offset != offset {
-                            log_debug(&format!(
-                                "TTS: normalized non-monotonic offset session={} prev={} new={} safe={}",
-                                session_id, state.tts_last_offset, offset, safe_offset
-                            ));
-                        }
-                        state.tts_last_offset = safe_offset;
-                        state.tts_pending_start_pos = None;
-                        if let Some(doc) = state.docs.get(state.current) {
-                            let current_pos = (current.initial_caret_pos + safe_offset).max(0);
-                            let hwnd_edit = doc.hwnd_edit;
-                            let title = doc.title.clone();
-                            let path = doc.path.clone();
-                            let format = doc.format;
-                            let (storage_key, _) = runtime_bookmark_storage_key(
-                                path.as_deref(),
-                                hwnd_edit,
-                                &title,
-                                format,
-                            );
-                            state.tts_automatic_bookmark_position =
-                                Some((hwnd_edit, storage_key, current_pos));
-                            state.tts_sentence_nav_anchor = Some((hwnd_edit, current_pos));
-                        }
-                        if state.settings.move_cursor_during_reading
-                            && let Some(doc) = state.docs.get(state.current)
-                        {
-                            let new_pos = current.initial_caret_pos + safe_offset;
-                            let mut cr = CHARRANGE {
-                                cpMin: new_pos,
-                                cpMax: new_pos,
-                            };
-                            SendMessageW(
-                                doc.hwnd_edit,
-                                EM_EXSETSEL,
-                                WPARAM(0),
-                                LPARAM(&mut cr as *mut _ as isize),
-                            );
-                            SendMessageW(doc.hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
-                        }
+                    let Some((initial_caret_pos, source_edit)) = state
+                        .tts_session
+                        .as_ref()
+                        .filter(|current| current.id == session_id)
+                        .map(|current| (current.initial_caret_pos, current.source_edit))
+                    else {
+                        return;
+                    };
+
+                    let safe_offset = clamp_tts_chunk_offset(state.tts_last_offset, offset);
+                    if safe_offset != offset {
+                        log_debug(&format!(
+                            "TTS: normalized non-monotonic offset session={} prev={} new={} safe={}",
+                            session_id, state.tts_last_offset, offset, safe_offset
+                        ));
+                    }
+                    state.tts_last_offset = safe_offset;
+                    state.tts_pending_start_pos = None;
+
+                    if source_edit.0 == 0 || !is_window_handle_valid(source_edit) {
+                        return;
+                    }
+
+                    let current_pos = (initial_caret_pos + safe_offset).max(0);
+                    if let Some(doc) = state.docs.iter().find(|doc| doc.hwnd_edit == source_edit) {
+                        let title = doc.title.clone();
+                        let path = doc.path.clone();
+                        let format = doc.format;
+                        let (storage_key, _) = runtime_bookmark_storage_key(
+                            path.as_deref(),
+                            source_edit,
+                            &title,
+                            format,
+                        );
+                        state.tts_automatic_bookmark_position =
+                            Some((source_edit, storage_key, current_pos));
+                    }
+                    state.tts_sentence_nav_anchor = Some((source_edit, current_pos));
+
+                    if state.settings.move_cursor_during_reading {
+                        let mut cr = CHARRANGE {
+                            cpMin: current_pos,
+                            cpMax: current_pos,
+                        };
+                        SendMessageW(
+                            source_edit,
+                            EM_EXSETSEL,
+                            WPARAM(0),
+                            LPARAM(&mut cr as *mut _ as isize),
+                        );
+                        SendMessageW(source_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+                        notify_editor_caret_changed(source_edit);
                     }
                 });
                 LRESULT(0)
@@ -18048,6 +18090,18 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
             crate::log_debug("shortcut probe: dispatch Alt+Shift+R -> radio");
         }
         dispatch_shortcut_command(hwnd, IDM_TOOLS_RADIO);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.open_calendar, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_CALENDAR);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.open_weather, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_WEATHER);
+        return true;
+    }
+    if shortcut_matches_message(shortcuts.open_cinema, msg) {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_CINEMA);
         return true;
     }
     if shortcut_matches_message(shortcuts.open_dictionary, msg) {

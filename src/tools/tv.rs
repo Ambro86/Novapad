@@ -1,5 +1,5 @@
 use base64::Engine;
-use chrono::Local;
+use chrono::{Local, NaiveDate};
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -22,6 +22,7 @@ const IOS_SAFARI_PLAYBACK_USER_AGENT: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS
 const LA7_STREAM_URL: &str = "https://d1chghleocc9sm.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-evfku205gqrtf/Live.m3u8";
 const LA7_CINEMA_DASH_URL: &str = "https://d15umi5iaezxgx.cloudfront.net/HBBTV/LA7D/DASH/Live.mpd";
 const REGIONAL_CATEGORY_PREFIX: &str = "Regionali - ";
+const TV_GUIDE_CHANNEL_PAYLOAD_JSON: &str = r#"{"payload_b64":"csAxIXZQMnhMMiawFTr6bjtEskCkzkNJJ+Zweyc6I0xoq5wAQq2me+nsGOl55vyuggHwBZyk/4KnTrP2iV7rNEEN7i90j4pqQXbXPAgPICMLN0By","algorithm":"gzip-xor-base64-v1"}"#;
 const TV_GUIDE_TIMELINE_PAYLOAD_JSON: &str = r#"{"payload_b64":"csAxIXZQMnhMMuhZfR1S+OWXPRn4oJR5K4nkpYbgWGup/jgB+m6jPWForBe9oLtOwaBOreEeoqetOYbKLTxeLIC4fDkh4S9vy3U4I3E=","algorithm":"gzip-xor-base64-v1"}"#;
 const TV_GUIDE_STATIC_KEY_PARTS: &[&[u8]] = &[b"sonar", b"pad-", b"SonarSecure-"];
 const TV_GUIDE_FALLBACK_MAX_AGE_SECS: i64 = 6 * 60 * 60;
@@ -91,8 +92,8 @@ pub(crate) struct TvChannelLoadResult {
 #[derive(Clone, Debug)]
 pub(crate) struct TvProgram {
     pub(crate) title: String,
-    start_time: i64,
-    end_time: i64,
+    pub(crate) start_time: i64,
+    pub(crate) end_time: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,10 +139,29 @@ struct TvChannelsCache {
 }
 
 pub(crate) fn load_current_programs() -> Result<HashMap<String, TvProgram>, String> {
-    let template = decode_tv_guide_timeline_url()?;
     let now = Local::now();
-    let date = now.format("%Y-%m-%d").to_string();
-    let url = template.replace("{date}", &date);
+    let programs_by_channel = load_programs_for_date(now.date_naive())?;
+    let now_seconds = now.timestamp();
+    let mut current_programs = HashMap::new();
+    for (channel, programs) in programs_by_channel {
+        let current = programs
+            .iter()
+            .find(|program| program.start_time <= now_seconds && program.end_time > now_seconds)
+            .cloned()
+            .or_else(|| latest_started_program(&programs, now_seconds));
+        if let Some(program) = current {
+            current_programs.insert(channel, program);
+        }
+    }
+    Ok(current_programs)
+}
+
+pub(crate) fn load_programs_for_date(
+    date: NaiveDate,
+) -> Result<HashMap<String, Vec<TvProgram>>, String> {
+    let template = decode_tv_guide_timeline_url()?;
+    let date_text = date.format("%Y-%m-%d").to_string();
+    let url = template.replace("{date}", &date_text);
 
     let client = Client::builder()
         .user_agent(DEFAULT_USER_AGENT)
@@ -162,12 +182,115 @@ pub(crate) fn load_current_programs() -> Result<HashMap<String, TvProgram>, Stri
     let root: Value = response
         .json()
         .map_err(|err| format!("Risposta della guida TV non valida: {err}"))?;
-    let Some(groups) = root.as_array() else {
-        return Ok(HashMap::new());
-    };
-
     let mut programs_by_channel = HashMap::<String, Vec<TvProgram>>::new();
-    let now_seconds = now.timestamp();
+    collect_tv_guide_programs(&root, &mut programs_by_channel);
+    for programs in programs_by_channel.values_mut() {
+        programs.sort_by_key(|program| program.start_time);
+        programs.dedup_by(|left, right| {
+            left.start_time == right.start_time
+                && left.end_time == right.end_time
+                && left.title == right.title
+        });
+    }
+    Ok(programs_by_channel)
+}
+
+pub(crate) fn load_channel_guide(
+    channel: &TvChannel,
+    date: NaiveDate,
+) -> Result<Vec<TvProgram>, String> {
+    let date_text = date.format("%Y-%m-%d").to_string();
+    let requested_channel = guide_channel_name(channel);
+    let requested_normalized = normalize_channel_name(requested_channel);
+    let client = Client::builder()
+        .user_agent(DEFAULT_USER_AGENT)
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|err| format!("Impossibile inizializzare la guida TV: {err}"))?;
+
+    let exact_channel =
+        resolve_exact_guide_channel_name(&client, &date_text, &requested_normalized)
+            .unwrap_or_else(|| requested_channel.to_string());
+
+    let template = decode_tv_guide_channel_url()?;
+    let encoded_channel = encode_uri_component(&exact_channel);
+    let url = template
+        .replace("{channel}", &encoded_channel)
+        .replace("{date}", &date_text);
+    let response = client
+        .get(url)
+        .send()
+        .map_err(|err| format!("Impossibile scaricare la guida TV: {err}"))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!(
+            "Impossibile scaricare la guida TV: errore HTTP {}.",
+            status.as_u16()
+        ));
+    }
+
+    let root: Value = response
+        .json()
+        .map_err(|err| format!("Risposta della guida TV non valida: {err}"))?;
+    let items = root.as_array().ok_or_else(|| {
+        "Risposta della guida TV non valida: elenco programmi assente.".to_string()
+    })?;
+    let mut programs = Vec::new();
+    for item in items {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let title = object
+            .get("title")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        if title.is_empty() {
+            continue;
+        }
+        let start_time = read_json_i64(object, "startTime", "start_time");
+        let end_time = read_json_i64(object, "endTime", "end_time");
+        if start_time <= 0 || end_time <= start_time {
+            continue;
+        }
+        programs.push(TvProgram {
+            title: title.to_string(),
+            start_time,
+            end_time,
+        });
+    }
+    programs.sort_by_key(|program| program.start_time);
+    programs.dedup_by(|left, right| {
+        left.start_time == right.start_time
+            && left.end_time == right.end_time
+            && left.title == right.title
+    });
+    crate::log_debug(&format!(
+        "TV guide channel API: requested={:?} exact={:?} date={} programs={}",
+        requested_channel,
+        exact_channel,
+        date,
+        programs.len()
+    ));
+    Ok(programs)
+}
+
+fn resolve_exact_guide_channel_name(
+    client: &Client,
+    date_text: &str,
+    target_normalized: &str,
+) -> Option<String> {
+    if target_normalized.is_empty() {
+        return None;
+    }
+    let template = decode_tv_guide_timeline_url().ok()?;
+    let url = template.replace("{date}", date_text);
+    let response = client.get(url).send().ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let root: Value = response.json().ok()?;
+    let groups = root.as_array()?;
     for group in groups {
         let Some(items) = group.as_array() else {
             continue;
@@ -176,6 +299,59 @@ pub(crate) fn load_current_programs() -> Result<HashMap<String, TvProgram>, Stri
             let Some(object) = item.as_object() else {
                 continue;
             };
+            let channel_name = object
+                .get("ch")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim();
+            if normalize_channel_name(channel_name) == target_normalized {
+                return Some(channel_name.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn guide_channel_name(channel: &TvChannel) -> &str {
+    let tvg_name = channel.tvg_name.trim();
+    if tvg_name.is_empty() {
+        channel.name.trim()
+    } else {
+        tvg_name
+    }
+}
+
+fn encode_uri_component(value: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric()
+            || matches!(
+                byte,
+                b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')'
+            )
+        {
+            encoded.push(char::from(byte));
+        } else {
+            encoded.push('%');
+            encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+            encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+        }
+    }
+    encoded
+}
+
+fn collect_tv_guide_programs(
+    value: &Value,
+    programs_by_channel: &mut HashMap<String, Vec<TvProgram>>,
+) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                collect_tv_guide_programs(item, programs_by_channel);
+            }
+        }
+        Value::Object(object) => {
             let guide_channel = object
                 .get("ch")
                 .and_then(Value::as_str)
@@ -186,39 +362,28 @@ pub(crate) fn load_current_programs() -> Result<HashMap<String, TvProgram>, Stri
                 .and_then(Value::as_str)
                 .unwrap_or_default()
                 .trim();
-            if guide_channel.is_empty() || title.is_empty() {
-                continue;
-            }
             let start_time = read_json_i64(object, "startTime", "start_time");
             let end_time = read_json_i64(object, "endTime", "end_time");
-            if start_time <= 0 || end_time <= 0 {
-                continue;
+            if !guide_channel.is_empty()
+                && !title.is_empty()
+                && start_time > 0
+                && end_time > start_time
+            {
+                let key = normalize_channel_name(guide_channel);
+                if !key.is_empty() {
+                    programs_by_channel.entry(key).or_default().push(TvProgram {
+                        title: title.to_string(),
+                        start_time,
+                        end_time,
+                    });
+                }
             }
-            let key = normalize_channel_name(guide_channel);
-            if key.is_empty() {
-                continue;
+            for nested in object.values() {
+                collect_tv_guide_programs(nested, programs_by_channel);
             }
-            programs_by_channel.entry(key).or_default().push(TvProgram {
-                title: title.to_string(),
-                start_time,
-                end_time,
-            });
         }
+        _ => {}
     }
-
-    let mut current_programs = HashMap::new();
-    for (channel, mut programs) in programs_by_channel {
-        programs.sort_by_key(|program| program.start_time);
-        let current = programs
-            .iter()
-            .find(|program| program.start_time <= now_seconds && program.end_time > now_seconds)
-            .cloned()
-            .or_else(|| latest_started_program(&programs, now_seconds));
-        if let Some(program) = current {
-            current_programs.insert(channel, program);
-        }
-    }
-    Ok(current_programs)
 }
 
 pub(crate) fn current_program_for_channel<'a>(
@@ -269,13 +434,21 @@ fn read_json_i64(object: &serde_json::Map<String, Value>, camel_key: &str, snake
 }
 
 fn decode_tv_guide_timeline_url() -> Result<String, String> {
+    decode_tv_guide_payload(TV_GUIDE_TIMELINE_PAYLOAD_JSON)
+}
+
+fn decode_tv_guide_channel_url() -> Result<String, String> {
+    decode_tv_guide_payload(TV_GUIDE_CHANNEL_PAYLOAD_JSON)
+}
+
+fn decode_tv_guide_payload(payload_json: &str) -> Result<String, String> {
     let secret = crate::settings::load_saved_rai_luce_code()
         .ok_or_else(|| "Codice RaiLuce non disponibile per la guida TV.".to_string())?;
     let secret = secret.trim();
     if secret.is_empty() {
         return Err("Codice RaiLuce non valido per la guida TV.".to_string());
     }
-    let payload: EncryptedTvGuidePayload = serde_json::from_str(TV_GUIDE_TIMELINE_PAYLOAD_JSON)
+    let payload: EncryptedTvGuidePayload = serde_json::from_str(payload_json)
         .map_err(|err| format!("Payload della guida TV non valido: {err}"))?;
     if payload.algorithm != "gzip-xor-base64-v1" {
         return Err(format!(

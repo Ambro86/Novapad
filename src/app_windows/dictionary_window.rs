@@ -371,15 +371,6 @@ fn dictionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
             WM_DESTROY => {
                 let parent = with_dictionary_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                 if parent.0 != 0 {
-                    EnableWindow(parent, true);
-                    SetForegroundWindow(parent);
-                    // Only focus editor if not in player mode (audiobook)
-                    if !crate::editor_manager::is_current_audiobook(parent) {
-                        SetFocus(parent);
-                        if let Some(edit) = crate::get_active_edit(parent) {
-                            SetFocus(edit);
-                        }
-                    }
                     if with_state(parent, |state| {
                         state.dictionary_window = HWND(0);
                     })
@@ -387,6 +378,10 @@ fn dictionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                     {
                         crate::log_debug("Failed to access dictionary state");
                     }
+                    EnableWindow(parent, true);
+                    SetForegroundWindow(parent);
+                    let _unused =
+                        PostMessageW(parent, crate::WM_FOCUS_EDITOR, WPARAM(0), LPARAM(0));
                 }
                 LRESULT(0)
             }
@@ -1272,6 +1267,7 @@ fn preview_entry_voice(hwnd: HWND) {
                 voice,
                 chunks,
                 initial_caret_pos: 0,
+                source_edit: HWND(0),
                 rate,
                 pitch,
                 volume,
@@ -1300,6 +1296,7 @@ fn preview_entry_voice(hwnd: HWND) {
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos: 0,
+                        source_edit: HWND(0),
                     });
                     state.tts_next_session_id += 1;
                 })
@@ -1324,6 +1321,7 @@ fn preview_entry_voice(hwnd: HWND) {
                         cancel: cancel.clone(),
                         paused: false,
                         initial_caret_pos: 0,
+                        source_edit: HWND(0),
                     });
                     state.tts_next_session_id += 1;
                 })

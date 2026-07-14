@@ -759,6 +759,8 @@ pub struct AppSettings {
     #[serde(default = "default_podcast_device_id")]
     pub dictation_microphone_device_id: String,
     pub podcast_include_system_audio: bool,
+    #[serde(default)]
+    pub podcast_split_sources: bool,
     pub podcast_system_device_id: String,
     pub podcast_system_gain: f32,
     #[serde(default)]
@@ -1109,7 +1111,9 @@ fn default_dialogue_opening_quote() -> String {
 }
 
 fn default_dialogue_closing_quote() -> String {
-    "\"|\u{201D}|\u{00BB}".to_string()
+    // U+201C is also the standard closing quotation mark in Czech/Slovak
+    // typography (for example: „dialogue“).
+    "\"|\u{201D}|\u{00BB}|\u{201C}".to_string()
 }
 
 fn default_indent_tab_width() -> u32 {
@@ -1210,6 +1214,7 @@ impl Default for AppSettings {
             podcast_microphone_gain: 1.5,
             dictation_microphone_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
             podcast_include_system_audio: true,
+            podcast_split_sources: false,
             podcast_system_device_id: PODCAST_DEVICE_DEFAULT.to_string(),
             podcast_system_gain: 1.0,
             podcast_system_capture_mode: PodcastSystemCaptureMode::AllSystem,
@@ -2188,7 +2193,12 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.dialogue_opening_quote.is_empty() || settings.dialogue_opening_quote == "\"" {
         settings.dialogue_opening_quote = default_dialogue_opening_quote();
     }
-    if settings.dialogue_closing_quote.is_empty() || settings.dialogue_closing_quote == "\"" {
+    if settings.dialogue_closing_quote.is_empty()
+        || settings.dialogue_closing_quote == "\""
+        || settings.dialogue_closing_quote == "\"|\u{201D}|\u{00BB}"
+    {
+        // Migrate the old default too, otherwise existing installations would
+        // never receive support for Czech/Slovak closing quotes.
         settings.dialogue_closing_quote = default_dialogue_closing_quote();
     }
     let valid_indent = [2, 4, 6, 8];

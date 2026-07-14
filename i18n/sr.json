@@ -910,6 +910,7 @@
   "podcast.include_mic": "Uključi mikrofon.",
   "podcast.include_single_app": "Snimi jednu aplikaciju",
   "podcast.include_system": "Uključi sistemski zvuk.",
+  "podcast.split_sources": "Sačuvaj mikrofon i sistemski zvuk ili zvuk aplikacija u odvojenim datotekama",
   "podcast.level_mic": "Nivo mikrofona:",
   "podcast.level_system": "Nivo sistemskog zvuka:",
   "podcast.mic_device": "Uređaj za mikrofon:",

@@ -910,6 +910,7 @@
   "podcast.include_mic": "Include Microphone",
   "podcast.include_single_app": "Record single app",
   "podcast.include_system": "Include System Audio",
+  "podcast.split_sources": "Save microphone and system or application audio to separate files",
   "podcast.level_mic": "Mic level:",
   "podcast.level_system": "System level:",
   "podcast.mic_device": "Microphone device:",

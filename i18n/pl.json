@@ -910,6 +910,7 @@
   "podcast.include_mic": "Dołącz mikrofon",
   "podcast.include_single_app": "Nagrywaj jedną aplikację",
   "podcast.include_system": "Dołącz dźwięk systemowy",
+  "podcast.split_sources": "Zapisz mikrofon oraz dźwięk systemowy lub dźwięk aplikacji w osobnych plikach",
   "podcast.level_mic": "Poziom mikrofonu:",
   "podcast.level_system": "Poziom systemu:",
   "podcast.mic_device": "Urządzenie mikrofonowe:",

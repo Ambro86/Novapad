@@ -910,6 +910,7 @@
   "podcast.include_mic": "Įtraukti mikrofoną",
   "podcast.include_single_app": "Įrašyti vieną programą",
   "podcast.include_system": "Įtraukti sistemos garso įrašą",
+  "podcast.split_sources": "Išsaugoti mikrofoną ir sistemos arba programų garsą atskiruose failuose",
   "podcast.level_mic": "Mikrofono lygis:",
   "podcast.level_system": "Sistemos lygis:",
   "podcast.mic_device": "Mikrofono įrenginys:",

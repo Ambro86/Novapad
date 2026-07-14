@@ -910,6 +910,7 @@
   "podcast.include_mic": "माइक्रोफ़ोन शामिल करें",
   "podcast.include_single_app": "एक ऐप रिकॉर्ड करें",
   "podcast.include_system": "सिस्टम ऑडियो शामिल करें",
+  "podcast.split_sources": "माइक्रोफ़ोन और सिस्टम या ऐप ऑडियो को अलग-अलग फ़ाइलों में सहेजें",
   "podcast.level_mic": "माइक स्तर:",
   "podcast.level_system": "सिस्टम स्तर:",
   "podcast.mic_device": "माइक्रोफ़ोन डिवाइस:",

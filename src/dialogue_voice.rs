@@ -94,7 +94,7 @@ pub fn load_dialogue_voice_config() -> Option<DialogueVoiceConfig> {
     let mut pitch = 0;
     let mut volume = 100;
     let mut opening_quote = "\"|\u{201C}|\u{00AB}|\u{201E}".to_string();
-    let mut closing_quote = "\"|\u{201D}|\u{00BB}".to_string();
+    let mut closing_quote = "\"|\u{201D}|\u{00BB}|\u{201C}".to_string();
     let mut allow_multiline = false;
 
     for raw in text.lines() {
@@ -162,8 +162,8 @@ pub fn load_dialogue_voice_config() -> Option<DialogueVoiceConfig> {
     if opening_quote == "\"" {
         opening_quote = "\"|\u{201C}|\u{00AB}|\u{201E}".to_string();
     }
-    if closing_quote == "\"" {
-        closing_quote = "\"|\u{201D}|\u{00BB}".to_string();
+    if closing_quote == "\"" || closing_quote == "\"|\u{201D}|\u{00BB}" {
+        closing_quote = "\"|\u{201D}|\u{00BB}|\u{201C}".to_string();
     }
     Some(DialogueVoiceConfig {
         engine,
@@ -575,6 +575,24 @@ mod tests {
         assert!(out.contains("\"Ciao mondo”"));
         assert!(out.contains("Prima. "));
         assert!(out.contains(" Dopo."));
+    }
+
+    #[test]
+    fn dialogue_tags_support_czech_quotes_and_mixed_edge_sapi5_voices() {
+        let text = "Řekl: „Ahoj.“ Odpověděla: „Dobrý den.“";
+        let mut settings = cfg("\"|“|«|„", "\"|”|»|“", false);
+        settings.engine = TtsEngine::Edge;
+        settings.voice = "cs-CZ-AntoninNeural".to_string();
+        settings.use_secondary_voice = true;
+        settings.secondary_engine = TtsEngine::Sapi5;
+        settings.secondary_voice = "Microsoft Zira Desktop".to_string();
+
+        let out = apply_dialogue_tags(text, &settings);
+        assert_eq!(out.matches("<voice ").count(), 2);
+        assert!(out.contains("engine=\"edge\" voice=\"cs-CZ-AntoninNeural\""));
+        assert!(out.contains("engine=\"sapi5\" voice=\"Microsoft Zira Desktop\""));
+        assert!(out.contains("„Ahoj.“"));
+        assert!(out.contains("„Dobrý den.“"));
     }
 
     #[test]

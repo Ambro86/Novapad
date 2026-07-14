@@ -12285,7 +12285,7 @@ fn apply_options_dialog(hwnd: HWND) {
             let text = String::from_utf16_lossy(&buf[..read as usize]);
             let trimmed = text.trim();
             settings.dialogue_closing_quote = if trimmed.is_empty() {
-                "\"|\u{201D}|\u{00BB}".to_string()
+                "\"|\u{201D}|\u{00BB}|\u{201C}".to_string()
             } else {
                 trimmed.to_string()
             };

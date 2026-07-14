@@ -81,6 +81,7 @@ const PODCAST_ID_REFRESH_SINGLE_APP: usize = 11029;
 const PODCAST_ID_TEST_SINGLE_APP_AUDIO: usize = 11030;
 const PODCAST_ID_SELECTED_APPS: usize = 11031;
 const PODCAST_ID_SHOW_INACTIVE_APPS: usize = 11032;
+const PODCAST_ID_SPLIT_SOURCES: usize = 11033;
 const WM_PODCAST_SAVE_RESULT: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP + 74;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -167,6 +168,7 @@ struct PodcastState {
     mic_device: HWND,
     mic_gain: HWND,
     include_system: HWND,
+    split_sources: HWND,
     system_device: HWND,
     system_gain: HWND,
     system_capture_mode: HWND,
@@ -220,6 +222,7 @@ struct PodcastLabels {
     mic_gain_label: String,
     system_gain_label: String,
     include_system: String,
+    split_sources: String,
     system_capture_mode: String,
     system_capture_mode_all_system: String,
     system_capture_mode_single_app: String,
@@ -281,6 +284,7 @@ fn labels(language: Language) -> PodcastLabels {
         mic_gain_label: i18n::tr(language, "podcast.mic_gain"),
         system_gain_label: i18n::tr(language, "podcast.system_gain"),
         include_system: i18n::tr(language, "podcast.include_system"),
+        split_sources: i18n::tr(language, "podcast.split_sources"),
         system_capture_mode: i18n::tr(language, "podcast.system_capture_mode"),
         system_capture_mode_all_system: i18n::tr(
             language,
@@ -917,6 +921,21 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     None,
                 );
 
+                let split_sources = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.split_sources).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    20,
+                    480,
+                    560,
+                    22,
+                    hwnd,
+                    HMENU(PODCAST_ID_SPLIT_SOURCES as isize),
+                    None,
+                    None,
+                );
+
                 let group_controls = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
@@ -1181,6 +1200,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     mic_gain,
                     monitor_check,
                     include_system,
+                    split_sources,
                     label_system,
                     system_device,
                     label_system_gain,
@@ -1247,6 +1267,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     mic_device,
                     mic_gain,
                     include_system,
+                    split_sources,
                     system_device,
                     system_gain,
                     system_capture_mode,
@@ -1290,6 +1311,7 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
 
                 // VIDEO REMOVED: populate_monitors removed
                 apply_settings_to_ui(&mut state, &settings);
+                ensure_system_audio_for_application_capture(&state);
                 update_source_controls(&state);
                 update_format_controls(&state);
                 update_filename_preview(&state);
@@ -1340,8 +1362,12 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                                 stop_active_monitor(state);
                             }
                         }
+                        if id == PODCAST_ID_INCLUDE_MIC {
+                            ensure_system_audio_for_application_capture(state);
+                        }
                         update_source_controls(state);
                         update_recording_controls(state);
+                        update_filename_preview(state);
                         persist_settings(state);
                         // Stop monitor if mic is disabled
                         if !is_checked(state.include_mic)
@@ -1357,6 +1383,11 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         }
                         handled = true;
                     }
+                    PODCAST_ID_SPLIT_SOURCES => {
+                        update_filename_preview(state);
+                        persist_settings(state);
+                        handled = true;
+                    }
                     PODCAST_ID_SYSTEM_CAPTURE_MODE => {
                         if code == CBN_SELCHANGE as u16 {
                             crate::log_if_err!(KillTimer(hwnd, PODCAST_SYSTEM_TEST_TIMER_ID));
@@ -1367,7 +1398,10 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                                 WPARAM(BST_UNCHECKED.0 as usize),
                                 LPARAM(0),
                             );
+                            ensure_system_audio_for_application_capture(state);
                             update_source_controls(state);
+                            update_recording_controls(state);
+                            update_filename_preview(state);
                             persist_settings(state);
                         }
                         handled = true;
@@ -1452,6 +1486,10 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     }
                     PODCAST_ID_SINGLE_APP => {
                         if code == CBN_SELCHANGE as u16 {
+                            ensure_system_audio_for_application_capture(state);
+                            update_source_controls(state);
+                            update_recording_controls(state);
+                            update_filename_preview(state);
                             persist_settings(state);
                             if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
                                 restart_single_app_monitor(state);
@@ -1462,6 +1500,10 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     }
                     PODCAST_ID_SELECTED_APPS => {
                         if code == LBN_SELCHANGE as u16 {
+                            ensure_system_audio_for_application_capture(state);
+                            update_source_controls(state);
+                            update_recording_controls(state);
+                            update_filename_preview(state);
                             persist_settings(state);
                             if state.active_monitor == Some(ActiveMonitorKind::SingleApp) {
                                 restart_single_app_monitor(state);
@@ -2002,6 +2044,17 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
 
         // VIDEO REMOVED: include_video and monitor setup removed
 
+        SendMessageW(
+            state.split_sources,
+            BM_SETCHECK,
+            WPARAM(if settings.podcast_split_sources {
+                BST_CHECKED.0 as usize
+            } else {
+                BST_UNCHECKED.0 as usize
+            }),
+            LPARAM(0),
+        );
+
         for (index, device) in state.system_devices.iter().enumerate() {
             let name = to_wide(&device.name);
             SendMessageW(
@@ -2066,6 +2119,30 @@ fn apply_settings_to_ui(state: &mut PodcastState, settings: &AppSettings) {
     }
 }
 
+fn ensure_system_audio_for_application_capture(state: &PodcastState) {
+    let capture_mode = selected_capture_mode(state);
+    if is_checked(state.include_mic)
+        && matches!(
+            capture_mode,
+            PodcastSystemCaptureMode::SingleApp | PodcastSystemCaptureMode::SelectedApps
+        )
+        && !is_checked(state.include_system)
+    {
+        unsafe {
+            SendMessageW(
+                state.include_system,
+                BM_SETCHECK,
+                WPARAM(BST_CHECKED.0 as usize),
+                LPARAM(0),
+            );
+        }
+    }
+}
+
+fn split_sources_available(state: &PodcastState) -> bool {
+    is_checked(state.include_mic) && is_checked(state.include_system)
+}
+
 fn update_source_controls(state: &PodcastState) {
     unsafe {
         let mic_checked = is_checked(state.include_mic);
@@ -2074,6 +2151,16 @@ fn update_source_controls(state: &PodcastState) {
         let single_app_mode = capture_mode == PodcastSystemCaptureMode::SingleApp;
         let selected_apps_mode = capture_mode == PodcastSystemCaptureMode::SelectedApps;
         let labels = labels(state.language);
+        let split_available = split_sources_available(state);
+        if !split_available && is_checked(state.split_sources) {
+            SendMessageW(
+                state.split_sources,
+                BM_SETCHECK,
+                WPARAM(BST_UNCHECKED.0 as usize),
+                LPARAM(0),
+            );
+        }
+        EnableWindow(state.split_sources, split_available);
         // VIDEO REMOVED: video_checked removed
         EnableWindow(state.mic_device, mic_checked);
         EnableWindow(state.mic_gain, mic_checked);
@@ -2246,6 +2333,10 @@ fn update_recording_controls(state: &PodcastState) {
         let pause_label = if paused { labels.resume } else { labels.pause };
         let pause_wide = to_wide(&pause_label);
 
+        EnableWindow(
+            state.split_sources,
+            split_sources_available(state) && !recording && !paused,
+        );
         EnableWindow(state.start_button, has_sources && !recording && !paused);
         EnableWindow(state.pause_button, recording || paused);
         if let Err(_e) = SetWindowTextW(state.pause_button, PCWSTR(pause_wide.as_ptr())) {
@@ -2416,7 +2507,11 @@ fn update_filename_preview(state: &PodcastState) {
         PodcastFormat::Wav => "wav",
     };
     let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-    let name = format!("Podcast_{timestamp}.{ext}");
+    let name = if is_checked(state.split_sources) && split_sources_available(state) {
+        format!("Podcast_{timestamp}_microphone.{ext}; Podcast_{timestamp}_system_audio.{ext}")
+    } else {
+        format!("Podcast_{timestamp}.{ext}")
+    };
     let wide = to_wide(&name);
     unsafe {
         if let Err(_e) = SetWindowTextW(state.filename_preview, PCWSTR(wide.as_ptr())) {
@@ -2680,6 +2775,8 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
 
     let include_system = is_checked(state.include_system);
     let include_mic = is_checked(state.include_mic);
+    update_source_controls(state);
+    update_filename_preview(state);
     if !include_mic && !include_system {
         update_recording_controls(state);
         update_source_controls(state);
@@ -2693,6 +2790,7 @@ fn start_recording_action(state: &mut PodcastState, _hwnd: HWND) {
         mic_device_name: selected_device_name(state, true),
         mic_gain: selected_mic_gain(state),
         include_system,
+        split_mic_system: is_checked(state.split_sources) && split_sources_available(state),
         system_device_id: selected_device_id(state, false),
         system_device_name: selected_device_name(state, false),
         system_gain: selected_system_gain(state),
@@ -2833,6 +2931,7 @@ fn stop_recording_action(state: &mut PodcastState, hwnd: HWND) {
 fn persist_settings(state: &PodcastState) {
     let include_mic = is_checked(state.include_mic);
     let include_system = is_checked(state.include_system);
+    let split_sources = is_checked(state.split_sources) && split_sources_available(state);
     let mic_device_id = selected_device_id(state, true);
     let mic_gain = selected_mic_gain(state);
     let system_device_id = selected_device_id(state, false);
@@ -2854,6 +2953,7 @@ fn persist_settings(state: &PodcastState) {
             app.settings.podcast_microphone_device_id = mic_device_id;
             app.settings.podcast_microphone_gain = mic_gain;
             app.settings.podcast_include_system_audio = include_system;
+            app.settings.podcast_split_sources = split_sources;
             app.settings.podcast_system_device_id = system_device_id;
             app.settings.podcast_system_gain = system_gain;
             app.settings.podcast_system_capture_mode = system_capture_mode;

@@ -910,6 +910,7 @@
   "podcast.include_mic": "Bao gồm mic",
   "podcast.include_single_app": "Ghi một ứng dụng",
   "podcast.include_system": "Bao gồm âm thanh hệ thống",
+  "podcast.split_sources": "Lưu micrô và âm thanh hệ thống hoặc ứng dụng thành các tệp riêng",
   "podcast.level_mic": "Mức mic:",
   "podcast.level_system": "Mức hệ thống:",
   "podcast.mic_device": "Thiết bị mic:",

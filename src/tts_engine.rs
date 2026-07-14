@@ -500,7 +500,16 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     let Some(hwnd_edit) = get_active_edit(hwnd) else {
         return;
     };
-    let (language, split_on_newline, tts_engine, dictionary, tts_rate, tts_pitch, tts_volume) = {
+    let (
+        language,
+        split_on_newline,
+        tts_engine,
+        dictionary,
+        tts_rate,
+        tts_pitch,
+        tts_volume,
+        move_cursor_during_reading,
+    ) = {
         with_state(hwnd, |state| {
             (
                 state.settings.language,
@@ -510,6 +519,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
                 state.settings.tts_rate,
                 state.settings.tts_pitch,
                 state.settings.tts_volume,
+                state.settings.move_cursor_during_reading,
             )
         })
     }
@@ -521,6 +531,7 @@ pub fn start_tts_from_caret(hwnd: HWND) {
         0,
         0,
         100,
+        false,
     ));
 
     let (mut text, initial_caret_pos) = get_text_from_caret(hwnd_edit);
@@ -545,7 +556,24 @@ pub fn start_tts_from_caret(hwnd: HWND) {
     let has_tags = has_voice_tags(&text);
     let has_pause = has_pause_tags(&text);
 
-    if (has_tags && tts_engine != TtsEngine::Edge) || has_pause {
+    // Edge and Google already use the shared chunked playback path.
+    // When cursor following is enabled, route SAPI4 and SAPI5 through the same
+    // path as well: every engine then reports progress from the actual decoded
+    // audio and uses the same sentence/clause boundaries (. ! ? ; :).
+    let needs_shared_cursor_progress =
+        move_cursor_during_reading && matches!(tts_engine, TtsEngine::Sapi4 | TtsEngine::Sapi5);
+    if (has_tags && tts_engine != TtsEngine::Edge) || has_pause || needs_shared_cursor_progress {
+        if needs_shared_cursor_progress {
+            let engine_label = match tts_engine {
+                TtsEngine::Sapi4 => "sapi4",
+                TtsEngine::Sapi5 => "sapi5",
+                TtsEngine::Edge => "edge",
+                TtsEngine::Google => "google",
+            };
+            crate::log_debug(&format!(
+                "TTS: shared cursor progress enabled for engine={engine_label}"
+            ));
+        }
         queue_tts_playback_from_text(TtsQueuedPlayback {
             hwnd,
             engine: tts_engine,
@@ -998,9 +1026,9 @@ fn synthesize_sapi5_bytes(
     pitch: i32,
     volume: i32,
     language: Language,
+    cancel: Arc<AtomicBool>,
 ) -> Result<Vec<u8>, String> {
     let path = temp_wav_path("sapi5");
-    let cancel = Arc::new(AtomicBool::new(false));
     let chunks = vec![text.to_string()];
     crate::sapi5_engine::speak_sapi_to_file(
         crate::sapi5_engine::SapiExportOptions {
@@ -1029,9 +1057,9 @@ fn synthesize_sapi4_bytes(
     rate: i32,
     pitch: i32,
     volume: i32,
+    cancel: Arc<AtomicBool>,
 ) -> Result<Vec<u8>, String> {
     let path = temp_wav_path("sapi4");
-    let cancel = Arc::new(AtomicBool::new(false));
     let voice_idx = parse_sapi4_voice_index(voice);
     let chunks = vec![text.to_string()];
     crate::sapi4_engine::speak_sapi4_to_file(
@@ -1099,8 +1127,9 @@ async fn synthesize_segment_bytes(text: &str, config: &SynthesisConfig) -> Resul
             let pitch = config.pitch;
             let volume = config.volume;
             let language = config.language;
+            let cancel = config.cancel.clone();
             tokio::task::spawn_blocking(move || {
-                synthesize_sapi5_bytes(&text, &voice, rate, pitch, volume, language)
+                synthesize_sapi5_bytes(&text, &voice, rate, pitch, volume, language, cancel)
             })
             .await
             .map_err(|e| e.to_string())?
@@ -1111,8 +1140,9 @@ async fn synthesize_segment_bytes(text: &str, config: &SynthesisConfig) -> Resul
             let rate = config.rate;
             let pitch = config.pitch;
             let volume = config.volume;
+            let cancel = config.cancel.clone();
             tokio::task::spawn_blocking(move || {
-                synthesize_sapi4_bytes(&text, &voice, rate, pitch, volume)
+                synthesize_sapi4_bytes(&text, &voice, rate, pitch, volume, cancel)
             })
             .await
             .map_err(|e| e.to_string())?
@@ -1320,6 +1350,56 @@ fn build_tts_progress_weight_prefix(text: &str) -> Vec<u64> {
     prefix
 }
 
+/// Return the number of interleaved PCM samples stored in a RIFF/WAVE file.
+/// Google, SAPI4 and SAPI5 synthesize complete WAV buffers before playback.
+/// Reading the data and format chunks gives cursor progress a reliable duration
+/// even when rodio/symphonia does not expose `total_duration()` for that WAV.
+fn wav_interleaved_sample_count(bytes: &[u8]) -> Option<u64> {
+    if bytes.len() < 12 || &bytes[..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
+        return None;
+    }
+
+    let mut offset = 12usize;
+    let mut channels = None;
+    let mut block_align = None;
+    let mut data_size = None;
+
+    while offset.checked_add(8)? <= bytes.len() {
+        let chunk_id = &bytes[offset..offset + 4];
+        let chunk_size =
+            u32::from_le_bytes(bytes[offset + 4..offset + 8].try_into().ok()?) as usize;
+        let data_start = offset.checked_add(8)?;
+        let available = bytes.len().saturating_sub(data_start);
+        let actual_size = chunk_size.min(available);
+
+        if chunk_id == b"fmt " && actual_size >= 16 {
+            channels = Some(u16::from_le_bytes(
+                bytes[data_start + 2..data_start + 4].try_into().ok()?,
+            ));
+            block_align = Some(u16::from_le_bytes(
+                bytes[data_start + 12..data_start + 14].try_into().ok()?,
+            ));
+        } else if chunk_id == b"data" {
+            data_size = Some(actual_size as u64);
+        }
+
+        if channels.is_some() && block_align.is_some() && data_size.is_some() {
+            break;
+        }
+
+        let padded_size = chunk_size.saturating_add(chunk_size & 1);
+        offset = data_start.checked_add(padded_size)?;
+    }
+
+    let channels = u64::from(channels?.max(1));
+    let block_align = u64::from(block_align?);
+    if block_align == 0 {
+        return None;
+    }
+    let frames = data_size? / block_align;
+    Some(frames.saturating_mul(channels))
+}
+
 struct TtsPlaybackProgressSource<S> {
     inner: S,
     hwnd: HWND,
@@ -1347,11 +1427,14 @@ where
         chunk_start_offset: usize,
         chunk_len: usize,
         progress_text: String,
+        known_total_samples: Option<u64>,
     ) -> Self {
         let channels = u64::from(inner.channels()).max(1);
         let sample_rate = u64::from(inner.sample_rate()).max(1);
-        let total_samples = inner.total_duration().map(|duration| {
-            (duration.as_secs_f64() * sample_rate as f64 * channels as f64).round() as u64
+        let total_samples = known_total_samples.or_else(|| {
+            inner.total_duration().map(|duration| {
+                (duration.as_secs_f64() * sample_rate as f64 * channels as f64).round() as u64
+            })
         });
         let report_interval_samples = (sample_rate * channels / 5).max(1);
         let progress_weight_prefix = build_tts_progress_weight_prefix(&progress_text);
@@ -1856,6 +1939,7 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
                 current_offset,
                 orig_len,
                 progress_text,
+                None,
             );
             sink.append(progress_source);
             appended_any = true;
@@ -1892,25 +1976,52 @@ fn tts_playback_inner(req: TtsPlaybackRequest) {
             log_debug(&format!("TTS first audio: elapsed_ms={}", first_ms));
         }
 
-        let cursor = std::io::Cursor::new(audio);
-        let source = match Decoder::new(cursor) {
-            Ok(source) => source,
-            Err(_) => {
-                post_tts_error(hwnd_copy, session_id, "Failed to decode audio.".to_string());
-                end_reason = "decode_error";
-                break;
-            }
-        };
-        let progress_source = TtsPlaybackProgressSource::new(
-            source,
-            hwnd_copy,
-            session_id,
-            current_offset,
-            orig_len,
-            progress_text,
-        );
-
-        sink.append(progress_source);
+        if tts_engine == TtsEngine::Edge {
+            // Decode the complete Edge MP3 segment before playback.  Using the
+            // exact PCM sample count avoids the small MP3 duration rounding
+            // errors that made cursor progress less precise than SAPI/Google.
+            let (samples, sample_rate, channels) = match decode_mp3_to_pcm(&audio) {
+                Ok(decoded) => decoded,
+                Err(_) => {
+                    post_tts_error(hwnd_copy, session_id, "Failed to decode audio.".to_string());
+                    end_reason = "decode_error";
+                    break;
+                }
+            };
+            let known_total_samples = u64::try_from(samples.len()).ok();
+            let source = SamplesBuffer::new(channels, sample_rate, samples);
+            let progress_source = TtsPlaybackProgressSource::new(
+                source,
+                hwnd_copy,
+                session_id,
+                current_offset,
+                orig_len,
+                progress_text,
+                known_total_samples,
+            );
+            sink.append(progress_source);
+        } else {
+            let known_total_samples = wav_interleaved_sample_count(&audio);
+            let cursor = std::io::Cursor::new(audio);
+            let source = match Decoder::new(cursor) {
+                Ok(source) => source,
+                Err(_) => {
+                    post_tts_error(hwnd_copy, session_id, "Failed to decode audio.".to_string());
+                    end_reason = "decode_error";
+                    break;
+                }
+            };
+            let progress_source = TtsPlaybackProgressSource::new(
+                source,
+                hwnd_copy,
+                session_id,
+                current_offset,
+                orig_len,
+                progress_text,
+                known_total_samples,
+            );
+            sink.append(progress_source);
+        }
         appended_any = true;
         while !sink.empty() {
             if cancel_flag.load(Ordering::SeqCst) {
@@ -6402,8 +6513,41 @@ mod tests {
         prepare_tts_text, preview_for_log, render_edge_ssml_text_with_pause_tags,
         render_sapi_ssml_text_with_pause_tags, sanitize_edge_text, split_into_tts_chunks,
         split_long_sentence_edge_with_limit, split_sentences, split_text_for_engine,
-        split_voice_tag_spans, strip_dashed_lines, utf16_len,
+        split_voice_tag_spans, strip_dashed_lines, utf16_len, wav_interleaved_sample_count,
     };
+
+    #[test]
+    fn wav_sample_count_uses_pcm_frames_and_channels() {
+        let channels = 2u16;
+        let bits_per_sample = 16u16;
+        let frames = 4u32;
+        let block_align = channels * (bits_per_sample / 8);
+        let data_size = frames * u32::from(block_align);
+        let mut wav = Vec::new();
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&(36u32 + data_size).to_le_bytes());
+        wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&channels.to_le_bytes());
+        wav.extend_from_slice(&44_100u32.to_le_bytes());
+        wav.extend_from_slice(&(44_100u32 * u32::from(block_align)).to_le_bytes());
+        wav.extend_from_slice(&block_align.to_le_bytes());
+        wav.extend_from_slice(&bits_per_sample.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&data_size.to_le_bytes());
+        wav.resize(wav.len() + data_size as usize, 0);
+
+        assert_eq!(
+            wav_interleaved_sample_count(&wav),
+            Some(u64::from(frames) * u64::from(channels))
+        );
+    }
+
+    #[test]
+    fn wav_sample_count_rejects_non_wave_data() {
+        assert_eq!(wav_interleaved_sample_count(b"not a wav"), None);
+    }
 
     #[test]
     fn google_playback_uses_a_short_natural_first_chunk() {

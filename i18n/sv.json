@@ -910,6 +910,7 @@
   "podcast.include_mic": "Inkludera mikrofon",
   "podcast.include_single_app": "Spela in en app",
   "podcast.include_system": "Inkludera systemljud",
+  "podcast.split_sources": "Spara mikrofon och system- eller appljud i separata filer",
   "podcast.level_mic": "Mik-nivå:",
   "podcast.level_system": "Systemnivå:",
   "podcast.mic_device": "Mikrofonenhet:",

@@ -910,6 +910,7 @@
   "podcast.include_mic": "Використовувати мікрофон",
   "podcast.include_single_app": "Записувати одну програму",
   "podcast.include_system": "Використовувати системне аудіо",
+  "podcast.split_sources": "Зберігати мікрофон і системний звук або звук програм в окремих файлах",
   "podcast.level_mic": "Рівень мікрофона:",
   "podcast.level_system": "Рівень системи:",
   "podcast.mic_device": "Пристрій мікрофона:",

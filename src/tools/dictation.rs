@@ -100,6 +100,7 @@ pub fn start_recording(config: &DictationRecordingConfig) -> Result<RecorderHand
         mic_device_name: device_name,
         mic_gain: config.mic_gain,
         include_system: false,
+        split_mic_system: false,
         system_device_id: String::new(),
         system_device_name: String::new(),
         system_gain: 0.0,

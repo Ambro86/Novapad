@@ -910,6 +910,7 @@
   "podcast.include_mic": "包含麦克风",
   "podcast.include_single_app": "录制单个应用",
   "podcast.include_system": "包含系统音频",
+  "podcast.split_sources": "将麦克风与系统或应用音频保存为单独文件",
   "podcast.level_mic": "麦克风音量：",
   "podcast.level_system": "系统音量：",
   "podcast.mic_device": "麦克风设备：",

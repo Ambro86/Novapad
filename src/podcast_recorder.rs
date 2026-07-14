@@ -286,6 +286,7 @@ pub struct RecorderConfig {
     pub mic_device_name: String,
     pub mic_gain: f32,
     pub include_system: bool,
+    pub split_mic_system: bool,
     pub system_device_id: String,
     pub system_device_name: String,
     pub system_gain: f32,
@@ -312,8 +313,11 @@ pub struct RecorderHandle {
     single_app_process_id: Option<Arc<AtomicU32>>,
     threads: Vec<JoinHandle<Result<(), String>>>,
     output_path: PathBuf,
+    secondary_output_path: Option<PathBuf>,
     temp_wav: PathBuf,
     temp_mp3: PathBuf,
+    secondary_temp_wav: Option<PathBuf>,
+    secondary_temp_mp3: Option<PathBuf>,
     format: PodcastFormat,
 }
 
@@ -368,16 +372,46 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
     let timestamp = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
     let base_name = format!("Podcast_{timestamp}");
 
-    let output_path = output_folder.join(format!(
-        "{}.{}",
-        base_name,
-        match config.output_format {
-            PodcastFormat::Mp3 => "mp3",
-            PodcastFormat::Wav => "wav",
-        }
+    let extension = match config.output_format {
+        PodcastFormat::Mp3 => "mp3",
+        PodcastFormat::Wav => "wav",
+    };
+    let split_mic_system = config.split_mic_system && config.include_mic && config.include_system;
+    let (
+        output_path,
+        secondary_output_path,
+        temp_wav,
+        temp_mp3,
+        secondary_temp_wav,
+        secondary_temp_mp3,
+    ) = if split_mic_system {
+        (
+            output_folder.join(format!("{base_name}_microphone.{extension}")),
+            Some(output_folder.join(format!("{base_name}_system_audio.{extension}"))),
+            output_folder.join(format!("{base_name}_microphone.wav.tmp")),
+            output_folder.join(format!("{base_name}_microphone_tmp.mp3")),
+            Some(output_folder.join(format!("{base_name}_system_audio.wav.tmp"))),
+            Some(output_folder.join(format!("{base_name}_system_audio_tmp.mp3"))),
+        )
+    } else {
+        (
+            output_folder.join(format!("{base_name}.{extension}")),
+            None,
+            output_folder.join(format!("{base_name}.wav.tmp")),
+            output_folder.join(format!("{base_name}_tmp.mp3")),
+            None,
+            None,
+        )
+    };
+    crate::log_debug(&format!(
+        "Podcast recorder output mode: split_sources={} primary={} secondary={}",
+        split_mic_system,
+        output_path.display(),
+        secondary_output_path
+            .as_ref()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| "none".to_string())
     ));
-    let temp_wav = output_folder.join(format!("{base_name}.wav.tmp"));
-    let temp_mp3 = output_folder.join(format!("{base_name}_tmp.mp3"));
 
     // Audio-only path
     let shared = Arc::new(SharedState::new(config.include_mic, config.include_system));
@@ -528,24 +562,42 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
     let writer_shared = shared.clone();
     let writer_stop = stop.clone();
     let writer_paused = paused.clone();
-    let (writer_path, writer_format) = match config.output_format {
-        PodcastFormat::Mp3 => (temp_mp3.clone(), PodcastFormat::Mp3),
-        PodcastFormat::Wav => (temp_wav.clone(), PodcastFormat::Wav),
-    };
     let writer_bitrate = config.mp3_bitrate;
-    let writer_config = WriterConfig {
-        path: writer_path,
-        format: writer_format,
-        mp3_bitrate: writer_bitrate,
+    let writer_format = config.output_format;
+    let primary_writer_path = match writer_format {
+        PodcastFormat::Mp3 => temp_mp3.clone(),
+        PodcastFormat::Wav => temp_wav.clone(),
+    };
+    let secondary_writer_path = match writer_format {
+        PodcastFormat::Mp3 => secondary_temp_mp3.clone(),
+        PodcastFormat::Wav => secondary_temp_wav.clone(),
     };
     threads.push(thread::spawn(move || {
-        let result = write_mixed_audio(
-            writer_config,
-            writer_buffer,
-            writer_shared.clone(),
-            writer_stop.clone(),
-            writer_paused,
-        );
+        let result = if let Some(system_path) = secondary_writer_path {
+            write_split_audio(
+                SplitWriterConfig {
+                    mic_path: primary_writer_path,
+                    system_path,
+                    format: writer_format,
+                    mp3_bitrate: writer_bitrate,
+                },
+                writer_buffer,
+                writer_stop.clone(),
+                writer_paused,
+            )
+        } else {
+            write_mixed_audio(
+                WriterConfig {
+                    path: primary_writer_path,
+                    format: writer_format,
+                    mp3_bitrate: writer_bitrate,
+                },
+                writer_buffer,
+                writer_shared.clone(),
+                writer_stop.clone(),
+                writer_paused,
+            )
+        };
         if let Err(err) = &result {
             if let Ok(mut error) = writer_shared.last_error.lock() {
                 *error = Some(err.clone());
@@ -565,8 +617,11 @@ pub fn start_recording(config: RecorderConfig) -> Result<RecorderHandle, String>
         single_app_process_id,
         threads,
         output_path,
+        secondary_output_path,
         temp_wav,
         temp_mp3,
+        secondary_temp_wav,
+        secondary_temp_mp3,
         format: config.output_format,
     })
 }
@@ -660,31 +715,42 @@ impl RecorderHandle {
         if let Some(cancel) = cancel.as_ref()
             && cancel.load(Ordering::Relaxed)
         {
-            crate::log_if_err!(std::fs::remove_file(&self.temp_wav));
-            crate::log_if_err!(std::fs::remove_file(&self.temp_mp3));
+            self.remove_temporary_files();
             return Err("Saving canceled.".to_string());
         }
 
-        if self.format == PodcastFormat::Mp3 {
+        let primary_temp = match self.format {
+            PodcastFormat::Mp3 => &self.temp_mp3,
+            PodcastFormat::Wav => &self.temp_wav,
+        };
+        let mut outputs = vec![(primary_temp, &self.output_path)];
+        let secondary_temp = match self.format {
+            PodcastFormat::Mp3 => self.secondary_temp_mp3.as_ref(),
+            PodcastFormat::Wav => self.secondary_temp_wav.as_ref(),
+        };
+        if let (Some(temp), Some(output)) = (secondary_temp, self.secondary_output_path.as_ref()) {
+            outputs.push((temp, output));
+        }
+
+        let output_count = outputs.len() as u32;
+        for (index, (temp, output)) in outputs.into_iter().enumerate() {
             if let Some(cancel) = cancel.as_ref()
                 && cancel.load(Ordering::Relaxed)
             {
-                crate::log_if_err!(std::fs::remove_file(&self.temp_wav));
-                crate::log_if_err!(std::fs::remove_file(&self.temp_mp3));
+                self.remove_temporary_files();
                 return Err("Saving canceled.".to_string());
             }
-            progress(100);
-            if let Err(err) = rename_atomic(&self.temp_mp3, &self.output_path) {
-                crate::log_debug(&format!("MP3 final rename failed: {}", err));
+            if let Err(err) = rename_atomic(temp, output) {
+                crate::log_debug(&format!(
+                    "Podcast final rename failed: source={} destination={} error={}",
+                    temp.display(),
+                    output.display(),
+                    err
+                ));
                 self.set_error(&err);
                 return Err(err);
             }
-        } else {
-            progress(100);
-            if let Err(err) = rename_atomic(&self.temp_wav, &self.output_path) {
-                self.set_error(&err);
-                return Err(err);
-            }
+            progress((((index as u32) + 1) * 100) / output_count.max(1));
         }
 
         if let Ok(mut status) = self.shared.status.lock() {
@@ -731,6 +797,17 @@ impl RecorderHandle {
 
     pub fn take_error(&self) -> Option<String> {
         self.shared.last_error.lock().ok()?.take()
+    }
+
+    fn remove_temporary_files(&self) {
+        crate::log_if_err!(std::fs::remove_file(&self.temp_wav));
+        crate::log_if_err!(std::fs::remove_file(&self.temp_mp3));
+        if let Some(path) = self.secondary_temp_wav.as_ref() {
+            crate::log_if_err!(std::fs::remove_file(path));
+        }
+        if let Some(path) = self.secondary_temp_mp3.as_ref() {
+            crate::log_if_err!(std::fs::remove_file(path));
+        }
     }
 
     fn set_error(&self, message: &str) {
@@ -1027,6 +1104,159 @@ fn write_mixed_audio_mp3(
         last_write = Instant::now();
     }
     writer.finalize()?;
+    Ok(())
+}
+
+struct SplitWriterConfig {
+    mic_path: PathBuf,
+    system_path: PathBuf,
+    format: PodcastFormat,
+    mp3_bitrate: u32,
+}
+
+fn write_split_audio(
+    config: SplitWriterConfig,
+    buffer: Arc<MixBuffer>,
+    stop: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
+) -> Result<(), String> {
+    match config.format {
+        PodcastFormat::Mp3 => write_split_audio_mp3(
+            config.mic_path,
+            config.system_path,
+            config.mp3_bitrate,
+            buffer,
+            stop,
+            paused,
+        ),
+        PodcastFormat::Wav => {
+            write_split_audio_wav(config.mic_path, config.system_path, buffer, stop, paused)
+        }
+    }
+}
+
+fn take_split_chunks(buffer: &Arc<MixBuffer>) -> Option<(Vec<f32>, Vec<f32>)> {
+    let mut inner = buffer.inner.lock().unwrap_or_else(|e| e.into_inner());
+    let available_mic = inner.mic.len() / TARGET_CHANNELS as usize;
+    let available_sys = inner
+        .system
+        .iter()
+        .map(|queue| queue.len() / TARGET_CHANNELS as usize)
+        .min()
+        .unwrap_or(0);
+    if available_mic < MIX_CHUNK_FRAMES || available_sys < MIX_CHUNK_FRAMES {
+        crate::log_if_err!(
+            buffer
+                .condvar
+                .wait_timeout(inner, Duration::from_millis(40))
+        );
+        return None;
+    }
+
+    let samples_per_chunk = MIX_CHUNK_FRAMES * TARGET_CHANNELS as usize;
+    let mut mic = Vec::with_capacity(samples_per_chunk);
+    let mut system = Vec::with_capacity(samples_per_chunk);
+    let system_streams = inner.system.len();
+    for _ in 0..MIX_CHUNK_FRAMES {
+        mic.push(inner.mic.pop_front().unwrap_or(0.0).clamp(-1.0, 1.0));
+        mic.push(inner.mic.pop_front().unwrap_or(0.0).clamp(-1.0, 1.0));
+
+        let mut left = 0.0f32;
+        let mut right = 0.0f32;
+        for queue in &mut inner.system {
+            left += queue.pop_front().unwrap_or(0.0);
+            right += queue.pop_front().unwrap_or(0.0);
+        }
+        if system_streams > 1 {
+            left /= system_streams as f32;
+            right /= system_streams as f32;
+        }
+        system.push(left.clamp(-1.0, 1.0));
+        system.push(right.clamp(-1.0, 1.0));
+    }
+    Some((mic, system))
+}
+
+fn write_split_audio_wav(
+    mic_path: PathBuf,
+    system_path: PathBuf,
+    buffer: Arc<MixBuffer>,
+    stop: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
+) -> Result<(), String> {
+    let mut mic_writer =
+        audio_utils::WavWriter::create(&mic_path, TARGET_SAMPLE_RATE, TARGET_CHANNELS, TARGET_BITS)
+            .map_err(|e| e.to_string())?;
+    let mut system_writer = audio_utils::WavWriter::create(
+        &system_path,
+        TARGET_SAMPLE_RATE,
+        TARGET_CHANNELS,
+        TARGET_BITS,
+    )
+    .map_err(|e| e.to_string())?;
+
+    while !stop.load(Ordering::SeqCst) {
+        if paused.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_millis(30));
+            continue;
+        }
+        let Some((mic, system)) = take_split_chunks(&buffer) else {
+            continue;
+        };
+        mic_writer
+            .write_samples_f32(&mic)
+            .map_err(|e| e.to_string())?;
+        system_writer
+            .write_samples_f32(&system)
+            .map_err(|e| e.to_string())?;
+    }
+    mic_writer.finalize().map_err(|e| e.to_string())?;
+    system_writer.finalize().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn write_split_audio_mp3(
+    mic_path: PathBuf,
+    system_path: PathBuf,
+    mp3_bitrate: u32,
+    buffer: Arc<MixBuffer>,
+    stop: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
+) -> Result<(), String> {
+    let mut mic_writer = mf_encoder::Mp3StreamWriter::create(
+        &mic_path,
+        mp3_bitrate,
+        TARGET_SAMPLE_RATE,
+        TARGET_CHANNELS,
+    )?;
+    let mut system_writer = mf_encoder::Mp3StreamWriter::create(
+        &system_path,
+        mp3_bitrate,
+        TARGET_SAMPLE_RATE,
+        TARGET_CHANNELS,
+    )?;
+
+    while !stop.load(Ordering::SeqCst) {
+        if paused.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_millis(30));
+            continue;
+        }
+        let Some((mic, system)) = take_split_chunks(&buffer) else {
+            continue;
+        };
+        let mic_pcm: Vec<i16> = mic
+            .into_iter()
+            .map(|sample| (sample.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)
+            .collect();
+        let system_pcm: Vec<i16> = system
+            .into_iter()
+            .map(|sample| (sample.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)
+            .collect();
+        mic_writer.write_i16(&mic_pcm)?;
+        system_writer.write_i16(&system_pcm)?;
+    }
+    mic_writer.finalize()?;
+    system_writer.finalize()?;
     Ok(())
 }
 

@@ -910,6 +910,7 @@
   "podcast.include_mic": "Zahrnout mikrofon",
   "podcast.include_single_app": "Nahrávat jednu aplikaci",
   "podcast.include_system": "Zahrnout systémový zvuk",
+  "podcast.split_sources": "Uložit mikrofon a systémový zvuk nebo zvuk aplikací do samostatných souborů",
   "podcast.level_mic": "Úroveň mikr.:",
   "podcast.level_system": "Úroveň syst.:",
   "podcast.mic_device": "Zařízení mikrofonu:",

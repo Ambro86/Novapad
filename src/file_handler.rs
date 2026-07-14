@@ -1157,6 +1157,7 @@ struct RawEpubIndexEntry {
 #[derive(Clone, Debug)]
 struct EpubResourcePlacement {
     text_start: usize,
+    text_len: usize,
     anchors: std::collections::HashMap<String, usize>,
 }
 
@@ -1211,6 +1212,7 @@ pub fn read_epub_document(path: &Path, language: Language) -> Result<EpubDocumen
                     )),
                     EpubResourcePlacement {
                         text_start,
+                        text_len: filtered.len(),
                         anchors: filtered_anchors,
                     },
                 );
@@ -1434,7 +1436,7 @@ fn resolve_epub_index_entries(
     let mut resolved = Vec::new();
     for entry in entries {
         let children = resolve_epub_index_entries(&entry.children, placements, full_text);
-        let target_utf16 = resolve_epub_target(&entry.target, placements, full_text)
+        let target_utf16 = resolve_epub_target(&entry.target, &entry.title, placements, full_text)
             .or(children.first().map(|child| child.target_utf16));
         if let Some(target_utf16) = target_utf16 {
             resolved.push(EpubIndexEntry {
@@ -1451,6 +1453,7 @@ fn resolve_epub_index_entries(
 
 fn resolve_epub_target(
     target: &str,
+    title: &str,
     placements: &std::collections::HashMap<String, EpubResourcePlacement>,
     full_text: &str,
 ) -> Option<i32> {
@@ -1486,10 +1489,59 @@ fn resolve_epub_target(
             })
             .unwrap_or(0)
     };
-    Some(byte_offset_to_editor_utf16(
-        full_text,
-        placement.text_start.saturating_add(local_offset),
-    ))
+    let raw_target = placement.text_start.saturating_add(local_offset);
+    let aligned_target = align_epub_target_to_title(full_text, placement, raw_target, title);
+    Some(byte_offset_to_editor_utf16(full_text, aligned_target))
+}
+
+fn align_epub_target_to_title(
+    full_text: &str,
+    placement: &EpubResourcePlacement,
+    raw_target: usize,
+    title: &str,
+) -> usize {
+    const TITLE_SEARCH_RADIUS_BYTES: usize = 4096;
+    let normalized_title = normalize_epub_index_label(title);
+    if normalized_title.is_empty() {
+        return raw_target;
+    }
+
+    let resource_start = placement.text_start.min(full_text.len());
+    let resource_end = placement
+        .text_start
+        .saturating_add(placement.text_len)
+        .min(full_text.len());
+    if resource_start >= resource_end {
+        return raw_target;
+    }
+    let search_start = raw_target
+        .saturating_sub(TITLE_SEARCH_RADIUS_BYTES)
+        .max(resource_start);
+    let search_end = raw_target
+        .saturating_add(TITLE_SEARCH_RADIUS_BYTES)
+        .min(resource_end);
+
+    let mut best_match = None;
+    let mut line_start = resource_start;
+    for segment in full_text[resource_start..resource_end].split_inclusive('\n') {
+        let line_end = line_start.saturating_add(segment.len());
+        if line_end >= search_start && line_start <= search_end {
+            let line = segment.strip_suffix('\n').unwrap_or(segment).trim();
+            if normalize_epub_index_label(line).eq_ignore_ascii_case(&normalized_title) {
+                let leading = segment.find(line).unwrap_or(0);
+                let candidate = line_start.saturating_add(leading);
+                let distance = candidate.abs_diff(raw_target);
+                if best_match
+                    .as_ref()
+                    .is_none_or(|(_, best_distance)| distance < *best_distance)
+                {
+                    best_match = Some((candidate, distance));
+                }
+            }
+        }
+        line_start = line_end;
+    }
+    best_match.map(|(offset, _)| offset).unwrap_or(raw_target)
 }
 
 fn byte_offset_to_editor_utf16(text: &str, byte_offset: usize) -> i32 {
@@ -1498,16 +1550,10 @@ fn byte_offset_to_editor_utf16(text: &str, byte_offset: usize) -> i32 {
         safe_offset -= 1;
     }
     let prefix = &text[..safe_offset];
-    let utf16_len = prefix.encode_utf16().count();
-    let bytes = prefix.as_bytes();
-    let inserted_carriage_returns = bytes
-        .iter()
-        .enumerate()
-        .filter(|(index, byte)| **byte == b'\n' && (*index == 0 || bytes[*index - 1] != b'\r'))
-        .count();
-    utf16_len
-        .saturating_add(inserted_carriage_returns)
-        .min(i32::MAX as usize) as i32
+    // RichEdit stores each paragraph break as one character even though
+    // SetWindowText receives CRLF. EM_EXSETSEL therefore expects the original
+    // single-newline UTF-16 offset, without an extra unit for the inserted CR.
+    prefix.encode_utf16().count().min(i32::MAX as usize) as i32
 }
 
 fn normalize_epub_index_label(label: &str) -> String {
@@ -1963,8 +2009,9 @@ fn decode_basic_html_entities(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        Language, WINDOWS_1250, WINDOWS_1252, choose_ansi_decoding, decode_ansi_best_effort,
-        html_to_text, is_epub_metadata_noise_line,
+        EpubResourcePlacement, Language, WINDOWS_1250, WINDOWS_1252, align_epub_target_to_title,
+        byte_offset_to_editor_utf16, choose_ansi_decoding, decode_ansi_best_effort, html_to_text,
+        is_epub_metadata_noise_line,
     };
 
     #[test]
@@ -1990,6 +2037,61 @@ mod tests {
         assert!(is_epub_metadata_noise_line("  EPUB   BASE   R2.1  "));
         assert!(!is_epub_metadata_noise_line("ePub base r2.2"));
         assert!(!is_epub_metadata_noise_line("Capitolo 1"));
+    }
+
+    #[test]
+    fn epub_index_offset_counts_rich_edit_line_break_as_one_character() {
+        let text = "Introduzione\nSeconda riga\nProemio\nTesto";
+        let title_offset = text.find("Proemio").unwrap_or_default();
+
+        assert_eq!(
+            byte_offset_to_editor_utf16(text, title_offset),
+            "Introduzione\nSeconda riga\n".encode_utf16().count() as i32
+        );
+    }
+
+    #[test]
+    fn epub_index_offset_remains_utf16_safe_with_unicode_before_title() {
+        let text = "È un’introduzione 😀\nProemio";
+        let title_offset = text.find("Proemio").unwrap_or_default();
+
+        assert_eq!(
+            byte_offset_to_editor_utf16(text, title_offset),
+            "È un’introduzione 😀\n".encode_utf16().count() as i32
+        );
+    }
+
+    #[test]
+    fn epub_index_target_moves_back_to_exact_title_line() {
+        let text = "Proemio\nPrima riga del testo.\nSeconda riga.\n";
+        let raw_target = text.find("Seconda riga").unwrap_or_default();
+        let placement = EpubResourcePlacement {
+            text_start: 0,
+            text_len: text.len(),
+            anchors: std::collections::HashMap::new(),
+        };
+
+        assert_eq!(
+            align_epub_target_to_title(text, &placement, raw_target, "Proemio"),
+            0
+        );
+    }
+
+    #[test]
+    fn epub_index_target_does_not_match_title_outside_resource() {
+        let text = "Proemio\nTesto precedente.\nCapitolo reale\nCorpo.\n";
+        let resource_start = text.find("Capitolo reale").unwrap_or_default();
+        let raw_target = text.find("Corpo").unwrap_or_default();
+        let placement = EpubResourcePlacement {
+            text_start: resource_start,
+            text_len: text.len().saturating_sub(resource_start),
+            anchors: std::collections::HashMap::new(),
+        };
+
+        assert_eq!(
+            align_epub_target_to_title(text, &placement, raw_target, "Proemio"),
+            raw_target
+        );
     }
 
     #[test]

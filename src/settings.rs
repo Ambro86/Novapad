@@ -927,6 +927,12 @@ pub struct AppSettings {
     #[serde(default)]
     pub rss_sources: Vec<RssSource>,
     #[serde(default)]
+    pub rss_sources_by_language: HashMap<String, Vec<RssSource>>,
+    #[serde(default)]
+    pub rss_news_language: String,
+    #[serde(default)]
+    pub rss_local_city: String,
+    #[serde(default)]
     pub rss_favorite_articles: Vec<RssItem>,
     #[serde(default)]
     pub podcast_sources: Vec<RssSource>,
@@ -1305,6 +1311,9 @@ impl Default for AppSettings {
             spellcheck_language_mode: SpellcheckLanguageMode::FollowEditorLanguage,
             spellcheck_fixed_language: "en-US".to_string(),
             rss_sources: Vec::new(),
+            rss_sources_by_language: HashMap::new(),
+            rss_news_language: String::new(),
+            rss_local_city: String::new(),
             rss_favorite_articles: Vec::new(),
             rss_removed_default_en: Vec::new(),
             rss_default_en_keys: Vec::new(),

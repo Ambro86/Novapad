@@ -16,7 +16,7 @@ Forbes – Innovation | https://www.forbes.com/innovation/feed2/
 New York Times – World News | https://rss.nytimes.com/services/xml/rss/nyt/World.xml
 Los Angeles Times – World News | https://www.latimes.com/world/rss2.0.xml
 TIME – Latest Stories | https://time.com/feed/
-The Atlantic – All Articles | https://www.theatlantic.com/feed/all/
+The Atlantic – All Articles | https://www.theatlantic.com/feed/all
 Vox – Latest Stories | https://www.vox.com/rss/index.xml
 Wired – Latest | https://www.wired.com/feed/rss
 TechCrunch – Startups & Tech | https://techcrunch.com/feed/

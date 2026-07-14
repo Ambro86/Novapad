@@ -84,6 +84,7 @@ fn browse_movies(
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
                 escape_stops_active_player: true,
+                refresh: None,
             },
         );
 
@@ -148,6 +149,7 @@ fn show_movie_detail(parent: HWND, language: Language, client: &CinemaClient, mo
                 right_arrow_accepts_selection: false,
                 left_arrow_closes: true,
                 escape_stops_active_player: false,
+                refresh: None,
             },
         );
 

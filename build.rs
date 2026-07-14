@@ -125,6 +125,7 @@ fn generate_ffmpeg_bindings() {
     let wrapper = r#"
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libavcodec/bsf.h>
 #include <libswresample/swresample.h>
 #include <libavutil/avutil.h>
 #include <libavutil/error.h>
@@ -161,6 +162,12 @@ fn generate_ffmpeg_bindings() {
         .allowlist_function("avcodec_receive_frame")
         .allowlist_function("avcodec_flush_buffers")
         .allowlist_function("avcodec_free_context")
+        .allowlist_function("av_bsf_get_by_name")
+        .allowlist_function("av_bsf_alloc")
+        .allowlist_function("av_bsf_init")
+        .allowlist_function("av_bsf_send_packet")
+        .allowlist_function("av_bsf_receive_packet")
+        .allowlist_function("av_bsf_free")
         .allowlist_function("av_packet_alloc")
         .allowlist_function("av_packet_free")
         .allowlist_function("av_packet_unref")
@@ -186,6 +193,8 @@ fn generate_ffmpeg_bindings() {
         .allowlist_type("AVPacket")
         .allowlist_type("AVFrame")
         .allowlist_type("AVCodec")
+        .allowlist_type("AVBitStreamFilter")
+        .allowlist_type("AVBSFContext")
         .allowlist_type("AVInputFormat")
         .allowlist_type("AVDictionary")
         .allowlist_type("AVDictionaryEntry")
@@ -197,6 +206,7 @@ fn generate_ffmpeg_bindings() {
         .allowlist_var("AV_TIME_BASE")
         .allowlist_var("AVMediaType_AVMEDIA_TYPE_AUDIO")
         .allowlist_var("AVMediaType_AVMEDIA_TYPE_SUBTITLE")
+        .allowlist_var("AVCodecID_AV_CODEC_ID_AAC")
         .allowlist_var("AVSampleFormat_AV_SAMPLE_FMT_FLT")
         .allowlist_var("AVERROR_EOF")
         .allowlist_var("EAGAIN")

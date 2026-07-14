@@ -351,6 +351,7 @@ fn browse_results(
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: false,
                 escape_stops_active_player: false,
+                refresh: None,
             },
         ) {
             MultilineSelectionResult::Selected(id) => {

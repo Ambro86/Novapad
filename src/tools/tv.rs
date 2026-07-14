@@ -183,7 +183,7 @@ pub(crate) fn load_programs_for_date(
         .json()
         .map_err(|err| format!("Risposta della guida TV non valida: {err}"))?;
     let mut programs_by_channel = HashMap::<String, Vec<TvProgram>>::new();
-    collect_tv_guide_programs(&root, &mut programs_by_channel);
+    collect_tv_guide_programs_from_timeline_root(&root, &mut programs_by_channel);
     for programs in programs_by_channel.values_mut() {
         programs.sort_by_key(|program| program.start_time);
         programs.dedup_by(|left, right| {
@@ -341,17 +341,21 @@ fn encode_uri_component(value: &str) -> String {
     encoded
 }
 
-fn collect_tv_guide_programs(
-    value: &Value,
+fn collect_tv_guide_programs_from_timeline_root(
+    root: &Value,
     programs_by_channel: &mut HashMap<String, Vec<TvProgram>>,
 ) {
-    match value {
-        Value::Array(items) => {
-            for item in items {
-                collect_tv_guide_programs(item, programs_by_channel);
-            }
-        }
-        Value::Object(object) => {
+    let Some(groups) = root.as_array() else {
+        return;
+    };
+    for group in groups {
+        let Some(items) = group.as_array() else {
+            continue;
+        };
+        for item in items {
+            let Some(object) = item.as_object() else {
+                continue;
+            };
             let guide_channel = object
                 .get("ch")
                 .and_then(Value::as_str)
@@ -362,27 +366,24 @@ fn collect_tv_guide_programs(
                 .and_then(Value::as_str)
                 .unwrap_or_default()
                 .trim();
+            if guide_channel.is_empty() || title.is_empty() {
+                continue;
+            }
             let start_time = read_json_i64(object, "startTime", "start_time");
             let end_time = read_json_i64(object, "endTime", "end_time");
-            if !guide_channel.is_empty()
-                && !title.is_empty()
-                && start_time > 0
-                && end_time > start_time
-            {
-                let key = normalize_channel_name(guide_channel);
-                if !key.is_empty() {
-                    programs_by_channel.entry(key).or_default().push(TvProgram {
-                        title: title.to_string(),
-                        start_time,
-                        end_time,
-                    });
-                }
+            if start_time <= 0 || end_time <= 0 {
+                continue;
             }
-            for nested in object.values() {
-                collect_tv_guide_programs(nested, programs_by_channel);
+            let key = normalize_channel_name(guide_channel);
+            if key.is_empty() {
+                continue;
             }
+            programs_by_channel.entry(key).or_default().push(TvProgram {
+                title: title.to_string(),
+                start_time,
+                end_time,
+            });
         }
-        _ => {}
     }
 }
 
@@ -965,5 +966,34 @@ mod tests {
             extract_xml_url(xml, true).as_deref(),
             Some("https://example.test/live.m3u8")
         );
+    }
+
+    #[test]
+    fn timeline_parser_ignores_nested_stale_programs() {
+        let root = serde_json::json!([
+            [
+                {
+                    "ch": "Italia 2",
+                    "title": "Occhi di gatto",
+                    "startTime": 100,
+                    "endTime": 200,
+                    "metadata": {
+                        "ch": "Italia 2",
+                        "title": "Che campioni Holly e Benji!",
+                        "startTime": 50,
+                        "endTime": 250
+                    }
+                }
+            ]
+        ]);
+        let mut programs = HashMap::new();
+
+        collect_tv_guide_programs_from_timeline_root(&root, &mut programs);
+
+        let italy_two = programs
+            .get("italia2")
+            .expect("Italia 2 should be collected from the main timeline row");
+        assert_eq!(italy_two.len(), 1);
+        assert_eq!(italy_two[0].title, "Occhi di gatto");
     }
 }

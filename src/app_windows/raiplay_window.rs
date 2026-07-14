@@ -198,6 +198,7 @@ fn browse_page(
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
                 escape_stops_active_player: false,
+                refresh: None,
             },
         );
         let selected_item_id = match selection {

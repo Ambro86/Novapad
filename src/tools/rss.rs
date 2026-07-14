@@ -27,7 +27,7 @@ pub enum RssSourceType {
     Site,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct RssFeedCache {
     #[serde(default)]
     pub feed_url: Option<String>,
@@ -47,7 +47,7 @@ pub struct RssFeedCache {
     pub last_error_kind: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RssSource {
     pub title: String,
     pub url: String,

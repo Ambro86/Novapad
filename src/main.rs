@@ -196,6 +196,30 @@ pub(crate) fn app_display_version() -> &'static str {
     app_release_tag()
 }
 
+fn update_epub_index_menu_item(hwnd: HWND, view_menu: HMENU) {
+    delete_menu_best_effort(
+        view_menu,
+        IDM_VIEW_SHOW_EPUB_INDEX as u32,
+        MF_BYCOMMAND,
+        "Delete EPUB index menu item",
+    );
+    if !editor_manager::current_document_has_epub_index(hwnd) {
+        return;
+    }
+
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let label = i18n::tr(language, "view.show_epub_index");
+    unsafe {
+        crate::log_if_err!(InsertMenuW(
+            view_menu,
+            2,
+            MF_BYPOSITION | MF_STRING | MF_ENABLED,
+            IDM_VIEW_SHOW_EPUB_INDEX,
+            PCWSTR(to_wide(&label).as_ptr()),
+        ));
+    }
+}
+
 fn update_route_image_menu_item(hwnd: HWND, file_menu: HMENU) {
     unsafe {
         crate::log_if_err!(DeleteMenu(
@@ -244,7 +268,7 @@ pub const WM_UPDATE_PROGRESS_CLOSE: u32 = WM_APP + 86;
 const WM_AUTO_UPDATE_CHECK: u32 = WM_APP + 81;
 const WM_CHECK_PENDING_UPDATE: u32 = WM_APP + 82;
 const WM_SHOW_CHANGELOG: u32 = WM_APP + 83;
-const WM_SHOW_UPDATE_COMPLETED: u32 = WM_APP + 87;
+const WM_SHOW_UPDATE_CHANGELOG: u32 = WM_APP + 87;
 const WM_PODCAST_CHAPTERS_READY: u32 = WM_APP + 31;
 const WM_DICTIONARY_LOADED: u32 = WM_APP + 32;
 const WM_PODCAST_EPISODE_SAVE_RESULT: u32 = WM_APP + 33;
@@ -258,6 +282,7 @@ const WM_LOCAL_MPV_VIDEO_MODE: u32 = WM_APP + 40;
 const WM_LOCAL_MPV_MENU_VISIBLE: u32 = WM_APP + 41;
 const WM_EDITOR_TRANSLATION_DONE: u32 = WM_APP + 42;
 const WM_EDITOR_SUMMARY_DONE: u32 = WM_APP + 43;
+const WM_REACTIVATE_MODAL_AFTER_EXTERNAL_OPEN: u32 = WM_APP + 44;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
@@ -354,8 +379,11 @@ const MPV_ESC_FOCUS_DEBUG_TIMER_ID4: usize = 19;
 const MPV_ESC_FOCUS_DEBUG_TIMER_ID5: usize = 20;
 const MPV_ESC_FOCUS_DEBUG_TIMER_ID6: usize = 21;
 const EDITOR_TRANSLATION_SPEAK_TIMER_ID: usize = 22;
+const EPUB_INDEX_ANNOUNCE_TIMER_ID: usize = 23;
 const DEFERRED_MODAL_COPYDATA_OPEN_TIMER_ID: usize = 0xD0F1;
 const DEFERRED_MODAL_COPYDATA_OPEN_TIMER_INTERVAL_MS: u32 = 150;
+const STARTUP_UPDATE_CHANGELOG_TIMER_ID: usize = 0xD0F2;
+const STARTUP_UPDATE_CHANGELOG_TIMER_INTERVAL_MS: u32 = 250;
 const GEMINI_TRANSLATION_FALLBACK_MODEL: &str = "gemini-2.5-flash";
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
@@ -364,6 +392,8 @@ const SPELLCHECK_HIGHLIGHT_DEBOUNCE_MS: u32 = 100;
 const PDF_OCR_PROMPT_TIMEOUT_COPYDATA_SECS: u64 = 30;
 const COPYDATA_OPEN_FILE: usize = 1;
 const COPYDATA_CALENDAR_REMINDER: usize = 2;
+const COPYDATA_RESULT_HANDLED: isize = 1;
+const COPYDATA_RESULT_DEFERRED_MODAL: isize = 2;
 const VOICE_PANEL_ID_ENGINE: usize = 21001;
 const VOICE_PANEL_ID_LANGUAGE: usize = 21012;
 const VOICE_PANEL_ID_VOICE: usize = 21002;
@@ -443,6 +473,85 @@ pub(crate) fn bring_window_to_foreground(hwnd: HWND) {
             && !AttachThreadInput(foreground_thread, current_thread, false).as_bool()
         {
             log_debug("AttachThreadInput (detach) failed");
+        }
+    }
+}
+
+fn bring_modal_window_to_foreground(hwnd: HWND) {
+    unsafe {
+        if !is_window_handle_valid(hwnd) {
+            log_debug(&format!(
+                "bring_modal_window_to_foreground: invalid target={hwnd:?}"
+            ));
+            return;
+        }
+
+        let foreground = GetForegroundWindow();
+        let current_thread = GetCurrentThreadId();
+        let mut attached_thread = None;
+        let previous_focus = GetFocus();
+        let focus_to_restore = if previous_focus.0 != 0
+            && is_window_handle_valid(previous_focus)
+            && (previous_focus == hwnd || IsChild(hwnd, previous_focus).as_bool())
+        {
+            previous_focus
+        } else {
+            HWND(0)
+        };
+
+        log_debug(&format!(
+            "bring_modal_window_to_foreground: target={:?} initial_foreground={:?} focus_to_restore={:?}",
+            hwnd, foreground, focus_to_restore
+        ));
+
+        if foreground.0 != 0 {
+            let foreground_thread = GetWindowThreadProcessId(foreground, None);
+            if foreground_thread != 0 && foreground_thread != current_thread {
+                if AttachThreadInput(foreground_thread, current_thread, true).as_bool() {
+                    attached_thread = Some(foreground_thread);
+                } else {
+                    log_debug("Modal AttachThreadInput (attach) failed");
+                }
+            }
+        }
+
+        if IsIconic(hwnd).as_bool() {
+            ShowWindow(hwnd, SW_RESTORE);
+        } else {
+            ShowWindow(hwnd, SW_SHOW);
+        }
+        if !SetForegroundWindow(hwnd).as_bool() {
+            log_debug("Modal SetForegroundWindow failed");
+        }
+        if GetForegroundWindow() != hwnd {
+            log_debug(&format!(
+                "bring_modal_window_to_foreground: foreground after first attempt is {:?}, applying SetWindowPos fallback",
+                GetForegroundWindow()
+            ));
+            let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW;
+            if let Err(err) = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags) {
+                log_debug(&format!("Modal SetWindowPos(HWND_TOPMOST) failed: {}", err));
+            }
+            if let Err(err) = SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags) {
+                log_debug(&format!(
+                    "Modal SetWindowPos(HWND_NOTOPMOST) failed: {}",
+                    err
+                ));
+            }
+            if !SetForegroundWindow(hwnd).as_bool() {
+                log_debug("Modal SetForegroundWindow retry failed");
+            }
+        }
+        SetActiveWindow(hwnd);
+        if focus_to_restore.0 != 0 && is_window_handle_valid(focus_to_restore) {
+            SetFocus(focus_to_restore);
+        }
+        log_foreground_snapshot("bring_modal_window_to_foreground.final");
+
+        if let Some(foreground_thread) = attached_thread
+            && !AttachThreadInput(foreground_thread, current_thread, false).as_bool()
+        {
+            log_debug("Modal AttachThreadInput (detach) failed");
         }
     }
 }
@@ -604,7 +713,7 @@ fn reactivate_pending_blocking_modal(hwnd: HWND) -> bool {
     }
     let popup = unsafe { GetLastActivePopup(hwnd) };
     if popup.0 != 0 && popup != hwnd && is_window_handle_valid(popup) {
-        bring_window_to_foreground(popup);
+        bring_modal_window_to_foreground(popup);
     } else {
         bring_window_to_foreground(hwnd);
     }
@@ -612,7 +721,7 @@ fn reactivate_pending_blocking_modal(hwnd: HWND) -> bool {
 }
 
 fn defer_copydata_paths_for_pending_blocking_modal(hwnd: HWND, paths: &[PathBuf]) -> bool {
-    if !reactivate_pending_blocking_modal(hwnd) {
+    if !has_pending_blocking_modal(hwnd) {
         return false;
     }
     with_state(hwnd, |state| {
@@ -621,11 +730,41 @@ fn defer_copydata_paths_for_pending_blocking_modal(hwnd: HWND, paths: &[PathBuf]
             .deferred_copydata_open_paths
             .extend(paths.iter().cloned());
     });
+    crate::log_if_err!(unsafe {
+        PostMessageW(
+            hwnd,
+            WM_REACTIVATE_MODAL_AFTER_EXTERNAL_OPEN,
+            WPARAM(0),
+            LPARAM(0),
+        )
+    });
     true
 }
 
 fn should_defer_external_file_open(main_window_enabled: bool) -> bool {
     !main_window_enabled
+}
+
+fn should_focus_existing_window_after_copydata(result: isize) -> bool {
+    result != COPYDATA_RESULT_DEFERRED_MODAL
+}
+
+fn reactivate_modal_child_while_main_disabled(hwnd: HWND) -> bool {
+    if unsafe { IsWindowEnabled(hwnd).as_bool() } {
+        return false;
+    }
+
+    let popup = unsafe { GetLastActivePopup(hwnd) };
+    if popup.0 == 0 || popup == hwnd || !is_window_handle_valid(popup) {
+        log_debug("Main window is disabled, but no valid modal popup was found");
+        return false;
+    }
+
+    log_debug(&format!(
+        "Reactivating modal popup while main window is disabled: popup={popup:?}"
+    ));
+    bring_modal_window_to_foreground(popup);
+    true
 }
 
 fn defer_copydata_paths_while_main_window_disabled(hwnd: HWND, paths: &[PathBuf]) -> bool {
@@ -634,15 +773,18 @@ fn defer_copydata_paths_while_main_window_disabled(hwnd: HWND, paths: &[PathBuf]
         return false;
     }
 
-    let popup = unsafe { GetLastActivePopup(hwnd) };
-    if popup.0 != 0 && popup != hwnd && is_window_handle_valid(popup) {
-        bring_window_to_foreground(popup);
-    }
-
     with_state(hwnd, |state| {
         state
             .deferred_modal_copydata_open_paths
             .extend(paths.iter().cloned());
+    });
+    crate::log_if_err!(unsafe {
+        PostMessageW(
+            hwnd,
+            WM_REACTIVATE_MODAL_AFTER_EXTERNAL_OPEN,
+            WPARAM(0),
+            LPARAM(0),
+        )
     });
 
     unsafe {
@@ -2664,10 +2806,24 @@ fn download_and_extract_mpv_runtime(
     extract_result
 }
 
-fn ensure_mpv_runtime_available(hwnd: HWND) -> Result<PathBuf, String> {
+pub(crate) fn installed_mpv_runtime_executable() -> Result<PathBuf, String> {
     let preferred_path = mpv_runtime_executable_path();
     if preferred_path.is_file() {
         return Ok(preferred_path);
+    }
+
+    let runtime_dir = mpv_runtime_dir();
+    find_mpv_executable_in_tree(&runtime_dir).ok_or_else(|| {
+        format!(
+            "mpv non è installato nella cartella {}.",
+            runtime_dir.display()
+        )
+    })
+}
+
+pub(crate) fn ensure_mpv_runtime_available(hwnd: HWND) -> Result<PathBuf, String> {
+    if let Ok(path) = installed_mpv_runtime_executable() {
+        return Ok(path);
     }
 
     let runtime_dir = mpv_runtime_dir();
@@ -2676,11 +2832,7 @@ fn ensure_mpv_runtime_available(hwnd: HWND) -> Result<PathBuf, String> {
     close_podcast_save_progress_window(hwnd);
     result?;
 
-    if preferred_path.is_file() {
-        return Ok(preferred_path);
-    }
-
-    find_mpv_executable_in_tree(&runtime_dir).ok_or_else(|| {
+    installed_mpv_runtime_executable().map_err(|_| {
         format!(
             "mpv scaricato ma mpv.exe non trovato in {}.",
             runtime_dir.display()
@@ -2691,6 +2843,7 @@ fn ensure_mpv_runtime_available(hwnd: HWND) -> Result<PathBuf, String> {
 fn clear_managed_mpv_state(hwnd: HWND) {
     if with_state(hwnd, |state| {
         state.active_mpv_session = None;
+        state.active_mpv_is_live_tv = false;
         state.active_mpv_ipc = None;
         state.active_mpv_subtitle_generation = state.active_mpv_subtitle_generation.wrapping_add(1);
         state.next_mpv_request_id = 1;
@@ -2712,7 +2865,7 @@ fn clear_managed_mpv_state(hwnd: HWND) {
     menu::update_playback_menu(hwnd, false);
 }
 
-fn open_mpv_ipc_pipe(ipc_path: &Path) -> Result<std::fs::File, String> {
+pub(crate) fn open_mpv_ipc_pipe(ipc_path: &Path) -> Result<std::fs::File, String> {
     std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -2809,7 +2962,7 @@ fn send_mpv_ipc_command_with_pipe(
     Ok(())
 }
 
-fn send_mpv_ipc_command(ipc_path: &Path, command_json: &str) -> Result<(), String> {
+pub(crate) fn send_mpv_ipc_command(ipc_path: &Path, command_json: &str) -> Result<(), String> {
     let mut pipe = open_mpv_ipc_pipe(ipc_path)?;
     let request_id = 1;
     let message = build_mpv_ipc_message(command_json, request_id)?;
@@ -2845,7 +2998,7 @@ fn send_mpv_ipc_request_with_pipe(
     send_mpv_ipc_request_with_id(ipc_path, pipe, command_json, request_id)
 }
 
-fn send_mpv_ipc_request_with_id(
+pub(crate) fn send_mpv_ipc_request_with_id(
     ipc_path: &Path,
     pipe: &mut std::fs::File,
     command_json: &str,
@@ -3018,7 +3171,7 @@ fn is_raiplay_audiodescription_track(language: Option<&str>, title: Option<&str>
             .unwrap_or(false)
 }
 
-fn preferred_mpv_audio_track_id(track_list: &serde_json::Value) -> Option<i64> {
+pub(crate) fn preferred_mpv_audio_track_id(track_list: &serde_json::Value) -> Option<i64> {
     let tracks = track_list.as_array()?;
 
     let find_track_id = |predicate: &dyn Fn(Option<&str>, Option<&str>) -> bool| {
@@ -3050,7 +3203,7 @@ fn preferred_mpv_audio_track_id(track_list: &serde_json::Value) -> Option<i64> {
     )
 }
 
-fn select_raiplay_mpv_audio_track(hwnd: HWND) {
+pub(crate) fn select_raiplay_mpv_audio_track(hwnd: HWND) {
     for _ in 0..10 {
         let Ok(track_list) = query_managed_mpv_property_transient(hwnd, "track-list") else {
             std::thread::sleep(std::time::Duration::from_millis(100));
@@ -3375,6 +3528,11 @@ pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
         log_debug("Failed to persist last stopped mpv position");
     }
     prevent_sleep(false);
+    if stop_active_mpv_stream_recording(hwnd) {
+        // Concediamo a libavformat il tempo di chiudere il contenitore prima
+        // di terminare il processo mpv.
+        std::thread::sleep(std::time::Duration::from_millis(150));
+    }
     if let Some(session) = session
         && let Err(err) = send_mpv_ipc_command(&session.ipc_path, r#"{"command":["quit"]}"#)
     {
@@ -3565,6 +3723,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
                     ipc_path: ipc_path.clone(),
                     process_id: child.id(),
                 });
+                state.active_mpv_is_live_tv = false;
                 state.active_mpv_ipc = persistent_pipe;
                 state.active_mpv_status = Some(MpvPlaybackStatus {
                     volume: initial_mpv_volume,
@@ -3630,6 +3789,70 @@ pub(crate) fn active_mpv_process_id(hwnd: HWND) -> Option<u32> {
     .flatten()
 }
 
+/// Avvia la registrazione sullo stesso demuxer già aperto da mpv.
+/// In questo modo non viene creata una seconda connessione HTTP/HLS, che può
+/// essere rifiutata da CDN dinamiche anche quando la riproduzione è attiva.
+pub(crate) fn start_active_mpv_stream_recording(
+    hwnd: HWND,
+    output_path: &Path,
+) -> Result<(), String> {
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|err| {
+            format!("Impossibile creare la cartella temporanea della registrazione mpv: {err}")
+        })?;
+    }
+    if let Err(err) = std::fs::remove_file(output_path)
+        && err.kind() != std::io::ErrorKind::NotFound
+    {
+        return Err(format!(
+            "Impossibile preparare il file temporaneo della registrazione mpv: {err}"
+        ));
+    }
+
+    let path_text = output_path.to_string_lossy().to_string();
+    let command = serde_json::json!({
+        "command": ["set_property", "stream-record", path_text]
+    })
+    .to_string();
+    try_send_command_to_managed_mpv(hwnd, &command)?;
+
+    let active_value = query_managed_mpv_property(hwnd, "stream-record")?;
+    let active_path = active_value.as_str().unwrap_or_default();
+    if active_path.trim().is_empty() {
+        return Err("mpv non ha attivato la registrazione del flusso corrente.".to_string());
+    }
+    log_debug(&format!(
+        "Managed mpv stream recording enabled: {}",
+        output_path.display()
+    ));
+    Ok(())
+}
+
+fn stop_active_mpv_stream_recording(hwnd: HWND) -> bool {
+    let Ok(value) = query_managed_mpv_property(hwnd, "stream-record") else {
+        return false;
+    };
+    let Some(path) = value.as_str().filter(|value| !value.trim().is_empty()) else {
+        return false;
+    };
+    let command = serde_json::json!({
+        "command": ["set_property", "stream-record", ""]
+    })
+    .to_string();
+    match try_send_command_to_managed_mpv(hwnd, &command) {
+        Ok(()) => {
+            log_debug(&format!("Managed mpv stream recording closed: {path}"));
+            true
+        }
+        Err(err) => {
+            log_debug(&format!(
+                "Managed mpv stream recording close failed path={path}: {err}"
+            ));
+            false
+        }
+    }
+}
+
 /// Attende che il player mpv abbia realmente aperto il flusso e pubblicato
 /// almeno una traccia. Il processo e il pipe IPC possono esistere alcuni
 /// secondi prima che un HLS dinamico (in particolare RAI) sia pronto.
@@ -3683,6 +3906,7 @@ pub(crate) fn launch_stream_url_in_mpv(
             prefer_audio_description: false,
             allow_bookmark_resume: true,
             force_video: false,
+            live_tv: false,
         },
     )
 }
@@ -3706,6 +3930,7 @@ pub(crate) fn launch_tv_stream_in_mpv(
             prefer_audio_description,
             allow_bookmark_resume: false,
             force_video: true,
+            live_tv: true,
         },
     )
 }
@@ -3730,6 +3955,7 @@ pub(crate) fn launch_video_stream_in_mpv(
             prefer_audio_description: false,
             allow_bookmark_resume: false,
             force_video: true,
+            live_tv: false,
         },
     )
 }
@@ -3873,6 +4099,7 @@ struct StreamMpvOptions<'a> {
     prefer_audio_description: bool,
     allow_bookmark_resume: bool,
     force_video: bool,
+    live_tv: bool,
 }
 
 fn launch_stream_url_in_mpv_with_options(
@@ -3889,6 +4116,7 @@ fn launch_stream_url_in_mpv_with_options(
         prefer_audio_description,
         allow_bookmark_resume,
         force_video,
+        live_tv,
     } = options;
     let mpv_exe = ensure_mpv_runtime_available(hwnd)?;
     let mpv_dir = mpv_exe
@@ -4017,6 +4245,7 @@ fn launch_stream_url_in_mpv_with_options(
                     ipc_path: ipc_path.clone(),
                     process_id: child.id(),
                 });
+                state.active_mpv_is_live_tv = live_tv;
                 state.active_mpv_ipc = persistent_pipe;
                 state.active_mpv_status = Some(MpvPlaybackStatus {
                     volume: initial_mpv_volume,
@@ -4088,6 +4317,7 @@ pub(crate) fn launch_local_tv_recording_in_mpv(hwnd: HWND, path: &Path) -> Resul
             prefer_audio_description: false,
             allow_bookmark_resume: false,
             force_video: true,
+            live_tv: false,
         },
     )
 }
@@ -4182,6 +4412,7 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
                     ipc_path: ipc_path.clone(),
                     process_id: child.id(),
                 });
+                state.active_mpv_is_live_tv = false;
                 state.active_mpv_ipc = persistent_pipe;
                 state.active_mpv_status = Some(MpvPlaybackStatus {
                     volume: initial_mpv_volume,
@@ -5800,6 +6031,13 @@ fn is_raiplay_live_stream_playback_active(hwnd: HWND) -> bool {
                 .as_ref()
                 .map(|player| is_direct_stream_url_path(&player.path))
                 .unwrap_or(false)
+    })
+    .unwrap_or(false)
+}
+
+pub(crate) fn is_live_tv_playback_active(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| {
+        state.active_mpv_session.is_some() && state.active_mpv_is_live_tv
     })
     .unwrap_or(false)
 }
@@ -7643,6 +7881,7 @@ pub(crate) struct AppState {
     active_podcast_episode_from_rai: RaiAudioOrigin,
     raiplay_live_audio_variants: Vec<RaiPlayLiveAudioVariant>,
     active_mpv_session: Option<MpvPlaybackSession>,
+    active_mpv_is_live_tv: bool,
     active_mpv_playback_generation: u64,
     active_mpv_ipc: Option<std::fs::File>,
     active_mpv_subtitle_generation: u64,
@@ -7953,13 +8192,19 @@ fn run_app(
                 } else if existing_pid != 0 {
                     crate::log_if_err!(AllowSetForegroundWindow(existing_pid));
                 }
-                SendMessageW(
+                let copydata_result = SendMessageW(
                     existing,
                     WM_COPYDATA,
                     WPARAM(0),
                     LPARAM(&mut cds as *mut _ as isize),
                 );
-                bring_window_to_foreground(existing);
+                if should_focus_existing_window_after_copydata(copydata_result.0) {
+                    bring_window_to_foreground(existing);
+                } else {
+                    log_debug(
+                        "Existing Sonarpad instance deferred the file open because a modal dialog is active; leaving that dialog in the foreground",
+                    );
+                }
                 return Ok(());
             }
         }
@@ -8012,29 +8257,16 @@ fn run_app(
             crate::settings::cleanup_legacy_context_menu_entries();
         }
         if show_update_completed {
-            let hwnd_val = hwnd.0;
-            let show_changelog_after_completed = show_changelog;
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(1200));
-                if let Err(e) = PostMessageW(
-                    HWND(hwnd_val),
-                    WM_SHOW_UPDATE_COMPLETED,
-                    WPARAM(0),
-                    LPARAM(show_changelog_after_completed as isize),
-                ) {
-                    crate::log_debug(&format!("Failed to post update completed message: {}", e));
-                }
-            });
-        } else if show_changelog {
-            let hwnd_val = hwnd.0;
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_secs(1));
-                if let Err(e) =
-                    PostMessageW(HWND(hwnd_val), WM_SHOW_CHANGELOG, WPARAM(0), LPARAM(0))
-                {
-                    crate::log_debug(&format!("Failed to post show changelog message: {}", e));
-                }
-            });
+            if let Err(e) = PostMessageW(hwnd, WM_SHOW_UPDATE_CHANGELOG, WPARAM(0), LPARAM(0)) {
+                crate::log_debug(&format!(
+                    "Failed to post startup update changelog message: {}",
+                    e
+                ));
+            }
+        } else if show_changelog
+            && let Err(e) = PostMessageW(hwnd, WM_SHOW_CHANGELOG, WPARAM(0), LPARAM(0))
+        {
+            crate::log_debug(&format!("Failed to post show changelog message: {}", e));
         }
 
         let check_updates = !show_update_completed
@@ -9431,6 +9663,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_podcast_episode_from_rai: RaiAudioOrigin::None,
                     raiplay_live_audio_variants: Vec::new(),
                     active_mpv_session: None,
+                    active_mpv_is_live_tv: false,
                     active_mpv_playback_generation: 0,
                     active_mpv_ipc: None,
                     active_mpv_subtitle_generation: 0,
@@ -9755,6 +9988,12 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     log_mpv_focus_snapshot(hwnd, "mpv_wm_activate.deactivate");
                 }
                 if is_activating {
+                    if reactivate_modal_child_while_main_disabled(hwnd) {
+                        log_debug(
+                            "WM_ACTIVATE redirected to the active modal popup because the main window is disabled",
+                        );
+                        return LRESULT(0);
+                    }
                     if reactivate_batch_audiobooks_window(hwnd) {
                         return LRESULT(0);
                     }
@@ -9820,9 +10059,44 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
+            WM_REACTIVATE_MODAL_AFTER_EXTERNAL_OPEN => {
+                if !reactivate_pending_blocking_modal(hwnd) {
+                    reactivate_modal_child_while_main_disabled(hwnd);
+                }
+                LRESULT(0)
+            }
             WM_TIMER => {
+                if wparam.0 == EPUB_INDEX_ANNOUNCE_TIMER_ID {
+                    kill_timer_best_effort(
+                        hwnd,
+                        EPUB_INDEX_ANNOUNCE_TIMER_ID,
+                        "KillTimer EPUB_INDEX_ANNOUNCE",
+                    );
+                    if editor_manager::current_document_has_epub_index(hwnd) {
+                        let language =
+                            with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                        screen_reader_speak(&i18n::tr(language, "epub_index.announcement"));
+                    }
+                    return LRESULT(0);
+                }
                 if wparam.0 == DEFERRED_MODAL_COPYDATA_OPEN_TIMER_ID {
                     process_deferred_modal_copydata_paths_if_ready(hwnd);
+                    return LRESULT(0);
+                }
+                if wparam.0 == STARTUP_UPDATE_CHANGELOG_TIMER_ID {
+                    kill_timer_best_effort(
+                        hwnd,
+                        STARTUP_UPDATE_CHANGELOG_TIMER_ID,
+                        "KillTimer STARTUP_UPDATE_CHANGELOG",
+                    );
+                    if let Err(err) =
+                        PostMessageW(hwnd, WM_SHOW_UPDATE_CHANGELOG, WPARAM(0), LPARAM(0))
+                    {
+                        log_debug(&format!(
+                            "Failed to repost startup update changelog message: {}",
+                            err
+                        ));
+                    }
                     return LRESULT(0);
                 }
                 if wparam.0 == FOCUS_EDITOR_TIMER_ID
@@ -9832,6 +10106,17 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 {
                     log_foreground_snapshot(&format!("focus_timer.before.{}", wparam.0));
                     kill_timer_best_effort(hwnd, wparam.0, "KillTimer FOCUS_EDITOR");
+                    if reactivate_modal_child_while_main_disabled(hwnd) {
+                        log_debug(&format!(
+                            "focus timer {} suppressed because a modal popup is active",
+                            wparam.0
+                        ));
+                        log_foreground_snapshot(&format!(
+                            "focus_timer.after_modal_popup.{}",
+                            wparam.0
+                        ));
+                        return LRESULT(0);
+                    }
                     if !is_mpv_playback_active(hwnd)
                         && app_windows::youtube_transcript_window::has_active_player_return_list(
                             hwnd,
@@ -10455,13 +10740,33 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 LRESULT(0)
             }
-            WM_SHOW_UPDATE_COMPLETED => {
-                let show_changelog_after_completed = lparam.0 != 0;
-                bring_window_to_foreground(hwnd);
-                updater::show_update_completed_dialog(hwnd);
-                if show_changelog_after_completed && !has_secondary_window_open(hwnd) {
-                    app_windows::help_window::open_changelog(hwnd);
+            WM_SHOW_UPDATE_CHANGELOG => {
+                if has_secondary_window_open(hwnd) {
+                    if SetTimer(
+                        hwnd,
+                        STARTUP_UPDATE_CHANGELOG_TIMER_ID,
+                        STARTUP_UPDATE_CHANGELOG_TIMER_INTERVAL_MS,
+                        None,
+                    ) == 0
+                    {
+                        log_debug(
+                            "Failed to schedule the update changelog while another window is open",
+                        );
+                    } else {
+                        log_debug(
+                            "Update changelog deferred until the current secondary window closes",
+                        );
+                    }
+                    return LRESULT(0);
                 }
+                kill_timer_best_effort(
+                    hwnd,
+                    STARTUP_UPDATE_CHANGELOG_TIMER_ID,
+                    "KillTimer STARTUP_UPDATE_CHANGELOG",
+                );
+                log_debug("Opening the combined update completion and changelog window");
+                bring_window_to_foreground(hwnd);
+                app_windows::help_window::open_update_changelog(hwnd);
                 LRESULT(0)
             }
             search::WM_REPLACE_ALL_DONE => {
@@ -10764,6 +11069,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     let file_menu = GetSubMenu(main_menu, 0);
                     if file_menu == hmenu {
                         update_route_image_menu_item(hwnd, hmenu);
+                    }
+                    let view_menu = GetSubMenu(main_menu, 2);
+                    if view_menu == hmenu {
+                        update_epub_index_menu_item(hwnd, hmenu);
                     }
                     let edit_menu = GetSubMenu(main_menu, 1);
                     if edit_menu == hmenu {
@@ -11492,7 +11801,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         LRESULT(0)
                     }
                     IDM_PLAYBACK_DOWNLOAD_EPISODE => {
-                        download_active_podcast_episode(hwnd);
+                        if !is_live_tv_playback_active(hwnd) {
+                            download_active_podcast_episode(hwnd);
+                        }
                         LRESULT(0)
                     }
                     IDM_PLAYBACK_TRANSCRIBE_CURRENT => {
@@ -11657,6 +11968,23 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_VIEW_SHOW_FAVORITES => {
                         log_debug("Menu: Toggle favorite voices panel");
                         toggle_favorites_panel(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_VIEW_SHOW_EPUB_INDEX => {
+                        let language =
+                            with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                        let index = editor_manager::current_epub_index(hwnd);
+                        if index.is_empty() {
+                            show_info(hwnd, language, &i18n::tr(language, "epub_index.no_index"));
+                            return LRESULT(0);
+                        }
+                        if let Some(target_utf16) =
+                            app_windows::epub_index_window::select_epub_index_entry(
+                                hwnd, &index, language,
+                            )
+                        {
+                            editor_manager::go_to_current_document_utf16_offset(hwnd, target_utf16);
+                        }
                         LRESULT(0)
                     }
                     IDM_VIEW_READ_ONLY => {
@@ -12013,17 +12341,17 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                             log_debug(
                                 "WM_COPYDATA open deferred while blocking modal dialog is pending",
                             );
-                            return LRESULT(1);
+                            return LRESULT(COPYDATA_RESULT_DEFERRED_MODAL);
                         }
                         if defer_copydata_paths_while_main_window_disabled(hwnd, &paths) {
                             log_debug(
                                 "WM_COPYDATA open deferred while the main window is disabled by a modal child",
                             );
-                            return LRESULT(1);
+                            return LRESULT(COPYDATA_RESULT_DEFERRED_MODAL);
                         }
                         open_copydata_paths(hwnd, paths);
                     }
-                    return LRESULT(1);
+                    return LRESULT(COPYDATA_RESULT_HANDLED);
                 }
                 LRESULT(0)
             }
@@ -18079,7 +18407,9 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         return true;
     }
     if key == 'E' as u16 && !ctrl_down && shift_down && alt_down {
-        dispatch_shortcut_command(hwnd, IDM_PLAYBACK_DOWNLOAD_EPISODE);
+        if !is_live_tv_playback_active(hwnd) {
+            dispatch_shortcut_command(hwnd, IDM_PLAYBACK_DOWNLOAD_EPISODE);
+        }
         return true;
     }
     if key == 'L' as u16 && !ctrl_down && shift_down && alt_down {
@@ -19394,9 +19724,11 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        SentenceNavigationDirection, audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
+        COPYDATA_RESULT_DEFERRED_MODAL, COPYDATA_RESULT_HANDLED, SentenceNavigationDirection,
+        audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
         normalize_soft_line_breaks_for_translation, relative_audiobook_bookmark,
         sentence_navigation_target, sentence_start_offsets_utf16, should_defer_external_file_open,
+        should_focus_existing_window_after_copydata,
     };
     use crate::bookmarks::Bookmark;
 
@@ -19408,6 +19740,20 @@ mod tests {
     #[test]
     fn external_file_open_is_immediate_when_main_window_is_enabled() {
         assert!(!should_defer_external_file_open(true));
+    }
+
+    #[test]
+    fn sender_does_not_focus_disabled_main_window_when_open_is_deferred() {
+        assert!(!should_focus_existing_window_after_copydata(
+            COPYDATA_RESULT_DEFERRED_MODAL,
+        ));
+    }
+
+    #[test]
+    fn sender_focuses_existing_window_after_immediate_open() {
+        assert!(should_focus_existing_window_after_copydata(
+            COPYDATA_RESULT_HANDLED,
+        ));
     }
 
     #[test]
@@ -19842,6 +20188,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
                 route_map: None,
+                epub_index: Vec::new(),
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -20060,6 +20407,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
             .unwrap_or(false);
 
         let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
+        let has_epub_index = !loaded.epub_index.is_empty();
         let (hwnd_edit, new_index) = with_state(hwnd, |state| {
             let use_word_wrap = state.settings.word_wrap && !large_file_no_wrap;
             let hwnd_edit = editor_manager::create_edit(
@@ -20087,6 +20435,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
                 route_map: None,
+                epub_index: loaded.epub_index,
             };
             state.docs.push(doc);
             if large_file_no_wrap {
@@ -20118,6 +20467,18 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
         }
 
         editor_manager::select_tab(hwnd, new_index);
+        if has_epub_index {
+            unsafe {
+                kill_timer_best_effort(
+                    hwnd,
+                    EPUB_INDEX_ANNOUNCE_TIMER_ID,
+                    "KillTimer previous EPUB_INDEX_ANNOUNCE",
+                );
+                if SetTimer(hwnd, EPUB_INDEX_ANNOUNCE_TIMER_ID, 1000, None) == 0 {
+                    log_debug("Failed to set EPUB index announcement timer");
+                }
+            }
+        }
         push_recent_file(hwnd, &path);
 
         let pending = with_state(hwnd, |state| state.pending_find_in_files.clone()).unwrap_or(None);

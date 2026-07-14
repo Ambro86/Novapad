@@ -2053,23 +2053,6 @@ pub(crate) fn cleanup_update_temp_on_start() {
     }
 }
 
-pub(crate) fn show_update_completed_dialog(owner: HWND) {
-    let language = with_state(owner, |state| state.settings.language)
-        .unwrap_or_else(|| load_settings().language);
-    let text = i18n::tr(language, "updater.info.completed");
-    let title = i18n::tr(language, "updater.title");
-    let msg = HSTRING::from(text);
-    let tit = HSTRING::from(title);
-    unsafe {
-        let _ignored = MessageBoxW(
-            owner,
-            &msg,
-            &tit,
-            MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND,
-        );
-    }
-}
-
 fn show_update_info(language: Language, info: UpdateInfo) {
     show_update_info_for_owner(language, info, HWND(0));
 }

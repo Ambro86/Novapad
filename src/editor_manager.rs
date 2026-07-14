@@ -53,6 +53,7 @@ pub(crate) struct LoadedDocument {
     pub(crate) content: String,
     pub(crate) format: FileFormat,
     pub(crate) opened_text_encoding: Option<TextEncoding>,
+    pub(crate) epub_index: Vec<EpubIndexEntry>,
 }
 
 pub(crate) struct DocumentLoadResult {
@@ -1355,6 +1356,7 @@ pub struct Document {
     pub prefer_title_for_save_suggestion: bool,
     pub prefer_mpv_playback: bool,
     pub route_map: Option<RouteMapData>,
+    pub epub_index: Vec<EpubIndexEntry>,
 }
 
 #[derive(Clone)]
@@ -1384,6 +1386,7 @@ impl Default for Document {
             prefer_title_for_save_suggestion: false,
             prefer_mpv_playback: false,
             route_map: None,
+            epub_index: Vec::new(),
         }
     }
 }
@@ -3276,6 +3279,7 @@ pub fn new_document(hwnd: HWND) {
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
                 route_map: None,
+                epub_index: Vec::new(),
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -3322,6 +3326,7 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
                 route_map: None,
+                epub_index: Vec::new(),
             };
             SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
             ShowWindow(hwnd_edit, SW_HIDE);
@@ -3395,6 +3400,7 @@ fn load_document_content(
             content: text,
             format: FileFormat::Docx,
             opened_text_encoding: None,
+            epub_index: Vec::new(),
         }));
     }
     if is_odt_path(path) {
@@ -3403,6 +3409,7 @@ fn load_document_content(
             content: text,
             format: FileFormat::Odt,
             opened_text_encoding: None,
+            epub_index: Vec::new(),
         }));
     }
     if is_pptx_path(path) {
@@ -3411,6 +3418,7 @@ fn load_document_content(
             content: text,
             format: FileFormat::Pptx,
             opened_text_encoding: None,
+            epub_index: Vec::new(),
         }));
     }
     if is_ppt_path(path) {
@@ -3419,6 +3427,7 @@ fn load_document_content(
             content: text,
             format: FileFormat::Ppt,
             opened_text_encoding: None,
+            epub_index: Vec::new(),
         }));
     }
     if is_odp_path(path) {
@@ -3427,14 +3436,16 @@ fn load_document_content(
             content: text,
             format: FileFormat::Odp,
             opened_text_encoding: None,
+            epub_index: Vec::new(),
         }));
     }
     if is_epub_path(path) {
-        let text = read_epub_text(path, language)?;
+        let document = read_epub_document(path, language)?;
         return Ok(Some(LoadedDocument {
-            content: text,
+            content: document.text,
             format: FileFormat::Epub,
             opened_text_encoding: None,
+            epub_index: document.index,
         }));
     }
     if is_html_path(path) {
@@ -3443,6 +3454,7 @@ fn load_document_content(
             content: text,
             format: FileFormat::Html,
             opened_text_encoding: None,
+            epub_index: Vec::new(),
         }));
     }
     let is_rtf = path
@@ -3457,6 +3469,7 @@ fn load_document_content(
             content: extract_rtf_text(&bytes),
             format: FileFormat::Text(TextEncoding::Utf8),
             opened_text_encoding: None,
+            epub_index: Vec::new(),
         }));
     }
     if is_gdoc_path(path) {
@@ -3502,6 +3515,7 @@ fn load_document_content(
             content: text,
             format: FileFormat::Text(encoding),
             opened_text_encoding: Some(encoding),
+            epub_index: Vec::new(),
         }));
     }
     if is_doc_path(path) {
@@ -3510,6 +3524,7 @@ fn load_document_content(
             content: text,
             format: FileFormat::Doc,
             opened_text_encoding: None,
+            epub_index: Vec::new(),
         }));
     }
     if is_spreadsheet_path(path) {
@@ -3518,6 +3533,7 @@ fn load_document_content(
             content: text,
             format: FileFormat::Spreadsheet,
             opened_text_encoding: None,
+            epub_index: Vec::new(),
         }));
     }
 
@@ -3529,6 +3545,7 @@ fn load_document_content(
             content: text,
             format: FileFormat::Text(encoding),
             opened_text_encoding: Some(encoding),
+            epub_index: Vec::new(),
         }));
     }
     let (text, encoding) = decode_text(&bytes, language)?;
@@ -3536,6 +3553,7 @@ fn load_document_content(
         content: text,
         format: FileFormat::Text(encoding),
         opened_text_encoding: Some(encoding),
+        epub_index: Vec::new(),
     }))
 }
 
@@ -3803,6 +3821,7 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
                 route_map: None,
+                epub_index: Vec::new(),
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
@@ -3812,6 +3831,62 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
         select_tab(hwnd, index);
         Some(hwnd_edit)
     }
+}
+
+pub fn current_epub_index(hwnd: HWND) -> Vec<EpubIndexEntry> {
+    with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .map(|document| document.epub_index.clone())
+            .unwrap_or_default()
+    })
+    .unwrap_or_default()
+}
+
+pub fn current_document_has_epub_index(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .map(|document| {
+                matches!(document.format, FileFormat::Epub) && !document.epub_index.is_empty()
+            })
+            .unwrap_or(false)
+    })
+    .unwrap_or(false)
+}
+
+pub fn go_to_current_document_utf16_offset(hwnd: HWND, target_utf16: i32) -> bool {
+    let hwnd_edit = with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .map(|document| document.hwnd_edit)
+    })
+    .flatten()
+    .unwrap_or(HWND(0));
+    if hwnd_edit.0 == 0 {
+        return false;
+    }
+
+    unsafe {
+        let target = target_utf16.max(0);
+        let mut selection = CHARRANGE {
+            cpMin: target,
+            cpMax: target,
+        };
+        SendMessageW(
+            hwnd_edit,
+            EM_EXSETSEL,
+            WPARAM(0),
+            LPARAM(&mut selection as *mut _ as isize),
+        );
+        SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+        SetFocus(hwnd_edit);
+    }
+    crate::notify_editor_caret_changed(hwnd_edit);
+    true
 }
 
 pub fn select_tab(hwnd: HWND, index: usize) {

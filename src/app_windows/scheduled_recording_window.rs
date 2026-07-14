@@ -83,6 +83,14 @@ struct ScheduledRecording {
     recurrence: RecordingRecurrence,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct ScheduledRecordingListItem {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) start_at: NaiveDateTime,
+    pub(crate) duration_minutes: u32,
+}
+
 struct ScheduleDialogState {
     parent: HWND,
     language: Language,
@@ -718,8 +726,14 @@ fn save_from_dialog(hwnd: HWND) {
         duration_minutes: duration,
         recurrence,
     };
-    let creation_result =
-        save_schedule(&schedule).and_then(|_| create_scheduled_task(&schedule, start_at));
+    let creation_result = (|| -> Result<(), String> {
+        if matches!(&schedule.source, ScheduledRecordingSource::Tv { .. }) {
+            let runtime_owner = if parent.0 != 0 { parent } else { hwnd };
+            crate::ensure_mpv_runtime_available(runtime_owner)?;
+        }
+        save_schedule(&schedule)?;
+        create_scheduled_task(&schedule, start_at)
+    })();
     match creation_result {
         Ok(()) => {
             show_message(
@@ -802,6 +816,66 @@ fn schedules_dir() -> PathBuf {
 
 fn schedule_path(id: &str) -> PathBuf {
     schedules_dir().join(format!("{}.json", safe_task_component(id)))
+}
+
+pub(crate) fn list_scheduled_recordings(
+    kind: StreamRecordingKind,
+) -> Vec<ScheduledRecordingListItem> {
+    let now = Local::now().naive_local();
+    let Ok(entries) = fs::read_dir(schedules_dir()) else {
+        return Vec::new();
+    };
+    let mut result = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if path.extension().and_then(|value| value.to_str()) != Some("json") {
+                return None;
+            }
+            let payload = fs::read(path).ok()?;
+            let schedule = serde_json::from_slice::<ScheduledRecording>(&payload).ok()?;
+            let (source_kind, title) = match &schedule.source {
+                ScheduledRecordingSource::Radio { name, .. } => {
+                    (StreamRecordingKind::Radio, name.clone())
+                }
+                ScheduledRecordingSource::Tv { channel } => {
+                    (StreamRecordingKind::Tv, channel.name.clone())
+                }
+            };
+            if source_kind != kind {
+                return None;
+            }
+            let start_at = next_occurrence(&schedule, now)?;
+            Some(ScheduledRecordingListItem {
+                id: schedule.id,
+                title,
+                start_at,
+                duration_minutes: schedule.duration_minutes,
+            })
+        })
+        .collect::<Vec<_>>();
+    result.sort_by_key(|item| item.start_at);
+    result
+}
+
+fn next_occurrence(schedule: &ScheduledRecording, now: NaiveDateTime) -> Option<NaiveDateTime> {
+    let date = NaiveDate::parse_from_str(&schedule.start_date, "%Y-%m-%d").ok()?;
+    let mut start = date.and_hms_opt(schedule.hour, schedule.minute, 0)?;
+    match schedule.recurrence {
+        RecordingRecurrence::Once => Some(start),
+        RecordingRecurrence::Daily => {
+            while start < now {
+                start += Duration::days(1);
+            }
+            Some(start)
+        }
+        RecordingRecurrence::Weekly => {
+            while start < now {
+                start += Duration::weeks(1);
+            }
+            Some(start)
+        }
+    }
 }
 
 fn create_scheduled_task(
@@ -967,7 +1041,11 @@ pub(crate) fn run_scheduled_recording(id: &str) -> i32 {
                 None,
                 StreamRecordingKind::Radio,
                 Some(schedule.language),
-                schedule.duration_minutes,
+                stream_recording::ScheduledRecordingOptions {
+                    duration_minutes: schedule.duration_minutes,
+                    scheduled_id: &schedule.id,
+                    prefer_audio_description: false,
+                },
             )
         }
         ScheduledRecordingSource::Tv { channel } => {
@@ -978,7 +1056,11 @@ pub(crate) fn run_scheduled_recording(id: &str) -> i32 {
                     Some(channel.media_playback_user_agent()),
                     StreamRecordingKind::Tv,
                     None,
-                    schedule.duration_minutes,
+                    stream_recording::ScheduledRecordingOptions {
+                        duration_minutes: schedule.duration_minutes,
+                        scheduled_id: &schedule.id,
+                        prefer_audio_description: tv::is_rai_audio_description_channel(channel),
+                    },
                 )
             })
         }

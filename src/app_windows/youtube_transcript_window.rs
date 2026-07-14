@@ -14,7 +14,9 @@ use windows::Win32::Graphics::Gdi::{
     DT_WORDBREAK, DrawTextW, EndPaint, FillRect, GetDC, HBRUSH, HFONT, HGDIOBJ, InvalidateRect,
     PAINTSTRUCT, ReleaseDC, SelectObject, SetBkMode, TRANSPARENT,
 };
-use windows::Win32::System::Threading::CREATE_NO_WINDOW;
+use windows::Win32::System::Threading::{
+    CREATE_NO_WINDOW, GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_BELOW_NORMAL,
+};
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL};
 use windows::Win32::UI::Controls::{
@@ -31,18 +33,18 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW, DLGC_WANTARROWS, DefWindowProcW, DestroyMenu,
     DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE, ES_READONLY, GWLP_USERDATA,
     GetCursorPos, GetForegroundWindow, GetParent, GetScrollInfo, GetWindowLongPtrW, HMENU,
-    HWND_TOPMOST, IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, LB_ADDSTRING,
+    HWND_TOPMOST, IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, KillTimer, LB_ADDSTRING,
     LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY,
     LoadCursorW, MB_ICONQUESTION, MB_YESNO, MF_STRING, MSG, PM_REMOVE, PeekMessageW, PostMessageW,
     RegisterClassW, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION,
     SB_THUMBTRACK, SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS, SIF_RANGE, SIF_TRACKPOS,
     SW_HIDE, SW_SHOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD,
-    TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
-    WM_CREATE, WM_DESTROY, WM_GETDLGCODE, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MOUSEWHEEL, WM_NCDESTROY,
-    WM_NEXTDLGCTL, WM_PAINT, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_VSCROLL, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY,
+    TPM_RETURNCMD, TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_GETDLGCODE, WM_KEYDOWN, WM_LBUTTONDOWN,
+    WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_PAINT, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
+    WM_TIMER, WM_VSCROLL, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -98,6 +100,7 @@ const WM_YT_TEXT_COMPLETE: u32 = WM_APP + 41;
 const WM_YT_LOAD_CANCEL: u32 = WM_APP + 42;
 const WM_YT_TEXT_CANCEL: u32 = WM_APP + 43;
 const WM_YT_REFOCUS_FLAT_LIST: u32 = WM_APP + 44;
+const YOUTUBE_COMMENTS_REFRESH_TIMER_ID: usize = 9337;
 
 // When a TV channel or recording is playing, its selection list remains alive
 // but hidden behind the visible mpv surface. Esc stops mpv and restores this list.
@@ -253,9 +256,13 @@ pub(crate) fn play_youtube_video_in_mpv(
 }
 
 fn ytdlp_command(path: &Path) -> Command {
+    const BELOW_NORMAL_PRIORITY_CLASS_FLAG: u32 = 0x0000_4000;
     let mut cmd = Command::new(path);
     cmd.stdin(Stdio::null());
-    cmd.creation_flags(CREATE_NO_WINDOW.0);
+    // yt-dlp may launch FFmpeg for merging/conversion.  Keep the whole child
+    // process tree below the UI priority so older PCs continue servicing the
+    // Sonarpad message loop and screen readers do not report "not responding".
+    cmd.creation_flags(CREATE_NO_WINDOW.0 | BELOW_NORMAL_PRIORITY_CLASS_FLAG);
     cmd
 }
 
@@ -1845,7 +1852,7 @@ struct StreamCollectionEntry {
     url: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 struct YoutubeComment {
     id: String,
     parent: String,
@@ -1865,6 +1872,7 @@ struct YoutubeCommentsDialogInit {
     flat_search: Option<YoutubeFlatSearchInit>,
     flat_secondary_action: Option<YoutubeFlatSecondaryActionInit>,
     flat_close_button_label: Option<String>,
+    flat_refresh: Option<MultilineRefreshOptions>,
     flat_context_actions:
         Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     right_arrow_accepts_selection: bool,
@@ -1879,6 +1887,7 @@ struct YoutubeCommentsDialogMode {
     flat_search: Option<YoutubeFlatSearchInit>,
     flat_secondary_action: Option<YoutubeFlatSecondaryActionInit>,
     flat_close_button_label: Option<String>,
+    flat_refresh: Option<MultilineRefreshOptions>,
     flat_context_actions:
         Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     right_arrow_accepts_selection: bool,
@@ -1934,6 +1943,7 @@ struct YoutubeCommentsDialogState {
     flat_selection_result: Option<Arc<Mutex<Option<String>>>>,
     flat_search_result: Option<Arc<Mutex<Option<String>>>>,
     flat_secondary_action_result: Option<Arc<Mutex<bool>>>,
+    flat_refresh: Option<MultilineRefreshOptions>,
     flat_context_actions:
         Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction>,
     right_arrow_accepts_selection: bool,
@@ -1948,6 +1958,12 @@ pub(crate) struct MultilineSelectionItem {
     pub(crate) description: Option<String>,
 }
 
+#[derive(Clone)]
+pub(crate) struct MultilineRefreshOptions {
+    pub(crate) interval_ms: u32,
+    pub(crate) loader: Arc<dyn Fn() -> Vec<MultilineSelectionItem> + Send + Sync>,
+}
+
 pub(crate) struct MultilineSearchOptions {
     pub(crate) initial_query: String,
     pub(crate) search_button_label: String,
@@ -1958,6 +1974,7 @@ pub(crate) struct MultilineSearchOptions {
     pub(crate) right_arrow_accepts_selection: bool,
     pub(crate) left_arrow_closes: bool,
     pub(crate) escape_stops_active_player: bool,
+    pub(crate) refresh: Option<MultilineRefreshOptions>,
 }
 
 struct YoutubeFlatSelectionInit {
@@ -2476,28 +2493,7 @@ pub(crate) fn select_multiline_items_with_search(
     initial_selected_id: Option<String>,
     search_options: MultilineSearchOptions,
 ) -> MultilineSelectionResult {
-    let comments = items
-        .into_iter()
-        .map(|item| {
-            let title = normalize_comment_text(&item.title);
-            let description = item
-                .description
-                .as_deref()
-                .map(normalize_comment_text)
-                .unwrap_or_default();
-            YoutubeComment {
-                id: item.id,
-                parent: "root".to_string(),
-                author: if title.is_empty() {
-                    "Elemento".to_string()
-                } else {
-                    title
-                },
-                text: description,
-                time_text: String::new(),
-            }
-        })
-        .collect::<Vec<_>>();
+    let comments = multiline_items_to_comments(items);
     let selection_result = Arc::new(Mutex::new(None));
     let search_result = Arc::new(Mutex::new(None));
     let secondary_action_result = Arc::new(Mutex::new(false));
@@ -2531,6 +2527,7 @@ pub(crate) fn select_multiline_items_with_search(
                 }
             }),
             flat_close_button_label: None,
+            flat_refresh: search_options.refresh,
             flat_context_actions: search_options.context_actions,
             right_arrow_accepts_selection: search_options.right_arrow_accepts_selection,
             left_arrow_closes: search_options.left_arrow_closes,
@@ -2557,6 +2554,31 @@ pub(crate) fn select_multiline_items_with_search(
     } else {
         MultilineSelectionResult::Cancelled
     }
+}
+
+fn multiline_items_to_comments(items: Vec<MultilineSelectionItem>) -> Vec<YoutubeComment> {
+    items
+        .into_iter()
+        .map(|item| {
+            let title = normalize_comment_text(&item.title);
+            let description = item
+                .description
+                .as_deref()
+                .map(normalize_comment_text)
+                .unwrap_or_default();
+            YoutubeComment {
+                id: item.id,
+                parent: "root".to_string(),
+                author: if title.is_empty() {
+                    "Elemento".to_string()
+                } else {
+                    title
+                },
+                text: description,
+                time_text: String::new(),
+            }
+        })
+        .collect()
 }
 
 fn fetch_youtube_comments_with_ytdlp(
@@ -2683,6 +2705,7 @@ fn open_youtube_comments_window_with_mode(
         flat_search: mode.flat_search,
         flat_secondary_action: mode.flat_secondary_action,
         flat_close_button_label: mode.flat_close_button_label,
+        flat_refresh: mode.flat_refresh,
         flat_context_actions: mode.flat_context_actions,
         right_arrow_accepts_selection: mode.right_arrow_accepts_selection,
         left_arrow_closes: mode.left_arrow_closes,
@@ -2815,12 +2838,7 @@ fn open_youtube_comments_window_with_mode(
                 .unwrap_or(false);
                 if back_to_previous_handled {
                     crate::log_debug("YT comments loop handling BACKSPACE as close");
-                    crate::send_message_w_safe(
-                        hwnd,
-                        WM_COMMAND,
-                        WPARAM(YOUTUBE_COMMENTS_ID_CLOSE),
-                        LPARAM(0),
-                    );
+                    crate::send_message_w_safe(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
                     continue;
                 }
                 let left_arrow_close_handled = with_youtube_comments_state(hwnd, |state| {
@@ -2834,12 +2852,7 @@ fn open_youtube_comments_window_with_mode(
                 .unwrap_or(false);
                 if left_arrow_close_handled {
                     crate::log_debug("YT comments loop handling LEFT as close");
-                    crate::send_message_w_safe(
-                        hwnd,
-                        WM_COMMAND,
-                        WPARAM(YOUTUBE_COMMENTS_ID_CLOSE),
-                        LPARAM(0),
-                    );
+                    crate::send_message_w_safe(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
                     continue;
                 }
                 if msg.wParam.0 as u32 == VK_ESCAPE.0 as u32 {
@@ -2850,12 +2863,7 @@ fn open_youtube_comments_window_with_mode(
                         continue;
                     }
                     crate::log_debug("YT comments loop handling ESC as close");
-                    crate::send_message_w_safe(
-                        hwnd,
-                        WM_COMMAND,
-                        WPARAM(YOUTUBE_COMMENTS_ID_CLOSE),
-                        LPARAM(0),
-                    );
+                    crate::send_message_w_safe(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
                     continue;
                 }
                 let (should_capture, handled) = with_youtube_comments_state(hwnd, |state| {
@@ -2896,7 +2904,8 @@ fn open_youtube_comments_window_with_mode(
                         && state.flat_list_mode
                         && msg.wParam.0 as u32 == VK_RETURN.0 as u32
                     {
-                        if GetFocus() == state.search_edit {
+                        let focus = GetFocus();
+                        if focus == state.search_edit || focus == state.search_button {
                             return (false, false);
                         }
                         return (true, false);
@@ -3263,6 +3272,7 @@ fn youtube_comments_dialog_wndproc_inner(
                     .flat_secondary_action
                     .as_ref()
                     .map(|secondary| Arc::clone(&secondary.result)),
+                flat_refresh: init.flat_refresh,
                 flat_context_actions: init.flat_context_actions,
                 right_arrow_accepts_selection: init.right_arrow_accepts_selection,
                 left_arrow_closes: init.left_arrow_closes,
@@ -3275,7 +3285,17 @@ fn youtube_comments_dialog_wndproc_inner(
             {
                 state.selected_row = index;
             }
+            let refresh_interval_ms = state
+                .flat_refresh
+                .as_ref()
+                .map(|refresh| refresh.interval_ms.max(250));
             crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+            if let Some(interval_ms) = refresh_interval_ms
+                && unsafe { SetTimer(hwnd, YOUTUBE_COMMENTS_REFRESH_TIMER_ID, interval_ms, None) }
+                    == 0
+            {
+                crate::log_debug("Unable to start flat-list refresh timer");
+            }
             relayout_youtube_comments_dialog(hwnd);
             unsafe {
                 SetFocus(accessibility_proxy);
@@ -3284,6 +3304,10 @@ fn youtube_comments_dialog_wndproc_inner(
                 "YT comments WM_CREATE completed hwnd={:?} view={:?} proxy={:?} close_button={:?}",
                 hwnd, view, accessibility_proxy, close_button
             ));
+            LRESULT(0)
+        }
+        WM_TIMER if wparam.0 == YOUTUBE_COMMENTS_REFRESH_TIMER_ID => {
+            refresh_youtube_flat_items(hwnd);
             LRESULT(0)
         }
         WM_SIZE => {
@@ -3335,12 +3359,7 @@ fn youtube_comments_dialog_wndproc_inner(
                     return LRESULT(0);
                 }
                 crate::log_debug("YT comments dialog handling ESC as close");
-                crate::send_message_w_safe(
-                    hwnd,
-                    WM_COMMAND,
-                    WPARAM(YOUTUBE_COMMENTS_ID_CLOSE),
-                    LPARAM(0),
-                );
+                crate::send_message_w_safe(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0));
                 return LRESULT(0);
             }
             let handled = with_youtube_comments_state(hwnd, |state| {
@@ -3446,7 +3465,7 @@ fn youtube_comments_dialog_wndproc_inner(
                 return LRESULT(0);
             }
             if cmd_id == YOUTUBE_COMMENTS_ID_CLOSE || cmd_id == 1 {
-                if lparam.0 != 0 && accept_youtube_comments_flat_selection(hwnd) {
+                if accept_youtube_comments_flat_selection(hwnd) {
                     return LRESULT(0);
                 }
                 crate::log_if_err!(crate::destroy_window_safe(hwnd));
@@ -3465,6 +3484,12 @@ fn youtube_comments_dialog_wndproc_inner(
             LRESULT(0)
         }
         WM_NCDESTROY => {
+            let had_refresh =
+                with_youtube_comments_state(hwnd, |state| state.flat_refresh.is_some())
+                    .unwrap_or(false);
+            if had_refresh {
+                crate::log_if_err!(unsafe { KillTimer(hwnd, YOUTUBE_COMMENTS_REFRESH_TIMER_ID) });
+            }
             let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
                 as *mut YoutubeCommentsDialogState;
             if !ptr.is_null() {
@@ -3473,6 +3498,50 @@ fn youtube_comments_dialog_wndproc_inner(
             LRESULT(0)
         }
         _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
+    }
+}
+
+fn refresh_youtube_flat_items(hwnd: HWND) {
+    let refresh_context = with_youtube_comments_state(hwnd, |state| {
+        let refresh = state.flat_refresh.clone()?;
+        let selected_id = state
+            .rows
+            .get(state.selected_row)
+            .and_then(|row| youtube_comments_row_comment(state, row))
+            .map(|comment| comment.id.clone());
+        Some((refresh.loader, selected_id, state.selected_row))
+    })
+    .flatten();
+    let Some((loader, selected_id, previous_row)) = refresh_context else {
+        return;
+    };
+
+    let refreshed_comments = multiline_items_to_comments(loader());
+    let changed = with_youtube_comments_state(hwnd, |state| {
+        if refreshed_comments == state.comments {
+            return false;
+        }
+        state.comments = refreshed_comments;
+        let (root_indices, children_by_parent) = build_youtube_comment_threads(&state.comments);
+        state.root_indices = root_indices;
+        state.children_by_parent = children_by_parent;
+        state.expanded_comment_ids.clear();
+        state.selected_row = selected_id
+            .as_deref()
+            .and_then(|id| {
+                state
+                    .comments
+                    .iter()
+                    .position(|comment| comment.id.as_str() == id)
+            })
+            .unwrap_or(previous_row.min(state.comments.len().saturating_sub(1)));
+        true
+    })
+    .unwrap_or(false);
+
+    if changed {
+        crate::log_debug("Recordings flat list changed; refreshing visible rows");
+        rebuild_youtube_comment_rows(hwnd);
     }
 }
 
@@ -6976,6 +7045,82 @@ fn pump_messages_detect_stream_cancel(parent: HWND, dialog: HWND) -> bool {
     cancelled
 }
 
+fn lower_current_stream_worker_priority(context: &str) {
+    unsafe {
+        if let Err(err) = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL) {
+            crate::log_debug(&format!(
+                "{}: failed to lower worker thread priority: {}",
+                context, err
+            ));
+        }
+    }
+}
+
+fn convert_stream_audio_responsive(
+    parent: HWND,
+    progress_dialog: HWND,
+    input: &Path,
+    output: &Path,
+    settings: crate::ffmpeg_export::ConvertAudioSettings,
+) -> Result<(), String> {
+    let input = input.to_path_buf();
+    let output = output.to_path_buf();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let worker_cancel = Arc::clone(&cancel);
+    let worker_progress = Arc::new(AtomicU32::new(0));
+    let worker_progress_for_thread = Arc::clone(&worker_progress);
+
+    let worker = std::thread::Builder::new()
+        .name("stream-audio-convert".to_string())
+        .spawn(move || {
+            lower_current_stream_worker_priority("Stream FFmpeg conversion");
+            let mut progress_cb = |pct: u32| {
+                worker_progress_for_thread.store((pct / 100).min(100), Ordering::Relaxed);
+            };
+            crate::ffmpeg_export::convert_audio_file(
+                &input,
+                &output,
+                &settings,
+                Some(worker_cancel),
+                Some(&mut progress_cb),
+            )
+        })
+        .map_err(|err| format!("Failed to start conversion worker: {err}"))?;
+
+    let mut last_reported = u32::MAX;
+    let mut last_focus_keepalive = std::time::Instant::now();
+    while !worker.is_finished() {
+        if pump_messages_detect_stream_cancel(parent, progress_dialog) {
+            cancel.store(true, Ordering::Relaxed);
+        }
+        let pct = worker_progress.load(Ordering::Relaxed);
+        if pct != last_reported {
+            last_reported = pct;
+            report_progress(progress_dialog, pct);
+        }
+        if last_focus_keepalive.elapsed() >= std::time::Duration::from_millis(300) {
+            keep_stream_progress_focus(progress_dialog);
+            last_focus_keepalive = std::time::Instant::now();
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+
+    // Drain any messages generated while the worker was completing and publish
+    // the final progress value before returning to the caller.
+    if pump_messages_detect_stream_cancel(parent, progress_dialog) {
+        cancel.store(true, Ordering::Relaxed);
+    }
+    let pct = worker_progress.load(Ordering::Relaxed);
+    if pct != last_reported {
+        report_progress(progress_dialog, pct);
+    }
+
+    match worker.join() {
+        Ok(result) => result,
+        Err(_) => Err("FFmpeg conversion worker terminated unexpectedly.".to_string()),
+    }
+}
+
 fn keep_stream_progress_focus(dialog: HWND) {
     unsafe {
         if dialog.0 == 0 || !IsWindow(dialog).as_bool() {
@@ -8509,14 +8654,12 @@ pub(crate) fn download_active_streaming_audio_media(
                 progress,
                 &i18n::tr(language, "stream_audio.progress_converting"),
             );
-            let cancel = Arc::new(AtomicBool::new(false));
-            let mut progress_cb = |pct: u32| report_progress(progress, (pct / 100).min(100));
-            match crate::ffmpeg_export::convert_audio_file(
+            match convert_stream_audio_responsive(
+                parent,
+                progress,
                 &downloaded_path,
                 &target,
-                &convert_settings,
-                Some(cancel),
-                Some(&mut progress_cb),
+                convert_settings,
             ) {
                 Ok(()) => {
                     crate::log_if_err!(std::fs::remove_file(&downloaded_path));
@@ -8711,14 +8854,12 @@ pub(crate) fn download_active_streaming_audio_media_for_transcription(
             &i18n::tr(language, "stream_audio.progress_converting"),
         );
         let converted_path = cache_dir.join(format!("{prefix}_converted.{target_ext}"));
-        let cancel = Arc::new(AtomicBool::new(false));
-        let mut progress_cb = |pct: u32| report_progress(progress, (pct / 100).min(100));
-        match crate::ffmpeg_export::convert_audio_file(
+        match convert_stream_audio_responsive(
+            parent,
+            progress,
             &downloaded_path,
             &converted_path,
-            &convert_settings,
-            Some(cancel),
-            Some(&mut progress_cb),
+            convert_settings,
         ) {
             Ok(()) => {
                 crate::log_if_err!(std::fs::remove_file(&downloaded_path));
@@ -9619,7 +9760,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 downloaded_path.clone()
             } else {
                 let converted_path = downloaded_path.with_extension(target_ext);
-                let convert_cancel = Arc::new(AtomicBool::new(false));
                 crate::log_debug(&format!(
                     "stream conversion start: input={} output={} target_ext={} quality={:?} format={:?}",
                     downloaded_path.to_string_lossy(),
@@ -9634,40 +9774,12 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 );
                 report_progress(progress, 0);
                 log_stream_focus_snapshot("stream_conversion.started", progress);
-                let mut last_pump = std::time::Instant::now();
-                let mut last_reported_pct = 0u32;
-                let convert_cancel_for_cb = Arc::clone(&convert_cancel);
-                let mut progress_cb = |pct: u32| {
-                    let normalized = (pct / 100).min(100);
-                    crate::log_debug(&format!(
-                        "stream conversion progress callback: raw_pct={} normalized_pct={} last_reported_pct={}",
-                        pct, normalized, last_reported_pct
-                    ));
-                    if normalized > last_reported_pct {
-                        last_reported_pct = normalized;
-                        report_progress(progress, normalized);
-                    }
-                    // Keep window responsive during in-process conversion on slower machines.
-                    if last_pump.elapsed() >= std::time::Duration::from_millis(50) {
-                        let cancelled = pump_messages_detect_stream_cancel(parent, progress);
-                        crate::log_debug(&format!(
-                            "stream conversion ui pump: cancelled={} elapsed_ms={}",
-                            cancelled,
-                            last_pump.elapsed().as_millis()
-                        ));
-                        log_stream_focus_snapshot("stream_conversion.ui_pump", progress);
-                        if cancelled {
-                            convert_cancel_for_cb.store(true, Ordering::Relaxed);
-                        }
-                        last_pump = std::time::Instant::now();
-                    }
-                };
-                let convert_result = crate::ffmpeg_export::convert_audio_file(
+                let convert_result = convert_stream_audio_responsive(
+                    parent,
+                    progress,
                     &downloaded_path,
                     &converted_path,
-                    &convert_settings,
-                    Some(Arc::clone(&convert_cancel)),
-                    Some(&mut progress_cb),
+                    convert_settings,
                 );
                 crate::log_debug(&format!(
                     "stream conversion result: success={} output_exists={} output={}",
@@ -9683,7 +9795,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                         converted_path
                     }
                     Err(err) => {
-                        if convert_cancel.load(Ordering::Relaxed) || err == "Conversion canceled." {
+                        if err == "Conversion canceled." {
                             crate::log_debug("stream conversion cancelled by user");
                             crate::log_if_err!(std::fs::remove_file(&converted_path));
                             return;

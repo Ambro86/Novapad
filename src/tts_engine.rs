@@ -29,6 +29,9 @@ use url::Url;
 use uuid::Uuid;
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::System::Power::{ES_CONTINUOUS, ES_SYSTEM_REQUIRED, SetThreadExecutionState};
+use windows::Win32::System::Threading::{
+    GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_BELOW_NORMAL,
+};
 use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXGETSEL, EM_GETTEXTRANGE, TEXTRANGEW};
 use windows::Win32::UI::WindowsAndMessaging::{
     PostMessageW, SendMessageW, WM_APP, WM_GETTEXTLENGTH,
@@ -50,6 +53,27 @@ pub(crate) const PAUSE_TAG_MAX_MS: u32 = 60_000;
 // Keep Edge chunks conservative to avoid partial audiobook exports.
 const EDGE_TTS_MAX_BYTES: usize = 1800;
 const KEEP_EDGE_TEMP_AFTER_CONVERSION: bool = false;
+
+fn lower_current_audiobook_worker_priority(context: &str) {
+    unsafe {
+        if let Err(err) = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL) {
+            crate::log_debug(&format!(
+                "Audiobook {}: failed to lower worker priority: {}",
+                context, err
+            ));
+        }
+    }
+}
+
+fn responsive_audiobook_worker_limit(requested: usize) -> usize {
+    let logical_cores = std::thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(2);
+    // Leave enough scheduler time for the Win32 message loop and NVDA while
+    // still allowing parallel synthesis.  This mainly protects old 1-4 core PCs.
+    let automatic_limit = logical_cores.saturating_mul(2).clamp(2, 16);
+    requested.max(1).min(automatic_limit)
+}
 
 pub const WM_TTS_PLAYBACK_DONE: u32 = WM_APP + 3;
 pub const WM_TTS_PLAYBACK_ERROR: u32 = WM_APP + 5;
@@ -5304,6 +5328,7 @@ fn start_audiobook_with_text(
 
     let cancel_clone = cancel_token.clone();
     std::thread::spawn(move || {
+        lower_current_audiobook_worker_priority("coordinator");
         let final_output = output.clone();
         let extension = final_output
             .extension()
@@ -5997,7 +6022,14 @@ pub(crate) fn run_sapi4_parallel_part(
     std::fs::create_dir_all(&temp_dir).ok();
 
     let mut internal_parts = Vec::new();
-    let pool_size = options.sapi4_threads.unwrap_or(30) as usize;
+    let requested_pool_size = options.sapi4_threads.unwrap_or(30) as usize;
+    let pool_size = responsive_audiobook_worker_limit(requested_pool_size);
+    if pool_size != requested_pool_size {
+        crate::log_debug(&format!(
+            "Audiobook SAPI4: worker count reduced from {} to {} to preserve UI responsiveness",
+            requested_pool_size, pool_size
+        ));
+    }
     let chunks_count = chunks.len();
     let sub_parts_count = if chunks_count < pool_size {
         chunks_count
@@ -6032,6 +6064,7 @@ pub(crate) fn run_sapi4_parallel_part(
         let progress_hwnd = options.progress_hwnd;
 
         let handle = std::thread::spawn(move || {
+            lower_current_audiobook_worker_priority("SAPI4 worker");
             loop {
                 let part = {
                     let mut guard = parts_shared.lock().unwrap_or_else(|e| e.into_inner());
@@ -6930,6 +6963,7 @@ fn run_sapi5_parallel_part(
         let bitrate = options.audiobook_bitrate_kbps;
 
         let handle = std::thread::spawn(move || {
+            lower_current_audiobook_worker_priority("SAPI5 worker");
             loop {
                 let part = {
                     let mut guard = parts_shared.lock().unwrap_or_else(|e| e.into_inner());
@@ -8226,6 +8260,7 @@ fn render_google_audiobook_units_parallel(
             let result_tx = result_tx.clone();
             let cancel = options.cancel.clone();
             let handle = std::thread::spawn(move || {
+                lower_current_audiobook_worker_priority("Google worker");
                 let mut session = crate::google_tts::GoogleTtsWorkerSession::new(worker_id);
                 loop {
                     if cancel.load(Ordering::Relaxed) {

@@ -932,12 +932,19 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
                         let Some(language) = with_radio_state(hwnd, |state| state.language) else {
                             return LRESULT(0);
                         };
-                        stream_recording::open_recordings(
+                        let playback_parent =
+                            with_radio_state(hwnd, |state| state.parent).unwrap_or(hwnd);
+                        let recordings_result = stream_recording::open_recordings(
                             hwnd,
+                            playback_parent,
                             language,
                             StreamRecordingKind::Radio,
                         );
-                        focus_search_edit(hwnd);
+                        if recordings_result
+                            != stream_recording::OpenRecordingsResult::PlaybackStarted
+                        {
+                            focus_search_edit(hwnd);
+                        }
                         LRESULT(0)
                     }
                     ID_BUTTON_RESET_FILTERS => {
@@ -2623,13 +2630,16 @@ fn record_and_play_selected_radio(hwnd: HWND) {
     };
     let recording_folder = stream_recording::recordings_folder(StreamRecordingKind::Radio);
     let recording_folder_text = recording_folder.to_string_lossy().to_string();
-    let destination_announcement = tr_fallback(
+    let starting_announcement = tr_fallback(
         language,
-        "radio.recording_destination",
-        &[("path", recording_folder_text.as_str())],
-        "La registrazione radio verrà salvata in {path}.",
+        "radio.recording_starting",
+        &[
+            ("name", item.name.as_str()),
+            ("path", recording_folder_text.as_str()),
+        ],
+        "Avvio registrazione di {name}. Il file sarà salvato in {path}.",
     );
-    crate::screen_reader_speak(&destination_announcement);
+    crate::screen_reader_speak(&starting_announcement);
 
     match stream_recording::start_radio_recording_and_playback(
         parent,

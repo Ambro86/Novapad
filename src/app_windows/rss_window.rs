@@ -15,6 +15,7 @@ use std::fs::File;
 use std::io::Write;
 use std::mem;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use url::Url;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
@@ -32,29 +33,44 @@ use windows::Win32::UI::Controls::{
     TVIF_TEXT, TVINSERTSTRUCTW, TVINSERTSTRUCTW_0, TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM,
     TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETITEMW, TVM_GETNEXTITEM, TVM_HITTEST, TVM_INSERTITEMW,
     TVM_SELECTITEM, TVM_SETITEMW, TVM_SORTCHILDRENCB, TVN_ITEMEXPANDINGW, TVN_KEYDOWN,
-    TVN_SELCHANGEDW, TVSORTCB, WC_BUTTON,
+    TVN_SELCHANGEDW, TVSORTCB, WC_BUTTON, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_DOWN, VK_ESCAPE,
-    VK_F10, VK_MENU, VK_RETURN, VK_SHIFT, VK_TAB, VK_UP,
+    GetFocus, GetKeyState, IsWindowEnabled, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL,
+    VK_DOWN, VK_ESCAPE, VK_F10, VK_MENU, VK_RETURN, VK_SHIFT, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, BS_DEFPUSHBUTTON, CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW,
-    CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu, ES_AUTOHSCROLL, ES_AUTOVSCROLL,
-    ES_MULTILINE, EVENT_OBJECT_FOCUS, GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgItem,
-    GetParent, GetWindowLongPtrW, GetWindowRect, HMENU, IDYES, KillTimer, MB_ICONINFORMATION,
-    MB_ICONQUESTION, MB_OK, MB_YESNOCANCEL, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING,
-    MessageBoxW, MoveWindow, OBJID_CLIENT, PostMessageW, RegisterClassW, SB_TOP, SW_HIDE, SW_SHOW,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow,
-    TrackPopupMenu, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY,
-    WM_KEYDOWN, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT,
-    WM_SETREDRAW, WM_SYSKEYDOWN, WM_TIMER, WM_USER, WM_VSCROLL, WNDCLASSW, WNDPROC, WS_CAPTION,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    AppendMenuW, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBN_SELCHANGE,
+    CHILDID_SELF, CREATESTRUCTW, CW_USEDEFAULT, CallWindowProcW, CreatePopupMenu, CreateWindowExW,
+    DefWindowProcW, DestroyMenu, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, EVENT_OBJECT_FOCUS,
+    GWLP_USERDATA, GWLP_WNDPROC, GetCursorPos, GetDlgItem, GetParent, GetWindowLongPtrW,
+    GetWindowRect, GetWindowTextLengthW, GetWindowTextW, HMENU, IDYES, KillTimer, LB_ADDSTRING,
+    LB_GETCURSEL, LB_RESETCONTENT, LBN_DBLCLK, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK,
+    MB_YESNOCANCEL, MF_GRAYED, MF_POPUP, MF_SEPARATOR, MF_STRING, MessageBoxW, MoveWindow,
+    OBJID_CLIENT, PostMessageW, RegisterClassW, SB_TOP, SW_HIDE, SW_SHOW, SendMessageW,
+    SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TrackPopupMenu,
+    WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_SETFOCUS, WM_SETFONT, WM_SETREDRAW,
+    WM_SYSKEYDOWN, WM_TIMER, WM_USER, WM_VSCROLL, WNDCLASSW, WNDPROC, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
     WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
 const RSS_WINDOW_CLASS: &str = "SonarpadRssWindow";
+const RSS_CITY_WINDOW_CLASS: &str = "SonarpadRssCityWindow";
+const RSS_COMMUNITY_ADD_WINDOW_CLASS: &str = "SonarpadRssCommunityAddWindow";
+const RSS_COMMUNITY_LIST_WINDOW_CLASS: &str = "SonarpadRssCommunityListWindow";
+const ID_CITY_EDIT: usize = 1601;
+const ID_CITY_OK: usize = 1602;
+const ID_CITY_CANCEL: usize = 1603;
+const ID_COMMUNITY_ADD_NAME: usize = 1701;
+const ID_COMMUNITY_ADD_URL: usize = 1702;
+const ID_COMMUNITY_ADD_SUBMIT: usize = 1703;
+const ID_COMMUNITY_ADD_CANCEL: usize = 1704;
+const ID_COMMUNITY_LIST: usize = 1801;
+const ID_COMMUNITY_LIST_ADD: usize = 1802;
+const ID_COMMUNITY_LIST_CLOSE: usize = 1803;
 
 #[inline]
 fn ignore_bool(_value: bool) {}
@@ -65,6 +81,9 @@ const ID_BTN_IMPORT: usize = 1004;
 const ID_BTN_EXPORT: usize = 1005;
 const ID_BTN_SEARCH: usize = 1006;
 const ID_EDIT_ARTICLE_PREVIEW: usize = 1007;
+const ID_COMBO_NEWS_LANGUAGE: usize = 1008;
+const ID_BTN_COMMUNITY_ADD: usize = 1009;
+const ID_BTN_COMMUNITY_BROWSE: usize = 1010;
 const ID_CTX_EDIT: usize = 1101;
 const ID_CTX_DELETE: usize = 1102;
 const ID_CTX_RETRY: usize = 1103;
@@ -85,6 +104,7 @@ const ID_CTX_SHARE_WHATSAPP: usize = 1204;
 const ID_CTX_SHARE_EMAIL: usize = 1205;
 const ID_CTX_PROPERTIES: usize = 1206;
 const ID_CTX_ADD_TO_FAVORITES: usize = 1207;
+const ID_CTX_CHANGE_CITY: usize = 1208;
 
 const WM_RSS_FETCH_COMPLETE: u32 = WM_USER + 200;
 const WM_RSS_IMPORT_COMPLETE: u32 = WM_USER + 201;
@@ -96,7 +116,12 @@ const WM_RSS_BACKGROUND_CHECK_COMPLETE: u32 = WM_USER + 206;
 const WM_RSS_MARK_ITEM_READ_UI: u32 = WM_USER + 207;
 const WM_RSS_SELECT_SOURCE_DELAYED: u32 = WM_USER + 208;
 const WM_RSS_PREVIEW_COMPLETE: u32 = WM_USER + 209;
+const WM_RSS_CITY_CHANGED: u32 = WM_USER + 210;
+const WM_RSS_COMMUNITY_SUBMIT_COMPLETE: u32 = WM_USER + 211;
+const WM_RSS_COMMUNITY_LIST_COMPLETE: u32 = WM_USER + 212;
 const ADD_GUARD_TIMER_ID: usize = 1;
+const RSS_LANGUAGE_FOCUS_TIMER_ID: usize = 2;
+const RSS_LANGUAGE_FOCUS_DELAY_MS: u32 = 2_000;
 const EM_REPLACESEL: u32 = 0x00C2;
 const REORDER_EDIT_ID: usize = 1401;
 const REORDER_OK_ID: usize = 1402;
@@ -123,6 +148,161 @@ const EM_LIMITTEXT: u32 = 0x00C5;
 const INITIAL_LOAD_COUNT: usize = 5;
 const LOAD_MORE_COUNT: usize = 5;
 const RSS_FAVORITES_SOURCE_URL: &str = "sonarpad://rss/favorites";
+const COMMUNITY_NEWS_SOURCES_URL: &str = "https://sonarpad.com/api/get_community_news_sources.php";
+const ADD_COMMUNITY_NEWS_SOURCE_URL: &str =
+    "https://sonarpad.com/api/add_community_news_source.php";
+const COMMUNITY_USER_AGENT: &str = "SonarpadWindows/0.7 (https://sonarpad.com)";
+const NEWS_LANGUAGE_CODES: [&str; 7] = ["it", "en", "fr", "es", "pt", "pl", "cs"];
+
+fn default_news_language_code(language: crate::settings::Language) -> &'static str {
+    match language {
+        crate::settings::Language::English => "en",
+        crate::settings::Language::French => "fr",
+        crate::settings::Language::Spanish => "es",
+        crate::settings::Language::Portuguese => "pt",
+        crate::settings::Language::Polish => "pl",
+        crate::settings::Language::Czech => "cs",
+        _ => "it",
+    }
+}
+
+fn normalize_news_language_code(code: &str) -> Option<&'static str> {
+    NEWS_LANGUAGE_CODES
+        .iter()
+        .copied()
+        .find(|candidate| candidate.eq_ignore_ascii_case(code.trim()))
+}
+
+fn news_language_as_app_language(code: &str) -> crate::settings::Language {
+    match normalize_news_language_code(code).unwrap_or("it") {
+        "en" => crate::settings::Language::English,
+        "fr" => crate::settings::Language::French,
+        "es" => crate::settings::Language::Spanish,
+        "pt" => crate::settings::Language::Portuguese,
+        "pl" => crate::settings::Language::Polish,
+        "cs" => crate::settings::Language::Czech,
+        _ => crate::settings::Language::Italian,
+    }
+}
+
+fn news_language_label(ui_language: crate::settings::Language, code: &str) -> String {
+    i18n::tr(ui_language, &format!("options.lang.{}", code))
+}
+
+fn active_news_language_code_from_state(state: &crate::AppState) -> String {
+    normalize_news_language_code(&state.settings.rss_news_language)
+        .unwrap_or_else(|| default_news_language_code(state.settings.language))
+        .to_string()
+}
+
+fn sync_active_rss_sources(state: &mut crate::AppState) {
+    let code = active_news_language_code_from_state(state);
+    state
+        .settings
+        .rss_sources_by_language
+        .insert(code, state.settings.rss_sources.clone());
+}
+
+fn save_rss_settings(state: &mut crate::AppState) {
+    sync_active_rss_sources(state);
+    crate::settings::save_settings(state.settings.clone());
+}
+
+fn prepare_rss_language_state(parent: HWND) {
+    with_state(parent, |state| {
+        let code = active_news_language_code_from_state(state);
+        let mut changed = false;
+        if state.settings.rss_news_language != code {
+            state.settings.rss_news_language = code.clone();
+            changed = true;
+        }
+        if state.settings.rss_sources_by_language.is_empty() {
+            state
+                .settings
+                .rss_sources_by_language
+                .insert(code.clone(), state.settings.rss_sources.clone());
+            changed = true;
+        } else {
+            let active = state
+                .settings
+                .rss_sources_by_language
+                .get(&code)
+                .cloned()
+                .unwrap_or_default();
+            state.settings.rss_sources = active;
+        }
+        if changed {
+            save_rss_settings(state);
+        }
+    });
+}
+
+fn active_news_language_code(parent: HWND) -> String {
+    with_state(parent, |state| active_news_language_code_from_state(state))
+        .unwrap_or_else(|| "it".to_string())
+}
+
+fn switch_news_language(hwnd: HWND, code: &str) {
+    let Some(code) = normalize_news_language_code(code) else {
+        return;
+    };
+    let parent = with_rss_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+    let changed = with_state(parent, |state| {
+        let old_code = active_news_language_code_from_state(state);
+        if old_code == code {
+            return false;
+        }
+        state
+            .settings
+            .rss_sources_by_language
+            .insert(old_code, state.settings.rss_sources.clone());
+        state.settings.rss_news_language = code.to_string();
+        state.settings.rss_sources = state
+            .settings
+            .rss_sources_by_language
+            .get(code)
+            .cloned()
+            .unwrap_or_default();
+        save_rss_settings(state);
+        true
+    })
+    .unwrap_or(false);
+    if !changed {
+        return;
+    }
+    ensure_default_sources(parent);
+    ensure_favorites_source(parent);
+    reload_tree(hwnd);
+    let hwnd_tree = with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 != 0 {
+        select_first_root_if_needed(hwnd, hwnd_tree);
+    }
+
+    let hwnd_language_combo =
+        with_rss_state(hwnd, |state| state.hwnd_language_combo).unwrap_or(HWND(0));
+    if hwnd_language_combo.0 != 0 {
+        crate::set_focus_safe(hwnd_language_combo);
+    }
+
+    if unsafe {
+        SetTimer(
+            hwnd,
+            RSS_LANGUAGE_FOCUS_TIMER_ID,
+            RSS_LANGUAGE_FOCUS_DELAY_MS,
+            None,
+        )
+    } == 0
+    {
+        crate::log_debug("Failed to set RSS language focus timer");
+        if hwnd_tree.0 != 0 {
+            crate::set_focus_safe(hwnd_tree);
+        }
+    }
+    start_background_unread_check(hwnd);
+}
 
 // Normalize article text before sending it to the editor:
 // - collapse multiple blank lines to a single blank line
@@ -660,7 +840,7 @@ fn show_selected_properties(hwnd: HWND) {
                 status_value
             ));
         }
-        None => return,
+        _ => return,
     }
 
     let body = lines.join("\r\n");
@@ -966,7 +1146,7 @@ fn import_sources_from_file(hwnd: HWND, path: &Path) -> usize {
             added += 1;
         }
         if added > 0 {
-            crate::settings::save_settings(state.settings.clone());
+            save_rss_settings(state);
         }
     })
     .is_none()
@@ -1051,7 +1231,7 @@ fn ensure_favorites_source(parent: HWND) -> usize {
                 if src.title != expected_title {
                     src.title = expected_title;
                     src.user_title = true;
-                    crate::settings::save_settings(ps.settings.clone());
+                    save_rss_settings(ps);
                 }
             }
             return idx;
@@ -1070,7 +1250,7 @@ fn ensure_favorites_source(parent: HWND) -> usize {
             read_item_keys: Vec::new(),
         };
         ps.settings.rss_sources.insert(0, favorites);
-        crate::settings::save_settings(ps.settings.clone());
+        save_rss_settings(ps);
         0
     })
     .unwrap_or(0)
@@ -1200,7 +1380,7 @@ fn prune_persisted_read_keys_for_source(
                 let before = src.read_item_keys.len();
                 src.read_item_keys.retain(|k| current_item_keys.contains(k));
                 if src.read_item_keys.len() != before {
-                    crate::settings::save_settings(ps.settings.clone());
+                    save_rss_settings(ps);
                 }
             }
         });
@@ -1223,7 +1403,10 @@ unsafe extern "system" fn rss_tree_compare(
     )
 }
 
-fn collect_root_items(hwnd_tree: HWND) -> Vec<windows::Win32::UI::Controls::HTREEITEM> {
+fn collect_source_root_items(
+    hwnd: HWND,
+    hwnd_tree: HWND,
+) -> Vec<windows::Win32::UI::Controls::HTREEITEM> {
     let mut items = Vec::new();
     let mut current = windows::Win32::UI::Controls::HTREEITEM(
         crate::send_message_w_safe(
@@ -1235,7 +1418,13 @@ fn collect_root_items(hwnd_tree: HWND) -> Vec<windows::Win32::UI::Controls::HTRE
         .0,
     );
     while current.0 != 0 {
-        items.push(current);
+        let is_source = with_rss_state(hwnd, |state| {
+            matches!(state.node_data.get(&current.0), Some(NodeData::Source(_)))
+        })
+        .unwrap_or(false);
+        if is_source {
+            items.push(current);
+        }
         current = windows::Win32::UI::Controls::HTREEITEM(
             crate::send_message_w_safe(
                 hwnd_tree,
@@ -1704,179 +1893,107 @@ fn apply_default_sources(
     changed
 }
 
-fn ensure_default_sources(parent: HWND) {
-    let language = { with_state(parent, |s| s.settings.language) }.unwrap_or_default();
-    let defaults = load_default_feeds(language);
-    if defaults.is_empty() {
-        return;
-    }
-    {
-        with_state(parent, |s| {
-            let changed = match language {
-                crate::settings::Language::Ukrainian
-                | crate::settings::Language::English
-                | crate::settings::Language::Lithuanian
-                | crate::settings::Language::Chinese
-                | crate::settings::Language::Russian => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_en,
-                    &mut s.settings.rss_default_en_keys,
-                    &defaults,
-                ),
-                crate::settings::Language::Swedish => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_en,
-                    &mut s.settings.rss_default_en_keys,
-                    &defaults,
-                ),
-                crate::settings::Language::Italian => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_it,
-                    &mut s.settings.rss_default_it_keys,
-                    &defaults,
-                ),
-                crate::settings::Language::Spanish => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_es,
-                    &mut s.settings.rss_default_es_keys,
-                    &defaults,
-                ),
-                crate::settings::Language::Portuguese => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_pt,
-                    &mut s.settings.rss_default_pt_keys,
-                    &defaults,
-                ),
-                crate::settings::Language::Vietnamese => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_vi,
-                    &mut s.settings.rss_default_vi_keys,
-                    &defaults,
-                ),
-                crate::settings::Language::Czech => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_cs,
-                    &mut s.settings.rss_default_cs_keys,
-                    &defaults,
-                ),
-                crate::settings::Language::Polish => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_pl,
-                    &mut s.settings.rss_default_pl_keys,
-                    &defaults,
-                ),
-                crate::settings::Language::French => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_fr,
-                    &mut s.settings.rss_default_fr_keys,
-                    &defaults,
-                ),
-                crate::settings::Language::Serbian => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_sr,
-                    &mut s.settings.rss_default_sr_keys,
-                    &defaults,
-                ),
-                crate::settings::Language::Hindi => apply_default_sources(
-                    &mut s.settings.rss_sources,
-                    &s.settings.rss_removed_default_hi,
-                    &mut s.settings.rss_default_hi_keys,
-                    &defaults,
-                ),
-            };
-            if changed {
-                crate::settings::save_settings(s.settings.clone());
-            }
-        });
-    }
-}
-
-pub(crate) fn sync_default_sources_for_settings(
+fn apply_defaults_for_news_language(
     settings: &mut crate::settings::AppSettings,
+    language: crate::settings::Language,
+    defaults: &[(String, String)],
 ) -> bool {
-    let language = settings.language;
-    let defaults = load_default_feeds(language);
-    if defaults.is_empty() {
-        return false;
-    }
     match language {
-        crate::settings::Language::Ukrainian
-        | crate::settings::Language::English
-        | crate::settings::Language::Lithuanian
-        | crate::settings::Language::Chinese
-        | crate::settings::Language::Russian => apply_default_sources(
-            &mut settings.rss_sources,
-            &settings.rss_removed_default_en,
-            &mut settings.rss_default_en_keys,
-            &defaults,
-        ),
-        crate::settings::Language::Swedish => apply_default_sources(
-            &mut settings.rss_sources,
-            &settings.rss_removed_default_en,
-            &mut settings.rss_default_en_keys,
-            &defaults,
-        ),
         crate::settings::Language::Italian => apply_default_sources(
             &mut settings.rss_sources,
             &settings.rss_removed_default_it,
             &mut settings.rss_default_it_keys,
-            &defaults,
+            defaults,
         ),
         crate::settings::Language::Spanish => apply_default_sources(
             &mut settings.rss_sources,
             &settings.rss_removed_default_es,
             &mut settings.rss_default_es_keys,
-            &defaults,
+            defaults,
         ),
         crate::settings::Language::Portuguese => apply_default_sources(
             &mut settings.rss_sources,
             &settings.rss_removed_default_pt,
             &mut settings.rss_default_pt_keys,
-            &defaults,
-        ),
-        crate::settings::Language::Vietnamese => apply_default_sources(
-            &mut settings.rss_sources,
-            &settings.rss_removed_default_vi,
-            &mut settings.rss_default_vi_keys,
-            &defaults,
+            defaults,
         ),
         crate::settings::Language::Czech => apply_default_sources(
             &mut settings.rss_sources,
             &settings.rss_removed_default_cs,
             &mut settings.rss_default_cs_keys,
-            &defaults,
+            defaults,
         ),
         crate::settings::Language::Polish => apply_default_sources(
             &mut settings.rss_sources,
             &settings.rss_removed_default_pl,
             &mut settings.rss_default_pl_keys,
-            &defaults,
+            defaults,
         ),
         crate::settings::Language::French => apply_default_sources(
             &mut settings.rss_sources,
             &settings.rss_removed_default_fr,
             &mut settings.rss_default_fr_keys,
-            &defaults,
+            defaults,
         ),
-        crate::settings::Language::Serbian => apply_default_sources(
+        _ => apply_default_sources(
             &mut settings.rss_sources,
-            &settings.rss_removed_default_sr,
-            &mut settings.rss_default_sr_keys,
-            &defaults,
-        ),
-        crate::settings::Language::Hindi => apply_default_sources(
-            &mut settings.rss_sources,
-            &settings.rss_removed_default_hi,
-            &mut settings.rss_default_hi_keys,
-            &defaults,
+            &settings.rss_removed_default_en,
+            &mut settings.rss_default_en_keys,
+            defaults,
         ),
     }
+}
+
+fn ensure_default_sources(parent: HWND) {
+    let language = news_language_as_app_language(&active_news_language_code(parent));
+    let defaults = load_default_feeds(language);
+    if defaults.is_empty() {
+        return;
+    }
+    with_state(parent, |state| {
+        if apply_defaults_for_news_language(&mut state.settings, language, &defaults) {
+            save_rss_settings(state);
+        }
+    });
+}
+
+pub(crate) fn sync_default_sources_for_settings(
+    settings: &mut crate::settings::AppSettings,
+) -> bool {
+    let code = normalize_news_language_code(&settings.rss_news_language)
+        .unwrap_or_else(|| default_news_language_code(settings.language))
+        .to_string();
+    settings.rss_news_language = code.clone();
+
+    if settings.rss_sources_by_language.is_empty() {
+        settings
+            .rss_sources_by_language
+            .insert(code.clone(), settings.rss_sources.clone());
+    } else {
+        settings.rss_sources = settings
+            .rss_sources_by_language
+            .get(&code)
+            .cloned()
+            .unwrap_or_default();
+    }
+
+    let language = news_language_as_app_language(&code);
+    let defaults = load_default_feeds(language);
+    let mut changed = apply_defaults_for_news_language(settings, language, &defaults);
+    let previous = settings
+        .rss_sources_by_language
+        .insert(code, settings.rss_sources.clone());
+    if previous.as_ref() != Some(&settings.rss_sources) {
+        changed = true;
+    }
+    changed
 }
 
 struct RssWindowState {
     parent: HWND,
     hwnd_tree: HWND,
     hwnd_preview: HWND,
+    hwnd_language_combo: HWND,
     hwnd_import: HWND,
     hwnd_export: HWND,
     node_data: HashMap<isize, NodeData>,
@@ -1894,6 +2011,10 @@ struct RssWindowState {
     suppress_focus_restore_once: bool,
     preview_proc: WNDPROC,
     preview_request_seq: u64,
+    community_add_dialog: HWND,
+    community_list_dialog: HWND,
+    city_dialog: HWND,
+    pending_local_category: isize,
 }
 
 #[derive(Clone)]
@@ -1913,7 +2034,218 @@ enum RssLastRemoved {
 }
 
 #[derive(Clone)]
+struct GoogleNewsCategory {
+    title: String,
+    url: String,
+    is_local: bool,
+}
+
+struct GoogleNewsLocale {
+    root_title: &'static str,
+    top_title: &'static str,
+    local_title: &'static str,
+    nation_title: &'static str,
+    world_title: &'static str,
+    business_title: &'static str,
+    technology_title: &'static str,
+    entertainment_title: &'static str,
+    sports_title: &'static str,
+    health_title: &'static str,
+    hl: &'static str,
+    gl: &'static str,
+    ceid: &'static str,
+}
+
+fn google_news_locale(code: &str) -> GoogleNewsLocale {
+    match normalize_news_language_code(code).unwrap_or("it") {
+        "en" => GoogleNewsLocale {
+            root_title: "Google News English",
+            top_title: "Top stories",
+            local_title: "My City",
+            nation_title: "US",
+            world_title: "World",
+            business_title: "Business",
+            technology_title: "Science & Tech",
+            entertainment_title: "Entertainment",
+            sports_title: "Sports",
+            health_title: "Health",
+            hl: "en",
+            gl: "US",
+            ceid: "US:en",
+        },
+        "fr" => GoogleNewsLocale {
+            root_title: "Google News France",
+            top_title: "À la une",
+            local_title: "Ma ville",
+            nation_title: "France",
+            world_title: "Monde",
+            business_title: "Économie",
+            technology_title: "Science et technologie",
+            entertainment_title: "Divertissement",
+            sports_title: "Sports",
+            health_title: "Santé",
+            hl: "fr",
+            gl: "FR",
+            ceid: "FR:fr",
+        },
+        "es" => GoogleNewsLocale {
+            root_title: "Google News España",
+            top_title: "Noticias principales",
+            local_title: "Mi ciudad",
+            nation_title: "España",
+            world_title: "Mundo",
+            business_title: "Negocios",
+            technology_title: "Ciencia y Tecnología",
+            entertainment_title: "Entretenimiento",
+            sports_title: "Deportes",
+            health_title: "Salud",
+            hl: "es",
+            gl: "ES",
+            ceid: "ES:es",
+        },
+        "pt" => GoogleNewsLocale {
+            root_title: "Google News Portugal",
+            top_title: "Principais notícias",
+            local_title: "A minha cidade",
+            nation_title: "Portugal",
+            world_title: "Mundo",
+            business_title: "Negócios",
+            technology_title: "Ciência e tecnologia",
+            entertainment_title: "Entretenimento",
+            sports_title: "Desporto",
+            health_title: "Saúde",
+            hl: "pt-PT",
+            gl: "PT",
+            ceid: "PT:pt-150",
+        },
+        "pl" => GoogleNewsLocale {
+            root_title: "Google News Polska",
+            top_title: "Najważniejsze wiadomości",
+            local_title: "Moje miasto",
+            nation_title: "Polska",
+            world_title: "Świat",
+            business_title: "Biznes",
+            technology_title: "Nauka i technologia",
+            entertainment_title: "Rozrywka",
+            sports_title: "Sport",
+            health_title: "Zdrowie",
+            hl: "pl",
+            gl: "PL",
+            ceid: "PL:pl",
+        },
+        "cs" => GoogleNewsLocale {
+            root_title: "Google News Česko",
+            top_title: "Hlavní zprávy",
+            local_title: "Moje město",
+            nation_title: "Česko",
+            world_title: "Svět",
+            business_title: "Byznys",
+            technology_title: "Věda a technologie",
+            entertainment_title: "Zábava",
+            sports_title: "Sport",
+            health_title: "Zdraví",
+            hl: "cs",
+            gl: "CZ",
+            ceid: "CZ:cs",
+        },
+        _ => GoogleNewsLocale {
+            root_title: "Google News Italia",
+            top_title: "Notizie principali",
+            local_title: "La mia città",
+            nation_title: "Italia",
+            world_title: "Dal mondo",
+            business_title: "Affari",
+            technology_title: "Scienza e tecnologia",
+            entertainment_title: "Intrattenimento",
+            sports_title: "Sport",
+            health_title: "Salute",
+            hl: "it",
+            gl: "IT",
+            ceid: "IT:it",
+        },
+    }
+}
+
+fn google_news_root_url(locale: &GoogleNewsLocale) -> String {
+    format!(
+        "https://news.google.com/rss?hl={}&gl={}&ceid={}",
+        locale.hl, locale.gl, locale.ceid
+    )
+}
+
+fn google_news_topic_url(locale: &GoogleNewsLocale, topic: &str) -> String {
+    format!(
+        "https://news.google.com/news/rss/headlines/section/topic/{}?hl={}&gl={}&ceid={}",
+        topic, locale.hl, locale.gl, locale.ceid
+    )
+}
+
+fn google_news_categories(code: &str) -> Vec<GoogleNewsCategory> {
+    let locale = google_news_locale(code);
+    vec![
+        GoogleNewsCategory {
+            title: locale.top_title.to_string(),
+            url: google_news_root_url(&locale),
+            is_local: false,
+        },
+        GoogleNewsCategory {
+            title: locale.local_title.to_string(),
+            url: String::new(),
+            is_local: true,
+        },
+        GoogleNewsCategory {
+            title: locale.nation_title.to_string(),
+            url: google_news_topic_url(&locale, "NATION"),
+            is_local: false,
+        },
+        GoogleNewsCategory {
+            title: locale.world_title.to_string(),
+            url: google_news_topic_url(&locale, "WORLD"),
+            is_local: false,
+        },
+        GoogleNewsCategory {
+            title: locale.business_title.to_string(),
+            url: google_news_topic_url(&locale, "BUSINESS"),
+            is_local: false,
+        },
+        GoogleNewsCategory {
+            title: locale.technology_title.to_string(),
+            url: google_news_topic_url(&locale, "TECHNOLOGY"),
+            is_local: false,
+        },
+        GoogleNewsCategory {
+            title: locale.entertainment_title.to_string(),
+            url: google_news_topic_url(&locale, "ENTERTAINMENT"),
+            is_local: false,
+        },
+        GoogleNewsCategory {
+            title: locale.sports_title.to_string(),
+            url: google_news_topic_url(&locale, "SPORTS"),
+            is_local: false,
+        },
+        GoogleNewsCategory {
+            title: locale.health_title.to_string(),
+            url: google_news_topic_url(&locale, "HEALTH"),
+            is_local: false,
+        },
+    ]
+}
+
+fn google_news_local_url(code: &str, city: &str) -> String {
+    let locale = google_news_locale(code);
+    format!(
+        "https://news.google.com/rss/search?q={}&hl={}&gl={}&ceid={}",
+        percent_encode(city.trim()),
+        locale.hl,
+        locale.gl,
+        locale.ceid
+    )
+}
+
+#[derive(Clone)]
 enum NodeData {
+    GoogleNewsRoot,
+    GoogleNewsCategory(GoogleNewsCategory),
     Source(usize), // Index in settings
     Item(RssItem),
     LoadMore,
@@ -1923,6 +2255,1584 @@ struct SourceItemsState {
     items: Vec<RssItem>,
     loaded: usize,
     read_item_keys: HashSet<String>,
+}
+
+struct RssCityDialogState {
+    parent: HWND,
+    category_hitem: isize,
+    edit: HWND,
+}
+
+fn read_control_text(hwnd: HWND) -> String {
+    if hwnd.0 == 0 {
+        return String::new();
+    }
+    unsafe {
+        let length = GetWindowTextLengthW(hwnd);
+        if length <= 0 {
+            return String::new();
+        }
+        let mut buffer = vec![0u16; length as usize + 1];
+        let copied = GetWindowTextW(hwnd, &mut buffer);
+        String::from_utf16_lossy(&buffer[..copied.max(0) as usize])
+    }
+}
+
+fn with_rss_city_state<R>(
+    hwnd: HWND,
+    callback: impl FnOnce(&mut RssCityDialogState) -> R,
+) -> Option<R> {
+    let pointer = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut RssCityDialogState;
+    crate::with_raw_mut_ptr_safe(pointer, callback)
+}
+
+fn show_rss_city_dialog(
+    rss_hwnd: HWND,
+    category_hitem: windows::Win32::UI::Controls::HTREEITEM,
+    prefill: &str,
+) {
+    let existing = with_rss_state(rss_hwnd, |state| state.city_dialog).unwrap_or(HWND(0));
+    if existing.0 != 0 {
+        crate::set_foreground_window_safe(existing);
+        let edit = with_rss_city_state(existing, |state| state.edit).unwrap_or(HWND(0));
+        if edit.0 != 0 {
+            crate::set_focus_safe(edit);
+        }
+        return;
+    }
+
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(RSS_CITY_WINDOW_CLASS);
+        let window_class = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                None,
+                windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+            )
+            .unwrap_or_default(),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(rss_city_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&window_class);
+
+        let language = with_rss_state(rss_hwnd, |state| {
+            with_state(state.parent, |parent_state| parent_state.settings.language)
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+        let title = to_wide(&i18n::tr(language, "rss.city.title"));
+        let init = Box::new((rss_hwnd, category_hitem.0, prefill.to_string()));
+        let init_ptr = Box::into_raw(init);
+        let dialog = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_POPUP | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            500,
+            190,
+            rss_hwnd,
+            None,
+            hinstance,
+            Some(init_ptr as *const _),
+        );
+        if dialog.0 == 0 {
+            let _unused = Box::from_raw(init_ptr);
+            return;
+        }
+        with_rss_state(rss_hwnd, |state| {
+            state.city_dialog = dialog;
+            state.pending_local_category = category_hitem.0;
+        });
+        crate::enable_window_safe(rss_hwnd, false);
+        crate::set_foreground_window_safe(dialog);
+    }
+}
+
+unsafe extern "system" fn rss_city_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*create).lpCreateParams as *mut (HWND, isize, String);
+                if init_ptr.is_null() {
+                    return LRESULT(-1);
+                }
+                let (parent, category_hitem, prefill) = *Box::from_raw(init_ptr);
+                let language = with_rss_state(parent, |state| {
+                    with_state(state.parent, |parent_state| parent_state.settings.language)
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                let label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.city.label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    15,
+                    450,
+                    24,
+                    hwnd,
+                    None,
+                    hinstance,
+                    None,
+                );
+                let edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR(to_wide(&prefill).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    12,
+                    45,
+                    450,
+                    28,
+                    hwnd,
+                    HMENU(ID_CITY_EDIT as isize),
+                    hinstance,
+                    None,
+                );
+                let ok = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "common.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    252,
+                    92,
+                    100,
+                    30,
+                    hwnd,
+                    HMENU(ID_CITY_OK as isize),
+                    hinstance,
+                    None,
+                );
+                let cancel = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "common.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    362,
+                    92,
+                    100,
+                    30,
+                    hwnd,
+                    HMENU(ID_CITY_CANCEL as isize),
+                    hinstance,
+                    None,
+                );
+                for control in [edit, ok, cancel] {
+                    subclass_auxiliary_dialog_control(control);
+                }
+                let font = with_rss_state(parent, |state| {
+                    with_state(state.parent, |parent_state| parent_state.hfont).unwrap_or(HFONT(0))
+                })
+                .unwrap_or(HFONT(0));
+                if font.0 != 0 {
+                    for control in [label, edit, ok, cancel] {
+                        SendMessageW(control, WM_SETFONT, WPARAM(font.0 as usize), LPARAM(1));
+                    }
+                }
+                let state = Box::new(RssCityDialogState {
+                    parent,
+                    category_hitem,
+                    edit,
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                SetFocus(edit);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                match id {
+                    ID_CITY_OK | 1 => {
+                        let Some((parent, category_hitem, edit)) =
+                            with_rss_city_state(hwnd, |state| {
+                                (state.parent, state.category_hitem, state.edit)
+                            })
+                        else {
+                            return LRESULT(0);
+                        };
+                        let city = read_control_text(edit).trim().to_string();
+                        if city.is_empty() {
+                            let language = with_rss_state(parent, |state| {
+                                with_state(state.parent, |parent_state| {
+                                    parent_state.settings.language
+                                })
+                                .unwrap_or_default()
+                            })
+                            .unwrap_or_default();
+                            MessageBoxW(
+                                hwnd,
+                                PCWSTR(to_wide(&i18n::tr(language, "rss.city.required")).as_ptr()),
+                                PCWSTR(to_wide(&i18n::tr(language, "rss.city.title")).as_ptr()),
+                                MB_OK | MB_ICONINFORMATION,
+                            );
+                            SetFocus(edit);
+                            return LRESULT(0);
+                        }
+                        let payload = Box::new(city);
+                        let pointer = Box::into_raw(payload);
+                        if let Err(error) = crate::post_message_w_safe(
+                            parent,
+                            WM_RSS_CITY_CHANGED,
+                            WPARAM(category_hitem as usize),
+                            LPARAM(pointer as isize),
+                        ) {
+                            let _payload_owner = Box::from_raw(pointer);
+                            crate::log_debug(&format!(
+                                "Failed to post RSS city change message: {}",
+                                error
+                            ));
+                            return LRESULT(0);
+                        }
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        LRESULT(0)
+                    }
+                    ID_CITY_CANCEL | 2 => {
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                }
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u16 == VK_ESCAPE.0 {
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_CLOSE => {
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RssCityDialogState;
+                if !pointer.is_null() {
+                    let state = Box::from_raw(pointer);
+                    let parent = state.parent;
+                    with_rss_state(parent, |rss_state| {
+                        rss_state.city_dialog = HWND(0);
+                        if rss_state.pending_local_category == state.category_hitem {
+                            rss_state.pending_local_category = 0;
+                        }
+                    });
+                    crate::enable_window_safe(parent, true);
+                    crate::set_foreground_window_safe(parent);
+                    let tree =
+                        with_rss_state(parent, |rss_state| rss_state.hwnd_tree).unwrap_or(HWND(0));
+                    if tree.0 != 0 {
+                        crate::set_focus_safe(tree);
+                    }
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
+    }
+}
+
+fn show_change_city_for_selected_category(hwnd: HWND) {
+    let tree = with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
+    if tree.0 == 0 {
+        return;
+    }
+    let selected = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    let is_local = with_rss_state(hwnd, |state| {
+        matches!(
+            state.node_data.get(&selected.0),
+            Some(NodeData::GoogleNewsCategory(category)) if category.is_local
+        )
+    })
+    .unwrap_or(false);
+    if !is_local {
+        return;
+    }
+    let parent = with_rss_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+    let city =
+        with_state(parent, |state| state.settings.rss_local_city.clone()).unwrap_or_default();
+    show_rss_city_dialog(hwnd, selected, &city);
+}
+
+#[derive(Clone)]
+struct CommunityNewsSource {
+    name: String,
+    url: String,
+}
+
+struct CommunityAddDialogState {
+    parent: HWND,
+    language: crate::settings::Language,
+    edit_name: HWND,
+    edit_url: HWND,
+    submit: HWND,
+    busy: bool,
+}
+
+struct CommunityListDialogState {
+    parent: HWND,
+    language: crate::settings::Language,
+    list: HWND,
+    add_button: HWND,
+    sources: Vec<CommunityNewsSource>,
+}
+
+struct CommunitySubmitResult {
+    result: Result<String, String>,
+}
+
+struct CommunityListResult {
+    result: Result<Vec<CommunityNewsSource>, String>,
+}
+
+static CITY_DIALOG_TAB_ORDER: [usize; 3] = [ID_CITY_EDIT, ID_CITY_OK, ID_CITY_CANCEL];
+static COMMUNITY_ADD_TAB_ORDER: [usize; 4] = [
+    ID_COMMUNITY_ADD_NAME,
+    ID_COMMUNITY_ADD_URL,
+    ID_COMMUNITY_ADD_SUBMIT,
+    ID_COMMUNITY_ADD_CANCEL,
+];
+static COMMUNITY_LIST_TAB_ORDER: [usize; 3] = [
+    ID_COMMUNITY_LIST,
+    ID_COMMUNITY_LIST_ADD,
+    ID_COMMUNITY_LIST_CLOSE,
+];
+static RSS_MAIN_BUTTON_TAB_ORDER: [usize; 7] = [
+    ID_BTN_ADD,
+    ID_BTN_COMMUNITY_ADD,
+    ID_BTN_COMMUNITY_BROWSE,
+    ID_BTN_IMPORT,
+    ID_BTN_EXPORT,
+    ID_BTN_SEARCH,
+    ID_BTN_CLOSE,
+];
+
+fn auxiliary_dialog_navigation(id: usize) -> Option<(&'static [usize], usize, usize)> {
+    if CITY_DIALOG_TAB_ORDER.contains(&id) {
+        Some((&CITY_DIALOG_TAB_ORDER, ID_CITY_OK, ID_CITY_CANCEL))
+    } else if COMMUNITY_ADD_TAB_ORDER.contains(&id) {
+        Some((
+            &COMMUNITY_ADD_TAB_ORDER,
+            ID_COMMUNITY_ADD_SUBMIT,
+            ID_COMMUNITY_ADD_CANCEL,
+        ))
+    } else if COMMUNITY_LIST_TAB_ORDER.contains(&id) {
+        Some((
+            &COMMUNITY_LIST_TAB_ORDER,
+            ID_COMMUNITY_LIST_ADD,
+            ID_COMMUNITY_LIST_CLOSE,
+        ))
+    } else {
+        None
+    }
+}
+
+fn subclass_auxiliary_dialog_control(control: HWND) {
+    if control.0 == 0 {
+        return;
+    }
+    unsafe {
+        let procedure = rss_auxiliary_control_wndproc as *const () as usize;
+        let previous = SetWindowLongPtrW(control, GWLP_WNDPROC, procedure as isize);
+        SetWindowLongPtrW(control, GWLP_USERDATA, previous);
+    }
+}
+
+unsafe extern "system" fn rss_auxiliary_control_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    crate::panic_guard::guard(
+        "rss_auxiliary_control_wndproc",
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
+        || rss_auxiliary_control_wndproc_inner(hwnd, msg, wparam, lparam),
+    )
+}
+
+fn rss_auxiliary_control_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    if msg == windows::Win32::UI::WindowsAndMessaging::WM_CHAR && wparam.0 as u16 == VK_TAB.0 {
+        return LRESULT(0);
+    }
+    if msg == WM_KEYDOWN {
+        let id = crate::get_dlg_ctrl_id_safe(hwnd);
+        if wparam.0 as u16 == VK_TAB.0
+            && (id == ID_COMBO_NEWS_LANGUAGE || RSS_MAIN_BUTTON_TAB_ORDER.contains(&id))
+        {
+            let parent = crate::get_parent_safe(hwnd);
+            let backwards =
+                (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+            let target = if id == ID_COMBO_NEWS_LANGUAGE {
+                if backwards {
+                    if rss_article_preview_enabled(parent)
+                        && selected_article_item(parent).is_some()
+                    {
+                        with_rss_state(parent, |state| state.hwnd_preview).unwrap_or(HWND(0))
+                    } else {
+                        with_rss_state(parent, |state| state.hwnd_tree).unwrap_or(HWND(0))
+                    }
+                } else {
+                    crate::get_dlg_item_safe(parent, RSS_MAIN_BUTTON_TAB_ORDER[0] as i32)
+                }
+            } else if let Some(position) = RSS_MAIN_BUTTON_TAB_ORDER
+                .iter()
+                .position(|candidate| *candidate == id)
+            {
+                if backwards {
+                    if position == 0 {
+                        with_rss_state(parent, |state| state.hwnd_language_combo).unwrap_or(HWND(0))
+                    } else {
+                        crate::get_dlg_item_safe(
+                            parent,
+                            RSS_MAIN_BUTTON_TAB_ORDER[position - 1] as i32,
+                        )
+                    }
+                } else if position + 1 == RSS_MAIN_BUTTON_TAB_ORDER.len() {
+                    with_rss_state(parent, |state| state.hwnd_tree).unwrap_or(HWND(0))
+                } else {
+                    crate::get_dlg_item_safe(parent, RSS_MAIN_BUTTON_TAB_ORDER[position + 1] as i32)
+                }
+            } else {
+                HWND(0)
+            };
+            if target.0 != 0 {
+                crate::set_focus_safe(target);
+                return LRESULT(0);
+            }
+        }
+        if let Some((order, accept_id, cancel_id)) = auxiliary_dialog_navigation(id) {
+            let parent = crate::get_parent_safe(hwnd);
+            if wparam.0 as u16 == VK_TAB.0 {
+                let backwards =
+                    (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                if let Some(position) = order.iter().position(|candidate| *candidate == id) {
+                    for offset in 1..=order.len() {
+                        let next_position = if backwards {
+                            (position + order.len() - (offset % order.len())) % order.len()
+                        } else {
+                            (position + offset) % order.len()
+                        };
+                        let target = crate::get_dlg_item_safe(parent, order[next_position] as i32);
+                        if target.0 != 0 && unsafe { IsWindowEnabled(target).as_bool() } {
+                            crate::set_focus_safe(target);
+                            return LRESULT(0);
+                        }
+                    }
+                }
+            }
+            if wparam.0 as u16 == VK_RETURN.0 {
+                let command = if id == cancel_id {
+                    cancel_id
+                } else {
+                    accept_id
+                };
+                crate::send_message_w_safe(parent, WM_COMMAND, WPARAM(command), LPARAM(0));
+                return LRESULT(0);
+            }
+            if wparam.0 as u16 == VK_ESCAPE.0 {
+                crate::send_message_w_safe(parent, WM_COMMAND, WPARAM(cancel_id), LPARAM(0));
+                return LRESULT(0);
+            }
+        }
+    }
+    let previous = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA);
+    if previous == 0 {
+        return crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam);
+    }
+    crate::call_window_proc_w_safe(
+        crate::isize_to_wndproc_safe(previous),
+        hwnd,
+        msg,
+        wparam,
+        lparam,
+    )
+}
+
+fn community_language_key(code: &str) -> &'static str {
+    match normalize_news_language_code(code).unwrap_or("it") {
+        "en" => "english",
+        "fr" => "french",
+        "es" => "spanish",
+        "pt" => "portuguese",
+        "pl" => "polish",
+        "cs" => "czech",
+        _ => "italian",
+    }
+}
+
+fn normalize_community_language_key(value: &str) -> Option<&'static str> {
+    let normalized = value.trim().to_lowercase().replace('_', "-");
+    let primary = normalized.split('-').next().unwrap_or_default();
+    match normalized.as_str() {
+        "italian" | "italiano" => Some("italian"),
+        "english" | "inglese" => Some("english"),
+        "french" | "francese" | "français" | "francais" => Some("french"),
+        "spanish" | "spagnolo" | "español" | "espanol" => Some("spanish"),
+        "portuguese" | "portoghese" | "português" | "portugues" => Some("portuguese"),
+        "polish" | "polacco" | "polski" => Some("polish"),
+        "czech" | "ceco" | "čeština" | "cestina" => Some("czech"),
+        _ => match primary {
+            "it" => Some("italian"),
+            "en" => Some("english"),
+            "fr" => Some("french"),
+            "es" => Some("spanish"),
+            "pt" => Some("portuguese"),
+            "pl" => Some("polish"),
+            "cs" | "cz" => Some("czech"),
+            _ => None,
+        },
+    }
+}
+
+// Keep the same duplicate comparison used by Sonarpad Mobile for community
+// sources. In particular, do not merge http/https or slash variants here:
+// they can resolve to different feeds on some sites.
+fn community_source_url_key(url: &str) -> String {
+    url.trim().to_lowercase()
+}
+
+fn app_language_code(language: crate::settings::Language) -> &'static str {
+    match language {
+        crate::settings::Language::Italian => "it",
+        crate::settings::Language::English => "en",
+        crate::settings::Language::Spanish => "es",
+        crate::settings::Language::Portuguese => "pt",
+        crate::settings::Language::Swedish => "sv",
+        crate::settings::Language::Vietnamese => "vi",
+        crate::settings::Language::Czech => "cs",
+        crate::settings::Language::Polish => "pl",
+        crate::settings::Language::French => "fr",
+        crate::settings::Language::Serbian => "sr",
+        crate::settings::Language::Ukrainian => "uk",
+        crate::settings::Language::Lithuanian => "lt",
+        crate::settings::Language::Russian => "ru",
+        crate::settings::Language::Chinese => "zh",
+        crate::settings::Language::Hindi => "hi",
+    }
+}
+
+fn post_community_news_source(
+    name: &str,
+    url: &str,
+    news_language: &str,
+    ui_language: crate::settings::Language,
+) -> Result<String, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .user_agent(COMMUNITY_USER_AGENT)
+        .build()
+        .map_err(|error| error.to_string())?;
+    let response = client
+        .post(ADD_COMMUNITY_NEWS_SOURCE_URL)
+        .header("Accept", "application/json")
+        .form(&[
+            ("name", name),
+            ("url", url),
+            ("language", community_language_key(news_language)),
+            ("ui_language", app_language_code(ui_language)),
+        ])
+        .send()
+        .map_err(|error| error.to_string())?;
+    let status = response.status();
+    let body = response.text().map_err(|error| error.to_string())?;
+    let json: serde_json::Value = serde_json::from_str(&body).map_err(|error| {
+        if body.trim().is_empty() {
+            format!("HTTP {}: {}", status, error)
+        } else {
+            format!("HTTP {}: {}", status, body.trim())
+        }
+    })?;
+    let ok = json
+        .get("ok")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false);
+    let message = json
+        .get("message")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    let error = json
+        .get("error")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+    if !status.is_success() || !ok {
+        Err(if error.is_empty() {
+            format!("HTTP {}", status)
+        } else {
+            error
+        })
+    } else {
+        Ok(message)
+    }
+}
+
+fn unique_community_source_name(base_name: &str, known_names: &mut HashSet<String>) -> String {
+    let base_name = base_name.trim();
+    let mut candidate = base_name.to_string();
+    let mut suffix = 2usize;
+    while known_names.contains(&candidate.to_lowercase()) {
+        candidate = format!("{} ({})", base_name, suffix);
+        suffix += 1;
+    }
+    known_names.insert(candidate.to_lowercase());
+    candidate
+}
+
+fn fetch_community_news_sources(
+    news_language: &str,
+    known_urls: HashSet<String>,
+    mut known_names: HashSet<String>,
+) -> Result<Vec<CommunityNewsSource>, String> {
+    let expected_language = community_language_key(news_language);
+    crate::log_debug(&format!(
+        "RSS community list: request language={} code={} known_urls={}",
+        expected_language,
+        news_language,
+        known_urls.len()
+    ));
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(12))
+        .user_agent(COMMUNITY_USER_AGENT)
+        .build()
+        .map_err(|error| error.to_string())?;
+    let request_bases = [
+        COMMUNITY_NEWS_SOURCES_URL,
+        "https://www.sonarpad.com/api/get_community_news_sources.php",
+    ];
+    let mut selected_json = None;
+    let mut last_empty_json = None;
+    let mut last_error = None;
+    for (attempt, base_url) in request_bases.iter().enumerate() {
+        let mut request_url = Url::parse(base_url).map_err(|error| error.to_string())?;
+        let cache_buster = format!("{}-{}", Local::now().timestamp_millis(), attempt);
+        request_url
+            .query_pairs_mut()
+            .append_pair("language", expected_language)
+            .append_pair("lang", news_language)
+            .append_pair("_ts", &cache_buster);
+        crate::log_debug(&format!(
+            "RSS community list: attempt={} endpoint={} cache_buster={}",
+            attempt + 1,
+            base_url,
+            cache_buster
+        ));
+        let response = match client
+            .get(request_url)
+            .header("Accept", "application/json")
+            .header(
+                reqwest::header::CACHE_CONTROL,
+                "no-cache, no-store, max-age=0",
+            )
+            .header(reqwest::header::PRAGMA, "no-cache")
+            .send()
+        {
+            Ok(response) => response,
+            Err(error) => {
+                crate::log_debug(&format!(
+                    "RSS community list: attempt={} request failed: {}",
+                    attempt + 1,
+                    error
+                ));
+                last_error = Some(error.to_string());
+                continue;
+            }
+        };
+        let status = response.status();
+        let effective_url = response.url().to_string();
+        let body = match response.text() {
+            Ok(body) => body,
+            Err(error) => {
+                crate::log_debug(&format!(
+                    "RSS community list: attempt={} body read failed: {}",
+                    attempt + 1,
+                    error
+                ));
+                last_error = Some(error.to_string());
+                continue;
+            }
+        };
+        crate::log_debug(&format!(
+            "RSS community list: attempt={} HTTP {} effective_url={} body_bytes={}",
+            attempt + 1,
+            status,
+            effective_url,
+            body.len()
+        ));
+        if !status.is_success() {
+            last_error = Some(format!("HTTP {}", status));
+            continue;
+        }
+        let json: serde_json::Value = match serde_json::from_str(&body) {
+            Ok(json) => json,
+            Err(error) => {
+                crate::log_debug(&format!(
+                    "RSS community list: attempt={} invalid JSON: {}",
+                    attempt + 1,
+                    error
+                ));
+                last_error = Some(error.to_string());
+                continue;
+            }
+        };
+        let item_count = if let Some(array) = json.as_array() {
+            Some(array.len())
+        } else {
+            ["items", "sources", "data"]
+                .iter()
+                .find_map(|key| json.get(*key).and_then(serde_json::Value::as_array))
+                .map(Vec::len)
+        };
+        let Some(item_count) = item_count else {
+            crate::log_debug(&format!(
+                "RSS community list: attempt={} response has no supported source array",
+                attempt + 1
+            ));
+            last_error = Some("Invalid community source response".to_string());
+            continue;
+        };
+        crate::log_debug(&format!(
+            "RSS community list: attempt={} server_items={}",
+            attempt + 1,
+            item_count
+        ));
+        if item_count > 0 {
+            selected_json = Some(json);
+            break;
+        }
+        last_empty_json = Some(json);
+    }
+    let json = selected_json.or(last_empty_json).ok_or_else(|| {
+        last_error.unwrap_or_else(|| "Unable to load community sources".to_string())
+    })?;
+    let items = if let Some(array) = json.as_array() {
+        array
+    } else {
+        ["items", "sources", "data"]
+            .iter()
+            .find_map(|key| json.get(*key).and_then(serde_json::Value::as_array))
+            .ok_or_else(|| "Invalid community source response".to_string())?
+    };
+    let mut results = Vec::new();
+    let mut result_urls = HashSet::new();
+    let mut skipped_invalid = 0usize;
+    let mut skipped_language = 0usize;
+    let mut skipped_known = 0usize;
+    let mut skipped_duplicate = 0usize;
+    for item in items {
+        let name = item
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        let url = item
+            .get("url")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        let language = item
+            .get("language")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        if name.is_empty() || url.is_empty() {
+            skipped_invalid += 1;
+            continue;
+        }
+        if !language.is_empty()
+            && normalize_community_language_key(language) != Some(expected_language)
+        {
+            skipped_language += 1;
+            continue;
+        }
+        let valid_url = matches!(
+            Url::parse(url),
+            Ok(parsed) if matches!(parsed.scheme(), "http" | "https") && parsed.host().is_some()
+        );
+        if !valid_url {
+            skipped_invalid += 1;
+            continue;
+        }
+        let normalized_url = community_source_url_key(url);
+        if known_urls.contains(&normalized_url) {
+            skipped_known += 1;
+            continue;
+        }
+        if !result_urls.insert(normalized_url) {
+            skipped_duplicate += 1;
+            continue;
+        }
+        results.push(CommunityNewsSource {
+            name: unique_community_source_name(name, &mut known_names),
+            url: url.to_string(),
+        });
+    }
+    results.sort_by_key(|source| source.name.to_lowercase());
+    crate::log_debug(&format!(
+        "RSS community list: selected_server_items={} available={} skipped_invalid={} skipped_language={} skipped_known={} skipped_duplicate={}",
+        items.len(),
+        results.len(),
+        skipped_invalid,
+        skipped_language,
+        skipped_known,
+        skipped_duplicate
+    ));
+    Ok(results)
+}
+
+fn with_community_add_state<R>(
+    hwnd: HWND,
+    callback: impl FnOnce(&mut CommunityAddDialogState) -> R,
+) -> Option<R> {
+    let pointer =
+        crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut CommunityAddDialogState;
+    crate::with_raw_mut_ptr_safe(pointer, callback)
+}
+
+fn with_community_list_state<R>(
+    hwnd: HWND,
+    callback: impl FnOnce(&mut CommunityListDialogState) -> R,
+) -> Option<R> {
+    let pointer =
+        crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut CommunityListDialogState;
+    crate::with_raw_mut_ptr_safe(pointer, callback)
+}
+
+fn show_community_add_dialog(rss_hwnd: HWND) {
+    let existing = with_rss_state(rss_hwnd, |state| state.community_add_dialog).unwrap_or(HWND(0));
+    if existing.0 != 0 {
+        crate::set_foreground_window_safe(existing);
+        return;
+    }
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(RSS_COMMUNITY_ADD_WINDOW_CLASS);
+        let window_class = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                None,
+                windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+            )
+            .unwrap_or_default(),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(community_add_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&window_class);
+        let language = with_rss_state(rss_hwnd, |state| {
+            with_state(state.parent, |parent_state| parent_state.settings.language)
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+        let title = to_wide(&i18n::tr(language, "rss.community.add_title"));
+        let dialog = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_POPUP | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            650,
+            330,
+            rss_hwnd,
+            None,
+            hinstance,
+            Some(rss_hwnd.0 as *const _),
+        );
+        if dialog.0 != 0 {
+            with_rss_state(rss_hwnd, |state| state.community_add_dialog = dialog);
+            crate::set_foreground_window_safe(dialog);
+        }
+    }
+}
+
+unsafe extern "system" fn community_add_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create = lparam.0 as *const CREATESTRUCTW;
+                let parent = HWND((*create).lpCreateParams as isize);
+                let language = with_rss_state(parent, |state| {
+                    with_state(state.parent, |parent_state| parent_state.settings.language)
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+                let news_code = active_news_language_code(
+                    with_rss_state(parent, |state| state.parent).unwrap_or(HWND(0)),
+                );
+                let selected_language = news_language_label(language, &news_code);
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                let instructions = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.community.instructions")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    12,
+                    600,
+                    48,
+                    hwnd,
+                    None,
+                    hinstance,
+                    None,
+                );
+                let name_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.community.name_label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    75,
+                    175,
+                    24,
+                    hwnd,
+                    None,
+                    hinstance,
+                    None,
+                );
+                let edit_name = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    190,
+                    70,
+                    420,
+                    28,
+                    hwnd,
+                    HMENU(ID_COMMUNITY_ADD_NAME as isize),
+                    hinstance,
+                    None,
+                );
+                let url_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.community.url_label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    115,
+                    175,
+                    24,
+                    hwnd,
+                    None,
+                    hinstance,
+                    None,
+                );
+                let edit_url = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    190,
+                    110,
+                    420,
+                    28,
+                    hwnd,
+                    HMENU(ID_COMMUNITY_ADD_URL as isize),
+                    hinstance,
+                    None,
+                );
+                let language_label_text = i18n::tr(language, "rss.community.selected_language")
+                    .replace("{language}", &selected_language);
+                let language_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&language_label_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    155,
+                    598,
+                    24,
+                    hwnd,
+                    None,
+                    hinstance,
+                    None,
+                );
+                let submit = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.community.submit")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    350,
+                    205,
+                    150,
+                    32,
+                    hwnd,
+                    HMENU(ID_COMMUNITY_ADD_SUBMIT as isize),
+                    hinstance,
+                    None,
+                );
+                let cancel = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "common.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    510,
+                    205,
+                    100,
+                    32,
+                    hwnd,
+                    HMENU(ID_COMMUNITY_ADD_CANCEL as isize),
+                    hinstance,
+                    None,
+                );
+                for control in [edit_name, edit_url, submit, cancel] {
+                    subclass_auxiliary_dialog_control(control);
+                }
+                let font = with_rss_state(parent, |state| {
+                    with_state(state.parent, |parent_state| parent_state.hfont).unwrap_or(HFONT(0))
+                })
+                .unwrap_or(HFONT(0));
+                if font.0 != 0 {
+                    for control in [
+                        instructions,
+                        name_label,
+                        edit_name,
+                        url_label,
+                        edit_url,
+                        language_label,
+                        submit,
+                        cancel,
+                    ] {
+                        SendMessageW(control, WM_SETFONT, WPARAM(font.0 as usize), LPARAM(1));
+                    }
+                }
+                let state = Box::new(CommunityAddDialogState {
+                    parent,
+                    language,
+                    edit_name,
+                    edit_url,
+                    submit,
+                    busy: false,
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                SetFocus(edit_name);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                match id {
+                    ID_COMMUNITY_ADD_SUBMIT | 1 => {
+                        submit_community_news_source(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_COMMUNITY_ADD_CANCEL | 2 => {
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                }
+            }
+            WM_RSS_COMMUNITY_SUBMIT_COMPLETE => {
+                let pointer = lparam.0 as *mut CommunitySubmitResult;
+                if pointer.is_null() {
+                    return LRESULT(0);
+                }
+                let result = *Box::from_raw(pointer);
+                let Some((parent, language, submit)) = with_community_add_state(hwnd, |state| {
+                    state.busy = false;
+                    (state.parent, state.language, state.submit)
+                }) else {
+                    return LRESULT(0);
+                };
+                crate::enable_window_safe(submit, true);
+                crate::log_if_err!(crate::set_window_text_w_safe(
+                    submit,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.community.submit")).as_ptr()),
+                ));
+                match result.result {
+                    Ok(message) => {
+                        let message = if message.trim().is_empty() {
+                            i18n::tr(language, "rss.community.added")
+                        } else {
+                            message
+                        };
+                        MessageBoxW(
+                            hwnd,
+                            PCWSTR(to_wide(&message).as_ptr()),
+                            PCWSTR(
+                                to_wide(&i18n::tr(language, "rss.community.add_title")).as_ptr(),
+                            ),
+                            MB_OK | MB_ICONINFORMATION,
+                        );
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        focus_library(parent);
+                    }
+                    Err(error) => {
+                        let message = i18n::tr(language, "rss.community.add_error")
+                            .replace("{error}", &error);
+                        MessageBoxW(
+                            hwnd,
+                            PCWSTR(to_wide(&message).as_ptr()),
+                            PCWSTR(
+                                to_wide(&i18n::tr(language, "rss.community.add_title")).as_ptr(),
+                            ),
+                            MB_OK | MB_ICONINFORMATION,
+                        );
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u16 == VK_ESCAPE.0 {
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_CLOSE => {
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let pointer =
+                    GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut CommunityAddDialogState;
+                if !pointer.is_null() {
+                    let state = Box::from_raw(pointer);
+                    with_rss_state(state.parent, |rss_state| {
+                        rss_state.community_add_dialog = HWND(0)
+                    });
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
+    }
+}
+
+fn submit_community_news_source(hwnd: HWND) {
+    let Some((parent, language, name, url, already_busy, submit)) =
+        with_community_add_state(hwnd, |state| {
+            (
+                state.parent,
+                state.language,
+                read_control_text(state.edit_name).trim().to_string(),
+                read_control_text(state.edit_url).trim().to_string(),
+                state.busy,
+                state.submit,
+            )
+        })
+    else {
+        return;
+    };
+    if already_busy {
+        return;
+    }
+    if name.is_empty() || url.is_empty() {
+        unsafe {
+            MessageBoxW(
+                hwnd,
+                PCWSTR(to_wide(&i18n::tr(language, "rss.community.missing_fields")).as_ptr()),
+                PCWSTR(to_wide(&i18n::tr(language, "rss.community.add_title")).as_ptr()),
+                MB_OK | MB_ICONINFORMATION,
+            );
+        }
+        return;
+    }
+    with_community_add_state(hwnd, |state| state.busy = true);
+    crate::enable_window_safe(submit, false);
+    crate::log_if_err!(crate::set_window_text_w_safe(
+        submit,
+        PCWSTR(to_wide(&i18n::tr(language, "rss.community.checking")).as_ptr()),
+    ));
+    let news_language =
+        active_news_language_code(with_rss_state(parent, |state| state.parent).unwrap_or(HWND(0)));
+    let dialog_raw = hwnd.0;
+    std::thread::spawn(move || {
+        let result = post_community_news_source(&name, &url, &news_language, language);
+        let payload = Box::new(CommunitySubmitResult { result });
+        let pointer = Box::into_raw(payload);
+        if crate::post_message_w_safe(
+            HWND(dialog_raw),
+            WM_RSS_COMMUNITY_SUBMIT_COMPLETE,
+            WPARAM(0),
+            LPARAM(pointer as isize),
+        )
+        .is_err()
+        {
+            let _unused = unsafe { Box::from_raw(pointer) };
+        }
+    });
+}
+
+fn show_community_sources_dialog(rss_hwnd: HWND) {
+    let existing = with_rss_state(rss_hwnd, |state| state.community_list_dialog).unwrap_or(HWND(0));
+    if existing.0 != 0 {
+        crate::set_foreground_window_safe(existing);
+        return;
+    }
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(RSS_COMMUNITY_LIST_WINDOW_CLASS);
+        let window_class = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                None,
+                windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+            )
+            .unwrap_or_default(),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(community_list_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&window_class);
+        let language = with_rss_state(rss_hwnd, |state| {
+            with_state(state.parent, |parent_state| parent_state.settings.language)
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+        let title = to_wide(&i18n::tr(language, "rss.community.sources_title"));
+        let dialog = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_POPUP | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            650,
+            500,
+            rss_hwnd,
+            None,
+            hinstance,
+            Some(rss_hwnd.0 as *const _),
+        );
+        if dialog.0 != 0 {
+            with_rss_state(rss_hwnd, |state| state.community_list_dialog = dialog);
+            crate::set_foreground_window_safe(dialog);
+        }
+    }
+}
+
+unsafe extern "system" fn community_list_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create = lparam.0 as *const CREATESTRUCTW;
+                let parent = HWND((*create).lpCreateParams as isize);
+                let language = with_rss_state(parent, |state| {
+                    with_state(state.parent, |parent_state| parent_state.settings.language)
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                let list = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_LISTBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | WINDOW_STYLE(0x0001),
+                    12,
+                    12,
+                    600,
+                    370,
+                    hwnd,
+                    HMENU(ID_COMMUNITY_LIST as isize),
+                    hinstance,
+                    None,
+                );
+                let add_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.community.add_to_library")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    350,
+                    395,
+                    150,
+                    32,
+                    hwnd,
+                    HMENU(ID_COMMUNITY_LIST_ADD as isize),
+                    hinstance,
+                    None,
+                );
+                let close = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "common.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    510,
+                    395,
+                    100,
+                    32,
+                    hwnd,
+                    HMENU(ID_COMMUNITY_LIST_CLOSE as isize),
+                    hinstance,
+                    None,
+                );
+                for control in [list, add_button, close] {
+                    subclass_auxiliary_dialog_control(control);
+                }
+                let loading = to_wide(&i18n::tr(language, "rss.community.loading"));
+                SendMessageW(
+                    list,
+                    LB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(loading.as_ptr() as isize),
+                );
+                crate::enable_window_safe(add_button, false);
+                let font = with_rss_state(parent, |state| {
+                    with_state(state.parent, |parent_state| parent_state.hfont).unwrap_or(HFONT(0))
+                })
+                .unwrap_or(HFONT(0));
+                if font.0 != 0 {
+                    for control in [list, add_button, close] {
+                        SendMessageW(control, WM_SETFONT, WPARAM(font.0 as usize), LPARAM(1));
+                    }
+                }
+                let state = Box::new(CommunityListDialogState {
+                    parent,
+                    language,
+                    list,
+                    add_button,
+                    sources: Vec::new(),
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                SetFocus(list);
+                start_community_sources_fetch(hwnd, parent);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                let notification = (wparam.0 >> 16) & 0xffff;
+                if id == ID_COMMUNITY_LIST && notification == LBN_DBLCLK as usize {
+                    add_selected_community_source(hwnd);
+                    return LRESULT(0);
+                }
+                match id {
+                    ID_COMMUNITY_LIST_ADD | 1 => {
+                        add_selected_community_source(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_COMMUNITY_LIST_CLOSE | 2 => {
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                }
+            }
+            WM_RSS_COMMUNITY_LIST_COMPLETE => {
+                let pointer = lparam.0 as *mut CommunityListResult;
+                if pointer.is_null() {
+                    return LRESULT(0);
+                }
+                let result = *Box::from_raw(pointer);
+                let Some((language, list, add_button)) = with_community_list_state(hwnd, |state| {
+                    (state.language, state.list, state.add_button)
+                }) else {
+                    return LRESULT(0);
+                };
+                SendMessageW(list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                match result.result {
+                    Ok(sources) => {
+                        if sources.is_empty() {
+                            let empty = to_wide(&i18n::tr(language, "rss.community.empty"));
+                            SendMessageW(
+                                list,
+                                LB_ADDSTRING,
+                                WPARAM(0),
+                                LPARAM(empty.as_ptr() as isize),
+                            );
+                            crate::enable_window_safe(add_button, false);
+                        } else {
+                            for source in &sources {
+                                let text = to_wide(&source.name);
+                                SendMessageW(
+                                    list,
+                                    LB_ADDSTRING,
+                                    WPARAM(0),
+                                    LPARAM(text.as_ptr() as isize),
+                                );
+                            }
+                            with_community_list_state(hwnd, |state| state.sources = sources);
+                            SendMessageW(
+                                list,
+                                windows::Win32::UI::WindowsAndMessaging::LB_SETCURSEL,
+                                WPARAM(0),
+                                LPARAM(0),
+                            );
+                            crate::enable_window_safe(add_button, true);
+                        }
+                    }
+                    Err(error) => {
+                        let message = i18n::tr(language, "rss.community.fetch_error")
+                            .replace("{error}", &error);
+                        SendMessageW(
+                            list,
+                            LB_ADDSTRING,
+                            WPARAM(0),
+                            LPARAM(to_wide(&message).as_ptr() as isize),
+                        );
+                        crate::enable_window_safe(add_button, false);
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u16 == VK_ESCAPE.0 {
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                    return LRESULT(0);
+                }
+                if wparam.0 as u16 == VK_RETURN.0
+                    && GetFocus() == GetDlgItem(hwnd, ID_COMMUNITY_LIST as i32)
+                {
+                    add_selected_community_source(hwnd);
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_CLOSE => {
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let pointer =
+                    GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut CommunityListDialogState;
+                if !pointer.is_null() {
+                    let state = Box::from_raw(pointer);
+                    with_rss_state(state.parent, |rss_state| {
+                        rss_state.community_list_dialog = HWND(0)
+                    });
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
+    }
+}
+
+fn start_community_sources_fetch(dialog: HWND, rss_hwnd: HWND) {
+    let parent = with_rss_state(rss_hwnd, |state| state.parent).unwrap_or(HWND(0));
+    let news_language = active_news_language_code(parent);
+    let (known_urls, known_names) = with_state(parent, |state| {
+        let urls = state
+            .settings
+            .rss_sources
+            .iter()
+            .map(|source| community_source_url_key(&source.url))
+            .filter(|url| !url.is_empty())
+            .collect();
+        let names = state
+            .settings
+            .rss_sources
+            .iter()
+            .map(|source| source.title.trim().to_lowercase())
+            .filter(|name| !name.is_empty())
+            .collect();
+        (urls, names)
+    })
+    .unwrap_or_default();
+    let dialog_raw = dialog.0;
+    std::thread::spawn(move || {
+        let result = fetch_community_news_sources(&news_language, known_urls, known_names);
+        let payload = Box::new(CommunityListResult { result });
+        let pointer = Box::into_raw(payload);
+        if crate::post_message_w_safe(
+            HWND(dialog_raw),
+            WM_RSS_COMMUNITY_LIST_COMPLETE,
+            WPARAM(0),
+            LPARAM(pointer as isize),
+        )
+        .is_err()
+        {
+            let _unused = unsafe { Box::from_raw(pointer) };
+        }
+    });
+}
+
+fn add_selected_community_source(hwnd: HWND) {
+    let Some((parent, language, source)) = with_community_list_state(hwnd, |state| {
+        let selected = crate::send_message_w_safe(state.list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        let source = if selected >= 0 {
+            state.sources.get(selected as usize).cloned()
+        } else {
+            None
+        };
+        (state.parent, state.language, source)
+    }) else {
+        return;
+    };
+    let Some(source) = source else {
+        return;
+    };
+    let app_parent = with_rss_state(parent, |state| state.parent).unwrap_or(HWND(0));
+    let added = with_state(app_parent, |state| {
+        let key = community_source_url_key(&source.url);
+        if state
+            .settings
+            .rss_sources
+            .iter()
+            .any(|existing| community_source_url_key(&existing.url) == key)
+        {
+            return false;
+        }
+        state.settings.rss_sources.push(RssSource {
+            title: source.name.clone(),
+            url: source.url.clone(),
+            kind: RssSourceType::Feed,
+            user_title: true,
+            unread: false,
+            cache: rss::RssFeedCache::default(),
+            last_seen_guid: None,
+            last_updated: None,
+            removed_item_keys: Vec::new(),
+            read_item_keys: Vec::new(),
+        });
+        save_rss_settings(state);
+        true
+    })
+    .unwrap_or(false);
+    if added {
+        reload_tree(parent);
+        let message =
+            i18n::tr(language, "rss.community.added_to_library").replace("{name}", &source.name);
+        announce_rss_status(&message);
+        unsafe {
+            MessageBoxW(
+                hwnd,
+                PCWSTR(to_wide(&message).as_ptr()),
+                PCWSTR(to_wide(&i18n::tr(language, "rss.community.sources_title")).as_ptr()),
+                MB_OK | MB_ICONINFORMATION,
+            );
+        }
+        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+        focus_library(parent);
+    }
 }
 
 struct AddDialogInit {
@@ -1978,19 +3888,19 @@ fn update_preview_layout(hwnd: HWND) {
 
     let show_preview = rss_article_preview_enabled(hwnd);
     let (tree_height, preview_cmd) = if show_preview {
-        (320, SW_SHOW)
+        (345, SW_SHOW)
     } else {
-        (500, SW_HIDE)
+        (525, SW_HIDE)
     };
 
     unsafe {
-        crate::log_if_err!(MoveWindow(hwnd_tree, 10, 10, 460, tree_height, true));
+        crate::log_if_err!(MoveWindow(hwnd_tree, 10, 10, 660, tree_height, true));
     }
     crate::show_window_safe(hwnd_preview, preview_cmd);
     crate::enable_window_safe(hwnd_preview, show_preview);
     if show_preview {
         unsafe {
-            crate::log_if_err!(MoveWindow(hwnd_preview, 10, 340, 460, 170, true));
+            crate::log_if_err!(MoveWindow(hwnd_preview, 10, 365, 660, 170, true));
         }
     }
 }
@@ -2014,7 +3924,7 @@ fn request_article_preview(hwnd: HWND, item: RssItem) {
     let title = item.title.clone();
     let description = item.description.clone();
     let language = if parent.0 != 0 {
-        with_state(parent, |state| state.settings.language).unwrap_or_default()
+        news_language_as_app_language(&active_news_language_code(parent))
     } else {
         crate::settings::Language::default()
     };
@@ -2111,8 +4021,8 @@ pub fn open(parent: HWND) {
             WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            500,
-            600,
+            700,
+            740,
             parent,
             None,
             hinstance,
@@ -2206,14 +4116,17 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
             return;
         }
 
-        let (is_source, source_index, article_item) =
-            with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
-                Some(NodeData::Source(idx)) => (true, Some(*idx), None),
-                Some(NodeData::Item(item)) => (false, None, Some(item.clone())),
-                Some(NodeData::LoadMore) | None => (false, None, None),
+        let (is_source, source_index, article_item, local_google_category) =
+            with_rss_state(hwnd, |state| match state.node_data.get(&hitem.0) {
+                Some(NodeData::Source(index)) => (true, Some(*index), None, false),
+                Some(NodeData::Item(item)) => (false, None, Some(item.clone()), false),
+                Some(NodeData::GoogleNewsCategory(category)) if category.is_local => {
+                    (false, None, None, true)
+                }
+                _ => (false, None, None, false),
             })
-            .unwrap_or((false, None, None));
-        if !is_source && article_item.is_none() {
+            .unwrap_or((false, None, None, false));
+        if !is_source && article_item.is_none() && !local_google_category {
             return;
         }
 
@@ -2242,6 +4155,7 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
         let email_label = i18n::tr(language, "rss.context.share_email");
         let add_to_favorites_label = i18n::tr(language, "rss.context.add_to_favorites");
         let properties_label = i18n::tr(language, "context.properties");
+        let change_city_label = i18n::tr(language, "rss.city.change");
         let undo_label = i18n::tr(language, "edit.undo")
             .split('\t')
             .next()
@@ -2266,7 +4180,14 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
         if let Ok(menu) = CreatePopupMenu()
             && menu.0 != 0
         {
-            if is_source {
+            if local_google_category {
+                if let Err(_error) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_CHANGE_CITY,
+                    PCWSTR(to_wide(&change_city_label).as_ptr()),
+                ) {}
+            } else if is_source {
                 let source_action_flags = if is_favorites_source_node {
                     MF_STRING | MF_GRAYED
                 } else {
@@ -2509,6 +4430,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     parent,
                     hwnd_tree: HWND(0),
                     hwnd_preview: HWND(0),
+                    hwnd_language_combo: HWND(0),
                     hwnd_import: HWND(0),
                     hwnd_export: HWND(0),
                     node_data: HashMap::new(),
@@ -2526,9 +4448,14 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     suppress_focus_restore_once: false,
                     preview_proc: None,
                     preview_request_seq: 0,
+                    community_add_dialog: HWND(0),
+                    community_list_dialog: HWND(0),
+                    city_dialog: HWND(0),
+                    pending_local_category: 0,
                 });
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
 
+                prepare_rss_language_state(parent);
                 create_controls(hwnd);
                 ensure_default_sources(parent);
                 reload_tree(hwnd);
@@ -2588,6 +4515,20 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
             }
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
+                let notification = (wparam.0 >> 16) & 0xffff;
+                if id == ID_COMBO_NEWS_LANGUAGE && notification == CBN_SELCHANGE as usize {
+                    let combo =
+                        with_rss_state(hwnd, |state| state.hwnd_language_combo).unwrap_or(HWND(0));
+                    if combo.0 != 0 {
+                        let selected = SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                        if selected >= 0
+                            && let Some(code) = NEWS_LANGUAGE_CODES.get(selected as usize)
+                        {
+                            switch_news_language(hwnd, code);
+                        }
+                    }
+                    return LRESULT(0);
+                }
                 match id {
                     ID_BTN_CLOSE | 2 => {
                         crate::log_if_err!(crate::destroy_window_safe(hwnd));
@@ -2606,6 +4547,14 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                 crate::log_debug(&format!("Error: {:?}", _e));
                             }
                         }
+                        LRESULT(0)
+                    }
+                    ID_BTN_COMMUNITY_ADD => {
+                        show_community_add_dialog(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_BTN_COMMUNITY_BROWSE => {
+                        show_community_sources_dialog(hwnd);
                         LRESULT(0)
                     }
                     ID_BTN_IMPORT => {
@@ -2688,6 +4637,8 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         let focus = GetFocus();
                         let btn_add = GetDlgItem(hwnd, ID_BTN_ADD as i32);
                         let btn_search = GetDlgItem(hwnd, ID_BTN_SEARCH as i32);
+                        let btn_community_add = GetDlgItem(hwnd, ID_BTN_COMMUNITY_ADD as i32);
+                        let btn_community_browse = GetDlgItem(hwnd, ID_BTN_COMMUNITY_BROWSE as i32);
                         let btn_import = GetDlgItem(hwnd, ID_BTN_IMPORT as i32);
                         let btn_export = GetDlgItem(hwnd, ID_BTN_EXPORT as i32);
                         let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
@@ -2702,6 +4653,16 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                     crate::log_debug(&format!("Error: {:?}", _e));
                                 }
                             }
+                            return LRESULT(0);
+                        }
+
+                        if focus == btn_community_add {
+                            show_community_add_dialog(hwnd);
+                            return LRESULT(0);
+                        }
+
+                        if focus == btn_community_browse {
+                            show_community_sources_dialog(hwnd);
                             return LRESULT(0);
                         }
 
@@ -2883,8 +4844,47 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         show_selected_properties(hwnd);
                         LRESULT(0)
                     }
+                    ID_CTX_CHANGE_CITY => {
+                        show_change_city_for_selected_category(hwnd);
+                        LRESULT(0)
+                    }
                     _ => DefWindowProcW(hwnd, msg, wparam, lparam),
                 }
+            }
+            WM_RSS_CITY_CHANGED => {
+                let pointer = lparam.0 as *mut String;
+                if pointer.is_null() {
+                    return LRESULT(0);
+                }
+                let city = *Box::from_raw(pointer);
+                let category_hitem = windows::Win32::UI::Controls::HTREEITEM(wparam.0 as isize);
+                let parent = with_rss_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+                with_state(parent, |state| {
+                    state.settings.rss_local_city = city;
+                    save_rss_settings(state);
+                });
+                let tree = with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
+                clear_tree_children(hwnd, tree, category_hitem);
+                with_rss_state(hwnd, |state| {
+                    state.source_items.remove(&category_hitem.0);
+                    state.pending_local_category = 0;
+                });
+                handle_expand(hwnd, category_hitem);
+                if tree.0 != 0 {
+                    SendMessageW(
+                        tree,
+                        TVM_EXPAND,
+                        WPARAM(TVE_EXPAND.0 as usize),
+                        LPARAM(category_hitem.0),
+                    );
+                    SendMessageW(
+                        tree,
+                        TVM_SELECTITEM,
+                        WPARAM(TVGN_CARET as usize),
+                        LPARAM(category_hitem.0),
+                    );
+                }
+                LRESULT(0)
             }
             windows::Win32::UI::WindowsAndMessaging::WM_COPYDATA => {
                 let cds = lparam.0 as *const COPYDATASTRUCT;
@@ -2919,7 +4919,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                 src.user_title = title.trim() != url.trim();
                                 src.cache = rss::RssFeedCache::default();
                             }
-                            crate::settings::save_settings(state.settings.clone());
+                            save_rss_settings(state);
                         });
                         reload_tree(hwnd);
                     } else {
@@ -2936,7 +4936,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                 removed_item_keys: Vec::new(),
                                 read_item_keys: Vec::new(),
                             });
-                            crate::settings::save_settings(state.settings.clone());
+                            save_rss_settings(state);
                         });
                         reload_tree(hwnd);
 
@@ -3311,6 +5311,20 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     }
                     return LRESULT(0);
                 }
+                if wparam.0 == RSS_LANGUAGE_FOCUS_TIMER_ID {
+                    if let Err(e) = KillTimer(hwnd, RSS_LANGUAGE_FOCUS_TIMER_ID) {
+                        crate::log_debug(&format!(
+                            "Failed to kill RSS language focus timer: {}",
+                            e
+                        ));
+                    }
+                    let hwnd_tree =
+                        with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
+                    if hwnd_tree.0 != 0 {
+                        crate::set_focus_safe(hwnd_tree);
+                    }
+                    return LRESULT(0);
+                }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
 
@@ -3652,6 +5666,24 @@ fn rss_tree_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) 
                     return LRESULT(0);
                 }
             }
+            if key == u32::from(VK_TAB.0) {
+                let parent = GetParent(hwnd);
+                if parent.0 != 0 {
+                    let target = if GetKeyState(VK_SHIFT.0 as i32) < 0 {
+                        GetDlgItem(parent, ID_BTN_CLOSE as i32)
+                    } else if rss_article_preview_enabled(parent)
+                        && selected_article_item(parent).is_some()
+                    {
+                        with_rss_state(parent, |state| state.hwnd_preview).unwrap_or(HWND(0))
+                    } else {
+                        with_rss_state(parent, |state| state.hwnd_language_combo).unwrap_or(HWND(0))
+                    };
+                    if target.0 != 0 {
+                        SetFocus(target);
+                        return LRESULT(0);
+                    }
+                }
+            }
             if key == u32::from(VK_RETURN.0) && GetKeyState(VK_MENU.0 as i32) < 0 {
                 let parent = GetParent(hwnd);
                 if parent.0 != 0 {
@@ -3711,7 +5743,7 @@ fn rss_preview_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARA
                     let target = if GetKeyState(VK_SHIFT.0 as i32) < 0 {
                         with_rss_state(parent, |s| s.hwnd_tree).unwrap_or(HWND(0))
                     } else {
-                        GetDlgItem(parent, ID_BTN_ADD as i32)
+                        with_rss_state(parent, |s| s.hwnd_language_combo).unwrap_or(HWND(0))
                     };
                     if target.0 != 0 {
                         SetFocus(target);
@@ -3755,8 +5787,8 @@ fn create_controls(hwnd: HWND) {
                 ),
             10,
             10,
-            460,
-            500,
+            660,
+            525,
             hwnd,
             HMENU(ID_TREE as isize),
             hinstance,
@@ -3780,8 +5812,8 @@ fn create_controls(hwnd: HWND) {
                 | WS_VSCROLL
                 | WINDOW_STYLE((ES_MULTILINE | ES_AUTOVSCROLL) as u32),
             10,
-            340,
-            460,
+            365,
+            660,
             170,
             hwnd,
             HMENU(ID_EDIT_ARTICLE_PREVIEW as isize),
@@ -3803,10 +5835,64 @@ fn create_controls(hwnd: HWND) {
             SendMessageW(hwnd_preview, EM_SETREADONLY, WPARAM(1), LPARAM(0));
         }
 
-        let language = with_rss_state(hwnd, |s| {
-            with_state(s.parent, |ps| ps.settings.language).unwrap_or_default()
+        let (language, selected_news_language) = with_rss_state(hwnd, |s| {
+            with_state(s.parent, |ps| {
+                (
+                    ps.settings.language,
+                    active_news_language_code_from_state(ps),
+                )
+            })
+            .unwrap_or((crate::settings::Language::default(), "it".to_string()))
         })
-        .unwrap_or_default();
+        .unwrap_or((crate::settings::Language::default(), "it".to_string()));
+
+        let hwnd_language_label = CreateWindowExW(
+            Default::default(),
+            WC_STATIC,
+            PCWSTR(to_wide(&i18n::tr(language, "rss.news_language")).as_ptr()),
+            WS_CHILD | WS_VISIBLE,
+            10,
+            550,
+            150,
+            25,
+            hwnd,
+            None,
+            hinstance,
+            None,
+        );
+        let hwnd_language_combo = CreateWindowExW(
+            WS_EX_CLIENTEDGE,
+            WC_COMBOBOXW,
+            PCWSTR::null(),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | WINDOW_STYLE(0x0003),
+            165,
+            545,
+            260,
+            220,
+            hwnd,
+            HMENU(ID_COMBO_NEWS_LANGUAGE as isize),
+            hinstance,
+            None,
+        );
+        for code in NEWS_LANGUAGE_CODES {
+            let label = news_language_label(language, code);
+            SendMessageW(
+                hwnd_language_combo,
+                CB_ADDSTRING,
+                WPARAM(0),
+                LPARAM(to_wide(&label).as_ptr() as isize),
+            );
+        }
+        let selected_index = NEWS_LANGUAGE_CODES
+            .iter()
+            .position(|code| *code == selected_news_language)
+            .unwrap_or(0);
+        SendMessageW(
+            hwnd_language_combo,
+            CB_SETCURSEL,
+            WPARAM(selected_index),
+            LPARAM(0),
+        );
 
         let hwnd_add = CreateWindowExW(
             Default::default(),
@@ -3814,11 +5900,39 @@ fn create_controls(hwnd: HWND) {
             PCWSTR(to_wide(&i18n::tr(language, "rss.tree.add_source")).as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP,
             10,
-            520,
-            90,
+            585,
+            125,
             30,
             hwnd,
             HMENU(ID_BTN_ADD as isize),
+            hinstance,
+            None,
+        );
+        let hwnd_community_add = CreateWindowExW(
+            Default::default(),
+            WC_BUTTON,
+            PCWSTR(to_wide(&i18n::tr(language, "rss.community.add_button")).as_ptr()),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            140,
+            585,
+            255,
+            30,
+            hwnd,
+            HMENU(ID_BTN_COMMUNITY_ADD as isize),
+            hinstance,
+            None,
+        );
+        let hwnd_community_browse = CreateWindowExW(
+            Default::default(),
+            WC_BUTTON,
+            PCWSTR(to_wide(&i18n::tr(language, "rss.community.browse_button")).as_ptr()),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            400,
+            585,
+            270,
+            30,
+            hwnd,
+            HMENU(ID_BTN_COMMUNITY_BROWSE as isize),
             hinstance,
             None,
         );
@@ -3828,16 +5942,15 @@ fn create_controls(hwnd: HWND) {
             WC_BUTTON,
             PCWSTR(to_wide(&i18n::tr(language, "rss.tree.import_txt")).as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-            105,
-            520,
-            90,
+            10,
+            625,
+            125,
             30,
             hwnd,
             HMENU(ID_BTN_IMPORT as isize),
             hinstance,
             None,
         );
-
         let export_label = i18n::tr(language, "rss.tree.export_opml");
         let export_label = if export_label == "rss.tree.export_opml" {
             "Export OPML...".to_string()
@@ -3849,24 +5962,37 @@ fn create_controls(hwnd: HWND) {
             WC_BUTTON,
             PCWSTR(to_wide(&export_label).as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-            200,
-            520,
-            90,
+            140,
+            625,
+            125,
             30,
             hwnd,
             HMENU(ID_BTN_EXPORT as isize),
             hinstance,
             None,
         );
-
+        let hwnd_search = CreateWindowExW(
+            Default::default(),
+            WC_BUTTON,
+            PCWSTR(to_wide(&i18n::tr(language, "rss.search.button")).as_ptr()),
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+            270,
+            625,
+            125,
+            30,
+            hwnd,
+            HMENU(ID_BTN_SEARCH as isize),
+            hinstance,
+            None,
+        );
         let hwnd_close = CreateWindowExW(
             Default::default(),
             WC_BUTTON,
             PCWSTR(to_wide(&i18n::tr(language, "rss.tree.close")).as_ptr()),
             WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-            295,
-            520,
-            80,
+            400,
+            625,
+            125,
             30,
             hwnd,
             HMENU(ID_BTN_CLOSE as isize),
@@ -3874,9 +6000,23 @@ fn create_controls(hwnd: HWND) {
             None,
         );
 
+        for control in [
+            hwnd_language_combo,
+            hwnd_add,
+            hwnd_community_add,
+            hwnd_community_browse,
+            hwnd_import,
+            hwnd_export,
+            hwnd_search,
+            hwnd_close,
+        ] {
+            subclass_auxiliary_dialog_control(control);
+        }
+
         with_rss_state(hwnd, |s| {
             s.hwnd_tree = hwnd_tree;
             s.hwnd_preview = hwnd_preview;
+            s.hwnd_language_combo = hwnd_language_combo;
             s.hwnd_import = hwnd_import;
             s.hwnd_export = hwnd_export;
         });
@@ -3886,17 +6026,21 @@ fn create_controls(hwnd: HWND) {
         })
         .unwrap_or(HFONT(0));
         if hfont.0 != 0 {
-            SendMessageW(hwnd_tree, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            SendMessageW(
+            for control in [
+                hwnd_tree,
                 hwnd_preview,
-                WM_SETFONT,
-                WPARAM(hfont.0 as usize),
-                LPARAM(1),
-            );
-            SendMessageW(hwnd_add, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            SendMessageW(hwnd_import, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            SendMessageW(hwnd_export, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
-            SendMessageW(hwnd_close, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                hwnd_language_label,
+                hwnd_language_combo,
+                hwnd_add,
+                hwnd_community_add,
+                hwnd_community_browse,
+                hwnd_import,
+                hwnd_export,
+                hwnd_search,
+                hwnd_close,
+            ] {
+                SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+            }
         }
 
         update_preview_layout(hwnd);
@@ -3930,6 +6074,35 @@ fn reload_tree(hwnd: HWND) {
     with_rss_state(hwnd, |s| {
         s.node_data.clear();
         s.source_items.clear();
+        s.pending_fetches.clear();
+    });
+
+    let news_code =
+        active_news_language_code(with_rss_state(hwnd, |state| state.parent).unwrap_or(HWND(0)));
+    let google_title = to_wide(google_news_locale(&news_code).root_title);
+    let mut google_insert = TVINSERTSTRUCTW {
+        hParent: TVI_ROOT,
+        hInsertAfter: TVI_FIRST,
+        Anonymous: TVINSERTSTRUCTW_0 {
+            item: TVITEMW {
+                mask: TVIF_TEXT | TVIF_PARAM | windows::Win32::UI::Controls::TVIF_CHILDREN,
+                pszText: windows::core::PWSTR(google_title.as_ptr() as *mut _),
+                cChildren: TVITEMEXW_CHILDREN(1),
+                lParam: LPARAM(-1),
+                ..Default::default()
+            },
+        },
+    };
+    let google_hitem = crate::send_message_w_safe(
+        hwnd_tree,
+        TVM_INSERTITEMW,
+        WPARAM(0),
+        LPARAM(&mut google_insert as *mut _ as isize),
+    );
+    with_rss_state(hwnd, |state| {
+        state
+            .node_data
+            .insert(google_hitem.0, NodeData::GoogleNewsRoot);
     });
 
     for (i, source) in sources.into_iter().enumerate() {
@@ -3961,6 +6134,107 @@ fn reload_tree(hwnd: HWND) {
 
         with_rss_state(hwnd, |s| {
             s.node_data.insert(hitem.0, NodeData::Source(i));
+        });
+    }
+}
+
+fn collect_tree_subtree_handles(
+    hwnd_tree: HWND,
+    item: windows::Win32::UI::Controls::HTREEITEM,
+    handles: &mut Vec<isize>,
+) {
+    handles.push(item.0);
+    let mut child = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CHILD as usize),
+            LPARAM(item.0),
+        )
+        .0,
+    );
+    while child.0 != 0 {
+        collect_tree_subtree_handles(hwnd_tree, child, handles);
+        child = windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_NEXT as usize),
+                LPARAM(child.0),
+            )
+            .0,
+        );
+    }
+}
+
+fn clear_tree_children(
+    hwnd: HWND,
+    hwnd_tree: HWND,
+    parent_item: windows::Win32::UI::Controls::HTREEITEM,
+) {
+    let mut removed_handles = Vec::new();
+    loop {
+        let child = windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CHILD as usize),
+                LPARAM(parent_item.0),
+            )
+            .0,
+        );
+        if child.0 == 0 {
+            break;
+        }
+        collect_tree_subtree_handles(hwnd_tree, child, &mut removed_handles);
+        crate::send_message_w_safe(hwnd_tree, TVM_DELETEITEM, WPARAM(0), LPARAM(child.0));
+    }
+    with_rss_state(hwnd, |state| {
+        for handle in removed_handles {
+            state.node_data.remove(&handle);
+            state.source_items.remove(&handle);
+        }
+    });
+}
+
+fn populate_google_news_categories(hwnd: HWND, root_item: windows::Win32::UI::Controls::HTREEITEM) {
+    let hwnd_tree = with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return;
+    }
+    let code =
+        active_news_language_code(with_rss_state(hwnd, |state| state.parent).unwrap_or(HWND(0)));
+    let categories = google_news_categories(&code);
+    clear_tree_children(hwnd, hwnd_tree, root_item);
+    with_rss_state(hwnd, |state| {
+        state.source_items.remove(&root_item.0);
+    });
+
+    for category in categories {
+        let title = to_wide(&category.title);
+        let mut insert = TVINSERTSTRUCTW {
+            hParent: root_item,
+            hInsertAfter: TVI_LAST,
+            Anonymous: TVINSERTSTRUCTW_0 {
+                item: TVITEMW {
+                    mask: TVIF_TEXT | TVIF_PARAM | windows::Win32::UI::Controls::TVIF_CHILDREN,
+                    pszText: windows::core::PWSTR(title.as_ptr() as *mut _),
+                    cChildren: TVITEMEXW_CHILDREN(1),
+                    lParam: LPARAM(0),
+                    ..Default::default()
+                },
+            },
+        };
+        let hitem = crate::send_message_w_safe(
+            hwnd_tree,
+            TVM_INSERTITEMW,
+            WPARAM(0),
+            LPARAM(&mut insert as *mut _ as isize),
+        );
+        with_rss_state(hwnd, |state| {
+            state
+                .node_data
+                .insert(hitem.0, NodeData::GoogleNewsCategory(category.clone()));
         });
     }
 }
@@ -4083,7 +6357,7 @@ fn set_source_unread(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM,
                             ps.settings.announce_unread_rss_podcast_items,
                             ps.settings.rss_podcast_unread_label_position,
                         );
-                        crate::settings::save_settings(ps.settings.clone());
+                        save_rss_settings(ps);
                         return Some(title);
                     }
                 }
@@ -4100,26 +6374,46 @@ fn set_source_unread(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM,
 }
 
 fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
-    // Check if items are already loaded - if so, mark as read immediately
-    let has_loaded_items = with_rss_state(hwnd, |s| {
-        if !matches!(s.node_data.get(&(hitem.0)), Some(NodeData::Source(_))) {
-            return false;
+    let node = with_rss_state(hwnd, |state| state.node_data.get(&hitem.0).cloned()).flatten();
+    match node.as_ref() {
+        Some(NodeData::GoogleNewsRoot) => {
+            populate_google_news_categories(hwnd, hitem);
+            return;
         }
-        s.source_items
+        Some(NodeData::GoogleNewsCategory(category)) if category.is_local => {
+            let parent = with_rss_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+            let city = with_state(parent, |state| state.settings.rss_local_city.clone())
+                .unwrap_or_default();
+            if city.trim().is_empty() {
+                with_rss_state(hwnd, |state| state.pending_local_category = hitem.0);
+                show_rss_city_dialog(hwnd, hitem, "");
+                return;
+            }
+        }
+        _ => {}
+    }
+
+    let has_loaded_items = with_rss_state(hwnd, |state| {
+        matches!(
+            state.node_data.get(&hitem.0),
+            Some(NodeData::Source(_)) | Some(NodeData::GoogleNewsCategory(_))
+        ) && state
+            .source_items
             .get(&hitem.0)
-            .map(|state| !state.items.is_empty())
+            .map(|items| !items.items.is_empty())
             .unwrap_or(false)
     })
     .unwrap_or(false);
 
-    let favorites_source_idx = with_rss_state(hwnd, |s| {
-        if let Some(NodeData::Source(idx)) = s.node_data.get(&(hitem.0)) {
-            with_state(s.parent, |ps| {
-                ps.settings
+    let favorites_source_idx = with_rss_state(hwnd, |state| {
+        if let Some(NodeData::Source(index)) = state.node_data.get(&hitem.0) {
+            with_state(state.parent, |parent_state| {
+                parent_state
+                    .settings
                     .rss_sources
-                    .get(*idx)
-                    .filter(|src| is_favorites_source(src))
-                    .map(|_| *idx)
+                    .get(*index)
+                    .filter(|source| is_favorites_source(source))
+                    .map(|_| *index)
             })
             .flatten()
         } else {
@@ -4127,43 +6421,52 @@ fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
         }
     })
     .flatten();
-    if let Some(source_idx) = favorites_source_idx {
-        load_favorites_source_items(hwnd, hitem, source_idx);
+    if let Some(source_index) = favorites_source_idx {
+        load_favorites_source_items(hwnd, hitem, source_index);
         set_source_unread(hwnd, hitem, false);
         return;
     }
 
     if has_loaded_items {
-        // Items already loaded, mark as read now
         set_source_unread(hwnd, hitem, false);
     }
-    // If items not loaded yet, they will be fetched and mark_as_read will happen
-    // in process_fetch_result after items are loaded
-    let item_info_opt = with_rss_state(hwnd, |s| {
-        if let Some(NodeData::Source(idx)) = s.node_data.get(&(hitem.0)) {
-            {
-                with_state(s.parent, |ps| {
-                    ps.settings
-                        .rss_sources
-                        .get(*idx)
-                        .map(|src| (src.url.clone(), src.kind.clone(), src.cache.clone(), true))
+
+    let item_info_opt = with_rss_state(hwnd, |state| match state.node_data.get(&hitem.0) {
+        Some(NodeData::Source(index)) => with_state(state.parent, |parent_state| {
+            parent_state.settings.rss_sources.get(*index).map(|source| {
+                (
+                    source.url.clone(),
+                    source.kind.clone(),
+                    source.cache.clone(),
+                    true,
+                )
+            })
+        })
+        .flatten(),
+        Some(NodeData::GoogleNewsCategory(category)) => {
+            let url = if category.is_local {
+                let city = with_state(state.parent, |parent_state| {
+                    parent_state.settings.rss_local_city.clone()
                 })
-            }
-            .flatten()
-        } else if let Some(NodeData::Item(item)) = s.node_data.get(&(hitem.0)) {
-            if item.is_folder {
-                Some((
-                    item.link.clone(),
-                    RssSourceType::Site,
-                    rss::RssFeedCache::default(),
-                    false,
-                ))
+                .unwrap_or_default();
+                google_news_local_url(&active_news_language_code(state.parent), &city)
             } else {
-                None
-            }
-        } else {
-            None
+                category.url.clone()
+            };
+            Some((
+                url,
+                RssSourceType::Feed,
+                rss::RssFeedCache::default(),
+                false,
+            ))
         }
+        Some(NodeData::Item(item)) if item.is_folder => Some((
+            item.link.clone(),
+            RssSourceType::Site,
+            rss::RssFeedCache::default(),
+            false,
+        )),
+        _ => None,
     });
 
     let (url, source_kind, mut cache, _is_source) = if let Some(info) = item_info_opt.flatten() {
@@ -4243,7 +6546,7 @@ fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
     } else {
         rss::RssFetchConfig::default()
     };
-    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let language = news_language_as_app_language(&active_news_language_code(parent));
     if parent.0 != 0 {
         ensure_rss_http(parent);
     }
@@ -4289,6 +6592,8 @@ struct FetchResult {
 /// Result of a background check for new articles (lightweight, no UI update needed)
 struct BackgroundCheckResult {
     source_idx: usize,
+    source_url: String,
+    news_language: String,
     newest_item_key: Option<String>,
 }
 
@@ -4331,7 +6636,8 @@ fn start_background_unread_check(hwnd: HWND) {
     }
 
     let fetch_config = rss_fetch_config(parent);
-    let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
+    let news_language = active_news_language_code(parent);
+    let language = news_language_as_app_language(&news_language);
     ensure_rss_http(parent);
 
     let hwnd_raw = hwnd.0;
@@ -4356,6 +6662,8 @@ fn start_background_unread_check(hwnd: HWND) {
                 let sem = semaphore.clone();
                 let cfg = fetch_config;
                 let hwnd_val = hwnd_raw;
+                let result_language = news_language.clone();
+                let result_url = url.clone();
 
                 let handle = tokio::spawn(async move {
                     let _permit = sem.acquire().await.ok()?;
@@ -4365,14 +6673,18 @@ fn start_background_unread_check(hwnd: HWND) {
                         let newest_key = select_newest_item_key(&outcome.items, &removed_keys);
                         let msg = Box::new(BackgroundCheckResult {
                             source_idx: idx,
+                            source_url: result_url,
+                            news_language: result_language,
                             newest_item_key: newest_key,
                         });
+                        let pointer = Box::into_raw(msg);
                         if let Err(e) = crate::post_message_w_safe(
                             HWND(hwnd_val),
                             WM_RSS_BACKGROUND_CHECK_COMPLETE,
                             WPARAM(0),
-                            LPARAM(Box::into_raw(msg) as isize),
+                            LPARAM(pointer as isize),
                         ) {
+                            let _message_owner = unsafe { Box::from_raw(pointer) };
                             crate::log_debug(&format!(
                                 "Failed to post WM_RSS_BACKGROUND_CHECK_COMPLETE: {}",
                                 e
@@ -4404,19 +6716,24 @@ fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
         return;
     };
 
-    // Check if this is a new article compared to last_seen_guid
-    let should_mark_unread = {
-        with_state(parent, |ps| {
-            ps.settings
-                .rss_sources
-                .get(res.source_idx)
-                .map(|src| match &src.last_seen_guid {
-                    Some(last_seen) => last_seen != &newest_key,
-                    None => true, // Never seen before
-                })
-                .unwrap_or(false)
-        })
-    }
+    // Ignore results started for a language or source list that is no longer active.
+    let should_mark_unread = with_state(parent, |state| {
+        if active_news_language_code_from_state(state) != res.news_language {
+            return false;
+        }
+        state
+            .settings
+            .rss_sources
+            .get(res.source_idx)
+            .filter(|source| {
+                normalize_rss_url_key(&source.url) == normalize_rss_url_key(&res.source_url)
+            })
+            .map(|source| match &source.last_seen_guid {
+                Some(last_seen) => last_seen != &newest_key,
+                None => true,
+            })
+            .unwrap_or(false)
+    })
     .unwrap_or(false);
 
     if should_mark_unread {
@@ -4442,6 +6759,11 @@ fn process_background_check_result(hwnd: HWND, res: BackgroundCheckResult) {
 fn process_fetch_result(hwnd: HWND, res: FetchResult) {
     unsafe {
         let hitem = windows::Win32::UI::Controls::HTREEITEM(res.hitem);
+        let still_current =
+            with_rss_state(hwnd, |state| state.node_data.contains_key(&hitem.0)).unwrap_or(false);
+        if !still_current {
+            return;
+        }
         let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
         let caret = windows::Win32::UI::Controls::HTREEITEM(
             SendMessageW(
@@ -4475,14 +6797,17 @@ fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                         let mut final_title = outcome.title.clone();
                         let allow_title_update = caret != hitem;
                         with_state(parent, |ps| {
-                            let lang = ps.settings.language;
+                            let ui_language = ps.settings.language;
+                            let default_language = news_language_as_app_language(
+                                &active_news_language_code_from_state(ps),
+                            );
                             let (_key, keep_default_title) = ps
                                 .settings
                                 .rss_sources
                                 .get(i)
                                 .map(|src| {
                                     let key = normalize_rss_url_key(&src.url);
-                                    let keep = is_default_key(lang, &ps.settings, &key);
+                                    let keep = is_default_key(default_language, &ps.settings, &key);
                                     (key, keep)
                                 })
                                 .unwrap_or_default();
@@ -4498,7 +6823,7 @@ fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                                 }
                                 final_title = rss_source_display_title(
                                     src,
-                                    lang,
+                                    ui_language,
                                     ps.settings.announce_unread_rss_podcast_items,
                                     ps.settings.rss_podcast_unread_label_position,
                                 );
@@ -4511,7 +6836,7 @@ fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                                     src.last_updated = Some(ts);
                                 }
                             }
-                            crate::settings::save_settings(ps.settings.clone());
+                            save_rss_settings(ps);
                         });
 
                         if allow_title_update {
@@ -4736,7 +7061,7 @@ fn process_fetch_result(hwnd: HWND, res: FetchResult) {
                             if let Some(src) = ps.settings.rss_sources.get_mut(i) {
                                 src.cache = cache;
                             }
-                            crate::settings::save_settings(ps.settings.clone());
+                            save_rss_settings(ps);
                         });
                     }
                 }
@@ -5010,7 +7335,7 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
                                 let overflow = src.read_item_keys.len() - MAX_PERSISTED_READ_KEYS;
                                 src.read_item_keys.drain(0..overflow);
                             }
-                            crate::settings::save_settings(ps.settings.clone());
+                            save_rss_settings(ps);
                         }
                     });
                 }
@@ -5093,6 +7418,9 @@ fn handle_delete(hwnd: HWND) {
                 .unwrap_or((crate::settings::Language::default(), true))
             })
             .unwrap_or((crate::settings::Language::default(), true));
+            let news_language = news_language_as_app_language(&active_news_language_code(
+                with_rss_state(hwnd, |state| state.parent).unwrap_or(HWND(0)),
+            ));
             let msg_template = i18n::tr(language, "rss.delete_confirm");
             let msg_text = msg_template.replace("{title}", &title);
             let caption = i18n::tr(language, "rss.delete_title");
@@ -5113,7 +7441,7 @@ fn handle_delete(hwnd: HWND) {
                 let mut delayed_target_source_idx: Option<usize> = None;
                 with_state(parent, |ps| {
                     if matches!(
-                        language,
+                        news_language,
                         crate::settings::Language::English
                             | crate::settings::Language::Swedish
                             | crate::settings::Language::Italian
@@ -5125,7 +7453,7 @@ fn handle_delete(hwnd: HWND) {
                             | crate::settings::Language::French
                             | crate::settings::Language::Serbian
                     ) {
-                        let defaults = load_default_feeds(language);
+                        let defaults = load_default_feeds(news_language);
                         if !defaults.is_empty() {
                             let mut default_keys = HashSet::new();
                             for (_title, url) in defaults {
@@ -5136,7 +7464,7 @@ fn handle_delete(hwnd: HWND) {
                             }
                             let key = normalize_rss_url_key(&url);
                             if !key.is_empty() && default_keys.contains(&key) {
-                                let removed_list = match language {
+                                let removed_list = match news_language {
                                     crate::settings::Language::Ukrainian
                                     | crate::settings::Language::English
                                     | crate::settings::Language::Lithuanian
@@ -5160,7 +7488,7 @@ fn handle_delete(hwnd: HWND) {
                                         &mut ps.settings.rss_removed_default_vi
                                     }
                                     crate::settings::Language::Czech => {
-                                        &mut ps.settings.rss_removed_default_en
+                                        &mut ps.settings.rss_removed_default_cs
                                     }
                                     crate::settings::Language::Polish => {
                                         &mut ps.settings.rss_removed_default_pl
@@ -5195,7 +7523,7 @@ fn handle_delete(hwnd: HWND) {
                     } else {
                         Some(0)
                     };
-                    crate::settings::save_settings(ps.settings.clone());
+                    save_rss_settings(ps);
                 });
                 with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
                 SendMessageW(hwnd_tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
@@ -5207,7 +7535,7 @@ fn handle_delete(hwnd: HWND) {
                         s.removed_history.push(RssLastRemoved::Source {
                             index: idx,
                             source,
-                            language,
+                            language: news_language,
                             default_removed_key_added,
                         });
                     });
@@ -5295,7 +7623,7 @@ fn handle_delete(hwnd: HWND) {
                                 && !src.removed_item_keys.iter().any(|k| k == &key)
                             {
                                 src.removed_item_keys.push(key.clone());
-                                crate::settings::save_settings(ps.settings.clone());
+                                save_rss_settings(ps);
                             }
                         });
                     }
@@ -5410,7 +7738,7 @@ fn undo_last_delete(hwnd: HWND) {
                                 &mut ps.settings.rss_removed_default_vi
                             }
                             crate::settings::Language::Czech => {
-                                &mut ps.settings.rss_removed_default_en
+                                &mut ps.settings.rss_removed_default_cs
                             }
                             crate::settings::Language::Polish => {
                                 &mut ps.settings.rss_removed_default_pl
@@ -5427,7 +7755,7 @@ fn undo_last_delete(hwnd: HWND) {
                         };
                         removed_list.retain(|u| normalize_rss_url_key(u) != key);
                     }
-                    crate::settings::save_settings(ps.settings.clone());
+                    save_rss_settings(ps);
                 })
                 .unwrap_or(());
 
@@ -5460,7 +7788,7 @@ fn undo_last_delete(hwnd: HWND) {
                     with_state(parent, |ps| {
                         if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
                             src.removed_item_keys.retain(|k| k != &key);
-                            crate::settings::save_settings(ps.settings.clone());
+                            save_rss_settings(ps);
                         }
                     });
                 }
@@ -5870,7 +8198,7 @@ fn apply_reorder_action(
     if hwnd_tree.0 == 0 || parent.0 == 0 {
         return None;
     }
-    let mut root_items = collect_root_items(hwnd_tree);
+    let mut root_items = collect_source_root_items(hwnd, hwnd_tree);
     if source_index >= root_items.len() {
         return None;
     }
@@ -5896,7 +8224,7 @@ fn apply_reorder_action(
                 ),
             };
             if moved.is_some() {
-                crate::settings::save_settings(ps.settings.clone());
+                save_rss_settings(ps);
             }
             moved
         })
@@ -5944,7 +8272,7 @@ fn handle_sort_action(hwnd: HWND, order: crate::settings::SortOrder) {
     {
         with_state(parent, |ps| {
             crate::settings::sort_rss_sources(&mut ps.settings, order);
-            crate::settings::save_settings(ps.settings.clone());
+            save_rss_settings(ps);
         });
         reload_tree(hwnd);
     }
@@ -6186,7 +8514,7 @@ fn move_selected_article_by_one(hwnd: HWND, move_up: bool) -> bool {
                 .flatten()
                 .unwrap_or_default();
                 ps.settings.rss_favorite_articles = updated;
-                crate::settings::save_settings(ps.settings.clone());
+                save_rss_settings(ps);
             }
         });
     }
@@ -6434,7 +8762,7 @@ fn handle_add_article_to_favorites(hwnd: HWND) {
         if let Some(src) = ps.settings.rss_sources.get_mut(favorites_index) {
             src.unread = true;
         }
-        crate::settings::save_settings(ps.settings.clone());
+        save_rss_settings(ps);
         added = true;
     });
 

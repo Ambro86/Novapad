@@ -13,16 +13,17 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
     ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, GWLP_USERDATA, GetWindowLongPtrW, HMENU,
-    IDC_ARROW, IDCANCEL, IsChild, LoadCursorW, MSG, MoveWindow, RegisterClassW, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WNDCLASSW,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_OVERLAPPEDWINDOW, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    IDC_ARROW, IDCANCEL, IsChild, LoadCursorW, MSG, MoveWindow, PostMessageW, RegisterClassW,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
+    WM_SIZE, WNDCLASSW, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_OVERLAPPEDWINDOW,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
 const HELP_CLASS_NAME: &str = "SonarpadHelp";
 const HELP_ID_OK: usize = 7003;
+const WM_HELP_FOCUS_CONTENT: u32 = WM_APP + 1;
 const READONLY_TEXT_CLASS_NAME: &str = "SonarpadReadonlyText";
 const READONLY_TEXT_ID_OK: usize = 7013;
 const DONATIONS_IT: &str = include_str!("../../donations_it.txt");
@@ -70,6 +71,7 @@ fn read_override_text(file_name: &str) -> Option<String> {
 enum HelpWindowKind {
     Guide,
     Changelog,
+    UpdateChangelog,
     Donations,
 }
 
@@ -188,6 +190,10 @@ pub fn open_changelog(parent: HWND) {
     open_window(parent, HelpWindowKind::Changelog);
 }
 
+pub fn open_update_changelog(parent: HWND) {
+    open_window(parent, HelpWindowKind::UpdateChangelog);
+}
+
 pub fn open_donations(parent: HWND) {
     open_window(parent, HelpWindowKind::Donations);
 }
@@ -240,7 +246,7 @@ fn open_window(parent: HWND, kind: HelpWindowKind) {
     let existing = {
         with_state(parent, |state| match kind {
             HelpWindowKind::Guide => state.help_window,
-            HelpWindowKind::Changelog => state.changelog_window,
+            HelpWindowKind::Changelog | HelpWindowKind::UpdateChangelog => state.changelog_window,
             HelpWindowKind::Donations => state.donations_window,
         })
     }
@@ -293,7 +299,9 @@ fn open_window(parent: HWND, kind: HelpWindowKind) {
         if {
             with_state(parent, |state| match kind {
                 HelpWindowKind::Guide => state.help_window = window,
-                HelpWindowKind::Changelog => state.changelog_window = window,
+                HelpWindowKind::Changelog | HelpWindowKind::UpdateChangelog => {
+                    state.changelog_window = window
+                }
                 HelpWindowKind::Donations => state.donations_window = window,
             })
         }
@@ -425,24 +433,10 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                         Language::Chinese => include_str!("../../guida_zh.txt").to_string(),
                         Language::Hindi => include_str!("../../guida_hi.txt").to_string(),
                     },
-                    HelpWindowKind::Changelog => match init.language {
-                        Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
-                        Language::Ukrainian | Language::English => {
-                            include_str!("../../CHANGELOG.md").to_string()
-                        }
-                        Language::Hindi => include_str!("../../CHANGELOG-HI.txt").to_string(),
-                        Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
-                        Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
-                        Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
-                        Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
-                        Language::Czech => include_str!("../../CHANGELOG_CS.md").to_string(),
-                        Language::Polish => include_str!("../../CHANGELOG_PL.md").to_string(),
-                        Language::French => include_str!("../../CHANGELOG_FR.md").to_string(),
-                        Language::Serbian => include_str!("../../CHANGELOG.md").to_string(),
-                        Language::Lithuanian => include_str!("../../CHANGELOG.md").to_string(),
-                        Language::Russian => include_str!("../../CHANGELOG_RU.md").to_string(),
-                        Language::Chinese => include_str!("../../CHANGELOG.md").to_string(),
-                    },
+                    HelpWindowKind::Changelog => changelog_content(init.language),
+                    HelpWindowKind::UpdateChangelog => {
+                        update_completed_changelog_content(init.language)
+                    }
                     HelpWindowKind::Donations => donations_content(init.language),
                 };
                 let content = normalize_to_crlf(&content);
@@ -450,8 +444,6 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 if let Err(e) = SetWindowTextW(edit, PCWSTR(content_wide.as_ptr())) {
                     crate::log_debug(&format!("Failed to set help content: {}", e));
                 }
-                SetFocus(edit);
-
                 let state = Box::new(HelpWindowState {
                     parent,
                     edit,
@@ -459,6 +451,23 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                     kind: init.kind,
                 });
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                if let Err(err) = PostMessageW(hwnd, WM_HELP_FOCUS_CONTENT, WPARAM(0), LPARAM(0)) {
+                    crate::log_debug(&format!(
+                        "Failed to post help content focus message: {}",
+                        err
+                    ));
+                    SetFocus(edit);
+                }
+                LRESULT(0)
+            }
+            WM_HELP_FOCUS_CONTENT => {
+                if with_help_state(hwnd, |state| {
+                    SetFocus(state.edit);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to focus help content");
+                }
                 LRESULT(0)
             }
             WM_SETFOCUS => {
@@ -509,7 +518,9 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 if parent.0 != 0
                     && with_state(parent, |state| match kind {
                         HelpWindowKind::Guide => state.help_window = HWND(0),
-                        HelpWindowKind::Changelog => state.changelog_window = HWND(0),
+                        HelpWindowKind::Changelog | HelpWindowKind::UpdateChangelog => {
+                            state.changelog_window = HWND(0)
+                        }
                         HelpWindowKind::Donations => state.donations_window = HWND(0),
                     })
                     .is_none()
@@ -561,8 +572,48 @@ fn help_title(language: Language, kind: HelpWindowKind) -> String {
     match kind {
         HelpWindowKind::Guide => i18n::tr(language, "help.window.guide"),
         HelpWindowKind::Changelog => i18n::tr(language, "help.window.changelog"),
+        HelpWindowKind::UpdateChangelog => update_completed_changelog_title(language),
         HelpWindowKind::Donations => i18n::tr(language, "help.window.donations"),
     }
+}
+
+fn update_completed_changelog_title(language: Language) -> String {
+    let completed = i18n::tr(language, "updater.info.completed");
+    let completed = completed.trim().trim_end_matches(['.', '。', '।']);
+    let changelog = i18n::tr(language, "help.window.changelog");
+    format!(
+        "{} – {} – Sonarpad {}",
+        completed,
+        changelog,
+        crate::app_display_version()
+    )
+}
+
+fn changelog_content(language: Language) -> String {
+    match language {
+        Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
+        Language::Ukrainian | Language::English => include_str!("../../CHANGELOG.md").to_string(),
+        Language::Hindi => include_str!("../../CHANGELOG-HI.txt").to_string(),
+        Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
+        Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
+        Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
+        Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
+        Language::Czech => include_str!("../../CHANGELOG_CS.md").to_string(),
+        Language::Polish => include_str!("../../CHANGELOG_PL.md").to_string(),
+        Language::French => include_str!("../../CHANGELOG_FR.md").to_string(),
+        Language::Serbian => include_str!("../../CHANGELOG.md").to_string(),
+        Language::Lithuanian => include_str!("../../CHANGELOG.md").to_string(),
+        Language::Russian => include_str!("../../CHANGELOG_RU.md").to_string(),
+        Language::Chinese => include_str!("../../CHANGELOG.md").to_string(),
+    }
+}
+
+fn update_completed_changelog_content(language: Language) -> String {
+    format!(
+        "{}\r\n\r\n{}",
+        i18n::tr(language, "updater.info.completed"),
+        changelog_content(language)
+    )
 }
 
 fn donations_content(language: Language) -> String {

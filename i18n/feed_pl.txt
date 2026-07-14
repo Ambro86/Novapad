@@ -1,20 +1,20 @@
-Rzeczpospolita | https://www.rp.pl/rss/1019
 Polsat News | https://www.polsatnews.pl/rss/wszystkie.xml
-Interia Wydarzenia | https://wydarzenia.interia.pl/feed
-TVN24 Najnowsze | https://www.tvn24.pl/najnowsze.xml
+TVN24 | https://www.tvn24.pl/najnowsze.xml
+Interia Wiadomości | https://wydarzenia.interia.pl/feed
 Fakt | https://fakt.pl/rss
+Wprost | https://www.wprost.pl/rss
+Antyweb | https://antyweb.pl/feed
+Onet Wiadomości | https://wiadomosci.onet.pl/rss
+Wirtualna Polska | https://wiadomosci.wp.pl/rss.xml
+Spider's Web | https://spidersweb.pl/feed
+Rzeczpospolita | https://www.rp.pl/rss/1019
 Gazeta Wyborcza | https://wyborcza.pl/rss/0,0.xml
 PAP Biznes | https://biznes.pap.pl/pl/rss/ostatnie-wiadomosci
 PAP Nauka | https://naukawpolsce.pap.pl/rss.xml
 Dziennik.pl | https://wiadomosci.dziennik.pl/rss
-Wprost | https://www.wprost.pl/rss
 Newsweek Polska | https://www.newsweek.pl/rss
-Spider's Web | https://spidersweb.pl/feed
-Antyweb | https://antyweb.pl/feed
 Benchmark.pl | https://www.benchmark.pl/rss
 Dobreprogramy | https://www.dobreprogramy.pl/feed
 Gram.pl | https://www.gram.pl/feed/
 Filmweb | https://www.filmweb.pl/feed/news
 Przegląd Sportowy | https://przegladsportowy.onet.pl/rss
-Onet Wiadomości | https://wiadomosci.onet.pl/rss
-Wirtualna Polska | https://wiadomosci.wp.pl/rss.xml

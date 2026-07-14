@@ -1,11 +1,11 @@
-Público – Últimas | https://feeds.feedburner.com/PublicoRSS
-Observador – Últimas | https://observador.pt/feed/
-RTP Notícias – RSS (índice) | https://www.rtp.pt/noticias/rss
+Público | https://feeds.feedburner.com/PublicoRSS
+Observador | https://observador.pt/feed/
+RTP Notícias | https://www.rtp.pt/noticias/rss
+Correio da Manhã | https://www.cmjornal.pt/rss
+Jornal de Notícias | http://feeds.jn.pt/JN-ULTIMAS
+O Jornal Económico | https://jornaleconomico.sapo.pt/feed/
+Diário As Beiras | http://feeds.feedburner.com/asbeiras
 RTP Notícias – País | https://www.rtp.pt/noticias/rss/pais
 RTP Notícias – Mundo | https://www.rtp.pt/noticias/rss/mundo
-Correio da Manhã – RSS | https://www.cmjornal.pt/rss
-O Jornal Económico – RSS | https://jornaleconomico.sapo.pt/feed/
-Jornal de Notícias – Últimas | http://feeds.jn.pt/JN-ULTIMAS
 Rádio Renascença – RSS | https://rr.sapo.pt/rss/rssfeed.aspx
 Diário de Notícias – Podcast “Soberania” | https://feeds.dn.pt/soberania-podcast
-Diário As Beiras – RSS | http://feeds.feedburner.com/asbeiras

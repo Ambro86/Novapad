@@ -1,33 +1,42 @@
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use chrono::{Local, NaiveDateTime};
+use serde::{Deserialize, Serialize};
 use windows::Win32::Foundation::{CloseHandle, HWND};
+use windows::Win32::System::Threading::{
+    GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+};
 use windows::Win32::UI::WindowsAndMessaging::{MB_ICONWARNING, MB_OK};
 use windows::core::PCWSTR;
 
 use crate::accessibility::to_wide;
-use windows::Win32::System::Threading::{
-    GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-};
-
 use crate::app_windows::interpreter_select_window::InterpreterContextAction;
 use crate::app_windows::youtube_transcript_window::{
-    self, MultilineSearchOptions, MultilineSelectionItem, MultilineSelectionResult,
+    self, MultilineRefreshOptions, MultilineSearchOptions, MultilineSelectionItem,
+    MultilineSelectionResult,
 };
 use crate::settings::Language;
 
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+const CREATE_NO_WINDOW_FLAG: u32 = 0x0800_0000;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum StreamRecordingKind {
     Radio,
     Tv,
+}
+
+pub(crate) struct ScheduledRecordingOptions<'a> {
+    pub(crate) duration_minutes: u32,
+    pub(crate) scheduled_id: &'a str,
+    pub(crate) prefer_audio_description: bool,
 }
 
 impl StreamRecordingKind {
@@ -42,6 +51,72 @@ impl StreamRecordingKind {
         match self {
             Self::Radio => "mp3",
             Self::Tv => "mp4",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct RecordingActivity {
+    id: String,
+    kind: StreamRecordingKind,
+    title: String,
+    output_path: String,
+    process_id: u32,
+    started_unix: u64,
+    expected_end_unix: Option<u64>,
+    scheduled_id: Option<String>,
+}
+
+#[derive(Clone)]
+enum RecordingListEntry {
+    Scheduled {
+        id: String,
+        title: String,
+        description: String,
+    },
+    Active {
+        id: String,
+        title: String,
+        description: String,
+    },
+    File(PathBuf),
+}
+
+impl RecordingListEntry {
+    fn id(&self) -> String {
+        match self {
+            Self::Scheduled { id, .. } | Self::Active { id, .. } => id.clone(),
+            Self::File(path) => path.to_string_lossy().to_string(),
+        }
+    }
+
+    fn as_item(&self) -> MultilineSelectionItem {
+        match self {
+            Self::Scheduled {
+                id,
+                title,
+                description,
+            }
+            | Self::Active {
+                id,
+                title,
+                description,
+            } => MultilineSelectionItem {
+                id: id.clone(),
+                title: title.clone(),
+                description: Some(description.clone()),
+            },
+            Self::File(path) => MultilineSelectionItem {
+                id: path.to_string_lossy().to_string(),
+                title: path
+                    .file_stem()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or("Registrazione")
+                    .to_string(),
+                description: fs::metadata(path)
+                    .ok()
+                    .map(|metadata| format_file_size(metadata.len())),
+            },
         }
     }
 }
@@ -99,13 +174,7 @@ fn start_recording_and_playback(
         ));
     }
 
-    let ffmpeg = find_ffmpeg_executable(ui_language)?;
     let output_path = next_recording_path(kind, title, ui_language)?;
-
-    // Avviamo prima mpv. Alcuni redirect HLS dinamici, soprattutto quelli RAI,
-    // non tollerano bene che FFmpeg apra il flusso per primo: il player resta
-    // senza tracce e quindi senza audio. Dopo che mpv ha caricato le tracce,
-    // apriamo una seconda connessione indipendente per la registrazione.
     let playback_result = match kind {
         StreamRecordingKind::Radio => {
             crate::launch_stream_url_in_mpv(parent, url, Some(title), None, None, None)
@@ -144,53 +213,114 @@ fn start_recording_and_playback(
             "Il canale TV non ha completato il caricamento e la registrazione non è stata avviata.",
         ));
     }
+    if kind == StreamRecordingKind::Tv && prefer_audio_description {
+        // La prima selezione può avvenire quando l'HLS non ha ancora pubblicato
+        // le tracce. Ora che il caricamento è completo, la ripetiamo prima di
+        // attivare stream-record, evitando cambi di traccia durante il file.
+        crate::select_raiplay_mpv_audio_track(parent);
+    }
 
-    let mut recorder = match spawn_ffmpeg_recorder(
-        &ffmpeg,
-        url,
-        &output_path,
-        user_agent,
-        kind,
-        ui_language,
-        None,
-    ) {
-        Ok(recorder) => recorder,
-        Err(err) => {
+    let activity = match create_activity(kind, title, &output_path, None, None) {
+        Ok(activity) => activity,
+        Err(error) => {
             crate::stop_managed_mpv_playback(parent);
-            remove_recording_file(&output_path, "FFmpeg launch failure");
-            return Err(err);
+            remove_recording_file(&output_path, "recording activity creation failure");
+            return Err(error);
         }
     };
 
-    // Verifica rapida: se FFmpeg termina immediatamente, evitiamo di annunciare
-    // una registrazione che in realtà non è partita.
+    if kind == StreamRecordingKind::Tv {
+        let temp_path = match mpv_stream_recording_temp_path(&output_path) {
+            Ok(path) => path,
+            Err(error) => {
+                remove_activity(&activity.id);
+                crate::stop_managed_mpv_playback(parent);
+                return Err(error);
+            }
+        };
+        if let Err(error) = crate::start_active_mpv_stream_recording(parent, &temp_path) {
+            remove_activity(&activity.id);
+            crate::stop_managed_mpv_playback(parent);
+            remove_recording_file(&temp_path, "mpv stream recording startup failure");
+            remove_recording_file(&output_path, "mpv stream recording startup failure");
+            return Err(error);
+        }
+
+        crate::log_debug(&format!(
+            "Managed mpv TV recording started: mpv_pid={mpv_process_id} temp={} output={}",
+            temp_path.display(),
+            output_path.display()
+        ));
+        let activity_id = activity.id.clone();
+        let output_for_thread = output_path.clone();
+        thread::spawn(move || {
+            monitor_mpv_recording_until_player_closes(
+                mpv_process_id,
+                temp_path,
+                output_for_thread,
+                activity_id,
+            );
+        });
+        return Ok(output_path);
+    }
+
+    let stop = Arc::new(AtomicBool::new(false));
+    let result_rx = spawn_internal_recording(
+        url.to_string(),
+        output_path.clone(),
+        user_agent.map(ToOwned::to_owned),
+        kind,
+        prefer_audio_description,
+        Arc::clone(&stop),
+    );
+
     thread::sleep(Duration::from_millis(350));
-    match recorder.try_wait() {
-        Ok(Some(status)) => {
+    match result_rx.try_recv() {
+        Ok(Ok(())) => {
+            remove_activity(&activity.id);
             crate::stop_managed_mpv_playback(parent);
-            remove_recording_file(&output_path, "FFmpeg immediate exit");
-            return Err(format!(
-                "FFmpeg ha terminato subito la registrazione con stato {status}."
-            ));
+            if !recording_output_is_usable(&output_path) {
+                remove_recording_file(&output_path, "internal FFmpeg immediate completion");
+                return Err(
+                    "La registrazione è terminata immediatamente senza produrre un file valido."
+                        .to_string(),
+                );
+            }
+            return Ok(output_path);
         }
-        Ok(None) => {}
-        Err(err) => {
+        Ok(Err(error)) => {
+            remove_activity(&activity.id);
             crate::stop_managed_mpv_playback(parent);
-            remove_recording_file(&output_path, "FFmpeg startup check failure");
-            return Err(format!(
-                "Impossibile verificare l'avvio della registrazione: {err}"
-            ));
+            remove_recording_file(&output_path, "internal FFmpeg startup failure");
+            return Err(error);
         }
+        Err(TryRecvError::Disconnected) => {
+            remove_activity(&activity.id);
+            crate::stop_managed_mpv_playback(parent);
+            remove_recording_file(&output_path, "internal FFmpeg channel disconnected");
+            return Err(
+                "Il motore FFmpeg interno si è chiuso durante l'avvio della registrazione."
+                    .to_string(),
+            );
+        }
+        Err(TryRecvError::Empty) => {}
     }
 
     crate::log_debug(&format!(
-        "Stream recording started: kind={kind:?} mpv_pid={mpv_process_id} output={}",
+        "Internal FFmpeg stream recording started: kind={kind:?} mpv_pid={mpv_process_id} output={}",
         output_path.display()
     ));
 
     let output_for_thread = output_path.clone();
+    let activity_id = activity.id.clone();
     thread::spawn(move || {
-        monitor_recording_until_player_closes(recorder, mpv_process_id, output_for_thread);
+        monitor_internal_recording_until_player_closes(
+            result_rx,
+            stop,
+            mpv_process_id,
+            output_for_thread,
+            activity_id,
+        );
     });
 
     Ok(output_path)
@@ -202,7 +332,7 @@ pub(crate) fn record_stream_for_duration(
     user_agent: Option<&str>,
     kind: StreamRecordingKind,
     ui_language: Option<Language>,
-    duration_minutes: u32,
+    options: ScheduledRecordingOptions<'_>,
 ) -> Result<PathBuf, String> {
     let url = url.trim();
     if url.is_empty() {
@@ -212,213 +342,578 @@ pub(crate) fn record_stream_for_duration(
             "L'indirizzo dello stream è vuoto.",
         ));
     }
-    if duration_minutes == 0 {
+    if options.duration_minutes == 0 {
         return Err("La durata della registrazione deve essere maggiore di zero.".to_string());
     }
-    let ffmpeg = find_ffmpeg_executable(ui_language)?;
+
     let output_path = next_recording_path(kind, title, ui_language)?;
-    let mut recorder = spawn_ffmpeg_recorder(
-        &ffmpeg,
-        url,
-        &output_path,
-        user_agent,
+    let duration = Duration::from_secs(u64::from(options.duration_minutes) * 60);
+    let expected_end = unix_now().saturating_add(duration.as_secs());
+    let activity = create_activity(
         kind,
-        ui_language,
-        Some(duration_minutes),
+        title,
+        &output_path,
+        Some(expected_end),
+        Some(options.scheduled_id),
     )?;
-    let status = recorder.wait().map_err(|error| {
-        remove_recording_file(&output_path, "scheduled recording wait failure");
-        error.to_string()
-    })?;
-    let file_size = fs::metadata(&output_path)
-        .map(|metadata| metadata.len())
-        .unwrap_or(0);
-    if !status.success() || file_size < 1024 {
+
+    let result = match kind {
+        StreamRecordingKind::Radio => {
+            let stop = Arc::new(AtomicBool::new(false));
+            let timer_stop = Arc::clone(&stop);
+            thread::spawn(move || {
+                thread::sleep(duration);
+                timer_stop.store(true, Ordering::Release);
+            });
+            run_internal_recording(
+                url,
+                &output_path,
+                user_agent,
+                kind,
+                options.prefer_audio_description,
+                stop,
+            )
+        }
+        StreamRecordingKind::Tv => record_tv_for_duration_with_hidden_mpv(
+            url,
+            &output_path,
+            user_agent,
+            options.prefer_audio_description,
+            duration,
+        ),
+    };
+
+    remove_activity(&activity.id);
+    if let Err(error) = result {
         remove_recording_file(&output_path, "scheduled recording failure");
-        return Err(format!(
-            "FFmpeg ha terminato la registrazione programmata con stato {status}."
-        ));
+        return Err(error);
+    }
+    if !recording_output_is_usable(&output_path) {
+        remove_recording_file(&output_path, "scheduled recording too small");
+        return Err("Il motore di registrazione non ha prodotto un file valido.".to_string());
     }
     Ok(output_path)
 }
 
-fn spawn_ffmpeg_recorder(
-    ffmpeg: &Path,
+fn spawn_internal_recording(
+    url: String,
+    output_path: PathBuf,
+    user_agent: Option<String>,
+    kind: StreamRecordingKind,
+    prefer_audio_description: bool,
+    stop: Arc<AtomicBool>,
+) -> Receiver<Result<(), String>> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let result = run_internal_recording(
+            &url,
+            &output_path,
+            user_agent.as_deref(),
+            kind,
+            prefer_audio_description,
+            stop,
+        );
+        crate::log_if_err!(sender.send(result), "Sending recording result failed");
+    });
+    receiver
+}
+
+fn run_internal_recording(
     url: &str,
     output_path: &Path,
     user_agent: Option<&str>,
     kind: StreamRecordingKind,
-    ui_language: Option<Language>,
-    duration_minutes: Option<u32>,
-) -> Result<Child, String> {
-    let mut command = Command::new(ffmpeg);
-    command
-        .arg("-y")
-        .arg("-hide_banner")
-        .arg("-loglevel")
-        .arg("warning")
-        .arg("-reconnect")
-        .arg("1")
-        .arg("-reconnect_streamed")
-        .arg("1")
-        .arg("-reconnect_delay_max")
-        .arg("5");
-
-    if let Some(user_agent) = user_agent.map(str::trim).filter(|value| !value.is_empty()) {
-        command.arg("-user_agent").arg(user_agent);
-    }
-
-    command
-        .arg("-fflags")
-        .arg("+genpts+discardcorrupt")
-        .arg("-i")
-        .arg(url);
+    prefer_audio_description: bool,
+    stop: Arc<AtomicBool>,
+) -> Result<(), String> {
     match kind {
         StreamRecordingKind::Radio => {
-            // Le radio possono trasmettere in AAC, Opus, Vorbis o MP3. Per ottenere
-            // sempre un vero file MP3 riproducibile, l'audio viene ricodificato.
-            command
-                .arg("-map")
-                .arg("0:a:0?")
-                .arg("-vn")
-                .arg("-sn")
-                .arg("-dn")
-                .arg("-c:a")
-                .arg("libmp3lame")
-                .arg("-q:a")
-                .arg("2")
-                .arg("-id3v2_version")
-                .arg("3")
-                .arg("-write_id3v1")
-                .arg("1")
-                .arg("-f")
-                .arg("mp3");
+            crate::ffmpeg_export::record_live_audio_stream_to_mp3(url, output_path, stop)
         }
-        StreamRecordingKind::Tv => {
-            // Il video viene copiato senza perdita; l'audio viene convertito in AAC,
-            // formato sempre compatibile con MP4. L'MP4 frammentato rimane leggibile
-            // anche se la registrazione viene interrotta mentre è in corso.
-            command
-                .arg("-map")
-                .arg("0:v:0?")
-                .arg("-map")
-                .arg("0:a:0?")
-                .arg("-sn")
-                .arg("-dn")
-                .arg("-c:v")
-                .arg("copy")
-                .arg("-c:a")
-                .arg(if is_rai_like_stream(url) {
-                    "copy"
-                } else {
-                    "aac"
-                });
-            if !is_rai_like_stream(url) {
-                command.arg("-b:a").arg("192k").arg("-ar").arg("48000");
-            }
-            command
-                .arg("-movflags")
-                .arg("+frag_keyframe+empty_moov+default_base_moof")
-                .arg("-f")
-                .arg("mp4");
-        }
+        StreamRecordingKind::Tv => crate::ffmpeg_export::record_live_media_stream_to_mp4(
+            url,
+            output_path,
+            user_agent,
+            prefer_audio_description,
+            stop,
+        ),
     }
-    command.arg("-map_metadata").arg("-1");
-    if let Some(minutes) = duration_minutes.filter(|value| *value > 0) {
-        command.arg("-t").arg((u64::from(minutes) * 60).to_string());
-    }
-    command
-        .arg(output_path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped());
+}
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    let mut child = command.spawn().map_err(|err| {
-        recording_format(
-            ui_language,
-            "radio.recording_error_start_ffmpeg",
-            &[("error", err.to_string())],
-            "Impossibile avviare FFmpeg per la registrazione: {error}",
-        )
+fn mpv_stream_recording_temp_path(output_path: &Path) -> Result<PathBuf, String> {
+    let temp_dir = crate::settings::settings_dir().join("RecordingTemp");
+    fs::create_dir_all(&temp_dir).map_err(|error| {
+        format!("Impossibile creare la cartella temporanea delle registrazioni: {error}")
     })?;
+    let stem = output_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("tv_recording");
+    Ok(temp_dir.join(format!("{stem}.ts")))
+}
 
-    if let Some(stderr) = child.stderr.take() {
-        let output_for_log = output_path.to_path_buf();
-        thread::spawn(move || {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines().map_while(Result::ok) {
-                let line = redact_http_urls(&line);
-                if !line.trim().is_empty() {
+fn background_mpv_ipc_path() -> PathBuf {
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    PathBuf::from(format!(
+        r"\\.\pipe\sonarpad-scheduled-mpv-{}-{suffix}",
+        std::process::id()
+    ))
+}
+
+fn query_mpv_property_at_ipc(ipc_path: &Path, property: &str) -> Result<serde_json::Value, String> {
+    let mut pipe = crate::open_mpv_ipc_pipe(ipc_path)?;
+    let request = serde_json::json!({
+        "command": ["get_property", property]
+    })
+    .to_string();
+    let response = crate::send_mpv_ipc_request_with_id(ipc_path, &mut pipe, &request, 1)?;
+    Ok(response
+        .get("data")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null))
+}
+
+fn background_mpv_exited(child: &mut Child) -> Result<Option<String>, String> {
+    child
+        .try_wait()
+        .map(|status| status.map(|value| value.to_string()))
+        .map_err(|error| format!("Impossibile controllare il processo mpv nascosto: {error}"))
+}
+
+fn wait_for_background_mpv_ipc(
+    child: &mut Child,
+    ipc_path: &Path,
+    timeout: Duration,
+) -> Result<(), String> {
+    let started = Instant::now();
+    while started.elapsed() < timeout {
+        if let Some(status) = background_mpv_exited(child)? {
+            return Err(format!(
+                "mpv si è chiuso durante l'apertura del flusso, stato {status}."
+            ));
+        }
+        if crate::send_mpv_ipc_command(ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok()
+        {
+            return Ok(());
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    Err("mpv non ha inizializzato il canale di controllo della registrazione.".to_string())
+}
+
+fn wait_for_background_mpv_tracks(
+    child: &mut Child,
+    ipc_path: &Path,
+    timeout: Duration,
+) -> Result<serde_json::Value, String> {
+    let started = Instant::now();
+    while started.elapsed() < timeout {
+        if let Some(status) = background_mpv_exited(child)? {
+            return Err(format!(
+                "mpv si è chiuso prima di caricare le tracce, stato {status}."
+            ));
+        }
+        if let Ok(track_list) = query_mpv_property_at_ipc(ipc_path, "track-list")
+            && track_list
+                .as_array()
+                .map(|tracks| !tracks.is_empty())
+                .unwrap_or(false)
+        {
+            crate::log_debug(&format!(
+                "Scheduled hidden mpv tracks ready after {} ms: {}",
+                started.elapsed().as_millis(),
+                track_list
+            ));
+            return Ok(track_list);
+        }
+        thread::sleep(Duration::from_millis(200));
+    }
+    Err("mpv non ha caricato le tracce del canale entro il tempo previsto.".to_string())
+}
+
+fn track_id(track: &serde_json::Value) -> Option<i64> {
+    track.get("id").and_then(serde_json::Value::as_i64)
+}
+
+fn track_is_type(track: &serde_json::Value, kind: &str) -> bool {
+    track
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .map(|value| value.eq_ignore_ascii_case(kind))
+        .unwrap_or(false)
+}
+
+fn track_is_selected(track: &serde_json::Value) -> bool {
+    track
+        .get("selected")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
+}
+
+fn select_background_mpv_tracks(
+    ipc_path: &Path,
+    track_list: &serde_json::Value,
+    prefer_audio_description: bool,
+) -> Result<(), String> {
+    let Some(tracks) = track_list.as_array() else {
+        return Err("mpv ha restituito un elenco tracce non valido.".to_string());
+    };
+
+    let selected_video = tracks
+        .iter()
+        .find(|track| track_is_type(track, "video") && track_is_selected(track));
+    let video = selected_video.or_else(|| {
+        tracks
+            .iter()
+            .filter(|track| track_is_type(track, "video"))
+            .max_by_key(|track| {
+                track
+                    .get("hls-bitrate")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or_default()
+            })
+    });
+    if let Some(video_id) = video.and_then(track_id) {
+        let command = serde_json::json!({
+            "command": ["set_property", "vid", video_id]
+        })
+        .to_string();
+        crate::send_mpv_ipc_command(ipc_path, &command)?;
+    }
+
+    let preferred_audio_id = if prefer_audio_description {
+        crate::preferred_mpv_audio_track_id(track_list)
+    } else {
+        tracks
+            .iter()
+            .find(|track| track_is_type(track, "audio") && track_is_selected(track))
+            .and_then(track_id)
+            .or_else(|| {
+                let video_program = video
+                    .and_then(|track| track.get("program-id"))
+                    .and_then(serde_json::Value::as_i64);
+                tracks
+                    .iter()
+                    .find(|track| {
+                        track_is_type(track, "audio")
+                            && video_program.is_some_and(|program| {
+                                track.get("program-id").and_then(serde_json::Value::as_i64)
+                                    == Some(program)
+                            })
+                    })
+                    .and_then(track_id)
+            })
+            .or_else(|| {
+                tracks
+                    .iter()
+                    .find(|track| track_is_type(track, "audio"))
+                    .and_then(track_id)
+            })
+    };
+    if let Some(audio_id) = preferred_audio_id {
+        let command = serde_json::json!({
+            "command": ["set_property", "aid", audio_id]
+        })
+        .to_string();
+        crate::send_mpv_ipc_command(ipc_path, &command)?;
+    }
+    Ok(())
+}
+
+fn remux_mpv_stream_recording(temp_path: &Path, output_path: &Path) -> Result<(), String> {
+    if !recording_output_is_usable(temp_path) {
+        remove_recording_file(temp_path, "empty mpv stream recording");
+        return Err("mpv non ha prodotto un flusso registrato utilizzabile.".to_string());
+    }
+    let result = crate::ffmpeg_export::remux_media_file_to_mp4_with_preferred_audio_stream(
+        temp_path,
+        output_path,
+        None,
+        None,
+        None,
+    );
+    remove_recording_file(temp_path, "mpv stream recording cleanup");
+    result?;
+    if !recording_output_is_usable(output_path) {
+        remove_recording_file(output_path, "unusable remuxed mpv recording");
+        return Err(
+            "La conversione finale della registrazione mpv non ha prodotto un MP4 valido."
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
+fn record_tv_for_duration_with_hidden_mpv(
+    url: &str,
+    output_path: &Path,
+    user_agent: Option<&str>,
+    prefer_audio_description: bool,
+    duration: Duration,
+) -> Result<(), String> {
+    let mpv_exe = crate::installed_mpv_runtime_executable()?;
+    let mpv_dir = mpv_exe
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| "Cartella di mpv non valida.".to_string())?;
+    let temp_path = mpv_stream_recording_temp_path(output_path)?;
+    remove_recording_file(&temp_path, "hidden mpv recording preparation");
+    remove_recording_file(output_path, "hidden mpv output preparation");
+    let ipc_path = background_mpv_ipc_path();
+
+    let mut command = Command::new(&mpv_exe);
+    command
+        .current_dir(&mpv_dir)
+        .arg(url)
+        .arg("--no-config")
+        .arg("--terminal=no")
+        .arg("--input-default-bindings=no")
+        .arg("--osc=no")
+        .arg("--force-window=no")
+        .arg("--vo=null")
+        .arg("--ao=null")
+        .arg("--pause=yes")
+        .arg("--aid=auto")
+        .arg("--audio-channels=stereo")
+        .arg(format!("--input-ipc-server={}", ipc_path.display()))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW_FLAG);
+    if url.to_ascii_lowercase().contains(".m3u8") {
+        command.arg("--hls-bitrate=max");
+    }
+    if let Some(user_agent) = user_agent.map(str::trim).filter(|value| !value.is_empty()) {
+        command.arg(format!("--user-agent={user_agent}"));
+    }
+
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("Impossibile avviare mpv in modalità registrazione: {error}"))?;
+    crate::log_debug(&format!(
+        "Scheduled hidden mpv TV recording process started: pid={} temp={} output={} duration_secs={}",
+        child.id(),
+        temp_path.display(),
+        output_path.display(),
+        duration.as_secs()
+    ));
+
+    let setup_result = (|| -> Result<(), String> {
+        wait_for_background_mpv_ipc(&mut child, &ipc_path, Duration::from_secs(12))?;
+        let track_list =
+            wait_for_background_mpv_tracks(&mut child, &ipc_path, Duration::from_secs(20))?;
+        select_background_mpv_tracks(&ipc_path, &track_list, prefer_audio_description)?;
+        thread::sleep(Duration::from_millis(200));
+        let record_command = serde_json::json!({
+            "command": ["set_property", "stream-record", temp_path.to_string_lossy()]
+        })
+        .to_string();
+        crate::send_mpv_ipc_command(&ipc_path, &record_command)?;
+        let active_record_path = query_mpv_property_at_ipc(&ipc_path, "stream-record")?;
+        if active_record_path
+            .as_str()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_none()
+        {
+            return Err("mpv non ha attivato il file della registrazione programmata.".to_string());
+        }
+        crate::send_mpv_ipc_command(&ipc_path, r#"{"command":["set_property","pause",false]}"#)?;
+        Ok(())
+    })();
+    if let Err(error) = setup_result {
+        if let Err(kill_error) = child.kill() {
+            crate::log_debug(&format!(
+                "Scheduled hidden mpv kill after setup failure failed: {kill_error}"
+            ));
+        }
+        if let Err(wait_error) = child.wait() {
+            crate::log_debug(&format!(
+                "Scheduled hidden mpv wait after setup failure failed: {wait_error}"
+            ));
+        }
+        remove_recording_file(&temp_path, "hidden mpv setup failure");
+        return Err(error);
+    }
+
+    let recording_started = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {}
+            Err(error) => {
+                if let Err(kill_error) = child.kill() {
                     crate::log_debug(&format!(
-                        "FFmpeg recording {}: {}",
-                        output_for_log.display(),
-                        line
+                        "Scheduled hidden mpv kill after status failure failed: {kill_error}"
+                    ));
+                }
+                if let Err(wait_error) = child.wait() {
+                    crate::log_debug(&format!(
+                        "Scheduled hidden mpv wait after status failure failed: {wait_error}"
+                    ));
+                }
+                remove_recording_file(&temp_path, "hidden mpv status failure");
+                return Err(format!(
+                    "Impossibile controllare mpv durante la registrazione: {error}"
+                ));
+            }
+        }
+
+        let elapsed = recording_started.elapsed();
+        if elapsed >= duration {
+            let quit_result = crate::send_mpv_ipc_command(&ipc_path, r#"{"command":["quit"]}"#);
+            if let Err(error) = quit_result {
+                crate::log_debug(&format!(
+                    "Scheduled hidden mpv graceful quit failed; terminating process: {error}"
+                ));
+                if let Err(kill_error) = child.kill() {
+                    crate::log_debug(&format!(
+                        "Scheduled hidden mpv forced termination failed: {kill_error}"
                     ));
                 }
             }
-        });
+            break match child.wait() {
+                Ok(status) => status,
+                Err(error) => {
+                    remove_recording_file(&temp_path, "hidden mpv final wait failure");
+                    return Err(format!("Impossibile attendere la fine di mpv: {error}"));
+                }
+            };
+        }
+
+        let remaining = duration.saturating_sub(elapsed);
+        thread::sleep(remaining.min(Duration::from_millis(250)));
+    };
+    thread::sleep(Duration::from_millis(200));
+    let elapsed = recording_started.elapsed();
+    crate::log_debug(&format!(
+        "Scheduled hidden mpv TV recording process ended: status={} elapsed_secs={:.3} temp_bytes={}",
+        status,
+        elapsed.as_secs_f64(),
+        fs::metadata(&temp_path)
+            .map(|metadata| metadata.len())
+            .unwrap_or_default()
+    ));
+    if !status.success() {
+        remove_recording_file(&temp_path, "hidden mpv unsuccessful exit");
+        return Err(format!(
+            "mpv ha terminato la registrazione con stato {status}."
+        ));
     }
-
-    Ok(child)
+    if elapsed.saturating_add(Duration::from_secs(1)) < duration {
+        remove_recording_file(&temp_path, "hidden mpv early exit");
+        return Err(format!(
+            "mpv ha terminato la registrazione troppo presto: {:.1} secondi su {}.",
+            elapsed.as_secs_f64(),
+            duration.as_secs()
+        ));
+    }
+    remux_mpv_stream_recording(&temp_path, output_path)
 }
 
-fn is_rai_like_stream(url: &str) -> bool {
-    let lower = url.to_ascii_lowercase();
-    lower.contains("rai") || lower.contains("mediapolis") || lower.contains("relinker")
+fn monitor_mpv_recording_until_player_closes(
+    mpv_process_id: u32,
+    temp_path: PathBuf,
+    output_path: PathBuf,
+    activity_id: String,
+) {
+    while is_process_alive(mpv_process_id) {
+        thread::sleep(Duration::from_millis(500));
+    }
+    // Il processo è terminato: il file stream-record non è più aperto da mpv.
+    thread::sleep(Duration::from_millis(150));
+    finalize_mpv_recording(&temp_path, &output_path, &activity_id);
 }
 
-fn monitor_recording_until_player_closes(
-    mut recorder: Child,
+fn finalize_mpv_recording(temp_path: &Path, output_path: &Path, activity_id: &str) {
+    remove_activity(activity_id);
+    let temp_bytes = fs::metadata(temp_path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
+    let result = remux_mpv_stream_recording(temp_path, output_path);
+    let usable = result.is_ok() && recording_output_is_usable(output_path);
+    crate::log_debug(&format!(
+        "Managed mpv TV recording finalized: success={} temp_bytes={} output_bytes={} temp={} output={} error={}",
+        usable,
+        temp_bytes,
+        fs::metadata(output_path)
+            .map(|metadata| metadata.len())
+            .unwrap_or(0),
+        temp_path.display(),
+        output_path.display(),
+        result.as_ref().err().map(String::as_str).unwrap_or("")
+    ));
+    if !usable {
+        remove_recording_file(output_path, "unusable mpv stream recording");
+    }
+}
+
+fn monitor_internal_recording_until_player_closes(
+    result_rx: Receiver<Result<(), String>>,
+    stop: Arc<AtomicBool>,
     mpv_process_id: u32,
     output_path: PathBuf,
+    activity_id: String,
 ) {
-    let mut recorder_failed = false;
     loop {
-        match recorder.try_wait() {
-            Ok(Some(status)) => {
-                recorder_failed = !status.success();
-                crate::log_debug(&format!(
-                    "Stream recording ended before player: status={status} output={}",
-                    output_path.display()
-                ));
-                break;
+        match result_rx.try_recv() {
+            Ok(result) => {
+                finalize_internal_recording(result, &output_path, &activity_id);
+                return;
             }
-            Ok(None) => {}
-            Err(err) => {
-                recorder_failed = true;
-                crate::log_debug(&format!("Stream recording status check failed: {err}"));
-                break;
+            Err(TryRecvError::Disconnected) => {
+                finalize_internal_recording(
+                    Err(
+                        "Il worker FFmpeg interno si è chiuso senza restituire un risultato."
+                            .to_string(),
+                    ),
+                    &output_path,
+                    &activity_id,
+                );
+                return;
             }
+            Err(TryRecvError::Empty) => {}
         }
 
         if !is_process_alive(mpv_process_id) {
-            stop_recorder(&mut recorder);
-            break;
+            stop.store(true, Ordering::Release);
+            let result = result_rx.recv().unwrap_or_else(|_| {
+                Err(
+                    "Il worker FFmpeg interno non ha completato correttamente la chiusura."
+                        .to_string(),
+                )
+            });
+            finalize_internal_recording(result, &output_path, &activity_id);
+            return;
         }
         thread::sleep(Duration::from_millis(500));
     }
+}
 
-    let file_size = fs::metadata(&output_path)
-        .map(|metadata| metadata.len())
-        .unwrap_or(0);
-    let file_too_small = file_size < 1024;
+fn finalize_internal_recording(result: Result<(), String>, output_path: &Path, activity_id: &str) {
+    remove_activity(activity_id);
+    let usable = result.is_ok() && recording_output_is_usable(output_path);
     crate::log_debug(&format!(
-        "Stream recording finalized: failed={recorder_failed} bytes={file_size} output={}",
-        output_path.display()
+        "Internal FFmpeg stream recording finalized: success={} bytes={} output={} error={}",
+        usable,
+        fs::metadata(output_path)
+            .map(|metadata| metadata.len())
+            .unwrap_or(0),
+        output_path.display(),
+        result.as_ref().err().map(String::as_str).unwrap_or("")
     ));
-    if recorder_failed || file_too_small {
-        crate::log_debug(&format!(
-            "Removing unusable stream recording: failed={recorder_failed} output={}",
-            output_path.display()
-        ));
-        remove_recording_file(&output_path, "unusable recording");
+    if !usable {
+        remove_recording_file(output_path, "unusable internal recording");
     }
+}
+
+fn recording_output_is_usable(path: &Path) -> bool {
+    fs::metadata(path)
+        .map(|metadata| metadata.len() >= 1024)
+        .unwrap_or(false)
 }
 
 fn remove_recording_file(path: &Path, context: &str) {
@@ -431,52 +926,6 @@ fn remove_recording_file(path: &Path, context: &str) {
             path.display()
         ));
     }
-}
-
-fn stop_recorder(recorder: &mut Child) {
-    if let Some(mut stdin) = recorder.stdin.take() {
-        if let Err(err) = stdin.write_all(b"q\n") {
-            crate::log_debug(&format!(
-                "Unable to request a graceful FFmpeg shutdown: {err}"
-            ));
-        }
-        if let Err(err) = stdin.flush() {
-            crate::log_debug(&format!("Unable to flush FFmpeg stdin: {err}"));
-        }
-    }
-    // MP4 e MP3 hanno bisogno di qualche secondo per scrivere trailer e indici.
-    for _ in 0..100 {
-        match recorder.try_wait() {
-            Ok(Some(_)) => return,
-            Ok(None) => thread::sleep(Duration::from_millis(100)),
-            Err(_) => break,
-        }
-    }
-    if let Err(err) = recorder.kill() {
-        crate::log_debug(&format!("Unable to terminate FFmpeg: {err}"));
-    }
-    if let Err(err) = recorder.wait() {
-        crate::log_debug(&format!("Unable to wait for FFmpeg termination: {err}"));
-    }
-}
-
-fn redact_http_urls(line: &str) -> String {
-    let mut result = line.to_string();
-    for scheme in ["https://", "http://"] {
-        while let Some(start) = result.find(scheme) {
-            let tail = &result[start..];
-            let relative_end = tail
-                .char_indices()
-                .skip(1)
-                .find_map(|(index, ch)| {
-                    (ch.is_whitespace() || matches!(ch, '\'' | '"' | ']' | ')' | '>'))
-                        .then_some(index)
-                })
-                .unwrap_or(tail.len());
-            result.replace_range(start..start + relative_end, "[URL redatto]");
-        }
-    }
-    result
 }
 
 fn is_process_alive(process_id: u32) -> bool {
@@ -493,54 +942,90 @@ fn is_process_alive(process_id: u32) -> bool {
     }
 }
 
-fn find_ffmpeg_executable(ui_language: Option<Language>) -> Result<PathBuf, String> {
-    let mut candidates = Vec::<PathBuf>::new();
-    if let Ok(path) = std::env::var("SONARPAD_FFMPEG_PATH") {
-        let path = PathBuf::from(path.trim());
-        if !path.as_os_str().is_empty() {
-            candidates.push(path);
-        }
-    }
-    if let Ok(exe) = std::env::current_exe()
-        && let Some(dir) = exe.parent()
-    {
-        candidates.push(dir.join("ffmpeg.exe"));
-        candidates.push(dir.join("bin").join("ffmpeg.exe"));
-        candidates.push(dir.join("deps").join("ffmpeg.exe"));
-        candidates.push(dir.join("runtime").join("ffmpeg.exe"));
-    }
-    candidates.push(PathBuf::from("ffmpeg.exe"));
-    candidates.push(PathBuf::from("ffmpeg"));
+fn activity_dir() -> PathBuf {
+    crate::settings::settings_dir().join("RecordingActivities")
+}
 
-    for candidate in candidates {
-        if candidate.components().count() > 1 && !candidate.is_file() {
+fn activity_path(id: &str) -> PathBuf {
+    activity_dir().join(format!("{id}.json"))
+}
+
+fn create_activity(
+    kind: StreamRecordingKind,
+    title: &str,
+    output_path: &Path,
+    expected_end_unix: Option<u64>,
+    scheduled_id: Option<&str>,
+) -> Result<RecordingActivity, String> {
+    fs::create_dir_all(activity_dir()).map_err(|error| error.to_string())?;
+    let activity = RecordingActivity {
+        id: uuid::Uuid::new_v4().to_string(),
+        kind,
+        title: title.trim().to_string(),
+        output_path: output_path.to_string_lossy().to_string(),
+        process_id: std::process::id(),
+        started_unix: unix_now(),
+        expected_end_unix,
+        scheduled_id: scheduled_id.map(ToOwned::to_owned),
+    };
+    let payload = serde_json::to_vec_pretty(&activity).map_err(|error| error.to_string())?;
+    let path = activity_path(&activity.id);
+    let temp_path = path.with_extension("json.tmp");
+    fs::write(&temp_path, payload).map_err(|error| error.to_string())?;
+    fs::rename(&temp_path, &path).map_err(|error| error.to_string())?;
+    Ok(activity)
+}
+
+fn remove_activity(id: &str) {
+    if let Err(error) = fs::remove_file(activity_path(id))
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        crate::log_debug(&format!(
+            "Recording activity removal failed id={id} error={error}"
+        ));
+    }
+}
+
+fn list_active_recordings(kind: StreamRecordingKind) -> Vec<RecordingActivity> {
+    let mut activities = Vec::new();
+    let Ok(entries) = fs::read_dir(activity_dir()) else {
+        return activities;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
             continue;
         }
-        let mut command = Command::new(&candidate);
-        command
-            .arg("-version")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            command.creation_flags(CREATE_NO_WINDOW);
+        let Ok(payload) = fs::read(&path) else {
+            continue;
+        };
+        let Ok(activity) = serde_json::from_slice::<RecordingActivity>(&payload) else {
+            crate::log_if_err!(
+                fs::remove_file(&path),
+                "Removing invalid recording activity failed"
+            );
+            continue;
+        };
+        if !is_process_alive(activity.process_id) {
+            crate::log_if_err!(
+                fs::remove_file(&path),
+                "Removing stale recording activity failed"
+            );
+            continue;
         }
-        if command
-            .status()
-            .map(|status| status.success())
-            .unwrap_or(false)
-        {
-            return Ok(candidate);
+        if activity.kind == kind {
+            activities.push(activity);
         }
     }
+    activities.sort_by_key(|activity| activity.started_unix);
+    activities
+}
 
-    Err(recording_text(
-        ui_language,
-        "radio.recording_error_ffmpeg",
-        "FFmpeg non è stato trovato. Copia ffmpeg.exe accanto a Sonarpad oppure imposta SONARPAD_FFMPEG_PATH.",
-    ))
+fn unix_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 fn next_recording_path(
@@ -626,17 +1111,29 @@ fn sanitize_file_name(value: &str) -> String {
     result.chars().take(100).collect()
 }
 
-pub(crate) fn open_recordings(parent: HWND, language: Language, kind: StreamRecordingKind) {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum OpenRecordingsResult {
+    Closed,
+    ReturnToSearch,
+    PlaybackStarted,
+}
+
+pub(crate) fn open_recordings(
+    parent: HWND,
+    playback_parent: HWND,
+    language: Language,
+    kind: StreamRecordingKind,
+) -> OpenRecordingsResult {
     let mut selected_id: Option<String> = None;
     let mut close_silently_if_empty = false;
     loop {
-        let files = list_recordings(kind);
-        if files.is_empty() {
+        let entries = build_recording_entries(language, kind);
+        if entries.is_empty() {
             if close_silently_if_empty {
                 crate::log_debug(
                     "Recordings list is empty after deletion; closing without an error.",
                 );
-                return;
+                return OpenRecordingsResult::Closed;
             }
             let text = match kind {
                 StreamRecordingKind::Radio => translated(
@@ -644,7 +1141,11 @@ pub(crate) fn open_recordings(parent: HWND, language: Language, kind: StreamReco
                     "radio.recordings_empty",
                     "Non ci sono registrazioni radio.",
                 ),
-                StreamRecordingKind::Tv => "Non ci sono registrazioni TV.".to_string(),
+                StreamRecordingKind::Tv => translated(
+                    language,
+                    "recordings.tv_empty",
+                    "Non ci sono registrazioni TV.",
+                ),
             };
             let title = translated(language, "app.warning_title", "Attenzione");
             let title_wide = to_wide(&title);
@@ -655,30 +1156,15 @@ pub(crate) fn open_recordings(parent: HWND, language: Language, kind: StreamReco
                 PCWSTR(title_wide.as_ptr()),
                 MB_OK | MB_ICONWARNING,
             );
-            return;
+            return OpenRecordingsResult::Closed;
         }
 
-        let items = files
+        let items = entries
             .iter()
-            .map(|path| MultilineSelectionItem {
-                id: path.to_string_lossy().to_string(),
-                title: path
-                    .file_stem()
-                    .and_then(|value| value.to_str())
-                    .unwrap_or("Registrazione")
-                    .to_string(),
-                description: fs::metadata(path)
-                    .ok()
-                    .map(|metadata| format_file_size(metadata.len())),
-            })
+            .map(RecordingListEntry::as_item)
             .collect::<Vec<_>>();
 
-        let delete_label = match kind {
-            StreamRecordingKind::Radio => {
-                translated(language, "radio.delete_recording", "Elimina registrazione")
-            }
-            StreamRecordingKind::Tv => "Elimina registrazione".to_string(),
-        };
+        let delete_label = translated(language, "radio.delete_recording", "Elimina registrazione");
         let recording_deleted = Arc::new(AtomicBool::new(false));
         let recording_deleted_handler = Arc::clone(&recording_deleted);
         let delete_action = InterpreterContextAction {
@@ -711,7 +1197,9 @@ pub(crate) fn open_recordings(parent: HWND, language: Language, kind: StreamReco
             StreamRecordingKind::Radio => {
                 translated(language, "radio.recordings", "Registrazioni radio")
             }
-            StreamRecordingKind::Tv => "Registrazioni TV".to_string(),
+            StreamRecordingKind::Tv => {
+                translated(language, "recordings.tv_title", "Registrazioni TV")
+            }
         };
         let result = youtube_transcript_window::select_multiline_items_with_search(
             parent,
@@ -721,13 +1209,26 @@ pub(crate) fn open_recordings(parent: HWND, language: Language, kind: StreamReco
             selected_id.clone(),
             MultilineSearchOptions {
                 initial_query: String::new(),
-                search_button_label: translated(language, "radio.search", "Ricerca"),
+                search_button_label: translated(
+                    language,
+                    "recordings.back_to_search",
+                    "Torna alla ricerca",
+                ),
                 show_search_edit: false,
                 secondary_action_label: None,
                 context_actions: vec![delete_action],
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
                 escape_stops_active_player: kind == StreamRecordingKind::Tv,
+                refresh: Some(MultilineRefreshOptions {
+                    interval_ms: 1_000,
+                    loader: Arc::new(move || {
+                        build_recording_entries(language, kind)
+                            .into_iter()
+                            .map(|entry| entry.as_item())
+                            .collect()
+                    }),
+                }),
             },
         );
 
@@ -739,31 +1240,220 @@ pub(crate) fn open_recordings(parent: HWND, language: Language, kind: StreamReco
         close_silently_if_empty = false;
 
         match result {
-            MultilineSelectionResult::Selected(path) => {
-                selected_id = Some(path.clone());
+            MultilineSelectionResult::Selected(id) => {
+                selected_id = Some(id.clone());
+                // The list can refresh while it is open, so resolve the selected ID
+                // against a fresh snapshot rather than the entries used at creation.
+                let current_entries = build_recording_entries(language, kind);
+                let selected = current_entries.iter().find(|entry| entry.id() == id);
+                let Some(RecordingListEntry::File(path)) = selected else {
+                    continue;
+                };
                 let playback_result = match kind {
                     StreamRecordingKind::Radio => {
-                        crate::launch_local_video_in_mpv(parent, Path::new(&path))
+                        let path_text = path.to_string_lossy().to_string();
+                        let title = path
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .unwrap_or("Registrazione radio");
+                        crate::log_debug(&format!(
+                            "Opening radio recording through stream player: {}",
+                            path.display()
+                        ));
+                        crate::launch_stream_url_in_mpv(
+                            playback_parent,
+                            &path_text,
+                            Some(title),
+                            None,
+                            None,
+                            None,
+                        )
                     }
                     StreamRecordingKind::Tv => {
-                        crate::launch_local_tv_recording_in_mpv(parent, Path::new(&path))
+                        crate::launch_local_tv_recording_in_mpv(playback_parent, path)
                     }
                 };
                 if let Err(err) = playback_result {
                     crate::show_error(parent, language, &err);
+                    if kind == StreamRecordingKind::Radio {
+                        return OpenRecordingsResult::ReturnToSearch;
+                    }
+                    continue;
                 }
                 if kind == StreamRecordingKind::Radio {
-                    return;
+                    return OpenRecordingsResult::PlaybackStarted;
                 }
-                // For TV, reopen the recordings list on the same item. Esc while
-                // mpv is active stops playback and returns focus here; a second
-                // Esc closes the recordings list.
                 continue;
             }
-            MultilineSelectionResult::Cancelled => return,
-            MultilineSelectionResult::Search(_) | MultilineSelectionResult::SecondaryAction => {}
+            MultilineSelectionResult::Search(_) => {
+                return OpenRecordingsResult::ReturnToSearch;
+            }
+            MultilineSelectionResult::Cancelled => return OpenRecordingsResult::Closed,
+            MultilineSelectionResult::SecondaryAction => {}
         }
     }
+}
+
+fn build_recording_entries(
+    language: Language,
+    kind: StreamRecordingKind,
+) -> Vec<RecordingListEntry> {
+    let active = list_active_recordings(kind);
+    let active_schedule_ids = active
+        .iter()
+        .filter_map(|activity| activity.scheduled_id.clone())
+        .collect::<std::collections::HashSet<_>>();
+    let active_output_paths = active
+        .iter()
+        .map(|activity| PathBuf::from(&activity.output_path))
+        .collect::<std::collections::HashSet<_>>();
+
+    let mut entries = active
+        .into_iter()
+        .map(|activity| {
+            let status = translated(
+                language,
+                "recordings.status_in_progress",
+                "Registrazione in corso",
+            );
+            let description = remove_repeated_status_prefix(
+                active_recording_description(language, &activity),
+                &status,
+            );
+            RecordingListEntry::Active {
+                id: format!("active:{}", activity.id),
+                title: format!("{} — {}", activity.title, status),
+                description,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    entries.extend(
+        crate::app_windows::scheduled_recording_window::list_scheduled_recordings(kind)
+            .into_iter()
+            .filter(|item| !active_schedule_ids.contains(item.id.as_str()))
+            .map(|item| {
+                let status = translated(
+                    language,
+                    "recordings.status_scheduled",
+                    "Registrazione programmata",
+                );
+                RecordingListEntry::Scheduled {
+                    id: format!("scheduled:{}", item.id),
+                    title: format!("{} — {}", item.title, status),
+                    description: remove_repeated_status_prefix(
+                        scheduled_recording_description(
+                            language,
+                            item.start_at,
+                            item.duration_minutes,
+                        ),
+                        &status,
+                    ),
+                }
+            }),
+    );
+
+    entries.extend(
+        list_recordings(kind)
+            .into_iter()
+            .filter(|path| !active_output_paths.contains(path))
+            .map(RecordingListEntry::File),
+    );
+    entries
+}
+
+fn remove_repeated_status_prefix(description: String, status: &str) -> String {
+    let trimmed = description.trim_start();
+    let Some(remainder) = trimmed.strip_prefix(status) else {
+        return description;
+    };
+    let remainder = remainder.trim_start_matches(|character: char| {
+        character.is_whitespace()
+            || matches!(
+                character,
+                '.' | ':' | ';' | ',' | '-' | '–' | '—' | '。' | '：' | '；'
+            )
+    });
+    if remainder.is_empty() {
+        return description;
+    }
+
+    let mut characters = remainder.chars();
+    let Some(first) = characters.next() else {
+        return description;
+    };
+    first.to_uppercase().chain(characters).collect()
+}
+
+fn active_recording_description(language: Language, activity: &RecordingActivity) -> String {
+    let started = format_unix_time(activity.started_unix);
+    if let Some(expected_end) = activity.expected_end_unix {
+        let end = format_unix_time(expected_end);
+        recording_format(
+            Some(language),
+            "recordings.in_progress_times",
+            &[("start", started), ("end", end)],
+            "Registrazione in corso. Iniziata alle {start}; termine previsto alle {end}.",
+        )
+    } else {
+        recording_format(
+            Some(language),
+            "recordings.in_progress_since",
+            &[("start", started)],
+            "Registrazione in corso dalle {start}.",
+        )
+    }
+}
+
+fn scheduled_recording_description(
+    language: Language,
+    start_at: NaiveDateTime,
+    duration_minutes: u32,
+) -> String {
+    let now = Local::now().naive_local();
+    let seconds = (start_at - now).num_seconds();
+    let date = start_at.format("%d/%m/%Y").to_string();
+    let time = start_at.format("%H:%M").to_string();
+    if (0..=3600).contains(&seconds) {
+        let minutes = ((seconds + 59) / 60).max(0);
+        let key = if minutes == 1 {
+            "recordings.scheduled_countdown_one"
+        } else {
+            "recordings.scheduled_countdown"
+        };
+        let fallback = if minutes == 1 {
+            "Registrazione programmata alle {time}. Manca 1 minuto all'inizio. Durata: {duration} minuti."
+        } else {
+            "Registrazione programmata alle {time}. Mancano {minutes} minuti all'inizio. Durata: {duration} minuti."
+        };
+        recording_format(
+            Some(language),
+            key,
+            &[
+                ("time", time),
+                ("minutes", minutes.to_string()),
+                ("duration", duration_minutes.to_string()),
+            ],
+            fallback,
+        )
+    } else {
+        recording_format(
+            Some(language),
+            "recordings.scheduled_datetime",
+            &[
+                ("date", date),
+                ("time", time),
+                ("duration", duration_minutes.to_string()),
+            ],
+            "Registrazione programmata per il {date} alle {time}. Durata: {duration} minuti.",
+        )
+    }
+}
+
+fn format_unix_time(timestamp: u64) -> String {
+    let system_time = UNIX_EPOCH + Duration::from_secs(timestamp);
+    let datetime: chrono::DateTime<Local> = system_time.into();
+    datetime.format("%H:%M").to_string()
 }
 
 fn list_recordings(kind: StreamRecordingKind) -> Vec<PathBuf> {

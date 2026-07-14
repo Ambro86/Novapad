@@ -1134,8 +1134,40 @@ fn extract_pptx_slide_text(xml: &str) -> String {
 
 // --- EPUB Parsing ---
 
+#[derive(Clone, Debug)]
+pub struct EpubIndexEntry {
+    pub title: String,
+    pub target_utf16: i32,
+    pub children: Vec<EpubIndexEntry>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EpubDocumentContent {
+    pub text: String,
+    pub index: Vec<EpubIndexEntry>,
+}
+
+#[derive(Clone, Debug)]
+struct RawEpubIndexEntry {
+    title: String,
+    target: String,
+    children: Vec<RawEpubIndexEntry>,
+}
+
+#[derive(Clone, Debug)]
+struct EpubResourcePlacement {
+    text_start: usize,
+    anchors: std::collections::HashMap<String, usize>,
+}
+
 pub fn read_epub_text(path: &Path, language: Language) -> Result<String, String> {
+    read_epub_document(path, language).map(|document| document.text)
+}
+
+pub fn read_epub_document(path: &Path, language: Language) -> Result<EpubDocumentContent, String> {
     use epub::doc::EpubDoc;
+    use std::collections::HashMap;
+
     let mut doc = EpubDoc::new(path).map_err(|e| {
         i18n::tr_f(
             language,
@@ -1144,6 +1176,7 @@ pub fn read_epub_text(path: &Path, language: Language) -> Result<String, String>
         )
     })?;
     let mut full_text = String::new();
+    let mut placements: HashMap<String, EpubResourcePlacement> = HashMap::new();
 
     if let Some(title_item) = doc.mdata("title") {
         full_text.push_str(&title_item.value);
@@ -1152,25 +1185,36 @@ pub fn read_epub_text(path: &Path, language: Language) -> Result<String, String>
 
     let spine = doc.spine.clone();
     for item in spine {
+        let resource_path = doc
+            .resources
+            .get(&item.idref)
+            .map(|resource| resource.path.clone());
         if let Some((content, mime)) = doc.get_resource(&item.idref)
             && (mime.contains("xhtml") || mime.contains("html") || mime.contains("xml"))
         {
             let text = String::from_utf8(content.clone())
                 .unwrap_or_else(|_| String::from_utf8_lossy(&content).to_string());
-
-            let cleaned = html_to_text(&text);
-            for line in cleaned.lines() {
-                let trimmed = line.trim();
-                if trimmed.is_empty()
-                    || is_epub_metadata_noise_line(trimmed)
-                    || (trimmed.starts_with("part") && trimmed.len() <= 12)
-                {
-                    continue;
-                }
-                full_text.push_str(trimmed);
-                full_text.push('\n');
+            let (cleaned, anchors) = html_to_text_with_anchors(&text);
+            let (filtered, filtered_anchors) = filter_epub_text_with_anchors(&cleaned, &anchors);
+            if filtered.trim().is_empty() {
+                continue;
             }
+
+            let text_start = full_text.len();
+            full_text.push_str(&filtered);
             full_text.push('\n');
+
+            if let Some(resource_path) = resource_path {
+                placements.insert(
+                    normalize_epub_internal_path(&percent_decode_epub_component(
+                        &resource_path.to_string_lossy(),
+                    )),
+                    EpubResourcePlacement {
+                        text_start,
+                        anchors: filtered_anchors,
+                    },
+                );
+            }
         }
     }
 
@@ -1178,7 +1222,403 @@ pub fn read_epub_text(path: &Path, language: Language) -> Result<String, String>
         return Err(i18n::tr(language, "file_handler.epub_no_text"));
     }
 
-    Ok(full_text)
+    let epub3_index = extract_epub3_navigation(&mut doc);
+    let mut index = resolve_epub_index_entries(&epub3_index, &placements, &full_text);
+    if index.is_empty() {
+        let ncx_index = convert_ncx_navigation(&doc.toc);
+        index = resolve_epub_index_entries(&ncx_index, &placements, &full_text);
+    }
+
+    Ok(EpubDocumentContent {
+        text: full_text,
+        index,
+    })
+}
+
+fn convert_ncx_navigation(points: &[epub::doc::NavPoint]) -> Vec<RawEpubIndexEntry> {
+    points
+        .iter()
+        .filter_map(|point| {
+            let title = normalize_epub_index_label(&point.label);
+            if title.is_empty() {
+                return None;
+            }
+            Some(RawEpubIndexEntry {
+                title,
+                target: point.content.to_string_lossy().into_owned(),
+                children: convert_ncx_navigation(&point.children),
+            })
+        })
+        .collect()
+}
+
+fn extract_epub3_navigation<R: std::io::Read + std::io::Seek>(
+    doc: &mut epub::doc::EpubDoc<R>,
+) -> Vec<RawEpubIndexEntry> {
+    use scraper::{Html, Selector};
+
+    let Some(nav_id) = doc.get_nav_id() else {
+        return Vec::new();
+    };
+    let Some(nav_path) = doc
+        .resources
+        .get(&nav_id)
+        .map(|resource| resource.path.clone())
+    else {
+        return Vec::new();
+    };
+    let Some((content, _mime)) = doc.get_resource(&nav_id) else {
+        return Vec::new();
+    };
+    let html = String::from_utf8(content)
+        .unwrap_or_else(|bytes| String::from_utf8_lossy(bytes.as_bytes()).into_owned());
+    let document = Html::parse_document(&html);
+    let Ok(nav_selector) = Selector::parse("nav") else {
+        return Vec::new();
+    };
+
+    let navigation_elements = document.select(&nav_selector).collect::<Vec<_>>();
+    for nav in &navigation_elements {
+        let nav_type = nav
+            .value()
+            .attr("epub:type")
+            .or_else(|| nav.value().attr("type"))
+            .unwrap_or_default();
+        let role = nav.value().attr("role").unwrap_or_default();
+        if nav_type
+            .split_ascii_whitespace()
+            .any(|value| value == "toc")
+            || role.eq_ignore_ascii_case("doc-toc")
+        {
+            return parse_epub3_nav_element(*nav, &nav_path);
+        }
+    }
+
+    for nav in &navigation_elements {
+        let marker = format!(
+            "{} {} {}",
+            nav.value().attr("id").unwrap_or_default(),
+            nav.value().attr("class").unwrap_or_default(),
+            nav.value().attr("aria-label").unwrap_or_default(),
+        )
+        .to_ascii_lowercase();
+        if marker
+            .split(|ch: char| !ch.is_ascii_alphanumeric())
+            .any(|part| matches!(part, "toc" | "contents" | "index" | "indice"))
+        {
+            return parse_epub3_nav_element(*nav, &nav_path);
+        }
+    }
+
+    if let [nav] = navigation_elements.as_slice() {
+        return parse_epub3_nav_element(*nav, &nav_path);
+    }
+    Vec::new()
+}
+
+fn parse_epub3_nav_element(
+    nav: scraper::ElementRef<'_>,
+    nav_path: &std::path::Path,
+) -> Vec<RawEpubIndexEntry> {
+    use scraper::ElementRef;
+
+    let root_list = nav
+        .children()
+        .filter_map(ElementRef::wrap)
+        .find(|element| matches!(element.value().name(), "ol" | "ul"))
+        .or_else(|| {
+            nav.descendants()
+                .filter_map(ElementRef::wrap)
+                .find(|element| matches!(element.value().name(), "ol" | "ul"))
+        });
+    root_list
+        .map(|list| parse_epub3_list(list, nav_path))
+        .unwrap_or_default()
+}
+
+fn parse_epub3_list(
+    list: scraper::ElementRef<'_>,
+    nav_path: &std::path::Path,
+) -> Vec<RawEpubIndexEntry> {
+    use scraper::ElementRef;
+
+    let mut entries = Vec::new();
+    for item in list
+        .children()
+        .filter_map(ElementRef::wrap)
+        .filter(|element| element.value().name() == "li")
+    {
+        let nested_list = item
+            .children()
+            .filter_map(ElementRef::wrap)
+            .find(|element| matches!(element.value().name(), "ol" | "ul"));
+        let children = nested_list
+            .map(|child_list| parse_epub3_list(child_list, nav_path))
+            .unwrap_or_default();
+        let link = first_epub3_element_before_nested_list(item, &["a"]);
+        let label_element =
+            link.or_else(|| first_epub3_element_before_nested_list(item, &["span", "div", "p"]));
+        let title = label_element
+            .map(|element| {
+                normalize_epub_index_label(&element.text().collect::<Vec<_>>().join(" "))
+            })
+            .unwrap_or_default();
+        if title.is_empty() {
+            entries.extend(children);
+            continue;
+        }
+
+        let target = link
+            .and_then(|element| element.value().attr("href"))
+            .map(|href| resolve_epub_relative_target(nav_path, href))
+            .or(children.first().map(|child| child.target.clone()));
+        let Some(target) = target else {
+            entries.extend(children);
+            continue;
+        };
+
+        entries.push(RawEpubIndexEntry {
+            title,
+            target,
+            children,
+        });
+    }
+    entries
+}
+
+fn first_epub3_element_before_nested_list<'a>(
+    item: scraper::ElementRef<'a>,
+    names: &[&str],
+) -> Option<scraper::ElementRef<'a>> {
+    use scraper::ElementRef;
+
+    for child in item.children().filter_map(ElementRef::wrap) {
+        let name = child.value().name();
+        if matches!(name, "ol" | "ul") {
+            continue;
+        }
+        if names.contains(&name) {
+            return Some(child);
+        }
+        if let Some(element) = first_epub3_element_before_nested_list(child, names) {
+            return Some(element);
+        }
+    }
+    None
+}
+
+fn resolve_epub_relative_target(nav_path: &std::path::Path, href: &str) -> String {
+    let (path_part, fragment) = href.split_once('#').unwrap_or((href, ""));
+    let path_part = path_part.split('?').next().unwrap_or(path_part);
+    let decoded_path = percent_decode_epub_component(path_part);
+    let base = nav_path.parent().unwrap_or(std::path::Path::new(""));
+    let joined = if decoded_path.trim().is_empty() {
+        nav_path.to_path_buf()
+    } else {
+        base.join(decoded_path)
+    };
+    let normalized =
+        normalize_epub_internal_path(&percent_decode_epub_component(&joined.to_string_lossy()));
+    if fragment.is_empty() {
+        normalized
+    } else {
+        format!("{}#{}", normalized, percent_decode_epub_component(fragment))
+    }
+}
+
+fn resolve_epub_index_entries(
+    entries: &[RawEpubIndexEntry],
+    placements: &std::collections::HashMap<String, EpubResourcePlacement>,
+    full_text: &str,
+) -> Vec<EpubIndexEntry> {
+    let mut resolved = Vec::new();
+    for entry in entries {
+        let children = resolve_epub_index_entries(&entry.children, placements, full_text);
+        let target_utf16 = resolve_epub_target(&entry.target, placements, full_text)
+            .or(children.first().map(|child| child.target_utf16));
+        if let Some(target_utf16) = target_utf16 {
+            resolved.push(EpubIndexEntry {
+                title: entry.title.clone(),
+                target_utf16,
+                children,
+            });
+        } else {
+            resolved.extend(children);
+        }
+    }
+    resolved
+}
+
+fn resolve_epub_target(
+    target: &str,
+    placements: &std::collections::HashMap<String, EpubResourcePlacement>,
+    full_text: &str,
+) -> Option<i32> {
+    let (path_part, fragment) = target.split_once('#').unwrap_or((target, ""));
+    let path_part = path_part.split('?').next().unwrap_or(path_part);
+    let normalized_path = normalize_epub_internal_path(&percent_decode_epub_component(path_part));
+    let placement = placements.get(&normalized_path).or_else(|| {
+        placements.iter().find_map(|(path, placement)| {
+            if path.ends_with(&format!("/{}", normalized_path))
+                || normalized_path.ends_with(&format!("/{}", path))
+                || path.eq_ignore_ascii_case(&normalized_path)
+            {
+                Some(placement)
+            } else {
+                None
+            }
+        })
+    })?;
+
+    let decoded_fragment = percent_decode_epub_component(fragment);
+    let local_offset = if decoded_fragment.is_empty() {
+        0
+    } else {
+        placement
+            .anchors
+            .get(&decoded_fragment)
+            .copied()
+            .or_else(|| {
+                placement.anchors.iter().find_map(|(name, offset)| {
+                    name.eq_ignore_ascii_case(&decoded_fragment)
+                        .then_some(*offset)
+                })
+            })
+            .unwrap_or(0)
+    };
+    Some(byte_offset_to_editor_utf16(
+        full_text,
+        placement.text_start.saturating_add(local_offset),
+    ))
+}
+
+fn byte_offset_to_editor_utf16(text: &str, byte_offset: usize) -> i32 {
+    let mut safe_offset = byte_offset.min(text.len());
+    while safe_offset > 0 && !text.is_char_boundary(safe_offset) {
+        safe_offset -= 1;
+    }
+    let prefix = &text[..safe_offset];
+    let utf16_len = prefix.encode_utf16().count();
+    let bytes = prefix.as_bytes();
+    let inserted_carriage_returns = bytes
+        .iter()
+        .enumerate()
+        .filter(|(index, byte)| **byte == b'\n' && (*index == 0 || bytes[*index - 1] != b'\r'))
+        .count();
+    utf16_len
+        .saturating_add(inserted_carriage_returns)
+        .min(i32::MAX as usize) as i32
+}
+
+fn normalize_epub_index_label(label: &str) -> String {
+    label.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn normalize_epub_internal_path(path: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    let replaced = path.replace('\\', "/");
+    for part in replaced.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.truncate(parts.len().saturating_sub(1));
+            }
+            _ => parts.push(part),
+        }
+    }
+    parts.join("/")
+}
+
+fn percent_decode_epub_component(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            let high = hex_value(bytes[index + 1]);
+            let low = hex_value(bytes[index + 2]);
+            if let (Some(high), Some(low)) = (high, low) {
+                decoded.push((high << 4) | low);
+                index += 3;
+                continue;
+            }
+        }
+        decoded.push(bytes[index]);
+        index += 1;
+    }
+    String::from_utf8(decoded)
+        .unwrap_or_else(|bytes| String::from_utf8_lossy(bytes.as_bytes()).into_owned())
+}
+
+fn hex_value(value: u8) -> Option<u8> {
+    match value {
+        b'0'..=b'9' => Some(value - b'0'),
+        b'a'..=b'f' => Some(value - b'a' + 10),
+        b'A'..=b'F' => Some(value - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn filter_epub_text_with_anchors(
+    cleaned: &str,
+    anchors: &std::collections::HashMap<String, usize>,
+) -> (String, std::collections::HashMap<String, usize>) {
+    let mut output = String::new();
+    let mut kept_ranges: Vec<(usize, usize, usize)> = Vec::new();
+    let mut source_start = 0usize;
+
+    for segment in cleaned.split_inclusive('\n') {
+        let line = segment.strip_suffix('\n').unwrap_or(segment);
+        let trimmed = line.trim();
+        if !trimmed.is_empty()
+            && !is_epub_metadata_noise_line(trimmed)
+            && !(trimmed.starts_with("part") && trimmed.len() <= 12)
+        {
+            let leading = line.find(trimmed).unwrap_or(0);
+            let text_start = source_start.saturating_add(leading);
+            let text_end = text_start.saturating_add(trimmed.len());
+            let destination_start = output.len();
+            output.push_str(trimmed);
+            output.push('\n');
+            kept_ranges.push((text_start, text_end, destination_start));
+        }
+        source_start = source_start.saturating_add(segment.len());
+    }
+
+    if source_start < cleaned.len() {
+        let line = &cleaned[source_start..];
+        let trimmed = line.trim();
+        if !trimmed.is_empty()
+            && !is_epub_metadata_noise_line(trimmed)
+            && !(trimmed.starts_with("part") && trimmed.len() <= 12)
+        {
+            let leading = line.find(trimmed).unwrap_or(0);
+            let text_start = source_start.saturating_add(leading);
+            let text_end = text_start.saturating_add(trimmed.len());
+            let destination_start = output.len();
+            output.push_str(trimmed);
+            output.push('\n');
+            kept_ranges.push((text_start, text_end, destination_start));
+        }
+    }
+
+    let mut mapped_anchors = std::collections::HashMap::new();
+    for (name, source_offset) in anchors {
+        let mapped = kept_ranges
+            .iter()
+            .find_map(|(range_start, range_end, destination_start)| {
+                if source_offset <= range_end {
+                    let relative = source_offset.saturating_sub(*range_start);
+                    Some(destination_start.saturating_add(relative.min(range_end - range_start)))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(output.len());
+        mapped_anchors.insert(name.clone(), mapped);
+    }
+
+    (output, mapped_anchors)
 }
 
 pub fn read_epub_chapters(path: &Path, language: Language) -> Result<Vec<String>, String> {
@@ -1251,12 +1691,19 @@ pub fn read_html_text(path: &Path, language: Language) -> Result<(String, TextEn
 }
 
 fn html_to_text(html: &str) -> String {
+    html_to_text_with_anchors(html).0
+}
+
+fn html_to_text_with_anchors(html: &str) -> (String, std::collections::HashMap<String, usize>) {
     let mut out = String::new();
+    let mut anchors = std::collections::HashMap::new();
     let mut inside = false;
     let mut tag = String::new();
     let mut last_newline = false;
     let mut skip_stack: Vec<String> = Vec::new();
     let mut in_comment = false;
+    let mut entity = String::new();
+    let mut in_entity = false;
 
     for ch in html.chars() {
         if in_comment {
@@ -1273,8 +1720,6 @@ fn html_to_text(html: &str) -> String {
                 inside = false;
                 let tag_trimmed = tag.trim();
                 if tag_trimmed.starts_with("!--") {
-                    // Inline comments (<!-- ... -->) are fully contained in this tag.
-                    // Only keep comment mode when we saw an opening part that did not close yet.
                     if !tag_trimmed.ends_with("--") {
                         in_comment = true;
                     }
@@ -1288,12 +1733,13 @@ fn html_to_text(html: &str) -> String {
                     .split_whitespace()
                     .next()
                     .unwrap_or("")
+                    .trim_end_matches('/')
                     .to_ascii_lowercase();
                 let is_closing = tag_trimmed.starts_with('/');
 
                 if matches!(tag_name.as_str(), "head" | "style" | "script" | "title") {
                     if is_closing {
-                        if let Some(pos) = skip_stack.iter().rposition(|t| t == &tag_name) {
+                        if let Some(pos) = skip_stack.iter().rposition(|value| value == &tag_name) {
                             skip_stack.truncate(pos);
                         }
                     } else {
@@ -1325,6 +1771,16 @@ fn html_to_text(html: &str) -> String {
                     out.push('\n');
                     last_newline = true;
                 }
+
+                if !is_closing && skip_stack.is_empty() {
+                    for attribute in ["id", "xml:id", "name"] {
+                        if let Some(value) = html_tag_attribute(tag_trimmed, attribute)
+                            && !value.is_empty()
+                        {
+                            anchors.entry(value).or_insert(out.len());
+                        }
+                    }
+                }
                 tag.clear();
             } else {
                 tag.push(ch);
@@ -1332,22 +1788,176 @@ fn html_to_text(html: &str) -> String {
             continue;
         }
         if ch == '<' {
+            if in_entity {
+                append_html_entity(&mut out, &entity);
+                entity.clear();
+                in_entity = false;
+            }
             inside = true;
             continue;
         }
         if !skip_stack.is_empty() {
             continue;
         }
+        if in_entity {
+            if ch == ';' {
+                append_html_entity(&mut out, &entity);
+                entity.clear();
+                in_entity = false;
+                last_newline = out.ends_with('\n');
+            } else if entity.len() < 16 && !ch.is_whitespace() {
+                entity.push(ch);
+            } else {
+                out.push('&');
+                out.push_str(&entity);
+                out.push(ch);
+                entity.clear();
+                in_entity = false;
+                last_newline = ch == '\n';
+            }
+            continue;
+        }
+        if ch == '&' {
+            in_entity = true;
+            entity.clear();
+            continue;
+        }
         out.push(ch);
         last_newline = ch == '\n';
     }
 
-    out.replace("&nbsp;", " ")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&amp;", "&")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
+    if in_entity {
+        out.push('&');
+        out.push_str(&entity);
+    }
+
+    (out, anchors)
+}
+
+fn html_tag_attribute(tag: &str, requested_name: &str) -> Option<String> {
+    let bytes = tag.as_bytes();
+    let mut index = 0usize;
+    while index < bytes.len() && !bytes[index].is_ascii_whitespace() {
+        index += 1;
+    }
+    while index < bytes.len() {
+        while index < bytes.len() && (bytes[index].is_ascii_whitespace() || bytes[index] == b'/') {
+            index += 1;
+        }
+        let name_start = index;
+        while index < bytes.len()
+            && !bytes[index].is_ascii_whitespace()
+            && bytes[index] != b'='
+            && bytes[index] != b'/'
+        {
+            index += 1;
+        }
+        if name_start == index {
+            break;
+        }
+        let name = &tag[name_start..index];
+        while index < bytes.len() && bytes[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if index >= bytes.len() || bytes[index] != b'=' {
+            continue;
+        }
+        index += 1;
+        while index < bytes.len() && bytes[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if index >= bytes.len() {
+            break;
+        }
+        let (value_start, value_end) = if bytes[index] == b'\'' || bytes[index] == b'"' {
+            let quote = bytes[index];
+            index += 1;
+            let start = index;
+            while index < bytes.len() && bytes[index] != quote {
+                index += 1;
+            }
+            let end = index;
+            if index < bytes.len() {
+                index += 1;
+            }
+            (start, end)
+        } else {
+            let start = index;
+            while index < bytes.len() && !bytes[index].is_ascii_whitespace() && bytes[index] != b'/'
+            {
+                index += 1;
+            }
+            (start, index)
+        };
+        if name.eq_ignore_ascii_case(requested_name) {
+            return Some(decode_basic_html_entities(&tag[value_start..value_end]));
+        }
+    }
+    None
+}
+
+fn append_html_entity(output: &mut String, entity: &str) {
+    match entity {
+        "nbsp" => output.push(' '),
+        "lt" => output.push('<'),
+        "gt" => output.push('>'),
+        "amp" => output.push('&'),
+        "quot" => output.push('"'),
+        "apos" => output.push('\''),
+        value if value.starts_with("#x") || value.starts_with("#X") => {
+            if let Ok(number) = u32::from_str_radix(&value[2..], 16)
+                && let Some(ch) = char::from_u32(number)
+            {
+                output.push(ch);
+                return;
+            }
+            output.push('&');
+            output.push_str(entity);
+            output.push(';');
+        }
+        value if value.starts_with('#') => {
+            if let Ok(number) = value[1..].parse::<u32>()
+                && let Some(ch) = char::from_u32(number)
+            {
+                output.push(ch);
+                return;
+            }
+            output.push('&');
+            output.push_str(entity);
+            output.push(';');
+        }
+        _ => {
+            output.push('&');
+            output.push_str(entity);
+            output.push(';');
+        }
+    }
+}
+
+fn decode_basic_html_entities(value: &str) -> String {
+    let mut output = String::new();
+    let mut entity = String::new();
+    let mut in_entity = false;
+    for ch in value.chars() {
+        if in_entity {
+            if ch == ';' {
+                append_html_entity(&mut output, &entity);
+                entity.clear();
+                in_entity = false;
+            } else {
+                entity.push(ch);
+            }
+        } else if ch == '&' {
+            in_entity = true;
+        } else {
+            output.push(ch);
+        }
+    }
+    if in_entity {
+        output.push('&');
+        output.push_str(&entity);
+    }
+    output
 }
 
 #[cfg(test)]

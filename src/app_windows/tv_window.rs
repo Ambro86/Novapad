@@ -351,6 +351,7 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
                 // per chiudere l'intera funzione resta disponibile Esc.
                 left_arrow_closes: page != TvPage::Root,
                 escape_stops_active_player: true,
+                refresh: None,
             },
         );
 
@@ -450,7 +451,12 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
                 play_channel(parent, language, &channel);
             }
             TvEntryKind::Recordings => {
-                stream_recording::open_recordings(parent, language, StreamRecordingKind::Tv);
+                stream_recording::open_recordings(
+                    parent,
+                    parent,
+                    language,
+                    StreamRecordingKind::Tv,
+                );
             }
         }
     }

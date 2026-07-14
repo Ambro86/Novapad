@@ -98,6 +98,13 @@ type AvcodecFlushBuffers = unsafe extern "C" fn(*mut AVCodecContext);
 type AvcodecSendFrame = unsafe extern "C" fn(*mut AVCodecContext, *const AVFrame) -> libc::c_int;
 type AvcodecReceivePacket = unsafe extern "C" fn(*mut AVCodecContext, *mut AVPacket) -> libc::c_int;
 type AvcodecFreeContext = unsafe extern "C" fn(*mut *mut AVCodecContext);
+type AvBsfGetByName = unsafe extern "C" fn(*const libc::c_char) -> *const AVBitStreamFilter;
+type AvBsfAlloc =
+    unsafe extern "C" fn(*const AVBitStreamFilter, *mut *mut AVBSFContext) -> libc::c_int;
+type AvBsfInit = unsafe extern "C" fn(*mut AVBSFContext) -> libc::c_int;
+type AvBsfSendPacket = unsafe extern "C" fn(*mut AVBSFContext, *mut AVPacket) -> libc::c_int;
+type AvBsfReceivePacket = unsafe extern "C" fn(*mut AVBSFContext, *mut AVPacket) -> libc::c_int;
+type AvBsfFree = unsafe extern "C" fn(*mut *mut AVBSFContext);
 type AvPacketAlloc = unsafe extern "C" fn() -> *mut AVPacket;
 type AvPacketFree = unsafe extern "C" fn(*mut *mut AVPacket);
 type AvPacketUnref = unsafe extern "C" fn(*mut AVPacket);
@@ -183,6 +190,12 @@ pub(crate) struct FfmpegApi {
     pub(crate) avcodec_send_frame: AvcodecSendFrame,
     pub(crate) avcodec_receive_packet: AvcodecReceivePacket,
     pub(crate) avcodec_free_context: AvcodecFreeContext,
+    pub(crate) av_bsf_get_by_name: AvBsfGetByName,
+    pub(crate) av_bsf_alloc: AvBsfAlloc,
+    pub(crate) av_bsf_init: AvBsfInit,
+    pub(crate) av_bsf_send_packet: AvBsfSendPacket,
+    pub(crate) av_bsf_receive_packet: AvBsfReceivePacket,
+    pub(crate) av_bsf_free: AvBsfFree,
     pub(crate) av_packet_alloc: AvPacketAlloc,
     pub(crate) av_packet_free: AvPacketFree,
     pub(crate) av_packet_unref: AvPacketUnref,
@@ -323,6 +336,12 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
     let avcodec_send_frame = load_symbol(avcodec, b"avcodec_send_frame\0")?;
     let avcodec_receive_packet = load_symbol(avcodec, b"avcodec_receive_packet\0")?;
     let avcodec_free_context = load_symbol(avcodec, b"avcodec_free_context\0")?;
+    let av_bsf_get_by_name = load_symbol(avcodec, b"av_bsf_get_by_name\0")?;
+    let av_bsf_alloc = load_symbol(avcodec, b"av_bsf_alloc\0")?;
+    let av_bsf_init = load_symbol(avcodec, b"av_bsf_init\0")?;
+    let av_bsf_send_packet = load_symbol(avcodec, b"av_bsf_send_packet\0")?;
+    let av_bsf_receive_packet = load_symbol(avcodec, b"av_bsf_receive_packet\0")?;
+    let av_bsf_free = load_symbol(avcodec, b"av_bsf_free\0")?;
     let av_packet_alloc = load_symbol(avcodec, b"av_packet_alloc\0")?;
     let av_packet_free = load_symbol(avcodec, b"av_packet_free\0")?;
     let av_packet_unref = load_symbol(avcodec, b"av_packet_unref\0")?;
@@ -381,6 +400,12 @@ fn load_ffmpeg_api() -> Result<FfmpegApi, String> {
         avcodec_send_frame,
         avcodec_receive_packet,
         avcodec_free_context,
+        av_bsf_get_by_name,
+        av_bsf_alloc,
+        av_bsf_init,
+        av_bsf_send_packet,
+        av_bsf_receive_packet,
+        av_bsf_free,
         av_packet_alloc,
         av_packet_free,
         av_packet_unref,

@@ -49,6 +49,26 @@ struct HlsProgressEstimate {
     total_duration_us: i64,
 }
 
+struct HlsRecordingInputs {
+    video_url: String,
+    audio_url: String,
+}
+
+struct HlsAudioRendition {
+    group_id: String,
+    uri: Option<String>,
+    language: String,
+    name: String,
+    is_default: bool,
+    autoselect: bool,
+}
+
+struct HlsVideoVariant {
+    url: String,
+    bandwidth_bits_per_sec: u64,
+    audio_group: Option<String>,
+}
+
 struct MuxProgressSample<'a> {
     pts: i64,
     dts: i64,
@@ -410,6 +430,45 @@ fn dict_set_str(
         return Err(format!("FFmpeg: failed to set {} (code {})", key, ret));
     }
     Ok(())
+}
+
+fn open_input_with_network_options(
+    api: &FfmpegApi,
+    input: *const i8,
+    context: *mut *mut AVFormatContext,
+    user_agent: Option<&str>,
+    referer: Option<&str>,
+    network_options: bool,
+) -> i32 {
+    let mut options: *mut AVDictionary = ptr::null_mut();
+    if network_options {
+        crate::log_if_err!(dict_set_str(api, &mut options, "reconnect", "1"));
+        crate::log_if_err!(dict_set_str(api, &mut options, "reconnect_streamed", "1"));
+        crate::log_if_err!(dict_set_str(api, &mut options, "reconnect_delay_max", "5"));
+        crate::log_if_err!(dict_set_str(api, &mut options, "rw_timeout", "15000000"));
+        crate::log_if_err!(dict_set_str(api, &mut options, "probesize", "10000000"));
+        crate::log_if_err!(dict_set_str(
+            api,
+            &mut options,
+            "analyzeduration",
+            "10000000",
+        ));
+    }
+    if let Some(user_agent) = user_agent.map(str::trim).filter(|value| !value.is_empty()) {
+        crate::log_if_err!(dict_set_str(api, &mut options, "user_agent", user_agent));
+    }
+    if let Some(referer) = referer.map(str::trim).filter(|value| !value.is_empty()) {
+        crate::log_if_err!(dict_set_str(api, &mut options, "referer", referer));
+    }
+    let result = crate::ffmpeg_source::avformat_open_input_safe(
+        api,
+        context,
+        input,
+        ptr::null_mut(),
+        &mut options,
+    );
+    crate::ffmpeg_source::av_dict_free_safe(api, &mut options);
+    result
 }
 
 fn segment_format_from_path(path: &Path) -> Option<&'static str> {
@@ -1220,6 +1279,47 @@ fn read_next_packet_for_stream(
     }
 }
 
+fn packet_reference_timestamp(packet: *mut AVPacket) -> Option<i64> {
+    if packet.is_null() {
+        return None;
+    }
+    unsafe {
+        match (
+            ((*packet).dts != AV_NOPTS_VALUE_I64).then_some((*packet).dts),
+            ((*packet).pts != AV_NOPTS_VALUE_I64).then_some((*packet).pts),
+        ) {
+            (Some(dts), Some(pts)) => Some(dts.min(pts)),
+            (Some(dts), None) => Some(dts),
+            (None, Some(pts)) => Some(pts),
+            (None, None) => None,
+        }
+    }
+}
+
+fn relative_packet_timestamp(packet: *mut AVPacket, origin: Option<i64>) -> i64 {
+    let timestamp = packet_reference_timestamp(packet).unwrap_or(0);
+    origin
+        .map(|start| timestamp.saturating_sub(start))
+        .unwrap_or(timestamp)
+}
+
+fn normalize_live_packet_timestamps(packet: *mut AVPacket, origin: Option<i64>) {
+    let Some(origin) = origin else {
+        return;
+    };
+    if packet.is_null() {
+        return;
+    }
+    unsafe {
+        if (*packet).pts != AV_NOPTS_VALUE_I64 {
+            (*packet).pts = (*packet).pts.saturating_sub(origin);
+        }
+        if (*packet).dts != AV_NOPTS_VALUE_I64 {
+            (*packet).dts = (*packet).dts.saturating_sub(origin);
+        }
+    }
+}
+
 fn encode_mixed_audio_to_m4a(
     api: &FfmpegApi,
     input_path: &Path,
@@ -1597,15 +1697,178 @@ fn encode_mixed_audio_to_m4a(
     Ok(())
 }
 
+const AVERROR_EOF_FALLBACK: i32 =
+    -((b'E' as i32) | ((b'O' as i32) << 8) | ((b'F' as i32) << 16) | ((b' ' as i32) << 24));
+
+fn ffmpeg_is_eagain(code: i32) -> bool {
+    code == -(EAGAIN as i32)
+}
+
+struct AacAdtsToAscFilter {
+    context: *mut AVBSFContext,
+    output_packet: *mut AVPacket,
+}
+
+impl AacAdtsToAscFilter {
+    fn create(
+        api: &FfmpegApi,
+        input_stream: *mut AVStream,
+        output_stream: *mut AVStream,
+    ) -> Result<Self, String> {
+        let filter_name = CString::new("aac_adtstoasc")
+            .map_err(|_| "FFmpeg: invalid AAC bitstream filter name".to_string())?;
+        let filter = unsafe { (api.av_bsf_get_by_name)(filter_name.as_ptr()) };
+        if filter.is_null() {
+            return Err("FFmpeg: internal aac_adtstoasc filter is unavailable".to_string());
+        }
+
+        let mut context: *mut AVBSFContext = ptr::null_mut();
+        let alloc_ret = unsafe { (api.av_bsf_alloc)(filter, &mut context) };
+        if alloc_ret < 0 || context.is_null() {
+            return Err(format!(
+                "FFmpeg: av_bsf_alloc(aac_adtstoasc) failed: {} ({})",
+                ffmpeg_error_text(api, alloc_ret),
+                alloc_ret
+            ));
+        }
+
+        let configure_result = unsafe {
+            let copy_ret = crate::ffmpeg_source::avcodec_parameters_copy_safe(
+                api,
+                (*context).par_in,
+                (*input_stream).codecpar,
+            );
+            if copy_ret < 0 {
+                Err(format!(
+                    "FFmpeg: unable to configure AAC bitstream filter: {} ({})",
+                    ffmpeg_error_text(api, copy_ret),
+                    copy_ret
+                ))
+            } else {
+                (*context).time_base_in = (*input_stream).time_base;
+                let init_ret = (api.av_bsf_init)(context);
+                if init_ret < 0 {
+                    Err(format!(
+                        "FFmpeg: av_bsf_init(aac_adtstoasc) failed: {} ({})",
+                        ffmpeg_error_text(api, init_ret),
+                        init_ret
+                    ))
+                } else {
+                    let out_copy_ret = crate::ffmpeg_source::avcodec_parameters_copy_safe(
+                        api,
+                        (*output_stream).codecpar,
+                        (*context).par_out,
+                    );
+                    if out_copy_ret < 0 {
+                        Err(format!(
+                            "FFmpeg: unable to copy filtered AAC parameters: {} ({})",
+                            ffmpeg_error_text(api, out_copy_ret),
+                            out_copy_ret
+                        ))
+                    } else {
+                        (*(*output_stream).codecpar).codec_tag = 0;
+                        (*output_stream).time_base = (*context).time_base_out;
+                        Ok(())
+                    }
+                }
+            }
+        };
+        if let Err(error) = configure_result {
+            unsafe { (api.av_bsf_free)(&mut context) };
+            return Err(error);
+        }
+
+        let output_packet = crate::ffmpeg_source::av_packet_alloc_safe(api);
+        if output_packet.is_null() {
+            unsafe { (api.av_bsf_free)(&mut context) };
+            return Err("FFmpeg: packet allocation failed for AAC bitstream filter".to_string());
+        }
+
+        log_debug("FFmpeg: internal aac_adtstoasc filter enabled for live MP4 recording");
+        Ok(Self {
+            context,
+            output_packet,
+        })
+    }
+
+    fn output_time_base(&self) -> AVRational {
+        unsafe { (*self.context).time_base_out }
+    }
+
+    fn send(&mut self, api: &FfmpegApi, packet: *mut AVPacket) -> Result<(), String> {
+        let ret = unsafe { (api.av_bsf_send_packet)(self.context, packet) };
+        if ret < 0 {
+            return Err(format!(
+                "FFmpeg: av_bsf_send_packet(aac_adtstoasc) failed: {} ({})",
+                ffmpeg_error_text(api, ret),
+                ret
+            ));
+        }
+        Ok(())
+    }
+
+    fn receive(&mut self, api: &FfmpegApi) -> Result<Option<*mut AVPacket>, String> {
+        crate::ffmpeg_source::av_packet_unref_safe(api, self.output_packet);
+        let ret = unsafe { (api.av_bsf_receive_packet)(self.context, self.output_packet) };
+        if ret == 0 {
+            return Ok(Some(self.output_packet));
+        }
+        if ffmpeg_is_eagain(ret) || ret == AVERROR_EOF_FALLBACK {
+            return Ok(None);
+        }
+        Err(format!(
+            "FFmpeg: av_bsf_receive_packet(aac_adtstoasc) failed: {} ({})",
+            ffmpeg_error_text(api, ret),
+            ret
+        ))
+    }
+
+    fn flush(&mut self, api: &FfmpegApi) -> Result<(), String> {
+        let ret = unsafe { (api.av_bsf_send_packet)(self.context, ptr::null_mut()) };
+        if ret < 0 && ret != AVERROR_EOF_FALLBACK {
+            return Err(format!(
+                "FFmpeg: unable to flush aac_adtstoasc: {} ({})",
+                ffmpeg_error_text(api, ret),
+                ret
+            ));
+        }
+        Ok(())
+    }
+
+    fn free(&mut self, api: &FfmpegApi) {
+        if !self.output_packet.is_null() {
+            crate::ffmpeg_source::av_packet_free_safe(api, &mut self.output_packet);
+        }
+        if !self.context.is_null() {
+            unsafe { (api.av_bsf_free)(&mut self.context) };
+        }
+    }
+}
+
+struct MuxVideoWithAudioOptions<'a> {
+    preferred_audio_stream_index: Option<i32>,
+    cancel: Option<Arc<AtomicBool>>,
+    progress: Option<&'a mut dyn FnMut(u32)>,
+    input_user_agent: Option<&'a str>,
+    input_referer: Option<&'a str>,
+    graceful_stop: bool,
+}
+
 fn mux_video_with_audio(
     api: &FfmpegApi,
     video_path: &Path,
     audio_path: &Path,
     out_path: &Path,
-    preferred_audio_stream_index: Option<i32>,
-    cancel: Option<Arc<AtomicBool>>,
-    mut progress: Option<&mut dyn FnMut(u32)>,
+    options: MuxVideoWithAudioOptions<'_>,
 ) -> Result<(), String> {
+    let MuxVideoWithAudioOptions {
+        preferred_audio_stream_index,
+        cancel,
+        mut progress,
+        input_user_agent,
+        input_referer,
+        graceful_stop,
+    } = options;
     let hls_progress_estimate = estimate_hls_progress(video_path);
     let video_c = CString::new(video_path.to_string_lossy().as_bytes())
         .map_err(|_| "FFmpeg: invalid video path".to_string())?;
@@ -1618,26 +1881,36 @@ fn mux_video_with_audio(
     let mut in_audio: *mut AVFormatContext = ptr::null_mut();
     let mut out_ctx: *mut AVFormatContext = ptr::null_mut();
 
-    let open_vid = crate::ffmpeg_source::avformat_open_input_safe(
+    let open_vid = open_input_with_network_options(
         api,
-        &mut in_video,
         video_c.as_ptr(),
-        ptr::null_mut(),
-        ptr::null_mut(),
+        &mut in_video,
+        input_user_agent,
+        input_referer,
+        graceful_stop,
     );
     if open_vid < 0 || in_video.is_null() {
-        return Err("FFmpeg: failed to open video input".to_string());
+        return Err(format!(
+            "FFmpeg: failed to open video input: {} ({})",
+            ffmpeg_error_text(api, open_vid),
+            open_vid
+        ));
     }
-    let open_aud = crate::ffmpeg_source::avformat_open_input_safe(
+    let open_aud = open_input_with_network_options(
         api,
-        &mut in_audio,
         audio_c.as_ptr(),
-        ptr::null_mut(),
-        ptr::null_mut(),
+        &mut in_audio,
+        input_user_agent,
+        input_referer,
+        graceful_stop,
     );
     if open_aud < 0 || in_audio.is_null() {
         crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_video);
-        return Err("FFmpeg: failed to open audio input".to_string());
+        return Err(format!(
+            "FFmpeg: failed to open audio input: {} ({})",
+            ffmpeg_error_text(api, open_aud),
+            open_aud
+        ));
     }
     if crate::ffmpeg_source::avformat_find_stream_info_safe(api, in_video, ptr::null_mut()) < 0 {
         unsafe {
@@ -1737,21 +2010,44 @@ fn mux_video_with_audio(
             (*out_v_stream).codecpar,
             (*in_v_stream).codecpar,
         );
-        crate::ffmpeg_source::avcodec_parameters_copy_safe(
-            api,
-            (*out_a_stream).codecpar,
-            (*in_a_stream).codecpar,
-        );
         (*(*out_v_stream).codecpar).codec_tag = 0;
-        (*(*out_a_stream).codecpar).codec_tag = 0;
         (*out_v_stream).time_base = (*in_v_stream).time_base;
-        (*out_a_stream).time_base = (*in_a_stream).time_base;
     }
+
+    let use_aac_filter = graceful_stop
+        && unsafe { (*(*in_a_stream).codecpar).codec_id == AVCodecID_AV_CODEC_ID_AAC };
+    let mut aac_filter = if use_aac_filter {
+        match AacAdtsToAscFilter::create(api, in_a_stream, out_a_stream) {
+            Ok(filter) => Some(filter),
+            Err(error) => {
+                unsafe {
+                    (api.avformat_free_context)(out_ctx);
+                    (api.avformat_close_input)(&mut in_audio);
+                    (api.avformat_close_input)(&mut in_video);
+                }
+                return Err(error);
+            }
+        }
+    } else {
+        unsafe {
+            crate::ffmpeg_source::avcodec_parameters_copy_safe(
+                api,
+                (*out_a_stream).codecpar,
+                (*in_a_stream).codecpar,
+            );
+            (*(*out_a_stream).codecpar).codec_tag = 0;
+            (*out_a_stream).time_base = (*in_a_stream).time_base;
+        }
+        None
+    };
 
     let mut io: *mut AVIOContext = ptr::null_mut();
     let open_io =
         crate::ffmpeg_source::avio_open_safe(api, &mut io, out_c.as_ptr(), AVIO_FLAG_WRITE);
     if open_io < 0 {
+        if let Some(filter) = aac_filter.as_mut() {
+            filter.free(api);
+        }
         unsafe {
             (api.avformat_free_context)(out_ctx);
             (api.avformat_close_input)(&mut in_audio);
@@ -1762,9 +2058,34 @@ fn mux_video_with_audio(
     unsafe {
         (*out_ctx).pb = io;
     }
+    let mut header_options: *mut AVDictionary = ptr::null_mut();
+    if graceful_stop
+        && let Err(error) = dict_set_str(
+            api,
+            &mut header_options,
+            "movflags",
+            "frag_keyframe+empty_moov+default_base_moof",
+        )
+    {
+        crate::ffmpeg_source::av_dict_free_safe(api, &mut header_options);
+        if let Some(filter) = aac_filter.as_mut() {
+            filter.free(api);
+        }
+        unsafe {
+            (api.avio_closep)(&mut io);
+            (api.avformat_free_context)(out_ctx);
+            (api.avformat_close_input)(&mut in_audio);
+            (api.avformat_close_input)(&mut in_video);
+        }
+        return Err(error);
+    }
     let header_ret =
-        crate::ffmpeg_source::avformat_write_header_safe(api, out_ctx, ptr::null_mut());
+        crate::ffmpeg_source::avformat_write_header_safe(api, out_ctx, &mut header_options);
+    crate::ffmpeg_source::av_dict_free_safe(api, &mut header_options);
     if header_ret < 0 {
+        if let Some(filter) = aac_filter.as_mut() {
+            filter.free(api);
+        }
         unsafe {
             (api.avio_closep)(&mut io);
             (api.avformat_free_context)(out_ctx);
@@ -1776,27 +2097,83 @@ fn mux_video_with_audio(
 
     let mut pkt_v = crate::ffmpeg_source::av_packet_alloc_safe(api);
     let mut pkt_a = crate::ffmpeg_source::av_packet_alloc_safe(api);
+    if pkt_v.is_null() || pkt_a.is_null() {
+        if !pkt_v.is_null() {
+            crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt_v);
+        }
+        if !pkt_a.is_null() {
+            crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt_a);
+        }
+        if let Some(filter) = aac_filter.as_mut() {
+            filter.free(api);
+        }
+        unsafe {
+            (api.avio_closep)(&mut io);
+            (api.avformat_free_context)(out_ctx);
+            (api.avformat_close_input)(&mut in_audio);
+            (api.avformat_close_input)(&mut in_video);
+        }
+        return Err("FFmpeg: packet allocation failed while starting recording".to_string());
+    }
     let mut has_v = read_next_packet_for_stream(api, in_video, pkt_v, video_stream_idx);
     let mut has_a = read_next_packet_for_stream(api, in_audio, pkt_a, audio_stream_idx);
+    let video_timestamp_origin = if graceful_stop && has_v {
+        packet_reference_timestamp(pkt_v)
+    } else {
+        None
+    };
+    let audio_timestamp_origin = if graceful_stop && has_a {
+        packet_reference_timestamp(pkt_a)
+    } else {
+        None
+    };
+    if graceful_stop {
+        log_debug(&format!(
+            "FFmpeg live timestamp origins: video={:?} audio={:?}",
+            video_timestamp_origin, audio_timestamp_origin
+        ));
+        unsafe {
+            log_debug(&format!(
+                "FFmpeg live first packets: video_pts={} video_dts={} video_duration={} video_tb={}/{} audio_pts={} audio_dts={} audio_duration={} audio_tb={}/{}",
+                (*pkt_v).pts,
+                (*pkt_v).dts,
+                (*pkt_v).duration,
+                (*in_v_stream).time_base.num,
+                (*in_v_stream).time_base.den,
+                (*pkt_a).pts,
+                (*pkt_a).dts,
+                (*pkt_a).duration,
+                (*in_a_stream).time_base.num,
+                (*in_a_stream).time_base.den
+            ));
+        }
+    }
     let mut progress_state = MuxProgressState {
         start_us: None,
         cursor_us: 0,
         last_pct: None,
         last_hls_log_pct_bucket: None,
     };
+    let mut write_error: Option<String> = None;
 
-    while has_v || has_a {
+    'mux_loop: while has_v || has_a {
         if cancel
             .as_ref()
             .map(|flag| flag.load(Ordering::Relaxed))
             .unwrap_or(false)
         {
+            if graceful_stop {
+                break;
+            }
             unsafe {
                 if !pkt_v.is_null() {
                     crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt_v);
                 }
                 if !pkt_a.is_null() {
                     crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt_a);
+                }
+                if let Some(filter) = aac_filter.as_mut() {
+                    filter.free(api);
                 }
                 (api.avio_closep)(&mut io);
                 (api.avformat_free_context)(out_ctx);
@@ -1810,8 +2187,8 @@ fn mux_video_with_audio(
         } else if !has_v {
             false
         } else {
-            let vts = unsafe { (*pkt_v).pts };
-            let ats = unsafe { (*pkt_a).pts };
+            let vts = relative_packet_timestamp(pkt_v, video_timestamp_origin);
+            let ats = relative_packet_timestamp(pkt_a, audio_timestamp_origin);
             let v_cmp = rescale_q(vts, unsafe { (*in_v_stream).time_base }, unsafe {
                 (*out_v_stream).time_base
             });
@@ -1822,6 +2199,7 @@ fn mux_video_with_audio(
         };
 
         if write_video {
+            normalize_live_packet_timestamps(pkt_v, video_timestamp_origin);
             unsafe {
                 (*pkt_v).stream_index = (*out_v_stream).index;
                 crate::ffmpeg_source::av_packet_rescale_ts_safe(
@@ -1833,10 +2211,15 @@ fn mux_video_with_audio(
                 let write_ret =
                     crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt_v);
                 if write_ret < 0 {
-                    log_debug(&format!(
-                        "FFmpeg: av_interleaved_write_frame (V) failed: {}",
+                    let error = format!(
+                        "FFmpeg: av_interleaved_write_frame (V) failed: {} ({})",
+                        ffmpeg_error_text(api, write_ret),
                         write_ret
-                    ));
+                    );
+                    log_debug(&error);
+                    write_error = Some(error);
+                    crate::ffmpeg_source::av_packet_unref_safe(api, pkt_v);
+                    break 'mux_loop;
                 }
                 if let Some(progress_cb) = progress.as_deref_mut() {
                     report_mux_progress(
@@ -1857,40 +2240,137 @@ fn mux_video_with_audio(
             }
             has_v = read_next_packet_for_stream(api, in_video, pkt_v, video_stream_idx);
         } else {
-            unsafe {
-                (*pkt_a).stream_index = (*out_a_stream).index;
-                crate::ffmpeg_source::av_packet_rescale_ts_safe(
-                    api,
-                    pkt_a,
-                    (*in_a_stream).time_base,
-                    (*out_a_stream).time_base,
-                );
+            normalize_live_packet_timestamps(pkt_a, audio_timestamp_origin);
+            let input_progress_sample = unsafe {
+                MuxProgressSample {
+                    pts: (*pkt_a).pts,
+                    dts: (*pkt_a).dts,
+                    duration: (*pkt_a).duration,
+                    time_base: (*in_a_stream).time_base,
+                    out_path,
+                    hls_progress_estimate: hls_progress_estimate.as_ref(),
+                }
+            };
+            if let Some(filter) = aac_filter.as_mut() {
+                if let Err(error) = filter.send(api, pkt_a) {
+                    log_debug(&error);
+                    write_error = Some(error);
+                    break 'mux_loop;
+                }
+                loop {
+                    let filtered_packet = match filter.receive(api) {
+                        Ok(Some(packet)) => packet,
+                        Ok(None) => break,
+                        Err(error) => {
+                            log_debug(&error);
+                            write_error = Some(error);
+                            break 'mux_loop;
+                        }
+                    };
+                    unsafe {
+                        (*filtered_packet).stream_index = (*out_a_stream).index;
+                        crate::ffmpeg_source::av_packet_rescale_ts_safe(
+                            api,
+                            filtered_packet,
+                            filter.output_time_base(),
+                            (*out_a_stream).time_base,
+                        );
+                    }
+                    let write_ret = crate::ffmpeg_source::av_interleaved_write_frame_safe(
+                        api,
+                        out_ctx,
+                        filtered_packet,
+                    );
+                    if write_ret < 0 {
+                        let error = format!(
+                            "FFmpeg: av_interleaved_write_frame (A filtered) failed: {} ({})",
+                            ffmpeg_error_text(api, write_ret),
+                            write_ret
+                        );
+                        log_debug(&error);
+                        write_error = Some(error);
+                        break 'mux_loop;
+                    }
+                }
+            } else {
+                unsafe {
+                    (*pkt_a).stream_index = (*out_a_stream).index;
+                    crate::ffmpeg_source::av_packet_rescale_ts_safe(
+                        api,
+                        pkt_a,
+                        (*in_a_stream).time_base,
+                        (*out_a_stream).time_base,
+                    );
+                }
                 let write_ret =
                     crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt_a);
                 if write_ret < 0 {
-                    log_debug(&format!(
-                        "FFmpeg: av_interleaved_write_frame (A) failed: {}",
+                    let error = format!(
+                        "FFmpeg: av_interleaved_write_frame (A) failed: {} ({})",
+                        ffmpeg_error_text(api, write_ret),
                         write_ret
-                    ));
-                }
-                if let Some(progress_cb) = progress.as_deref_mut() {
-                    report_mux_progress(
-                        progress_cb,
-                        total_duration_us,
-                        MuxProgressSample {
-                            pts: (*pkt_a).pts,
-                            dts: (*pkt_a).dts,
-                            duration: (*pkt_a).duration,
-                            time_base: (*in_a_stream).time_base,
-                            out_path,
-                            hls_progress_estimate: hls_progress_estimate.as_ref(),
-                        },
-                        &mut progress_state,
                     );
+                    log_debug(&error);
+                    write_error = Some(error);
+                    crate::ffmpeg_source::av_packet_unref_safe(api, pkt_a);
+                    break 'mux_loop;
                 }
                 crate::ffmpeg_source::av_packet_unref_safe(api, pkt_a);
             }
+            if let Some(progress_cb) = progress.as_deref_mut() {
+                report_mux_progress(
+                    progress_cb,
+                    total_duration_us,
+                    input_progress_sample,
+                    &mut progress_state,
+                );
+            }
             has_a = read_next_packet_for_stream(api, in_audio, pkt_a, audio_stream_idx);
+        }
+    }
+
+    if write_error.is_none()
+        && let Some(filter) = aac_filter.as_mut()
+    {
+        if let Err(error) = filter.flush(api) {
+            log_debug(&error);
+            write_error = Some(error);
+        } else {
+            loop {
+                let filtered_packet = match filter.receive(api) {
+                    Ok(Some(packet)) => packet,
+                    Ok(None) => break,
+                    Err(error) => {
+                        log_debug(&error);
+                        write_error = Some(error);
+                        break;
+                    }
+                };
+                unsafe {
+                    (*filtered_packet).stream_index = (*out_a_stream).index;
+                    crate::ffmpeg_source::av_packet_rescale_ts_safe(
+                        api,
+                        filtered_packet,
+                        filter.output_time_base(),
+                        (*out_a_stream).time_base,
+                    );
+                }
+                let write_ret = crate::ffmpeg_source::av_interleaved_write_frame_safe(
+                    api,
+                    out_ctx,
+                    filtered_packet,
+                );
+                if write_ret < 0 {
+                    let error = format!(
+                        "FFmpeg: av_interleaved_write_frame (A filter flush) failed: {} ({})",
+                        ffmpeg_error_text(api, write_ret),
+                        write_ret
+                    );
+                    log_debug(&error);
+                    write_error = Some(error);
+                    break;
+                }
+            }
         }
     }
 
@@ -1905,10 +2385,16 @@ fn mux_video_with_audio(
         if !pkt_a.is_null() {
             crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt_a);
         }
+        if let Some(filter) = aac_filter.as_mut() {
+            filter.free(api);
+        }
         (api.avio_closep)(&mut io);
         (api.avformat_free_context)(out_ctx);
         (api.avformat_close_input)(&mut in_audio);
         (api.avformat_close_input)(&mut in_video);
+    }
+    if let Some(error) = write_error {
+        return Err(error);
     }
     Ok(())
 }
@@ -2070,6 +2556,176 @@ fn report_mux_progress(
     }
     progress_state.last_pct = Some(pct);
     progress_cb(pct);
+}
+
+fn resolve_hls_recording_inputs(
+    input_url: &str,
+    prefer_audio_description: bool,
+) -> Option<HlsRecordingInputs> {
+    let input_url = input_url.trim();
+    if !input_url.to_ascii_lowercase().contains(".m3u8") {
+        return None;
+    }
+
+    let bytes = crate::curl_client::CurlClient::fetch_url_impersonated(input_url).ok()?;
+    let playlist = String::from_utf8(bytes).ok()?;
+    if !playlist.lines().any(|line| {
+        line.trim_start()
+            .to_ascii_uppercase()
+            .starts_with("#EXT-X-STREAM-INF:")
+    }) {
+        return None;
+    }
+
+    let mut audio_renditions = Vec::new();
+    let mut variants = Vec::new();
+    let mut pending_variant_attributes: Option<Vec<(String, String)>> = None;
+
+    for line in playlist.lines() {
+        let trimmed = line.trim();
+        if let Some(attributes) = trimmed.strip_prefix("#EXT-X-MEDIA:") {
+            let attributes = parse_hls_attributes(attributes);
+            if hls_attribute(&attributes, "TYPE")
+                .is_some_and(|value| value.eq_ignore_ascii_case("AUDIO"))
+            {
+                let Some(group_id) = hls_attribute(&attributes, "GROUP-ID") else {
+                    continue;
+                };
+                audio_renditions.push(HlsAudioRendition {
+                    group_id: group_id.to_string(),
+                    uri: hls_attribute(&attributes, "URI").map(|value| value.to_string()),
+                    language: hls_attribute(&attributes, "LANGUAGE")
+                        .unwrap_or_default()
+                        .to_string(),
+                    name: hls_attribute(&attributes, "NAME")
+                        .unwrap_or_default()
+                        .to_string(),
+                    is_default: hls_yes_attribute(&attributes, "DEFAULT"),
+                    autoselect: hls_yes_attribute(&attributes, "AUTOSELECT"),
+                });
+            }
+            continue;
+        }
+        if let Some(attributes) = trimmed.strip_prefix("#EXT-X-STREAM-INF:") {
+            pending_variant_attributes = Some(parse_hls_attributes(attributes));
+            continue;
+        }
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let Some(attributes) = pending_variant_attributes.take() else {
+            continue;
+        };
+        let bandwidth_bits_per_sec = hls_attribute(&attributes, "AVERAGE-BANDWIDTH")
+            .or_else(|| hls_attribute(&attributes, "BANDWIDTH"))
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(0);
+        variants.push(HlsVideoVariant {
+            url: resolve_hls_child_url(input_url, trimmed),
+            bandwidth_bits_per_sec,
+            audio_group: hls_attribute(&attributes, "AUDIO").map(|value| value.to_string()),
+        });
+    }
+
+    let selected_variant = variants
+        .into_iter()
+        .max_by_key(|variant| variant.bandwidth_bits_per_sec)?;
+    let audio_url = selected_variant
+        .audio_group
+        .as_deref()
+        .and_then(|group_id| {
+            select_hls_audio_rendition(&audio_renditions, group_id, prefer_audio_description)
+        })
+        .and_then(|rendition| rendition.uri.as_deref())
+        .map(|uri| resolve_hls_child_url(input_url, uri))
+        .unwrap_or_else(|| selected_variant.url.clone());
+
+    log_debug(&format!(
+        "FFmpeg HLS recording inputs: master={} video={} audio={} bandwidth_bps={} prefer_audio_description={}",
+        input_url,
+        selected_variant.url,
+        audio_url,
+        selected_variant.bandwidth_bits_per_sec,
+        prefer_audio_description
+    ));
+
+    Some(HlsRecordingInputs {
+        video_url: selected_variant.url,
+        audio_url,
+    })
+}
+
+fn select_hls_audio_rendition<'a>(
+    renditions: &'a [HlsAudioRendition],
+    group_id: &str,
+    prefer_audio_description: bool,
+) -> Option<&'a HlsAudioRendition> {
+    renditions
+        .iter()
+        .filter(|rendition| rendition.group_id == group_id)
+        .max_by_key(|rendition| {
+            let description =
+                format!("{} {}", rendition.language, rendition.name).to_ascii_lowercase();
+            let is_audio_description = description.contains("audiodesc")
+                || description.contains("audio desc")
+                || description.contains("description")
+                || description.split_whitespace().any(|part| part == "des");
+            let is_italian = description.contains("ital")
+                || description
+                    .split_whitespace()
+                    .any(|part| part == "it" || part == "ita");
+            let description_score = if prefer_audio_description && is_audio_description {
+                10_000
+            } else if !prefer_audio_description && !is_audio_description {
+                2_000
+            } else {
+                0
+            };
+            description_score
+                + usize::from(rendition.is_default) * 1_000
+                + usize::from(is_italian) * 500
+                + usize::from(rendition.autoselect) * 100
+                + usize::from(rendition.uri.is_some())
+        })
+}
+
+fn parse_hls_attributes(input: &str) -> Vec<(String, String)> {
+    let mut attributes = Vec::new();
+    let mut start = 0usize;
+    let mut in_quotes = false;
+    for (index, character) in input.char_indices() {
+        match character {
+            '"' => in_quotes = !in_quotes,
+            ',' if !in_quotes => {
+                push_hls_attribute(&mut attributes, &input[start..index]);
+                start = index + character.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    push_hls_attribute(&mut attributes, &input[start..]);
+    attributes
+}
+
+fn push_hls_attribute(attributes: &mut Vec<(String, String)>, part: &str) {
+    let Some((key, value)) = part.split_once('=') else {
+        return;
+    };
+    attributes.push((
+        key.trim().to_ascii_uppercase(),
+        value.trim().trim_matches('"').to_string(),
+    ));
+}
+
+fn hls_attribute<'a>(attributes: &'a [(String, String)], key: &str) -> Option<&'a str> {
+    attributes
+        .iter()
+        .find(|(attribute_key, _)| attribute_key.eq_ignore_ascii_case(key))
+        .map(|(_, value)| value.as_str())
+}
+
+fn hls_yes_attribute(attributes: &[(String, String)], key: &str) -> bool {
+    hls_attribute(attributes, key).is_some_and(|value| value.eq_ignore_ascii_case("YES"))
 }
 
 fn estimate_hls_progress(input_path: &Path) -> Option<HlsProgressEstimate> {
@@ -2249,7 +2905,20 @@ pub fn export_mixed_media(
         "Subtitle: muxing video+audio to {}",
         out_mp4.display()
     ));
-    mux_video_with_audio(api, media_path, &out_audio, &out_mp4, None, None, None)?;
+    mux_video_with_audio(
+        api,
+        media_path,
+        &out_audio,
+        &out_mp4,
+        MuxVideoWithAudioOptions {
+            preferred_audio_stream_index: None,
+            cancel: None,
+            progress: None,
+            input_user_agent: None,
+            input_referer: None,
+            graceful_stop: false,
+        },
+    )?;
     if let Err(e) = std::fs::remove_file(&out_audio) {
         crate::log_debug(&format!(
             "Subtitle: failed to delete temp audio {}: {}",
@@ -2369,10 +3038,13 @@ pub fn convert_audio_file(
         input_path,
         output_path,
         settings,
-        cancel,
-        progress,
-        None,
-        None,
+        ConvertAudioFileOptions {
+            cancel,
+            progress,
+            forced_channels: None,
+            preferred_stream_index: None,
+            graceful_stop: false,
+        },
     )
 }
 
@@ -2388,10 +3060,13 @@ pub fn convert_audio_file_with_preferred_stream(
         input_path,
         output_path,
         settings,
-        cancel,
-        progress,
-        None,
-        preferred_stream_index,
+        ConvertAudioFileOptions {
+            cancel,
+            progress,
+            forced_channels: None,
+            preferred_stream_index,
+            graceful_stop: false,
+        },
     )
 }
 
@@ -2408,9 +3083,14 @@ pub fn remux_media_file_to_mp4_with_preferred_audio_stream(
         input_path,
         input_path,
         output_path,
-        preferred_audio_stream_index,
-        cancel,
-        progress,
+        MuxVideoWithAudioOptions {
+            preferred_audio_stream_index,
+            cancel,
+            progress,
+            input_user_agent: None,
+            input_referer: None,
+            graceful_stop: false,
+        },
     )
 }
 
@@ -2427,9 +3107,137 @@ pub fn remux_media_file_to_mp4_with_external_audio_stream(
         video_path,
         audio_path,
         output_path,
-        None,
-        cancel,
-        progress,
+        MuxVideoWithAudioOptions {
+            preferred_audio_stream_index: None,
+            cancel,
+            progress,
+            input_user_agent: None,
+            input_referer: None,
+            graceful_stop: false,
+        },
+    )
+}
+
+fn remove_partial_live_recording(path: &Path) {
+    if let Err(error) = std::fs::remove_file(path)
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        log_debug(&format!(
+            "FFmpeg: unable to remove partial live recording {}: {}",
+            path.display(),
+            error
+        ));
+    }
+}
+
+pub fn record_live_media_stream_to_mp4(
+    input_url: &str,
+    output_path: &Path,
+    user_agent: Option<&str>,
+    prefer_audio_description: bool,
+    stop: Arc<AtomicBool>,
+) -> Result<(), String> {
+    const HLS_FALLBACK_USER_AGENT: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+
+    let api = ffmpeg_api()?;
+    let resolved_inputs = resolve_hls_recording_inputs(input_url, prefer_audio_description);
+    let video_url = resolved_inputs
+        .as_ref()
+        .map(|inputs| inputs.video_url.as_str())
+        .unwrap_or(input_url);
+    let audio_url = resolved_inputs
+        .as_ref()
+        .map(|inputs| inputs.audio_url.as_str())
+        .unwrap_or(input_url);
+
+    let run_attempt = |attempt_video_url: &str,
+                       attempt_audio_url: &str,
+                       attempt_user_agent: Option<&str>,
+                       attempt_referer: Option<&str>| {
+        mux_video_with_audio(
+            api,
+            Path::new(attempt_video_url),
+            Path::new(attempt_audio_url),
+            output_path,
+            MuxVideoWithAudioOptions {
+                preferred_audio_stream_index: None,
+                cancel: Some(Arc::clone(&stop)),
+                progress: None,
+                input_user_agent: attempt_user_agent,
+                input_referer: attempt_referer,
+                graceful_stop: true,
+            },
+        )
+    };
+
+    let resolved_referer =
+        ((video_url != input_url) || (audio_url != input_url)).then_some(input_url);
+
+    match run_attempt(video_url, audio_url, user_agent, resolved_referer) {
+        Ok(()) => Ok(()),
+        Err(first_error) => {
+            if stop.load(Ordering::Relaxed) {
+                return Err(first_error);
+            }
+            remove_partial_live_recording(output_path);
+            log_debug(&format!(
+                "FFmpeg live recording first attempt failed; retrying resolved inputs with browser user-agent: {}",
+                first_error
+            ));
+
+            match run_attempt(
+                video_url,
+                audio_url,
+                Some(HLS_FALLBACK_USER_AGENT),
+                resolved_referer,
+            ) {
+                Ok(()) => Ok(()),
+                Err(second_error) => {
+                    if stop.load(Ordering::Relaxed) {
+                        return Err(second_error);
+                    }
+                    if video_url == input_url && audio_url == input_url {
+                        return Err(second_error);
+                    }
+                    remove_partial_live_recording(output_path);
+                    log_debug(&format!(
+                        "FFmpeg live recording resolved-input retry failed; falling back to master playlist: {}",
+                        second_error
+                    ));
+                    run_attempt(input_url, input_url, Some(HLS_FALLBACK_USER_AGENT), None).map_err(
+                        |master_error| {
+                            format!(
+                                "{}; browser retry: {}; master fallback: {}",
+                                first_error, second_error, master_error
+                            )
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+pub fn record_live_audio_stream_to_mp3(
+    input_url: &str,
+    output_path: &Path,
+    stop: Arc<AtomicBool>,
+) -> Result<(), String> {
+    let settings = ConvertAudioSettings {
+        format: ConvertAudioFormat::Mp3,
+        quality: ConvertAudioQuality::BitrateKbps(192),
+    };
+    convert_audio_file_with_stream_index(
+        Path::new(input_url),
+        output_path,
+        &settings,
+        ConvertAudioFileOptions {
+            cancel: Some(stop),
+            progress: None,
+            forced_channels: None,
+            preferred_stream_index: None,
+            graceful_stop: true,
+        },
     )
 }
 
@@ -2445,22 +3253,37 @@ pub fn convert_audio_file_with_channels(
         input_path,
         output_path,
         settings,
-        cancel,
-        progress,
-        forced_channels,
-        None,
+        ConvertAudioFileOptions {
+            cancel,
+            progress,
+            forced_channels,
+            preferred_stream_index: None,
+            graceful_stop: false,
+        },
     )
+}
+
+struct ConvertAudioFileOptions<'a> {
+    cancel: Option<Arc<AtomicBool>>,
+    progress: Option<&'a mut dyn FnMut(u32)>,
+    forced_channels: Option<u16>,
+    preferred_stream_index: Option<i32>,
+    graceful_stop: bool,
 }
 
 fn convert_audio_file_with_stream_index(
     input_path: &Path,
     output_path: &Path,
     settings: &ConvertAudioSettings,
-    cancel: Option<Arc<AtomicBool>>,
-    mut progress: Option<&mut dyn FnMut(u32)>,
-    forced_channels: Option<u16>,
-    preferred_stream_index: Option<i32>,
+    options: ConvertAudioFileOptions<'_>,
 ) -> Result<(), String> {
+    let ConvertAudioFileOptions {
+        cancel,
+        mut progress,
+        forced_channels,
+        preferred_stream_index,
+        graceful_stop,
+    } = options;
     let api = ffmpeg_api()?;
     let args = build_ffmpeg_args(settings);
     log_debug(&format!(
@@ -3030,7 +3853,7 @@ fn convert_audio_file_with_stream_index(
         }
     }
 
-    if canceled {
+    if canceled && !graceful_stop {
         unsafe {
             (api.swr_free)(&mut swr_ctx);
             (api.av_frame_free)(&mut frame);

@@ -1,10 +1,10 @@
 Le Monde | https://www.lemonde.fr/rss/une.xml
 Le Figaro | https://www.lefigaro.fr/rss/figaro_actualites.xml
 France Info | https://www.francetvinfo.fr/titres.rss
-Libération | https://www.liberation.fr/rss/
-Les Échos | https://www.lesechos.fr/rss/rss_france.xml
+Libération | http://rss.liberation.fr/rss/latest/
+Les Échos | https://services.lesechos.fr/rss/les-echos-economie.xml
 L'Express | https://www.lexpress.fr/rss/alaune.xml
-20 Minutes | https://www.20minutes.fr/rss/une.xml
+20 Minutes | https://www.20minutes.fr/feeds/rss-une.xml
 BFM TV | https://www.bfmtv.com/rss/news-24-7/
 La Croix | https://www.la-croix.com/RSS/UNIVERS
 L'Humanité | https://www.humanite.fr/rss
@@ -16,5 +16,5 @@ ZDNet France | https://www.zdnet.fr/feeds/rss/actualites/
 Clubic | https://www.clubic.com/feed/news.rss
 Gamekult | https://www.gamekult.com/feed.xml
 Allociné | https://www.allocine.fr/rss/news.xml
-L'Équipe | https://lequipe.fr/rss/actu_rss.xml
-Eurosport | https://www.eurosport.fr/rss.xml
+L'Équipe | https://news.google.com/rss/search?q=site%3Alequipe.fr&hl=fr&gl=FR&ceid=FR:fr
+Eurosport | https://news.google.com/rss/search?q=site%3Aeurosport.fr&hl=fr&gl=FR&ceid=FR:fr

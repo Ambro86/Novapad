@@ -116,6 +116,7 @@ pub const IDM_VIEW_SHOW_FAVORITES: usize = 6102;
 pub const IDM_VIEW_READ_ONLY: usize = 6103;
 pub const IDM_VIEW_WORD_WRAP: usize = 6104;
 pub const IDM_VIEW_SHOW_VIDEO_DURING_PLAYBACK: usize = 6105;
+pub const IDM_VIEW_SHOW_EPUB_INDEX: usize = 6106;
 pub const IDM_VIEW_FONT_ARIAL: usize = 6401;
 pub const IDM_VIEW_FONT_CALIBRI: usize = 6402;
 pub const IDM_VIEW_FONT_CONSOLAS: usize = 6403;
@@ -542,6 +543,7 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
         .unwrap_or(false);
         let mpv_playback_active =
             with_state(hwnd, |state| state.active_mpv_session.is_some()).unwrap_or(false);
+        let live_tv_playback = crate::is_live_tv_playback_active(hwnd);
         let hls_m3u8_playback = with_state(hwnd, |state| {
             let active_player_url = state
                 .active_audiobook
@@ -680,18 +682,20 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 IDM_PLAYBACK_SEEK_BACKWARD,
                 &seek_backward,
             );
-            append_menu_string(
-                playback_menu,
-                seek_flags,
-                IDM_PLAYBACK_SEEK_TO_START,
-                &seek_to_start,
-            );
-            append_menu_string(
-                playback_menu,
-                seek_flags,
-                IDM_PLAYBACK_SEEK_TO_END,
-                &seek_to_end,
-            );
+            if !live_tv_playback {
+                append_menu_string(
+                    playback_menu,
+                    seek_flags,
+                    IDM_PLAYBACK_SEEK_TO_START,
+                    &seek_to_start,
+                );
+                append_menu_string(
+                    playback_menu,
+                    seek_flags,
+                    IDM_PLAYBACK_SEEK_TO_END,
+                    &seek_to_end,
+                );
+            }
             append_menu_string(
                 playback_menu,
                 MF_STRING,
@@ -724,7 +728,11 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     &chapter_list,
                 );
             }
-            if show_download && !stream_direct_no_download && !raiplay_live_stream_playback {
+            if show_download
+                && !stream_direct_no_download
+                && !raiplay_live_stream_playback
+                && !live_tv_playback
+            {
                 append_menu_string(
                     playback_menu,
                     MF_STRING,
@@ -771,16 +779,18 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     );
                 }
             }
-            append_menu_string(
-                playback_menu,
-                if direct_stream_playback {
-                    MF_STRING | MF_GRAYED
-                } else {
-                    MF_STRING
-                },
-                IDM_PLAYBACK_GO_TO_TIME,
-                &go_to_time,
-            );
+            if !live_tv_playback {
+                append_menu_string(
+                    playback_menu,
+                    if direct_stream_playback {
+                        MF_STRING | MF_GRAYED
+                    } else {
+                        MF_STRING
+                    },
+                    IDM_PLAYBACK_GO_TO_TIME,
+                    &go_to_time,
+                );
+            }
             append_menu_string(
                 playback_menu,
                 MF_STRING,

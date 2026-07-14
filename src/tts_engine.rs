@@ -47,6 +47,7 @@ pub const MAX_TTS_TEXT_LEN: usize = 3000;
 pub const MAX_TTS_TEXT_LEN_LONG: usize = 2000;
 pub const MAX_TTS_FIRST_CHUNK_LEN_LONG: usize = 800;
 pub const TTS_LONG_TEXT_THRESHOLD: usize = MAX_TTS_TEXT_LEN;
+const GOOGLE_PLAYBACK_FIRST_CHUNK_MAX_CHARS: usize = 100;
 pub(crate) const PAUSE_TAG_MIN_MS: u32 = 50;
 pub(crate) const PAUSE_TAG_MAX_MS: u32 = 60_000;
 // Some voices silently truncate long SSML payloads without returning an error.
@@ -778,14 +779,109 @@ pub fn speak_text_once(hwnd: HWND, text: String) {
     }
 }
 
+fn google_playback_startup_split_index(text: &str, max_chars: usize) -> Option<usize> {
+    if max_chars == 0 || text.chars().count() <= max_chars {
+        return None;
+    }
+
+    let min_natural_boundary = (max_chars / 3).max(1);
+    let mut natural_boundary = None;
+    let mut whitespace_boundary = None;
+    let mut hard_boundary = None;
+    for (char_index, (byte_index, ch)) in text.char_indices().enumerate() {
+        let char_count = char_index + 1;
+        if char_count > max_chars {
+            break;
+        }
+        let after_char = byte_index + ch.len_utf8();
+        hard_boundary = Some(after_char);
+        if ch.is_whitespace() {
+            whitespace_boundary = Some(byte_index);
+        }
+        if char_count >= min_natural_boundary
+            && matches!(
+                ch,
+                '.' | ':' | ';' | '?' | '!' | ',' | '\n' | '\r' | '—' | '–'
+            )
+        {
+            natural_boundary = Some(after_char);
+        }
+    }
+
+    natural_boundary.or(whitespace_boundary).or(hard_boundary)
+}
+
+fn optimize_google_playback_startup(chunks: &mut Vec<TtsChunk>, default_engine: TtsEngine) {
+    let Some(first_playable_index) = chunks.iter().position(|chunk| chunk.pause_ms.is_none())
+    else {
+        return;
+    };
+    let first = &chunks[first_playable_index];
+    let engine = first
+        .override_voice
+        .as_ref()
+        .map(|voice| voice.engine)
+        .unwrap_or(default_engine);
+    if engine != TtsEngine::Google {
+        return;
+    }
+
+    let original_chars = first.text_to_read.chars().count();
+    let Some(split_index) = google_playback_startup_split_index(
+        &first.text_to_read,
+        GOOGLE_PLAYBACK_FIRST_CHUNK_MAX_CHARS,
+    ) else {
+        return;
+    };
+    let head_text = first.text_to_read[..split_index].trim().to_string();
+    let tail_text = first.text_to_read[split_index..].trim().to_string();
+    if head_text.is_empty() || tail_text.is_empty() {
+        return;
+    }
+
+    let total_text_len = utf16_len(&first.text_to_read).max(1);
+    let mut head_original_len =
+        first.original_len.saturating_mul(utf16_len(&head_text)) / total_text_len;
+    if first.original_len >= 2 {
+        head_original_len = head_original_len.clamp(1, first.original_len - 1);
+    }
+    let tail_original_len = first.original_len.saturating_sub(head_original_len);
+    let override_voice = first.override_voice.clone();
+    chunks[first_playable_index] = TtsChunk {
+        text_to_read: head_text,
+        original_len: head_original_len,
+        override_voice: override_voice.clone(),
+        pause_ms: None,
+    };
+    chunks.insert(
+        first_playable_index + 1,
+        TtsChunk {
+            text_to_read: tail_text,
+            original_len: tail_original_len,
+            override_voice,
+            pause_ms: None,
+        },
+    );
+    crate::log_debug(&format!(
+        "Google playback startup split: original_chars={} first_chars={} remaining_chars={}",
+        original_chars,
+        chunks[first_playable_index].text_to_read.chars().count(),
+        chunks[first_playable_index + 1]
+            .text_to_read
+            .chars()
+            .count()
+    ));
+}
+
 fn queue_tts_playback_from_text(options: TtsQueuedPlayback) {
     std::thread::spawn(move || {
-        let chunks = split_into_tts_chunks(
+        let mut chunks = split_into_tts_chunks(
             &options.text,
             options.split_on_newline,
             &options.dictionary,
             options.engine,
         );
+        optimize_google_playback_startup(&mut chunks, options.engine);
         let payload = Box::new(TtsPlaybackOptions {
             hwnd: options.hwnd,
             engine: options.engine,
@@ -6299,14 +6395,89 @@ mod tests {
     use crate::settings::DictionaryEntry;
 
     use super::{
-        TtsEngine, build_audiobook_parts_by_positions, collect_marker_entries, find_edge_split_idx,
-        is_edge_text_usable, normalize_for_tts, parse_edge_binary_audio_payload,
-        parse_sapi4_part_index, parse_voice_tag_override, prepare_tts_text, preview_for_log,
-        render_edge_ssml_text_with_pause_tags, render_sapi_ssml_text_with_pause_tags,
-        sanitize_edge_text, split_into_tts_chunks, split_long_sentence_edge_with_limit,
-        split_sentences, split_text_for_engine, split_voice_tag_spans, strip_dashed_lines,
-        utf16_len,
+        GOOGLE_PLAYBACK_FIRST_CHUNK_MAX_CHARS, TtsChunk, TtsEngine,
+        build_audiobook_parts_by_positions, collect_marker_entries, find_edge_split_idx,
+        is_edge_text_usable, normalize_for_tts, optimize_google_playback_startup,
+        parse_edge_binary_audio_payload, parse_sapi4_part_index, parse_voice_tag_override,
+        prepare_tts_text, preview_for_log, render_edge_ssml_text_with_pause_tags,
+        render_sapi_ssml_text_with_pause_tags, sanitize_edge_text, split_into_tts_chunks,
+        split_long_sentence_edge_with_limit, split_sentences, split_text_for_engine,
+        split_voice_tag_spans, strip_dashed_lines, utf16_len,
     };
+
+    #[test]
+    fn google_playback_uses_a_short_natural_first_chunk() {
+        let text = format!(
+            "{}{}, poi il testo continua ancora per simulare una prima frase molto lunga",
+            "Titolo introduttivo ".repeat(2),
+            "naturale"
+        );
+        let original_len = utf16_len(&text);
+        let mut chunks = vec![TtsChunk {
+            text_to_read: text.clone(),
+            original_len,
+            override_voice: None,
+            pause_ms: None,
+        }];
+
+        optimize_google_playback_startup(&mut chunks, TtsEngine::Google);
+
+        assert_eq!(chunks.len(), 2);
+        assert!(chunks[0].text_to_read.chars().count() <= GOOGLE_PLAYBACK_FIRST_CHUNK_MAX_CHARS);
+        assert!(chunks[0].text_to_read.ends_with(','));
+        assert_eq!(
+            chunks.iter().map(|chunk| chunk.original_len).sum::<usize>(),
+            original_len
+        );
+        assert_eq!(
+            chunks
+                .iter()
+                .flat_map(|chunk| chunk.text_to_read.split_whitespace())
+                .collect::<Vec<_>>(),
+            text.split_whitespace().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn google_playback_hard_fallback_keeps_first_chunk_bounded() {
+        let text = "a".repeat(GOOGLE_PLAYBACK_FIRST_CHUNK_MAX_CHARS + 75);
+        let mut chunks = vec![TtsChunk {
+            original_len: utf16_len(&text),
+            text_to_read: text.clone(),
+            override_voice: None,
+            pause_ms: None,
+        }];
+
+        optimize_google_playback_startup(&mut chunks, TtsEngine::Google);
+
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(
+            chunks[0].text_to_read.chars().count(),
+            GOOGLE_PLAYBACK_FIRST_CHUNK_MAX_CHARS
+        );
+        assert_eq!(
+            chunks
+                .iter()
+                .map(|chunk| chunk.text_to_read.as_str())
+                .collect::<String>(),
+            text
+        );
+    }
+
+    #[test]
+    fn startup_optimization_does_not_change_non_google_playback() {
+        let text = "Una frase iniziale molto lunga senza una conclusione ".repeat(5);
+        let mut chunks = vec![TtsChunk {
+            original_len: utf16_len(&text),
+            text_to_read: text,
+            override_voice: None,
+            pause_ms: None,
+        }];
+
+        optimize_google_playback_startup(&mut chunks, TtsEngine::Edge);
+
+        assert_eq!(chunks.len(), 1);
+    }
 
     #[test]
     fn prepare_tts_text_keeps_dictionary_entries_case_sensitive_by_default() {
@@ -7825,7 +7996,7 @@ fn resolve_mixed_chunk_synth<'a>(
     }
 }
 
-const GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS: usize = 1_600;
+const GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS: usize = 800;
 
 #[derive(Clone, PartialEq, Eq)]
 struct MixedSynthKey {
@@ -7871,6 +8042,115 @@ fn append_google_batch_text(target: &mut String, incoming: &str) {
     target.push_str(incoming);
 }
 
+fn append_google_source_text(target: &mut String, incoming: &str) {
+    if !target.is_empty() {
+        target.push('\n');
+    }
+    target.push_str(incoming);
+}
+
+fn split_google_text_at_whitespace(text: &str, max_chars: usize) -> Vec<String> {
+    let mut remaining = text.trim();
+    let mut parts = Vec::new();
+    while remaining.chars().count() > max_chars {
+        let hard_split = remaining
+            .char_indices()
+            .nth(max_chars)
+            .map(|(index, _)| index)
+            .unwrap_or(remaining.len());
+        let split_at = remaining[..hard_split]
+            .char_indices()
+            .rev()
+            .find_map(|(index, ch)| ch.is_whitespace().then_some(index))
+            .filter(|index| *index > 0)
+            .unwrap_or(hard_split);
+        let (head, tail) = remaining.split_at(split_at);
+        let head = head.trim();
+        if !head.is_empty() {
+            parts.push(head.to_string());
+        }
+        remaining = tail.trim_start();
+    }
+    if !remaining.is_empty() {
+        parts.push(remaining.to_string());
+    }
+    parts
+}
+
+fn google_line_starts_with_uppercase(line: &str) -> bool {
+    line.trim_start()
+        .chars()
+        .next()
+        .is_some_and(char::is_uppercase)
+}
+
+fn split_oversized_google_sentence(text: &str, max_chars: usize) -> Vec<String> {
+    let mut line_parts = Vec::new();
+    let mut current = String::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let combined_chars = current
+            .chars()
+            .count()
+            .saturating_add(usize::from(!current.is_empty()))
+            .saturating_add(line.chars().count());
+        if !current.is_empty()
+            && combined_chars > max_chars
+            && google_line_starts_with_uppercase(line)
+        {
+            line_parts.push(current);
+            current = String::new();
+        }
+        append_google_batch_text(&mut current, line);
+    }
+    if !current.is_empty() {
+        line_parts.push(current);
+    }
+
+    line_parts
+        .into_iter()
+        .flat_map(|part| split_google_text_at_whitespace(&part, max_chars))
+        .collect()
+}
+
+fn split_google_audiobook_text(text: &str, max_chars: usize) -> Vec<String> {
+    let max_chars = max_chars.max(1);
+    let mut parts = Vec::new();
+    let mut current = String::new();
+
+    for sentence in split_sentences(text) {
+        let sentence = sentence.trim();
+        if sentence.is_empty() {
+            continue;
+        }
+        let sentence_parts = if sentence.chars().count() > max_chars {
+            split_oversized_google_sentence(sentence, max_chars)
+        } else {
+            vec![sentence.to_string()]
+        };
+        for sentence_part in sentence_parts {
+            let combined_chars = current
+                .chars()
+                .count()
+                .saturating_add(usize::from(!current.is_empty()))
+                .saturating_add(sentence_part.chars().count());
+            if !current.is_empty() && combined_chars > max_chars {
+                parts.push(current);
+                current = String::new();
+            }
+            append_google_batch_text(&mut current, &sentence_part);
+        }
+    }
+
+    if !current.is_empty() {
+        parts.push(current);
+    }
+    parts
+}
+
 fn coalesce_google_audiobook_chunks(
     chunks: &[TtsChunk],
     options: &AudiobookCommonOptions,
@@ -7891,45 +8171,40 @@ fn coalesce_google_audiobook_chunks(
             continue;
         }
 
-        let mut merged = first.clone();
-        let mut source_chunk_count = 1usize;
+        let first_chunk_index = index;
+        let mut combined_text = String::new();
+        let mut source_chunk_count = 0usize;
         let mut next_index = index + 1;
+        append_google_source_text(&mut combined_text, &first.text_to_read);
+        source_chunk_count += 1;
         while next_index < chunks.len() {
             let next = &chunks[next_index];
             if next.pause_ms.is_some() || mixed_synth_key(next, options, config) != key {
                 break;
             }
-            let separator_len = usize::from(
-                !merged
-                    .text_to_read
-                    .chars()
-                    .next_back()
-                    .is_some_and(char::is_whitespace)
-                    && !next
-                        .text_to_read
-                        .chars()
-                        .next()
-                        .is_some_and(char::is_whitespace),
-            );
-            let combined_len = merged
-                .text_to_read
-                .chars()
-                .count()
-                .saturating_add(separator_len)
-                .saturating_add(next.text_to_read.chars().count());
-            if combined_len > GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS {
-                break;
-            }
-            append_google_batch_text(&mut merged.text_to_read, &next.text_to_read);
-            merged.original_len = merged.original_len.saturating_add(next.original_len);
+            append_google_source_text(&mut combined_text, &next.text_to_read);
             source_chunk_count = source_chunk_count.saturating_add(1);
             next_index += 1;
         }
-        units.push(MixedAudiobookUnit {
-            first_chunk_index: index,
-            source_chunk_count,
-            chunk: merged,
-        });
+
+        let batches = split_google_audiobook_text(&combined_text, GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS);
+        let batch_count = batches.len().max(1);
+        let mut assigned_source_chunks = 0usize;
+        for (batch_index, text_to_read) in batches.into_iter().enumerate() {
+            let cumulative_source_chunks =
+                (batch_index + 1).saturating_mul(source_chunk_count) / batch_count;
+            let batch_source_chunks =
+                cumulative_source_chunks.saturating_sub(assigned_source_chunks);
+            assigned_source_chunks = cumulative_source_chunks;
+            let mut chunk = first.clone();
+            chunk.original_len = utf16_len(&text_to_read);
+            chunk.text_to_read = text_to_read;
+            units.push(MixedAudiobookUnit {
+                first_chunk_index,
+                source_chunk_count: batch_source_chunks,
+                chunk,
+            });
+        }
         index = next_index;
     }
     units
@@ -8037,7 +8312,20 @@ async fn synthesize_mixed_chunk_with_retry(
     None
 }
 
-const GOOGLE_AUDIOBOOK_MAX_WORKERS: usize = 5;
+const GOOGLE_AUDIOBOOK_MAX_WORKERS: usize = 8;
+
+fn google_audiobook_worker_limit_for_cores(logical_cores: usize) -> usize {
+    match logical_cores {
+        20.. => 8,
+        16..=19 => 7,
+        12..=15 => 6,
+        8..=11 => 5,
+        6..=7 => 4,
+        4..=5 => 3,
+        2..=3 => 2,
+        _ => 1,
+    }
+}
 
 fn google_audiobook_worker_limit() -> usize {
     if let Ok(raw) = std::env::var("SONARPAD_GOOGLE_TTS_WORKERS")
@@ -8048,13 +8336,7 @@ fn google_audiobook_worker_limit() -> usize {
     let logical_cores = std::thread::available_parallelism()
         .map(|value| value.get())
         .unwrap_or(4);
-    match logical_cores {
-        12.. => 5,
-        8..=11 => 4,
-        4..=7 => 3,
-        2..=3 => 2,
-        _ => 1,
-    }
+    google_audiobook_worker_limit_for_cores(logical_cores)
 }
 
 struct GoogleAudiobookTask {
@@ -8629,4 +8911,195 @@ pub(crate) fn render_mixed_audiobook_part(
         output
     ));
     Ok(())
+}
+
+#[cfg(test)]
+mod google_audiobook_optimization_tests {
+    use super::*;
+
+    #[test]
+    fn google_batch_splitter_preserves_unicode_sentence_boundaries() {
+        let sentence = "Titolo accentato: È una domanda? Sì, è una risposta! Questa è la fine. ";
+        let text = sentence.repeat(80);
+        let parts = split_google_audiobook_text(&text, GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS);
+
+        assert!(parts.len() > 1);
+        assert!(
+            parts
+                .iter()
+                .all(|part| part.chars().count() <= GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS)
+        );
+        assert!(parts.iter().all(|part| {
+            part.ends_with('.')
+                || part.ends_with(':')
+                || part.ends_with(';')
+                || part.ends_with('?')
+                || part.ends_with('!')
+        }));
+        assert_eq!(
+            parts
+                .iter()
+                .flat_map(|part| part.split_whitespace())
+                .collect::<Vec<_>>(),
+            text.split_whitespace().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn google_batch_splitter_emergency_splits_an_exceptionally_long_sentence() {
+        let text = format!("{}.", "parola ".repeat(300));
+        let parts = split_google_audiobook_text(&text, GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS);
+
+        assert!(parts.len() > 1);
+        assert!(
+            parts
+                .iter()
+                .all(|part| part.chars().count() <= GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS)
+        );
+        assert_eq!(
+            parts
+                .iter()
+                .flat_map(|part| part.split_whitespace())
+                .collect::<Vec<_>>(),
+            text.split_whitespace().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn google_batch_splitter_uses_uppercase_newline_even_after_hyphen() {
+        let first_line = format!("{}-", "Prima parte molto lunga ".repeat(30));
+        let second_line = format!("{}.", "Nuova riga maiuscola ".repeat(20));
+        let text = format!("{first_line}\n{second_line}");
+
+        let parts = split_google_audiobook_text(&text, GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS);
+
+        assert!(parts.len() >= 2);
+        assert!(parts[0].ends_with('-'));
+        assert!(parts[1].starts_with("Nuova"));
+        assert!(
+            parts
+                .iter()
+                .all(|part| part.chars().count() <= GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS)
+        );
+    }
+
+    #[test]
+    fn oversized_google_chunk_is_split_without_overcounting_progress() {
+        let text = "Una frase italiana termina chiaramente qui. ".repeat(250);
+        let chunk = TtsChunk {
+            original_len: utf16_len(&text),
+            text_to_read: text.clone(),
+            override_voice: None,
+            pause_ms: None,
+        };
+        let cancel = Arc::new(AtomicBool::new(false));
+        let options = AudiobookCommonOptions {
+            voice: "google-test",
+            output: Path::new("test.wav"),
+            progress_hwnd: HWND(0),
+            cancel,
+            language: Language::Italian,
+            part_naming_mode: AudiobookPartNamingMode::TitleNumber,
+            audiobook_bitrate_kbps: 128,
+            rate: 0,
+            pitch: 0,
+            volume: 100,
+            sapi4_threads: None,
+        };
+        let config = MixedAudiobookConfig {
+            main_engine: TtsEngine::Google,
+        };
+
+        let units = coalesce_google_audiobook_chunks(&[chunk], &options, &config);
+
+        assert!(units.len() > 1);
+        assert!(units.iter().all(|unit| {
+            unit.chunk.text_to_read.chars().count() <= GOOGLE_AUDIOBOOK_BATCH_MAX_CHARS
+        }));
+        assert!(
+            units
+                .iter()
+                .all(|unit| unit.chunk.text_to_read.ends_with('.'))
+        );
+        assert_eq!(
+            units
+                .iter()
+                .map(|unit| unit.source_chunk_count)
+                .sum::<usize>(),
+            1
+        );
+        let original_words = text.split_whitespace().collect::<Vec<_>>();
+        let split_words = units
+            .iter()
+            .flat_map(|unit| unit.chunk.text_to_read.split_whitespace())
+            .collect::<Vec<_>>();
+        assert_eq!(split_words, original_words);
+    }
+
+    #[test]
+    fn google_batching_reassembles_sentences_split_across_source_chunks() {
+        let chunks = [
+            TtsChunk {
+                original_len: 12,
+                text_to_read: "Questa frase".to_string(),
+                override_voice: None,
+                pause_ms: None,
+            },
+            TtsChunk {
+                original_len: 31,
+                text_to_read: "continua e termina qui. Seconda".to_string(),
+                override_voice: None,
+                pause_ms: None,
+            },
+            TtsChunk {
+                original_len: 15,
+                text_to_read: "frase conclusa!".to_string(),
+                override_voice: None,
+                pause_ms: None,
+            },
+        ];
+        let options = AudiobookCommonOptions {
+            voice: "google-test",
+            output: Path::new("test.wav"),
+            progress_hwnd: HWND(0),
+            cancel: Arc::new(AtomicBool::new(false)),
+            language: Language::Italian,
+            part_naming_mode: AudiobookPartNamingMode::TitleNumber,
+            audiobook_bitrate_kbps: 128,
+            rate: 0,
+            pitch: 0,
+            volume: 100,
+            sapi4_threads: None,
+        };
+        let config = MixedAudiobookConfig {
+            main_engine: TtsEngine::Google,
+        };
+
+        let units = coalesce_google_audiobook_chunks(&chunks, &options, &config);
+
+        assert_eq!(units.len(), 1);
+        assert_eq!(
+            units[0]
+                .chunk
+                .text_to_read
+                .split_whitespace()
+                .collect::<Vec<_>>(),
+            "Questa frase continua e termina qui. Seconda frase conclusa!"
+                .split_whitespace()
+                .collect::<Vec<_>>()
+        );
+        assert!(units[0].chunk.text_to_read.contains('\n'));
+        assert!(units[0].chunk.text_to_read.ends_with('!'));
+        assert_eq!(units[0].source_chunk_count, chunks.len());
+    }
+
+    #[test]
+    fn google_worker_limit_scales_on_modern_cpus() {
+        assert_eq!(google_audiobook_worker_limit_for_cores(1), 1);
+        assert_eq!(google_audiobook_worker_limit_for_cores(4), 3);
+        assert_eq!(google_audiobook_worker_limit_for_cores(8), 5);
+        assert_eq!(google_audiobook_worker_limit_for_cores(12), 6);
+        assert_eq!(google_audiobook_worker_limit_for_cores(16), 7);
+        assert_eq!(google_audiobook_worker_limit_for_cores(24), 8);
+    }
 }

@@ -968,6 +968,10 @@ impl GoogleTtsRuntime {
         }
         let synthesis_started = Instant::now();
         let mapped_rate = google_rate(rate);
+        let synthesis_timeout = google_synthesis_timeout(mapped_rate);
+        let javascript_timeout_ms = synthesis_timeout
+            .saturating_sub(Duration::from_secs(5))
+            .as_millis() as u64;
         let pitch_percent = google_pitch_percent_from_internal(pitch);
         let mapped_pitch = google_pitch(pitch);
         let mapped_volume = (volume as f64 / 100.0).clamp(0.0, 1.0);
@@ -1057,9 +1061,9 @@ impl GoogleTtsRuntime {
                 "awaitPromise": true,
                 "returnByValue": true,
                 "userGesture": true,
-                "timeout": 120000
+                "timeout": javascript_timeout_ms
             }),
-            Duration::from_secs(130),
+            synthesis_timeout,
             cancel,
             Some(&mut handler),
         )?;
@@ -1294,6 +1298,11 @@ fn google_rate(rate: i32) -> f64 {
     (0.35 + (2.0 - 0.35) * normalized).clamp(0.1, 10.0)
 }
 
+fn google_synthesis_timeout(mapped_rate: f64) -> Duration {
+    let seconds = (30.0 / mapped_rate.max(0.1)).ceil().clamp(35.0, 120.0) as u64;
+    Duration::from_secs(seconds)
+}
+
 fn google_pitch(pitch: i32) -> f64 {
     // Exact conversion used by googleTtsForNvda: 0..100, 50 = normal.
     let percent = google_pitch_percent_from_internal(pitch) as f64;
@@ -1464,5 +1473,17 @@ fn cleanup_old_profiles(root: &Path, browser_name: &str) {
                 path.display()
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn synthesis_timeout_is_short_at_normal_rate_and_scales_for_slow_speech() {
+        assert_eq!(google_synthesis_timeout(google_rate(0)).as_secs(), 35);
+        assert_eq!(google_synthesis_timeout(google_rate(100)).as_secs(), 35);
+        assert_eq!(google_synthesis_timeout(google_rate(-100)).as_secs(), 86);
     }
 }

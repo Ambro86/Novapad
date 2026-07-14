@@ -1590,6 +1590,7 @@ fn log_path() -> Option<PathBuf> {
 }
 
 const MAX_LOG_SIZE: u64 = 150 * 1024;
+static LOG_WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 fn log_lock_path(log_path: &Path) -> Option<PathBuf> {
     let parent = log_path.parent()?;
@@ -1673,7 +1674,15 @@ pub(crate) fn log_debug(message: &str) {
     {
         return;
     }
-    truncate_log_if_needed(&path);
+    append_debug_log(&path, message);
+}
+
+fn append_debug_log(path: &Path, message: &str) {
+    let _write_guard = match LOG_WRITE_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    truncate_log_if_needed(path);
     if let Ok(mut log) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -19725,12 +19734,62 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
 mod tests {
     use super::{
         COPYDATA_RESULT_DEFERRED_MODAL, COPYDATA_RESULT_HANDLED, SentenceNavigationDirection,
-        audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
+        append_debug_log, audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
         normalize_soft_line_breaks_for_translation, relative_audiobook_bookmark,
         sentence_navigation_target, sentence_start_offsets_utf16, should_defer_external_file_open,
         should_focus_existing_window_after_copydata,
     };
     use crate::bookmarks::Bookmark;
+    use std::collections::HashSet;
+    use std::sync::{Arc, Barrier};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn concurrent_debug_log_writes_keep_lines_intact() {
+        const THREADS: usize = 8;
+        const LINES_PER_THREAD: usize = 50;
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let path = Arc::new(std::env::temp_dir().join(format!(
+            "sonarpad-concurrent-log-{}-{nonce}.log",
+            std::process::id()
+        )));
+        let barrier = Arc::new(Barrier::new(THREADS));
+
+        std::thread::scope(|scope| {
+            for thread_index in 0..THREADS {
+                let path = Arc::clone(&path);
+                let barrier = Arc::clone(&barrier);
+                scope.spawn(move || {
+                    barrier.wait();
+                    for line_index in 0..LINES_PER_THREAD {
+                        append_debug_log(
+                            &path,
+                            &format!("concurrent-log-{thread_index}-{line_index}"),
+                        );
+                    }
+                });
+            }
+        });
+
+        let content = std::fs::read_to_string(path.as_ref()).unwrap_or_default();
+        let lines = content.lines().collect::<Vec<_>>();
+        assert_eq!(lines.len(), THREADS * LINES_PER_THREAD);
+        let messages = lines
+            .iter()
+            .filter_map(|line| line.split_once("] ").map(|(_, message)| message))
+            .collect::<HashSet<_>>();
+        assert_eq!(messages.len(), THREADS * LINES_PER_THREAD);
+        for thread_index in 0..THREADS {
+            for line_index in 0..LINES_PER_THREAD {
+                let expected = format!("concurrent-log-{thread_index}-{line_index}");
+                assert!(messages.contains(expected.as_str()));
+            }
+        }
+        assert!(std::fs::remove_file(path.as_ref()).is_ok());
+    }
 
     #[test]
     fn external_file_open_is_deferred_when_main_window_is_disabled() {

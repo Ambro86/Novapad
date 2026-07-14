@@ -122,9 +122,10 @@ use windows::Win32::UI::Controls::{
     WC_TABCONTROLW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, GetKeyState, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL, VK_ESCAPE,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F7, VK_F8, VK_F9, VK_F10, VK_MEDIA_PLAY_PAUSE, VK_MENU, VK_NEXT,
-    VK_OEM_COMMA, VK_OEM_PERIOD, VK_PRIOR, VK_RETURN, VK_SHIFT, VK_TAB,
+    EnableWindow, GetFocus, GetKeyState, IsWindowEnabled, SetActiveWindow, SetFocus, VK_APPS,
+    VK_CONTROL, VK_ESCAPE, VK_F1, VK_F2, VK_F3, VK_F4, VK_F7, VK_F8, VK_F9, VK_F10,
+    VK_MEDIA_PLAY_PAUSE, VK_MENU, VK_NEXT, VK_OEM_COMMA, VK_OEM_PERIOD, VK_PRIOR, VK_RETURN,
+    VK_SHIFT, VK_TAB,
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
@@ -353,6 +354,8 @@ const MPV_ESC_FOCUS_DEBUG_TIMER_ID4: usize = 19;
 const MPV_ESC_FOCUS_DEBUG_TIMER_ID5: usize = 20;
 const MPV_ESC_FOCUS_DEBUG_TIMER_ID6: usize = 21;
 const EDITOR_TRANSLATION_SPEAK_TIMER_ID: usize = 22;
+const DEFERRED_MODAL_COPYDATA_OPEN_TIMER_ID: usize = 0xD0F1;
+const DEFERRED_MODAL_COPYDATA_OPEN_TIMER_INTERVAL_MS: u32 = 150;
 const GEMINI_TRANSLATION_FALLBACK_MODEL: &str = "gemini-2.5-flash";
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
@@ -619,6 +622,66 @@ fn defer_copydata_paths_for_pending_blocking_modal(hwnd: HWND, paths: &[PathBuf]
             .extend(paths.iter().cloned());
     });
     true
+}
+
+fn should_defer_external_file_open(main_window_enabled: bool) -> bool {
+    !main_window_enabled
+}
+
+fn defer_copydata_paths_while_main_window_disabled(hwnd: HWND, paths: &[PathBuf]) -> bool {
+    let main_window_enabled = unsafe { IsWindowEnabled(hwnd).as_bool() };
+    if !should_defer_external_file_open(main_window_enabled) {
+        return false;
+    }
+
+    let popup = unsafe { GetLastActivePopup(hwnd) };
+    if popup.0 != 0 && popup != hwnd && is_window_handle_valid(popup) {
+        bring_window_to_foreground(popup);
+    }
+
+    with_state(hwnd, |state| {
+        state
+            .deferred_modal_copydata_open_paths
+            .extend(paths.iter().cloned());
+    });
+
+    unsafe {
+        if SetTimer(
+            hwnd,
+            DEFERRED_MODAL_COPYDATA_OPEN_TIMER_ID,
+            DEFERRED_MODAL_COPYDATA_OPEN_TIMER_INTERVAL_MS,
+            None,
+        ) == 0
+        {
+            log_debug("Failed to set DEFERRED_MODAL_COPYDATA_OPEN_TIMER_ID");
+        }
+    }
+    true
+}
+
+fn process_deferred_modal_copydata_paths_if_ready(hwnd: HWND) {
+    if has_pending_blocking_modal(hwnd) || unsafe { !IsWindowEnabled(hwnd).as_bool() } {
+        return;
+    }
+
+    kill_timer_best_effort(
+        hwnd,
+        DEFERRED_MODAL_COPYDATA_OPEN_TIMER_ID,
+        "KillTimer DEFERRED_MODAL_COPYDATA_OPEN",
+    );
+    let pending_paths = with_state(hwnd, |state| {
+        std::mem::take(&mut state.deferred_modal_copydata_open_paths)
+    })
+    .unwrap_or_default();
+    if pending_paths.is_empty() {
+        return;
+    }
+
+    log_debug(&format!(
+        "Opening {} Explorer file(s) deferred until modal windows closed",
+        pending_paths.len()
+    ));
+    open_copydata_paths(hwnd, pending_paths);
 }
 
 fn take_deferred_copydata_paths_for_blocking_modal(hwnd: HWND) -> Vec<PathBuf> {
@@ -7564,6 +7627,7 @@ pub(crate) struct AppState {
     audiobook_progress: HWND,
     audiobook_cancel: Option<Arc<AtomicBool>>,
     blocking_modal: BlockingModalState,
+    deferred_modal_copydata_open_paths: Vec<PathBuf>,
     active_audiobook: Option<AudiobookPlayer>,
     active_audiobook_bookmark: Option<(String, i32)>,
     audiobook_session_id: u64,
@@ -9351,6 +9415,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     audiobook_progress: HWND(0),
                     audiobook_cancel: None,
                     blocking_modal: BlockingModalState::default(),
+                    deferred_modal_copydata_open_paths: Vec::new(),
                     active_audiobook: None,
                     active_audiobook_bookmark: None,
                     audiobook_session_id: 0,
@@ -9756,6 +9821,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_TIMER => {
+                if wparam.0 == DEFERRED_MODAL_COPYDATA_OPEN_TIMER_ID {
+                    process_deferred_modal_copydata_paths_if_ready(hwnd);
+                    return LRESULT(0);
+                }
                 if wparam.0 == FOCUS_EDITOR_TIMER_ID
                     || wparam.0 == FOCUS_EDITOR_TIMER_ID2
                     || wparam.0 == FOCUS_EDITOR_TIMER_ID3
@@ -11943,6 +12012,12 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         if defer_copydata_paths_for_pending_blocking_modal(hwnd, &paths) {
                             log_debug(
                                 "WM_COPYDATA open deferred while blocking modal dialog is pending",
+                            );
+                            return LRESULT(1);
+                        }
+                        if defer_copydata_paths_while_main_window_disabled(hwnd, &paths) {
+                            log_debug(
+                                "WM_COPYDATA open deferred while the main window is disabled by a modal child",
                             );
                             return LRESULT(1);
                         }
@@ -19321,9 +19396,19 @@ mod tests {
     use super::{
         SentenceNavigationDirection, audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
         normalize_soft_line_breaks_for_translation, relative_audiobook_bookmark,
-        sentence_navigation_target, sentence_start_offsets_utf16,
+        sentence_navigation_target, sentence_start_offsets_utf16, should_defer_external_file_open,
     };
     use crate::bookmarks::Bookmark;
+
+    #[test]
+    fn external_file_open_is_deferred_when_main_window_is_disabled() {
+        assert!(should_defer_external_file_open(false));
+    }
+
+    #[test]
+    fn external_file_open_is_immediate_when_main_window_is_enabled() {
+        assert!(!should_defer_external_file_open(true));
+    }
 
     #[test]
     fn audio_bookmark_position_rounds_down_and_formats() {

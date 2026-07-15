@@ -22,14 +22,10 @@ pub const ES_CENTER: u32 = 0x0001;
 pub const ES_READONLY: u32 = 0x0800;
 
 /// Converts a Rust string slice to a wide string (UTF-16) null-terminated vector.
-/// Embedded NUL characters are removed because Win32 treats them as end-of-string markers.
-/// Essential for all Win32 UI calls.
+/// Embedded NUL characters are preserved because some Win32 APIs use them as
+/// separators, for example `OPENFILENAMEW` filter pairs.
 pub fn to_wide(value: &str) -> Vec<u16> {
-    value
-        .encode_utf16()
-        .filter(|unit| *unit != 0)
-        .chain(std::iter::once(0))
-        .collect()
+    value.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
 /// Converts a Rust string slice to a wide string (UTF-16) null-terminated vector,
@@ -522,21 +518,19 @@ mod tests {
     use super::{to_wide, to_wide_normalized};
 
     #[test]
-    fn wide_conversion_removes_embedded_nuls_and_keeps_one_terminator() {
-        let wide = to_wide("testo prima\0testo dopo");
-        let expected: Vec<u16> = "testo primatesto dopo"
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
+    fn wide_conversion_preserves_win32_filter_separators_and_adds_a_terminator() {
+        let filter = "File PDF\0*.pdf\0";
+        let wide = to_wide(filter);
+        let expected: Vec<u16> = filter.encode_utf16().chain(std::iter::once(0)).collect();
 
         assert_eq!(wide, expected);
-        assert_eq!(wide.iter().filter(|unit| **unit == 0).count(), 1);
+        assert_eq!(wide.iter().filter(|unit| **unit == 0).count(), 3);
     }
 
     #[test]
-    fn normalized_wide_conversion_preserves_text_after_embedded_nul() {
+    fn normalized_wide_conversion_preserves_embedded_nul() {
         let wide = to_wide_normalized("prima\0dopo\nseconda riga");
-        let expected: Vec<u16> = "primadopo\r\nseconda riga"
+        let expected: Vec<u16> = "prima\0dopo\r\nseconda riga"
             .encode_utf16()
             .chain(std::iter::once(0))
             .collect();

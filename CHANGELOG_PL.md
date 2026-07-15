@@ -1,5 +1,23 @@
 # Dziennik zmian
 
+Wersja 0.8.1 – 2026-07-15
+
+Synteza mowy Google
+• Naprawiono uruchamianie Google TTS w systemach Windows, w których połączenia zaakceptowane przez wewnętrzny serwer przeglądarki dziedziczyły nieblokujący tryb gniazda, powodując błąd 10035 i uniemożliwiając działanie pobranych głosów.
+• Sonarpad czeka teraz na pełne załadowanie silnika WASM w Chrome lub Edge przed odsłuchem głosu albo czytaniem klawiszem F5, zapobiegając błędowi „Chrome WASM TTS engine was not loaded”.
+• Ukryta przeglądarka wyłącza tłumaczenie stron i dostępność procesu renderującego, aby nie ogłaszać opcji takich jak „Przetłumacz stronę” i nie zakłócać poleceń czytania.
+• Panel „Głosy w edytorze” pokazuje teraz przycisk „Zarządzaj głosami Google...” po wybraniu silnika Google i od razu odświeża listę zainstalowanych głosów po zamknięciu menedżera.
+• Ostrzeżenia o zależnościach wyświetlane podczas usuwania pakietów głosów Google są teraz przetłumaczone na wszystkie języki interfejsu.
+
+Obsługa aktualizacji
+• Po automatycznej aktualizacji okno zakończenia z listą zmian otwiera się po początkowym przywróceniu fokusu i pozostaje na pierwszym planie, zamiast pojawiać się dopiero po naciśnięciu klawisza Tab.
+
+Dostępność menu
+• Usunięto obliczanie mnemonik w czasie działania programu: klawisze dostępu są teraz zapisane jawnie we wszystkich 15 tłumaczeniach interfejsu i pozostają takie same przy każdym uruchomieniu.
+• Sprawdzono wszystkie stałe pozycje głównych menu i podmenu, w tym Odtwarzanie, czcionki, Zapisz obraz oraz Pokaż indeks EPUB; brakujące lub powtarzające się mnemoniki wśród pozycji tego samego poziomu poprawiono bezpośrednio w tłumaczeniach.
+• Testy automatyczne wyłącznie weryfikują teraz tłumaczenia i zgłaszają błąd, gdy mnemoniki brakuje, jest nieprawidłowa lub powtórzona; nie zmieniają już etykiet podczas działania programu.
+• W wyjątkowo rozbudowanych menu, gdy przetłumaczone etykiety nie zawierają wystarczającej liczby różnych znaków, wyświetlany jest jawny numeryczny klawisz dostępu w standardowej postaci Windows „(&1)”.
+
 Wersja 0.8.0 – 2026-07-15
 
 Słownik internetowy

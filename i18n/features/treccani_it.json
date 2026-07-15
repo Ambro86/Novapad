@@ -1,5 +1,5 @@
 {
-  "menu.treccani": "Enciclopedia Treccani...\tCtrl+Shift+E",
+  "menu.treccani": "&Enciclopedia Treccani...\tCtrl+Shift+E",
   "treccani.close": "Chiudi",
   "treccani.import_all_article": "Leggi tutto l’articolo",
   "treccani.import_button": "Leggi",

@@ -4091,6 +4091,7 @@ pub fn layout_children(hwnd: HWND) {
                 state.voice_label_voice,
                 state.voice_combo_voice,
                 state.voice_button_insert_tag,
+                state.voice_button_manage_google_voices,
                 state.voice_button_insert_pause,
                 state.voice_label_speed,
                 state.voice_combo_speed,
@@ -4126,6 +4127,7 @@ pub fn layout_children(hwnd: HWND) {
             label_voice,
             combo_voice,
             button_insert_tag,
+            button_manage_google_voices,
             button_insert_pause,
             label_speed,
             combo_speed,
@@ -4268,6 +4270,14 @@ pub fn layout_children(hwnd: HWND) {
                     button_voice_x,
                     if show_language { row3_top } else { row2_top },
                     VOICE_PANEL_BUTTON_WIDTH,
+                    VOICE_PANEL_ROW_HEIGHT,
+                    true,
+                ));
+                crate::log_if_err!(MoveWindow(
+                    button_manage_google_voices,
+                    combo_x,
+                    if show_language { row4_top } else { row3_top },
+                    combo_voice_width,
                     VOICE_PANEL_ROW_HEIGHT,
                     true,
                 ));

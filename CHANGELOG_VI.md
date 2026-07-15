@@ -1,5 +1,23 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.8.1 – 2026-07-15
+
+Tổng hợp giọng nói Google
+• Đã sửa lỗi khởi động Google TTS trên một số hệ thống Windows, nơi các kết nối được máy chủ trình duyệt nội bộ chấp nhận kế thừa chế độ socket không chặn, gây lỗi 10035 và khiến các giọng đã tải xuống không thể phát âm.
+• Sonarpad giờ chờ bộ máy WASM của Chrome hoặc Edge tải xong hoàn toàn trước khi nghe thử giọng hoặc đọc bằng F5, tránh lỗi “Chrome WASM TTS engine was not loaded”.
+• Trình duyệt ẩn tắt tính năng dịch trang và khả năng truy cập của tiến trình kết xuất để tránh thông báo như “Dịch trang” và không gây nhiễu các lệnh đọc.
+• Bảng “Giọng nói trong trình soạn thảo” giờ hiển thị nút “Quản lý giọng nói Google...” khi chọn bộ máy Google và cập nhật ngay danh sách giọng đã cài đặt sau khi đóng trình quản lý.
+• Cảnh báo về gói phụ thuộc khi xóa gói giọng Google hiện đã được dịch sang tất cả ngôn ngữ giao diện.
+
+Trải nghiệm cập nhật
+• Sau khi cập nhật tự động, cửa sổ hoàn tất kèm nhật ký thay đổi sẽ mở sau khi việc khôi phục tiêu điểm ban đầu kết thúc và luôn ở phía trước, thay vì chỉ xuất hiện sau khi nhấn Tab.
+
+Khả năng truy cập của menu
+• Đã loại bỏ việc tính ký tự gợi nhớ trong lúc chạy: phím truy cập giờ được ghi rõ trong cả 15 bản dịch giao diện và luôn giữ nguyên giữa các lần khởi động.
+• Đã kiểm tra mọi mục ổn định trong menu chính và menu con, bao gồm Phát, lựa chọn phông chữ, Lưu hình ảnh và Hiển thị mục lục EPUB; các ký tự gợi nhớ bị thiếu hoặc trùng giữa các mục cùng cấp được sửa trực tiếp trong bản dịch.
+• Các kiểm thử tự động giờ chỉ xác thực bản dịch và sẽ thất bại nếu ký tự gợi nhớ bị thiếu, không hợp lệ hoặc trùng; chúng không còn thay đổi nhãn menu trong lúc chạy.
+• Với menu đặc biệt dài mà nội dung dịch không cung cấp đủ ký tự khác nhau, một phím truy cập dạng số rõ ràng sẽ được hiển thị theo định dạng Windows chuẩn “(&1)”.
+
 Phiên bản 0.8.0 – 2026-07-15
 
 Từ điển trực tuyến
@@ -446,8 +464,6 @@ Cải tiến
 • Cải thiện hỗ trợ cho giọng nói Microsoft, hiện được phát bằng phương thức chuyên biệt với user agent khác.
 
 • Đã thêm hỗ trợ cho tệp MP4.
-
-
 
 Phiên bản 0.6.0 – 2026-01-20
 Tính năng mới

@@ -173,6 +173,15 @@ pub const IDM_HELP_EXPORT_DIAGNOSTICS: usize = 7007;
 pub const IDM_HELP_VISIT_SONARPAD: usize = 7008;
 pub const MAX_RECENT: usize = 5;
 
+const FONT_ARIAL_LABEL: &str = "&Arial";
+const FONT_CALIBRI_LABEL: &str = "&Calibri";
+const FONT_CONSOLAS_LABEL: &str = "C&onsolas";
+const FONT_SEGOE_UI_LABEL: &str = "&Segoe UI";
+const FONT_TAHOMA_LABEL: &str = "&Tahoma";
+const FONT_VERDANA_LABEL: &str = "&Verdana";
+const FONT_TIMES_NEW_ROMAN_LABEL: &str = "Times &New Roman";
+const FONT_GEORGIA_LABEL: &str = "&Georgia";
+
 pub struct MenuLabels {
     pub menu_file: String,
     pub menu_edit: String,
@@ -328,17 +337,17 @@ pub fn menu_labels(language: Language) -> MenuLabels {
             String::new()
         },
         menu_rai_audiodescrizioni: if language == Language::Italian {
-            "Rai audiodescrizioni...\tAlt+Shift+A".to_string()
+            "Rai a&udiodescrizioni...\tAlt+Shift+A".to_string()
         } else {
             String::new()
         },
         menu_raiplay: if language == Language::Italian {
-            "RaiPlay...\tAlt+Shift+P".to_string()
+            "&RaiPlay...\tAlt+Shift+P".to_string()
         } else {
             String::new()
         },
         menu_raiplaysound: if language == Language::Italian {
-            "RaiPlay Sound...\tCtrl+Shift+S".to_string()
+            "RaiPlay &Sound...\tCtrl+Shift+S".to_string()
         } else {
             String::new()
         },
@@ -351,7 +360,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_cinema: i18n::tr(language, "menu.cinema"),
         menu_calendar: i18n::tr(language, "menu.calendar"),
         menu_italiaonline: if language == Language::Italian {
-            "Pagine Bianche e Gialle...\tAlt+Shift+G".to_string()
+            "Pa&gine Bianche e Gialle...\tAlt+Shift+G".to_string()
         } else {
             String::new()
         },
@@ -469,6 +478,23 @@ fn label_with_shortcut(label: &str, binding: ShortcutBinding) -> String {
         strip_menu_shortcut(label),
         format_shortcut(binding)
     )
+}
+
+#[cfg(test)]
+fn menu_mnemonic(label: &str) -> Option<String> {
+    let display = strip_menu_shortcut(label);
+    let mut chars = display.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch != '&' {
+            continue;
+        }
+        if chars.peek() == Some(&'&') {
+            chars.next();
+            continue;
+        }
+        return chars.next().map(|value| value.to_lowercase().collect());
+    }
+    None
 }
 
 pub fn update_playback_menu(hwnd: HWND, show: bool) {
@@ -664,6 +690,7 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
             })
             .unwrap_or_default();
             let can_split_local_media = crate::current_local_playback_media_path(hwnd).is_some();
+            let audio_track_label = i18n::tr(language, "playback.audio_track");
 
             append_menu_string(
                 playback_menu,
@@ -820,7 +847,6 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
             }
             // Audio tracks submenu
             if !audio_tracks.is_empty() {
-                let audio_track_label = i18n::tr(language, "playback.audio_track");
                 let audio_tracks_menu = CreateMenu().unwrap_or(HMENU(0));
                 if audio_tracks_menu.0 != 0 {
                     for (i, track) in audio_tracks.iter().enumerate() {
@@ -991,6 +1017,8 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         let help_menu = CreateMenu().unwrap_or(HMENU(0));
 
         let mut labels = menu_labels(language);
+        let group_tools_menu_by_category =
+            with_state(hwnd, |state| state.settings.group_tools_menu_by_category).unwrap_or(true);
         let shortcuts = with_state(hwnd, |state| state.settings.shortcuts.clone())
             .unwrap_or_else(ShortcutSettings::default);
         labels.file_read_start = label_with_shortcut(&labels.file_read_start, shortcuts.read_start);
@@ -1240,29 +1268,54 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             &labels.view_show_video_during_playback,
         );
         crate::log_if_err!(AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null()));
-        append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_ARIAL, "Arial");
-        append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_CALIBRI, "Calibri");
+        append_menu_string(
+            view_font_menu,
+            MF_STRING,
+            IDM_VIEW_FONT_ARIAL,
+            FONT_ARIAL_LABEL,
+        );
+        append_menu_string(
+            view_font_menu,
+            MF_STRING,
+            IDM_VIEW_FONT_CALIBRI,
+            FONT_CALIBRI_LABEL,
+        );
         append_menu_string(
             view_font_menu,
             MF_STRING,
             IDM_VIEW_FONT_CONSOLAS,
-            "Consolas",
+            FONT_CONSOLAS_LABEL,
         );
         append_menu_string(
             view_font_menu,
             MF_STRING,
             IDM_VIEW_FONT_SEGOE_UI,
-            "Segoe UI",
+            FONT_SEGOE_UI_LABEL,
         );
-        append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_TAHOMA, "Tahoma");
-        append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_VERDANA, "Verdana");
+        append_menu_string(
+            view_font_menu,
+            MF_STRING,
+            IDM_VIEW_FONT_TAHOMA,
+            FONT_TAHOMA_LABEL,
+        );
+        append_menu_string(
+            view_font_menu,
+            MF_STRING,
+            IDM_VIEW_FONT_VERDANA,
+            FONT_VERDANA_LABEL,
+        );
         append_menu_string(
             view_font_menu,
             MF_STRING,
             IDM_VIEW_FONT_TIMES_NEW_ROMAN,
-            "Times New Roman",
+            FONT_TIMES_NEW_ROMAN_LABEL,
         );
-        append_menu_string(view_font_menu, MF_STRING, IDM_VIEW_FONT_GEORGIA, "Georgia");
+        append_menu_string(
+            view_font_menu,
+            MF_STRING,
+            IDM_VIEW_FONT_GEORGIA,
+            FONT_GEORGIA_LABEL,
+        );
         append_menu_string(
             view_menu,
             MF_POPUP,
@@ -1492,9 +1545,6 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             voice_audio_menu.0 as usize,
             &labels.menu_voice_audio,
         );
-
-        let group_tools_menu_by_category =
-            with_state(hwnd, |state| state.settings.group_tools_menu_by_category).unwrap_or(true);
 
         if group_tools_menu_by_category {
             let reading_content_menu = CreateMenu().unwrap_or(HMENU(0));
@@ -1865,4 +1915,480 @@ pub fn abbreviate_recent_label(path: &Path) -> String {
 pub fn append_menu_string(menu: HMENU, flags: MENU_ITEM_FLAGS, id: usize, text: &str) {
     let wide = to_wide(text);
     crate::log_if_err!(unsafe { AppendMenuW(menu, flags, id, PCWSTR(wide.as_ptr())) });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn assert_unique_group(language: &str, menu: &str, labels: &[&str]) {
+        let mut used = HashMap::new();
+        for label in labels {
+            if strip_menu_shortcut(label).trim().is_empty() {
+                continue;
+            }
+            let mnemonic = menu_mnemonic(label)
+                .unwrap_or_else(|| panic!("missing mnemonic in {language}/{menu}: {label:?}"));
+            assert!(
+                mnemonic.chars().all(char::is_alphanumeric),
+                "invalid mnemonic {mnemonic:?} in {language}/{menu}: {label:?}"
+            );
+            if let Some(previous) = used.insert(mnemonic.clone(), *label) {
+                panic!(
+                    "duplicate mnemonic {mnemonic:?} in {language}/{menu}: {previous:?} and {label:?}"
+                );
+            }
+        }
+    }
+
+    macro_rules! assert_menu_group {
+        ($labels:ident, $language:expr, $menu:expr, $($field:ident),+ $(,)?) => {{
+            let group = [$( $labels.$field.as_str() ),+];
+            assert_unique_group($language, $menu, &group);
+        }};
+    }
+
+    fn assert_all_groups(labels: &MenuLabels, language: &str, grouped_tools: bool) {
+        assert_menu_group!(
+            labels,
+            language,
+            "top",
+            menu_file,
+            menu_edit,
+            menu_view,
+            menu_insert,
+            menu_voice_audio,
+            menu_tools,
+            menu_window,
+            menu_help,
+        );
+        assert_menu_group!(
+            labels,
+            language,
+            "file",
+            file_new,
+            file_open,
+            file_save,
+            file_save_as,
+            file_save_all,
+            file_print,
+            file_recent,
+            file_execute,
+            file_exit,
+        );
+        assert_menu_group!(
+            labels,
+            language,
+            "edit",
+            edit_undo,
+            edit_cut,
+            edit_copy,
+            edit_paste,
+            edit_select_all,
+            edit_find,
+            edit_find_in_files,
+            edit_find_next,
+            edit_find_previous,
+            edit_replace,
+            edit_goto_line,
+            edit_prev_spelling_error,
+            edit_next_spelling_error,
+            edit_text_menu,
+            edit_text_stats,
+        );
+        assert_menu_group!(
+            labels,
+            language,
+            "edit/text",
+            edit_auto_format_tts,
+            edit_strip_markdown,
+            edit_normalize_whitespace,
+            edit_hard_line_break,
+            edit_join_lines,
+            edit_clean_eol_hyphens,
+            edit_order_items,
+            edit_keep_unique_items,
+            edit_reverse_items,
+            edit_quote_lines,
+            edit_unquote_lines,
+            edit_indent,
+            edit_outdent,
+            edit_remove_duplicate_lines,
+            edit_remove_duplicate_consecutive_lines,
+        );
+        assert_menu_group!(
+            labels,
+            language,
+            "view",
+            view_show_voices,
+            view_show_favorites,
+            view_read_only,
+            view_word_wrap,
+            view_show_video_during_playback,
+            view_font,
+            view_text_color,
+            view_text_size,
+        );
+        assert_menu_group!(
+            labels,
+            language,
+            "view/colors",
+            view_text_color_black,
+            view_text_color_dark_blue,
+            view_text_color_dark_green,
+            view_text_color_dark_brown,
+            view_text_color_dark_gray,
+            view_text_color_light_blue,
+            view_text_color_light_green,
+            view_text_color_light_brown,
+            view_text_color_light_gray,
+        );
+        assert_menu_group!(
+            labels,
+            language,
+            "view/sizes",
+            view_text_size_small,
+            view_text_size_normal,
+            view_text_size_large,
+            view_text_size_xlarge,
+            view_text_size_xxlarge,
+        );
+        assert_menu_group!(
+            labels,
+            language,
+            "insert",
+            insert_bookmark,
+            automatic_bookmark,
+            insert_goto_next_bookmark,
+            insert_goto_prev_bookmark,
+            insert_clear_bookmarks,
+            manage_bookmarks,
+        );
+        assert_menu_group!(
+            labels,
+            language,
+            "window",
+            file_close,
+            window_open_documents,
+            window_close_others,
+            window_close_all,
+        );
+        assert_menu_group!(
+            labels,
+            language,
+            "voice/audio",
+            file_read_start,
+            file_read_previous_sentence,
+            file_read_next_sentence,
+            file_read_pause,
+            file_read_stop,
+            file_audiobook,
+            file_batch_audiobooks,
+            file_podcast,
+            file_convert_audio,
+        );
+
+        if grouped_tools {
+            assert_menu_group!(
+                labels,
+                language,
+                "tools",
+                menu_tools_reading_content,
+                menu_tools_multimedia,
+                menu_tools_utilities,
+                menu_options,
+            );
+            assert_menu_group!(
+                labels,
+                language,
+                "tools/reading",
+                menu_prompt,
+                menu_rss,
+                menu_dictionary,
+                menu_dictionary_lookup,
+                menu_wikipedia_import,
+                menu_treccani,
+                menu_bdciechi,
+            );
+            assert_menu_group!(
+                labels,
+                language,
+                "tools/multimedia",
+                menu_podcasts,
+                menu_import_youtube,
+                menu_stream_audio,
+                menu_rai_audiodescrizioni,
+                menu_raiplay,
+                menu_raiplaysound,
+                menu_tv,
+                menu_cinema,
+                menu_radio,
+            );
+            assert_menu_group!(
+                labels,
+                language,
+                "tools/utilities",
+                menu_calendar,
+                menu_weather,
+                menu_paths_navigation,
+                menu_italiaonline,
+            );
+        } else {
+            assert_menu_group!(
+                labels,
+                language,
+                "tools/flat",
+                menu_prompt,
+                menu_rss,
+                menu_podcasts,
+                menu_dictionary,
+                menu_dictionary_lookup,
+                menu_wikipedia_import,
+                menu_treccani,
+                menu_import_youtube,
+                menu_stream_audio,
+                menu_rai_audiodescrizioni,
+                menu_raiplay,
+                menu_raiplaysound,
+                menu_tv,
+                menu_italiaonline,
+                menu_bdciechi,
+                menu_calendar,
+                menu_weather,
+                menu_cinema,
+                menu_paths_navigation,
+                menu_radio,
+                menu_options,
+            );
+        }
+
+        assert_menu_group!(
+            labels,
+            language,
+            "help",
+            help_guide,
+            help_changelog,
+            help_visit_sonarpad,
+            help_feedback,
+            help_donations,
+            help_check_updates,
+            help_export_diagnostics,
+            help_about,
+        );
+        assert_menu_group!(labels, language, "recent", recent_empty, recent_clear);
+    }
+
+    #[test]
+    fn every_localized_main_menu_has_unique_sibling_mnemonics() {
+        let languages = [
+            (Language::Italian, "it"),
+            (Language::English, "en"),
+            (Language::Spanish, "es"),
+            (Language::Portuguese, "pt"),
+            (Language::Swedish, "sv"),
+            (Language::Vietnamese, "vi"),
+            (Language::Czech, "cs"),
+            (Language::Polish, "pl"),
+            (Language::French, "fr"),
+            (Language::Serbian, "sr"),
+            (Language::Ukrainian, "uk"),
+            (Language::Lithuanian, "lt"),
+            (Language::Russian, "ru"),
+            (Language::Chinese, "zh"),
+            (Language::Hindi, "hi"),
+        ];
+
+        for (language, code) in languages {
+            for grouped_tools in [true, false] {
+                let labels = menu_labels(language);
+                assert_all_groups(&labels, code, grouped_tools);
+            }
+        }
+    }
+
+    #[test]
+    fn dynamic_file_and_view_items_have_explicit_unique_mnemonics() {
+        let languages = [
+            (Language::Italian, "it"),
+            (Language::English, "en"),
+            (Language::Spanish, "es"),
+            (Language::Portuguese, "pt"),
+            (Language::Swedish, "sv"),
+            (Language::Vietnamese, "vi"),
+            (Language::Czech, "cs"),
+            (Language::Polish, "pl"),
+            (Language::French, "fr"),
+            (Language::Serbian, "sr"),
+            (Language::Ukrainian, "uk"),
+            (Language::Lithuanian, "lt"),
+            (Language::Russian, "ru"),
+            (Language::Chinese, "zh"),
+            (Language::Hindi, "hi"),
+        ];
+
+        for (language, code) in languages {
+            let labels = menu_labels(language);
+            let save_image = i18n::tr(language, "file.save_image");
+            assert_unique_group(
+                code,
+                "file/dynamic",
+                &[
+                    labels.file_new.as_str(),
+                    labels.file_open.as_str(),
+                    labels.file_save.as_str(),
+                    labels.file_save_as.as_str(),
+                    labels.file_save_all.as_str(),
+                    labels.file_print.as_str(),
+                    labels.file_recent.as_str(),
+                    save_image.as_str(),
+                    labels.file_execute.as_str(),
+                    labels.file_exit.as_str(),
+                ],
+            );
+
+            let epub_index = i18n::tr(language, "view.show_epub_index");
+            assert_unique_group(
+                code,
+                "view/dynamic",
+                &[
+                    labels.view_show_voices.as_str(),
+                    labels.view_show_favorites.as_str(),
+                    labels.view_read_only.as_str(),
+                    labels.view_word_wrap.as_str(),
+                    labels.view_show_video_during_playback.as_str(),
+                    epub_index.as_str(),
+                    labels.view_font.as_str(),
+                    labels.view_text_color.as_str(),
+                    labels.view_text_size.as_str(),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn playback_menu_mnemonics_are_unique_in_every_language() {
+        let languages = [
+            (Language::Italian, "it"),
+            (Language::English, "en"),
+            (Language::Spanish, "es"),
+            (Language::Portuguese, "pt"),
+            (Language::Swedish, "sv"),
+            (Language::Vietnamese, "vi"),
+            (Language::Czech, "cs"),
+            (Language::Polish, "pl"),
+            (Language::French, "fr"),
+            (Language::Serbian, "sr"),
+            (Language::Ukrainian, "uk"),
+            (Language::Lithuanian, "lt"),
+            (Language::Russian, "ru"),
+            (Language::Chinese, "zh"),
+            (Language::Hindi, "hi"),
+        ];
+
+        for (language, code) in languages {
+            let main_labels = menu_labels(language);
+            let title = i18n::tr(language, "menu.playback");
+            assert_unique_group(
+                code,
+                "top/playback",
+                &[
+                    main_labels.menu_file.as_str(),
+                    main_labels.menu_edit.as_str(),
+                    main_labels.menu_view.as_str(),
+                    main_labels.menu_insert.as_str(),
+                    main_labels.menu_voice_audio.as_str(),
+                    main_labels.menu_tools.as_str(),
+                    main_labels.menu_window.as_str(),
+                    main_labels.menu_help.as_str(),
+                    title.as_str(),
+                ],
+            );
+
+            let playback = [
+                i18n::tr(language, "playback.play_pause"),
+                i18n::tr(language, "playback.stop"),
+                i18n::tr(language, "playback.seek_forward"),
+                i18n::tr(language, "playback.seek_backward"),
+                i18n::tr(language, "playback.seek_to_start"),
+                i18n::tr(language, "playback.seek_to_end"),
+                i18n::tr(language, "playback.track_prev"),
+                i18n::tr(language, "playback.track_next"),
+                i18n::tr(language, "playback.chapter_prev"),
+                i18n::tr(language, "playback.chapter_next"),
+                i18n::tr(language, "playback.chapter_list"),
+                i18n::tr(language, "playback.download_episode"),
+                i18n::tr(language, "playback.transcribe_current"),
+                i18n::tr(language, "playback.transcribe_current_folder"),
+                i18n::tr(language, "playback.split_media"),
+                i18n::tr(language, "playback.go_to_time"),
+                i18n::tr(language, "playback.announce_time"),
+                i18n::tr(language, "playback.add_subtitles"),
+                i18n::tr(language, "playback.remove_subtitles"),
+                i18n::tr(language, "playback.audio_track"),
+                i18n::tr(language, "playback.volume_up"),
+                i18n::tr(language, "playback.volume_down"),
+                i18n::tr(language, "playback.speed_up"),
+                i18n::tr(language, "playback.speed_down"),
+                i18n::tr(language, "playback.pitch_up"),
+                i18n::tr(language, "playback.pitch_down"),
+                i18n::tr(language, "playback.reset_menu"),
+                i18n::tr(language, "playback.mute_toggle"),
+            ];
+            let playback_refs: Vec<&str> = playback.iter().map(String::as_str).collect();
+            assert_unique_group(code, "playback", &playback_refs);
+
+            let split = [
+                i18n::tr(language, "playback.split_media.parts"),
+                i18n::tr(language, "playback.split_media.time"),
+            ];
+            let split_refs: Vec<&str> = split.iter().map(String::as_str).collect();
+            assert_unique_group(code, "playback/split", &split_refs);
+
+            let reset = [
+                i18n::tr(language, "playback.volume_reset"),
+                i18n::tr(language, "playback.speed_reset"),
+                i18n::tr(language, "playback.pitch_reset"),
+            ];
+            let reset_refs: Vec<&str> = reset.iter().map(String::as_str).collect();
+            assert_unique_group(code, "playback/reset", &reset_refs);
+        }
+    }
+
+    #[test]
+    fn font_menu_uses_explicit_unique_mnemonics() {
+        assert_unique_group(
+            "all",
+            "view/fonts",
+            &[
+                FONT_ARIAL_LABEL,
+                FONT_CALIBRI_LABEL,
+                FONT_CONSOLAS_LABEL,
+                FONT_SEGOE_UI_LABEL,
+                FONT_TAHOMA_LABEL,
+                FONT_VERDANA_LABEL,
+                FONT_TIMES_NEW_ROMAN_LABEL,
+                FONT_GEORGIA_LABEL,
+            ],
+        );
+    }
+
+    #[test]
+    fn italian_read_only_and_text_submenu_keep_expected_mnemonics() {
+        let labels = menu_labels(Language::Italian);
+
+        assert_eq!(menu_mnemonic(&labels.view_read_only).as_deref(), Some("m"));
+        assert_eq!(
+            menu_mnemonic(&labels.view_show_video_during_playback).as_deref(),
+            Some("l")
+        );
+        assert_eq!(menu_mnemonic(&labels.edit_text_menu).as_deref(), Some("t"));
+        assert_eq!(menu_mnemonic(&labels.edit_find).as_deref(), Some("v"));
+    }
+
+    #[test]
+    fn polish_word_wrap_keeps_the_z_mnemonic() {
+        let labels = menu_labels(Language::Polish);
+        assert_eq!(menu_mnemonic(&labels.view_word_wrap).as_deref(), Some("z"));
+    }
 }

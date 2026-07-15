@@ -1,5 +1,23 @@
 # Changelog
 
+Versione 0.8.1 – 2026-07-15
+
+Sintesi vocale Google
+• Corretto l’avvio di Google TTS nei sistemi Windows in cui le connessioni accettate dal server interno del browser ereditavano la modalità socket non bloccante, provocando l’errore 10035 e impedendo alle voci scaricate di parlare.
+• Sonarpad attende ora che il motore WASM di Chrome o Edge sia realmente caricato prima dell’anteprima della voce o della lettura con F5, evitando l’errore “Chrome WASM TTS engine was not loaded”.
+• Nel browser invisibile vengono disattivate la traduzione della pagina e l’accessibilità del renderer, evitando annunci come “Traduci pagina” e interferenze con i comandi di lettura.
+• Nel pannello “Voci nell’editor” compare ora il pulsante “Gestisci voci Google...” quando è selezionato il motore Google; alla chiusura della gestione, l’elenco delle voci installate viene aggiornato immediatamente.
+• Gli avvisi sulle dipendenze mostrati durante la rimozione dei pacchetti vocali Google sono ora tradotti in tutte le lingue dell’interfaccia.
+
+Esperienza di aggiornamento
+• Dopo un aggiornamento automatico, la finestra di completamento con il registro modifiche si apre dopo il ripristino iniziale del focus e resta in primo piano, invece di comparire soltanto dopo aver premuto Tab.
+
+Accessibilità dei menu
+• Rimosso il calcolo delle mnemoniche durante l’esecuzione: le lettere di accesso sono ora scritte esplicitamente in ciascuna delle 15 traduzioni dell’interfaccia e restano quindi identiche a ogni avvio.
+• Revisionate tutte le voci stabili dei menu principali e dei sottomenu, compresi Riproduzione, i caratteri, Salva immagine e Mostra indice EPUB; le mnemoniche mancanti o duplicate tra voci sorelle sono state corrette direttamente nelle traduzioni.
+• I test automatici ora si limitano a controllare le traduzioni e falliscono se una mnemonica manca, non è valida o è duplicata; non modificano più le etichette durante l’esecuzione.
+• Nei menu eccezionalmente estesi, quando il testo tradotto non contiene abbastanza caratteri distinti, viene mostrata una lettera di accesso numerica esplicita nella forma standard di Windows “(&1)”.
+
 Versione 0.8.0 – 2026-07-15
 
 Dizionario online

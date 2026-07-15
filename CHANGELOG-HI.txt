@@ -1,5 +1,19 @@
 # परिवर्तन सूची
 
+Version 0.8.1 – 2026-07-15
+
+Google text-to-speech
+• उन Windows प्रणालियों पर Google TTS startup ठीक किया गया है जहाँ internal browser server द्वारा स्वीकार किए गए connections non-blocking socket mode प्राप्त कर लेते थे, जिससे error 10035 आता था और downloaded voices बोल नहीं पाती थीं।
+• Voice preview या F5 reading शुरू करने से पहले Sonarpad अब Chrome या Edge के WASM engine के पूरी तरह load होने की प्रतीक्षा करता है, जिससे “Chrome WASM TTS engine was not loaded” error नहीं आता।
+• Hidden browser में page translation और renderer accessibility बंद रहती हैं, ताकि “Translate page” जैसे announcements और reading commands में interference न हो।
+• “Voices in editor” panel में Google engine चुने जाने पर अब “Manage Google voices...” button दिखाई देता है, और manager बंद होते ही installed voices की सूची तुरंत refresh होती है।
+
+Menu accessibility
+• Runtime mnemonic calculation हटा दिया गया है: access keys अब सभी 15 interface translations में स्पष्ट रूप से लिखी गई हैं और हर startup पर समान रहती हैं।
+• सभी स्थिर main-menu items और submenus की जाँच की गई है, जिनमें Playback, font choices, Save image और Show EPUB index शामिल हैं; एक ही level पर missing या duplicate mnemonics को translations में सीधे ठीक किया गया है।
+• Automated tests अब केवल translations को validate करते हैं और mnemonic missing, invalid या duplicate होने पर fail होते हैं; runtime में menu labels नहीं बदलते।
+• बहुत बड़े menus में, जहाँ translated label पर्याप्त अलग characters नहीं देता, standard Windows रूप “(&1)” में स्पष्ट numeric access key दिखाई जाती है।
+
 Version 0.8.0 – 2026-07-15
 
 Online dictionary

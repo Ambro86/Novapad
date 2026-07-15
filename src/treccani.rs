@@ -52,7 +52,7 @@ impl std::error::Error for TreccaniError {}
 fn http_client() -> Result<Client, TreccaniError> {
     Client::builder()
         .timeout(Duration::from_secs(20))
-        .user_agent("Sonarpad/0.8.0 (Treccani encyclopedia reader)")
+        .user_agent("Sonarpad/0.8.1 (Treccani encyclopedia reader)")
         .build()
         .map_err(|err| TreccaniError::Other(err.to_string()))
 }

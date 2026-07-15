@@ -1,4 +1,4 @@
-use crate::settings::VoiceInfo;
+use crate::settings::{Language, VoiceInfo};
 use base64::Engine;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -382,7 +382,7 @@ pub fn has_installed_voices() -> bool {
     catalog_cache().iter().any(is_package_ready)
 }
 
-pub fn remove_package(package_id: &str) -> Result<(), String> {
+pub fn remove_package(package_id: &str, language: Language) -> Result<(), String> {
     let package = package_by_id(package_id)
         .ok_or_else(|| format!("Unknown Google TTS voice package: {package_id}"))?;
     let required_by: Vec<&str> = catalog_cache()
@@ -394,9 +394,11 @@ pub fn remove_package(package_id: &str) -> Result<(), String> {
         .map(|candidate| candidate.id.as_str())
         .collect();
     if !required_by.is_empty() {
-        return Err(format!(
-            "This Google TTS package is required by: {}. Remove those dependent voice packages first.",
-            required_by.join(", ")
+        let packages = required_by.join(", ");
+        return Err(crate::i18n::tr_f(
+            language,
+            "google_tts.voices.required_by",
+            &[("packages", &packages)],
         ));
     }
     let path = package_path(package);
@@ -602,6 +604,9 @@ impl EmbeddedHttpServer {
             .set_nonblocking(true)
             .map_err(|err| err.to_string())?;
         let port = listener.local_addr().map_err(|err| err.to_string())?.port();
+        crate::log_debug(&format!(
+            "Google TTS HTTP server: listening on 127.0.0.1:{port}; accepted sockets use blocking I/O"
+        ));
         let stop = Arc::new(AtomicBool::new(false));
         let stop_copy = stop.clone();
         let thread = thread::spawn(move || {
@@ -609,7 +614,9 @@ impl EmbeddedHttpServer {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
                         let _request_thread = thread::spawn(move || {
-                            if let Err(err) = handle_http_request(&mut stream) {
+                            if let Err(err) = configure_http_client_stream(&stream)
+                                .and_then(|()| handle_http_request(&mut stream))
+                            {
                                 crate::log_debug(&format!("Google TTS HTTP request failed: {err}"));
                             }
                         });
@@ -643,13 +650,61 @@ impl Drop for EmbeddedHttpServer {
     }
 }
 
+const HTTP_REQUEST_LIMIT: usize = 64 * 1024;
+const HTTP_IO_TIMEOUT: Duration = Duration::from_secs(10);
+
+fn configure_http_client_stream(stream: &TcpStream) -> Result<(), String> {
+    // On some Windows configurations a socket accepted from a non-blocking
+    // listener inherits that mode. Chrome can connect before sending the HTTP
+    // request, so an immediate read then fails with WSAEWOULDBLOCK (10035).
+    // Client sockets are handled on their own threads and must be blocking.
+    stream
+        .set_nonblocking(false)
+        .map_err(|err| format!("could not enable blocking mode: {err}"))?;
+    stream
+        .set_read_timeout(Some(HTTP_IO_TIMEOUT))
+        .map_err(|err| format!("could not set read timeout: {err}"))?;
+    stream
+        .set_write_timeout(Some(HTTP_IO_TIMEOUT))
+        .map_err(|err| format!("could not set write timeout: {err}"))?;
+    Ok(())
+}
+
+fn read_http_request(stream: &mut TcpStream) -> Result<Vec<u8>, String> {
+    let mut request = Vec::with_capacity(2048);
+    let mut buffer = [0u8; 2048];
+    loop {
+        let read = match stream.read(&mut buffer) {
+            Ok(read) => read,
+            Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(err) => return Err(format!("request read failed: {err}")),
+        };
+        if read == 0 {
+            break;
+        }
+        request.extend_from_slice(&buffer[..read]);
+        if request.windows(4).any(|window| window == b"\r\n\r\n") {
+            break;
+        }
+        if request.len() >= HTTP_REQUEST_LIMIT {
+            return Err("HTTP request headers are too large".to_string());
+        }
+    }
+    if request.is_empty() {
+        return Ok(request);
+    }
+    if !request.windows(4).any(|window| window == b"\r\n\r\n") {
+        return Err("HTTP request ended before the headers were complete".to_string());
+    }
+    Ok(request)
+}
+
 fn handle_http_request(stream: &mut TcpStream) -> Result<(), String> {
-    let mut request = [0u8; 8192];
-    let read = stream.read(&mut request).map_err(|err| err.to_string())?;
-    if read == 0 {
+    let request = read_http_request(stream)?;
+    if request.is_empty() {
         return Ok(());
     }
-    let request_text = String::from_utf8_lossy(&request[..read]);
+    let request_text = String::from_utf8_lossy(&request);
     let path = request_text
         .lines()
         .next()
@@ -785,6 +840,9 @@ impl GoogleTtsRuntime {
             format!("--user-data-dir={}", profile_dir.display()),
             "--no-first-run".to_string(),
             "--no-default-browser-check".to_string(),
+            "--disable-translate".to_string(),
+            "--disable-features=Translate,TranslateUI".to_string(),
+            "--disable-renderer-accessibility".to_string(),
             "--disable-background-networking".to_string(),
             "--disable-breakpad".to_string(),
             "--disable-crash-reporter".to_string(),
@@ -845,15 +903,18 @@ impl GoogleTtsRuntime {
     }
 
     fn wait_until_ready(&mut self, cancel: &Arc<AtomicBool>) -> Result<(), String> {
-        let expression = r#"
+        let bridge_expression = r#"
             typeof window.googleTtsForSonarpadSpeak === "function"
             && typeof window.googleTtsForSonarpadPreload === "function"
             && typeof window.googleTtsForSonarpadBridge === "function"
+            && typeof window.googleTtsForSonarpadWaitForEngine === "function"
+            && typeof window.googleTtsForSonarpadEngineStatus === "function"
         "#;
+        let mut bridge_ready = false;
         for attempt in 0..400 {
             let response = match self.cdp_request(
                 "Runtime.evaluate",
-                json!({"expression": expression, "returnByValue": true}),
+                json!({"expression": bridge_expression, "returnByValue": true}),
                 Duration::from_secs(5),
                 cancel,
                 None,
@@ -877,11 +938,40 @@ impl GoogleTtsRuntime {
                 .and_then(Value::as_bool)
                 .unwrap_or(false)
             {
-                return Ok(());
+                bridge_ready = true;
+                break;
             }
             thread::sleep(Duration::from_millis(50));
         }
-        Err("Google TTS engine did not finish loading.".to_string())
+        if !bridge_ready {
+            return Err("Google TTS bridge did not finish loading.".to_string());
+        }
+
+        crate::log_debug("Google TTS runtime: bridge loaded; waiting for the WASM engine");
+        let response = self.cdp_request(
+            "Runtime.evaluate",
+            json!({
+                "expression": "window.googleTtsForSonarpadWaitForEngine(30000)",
+                "awaitPromise": true,
+                "returnByValue": true
+            }),
+            Duration::from_secs(35),
+            cancel,
+            None,
+        )?;
+        let status = response
+            .pointer("/result/result/value")
+            .cloned()
+            .unwrap_or(Value::Null);
+        if status.get("ready").and_then(Value::as_bool) != Some(true) {
+            return Err(format!(
+                "Google TTS WASM engine did not finish loading. status={status}"
+            ));
+        }
+        crate::log_debug(&format!(
+            "Google TTS runtime: WASM engine ready; status={status}"
+        ));
+        Ok(())
     }
 
     fn cdp_request(
@@ -1121,6 +1211,34 @@ fn is_transient_execution_context_error(error: &str) -> bool {
         || error.contains("Inspected target navigated or closed")
 }
 
+fn is_transient_google_engine_startup_error(error: &str) -> bool {
+    is_transient_execution_context_error(error)
+        || error.contains("Chrome WASM TTS engine was not loaded")
+        || error.contains("Google TTS WASM engine did not finish loading")
+        || error.contains("Google TTS engine did not finish loading")
+}
+
+fn start_google_runtime_with_retry(
+    cancel: &Arc<AtomicBool>,
+    session_label: &str,
+) -> Result<GoogleTtsRuntime, String> {
+    match GoogleTtsRuntime::start(cancel) {
+        Ok(runtime) => Ok(runtime),
+        Err(err)
+            if is_transient_google_engine_startup_error(&err)
+                && !cancel.load(Ordering::Relaxed) =>
+        {
+            crate::log_debug(&format!(
+                "Google TTS runtime [{}]: startup was incomplete; recreating the browser runtime and retrying once: {}",
+                session_label, err
+            ));
+            thread::sleep(Duration::from_millis(200));
+            GoogleTtsRuntime::start(cancel)
+        }
+        Err(err) => Err(err),
+    }
+}
+
 fn runtime_slot() -> &'static Mutex<Option<GoogleTtsRuntime>> {
     static RUNTIME: OnceLock<Mutex<Option<GoogleTtsRuntime>>> = OnceLock::new();
     RUNTIME.get_or_init(|| Mutex::new(None))
@@ -1177,7 +1295,7 @@ fn synthesize_with_runtime(
             "Google TTS runtime [{}]: cold start requested",
             session_label
         ));
-        *runtime = Some(GoogleTtsRuntime::start(cancel)?);
+        *runtime = Some(start_google_runtime_with_retry(cancel, session_label)?);
         crate::log_debug(&format!(
             "Google TTS runtime [{}]: cold start completed in {} ms",
             session_label,
@@ -1195,17 +1313,17 @@ fn synthesize_with_runtime(
         .ok_or_else(|| "Google TTS runtime unavailable".to_string())?
         .synthesize(text, speaker, rate, pitch, volume, cancel);
     if let Err(err) = &result {
-        let retry_transient_context =
-            is_transient_execution_context_error(err) && !cancel.load(Ordering::Relaxed);
+        let retry_transient_runtime =
+            is_transient_google_engine_startup_error(err) && !cancel.load(Ordering::Relaxed);
         *runtime = None;
-        if retry_transient_context {
+        if retry_transient_runtime {
             crate::log_debug(&format!(
-                "Google TTS runtime [{}]: transient JavaScript context failure; restarting the browser runtime and retrying once: {}",
+                "Google TTS runtime [{}]: transient browser or WASM engine failure; restarting the browser runtime and retrying once: {}",
                 session_label, err
             ));
             thread::sleep(Duration::from_millis(100));
             let runtime_started = Instant::now();
-            *runtime = Some(GoogleTtsRuntime::start(cancel)?);
+            *runtime = Some(start_google_runtime_with_retry(cancel, session_label)?);
             crate::log_debug(&format!(
                 "Google TTS runtime [{}]: recovery cold start completed in {} ms",
                 session_label,
@@ -1485,5 +1603,72 @@ mod tests {
         assert_eq!(google_synthesis_timeout(google_rate(0)).as_secs(), 35);
         assert_eq!(google_synthesis_timeout(google_rate(100)).as_secs(), 35);
         assert_eq!(google_synthesis_timeout(google_rate(-100)).as_secs(), 86);
+    }
+
+    #[test]
+    fn wasm_engine_startup_errors_are_treated_as_transient() {
+        assert!(is_transient_google_engine_startup_error(
+            "Chrome WASM TTS engine was not loaded."
+        ));
+        assert!(is_transient_google_engine_startup_error(
+            "Google TTS WASM engine did not finish loading."
+        ));
+        assert!(!is_transient_google_engine_startup_error(
+            "The selected Google TTS voice is not installed."
+        ));
+    }
+
+    #[test]
+    fn embedded_bridge_exposes_wasm_readiness_helpers() {
+        let script = String::from_utf8_lossy(BRIDGE_HARNESS_JS);
+        assert!(script.contains("googleTtsForSonarpadWaitForEngine"));
+        assert!(script.contains("googleTtsForSonarpadEngineStatus"));
+        assert!(script.contains("waitForTtsEngine"));
+    }
+
+    #[test]
+    fn embedded_http_handler_waits_for_a_delayed_partial_request() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind test listener");
+        listener
+            .set_nonblocking(true)
+            .expect("set test listener nonblocking");
+        let address = listener.local_addr().expect("test listener address");
+        let client = thread::spawn(move || {
+            let mut stream = TcpStream::connect(address).expect("connect test client");
+            stream
+                .write_all(b"GET /missing HTTP/1.1\r\nHost: 127.0.0.1")
+                .expect("write first request part");
+            thread::sleep(Duration::from_millis(40));
+            stream
+                .write_all(b"\r\nConnection: close\r\n\r\n")
+                .expect("write second request part");
+            let mut response = Vec::new();
+            stream.read_to_end(&mut response).expect("read response");
+            response
+        });
+
+        let mut accepted = loop {
+            match listener.accept() {
+                Ok((stream, _)) => break stream,
+                Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                Err(err) => panic!("accept test client: {err}"),
+            }
+        };
+        // Reproduce the Windows failure deterministically even on platforms
+        // where accepted sockets do not inherit the listener's mode.
+        accepted
+            .set_nonblocking(true)
+            .expect("set accepted test stream nonblocking");
+        configure_http_client_stream(&accepted).expect("configure accepted stream");
+        handle_http_request(&mut accepted).expect("serve delayed request");
+        accepted
+            .shutdown(std::net::Shutdown::Both)
+            .expect("shutdown accepted test stream");
+
+        let response = client.join().expect("join test client");
+        let response = String::from_utf8_lossy(&response);
+        assert!(response.starts_with("HTTP/1.1 404 Not Found"));
     }
 }

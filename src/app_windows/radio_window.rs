@@ -2260,7 +2260,7 @@ fn fetch_radio_browser_country_options(
 fn fetch_radio_browser_language_directory() -> Result<Vec<RadioBrowserDirectoryEntry>, String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(5))
-        .user_agent("Sonarpad/0.8.0 (https://sonarpad.com)")
+        .user_agent("Sonarpad/0.8.1 (https://sonarpad.com)")
         .build()
         .map_err(|error| error.to_string())?;
     let mut last_error = None;
@@ -2288,7 +2288,7 @@ fn fetch_radio_browser_language_directory() -> Result<Vec<RadioBrowserDirectoryE
 fn fetch_radio_browser_country_directory() -> Result<Vec<RadioBrowserCountryEntry>, String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(5))
-        .user_agent("Sonarpad/0.8.0 (https://sonarpad.com)")
+        .user_agent("Sonarpad/0.8.1 (https://sonarpad.com)")
         .build()
         .map_err(|error| error.to_string())?;
     let mut last_error = None;

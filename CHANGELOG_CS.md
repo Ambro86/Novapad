@@ -1,5 +1,23 @@
 # Přehled změn
 
+Verze 0.8.1 – 2026-07-15
+
+Google TTS
+• Opraveno spouštění Google TTS v systémech Windows, kde připojení přijatá interním serverem prohlížeče dědila neblokující režim socketu, což způsobovalo chybu 10035 a znemožňovalo přehrávání stažených hlasů.
+• Sonarpad nyní před náhledem hlasu nebo čtením pomocí F5 čeká na úplné načtení modulu WASM v Chromu nebo Edgi, čímž se předchází chybě „Chrome WASM TTS engine was not loaded“.
+• Skrytý prohlížeč vypíná překlad stránek a zpřístupnění vykreslovacího procesu, aby neoznamoval možnosti jako „Přeložit stránku“ a nenarušoval příkazy čtení.
+• Panel „Hlasy v editoru“ nyní při výběru enginu Google zobrazuje tlačítko „Spravovat hlasy Google...“ a po zavření správce ihned obnoví seznam nainstalovaných hlasů.
+• Upozornění na závislosti zobrazovaná při odebírání hlasových balíčků Google jsou nyní přeložena do všech jazyků rozhraní.
+
+Průběh aktualizace
+• Po automatické aktualizaci se okno dokončení se seznamem změn otevře až po počátečním obnovení fokusu a zůstane v popředí, místo aby se zobrazilo teprve po stisknutí klávesy Tab.
+
+Přístupnost nabídek
+• Výpočet mnemotechnických kláves za běhu byl odstraněn: přístupové klávesy jsou nyní výslovně zapsány ve všech 15 překladech rozhraní a při každém spuštění zůstávají stejné.
+• Byly zkontrolovány všechny stabilní položky hlavních nabídek a podnabídek, včetně Přehrávání, písem, Uložit obrázek a Zobrazit rejstřík EPUB; chybějící nebo duplicitní mnemotechnické klávesy mezi položkami stejné úrovně byly opraveny přímo v překladech.
+• Automatické testy nyní překlady pouze ověřují a selžou, pokud mnemotechnická klávesa chybí, je neplatná nebo duplicitní; za běhu již popisky nemění.
+• U mimořádně rozsáhlých nabídek, kde překlad neposkytuje dostatek různých znaků, se zobrazí výslovná číselná přístupová klávesa ve standardním tvaru Windows „(&1)“.
+
 Verze 0.8.0 – 2026-07-15
 
 Online slovník

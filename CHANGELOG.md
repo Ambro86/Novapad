@@ -1,5 +1,23 @@
 # Changelog
 
+Version 0.8.1 – 2026-07-15
+
+Google text-to-speech
+• Fixed Google TTS startup on Windows systems where connections accepted by the internal browser server inherited non-blocking socket mode, causing error 10035 and preventing downloaded voices from speaking.
+• Sonarpad now waits until the Chrome or Edge WASM engine is fully loaded before voice preview or F5 reading, preventing the “Chrome WASM TTS engine was not loaded” error.
+• The hidden browser disables page translation and renderer accessibility so it cannot announce “Translate page” or interfere with reading commands.
+• The “Voices in editor” panel now shows a “Manage Google voices...” button whenever the Google engine is selected, and refreshes the installed voice list immediately after the manager closes.
+• Dependency warnings shown when removing Google voice packages are now localized in every interface language.
+
+Update experience
+• After an automatic update, the completion and changelog window now opens after the initial editor focus restoration and remains in the foreground instead of appearing only after pressing Tab.
+
+Menu accessibility
+• Removed runtime mnemonic generation: access keys are now written explicitly in each of the 15 interface translations and therefore remain identical across launches.
+• Reviewed every stable main-menu item and submenu, including Playback, font choices, Save image and Show EPUB index; missing or duplicate sibling mnemonics were corrected directly in the translations.
+• Automated tests now only validate the translations and fail if a mnemonic is missing, invalid or duplicated; they never modify menu labels at runtime.
+• In exceptionally large menus where the translated labels do not provide enough distinct characters, an explicit numeric access key is shown using the standard Windows form “(&1)”.
+
 Version 0.8.0 – 2026-07-15
 
 Online dictionary

@@ -1,5 +1,23 @@
 # Journal des modifications
 
+Version 0.8.1 – 2026-07-15
+
+Synthèse vocale Google
+• Correction du démarrage de Google TTS sur les systèmes Windows où les connexions acceptées par le serveur interne du navigateur héritaient du mode socket non bloquant, provoquant l’erreur 10035 et empêchant les voix téléchargées de parler.
+• Sonarpad attend désormais que le moteur WASM de Chrome ou Edge soit entièrement chargé avant l’aperçu de la voix ou la lecture avec F5, évitant l’erreur « Chrome WASM TTS engine was not loaded ».
+• Le navigateur caché désactive la traduction des pages et l’accessibilité du moteur de rendu afin d’éviter des annonces comme « Traduire la page » et toute interférence avec les commandes de lecture.
+• Le panneau « Voix dans l’éditeur » affiche désormais le bouton « Gérer les voix Google... » lorsque le moteur Google est sélectionné et actualise immédiatement la liste des voix installées à la fermeture du gestionnaire.
+• Les avertissements de dépendance affichés lors de la suppression de paquets vocaux Google sont désormais traduits dans toutes les langues de l’interface.
+
+Expérience de mise à jour
+• Après une mise à jour automatique, la fenêtre de confirmation avec le journal des modifications s’ouvre après la restauration initiale du focus et reste au premier plan, au lieu de n’apparaître qu’après l’appui sur Tab.
+
+Accessibilité des menus
+• Le calcul des mnémoniques à l’exécution a été supprimé : les touches d’accès sont désormais écrites explicitement dans chacune des 15 traductions de l’interface et restent donc identiques à chaque démarrage.
+• Toutes les entrées stables des menus principaux et sous-menus ont été vérifiées, notamment Lecture, les polices, Enregistrer l’image et Afficher l’index EPUB ; les mnémoniques manquantes ou dupliquées entre éléments de même niveau ont été corrigées directement dans les traductions.
+• Les tests automatiques se contentent désormais de valider les traductions et échouent si une mnémonique manque, est invalide ou est dupliquée ; ils ne modifient plus les libellés à l’exécution.
+• Dans les menus exceptionnellement longs où le texte traduit ne fournit pas assez de caractères distincts, une touche d’accès numérique explicite est affichée selon la forme Windows standard « (&1) ».
+
 Version 0.8.0 – 2026-07-15
 
 Dictionnaire en ligne

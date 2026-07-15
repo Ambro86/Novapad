@@ -158,10 +158,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     ShowWindow, TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateAcceleratorW,
     TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_APPCOMMAND, WM_CANCELMODE, WM_CHAR,
     WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_COPY, WM_COPYDATA, WM_CREATE, WM_CUT, WM_DESTROY,
-    WM_DROPFILES, WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN, WM_KEYUP, WM_MOUSEMOVE,
-    WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS, WM_SETFONT,
-    WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_TIMER,
-    WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
+    WM_DROPFILES, WM_GETFONT, WM_GETTEXTLENGTH, WM_INITMENUPOPUP, WM_KEYDOWN, WM_KEYUP,
+    WM_MOUSEMOVE, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_NULL, WM_PASTE, WM_SETFOCUS,
+    WM_SETFONT, WM_SETREDRAW, WM_SIZE, WM_SYSCHAR, WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    WM_TIMER, WNDCLASSW, WNDPROC, WS_CHILD, WS_CLIPCHILDREN, WS_EX_CLIENTEDGE, WS_OVERLAPPEDWINDOW,
     WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{Interface, PCWSTR, PWSTR, implement, w};
@@ -384,7 +384,8 @@ const EPUB_INDEX_ANNOUNCE_TIMER_ID: usize = 23;
 const DEFERRED_MODAL_COPYDATA_OPEN_TIMER_ID: usize = 0xD0F1;
 const DEFERRED_MODAL_COPYDATA_OPEN_TIMER_INTERVAL_MS: u32 = 150;
 const STARTUP_UPDATE_CHANGELOG_TIMER_ID: usize = 0xD0F2;
-const STARTUP_UPDATE_CHANGELOG_TIMER_INTERVAL_MS: u32 = 250;
+const STARTUP_UPDATE_CHANGELOG_INITIAL_DELAY_MS: u32 = 1000;
+const STARTUP_UPDATE_CHANGELOG_RETRY_INTERVAL_MS: u32 = 250;
 const GEMINI_TRANSLATION_FALLBACK_MODEL: &str = "gemini-2.5-flash";
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
@@ -408,6 +409,7 @@ const VOICE_PANEL_ID_PITCH_EDIT: usize = 21009;
 const VOICE_PANEL_ID_VOLUME_EDIT: usize = 21010;
 const VOICE_PANEL_ID_INSERT_TAG: usize = 21011;
 const VOICE_PANEL_ID_INSERT_PAUSE: usize = 21015;
+const VOICE_PANEL_ID_MANAGE_GOOGLE_VOICES: usize = 21016;
 const PAUSE_TAG_MENU_250MS: usize = 21101;
 const PAUSE_TAG_MENU_500MS: usize = 21102;
 const PAUSE_TAG_MENU_1S: usize = 21103;
@@ -7947,6 +7949,7 @@ pub(crate) struct AppState {
     voice_label_voice: HWND,
     voice_combo_voice: HWND,
     voice_button_insert_tag: HWND,
+    voice_button_manage_google_voices: HWND,
     voice_button_insert_pause: HWND,
     voice_label_speed: HWND,
     voice_combo_speed: HWND,
@@ -8280,10 +8283,26 @@ fn run_app(
             crate::settings::cleanup_legacy_context_menu_entries();
         }
         if show_update_completed {
-            if let Err(e) = PostMessageW(hwnd, WM_SHOW_UPDATE_CHANGELOG, WPARAM(0), LPARAM(0)) {
-                crate::log_debug(&format!(
-                    "Failed to post startup update changelog message: {}",
-                    e
+            if SetTimer(
+                hwnd,
+                STARTUP_UPDATE_CHANGELOG_TIMER_ID,
+                STARTUP_UPDATE_CHANGELOG_INITIAL_DELAY_MS,
+                None,
+            ) == 0
+            {
+                log_debug(
+                    "Failed to schedule the delayed update changelog; opening it immediately",
+                );
+                if let Err(e) = PostMessageW(hwnd, WM_SHOW_UPDATE_CHANGELOG, WPARAM(0), LPARAM(0)) {
+                    crate::log_debug(&format!(
+                        "Failed to post startup update changelog message: {}",
+                        e
+                    ));
+                }
+            } else {
+                log_debug(&format!(
+                    "Update changelog scheduled after startup focus restoration ({} ms)",
+                    STARTUP_UPDATE_CHANGELOG_INITIAL_DELAY_MS
                 ));
             }
         } else if show_changelog
@@ -9374,6 +9393,20 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     HINSTANCE(0),
                     None,
                 );
+                let button_manage_google_voices = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(empty_label.as_ptr()),
+                    WS_CHILD | WS_TABSTOP,
+                    0,
+                    0,
+                    0,
+                    0,
+                    hwnd,
+                    HMENU(VOICE_PANEL_ID_MANAGE_GOOGLE_VOICES as isize),
+                    HINSTANCE(0),
+                    None,
+                );
                 let button_insert_pause = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -9578,6 +9611,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     label_voice,
                     combo_voice,
                     button_insert_tag,
+                    button_manage_google_voices,
+                    button_insert_pause,
                     label_speed,
                     combo_speed,
                     edit_speed,
@@ -9750,6 +9785,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     voice_label_voice: label_voice,
                     voice_combo_voice: combo_voice,
                     voice_button_insert_tag: button_insert_tag,
+                    voice_button_manage_google_voices: button_manage_google_voices,
                     voice_button_insert_pause: button_insert_pause,
                     voice_label_speed: label_speed,
                     voice_combo_speed: combo_speed,
@@ -10146,6 +10182,20 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 {
                     log_foreground_snapshot(&format!("focus_timer.before.{}", wparam.0));
                     kill_timer_best_effort(hwnd, wparam.0, "KillTimer FOCUS_EDITOR");
+                    let changelog_window =
+                        with_state(hwnd, |state| state.changelog_window).unwrap_or(HWND(0));
+                    if changelog_window.0 != 0 {
+                        log_debug(&format!(
+                            "focus timer {} suppressed because the changelog window is open",
+                            wparam.0
+                        ));
+                        crate::set_foreground_window_safe(changelog_window);
+                        log_foreground_snapshot(&format!(
+                            "focus_timer.after_changelog.{}",
+                            wparam.0
+                        ));
+                        return LRESULT(0);
+                    }
                     if reactivate_modal_child_while_main_disabled(hwnd) {
                         log_debug(&format!(
                             "focus timer {} suppressed because a modal popup is active",
@@ -10785,7 +10835,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     if SetTimer(
                         hwnd,
                         STARTUP_UPDATE_CHANGELOG_TIMER_ID,
-                        STARTUP_UPDATE_CHANGELOG_TIMER_INTERVAL_MS,
+                        STARTUP_UPDATE_CHANGELOG_RETRY_INTERVAL_MS,
                         None,
                     ) == 0
                     {
@@ -11305,6 +11355,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 if cmd_id == VOICE_PANEL_ID_INSERT_TAG {
                     insert_voice_tag_from_voice_panel(hwnd);
+                    return LRESULT(0);
+                }
+                if cmd_id == VOICE_PANEL_ID_MANAGE_GOOGLE_VOICES {
+                    handle_voice_panel_manage_google_voices(hwnd);
                     return LRESULT(0);
                 }
                 if cmd_id == VOICE_PANEL_ID_INSERT_PAUSE {
@@ -12485,6 +12539,7 @@ struct VoicePanelLabels {
     label_favorites: String,
     label_multilingual: String,
     button_insert_tag: String,
+    button_manage_google_voices: String,
     button_insert_pause: String,
     engine_edge: String,
     engine_sapi: String,
@@ -12507,6 +12562,7 @@ fn voice_panel_labels(language: Language) -> VoicePanelLabels {
         label_favorites: i18n::tr(language, "voice_panel.label_favorites"),
         label_multilingual: i18n::tr(language, "voice_panel.label_multilingual"),
         button_insert_tag: i18n::tr(language, "voice_panel.insert_tag"),
+        button_manage_google_voices: i18n::tr(language, "menu.google_voices"),
         button_insert_pause: i18n::tr(language, "options.label.insert_pause_tag"),
         engine_edge: i18n::tr(language, "voice_panel.engine_edge"),
         engine_sapi: i18n::tr(language, "voice_panel.engine_sapi"),
@@ -13019,6 +13075,7 @@ fn apply_ui_font(hwnd: HWND, face_name: String) {
                 state.voice_label_voice,
                 state.voice_combo_voice,
                 state.voice_button_insert_tag,
+                state.voice_button_manage_google_voices,
                 state.voice_button_insert_pause,
                 state.voice_label_speed,
                 state.voice_combo_speed,
@@ -13238,6 +13295,7 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
         label_voice,
         combo_voice,
         button_insert_tag,
+        button_manage_google_voices,
         button_insert_pause,
         label_speed,
         combo_speed,
@@ -13262,6 +13320,7 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
             state.voice_label_voice,
             state.voice_combo_voice,
             state.voice_button_insert_tag,
+            state.voice_button_manage_google_voices,
             state.voice_button_insert_pause,
             state.voice_label_speed,
             state.voice_combo_speed,
@@ -13289,6 +13348,7 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
         label_voice,
         combo_voice,
         button_insert_tag,
+        button_manage_google_voices,
         button_insert_pause,
         label_speed,
         combo_speed,
@@ -13305,6 +13365,18 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
             unsafe {
                 ShowWindow(control, show);
             }
+        }
+    }
+    let show_manage_google = visible
+        && with_state(hwnd, |state| state.settings.tts_engine == TtsEngine::Google)
+            .unwrap_or(false);
+    if button_manage_google_voices.0 != 0 {
+        unsafe {
+            ShowWindow(
+                button_manage_google_voices,
+                if show_manage_google { SW_SHOW } else { SW_HIDE },
+            );
+            EnableWindow(button_manage_google_voices, show_manage_google);
         }
     }
     update_voice_panel_menu_check(hwnd);
@@ -13381,6 +13453,7 @@ pub(crate) fn refresh_voice_panel(hwnd: HWND) {
             label_voice,
             combo_voice,
             button_insert_tag,
+            button_manage_google_voices,
             button_insert_pause,
             label_speed,
             combo_speed,
@@ -13405,6 +13478,7 @@ pub(crate) fn refresh_voice_panel(hwnd: HWND) {
                 state.voice_label_voice,
                 state.voice_combo_voice,
                 state.voice_button_insert_tag,
+                state.voice_button_manage_google_voices,
                 state.voice_button_insert_pause,
                 state.voice_label_speed,
                 state.voice_combo_speed,
@@ -13450,10 +13524,15 @@ pub(crate) fn refresh_voice_panel(hwnd: HWND) {
                 PCWSTR(label_voice_wide.as_ptr())
             ));
             let button_insert_wide = to_wide(&labels.button_insert_tag);
+            let button_manage_google_wide = to_wide(&labels.button_manage_google_voices);
             let button_pause_wide = to_wide(&labels.button_insert_pause);
             crate::log_if_err!(SetWindowTextW(
                 button_insert_tag,
                 PCWSTR(button_insert_wide.as_ptr())
+            ));
+            crate::log_if_err!(SetWindowTextW(
+                button_manage_google_voices,
+                PCWSTR(button_manage_google_wide.as_ptr())
             ));
             crate::log_if_err!(SetWindowTextW(
                 button_insert_pause,
@@ -13518,6 +13597,12 @@ pub(crate) fn refresh_voice_panel(hwnd: HWND) {
                 TtsEngine::Google => 3,
             };
             SendMessageW(combo_engine, CB_SETCURSEL, WPARAM(engine_index), LPARAM(0));
+            let is_google = matches!(settings.tts_engine, TtsEngine::Google);
+            ShowWindow(
+                button_manage_google_voices,
+                if is_google { SW_SHOW } else { SW_HIDE },
+            );
+            EnableWindow(button_manage_google_voices, is_google);
             let is_edge = matches!(settings.tts_engine, TtsEngine::Edge);
             SendMessageW(
                 checkbox_multilingual,
@@ -14158,6 +14243,42 @@ fn handle_voice_panel_engine_change(hwnd: HWND) {
             }
             restart_tts_from_current_offset(hwnd);
         }
+    }
+}
+
+fn handle_voice_panel_manage_google_voices(hwnd: HWND) {
+    unsafe {
+        let (engine, language, combo_voice) = match with_state(hwnd, |state| {
+            (
+                state.settings.tts_engine,
+                state.settings.language,
+                state.voice_combo_voice,
+            )
+        }) {
+            Some(values) => values,
+            None => return,
+        };
+        if engine != TtsEngine::Google || combo_voice.0 == 0 {
+            return;
+        }
+
+        let old_voice =
+            with_state(hwnd, |state| state.settings.tts_voice.clone()).unwrap_or_default();
+        let manager_font = HFONT(SendMessageW(combo_voice, WM_GETFONT, WPARAM(0), LPARAM(0)).0);
+        log_debug("Voice panel: opening Google voice manager");
+        crate::app_windows::google_voice_manager_window::open_with_language(
+            hwnd,
+            language,
+            manager_font,
+        );
+        refresh_google_voice_settings(hwnd);
+        let new_voice =
+            with_state(hwnd, |state| state.settings.tts_voice.clone()).unwrap_or_default();
+        if new_voice != old_voice {
+            restart_tts_from_current_offset(hwnd);
+        }
+        set_focus_safe(combo_voice);
+        log_debug("Voice panel: Google voice manager closed; installed voice list refreshed");
     }
 }
 
@@ -18090,6 +18211,7 @@ fn is_focus_in_voice_panel(hwnd: HWND) -> bool {
                 || is_match(state.voice_combo_language)
                 || is_match(state.voice_combo_voice)
                 || is_match(state.voice_button_insert_tag)
+                || is_match(state.voice_button_manage_google_voices)
                 || is_match(state.voice_button_insert_pause)
                 || is_match(state.voice_combo_speed)
                 || is_match(state.voice_combo_pitch)
@@ -18112,6 +18234,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             combo_language,
             combo_voice,
             button_insert_tag,
+            button_manage_google_voices,
             button_insert_pause,
             combo_speed,
             combo_pitch,
@@ -18123,6 +18246,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             combo_favorites,
             favorites_visible,
             is_edge,
+            is_google,
             only_multilingual,
             manual_tuning,
             hwnd_tab,
@@ -18133,6 +18257,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
                 state.voice_combo_language,
                 state.voice_combo_voice,
                 state.voice_button_insert_tag,
+                state.voice_button_manage_google_voices,
                 state.voice_button_insert_pause,
                 state.voice_combo_speed,
                 state.voice_combo_pitch,
@@ -18144,6 +18269,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
                 state.voice_combo_favorites,
                 state.voice_favorites_visible,
                 matches!(state.settings.tts_engine, TtsEngine::Edge),
+                matches!(state.settings.tts_engine, TtsEngine::Google),
                 state.settings.tts_only_multilingual,
                 state.settings.tts_manual_tuning,
                 state.hwnd_tab,
@@ -18168,6 +18294,10 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
         } else if raw_focus == button_insert_tag || IsChild(button_insert_tag, raw_focus).as_bool()
         {
             button_insert_tag
+        } else if raw_focus == button_manage_google_voices
+            || IsChild(button_manage_google_voices, raw_focus).as_bool()
+        {
+            button_manage_google_voices
         } else if raw_focus == button_insert_pause
             || IsChild(button_insert_pause, raw_focus).as_bool()
         {
@@ -18187,6 +18317,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             || (is_edge && !only_multilingual && focus == combo_language)
             || focus == combo_voice
             || focus == button_insert_tag
+            || (is_google && focus == button_manage_google_voices)
             || focus == button_insert_pause
             || (!manual_tuning && focus == combo_speed)
             || (!manual_tuning && focus == combo_pitch)
@@ -18230,6 +18361,7 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             && focus != combo_language
             && focus != combo_voice
             && focus != button_insert_tag
+            && !(is_google && focus == button_manage_google_voices)
             && focus != button_insert_pause
             && focus != speed_control
             && focus != pitch_control
@@ -18262,6 +18394,9 @@ fn handle_voice_panel_tab(hwnd: HWND) -> bool {
             }
             order.push(combo_voice);
             order.push(button_insert_tag);
+            if is_google {
+                order.push(button_manage_google_voices);
+            }
             order.push(button_insert_pause);
             order.push(speed_control);
             order.push(pitch_control);

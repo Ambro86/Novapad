@@ -1,5 +1,23 @@
 # Changelog
 
+Versão 0.8.1 – 2026-07-15
+
+Síntese de voz Google
+• Corrigido o arranque do Google TTS em sistemas Windows nos quais as ligações aceites pelo servidor interno do navegador herdavam o modo de socket não bloqueante, causando o erro 10035 e impedindo as vozes descarregadas de falar.
+• O Sonarpad aguarda agora que o motor WASM do Chrome ou Edge esteja totalmente carregado antes da pré-visualização da voz ou da leitura com F5, evitando o erro “Chrome WASM TTS engine was not loaded”.
+• O navegador oculto desativa a tradução de páginas e a acessibilidade do processo de renderização, evitando anúncios como “Traduzir página” e interferências com os comandos de leitura.
+• O painel «Vozes no editor» mostra agora o botão «Gerir vozes Google...» quando o motor Google está selecionado e atualiza imediatamente a lista de vozes instaladas ao fechar o gestor.
+• Os avisos de dependências apresentados ao remover pacotes de voz Google estão agora traduzidos em todos os idiomas da interface.
+
+Experiência de atualização
+• Após uma atualização automática, a janela de conclusão com o registo de alterações abre depois da reposição inicial do foco e permanece em primeiro plano, em vez de aparecer apenas depois de premir Tab.
+
+Acessibilidade dos menus
+• Foi removido o cálculo de mnemónicas durante a execução: as teclas de acesso estão agora escritas explicitamente em cada uma das 15 traduções da interface e permanecem iguais em todos os arranques.
+• Foram revistas todas as entradas estáveis dos menus principais e submenus, incluindo Reprodução, tipos de letra, Guardar imagem e Mostrar índice EPUB; mnemónicas em falta ou duplicadas entre itens do mesmo nível foram corrigidas diretamente nas traduções.
+• Os testes automáticos passam apenas a validar as traduções e falham se uma mnemónica estiver em falta, for inválida ou estiver duplicada; já não alteram os rótulos durante a execução.
+• Em menus excecionalmente extensos, quando o texto traduzido não fornece caracteres distintos suficientes, é apresentada uma tecla de acesso numérica explícita no formato padrão do Windows «(&1)».
+
 Versão 0.8.0 – 2026-07-15
 
 Dicionário online
@@ -444,11 +462,9 @@ Melhorias
 • Melhorado o suporte para vozes Microsoft, que agora são reproduzidas utilizando um método dedicado com um user agent diferente.
 • Adicionado suporte para ficheiros MP4.
 
-
 Versão 0.6.0 – 2026-01-XX
 Melhorias
 • Melhorado o suporte para vozes Microsoft, que agora são reproduzidas utilizando um método dedicado com um user agent diferente.
-
 
 Versão 0.6.0 – 2026-01-20
 Novas funcionalidades

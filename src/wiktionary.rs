@@ -1529,7 +1529,7 @@ mod tests {
             .append_pair("format", "json")
             .append_pair("formatversion", "2");
         let response: serde_json::Value = reqwest::blocking::Client::builder()
-            .user_agent("Sonarpad/0.8.0 (German Wiktionary 50-word integration test)")
+            .user_agent("Sonarpad/0.8.1 (German Wiktionary 50-word integration test)")
             .build()
             .expect("German Wiktionary test client")
             .get(url)

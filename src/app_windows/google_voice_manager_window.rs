@@ -437,7 +437,7 @@ fn remove_selected(hwnd: HWND, state: &mut ManagerState) {
         return;
     }
     let package_id = package.package.id.clone();
-    match crate::google_tts::remove_package(&package_id) {
+    match crate::google_tts::remove_package(&package_id, state.language) {
         Ok(()) => {
             refresh_list(state, Some(&package_id));
             set_status(state, &tr(state.language, "google_tts.voices.removed"));

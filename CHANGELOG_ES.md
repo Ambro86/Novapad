@@ -1,5 +1,23 @@
 # Changelog
 
+Versión 0.8.1 – 2026-07-15
+
+Síntesis de voz de Google
+• Corregido el inicio de Google TTS en sistemas Windows donde las conexiones aceptadas por el servidor interno del navegador heredaban el modo de socket no bloqueante, provocando el error 10035 e impidiendo que hablaran las voces descargadas.
+• Sonarpad espera ahora a que el motor WASM de Chrome o Edge esté completamente cargado antes de la vista previa de voz o de la lectura con F5, evitando el error “Chrome WASM TTS engine was not loaded”.
+• El navegador oculto desactiva la traducción de páginas y la accesibilidad del renderizador para evitar anuncios como “Traducir página” e interferencias con los comandos de lectura.
+• El panel «Voces en el editor» muestra ahora el botón «Gestionar voces de Google...» cuando se selecciona el motor Google y actualiza inmediatamente la lista de voces instaladas al cerrar el gestor.
+• Los avisos de dependencias mostrados al eliminar paquetes de voz de Google ahora están traducidos a todos los idiomas de la interfaz.
+
+Experiencia de actualización
+• Después de una actualización automática, la ventana de finalización con el registro de cambios se abre tras restaurar el foco inicial y permanece en primer plano, en lugar de aparecer solo al pulsar Tab.
+
+Accesibilidad de los menús
+• Se eliminó el cálculo de mnemónicas durante la ejecución: las teclas de acceso están ahora escritas explícitamente en cada una de las 15 traducciones de la interfaz y permanecen idénticas en cada inicio.
+• Se revisaron todas las entradas estables de los menús principales y submenús, incluidos Reproducción, las fuentes, Guardar imagen y Mostrar índice EPUB; las mnemónicas ausentes o duplicadas entre elementos del mismo nivel se corrigieron directamente en las traducciones.
+• Las pruebas automáticas ahora solo validan las traducciones y fallan si falta una mnemónica, no es válida o está duplicada; ya no modifican las etiquetas durante la ejecución.
+• En menús excepcionalmente grandes, cuando el texto traducido no ofrece suficientes caracteres distintos, se muestra una tecla de acceso numérica explícita con el formato estándar de Windows «(&1)».
+
 Versión 0.8.0 – 2026-07-15
 
 Diccionario en línea

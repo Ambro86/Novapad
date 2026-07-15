@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "Êtes-vous sûr de vouloir annuler la création du livre audio ?",
   "audiobook.finalizing_progress": "Finalisation du livre audio. Progression : {pct} %",
   "audiobook.progress": "Création du livre audio. Progression : {pct} %",
-  "audiobook.sapi4_threads_body": "Combien de processus simultanés souhaitez-vous utiliser pour accélérer la création ? (Recommandé : 10-30).\nNote : un nombre trop élevé peut ralentir le système ou provoquer des erreurs dans le moteur SAPI4.",
+  "audiobook.sapi4_threads_body": "Combien de processus simultanés souhaitez-vous utiliser pour accélérer la création ? (Recommandé : 10-30).\nNote : un nombre trop élevé peut ralentir le système ou provoquer des erreurs dans le moteur SAPI4.\nPlage autorisée : 1 à 64.",
   "audiobook.sapi4_threads_title": "Processus SAPI4",
   "audiobook.title": "Création de livre audio",
   "batch_audiobooks.add_files": "Ajouter des fichiers...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "Déplacer le curseur pendant la lecture",
   "options.label.multilingual": "Afficher uniquement les voix multilingues",
   "options.label.network_proxy": "Proxy réseau global :",
+  "options.label.network_proxy_port": "Port du proxy:",
   "options.label.network_proxy_password": "Mot de passe du proxy :",
   "options.label.network_proxy_username": "Nom d'utilisateur du proxy :",
   "options.label.open": "Comportement à l'ouverture :",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "Choisissez un chapitre ou un sous-chapitre, puis appuyez sur Entrée.",
   "epub_index.announcement": "Cet EPUB contient une table des matières. Pour la consulter, ouvrez le menu Affichage et choisissez Afficher la table des matières.",
   "epub_index.no_index": "Cet EPUB ne contient aucune table des matières disponible.",
-  "recordings.back_to_search": "Retour à la recherche"
+  "recordings.back_to_search": "Retour à la recherche",
+  "dictionary.lookup.language.de": "Allemand"
 }

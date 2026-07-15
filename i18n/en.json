@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "Are you sure you want to cancel the audiobook creation?",
   "audiobook.finalizing_progress": "Finalizing audiobook. Progress: {pct}%",
   "audiobook.progress": "Creating audiobook. Progress: {pct}%",
-  "audiobook.sapi4_threads_body": "How many concurrent processes do you want to use to speed up creation? (Recommended: 10-30).\nNote: too many processes might slow down the system or cause errors in the SAPI4 engine.",
+  "audiobook.sapi4_threads_body": "How many concurrent processes do you want to use to speed up creation? (Recommended: 10-30).\nNote: too many processes might slow down the system or cause errors in the SAPI4 engine.\nAllowed range: 1-64.",
   "audiobook.sapi4_threads_title": "SAPI4 Processes",
   "audiobook.title": "Creating Audiobook",
   "batch_audiobooks.add_files": "Add Files...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "Move Cursor During Reading",
   "options.label.multilingual": "Show Only Multilingual Voices",
   "options.label.network_proxy": "Network proxy (global):",
+  "options.label.network_proxy_port": "Proxy port:",
   "options.label.network_proxy_password": "Proxy password:",
   "options.label.network_proxy_username": "Proxy username:",
   "options.label.open": "Open Behavior:",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "Choose a chapter or subchapter and press Enter.",
   "epub_index.announcement": "This EPUB contains a table of contents. To open it, go to the View menu and choose Show table of contents.",
   "epub_index.no_index": "This EPUB does not contain an available table of contents.",
-  "recordings.back_to_search": "Back to search"
+  "recordings.back_to_search": "Back to search",
+  "dictionary.lookup.language.de": "German"
 }

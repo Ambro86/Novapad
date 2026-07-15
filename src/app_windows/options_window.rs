@@ -34,9 +34,9 @@ use windows::Win32::UI::Controls::Dialogs::{
     OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_PATHMUSTEXIST, OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::{
-    BST_CHECKED, NMHDR, SetScrollInfo, ShowScrollBar, TCIF_TEXT, TCITEMW, TCM_GETCURSEL,
-    TCM_INSERTITEMW, TCM_SETCURSEL, TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_STATIC,
-    WC_TABCONTROLW,
+    BST_CHECKED, EM_LIMITTEXT, NMHDR, SetScrollInfo, ShowScrollBar, TCIF_TEXT, TCITEMW,
+    TCM_GETCURSEL, TCM_INSERTITEMW, TCM_SETCURSEL, TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_EDIT,
+    WC_STATIC, WC_TABCONTROLW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetAsyncKeyState, GetFocus, GetKeyState, SetFocus, VK_CONTROL, VK_ESCAPE, VK_F3,
@@ -157,6 +157,7 @@ const OPTIONS_ID_PROMPT_PROGRAM: usize = 6019;
 const OPTIONS_ID_NETWORK_PROXY: usize = 6075;
 const OPTIONS_ID_NETWORK_PROXY_USERNAME: usize = 6076;
 const OPTIONS_ID_NETWORK_PROXY_PASSWORD: usize = 6077;
+const OPTIONS_ID_NETWORK_PROXY_PORT: usize = 6152;
 const OPTIONS_ID_TABS: usize = 6024;
 const OPTIONS_ID_USE_DIALOGUE_VOICE: usize = 6049;
 const OPTIONS_ID_DIALOGUE_VOICE: usize = 6050;
@@ -250,8 +251,15 @@ struct GeminiModelsPayload {
 
 static GEMINI_MODELS_PAYLOADS: OnceLock<Mutex<VecDeque<GeminiModelsPayload>>> = OnceLock::new();
 
-fn proxy_is_valid(proxy_url: &str, username: &str, password: &str) -> Result<(), String> {
-    let mut proxy = reqwest::Proxy::all(proxy_url).map_err(|e| e.to_string())?;
+fn proxy_is_valid(
+    proxy_url: &str,
+    proxy_port: &str,
+    username: &str,
+    password: &str,
+) -> Result<(), String> {
+    let proxy_url = crate::settings::build_network_proxy_url(proxy_url, proxy_port)?
+        .ok_or_else(|| "Proxy non configurato".to_string())?;
+    let mut proxy = reqwest::Proxy::all(&proxy_url).map_err(|e| e.to_string())?;
     if !username.trim().is_empty() {
         proxy = proxy.basic_auth(username.trim(), password.trim());
     }
@@ -1099,6 +1107,8 @@ struct OptionsDialogState {
     combo_prompt_program: HWND,
     label_network_proxy: HWND,
     edit_network_proxy: HWND,
+    label_network_proxy_port: HWND,
+    edit_network_proxy_port: HWND,
     label_network_proxy_username: HWND,
     edit_network_proxy_username: HWND,
     label_network_proxy_password: HWND,
@@ -1216,6 +1226,7 @@ struct OptionsLabels {
     label_manage_site_credentials: String,
     label_prompt_program: String,
     label_network_proxy: String,
+    label_network_proxy_port: String,
     label_network_proxy_username: String,
     label_network_proxy_password: String,
     label_shortcut_action: String,
@@ -1461,6 +1472,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         label_manage_site_credentials: i18n::tr(language, "options.manage_site_credentials"),
         label_prompt_program: i18n::tr(language, "options.label.prompt_program"),
         label_network_proxy: i18n::tr(language, "options.label.network_proxy"),
+        label_network_proxy_port: i18n::tr(language, "options.label.network_proxy_port"),
         label_network_proxy_username: i18n::tr(language, "options.label.network_proxy_username"),
         label_network_proxy_password: i18n::tr(language, "options.label.network_proxy_password"),
         label_shortcut_action: shortcuts_label_action(language),
@@ -5926,6 +5938,37 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 30;
 
+                let label_network_proxy_port = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_network_proxy_port).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    y,
+                    140,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let edit_network_proxy_port = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    170,
+                    y - 2,
+                    120,
+                    22,
+                    hwnd,
+                    HMENU(OPTIONS_ID_NETWORK_PROXY_PORT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(edit_network_proxy_port, EM_LIMITTEXT, WPARAM(5), LPARAM(0));
+                y += 30;
+
                 let label_network_proxy_username = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
@@ -6311,6 +6354,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     combo_prompt_program,
                     label_network_proxy,
                     edit_network_proxy,
+                    label_network_proxy_port,
+                    edit_network_proxy_port,
                     label_network_proxy_username,
                     edit_network_proxy_username,
                     label_network_proxy_password,
@@ -6517,6 +6562,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     combo_prompt_program,
                     label_network_proxy,
                     edit_network_proxy,
+                    label_network_proxy_port,
+                    edit_network_proxy_port,
                     label_network_proxy_username,
                     edit_network_proxy_username,
                     label_network_proxy_password,
@@ -7255,6 +7302,8 @@ fn initialize_options_dialog(hwnd: HWND) {
             combo_prompt_program,
             _label_network_proxy,
             edit_network_proxy,
+            _label_network_proxy_port,
+            edit_network_proxy_port,
             _label_network_proxy_username,
             edit_network_proxy_username,
             _label_network_proxy_password,
@@ -7404,6 +7453,8 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.combo_prompt_program,
                 state.label_network_proxy,
                 state.edit_network_proxy,
+                state.label_network_proxy_port,
+                state.edit_network_proxy_port,
                 state.label_network_proxy_username,
                 state.edit_network_proxy_username,
                 state.label_network_proxy_password,
@@ -8835,6 +8886,12 @@ fn initialize_options_dialog(hwnd: HWND) {
             PCWSTR(to_wide(&settings.network_proxy_url).as_ptr()),
         ) {
             crate::log_debug(&format!("Failed to set network proxy text: {:?}", _e));
+        }
+        if let Err(_e) = SetWindowTextW(
+            edit_network_proxy_port,
+            PCWSTR(to_wide(&settings.network_proxy_port).as_ptr()),
+        ) {
+            crate::log_debug(&format!("Failed to set network proxy port text: {:?}", _e));
         }
         if let Err(_e) = SetWindowTextW(
             edit_network_proxy_username,
@@ -11352,6 +11409,7 @@ fn apply_options_dialog(hwnd: HWND) {
             combo_rss_quick_copy_mode,
             combo_prompt_program,
             edit_network_proxy,
+            edit_network_proxy_port,
             edit_network_proxy_username,
             edit_network_proxy_password,
         ) = match with_options_state(hwnd, |state| {
@@ -11451,6 +11509,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.combo_rss_quick_copy_mode,
                 state.combo_prompt_program,
                 state.edit_network_proxy,
+                state.edit_network_proxy_port,
                 state.edit_network_proxy_username,
                 state.edit_network_proxy_password,
             )
@@ -12033,6 +12092,13 @@ fn apply_options_dialog(hwnd: HWND) {
             let text = String::from_utf16_lossy(&buf[..read as usize]);
             settings.network_proxy_url = text.trim().to_string();
         }
+        let proxy_port_len = GetWindowTextLengthW(edit_network_proxy_port);
+        if proxy_port_len >= 0 {
+            let mut buf = vec![0u16; (proxy_port_len + 1) as usize];
+            let read = GetWindowTextW(edit_network_proxy_port, &mut buf);
+            let text = String::from_utf16_lossy(&buf[..read as usize]);
+            settings.network_proxy_port = text.trim().to_string();
+        }
         let proxy_user_len = GetWindowTextLengthW(edit_network_proxy_username);
         if proxy_user_len >= 0 {
             let mut buf = vec![0u16; (proxy_user_len + 1) as usize];
@@ -12047,9 +12113,10 @@ fn apply_options_dialog(hwnd: HWND) {
             let text = String::from_utf16_lossy(&buf[..read as usize]);
             settings.network_proxy_password = text.trim().to_string();
         }
-        if !settings.network_proxy_url.is_empty()
+        if (!settings.network_proxy_url.is_empty() || !settings.network_proxy_port.is_empty())
             && let Err(err) = proxy_is_valid(
                 &settings.network_proxy_url,
+                &settings.network_proxy_port,
                 &settings.network_proxy_username,
                 &settings.network_proxy_password,
             )
@@ -12064,6 +12131,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 MB_OK | MB_ICONWARNING,
             );
             settings.network_proxy_url.clear();
+            settings.network_proxy_port.clear();
             settings.network_proxy_username.clear();
             settings.network_proxy_password.clear();
         }
@@ -13112,6 +13180,14 @@ fn layout_general_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
         state.label_network_proxy,
         "edit_network_proxy",
         state.edit_network_proxy,
+        y,
+        OPTIONS_EDIT_HEIGHT,
+    );
+    y = layout_label_control(
+        "label_network_proxy_port",
+        state.label_network_proxy_port,
+        "edit_network_proxy_port",
+        state.edit_network_proxy_port,
         y,
         OPTIONS_EDIT_HEIGHT,
     );
@@ -14202,6 +14278,8 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.combo_prompt_program,
             state.label_network_proxy,
             state.edit_network_proxy,
+            state.label_network_proxy_port,
+            state.edit_network_proxy_port,
             state.label_network_proxy_username,
             state.edit_network_proxy_username,
             state.label_network_proxy_password,

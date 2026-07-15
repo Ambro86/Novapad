@@ -1,6 +1,6 @@
 [package]
 name = "sonarpad"
-version = "0.7.1"
+version = "0.8.0"
 edition = "2024"
 authors = ["Ambrogio Riili"]
 description = "A modern Notepad with PDF, DOCX, XLS and EPUB support and TTS capabilities."

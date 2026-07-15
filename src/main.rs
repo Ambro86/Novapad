@@ -59,6 +59,7 @@ mod podcast_recorder;
 mod spellcheck;
 mod text_ops;
 mod tools;
+mod treccani;
 mod updater;
 mod wikipedia;
 mod wiktionary;
@@ -1663,6 +1664,12 @@ fn truncate_log_if_needed(path: &Path) {
 }
 
 pub(crate) fn log_debug(message: &str) {
+    // Isolated SAPI5 workers are monitored by the parent diagnostic log.
+    // Avoid concurrent writes and log truncation races from many child processes.
+    if std::env::var_os("SONARPAD_SAPI5_WORKER").is_some() {
+        return;
+    }
+
     // Push to telemetry ring buffer for hang diagnostics
     telemetry::push_log_line(message);
 
@@ -4309,10 +4316,11 @@ fn launch_stream_url_in_mpv_with_options(
 }
 
 pub(crate) fn launch_local_tv_recording_in_mpv(hwnd: HWND, path: &Path) -> Result<(), String> {
+    let fallback_title = i18n::tr_tv("tv.local_recording_title");
     let title = path
         .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or("Registrazione TV");
+        .unwrap_or(fallback_title.as_str());
     let path_text = path.to_string_lossy().to_string();
     launch_stream_url_in_mpv_with_options(
         hwnd,
@@ -7605,6 +7613,7 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.dictionary_entry_dialog.0 != 0
                 || state.wiktionary_window.0 != 0
                 || state.wikipedia_window.0 != 0
+                || state.treccani_window.0 != 0
                 || state.bdciechi_window.0 != 0
                 || state.prompt_window.0 != 0
                 || state.podcast_window.0 != 0
@@ -7817,6 +7826,7 @@ pub(crate) struct AppState {
     dictionary_entry_dialog: HWND,
     wiktionary_window: HWND,
     wikipedia_window: HWND,
+    treccani_window: HWND,
     bdciechi_window: HWND,
     bdciechi_session_username: String,
     bdciechi_session_password: String,
@@ -8009,6 +8019,11 @@ struct DictationResult {
 }
 
 fn main() -> windows::core::Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(code) = tts_engine::run_sapi5_audiobook_worker_from_args(&args) {
+        std::process::exit(code);
+    }
+
     // Initialize COM for the main UI thread (STA)
     let _com = com_guard::ComGuard::new_sta().ok();
 
@@ -8018,7 +8033,6 @@ fn main() -> windows::core::Result<()> {
     }
     log_debug("Application started.");
 
-    let args: Vec<String> = std::env::args().collect();
     if let Some(index) = args.iter().position(|arg| arg == "--scheduled-recording") {
         let code = args
             .get(index + 1)
@@ -8569,6 +8583,16 @@ fn run_app(
                 {
                     continue;
                 }
+                let treccani_hwnd =
+                    with_state(hwnd, |state| state.treccani_window).unwrap_or(HWND(0));
+                if treccani_hwnd.0 != 0
+                    && let Some(hwnd_edit) = get_active_edit(hwnd)
+                    && GetFocus() == hwnd_edit
+                    && editor_manager::current_document_is_from_treccani(hwnd)
+                    && app_windows::treccani_window::focus_import_choice(treccani_hwnd)
+                {
+                    continue;
+                }
                 let save_hwnd =
                     with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
                 if save_hwnd.0 != 0 {
@@ -9008,6 +9032,12 @@ fn run_app(
                         state.wikipedia_window,
                         &msg,
                     )
+                {
+                    handled = true;
+                    return;
+                }
+                if state.treccani_window.0 != 0
+                    && app_windows::treccani_window::handle_navigation(state.treccani_window, &msg)
                 {
                     handled = true;
                     return;
@@ -9598,6 +9628,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     dictionary_entry_dialog: HWND(0),
                     wiktionary_window: HWND(0),
                     wikipedia_window: HWND(0),
+                    treccani_window: HWND(0),
                     bdciechi_window: HWND(0),
                     bdciechi_session_username: String::new(),
                     bdciechi_session_password: String::new(),
@@ -12136,6 +12167,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_TOOLS_WIKIPEDIA_IMPORT => {
                         log_debug("Menu: Wikipedia import");
                         app_windows::wikipedia_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_TRECCANI => {
+                        log_debug("Menu: Enciclopedia Treccani");
+                        app_windows::treccani_window::open(hwnd);
                         LRESULT(0)
                     }
                     IDM_TOOLS_IMPORT_YOUTUBE => {
@@ -18436,6 +18472,13 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_ITALIAONLINE);
         return true;
     }
+    if key == 'E' as u16 && ctrl_down && shift_down && !alt_down {
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        if language == Language::Italian {
+            dispatch_shortcut_command(hwnd, IDM_TOOLS_TRECCANI);
+            return true;
+        }
+    }
     if key == 'S' as u16 && ctrl_down && shift_down && !alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_RAIPLAYSOUND);
         return true;
@@ -20243,6 +20286,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 from_italiaonline: false,
                 from_find_in_files: false,
                 from_wikipedia: false,
+                from_treccani: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
@@ -20490,6 +20534,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 from_italiaonline: false,
                 from_find_in_files: false,
                 from_wikipedia: false,
+                from_treccani: false,
                 is_temporary: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,

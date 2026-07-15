@@ -1,5 +1,148 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.8.0 – 2026-07-15
+
+Từ điển trực tuyến
+• Đã thêm tiếng Đức vào từ điển trực tuyến Wiktionary.
+• Định nghĩa và từ đồng nghĩa tiếng Đức giờ được nhận diện đúng theo cấu trúc riêng của Wiktionary tiếng Đức.
+
+Độ tin cậy của sách nói SAPI5
+• Việc tạo sách nói SAPI5 vẫn sử dụng tối đa 12 worker song song khi giọng đã chọn tạo kết quả đáng tin cậy.
+• Mỗi phần được kiểm tra theo kích thước tệp, thời lượng ước tính và phép so sánh thận trọng với văn bản được giao.
+• Các phần bị thiếu hoặc đáng ngờ sẽ tự động được tạo lại với mức song song giảm dần: 12, 8, 6, 4, 2 và cuối cùng là 1 worker. Chỉ các phần có vấn đề mới được lặp lại.
+• Giới hạn đáng tin cậy được ghi nhớ riêng cho từng giọng SAPI5, không làm chậm các giọng hoạt động đúng với 12 worker.
+• Kiểm tra cuối ngăn Sonarpad âm thầm chấp nhận tệp MP3 ngắn hơn nhiều so với các phần đã tạo.
+• Chi tiết được ghi vào `sapi5_audiobook_diagnostic.log`.
+• Mỗi đơn vị tổng hợp SAPI5 giờ chạy trong một tiến trình Sonarpad riêng và ẩn. Nếu giọng của bên thứ ba bị lỗi, chỉ worker đó đóng lại còn ứng dụng chính vẫn mở.
+• Ngay trong lần tạo sách nói hiện tại, các phần chưa hoàn tất được thử lại ngay với mức song song thấp hơn kế tiếp; các phần đã được xác thực vẫn được giữ lại.
+• Khôi phục ở lần khởi động tiếp theo chỉ còn là lớp bảo vệ bổ sung khi ứng dụng chính hoặc máy tính bị gián đoạn.
+
+Tiến trình sách nói SAPI4
+• Số tiến trình SAPI4 do người dùng chọn giờ được tôn trọng tới giới hạn kỹ thuật 64; giới hạn ẩn 16 trước đây đã bị loại bỏ.
+• Số lượng thực tế chỉ giảm khi sách nói có ít đơn vị công việc hơn số đã yêu cầu.
+• Nếu một hoặc nhiều tiến trình cầu nối SAPI4 thất bại, các phần đã hoàn tất được giữ lại và chỉ các đơn vị lỗi được tự động thử lại với mức song song giảm dần.
+• Sonarpad giờ kiểm tra mã thoát của cầu nối SAPI4 và từ chối các phần âm thanh rỗng hoặc không hợp lệ.
+
+Cấu hình proxy
+• Đã thêm trường riêng cho cổng proxy trong phần cài đặt mạng.
+• Cổng có thể được nhập độc lập với địa chỉ proxy, được kiểm tra trong khoảng từ 1 đến 65535 và thay thế đúng cổng đã có trong URL.
+
+Tìm radio theo ngôn ngữ và quốc gia
+• Bộ lọc Ngôn ngữ và Quốc gia giờ được cập nhật bằng tất cả các mục có trong danh mục Radio Browser thay vì bị giới hạn trong một danh sách cố định.
+• Tên ngôn ngữ giờ được nhận diện ngay cả khi Radio Browser cung cấp bằng hệ chữ khác, tên bản địa, dạng viết tắt hoặc tổ hợp nhiều ngôn ngữ, rồi được hiển thị bằng ngôn ngữ giao diện hiện tại. Các giá trị không phải ngôn ngữ thực, chẳng hạn số, thể loại nhạc, quốc gia hoặc nhãn chung, sẽ bị lọc bỏ.
+• Danh mục được cập nhật trong nền và vẫn có danh sách dự phòng khi không thể kết nối với Radio Browser.
+• Các mục ngôn ngữ Radio Browser trở nên giống hệt nhau sau khi dịch giờ được gộp thành một mục duy nhất trong hộp danh sách, tránh các bước im lặng với trình đọc màn hình.
+
+Cải tiến quan trọng: đồng bộ giữa giọng đọc và con trỏ
+• Khả năng đồng bộ giữa giọng đọc và việc di chuyển con trỏ đã được cải thiện đáng kể cho tất cả các bộ máy giọng nói được hỗ trợ.
+• Khi bật tùy chọn “Di chuyển con trỏ trong khi đọc”, Sonarpad sử dụng một hệ thống tiến trình chung cho Microsoft Edge Neural, Google TTS, SAPI4, SAPI5 và OneCore.
+• Con trỏ bám chính xác hơn vào phần văn bản đang thực sự được đọc, với cách chia câu và đoạn câu nhất quán hơn.
+• Đã giảm rõ rệt tình trạng con trỏ đi trước, chậm, nhảy bất thường và sự khác biệt giữa các bộ máy giọng nói.
+• Vị trí chính xác được giữ tốt hơn sau khi tạm dừng, tiếp tục, tìm kiếm trong tài liệu hoặc đổi bộ máy giọng nói.
+
+Ghi podcast thành các tệp riêng
+• Đã thêm tùy chọn “Lưu micrô và âm thanh hệ thống hoặc ứng dụng thành các tệp riêng”.
+• Khi ghi đồng thời micrô và một nguồn khác, Sonarpad có thể tạo một tệp chỉ chứa micrô và một tệp thứ hai chứa âm thanh hệ thống, một ứng dụng hoặc các ứng dụng đã chọn.
+• Chế độ tách nguồn hỗ trợ cả MP3 và WAV.
+• Khi tùy chọn bị tắt, Sonarpad vẫn tạo một tệp trộn duy nhất như trước.
+• Các tệp riêng giúp điều chỉnh âm lượng, loại bỏ tiếng ồn và chỉnh sửa podcast, phỏng vấn và hướng dẫn dễ dàng hơn.
+
+Lên lịch ghi radio
+• Giờ đây có thể lên lịch ghi radio trước.
+• Có thể chọn đài, ngày, giờ và phút bắt đầu cùng thời lượng.
+• Hỗ trợ thời lượng tùy chỉnh từ 1 đến 1.440 phút.
+• Bản ghi có thể chạy một lần, hằng ngày hoặc hằng tuần.
+• Cửa sổ hiển thị rõ hơn các bản ghi đang chạy và đã lên lịch, ngày giờ dự kiến, thời lượng và thời gian còn lại.
+• Có thể dùng Windows Task Scheduler để tự động bắt đầu ghi ngay cả khi Sonarpad chưa mở.
+
+Lịch
+• Đã thêm lịch đầy đủ, có thể sử dụng hoàn toàn bằng bàn phím.
+• Có thể xem ngày trước và ngày sau, nhanh chóng trở về hôm nay và kiểm tra ngày lễ hoặc ngày kỷ niệm.
+• Đã thêm vị thánh trong ngày và câu trích dẫn trong ngày, có thể đọc, nghe hoặc sao chép.
+• Có thể tạo, sửa, xóa, hoãn và đánh dấu lời nhắc là hoàn tất.
+• Thông báo có thể xuất hiện đúng giờ hoặc sớm hơn và hoạt động qua lịch Windows ngay cả khi Sonarpad đã đóng.
+
+Thời tiết
+• Đã thêm mục dự báo thời tiết.
+• Có thể tìm thành phố và nhanh chóng mở lại các địa điểm đã xem gần đây.
+• Có thông tin thời tiết hiện tại, nhiệt độ, mức thấp và cao, độ ẩm, khả năng mưa và dự báo những ngày tiếp theo.
+• Có thể chọn độ C, độ F hoặc tự động.
+
+Phim đang chiếu
+• Đã thêm mục xem các phim đang chiếu tại rạp và các phim sắp phát hành.
+• Có tìm kiếm theo tên, nội dung, ngày phát hành và phát đoạn giới thiệu.
+
+Tổng hợp giọng nói Google
+• Đã tích hợp Google TTS để đọc tài liệu và tạo sách nói.
+• Đã thêm trình quản lý giọng để xem, lọc theo ngôn ngữ, tải xuống và xóa các giọng không còn cần thiết.
+• Có thể điều chỉnh tốc độ, âm lượng và cao độ.
+• Cao độ của giọng Google Natural được áp dụng trực tiếp bởi bộ máy để cho kết quả tự nhiên và ổn định hơn.
+• Đã cải thiện độ phản hồi và độ tin cậy của Google TTS, với giới hạn thời gian tổng hợp thích ứng theo tốc độ giọng.
+• Đã giảm thời gian chờ không cần thiết và cải thiện xử lý lỗi, gián đoạn.
+
+Mục lục EPUB
+• Sonarpad giờ nhận diện mục lục được nhúng trong sách EPUB.
+• Chương trình thông báo khi có mục lục và có thể mở từ menu Xem.
+• Chương và mục con được hiển thị theo cấu trúc phân cấp.
+• Nhấn Enter để chuyển ngay đến vị trí đã chọn.
+
+Tin tức và nguồn RSS
+• Mục Tin tức được mở rộng với các công cụ tìm kiếm và sắp xếp mới.
+• Đã thêm lựa chọn ngôn ngữ tin tức.
+• Có thể tìm trong nguồn RSS và đọc tin của thành phố mình.
+• Có thể duyệt, thêm vào bộ sưu tập cá nhân và gửi nguồn RSS cho cộng đồng Sonarpad.
+
+Ghi podcast
+• Có thể ghi chỉ micrô, toàn bộ âm thanh hệ thống, một ứng dụng, nhiều ứng dụng đã chọn hoặc micrô và ứng dụng cùng lúc.
+• Có thể chọn thiết bị micrô và nguồn âm thanh, điều chỉnh âm lượng riêng và theo dõi mức âm lượng theo thời gian thực.
+• Đã thêm tạm dừng và tiếp tục, đầu ra MP3 hoặc WAV, chọn bitrate MP3 và thư mục đích.
+• Có thể giữ máy tính hoạt động trong khi ghi.
+
+Radio
+• Mục Radio đã được tổ chức lại đáng kể.
+• Có thể tìm đài theo tên hoặc văn bản tự do, ngôn ngữ, quốc gia, thành phố, thể loại nhạc hoặc danh mục.
+• Đã cải thiện quản lý yêu thích và thêm cách xóa nhanh toàn bộ bộ lọc.
+• Có thể gửi đài cho cộng đồng Sonarpad.
+• Đã thêm ghi trực tiếp, chế độ “Ghi và phát”, danh sách bản ghi cùng khả năng quản lý và xóa.
+• Bản ghi radio được lưu trong thư mục riêng bên trong thư mục ghi âm chính.
+
+Phát đa phương tiện
+• Độ ổn định của trình phát đa phương tiện đã được cải thiện đáng kể.
+• Đã sửa lỗi có thể làm mpv bị treo và cải thiện giao tiếp với trình phát.
+• Cải thiện việc mở các loại tệp đa phương tiện khác nhau.
+• Sonarpad giờ ghi nhớ mức âm lượng đã dùng.
+• Cải thiện xử lý luồng và bản ghi.
+• Sửa việc mở tệp từ Windows bằng nhấp đúp hoặc “Mở bằng”.
+
+Tài liệu PDF
+• Đã thêm khả năng nhận diện các trường biểu mẫu trong PDF.
+• Sonarpad có thể tìm trường có thể điền, trình bày chúng dưới dạng văn bản dễ tiếp cận, cho phép sửa và lưu dữ liệu vào PDF.
+• Đã sửa cách tính vị trí con trỏ khi đọc, đặc biệt với ký tự nhiều byte và cấu trúc phức tạp.
+
+Khả năng tiếp cận và bàn phím
+• Cải thiện các lệnh chỉnh sửa thông thường trong toàn bộ chương trình.
+• Sao chép, cắt, dán, chọn tất cả, hoàn tác và làm lại được gửi đúng đến trường đang có tiêu điểm, kể cả cửa sổ phụ và hộp thoại.
+• Đã sửa lỗi cập nhật màn hình chữ nổi.
+• Cải thiện quản lý tiêu điểm và sửa lựa chọn ngôn ngữ trong Wikipedia.
+• Đã thêm tùy chọn nhóm các chức năng trong menu Công cụ theo danh mục.
+• Đã thêm hành động có thể cấu hình để nhanh chóng mở Lịch, Thời tiết và Phim đang chiếu.
+
+Sách nói
+• Cải thiện việc tạo sách nói khi hộp thoại hoặc cửa sổ phương thức đang mở.
+• Quản lý tiến trình đáng tin cậy hơn và bỏ qua các cập nhật âm thanh đã cũ.
+• Google TTS cũng có thể dùng để tạo sách nói với điều khiển tốc độ, âm lượng và cao độ.
+
+Trí tuệ nhân tạo
+• Đã cập nhật mô hình Gemini mặc định thành `gemini-3.5-flash`.
+
+Sửa lỗi chung
+• Sửa một số lỗi treo khi phát bằng mpv.
+• Sửa việc mở một số tệp âm thanh và video.
+• Cải thiện xử lý lệnh gửi đến trình phát.
+• Sửa việc khôi phục con trỏ trong khi đọc.
+• Cải thiện độ ổn định khi tạo sách nói.
+• Cải thiện tổng thể việc xử lý đa phương tiện, RSS, radio và EPUB.
+
 Phiên bản 0.7.1 – 2026-05-13
 
 Tính năng mới và cải tiến
@@ -464,14 +607,3 @@ Cải tiến
 
 ## 0.1.0 - 2025-12-25
 - Phiên bản phát hành đầu tiên: Cấu trúc dự án và tệp README.
-
-
-
-
-
-
-
-
-
-
-

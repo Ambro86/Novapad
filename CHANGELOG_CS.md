@@ -1,5 +1,148 @@
 # Přehled změn
 
+Verze 0.8.0 – 2026-07-15
+
+Online slovník
+• Do online slovníku Wiktionary byla přidána němčina.
+• Německé definice a synonyma jsou nyní správně rozpoznávána podle struktury německého Wiktionary.
+
+Spolehlivost audioknih SAPI5
+• Vytváření audioknih SAPI5 nadále používá až 12 paralelních pracovníků, pokud vybraný hlas vytváří spolehlivý výstup.
+• Každá část se kontroluje podle velikosti souboru, odhadované délky a opatrného porovnání s přiřazeným textem.
+• Chybějící nebo podezřelé části se automaticky vytvoří znovu s postupně nižší souběžností: 12, 8, 6, 4, 2 a nakonec 1 pracovník. Opakují se pouze problematické části.
+• Spolehlivý limit se ukládá samostatně pro každý hlas SAPI5, aniž by zpomaloval hlasy, které správně fungují s 12 pracovníky.
+• Závěrečná kontrola zabrání tichému přijetí MP3, které je výrazně kratší než vytvořené části.
+• Podrobnosti se zapisují do `sapi5_audiobook_diagnostic.log`.
+• Každá jednotka syntézy SAPI5 nyní běží v samostatném skrytém procesu Sonarpad. Pokud hlas třetí strany selže, ukončí se pouze tento worker a hlavní aplikace zůstane spuštěná.
+• Během stejného vytváření audioknihy se nedokončené části okamžitě zopakují s následující nižší úrovní souběhu; již ověřené části se zachovají.
+• Obnova při příštím spuštění zůstává doplňkovou ochranou pouze pro případ přerušení hlavní aplikace nebo počítače.
+
+Procesy audioknih SAPI4
+• Počet procesů SAPI4 zvolený uživatelem je nyní respektován až do technického maxima 64; předchozí skrytý limit 16 byl odstraněn.
+• Skutečný počet se sníží pouze tehdy, když audiokniha obsahuje méně pracovních jednotek, než bylo požadováno.
+• Pokud jeden nebo více procesů mostu SAPI4 selže, dokončené části se zachovají a automaticky se zopakují pouze neúspěšné jednotky s postupně nižší souběžností.
+• Sonarpad nyní kontroluje návratový kód mostu SAPI4 a odmítne prázdné nebo neplatné zvukové části.
+
+Nastavení proxy
+• Do nastavení sítě bylo přidáno samostatné pole pro port proxy.
+• Port lze zadat nezávisle na adrese proxy, je ověřen v rozsahu 1 až 65535 a správně nahradí port, který již může být součástí adresy.
+
+Vyhledávání rádia podle jazyka a země
+• Filtry Jazyk a Země se nyní aktualizují všemi položkami dostupnými v katalogu Radio Browser a nejsou již omezeny na pevný seznam.
+• Názvy jazyků jsou nyní rozpoznány i tehdy, když je Radio Browser poskytne v jiném písmu, v rodném názvu, jako zkratku nebo jako kombinaci více jazyků, a zobrazí se přeložené do aktuálního jazyka rozhraní. Hodnoty, které nepředstavují skutečné jazyky, například čísla, hudební žánry, země nebo obecné popisy, jsou odfiltrovány.
+• Katalog se aktualizuje na pozadí a při nedostupnosti Radio Browseru zůstává k dispozici záložní seznam.
+• Duplicitní jazykové položky Radio Browseru, které jsou po překladu totožné, se nyní slučují do jediné položky rozbalovacího seznamu, aby čtečky obrazovky nezůstávaly při pohybu potichu.
+
+Hlavní vylepšení: synchronizace čtení a kurzoru
+• Synchronizace hlasového čtení a pohybu kurzoru byla výrazně vylepšena pro všechny podporované hlasové moduly.
+• Je-li zapnuta volba „Posouvat kurzor během čtení“, používá Sonarpad společný systém postupu pro Microsoft Edge Neural, Google TTS, SAPI4, SAPI5 a OneCore.
+• Kurzor nyní přesněji sleduje skutečně vyslovovaný text a používá jednotnější dělení vět a jejich částí.
+• Výrazně se omezilo předbíhání, zpoždění, nepravidelné skoky a rozdíly mezi jednotlivými hlasovými moduly.
+• Správná pozice se lépe zachovává po pozastavení, obnovení, hledání v dokumentu nebo změně hlasového modulu.
+
+Samostatné soubory při nahrávání podcastu
+• Přidána volba „Uložit mikrofon a systémový zvuk nebo zvuk aplikací do samostatných souborů“.
+• Při současném nahrávání mikrofonu a dalšího zdroje může Sonarpad vytvořit jeden soubor pouze s mikrofonem a druhý se systémovým zvukem, jednou aplikací nebo vybranými aplikacemi.
+• Oddělené nahrávání je dostupné pro MP3 i WAV.
+• Pokud volba není zapnuta, nadále se vytváří jeden smíchaný soubor.
+• Samostatné soubory usnadňují úpravu hlasitosti, odstranění šumu a následný střih podcastů, rozhovorů a návodů.
+
+Plánované nahrávání rádia
+• Nahrávání rádia lze nyní naplánovat předem.
+• Pro každé nahrávání lze vybrat stanici, den, hodinu a minutu zahájení a délku.
+• K dispozici je vlastní délka od 1 do 1 440 minut.
+• Nahrávání lze spustit jednou, denně nebo týdně.
+• Okno přehledněji zobrazuje probíhající a plánovaná nahrávání, plánované datum a čas, délku a zbývající čas do spuštění.
+• Pomocí Plánovače úloh Windows lze nahrávání spustit automaticky, i když Sonarpad není otevřen.
+
+Kalendář
+• Přidán úplný kalendář přístupný z klávesnice.
+• Umožňuje procházet předchozí a následující dny, rychle se vrátit k dnešku a zjistit svátky a významné dny.
+• Přidán svátek a citát dne, které lze přečíst, vyslechnout nebo zkopírovat.
+• Připomínky lze vytvářet, upravovat, mazat, odkládat a označovat jako dokončené.
+• Upozornění lze zobrazit přesně v určený čas nebo s předstihem a mohou fungovat prostřednictvím plánování Windows i při zavřeném Sonarpadu.
+
+Počasí
+• Přidána sekce předpovědi počasí.
+• Lze vyhledat město a rychle znovu otevřít nedávno zobrazená místa.
+• Dostupné jsou aktuální podmínky, teplota, minimum a maximum, vlhkost, pravděpodobnost srážek a předpověď na další dny.
+• Lze zvolit stupně Celsia, Fahrenheita nebo automatický výběr.
+
+Filmy v kinech
+• Přidána sekce s filmy právě uváděnými v kinech a připravovanými premiérami.
+• K dispozici je hledání podle názvu, popis děje, datum uvedení a přehrávání upoutávky.
+
+Google TTS
+• Přidán Google TTS pro čtení dokumentů a vytváření audioknih.
+• Přidán správce hlasů pro jejich zobrazení, filtrování podle jazyka, stažení a odstranění nepotřebných hlasů.
+• Lze nastavit rychlost, hlasitost a výšku hlasu.
+• Výška hlasů Google Natural se nastavuje přímo v modulu, což přináší přirozenější a stabilnější výsledek.
+• Zlepšena odezva a spolehlivost Google TTS a časové limity se přizpůsobují rychlosti hlasu.
+• Zkráceno zbytečné čekání a vylepšeno zpracování chyb a přerušení.
+
+Obsah dokumentů EPUB
+• Sonarpad nyní rozpozná obsah vložený v knihách EPUB.
+• Jeho přítomnost je oznámena a lze jej otevřít z nabídky Zobrazení.
+• Kapitoly a podkapitoly jsou zobrazeny hierarchicky.
+• Stisknutím Enter se okamžitě přejde na vybrané místo v knize.
+
+Zprávy a zdroje RSS
+• Sekce Zprávy byla rozšířena o nové možnosti vyhledávání a organizace.
+• Přidán výběr jazyka zpráv.
+• Lze vyhledávat ve zdrojích RSS a číst zprávy z vlastního města.
+• Komunitní zdroje lze procházet, přidávat do vlastní sbírky a odesílat komunitě Sonarpad.
+
+Nahrávání podcastu
+• Lze nahrávat pouze mikrofon, celý systémový zvuk, jednu aplikaci, více vybraných aplikací nebo mikrofon a aplikace současně.
+• Lze vybrat mikrofon a zdroj zvuku, samostatně nastavit hlasitost a sledovat úrovně v reálném čase.
+• Přidáno pozastavení a obnovení, výstup MP3 nebo WAV, volba datového toku MP3 a cílové složky.
+• Během nahrávání lze zabránit uspání počítače.
+
+Rádio
+• Sekce Rádio byla výrazně přepracována.
+• Stanice lze hledat podle názvu nebo volného textu, jazyka, země, města, hudebního žánru nebo kategorie.
+• Zlepšena správa oblíbených položek a přidáno rychlé vymazání všech filtrů.
+• Stanice lze odesílat komunitě Sonarpad.
+• Přidáno živé nahrávání, režim „Nahrávat a přehrávat“, seznam nahrávek a jejich správa a mazání.
+• Nahrávky rádia jsou ukládány do vlastní složky v hlavním adresáři nahrávek.
+
+Přehrávání médií
+• Výrazně zlepšena stabilita přehrávače médií.
+• Opraven problém, který mohl zablokovat mpv, a zlepšena komunikace s přehrávačem.
+• Vylepšeno otevírání různých typů multimediálních souborů.
+• Sonarpad si nyní pamatuje použitou hlasitost.
+• Zlepšena správa streamů a nahrávek.
+• Opraveno otevírání souborů z Windows pomocí dvojitého kliknutí nebo „Otevřít v programu“.
+
+Dokumenty PDF
+• Přidáno rozpoznávání formulářových polí v PDF.
+• Sonarpad umí najít vyplnitelná pole, zpřístupnit je v textové podobě, umožnit úpravu a uložit údaje do PDF.
+• Opraven výpočet pozice kurzoru při čtení, zejména u vícebajtových znaků a složitých struktur.
+
+Přístupnost a klávesnice
+• Zlepšeno fungování běžných editačních příkazů v celém programu.
+• Kopírování, vyjmutí, vložení, výběr všeho, zpět a znovu se správně odesílají do prvku s fokusem, včetně vedlejších oken a dialogů.
+• Opraven problém s aktualizací braillských řádků.
+• Zlepšena práce s fokusem a opraven výběr jazyka ve Wikipedii.
+• Přidána možnost seskupovat funkce nabídky Nástroje podle kategorií.
+• Přidány nastavitelné akce pro rychlé otevření Kalendáře, Počasí a Filmů v kinech.
+
+Audioknihy
+• Zlepšeno vytváření audioknih při otevřených dialozích nebo modálních oknech.
+• Sledování průběhu je robustnější a ignoruje zastaralé zvukové aktualizace.
+• Google TTS lze použít také k vytváření audioknih s nastavením rychlosti, hlasitosti a výšky.
+
+Umělá inteligence
+• Výchozí model Gemini byl aktualizován na `gemini-3.5-flash`.
+
+Obecné opravy
+• Opraveno několik zamrznutí při přehrávání pomocí mpv.
+• Opraveno otevírání některých zvukových a obrazových souborů.
+• Zlepšena správa příkazů odesílaných přehrávači.
+• Opraveno obnovení kurzoru během čtení.
+• Zlepšena stabilita vytváření audioknih.
+• Zlepšena celková správa médií, RSS, rádia a EPUB.
+
 Verze 0.7.1 – 2026-05-13
 
 Novinky a vylepšení

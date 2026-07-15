@@ -69,7 +69,10 @@ pub(crate) fn open(parent: HWND, channel: TvChannel) {
             generation: 0,
         });
         let state_pointer = state.as_mut() as *mut TvGuideState;
-        let title = to_wide(&format!("Guida TV - {}", state.channel.name));
+        let title = to_wide(&crate::i18n::tr_tv_f(
+            "tv.guide.title",
+            &[("channel", &state.channel.name)],
+        ));
         crate::enable_window_safe(parent, false);
         let hwnd = CreateWindowExW(
             WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
@@ -248,7 +251,7 @@ unsafe fn create_controls(hwnd: HWND, state: &mut TvGuideState) {
             hwnd,
             hinstance,
             w!("STATIC"),
-            "Giorno:",
+            &crate::i18n::tr_tv("tv.guide.day_label"),
             (WS_CHILD | WS_VISIBLE, 0),
             ID_LABEL_DAY,
             font,
@@ -275,7 +278,7 @@ unsafe fn create_controls(hwnd: HWND, state: &mut TvGuideState) {
             hwnd,
             hinstance,
             w!("STATIC"),
-            "Programmi:",
+            &crate::i18n::tr_tv("tv.guide.programs_label"),
             (WS_CHILD | WS_VISIBLE, 0),
             ID_LABEL_PROGRAMS,
             font,
@@ -284,7 +287,7 @@ unsafe fn create_controls(hwnd: HWND, state: &mut TvGuideState) {
             hwnd,
             hinstance,
             w!("EDIT"),
-            "Caricamento guida TV...",
+            &crate::i18n::tr_tv("tv.guide.loading"),
             (
                 WS_CHILD
                     | WS_VISIBLE
@@ -303,7 +306,7 @@ unsafe fn create_controls(hwnd: HWND, state: &mut TvGuideState) {
             hwnd,
             hinstance,
             w!("BUTTON"),
-            "Chiudi",
+            &crate::i18n::tr_tv("tv.guide.close"),
             (
                 WS_CHILD
                     | WS_VISIBLE
@@ -380,7 +383,7 @@ fn start_load(hwnd: HWND) {
         return;
     };
     if let Some(edit) = with_state(hwnd, |state| state.edit_programs) {
-        let loading = to_wide("Caricamento guida TV...");
+        let loading = to_wide(&crate::i18n::tr_tv("tv.guide.loading"));
         crate::log_if_err!(unsafe { SetWindowTextW(edit, PCWSTR(loading.as_ptr())) });
     }
     let hwnd_value = hwnd.0;
@@ -428,7 +431,7 @@ fn load_guide_text(channel: &TvChannel, date: NaiveDate) -> Result<String, Strin
         programs.len()
     ));
     if programs.is_empty() {
-        return Ok("Nessun programma disponibile per questo giorno.".to_string());
+        return Ok(crate::i18n::tr_tv("tv.guide.no_programs"));
     }
     let mut lines = Vec::with_capacity(programs.len());
     for program in programs {
@@ -450,42 +453,44 @@ fn load_guide_text(channel: &TvChannel, date: NaiveDate) -> Result<String, Strin
 }
 
 fn date_label(date: NaiveDate, today: NaiveDate) -> String {
-    const WEEKDAYS: [&str; 7] = [
-        "lunedì",
-        "martedì",
-        "mercoledì",
-        "giovedì",
-        "venerdì",
-        "sabato",
-        "domenica",
+    const WEEKDAY_KEYS: [&str; 7] = [
+        "tv.guide.weekday.monday",
+        "tv.guide.weekday.tuesday",
+        "tv.guide.weekday.wednesday",
+        "tv.guide.weekday.thursday",
+        "tv.guide.weekday.friday",
+        "tv.guide.weekday.saturday",
+        "tv.guide.weekday.sunday",
     ];
-    const MONTHS: [&str; 12] = [
-        "gennaio",
-        "febbraio",
-        "marzo",
-        "aprile",
-        "maggio",
-        "giugno",
-        "luglio",
-        "agosto",
-        "settembre",
-        "ottobre",
-        "novembre",
-        "dicembre",
+    const MONTH_KEYS: [&str; 12] = [
+        "tv.guide.month.january",
+        "tv.guide.month.february",
+        "tv.guide.month.march",
+        "tv.guide.month.april",
+        "tv.guide.month.may",
+        "tv.guide.month.june",
+        "tv.guide.month.july",
+        "tv.guide.month.august",
+        "tv.guide.month.september",
+        "tv.guide.month.october",
+        "tv.guide.month.november",
+        "tv.guide.month.december",
     ];
     let prefix = if date == today {
-        "Oggi, "
+        crate::i18n::tr_tv("tv.guide.today_prefix")
     } else if date == today + Duration::days(1) {
-        "Domani, "
+        crate::i18n::tr_tv("tv.guide.tomorrow_prefix")
     } else {
-        ""
+        String::new()
     };
+    let weekday = crate::i18n::tr_tv(WEEKDAY_KEYS[date.weekday().num_days_from_monday() as usize]);
+    let month = crate::i18n::tr_tv(MONTH_KEYS[date.month0() as usize]);
     format!(
         "{}{} {} {} {}",
         prefix,
-        WEEKDAYS[date.weekday().num_days_from_monday() as usize],
+        weekday,
         date.day(),
-        MONTHS[date.month0() as usize],
+        month,
         date.year()
     )
 }

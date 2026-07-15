@@ -162,6 +162,7 @@ pub const IDM_TOOLS_TV: usize = 5018;
 pub const IDM_TOOLS_WEATHER: usize = 5019;
 pub const IDM_TOOLS_CINEMA: usize = 5020;
 pub const IDM_TOOLS_CALENDAR: usize = 5021;
+pub const IDM_TOOLS_TRECCANI: usize = 5022;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -188,6 +189,7 @@ pub struct MenuLabels {
     pub menu_dictionary: String,
     pub menu_dictionary_lookup: String,
     pub menu_wikipedia_import: String,
+    pub menu_treccani: String,
     pub menu_import_youtube: String,
     pub menu_stream_audio: String,
     pub menu_bdciechi: String,
@@ -313,6 +315,11 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_dictionary: i18n::tr(language, "menu.dictionary"),
         menu_dictionary_lookup: i18n::tr(language, "menu.dictionary_lookup"),
         menu_wikipedia_import: i18n::tr(language, "menu.wikipedia_import"),
+        menu_treccani: if language == Language::Italian {
+            i18n::tr_treccani("menu.treccani")
+        } else {
+            String::new()
+        },
         menu_import_youtube: i18n::tr(language, "menu.import_youtube"),
         menu_stream_audio: i18n::tr(language, "menu.stream_audio"),
         menu_bdciechi: if language == Language::Italian {
@@ -336,7 +343,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
             String::new()
         },
         menu_tv: if language == Language::Italian {
-            "TV...\tAlt+Shift+V".to_string()
+            i18n::tr_tv("menu.tv")
         } else {
             String::new()
         },
@@ -1525,6 +1532,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 append_menu_string(
                     reading_content_menu,
                     MF_STRING,
+                    IDM_TOOLS_TRECCANI,
+                    &labels.menu_treccani,
+                );
+                append_menu_string(
+                    reading_content_menu,
+                    MF_STRING,
                     IDM_TOOLS_BDCIECHI,
                     &labels.menu_bdciechi,
                 );
@@ -1663,6 +1676,14 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 IDM_TOOLS_WIKIPEDIA_IMPORT,
                 &labels.menu_wikipedia_import,
             );
+            if language == Language::Italian {
+                append_menu_string(
+                    tools_menu,
+                    MF_STRING,
+                    IDM_TOOLS_TRECCANI,
+                    &labels.menu_treccani,
+                );
+            }
             append_menu_string(
                 tools_menu,
                 MF_STRING,

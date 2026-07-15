@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "Opravdu chcete zrušit vytváření audioknihy?",
   "audiobook.finalizing_progress": "Dokončování audioknihy. Průběh: {pct}%",
   "audiobook.progress": "Vytváření audioknihy. Průběh: {pct}%",
-  "audiobook.sapi4_threads_body": "Kolik souběžných procesů chcete použít k urychlení vytváření? (Doporučeno: 10-30).\nPoznámka: příliš mnoho procesů může zpomalit systém nebo způsobit chyby v SAPI4.",
+  "audiobook.sapi4_threads_body": "Kolik souběžných procesů chcete použít k urychlení vytváření? (Doporučeno: 10-30).\nPoznámka: příliš mnoho procesů může zpomalit systém nebo způsobit chyby v SAPI4.\nPovolený rozsah: 1–64.",
   "audiobook.sapi4_threads_title": "Procesy SAPI4",
   "audiobook.title": "Vytváření audioknihy",
   "batch_audiobooks.add_files": "Přidat soubory...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "Posouvat kurzor během čtení",
   "options.label.multilingual": "Zobrazit pouze vícejazyčné hlasy",
   "options.label.network_proxy": "Síťový proxy (globální):",
+  "options.label.network_proxy_port": "Port proxy:",
   "options.label.network_proxy_password": "Heslo proxy:",
   "options.label.network_proxy_username": "Uživatelské jméno proxy:",
   "options.label.open": "Chování při otevírání:",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "Vyberte kapitolu nebo podkapitolu a stiskněte Enter.",
   "epub_index.announcement": "Tento soubor EPUB obsahuje obsah. Chcete-li jej otevřít, přejděte do nabídky Zobrazení a zvolte Zobrazit obsah.",
   "epub_index.no_index": "Tento soubor EPUB neobsahuje dostupný obsah.",
-  "recordings.back_to_search": "Zpět na vyhledávání"
+  "recordings.back_to_search": "Zpět na vyhledávání",
+  "dictionary.lookup.language.de": "Němčina"
 }

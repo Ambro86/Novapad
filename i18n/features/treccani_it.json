@@ -1,0 +1,19 @@
+{
+  "menu.treccani": "Enciclopedia Treccani...\tCtrl+Shift+E",
+  "treccani.close": "Chiudi",
+  "treccani.import_all_article": "Leggi tutto l’articolo",
+  "treccani.import_button": "Leggi",
+  "treccani.import_error": "Impossibile caricare l’articolo da Treccani.",
+  "treccani.importing": "Caricamento dell’articolo...",
+  "treccani.language_italian": "Italiano",
+  "treccani.language_label": "Lingua:",
+  "treccani.loading": "Ricerca in corso...",
+  "treccani.no_query": "Inserisci un termine da cercare.",
+  "treccani.no_results": "Nessun risultato.",
+  "treccani.results_label": "Risultati:",
+  "treccani.search_button": "Cerca",
+  "treccani.search_error": "Errore durante la ricerca su Treccani.",
+  "treccani.search_label": "Cerca:",
+  "treccani.sections_label": "Lettura:",
+  "treccani.title": "Enciclopedia Treccani"
+}

@@ -1,5 +1,148 @@
 # Journal des modifications
 
+Version 0.8.0 – 2026-07-15
+
+Dictionnaire en ligne
+• Ajout de l’allemand au dictionnaire en ligne Wiktionary.
+• Les définitions et synonymes allemands sont désormais reconnus correctement selon la structure propre au Wiktionnaire allemand.
+
+Fiabilité des livres audio SAPI5
+• La création de livres audio SAPI5 conserve jusqu’à 12 workers parallèles lorsque la voix sélectionnée produit un résultat fiable.
+• Chaque partie est contrôlée selon sa taille, sa durée estimée et une comparaison prudente avec le texte attribué.
+• Les parties absentes ou suspectes sont régénérées automatiquement avec une concurrence progressivement réduite : 12, 8, 6, 4, 2 puis 1 worker. Seules les parties problématiques sont répétées.
+• La limite fiable est mémorisée séparément pour chaque voix SAPI5, sans ralentir celles qui fonctionnent correctement avec 12 workers.
+• Un contrôle final empêche d’accepter silencieusement un MP3 beaucoup plus court que les parties générées.
+• Les détails sont enregistrés dans `sapi5_audiobook_diagnostic.log`.
+• Chaque unité de synthèse SAPI5 s’exécute désormais dans un processus Sonarpad séparé et invisible. Si une voix tierce plante, seul ce worker se ferme et l’application principale reste ouverte.
+• Pendant la même création de livre audio, les parties inachevées sont immédiatement réessayées avec le niveau de concurrence inférieur suivant ; les parties déjà validées sont conservées.
+• La récupération au prochain démarrage reste une protection supplémentaire uniquement si l’application principale ou l’ordinateur est interrompu.
+
+Processus de livres audio SAPI4
+• Le nombre de processus SAPI4 choisi par l’utilisateur est désormais respecté jusqu’à un maximum technique de 64 ; l’ancienne limite cachée de 16 a été supprimée.
+• Le nombre effectif n’est réduit que lorsque le livre audio contient moins d’unités de travail que demandé.
+• Si un ou plusieurs processus du pont SAPI4 échouent, les parties terminées sont conservées et seules les unités en échec sont relancées automatiquement avec une concurrence progressivement réduite.
+• Sonarpad vérifie maintenant le code de sortie du pont SAPI4 et refuse les parties audio vides ou non valides.
+
+Configuration du proxy
+• Ajout d’un champ séparé pour le port du proxy dans les paramètres réseau.
+• Le port peut être indiqué indépendamment de l’adresse, il est validé de 1 à 65535 et remplace correctement un port déjà présent dans l’URL.
+
+Recherche de radios par langue et pays
+• Les filtres Langue et Pays sont désormais alimentés par toutes les entrées disponibles dans le catalogue Radio Browser et ne sont plus limités à une liste fixe.
+• Les noms de langues sont désormais reconnus même lorsque Radio Browser les fournit dans un autre alphabet, sous leur nom natif, sous forme d’abréviation ou comme combinaison de plusieurs langues, puis affichés dans la langue actuelle de l’interface. Les valeurs qui ne correspondent pas à de véritables langues, comme les nombres, genres musicaux, pays ou libellés génériques, sont filtrées.
+• Le catalogue est actualisé en arrière-plan, avec une liste de secours utilisable lorsque Radio Browser est inaccessible.
+• Les entrées de langue Radio Browser qui deviennent identiques après traduction sont désormais regroupées en un seul élément de la liste, évitant les déplacements silencieux avec les lecteurs d’écran.
+
+Amélioration principale : synchronisation entre la lecture et le curseur
+• La synchronisation entre la lecture vocale et le déplacement du curseur a été considérablement améliorée pour tous les moteurs de synthèse vocale pris en charge.
+• Lorsque l’option « Déplacer le curseur pendant la lecture » est activée, Sonarpad utilise désormais un système d’avancement commun pour Microsoft Edge Neural, Google TTS, SAPI4, SAPI5 et OneCore.
+• Le curseur suit plus précisément le texte réellement prononcé, avec une segmentation plus cohérente des phrases et groupes de mots.
+• Les avances, retards, sauts irréguliers et différences entre moteurs vocaux ont été fortement réduits.
+• La position correcte est mieux conservée après une pause, une reprise, une recherche dans le document ou un changement de moteur vocal.
+
+Enregistrement de podcast dans des fichiers séparés
+• Ajout de l’option « Enregistrer le microphone et l’audio système ou des applications dans des fichiers séparés ».
+• Lorsque le microphone et une autre source sont enregistrés ensemble, Sonarpad peut créer un fichier contenant uniquement le microphone et un second contenant l’audio système, une application ou les applications sélectionnées.
+• La séparation est disponible en MP3 et en WAV.
+• Si l’option est désactivée, Sonarpad continue de créer un seul fichier mixé.
+• Les fichiers séparés facilitent le réglage des volumes, la suppression du bruit et le montage ultérieur des podcasts, entretiens et tutoriels.
+
+Enregistrements radio programmés
+• Les enregistrements radio peuvent désormais être programmés à l’avance.
+• Pour chaque enregistrement, il est possible de choisir la station, le jour, l’heure et les minutes de début ainsi que la durée.
+• Une durée personnalisée de 1 à 1 440 minutes est disponible.
+• L’enregistrement peut être exécuté une seule fois, chaque jour ou chaque semaine.
+• La fenêtre affiche plus clairement les enregistrements actifs et programmés, la date et l’heure prévues, la durée et le temps restant.
+• Le Planificateur de tâches Windows peut démarrer automatiquement l’enregistrement même lorsque Sonarpad n’est pas déjà ouvert.
+
+Calendrier
+• Ajout d’un calendrier complet et accessible au clavier.
+• Il permet de consulter les jours précédents et suivants, de revenir rapidement à aujourd’hui et de connaître les jours fériés et commémorations.
+• Ajout du saint du jour et de la citation du jour, qui peuvent être lus, prononcés ou copiés.
+• Les rappels peuvent être créés, modifiés, supprimés, reportés et marqués comme terminés.
+• Les alertes peuvent être affichées à l’heure exacte ou à l’avance et utiliser la planification Windows même lorsque Sonarpad est fermé.
+
+Météo
+• Ajout d’une section consacrée aux prévisions météorologiques.
+• Il est possible de rechercher une ville et de retrouver rapidement les lieux récemment consultés.
+• Les conditions actuelles, la température, les valeurs minimale et maximale, l’humidité, la probabilité de précipitations et les prévisions des jours suivants sont disponibles.
+• Les températures peuvent être affichées en Celsius, Fahrenheit ou automatiquement.
+
+Films au cinéma
+• Ajout d’une section pour les films actuellement en salles et les prochaines sorties.
+• Recherche par titre, résumé, date de sortie et lecture de la bande-annonce sont disponibles.
+
+Synthèse vocale Google
+• Intégration de Google TTS pour la lecture des documents et la création de livres audio.
+• Ajout d’un gestionnaire permettant d’afficher les voix, de les filtrer par langue, de les télécharger et de supprimer celles qui ne sont plus nécessaires.
+• La vitesse, le volume et la hauteur peuvent être réglés.
+• La hauteur des voix Google Natural est appliquée directement par le moteur pour un résultat plus naturel et plus stable.
+• La réactivité et la fiabilité de Google TTS ont été améliorées, avec des délais adaptés à la vitesse choisie.
+• Les attentes inutiles ont été réduites et la gestion des erreurs et interruptions a été améliorée.
+
+Table des matières EPUB
+• Sonarpad reconnaît désormais la table des matières intégrée aux livres EPUB.
+• Sa présence est annoncée et elle peut être ouverte depuis le menu Affichage.
+• Les chapitres et sous-chapitres sont présentés hiérarchiquement.
+• Appuyer sur Entrée permet d’atteindre immédiatement l’emplacement sélectionné.
+
+Actualités et sources RSS
+• La section Actualités a été enrichie de nouveaux outils de recherche et d’organisation.
+• Ajout du choix de la langue des actualités.
+• Il est possible d’effectuer une recherche dans les sources RSS et de consulter les actualités de sa ville.
+• Les sources communautaires peuvent être parcourues, ajoutées à sa collection et proposées à la communauté Sonarpad.
+
+Enregistrement de podcast
+• Il est possible d’enregistrer uniquement le microphone, tout l’audio système, une application, plusieurs applications sélectionnées, ou le microphone et les applications ensemble.
+• Le périphérique du microphone et la source audio peuvent être choisis, les volumes réglés séparément et les niveaux surveillés en temps réel.
+• Ajout de la pause et reprise, des formats MP3 ou WAV, du choix du débit MP3 et du dossier de destination.
+• L’ordinateur peut rester actif pendant l’enregistrement.
+
+Radio
+• La section Radio a été profondément réorganisée.
+• Les stations peuvent être recherchées par nom ou texte libre, langue, pays, ville, genre musical ou catégorie.
+• La gestion des favoris a été améliorée et tous les filtres peuvent être réinitialisés rapidement.
+• Les stations peuvent être proposées à la communauté Sonarpad.
+• Ajout de l’enregistrement en direct, du mode « Enregistrer et lire », de la liste des enregistrements ainsi que de leur gestion et suppression.
+• Les enregistrements radio sont conservés dans leur propre dossier au sein du répertoire général des enregistrements.
+
+Lecture multimédia
+• La stabilité du lecteur multimédia a été considérablement améliorée.
+• Correction d’un problème pouvant bloquer mpv et amélioration de la communication avec le lecteur.
+• Amélioration de l’ouverture des différents types de fichiers multimédias.
+• Sonarpad mémorise désormais le volume utilisé pendant la lecture.
+• Amélioration de la gestion des flux et des enregistrements.
+• Correction de l’ouverture depuis Windows par double-clic ou « Ouvrir avec ».
+
+Documents PDF
+• Ajout de la reconnaissance des champs de formulaire dans les PDF.
+• Sonarpad peut repérer les champs à remplir, les présenter sous une forme textuelle accessible, permettre leur modification et enregistrer les données dans le PDF.
+• Correction du calcul de la position du curseur pendant la lecture, notamment avec les caractères multioctets et les structures complexes.
+
+Accessibilité et clavier
+• Amélioration des commandes d’édition standard dans l’ensemble du programme.
+• Copier, couper, coller, tout sélectionner, annuler et rétablir sont correctement envoyés au champ ayant le focus, y compris dans les fenêtres secondaires et les boîtes de dialogue.
+• Correction d’un problème de mise à jour des afficheurs Braille.
+• Amélioration de la gestion du focus et correction du choix de langue dans Wikipédia.
+• Ajout du regroupement par catégorie des fonctions du menu Outils.
+• Ajout d’actions configurables pour ouvrir rapidement Calendrier, Météo et Films au cinéma.
+
+Livres audio
+• Amélioration de la création des livres audio lorsque des boîtes de dialogue ou fenêtres modales sont ouvertes.
+• La progression est plus robuste et ignore les anciennes mises à jour audio.
+• Google TTS peut également être utilisé pour créer des livres audio avec réglage de la vitesse, du volume et de la hauteur.
+
+Intelligence artificielle
+• Mise à jour du modèle Gemini par défaut vers `gemini-3.5-flash`.
+
+Corrections générales
+• Correction de plusieurs blocages pendant la lecture avec mpv.
+• Correction de l’ouverture de certains fichiers audio et vidéo.
+• Amélioration des commandes envoyées au lecteur.
+• Correction du rétablissement du curseur pendant la lecture vocale.
+• Amélioration de la stabilité de la création des livres audio.
+• Amélioration générale de la gestion des médias, RSS, radio et EPUB.
+
 Version 0.7.1 – 2026-05-13
 
 Nouveautés et améliorations
@@ -463,15 +606,3 @@ Améliorations
 
 ## 0.1.0 - 2025-12-25
 - Version initiale.
-
-
-
-
-
-
-
-
-
-
-
-

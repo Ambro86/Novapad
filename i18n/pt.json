@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "Tem a certeza de que deseja cancelar a criação do audiolivro?",
   "audiobook.finalizing_progress": "A finalizar audiolivro. Progresso: {pct}%",
   "audiobook.progress": "A criar audiolivro. Progresso: {pct}%",
-  "audiobook.sapi4_threads_body": "Quantos processos simultâneos quer usar para acelerar a criação? (Recomendado: 10-30).\nNota: demasiados processos podem tornar o sistema mais lento ou causar erros no motor SAPI4.",
+  "audiobook.sapi4_threads_body": "Quantos processos simultâneos quer usar para acelerar a criação? (Recomendado: 10-30).\nNota: demasiados processos podem tornar o sistema mais lento ou causar erros no motor SAPI4.\nIntervalo permitido: 1-64.",
   "audiobook.sapi4_threads_title": "Processos SAPI4",
   "audiobook.title": "A criar audiolivro",
   "batch_audiobooks.add_files": "Adicionar ficheiros...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "Mover cursor durante a leitura",
   "options.label.multilingual": "Mostrar apenas vozes multilingues",
   "options.label.network_proxy": "Proxy de rede global:",
+  "options.label.network_proxy_port": "Porta do proxy:",
   "options.label.network_proxy_password": "Palavra-passe do proxy:",
   "options.label.network_proxy_username": "Nome de utilizador do proxy:",
   "options.label.open": "Comportamento de abertura:",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "Escolha um capítulo ou subcapítulo e prima Enter.",
   "epub_index.announcement": "Este EPUB contém um índice. Para o consultar, abra o menu Ver e escolha Mostrar índice.",
   "epub_index.no_index": "Este EPUB não contém um índice disponível.",
-  "recordings.back_to_search": "Voltar à pesquisa"
+  "recordings.back_to_search": "Voltar à pesquisa",
+  "dictionary.lookup.language.de": "Alemão"
 }

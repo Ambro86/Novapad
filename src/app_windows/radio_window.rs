@@ -1,11 +1,11 @@
 use crate::accessibility::{PlayerCommand, handle_player_keyboard, to_wide};
-use crate::app_windows::scheduled_recording_window;
+use crate::app_windows::{locale_display_names, scheduled_recording_window};
 use crate::i18n;
 use crate::launch_stream_url_in_mpv;
 use crate::settings::{Language, RadioFavorite, load_settings, save_settings};
 use crate::stream_recording::{self, StreamRecordingKind};
-use serde::Deserialize;
-use std::collections::HashSet;
+use serde::{Deserialize, Deserializer};
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use url::Url;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
@@ -66,6 +66,7 @@ const ID_LABEL_GENRE: usize = 1015;
 const ID_LABEL_FAVORITES: usize = 1016;
 
 const CB_ADDSTRING: u32 = 0x0143;
+const CB_RESETCONTENT: u32 = 0x014B;
 const CB_SETCURSEL: u32 = 0x014E;
 const CB_GETCURSEL: u32 = 0x0147;
 const LB_ADDSTRING: u32 = 0x0180;
@@ -75,6 +76,7 @@ const LB_GETCURSEL: u32 = 0x0188;
 const WM_RADIO_FOCUS_RESULTS: u32 = WM_APP + 77;
 const WM_RADIO_FOCUS_FAVORITES: u32 = WM_APP + 79;
 const WM_RADIO_SEARCH_COMPLETE: u32 = WM_APP + 78;
+const WM_RADIO_DIRECTORY_COMPLETE: u32 = WM_APP + 80;
 const RADIO_REFOCUS_DELAYS_MS: &[u64] = &[150, 500];
 const ID_CONTEXT_ADD_FAVORITE: usize = 1;
 const ID_CONTEXT_REMOVE_FAVORITE: usize = 2;
@@ -161,6 +163,48 @@ struct RadioDialogState {
 struct RadioSearchComplete {
     language: Language,
     result: Result<Vec<RadioFavorite>, String>,
+}
+
+struct RadioDirectoryComplete {
+    languages: Vec<(String, String)>,
+    countries: Vec<(String, String)>,
+}
+
+#[derive(Clone, Deserialize)]
+struct RadioBrowserDirectoryEntry {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    iso_639: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_u32_from_any")]
+    stationcount: u32,
+}
+
+#[derive(Clone, Deserialize)]
+struct RadioBrowserCountryEntry {
+    #[serde(default)]
+    name: String,
+    #[serde(default, deserialize_with = "deserialize_u32_from_any")]
+    stationcount: u32,
+}
+
+#[derive(Clone)]
+struct RadioDirectoryOption {
+    code: String,
+    label: String,
+    station_count: u32,
+}
+
+fn deserialize_u32_from_any<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(match value {
+        serde_json::Value::Number(number) => number.as_u64().unwrap_or_default() as u32,
+        serde_json::Value::String(text) => text.trim().parse::<u32>().unwrap_or_default(),
+        _ => 0,
+    })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -883,6 +927,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             WM_RADIO_SEARCH_COMPLETE => {
                 let result = Box::from_raw(lparam.0 as *mut RadioSearchComplete);
                 finish_radio_search(hwnd, *result);
+                LRESULT(0)
+            }
+            WM_RADIO_DIRECTORY_COMPLETE => {
+                let result = Box::from_raw(lparam.0 as *mut RadioDirectoryComplete);
+                apply_radio_directory_options(hwnd, *result);
                 LRESULT(0)
             }
             WM_CREATE => {
@@ -1670,6 +1719,7 @@ fn create_controls(hwnd: HWND, parent: HWND) {
     populate_results(hwnd);
     layout(hwnd);
     crate::set_focus_safe(list_favorites);
+    start_radio_directory_refresh(hwnd, language);
 }
 
 fn create_static(parent: HWND, text: &str, id: usize) -> HWND {
@@ -1997,6 +2047,472 @@ fn radio_menu_countries(language: Language) -> Vec<(String, String)> {
         (code.to_string(), label)
     })
     .collect()
+}
+
+fn start_radio_directory_refresh(hwnd: HWND, language: Language) {
+    let hwnd_value = hwnd.0;
+    std::thread::spawn(move || {
+        let languages = fetch_radio_browser_language_options(language).unwrap_or_else(|error| {
+            crate::log_debug(&format!(
+                "Radio: language directory unavailable, using fallback list: {error}"
+            ));
+            radio_menu_languages(language)
+        });
+        let countries = fetch_radio_browser_country_options(language).unwrap_or_else(|error| {
+            crate::log_debug(&format!(
+                "Radio: country directory unavailable, using fallback list: {error}"
+            ));
+            radio_menu_countries(language)
+        });
+
+        let complete = Box::new(RadioDirectoryComplete {
+            languages,
+            countries,
+        });
+        let ptr = Box::into_raw(complete);
+        let hwnd = HWND(hwnd_value);
+        if let Err(error) = crate::post_message_w_safe(
+            hwnd,
+            WM_RADIO_DIRECTORY_COMPLETE,
+            WPARAM(0),
+            LPARAM(ptr as isize),
+        ) {
+            crate::log_debug(&format!("Radio: unable to post directory update: {error}"));
+            // SAFETY: ownership was transferred by Box::into_raw above and the failed post
+            // guarantees that the window procedure will not reclaim this allocation.
+            let _reclaimed_complete = unsafe { Box::from_raw(ptr) };
+        }
+    });
+}
+
+fn apply_radio_directory_options(hwnd: HWND, complete: RadioDirectoryComplete) {
+    with_radio_state(hwnd, |state| {
+        let selected_language = selected_language_code(state);
+        let selected_country = selected_country_code(state);
+
+        if !complete.languages.is_empty() {
+            state.languages = complete.languages;
+            replace_language_combo_options(
+                state.combo_language,
+                &state.languages,
+                &selected_language,
+                app_language_code(state.language),
+            );
+        }
+        if !complete.countries.is_empty() {
+            state.countries = complete.countries;
+            replace_combo_options(
+                state.combo_country,
+                &state.countries,
+                &selected_country,
+                default_country_code(state.language),
+            );
+        }
+    });
+}
+
+fn replace_language_combo_options(
+    combo: HWND,
+    options: &[(String, String)],
+    selected_code: &str,
+    fallback_code: &str,
+) {
+    crate::send_message_w_safe(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    for (_, label) in options {
+        let wide = to_wide(label);
+        crate::send_message_w_safe(
+            combo,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
+    let selected_canonical = canonical_language_option_code(selected_code);
+    let fallback_canonical = canonical_language_option_code(fallback_code);
+    let selected_index = options
+        .iter()
+        .position(|(code, _)| code == selected_code)
+        .or_else(|| {
+            options
+                .iter()
+                .position(|(code, _)| canonical_language_option_code(code) == selected_canonical)
+        })
+        .or_else(|| {
+            options
+                .iter()
+                .position(|(code, _)| canonical_language_option_code(code) == fallback_canonical)
+        })
+        .unwrap_or(0);
+    crate::send_message_w_safe(combo, CB_SETCURSEL, WPARAM(selected_index), LPARAM(0));
+}
+
+fn replace_combo_options(
+    combo: HWND,
+    options: &[(String, String)],
+    selected_code: &str,
+    fallback_code: &str,
+) {
+    crate::send_message_w_safe(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    for (_, label) in options {
+        let wide = to_wide(label);
+        crate::send_message_w_safe(
+            combo,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
+    let selected_index = options
+        .iter()
+        .position(|(code, _)| code == selected_code)
+        .or_else(|| options.iter().position(|(code, _)| code == fallback_code))
+        .unwrap_or(0);
+    crate::send_message_w_safe(combo, CB_SETCURSEL, WPARAM(selected_index), LPARAM(0));
+}
+
+fn fetch_radio_browser_language_options(
+    language: Language,
+) -> Result<Vec<(String, String)>, String> {
+    let entries = fetch_radio_browser_language_directory()?;
+    let dynamic = language_options_from_directory_entries(language, entries);
+    Ok(merge_language_directory_options(language, dynamic))
+}
+
+fn language_options_from_directory_entries(
+    language: Language,
+    entries: Vec<RadioBrowserDirectoryEntry>,
+) -> Vec<RadioDirectoryOption> {
+    entries
+        .into_iter()
+        .filter(|entry| entry.stationcount > 0)
+        .filter_map(|entry| {
+            let raw_name = entry.name.trim();
+            if raw_name.is_empty() {
+                return None;
+            }
+
+            let mut codes = entry
+                .iso_639
+                .as_deref()
+                .and_then(radio_code_from_browser_language)
+                .map(|code| vec![code])
+                .unwrap_or_else(|| {
+                    locale_display_names::language_codes_from_catalog_label(raw_name)
+                });
+            codes.dedup();
+            if codes.is_empty() {
+                crate::log_debug(&format!(
+                    "Radio: ignored invalid language-directory label: {raw_name}"
+                ));
+                return None;
+            }
+
+            let label = localized_language_codes_label(language, &codes);
+            let canonical_code = (codes.len() == 1).then(|| codes[0].as_str());
+            Some(RadioDirectoryOption {
+                code: dynamic_language_code(canonical_code, raw_name),
+                label,
+                station_count: entry.stationcount,
+            })
+        })
+        .collect()
+}
+
+fn localized_language_codes_label(language: Language, codes: &[String]) -> String {
+    let mut labels = Vec::new();
+    for code in codes {
+        let label = locale_display_names::language_name(language, code)
+            .unwrap_or_else(|| code.to_uppercase());
+        if !labels.contains(&label) {
+            labels.push(label);
+        }
+    }
+    labels.join(" / ")
+}
+
+fn fetch_radio_browser_country_options(
+    language: Language,
+) -> Result<Vec<(String, String)>, String> {
+    let entries = fetch_radio_browser_country_directory()?;
+    let dynamic = entries
+        .into_iter()
+        .filter(|entry| entry.stationcount > 0)
+        .filter_map(|entry| {
+            let code = entry.name.trim().to_ascii_lowercase();
+            if code.len() != 2 || !code.chars().all(|ch| ch.is_ascii_alphabetic()) {
+                return None;
+            }
+            let fallback = code.to_ascii_uppercase();
+            let name = locale_display_names::territory_name(language, &code)
+                .or_else(|| translated_country_name(language, &code))
+                .unwrap_or(fallback);
+            Some(RadioDirectoryOption {
+                label: country_name_with_code(&name, &code),
+                code,
+                station_count: entry.stationcount,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    Ok(merge_country_directory_options(language, dynamic))
+}
+
+fn fetch_radio_browser_language_directory() -> Result<Vec<RadioBrowserDirectoryEntry>, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .user_agent("Sonarpad/0.8.0 (https://sonarpad.com)")
+        .build()
+        .map_err(|error| error.to_string())?;
+    let mut last_error = None;
+    for mirror in radio_browser_mirrors() {
+        let url =
+            format!("{mirror}/json/languages?hidebroken=true&order=stationcount&reverse=true");
+        match client
+            .get(&url)
+            .send()
+            .and_then(|response| response.error_for_status())
+            .and_then(|response| response.json::<Vec<RadioBrowserDirectoryEntry>>())
+        {
+            Ok(entries) => return Ok(entries),
+            Err(error) => {
+                crate::log_debug(&format!(
+                    "Radio: language directory request failed: url={url} error={error}"
+                ));
+                last_error = Some(error.to_string());
+            }
+        }
+    }
+    Err(last_error.unwrap_or_else(|| "Radio Browser language list unavailable".to_string()))
+}
+
+fn fetch_radio_browser_country_directory() -> Result<Vec<RadioBrowserCountryEntry>, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .user_agent("Sonarpad/0.8.0 (https://sonarpad.com)")
+        .build()
+        .map_err(|error| error.to_string())?;
+    let mut last_error = None;
+    for mirror in radio_browser_mirrors() {
+        let url =
+            format!("{mirror}/json/countrycodes?hidebroken=true&order=stationcount&reverse=true");
+        match client
+            .get(&url)
+            .send()
+            .and_then(|response| response.error_for_status())
+            .and_then(|response| response.json::<Vec<RadioBrowserCountryEntry>>())
+        {
+            Ok(entries) => return Ok(entries),
+            Err(error) => {
+                crate::log_debug(&format!(
+                    "Radio: country directory request failed: url={url} error={error}"
+                ));
+                last_error = Some(error.to_string());
+            }
+        }
+    }
+    Err(last_error.unwrap_or_else(|| "Radio Browser country list unavailable".to_string()))
+}
+
+fn radio_browser_mirrors() -> [&'static str; 4] {
+    [
+        "https://all.api.radio-browser.info",
+        "https://de1.api.radio-browser.info",
+        "https://fi1.api.radio-browser.info",
+        "https://at1.api.radio-browser.info",
+    ]
+}
+
+fn merge_language_directory_options(
+    language: Language,
+    dynamic: Vec<RadioDirectoryOption>,
+) -> Vec<(String, String)> {
+    let mut by_code = HashMap::<String, RadioDirectoryOption>::new();
+    for (code, label) in radio_menu_languages(language) {
+        by_code.insert(
+            code.clone(),
+            RadioDirectoryOption {
+                code,
+                label,
+                station_count: 0,
+            },
+        );
+    }
+    for option in dynamic {
+        let key = canonical_language_option_code(&option.code);
+        let replace = by_code
+            .get(&key)
+            .is_none_or(|current| option.station_count > current.station_count);
+        if replace {
+            by_code.insert(key, option);
+        }
+    }
+
+    // Radio Browser can expose the same language using several raw labels
+    // (for example "english russian", "english/russian" and the equivalent
+    // Cyrillic form). Once localized, those entries become identical and a
+    // Win32 combo box still treats them as separate rows. Screen readers then
+    // receive a selection change without any text change and may announce
+    // nothing. Keep a single row for every visible label, choosing the
+    // directory entry with the greatest station coverage.
+    let mut by_label = HashMap::<String, RadioDirectoryOption>::new();
+    for option in by_code.into_values() {
+        let key = normalized_language_option_label(&option.label);
+        let replace = by_label
+            .get(&key)
+            .is_none_or(|current| prefer_language_directory_option(&option, current));
+        if replace {
+            by_label.insert(key, option);
+        }
+    }
+
+    let mut options = by_label.into_values().collect::<Vec<_>>();
+    options.sort_by(|left, right| {
+        preferred_language_priority(&canonical_language_option_code(&left.code))
+            .cmp(&preferred_language_priority(
+                &canonical_language_option_code(&right.code),
+            ))
+            .then_with(|| left.label.to_lowercase().cmp(&right.label.to_lowercase()))
+    });
+    options
+        .into_iter()
+        .map(|option| (option.code, option.label))
+        .collect()
+}
+
+fn normalized_language_option_label(label: &str) -> String {
+    label
+        .to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn prefer_language_directory_option(
+    candidate: &RadioDirectoryOption,
+    current: &RadioDirectoryOption,
+) -> bool {
+    candidate.station_count > current.station_count
+        || (candidate.station_count == current.station_count
+            && canonical_language_option_code(&candidate.code).len()
+                < canonical_language_option_code(&current.code).len())
+        || (candidate.station_count == current.station_count
+            && canonical_language_option_code(&candidate.code).len()
+                == canonical_language_option_code(&current.code).len()
+            && candidate.code < current.code)
+}
+
+fn merge_country_directory_options(
+    language: Language,
+    dynamic: Vec<RadioDirectoryOption>,
+) -> Vec<(String, String)> {
+    let mut by_code = HashMap::<String, RadioDirectoryOption>::new();
+    for (code, label) in radio_menu_countries(language) {
+        by_code.insert(
+            code.clone(),
+            RadioDirectoryOption {
+                code,
+                label,
+                station_count: 0,
+            },
+        );
+    }
+    for option in dynamic {
+        let key = option.code.to_lowercase();
+        let replace = by_code
+            .get(&key)
+            .is_none_or(|current| option.station_count > current.station_count);
+        if replace {
+            by_code.insert(key, option);
+        }
+    }
+    let mut options = by_code.into_values().collect::<Vec<_>>();
+    let default_code = default_country_code(language);
+    options.sort_by(|left, right| {
+        usize::from(left.code != default_code)
+            .cmp(&usize::from(right.code != default_code))
+            .then_with(|| left.label.to_lowercase().cmp(&right.label.to_lowercase()))
+    });
+    options
+        .into_iter()
+        .map(|option| (option.code, option.label))
+        .collect()
+}
+
+fn preferred_language_priority(code: &str) -> usize {
+    const PREFERRED: [&str; 8] = ["it", "en", "tr", "de", "es", "fr", "pt", "pl"];
+    PREFERRED
+        .iter()
+        .position(|preferred| *preferred == code)
+        .unwrap_or(1000)
+}
+
+fn radio_code_from_browser_language(value: &str) -> Option<String> {
+    locale_display_names::language_code_from_name(value)
+}
+
+fn dynamic_language_code(iso_code: Option<&str>, name: &str) -> String {
+    let iso_code = iso_code.unwrap_or_default().trim().to_lowercase();
+    let name = name.trim().to_lowercase();
+    format!("language:{iso_code}:{name}")
+}
+
+fn dynamic_language_parts(code: &str) -> Option<(Option<&str>, &str)> {
+    let rest = code.strip_prefix("language:")?;
+    if let Some((iso_code, name)) = rest.split_once(':') {
+        let iso_code = (!iso_code.is_empty()).then_some(iso_code);
+        Some((iso_code, name))
+    } else {
+        // Compatibility with favourites saved by the first dynamic-directory
+        // implementation, which stored only the Radio Browser name.
+        Some((None, rest))
+    }
+}
+
+fn dynamic_language_name(code: &str) -> Option<&str> {
+    dynamic_language_parts(code).map(|(_, name)| name)
+}
+
+fn canonical_language_option_code(code: &str) -> String {
+    dynamic_language_parts(code)
+        .and_then(|(iso_code, _)| iso_code)
+        .unwrap_or(code)
+        .trim()
+        .replace('_', "-")
+        .to_lowercase()
+}
+
+fn title_case_radio_directory_label(value: &str) -> String {
+    value
+        .split_whitespace()
+        .filter(|word| !word.is_empty())
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => {
+                    let first = first.to_uppercase().collect::<String>();
+                    format!("{first}{}", chars.as_str())
+                }
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn country_name_with_code(name: &str, code: &str) -> String {
+    let code = code.trim().to_ascii_uppercase();
+    let name = name.trim();
+    if name.is_empty() || name.eq_ignore_ascii_case(&code) {
+        code
+    } else {
+        format!("{name} ({code})")
+    }
+}
+
+fn translated_country_name(language: Language, code: &str) -> Option<String> {
+    let key = format!("options.podcast_country.{}", code.to_ascii_lowercase());
+    let translated = i18n::tr(language, &key);
+    (translated != key && !translated.trim().is_empty()).then_some(translated)
 }
 
 fn default_country_code(language: Language) -> &'static str {
@@ -2729,12 +3245,24 @@ fn radio_label(f: &RadioFavorite, language: Language) -> String {
     }
 }
 fn language_label(language: Language, code: &str) -> String {
-    radio_menu_languages(language)
-        .into_iter()
-        .find(|(c, _)| c == code)
-        .map(|(_, l)| l)
+    if let Some((iso_code, raw_name)) = dynamic_language_parts(code) {
+        if let Some(label) =
+            iso_code.and_then(|iso| locale_display_names::language_name(language, iso))
+        {
+            return label;
+        }
+        return title_case_radio_directory_label(raw_name);
+    }
+    locale_display_names::language_name(language, code)
+        .or_else(|| {
+            radio_menu_languages(language)
+                .into_iter()
+                .find(|(candidate, _)| candidate == code)
+                .map(|(_, label)| label)
+        })
         .unwrap_or_else(|| code.to_string())
 }
+
 fn normalized_radio_name(value: &str) -> String {
     value
         .to_lowercase()
@@ -2825,28 +3353,13 @@ fn radio_name_matches_keyword(name: &str, keyword: &str) -> bool {
         || c.contains(&format!(" {keyword} "))
         || (keyword.len() >= 4 && c.split_whitespace().any(|w| w.starts_with(keyword)))
 }
-fn radio_browser_language_name(code: &str) -> &str {
-    match code {
-        "cs" => "czech",
-        "de" => "german",
-        "en" => "english",
-        "es" => "spanish",
-        "fr" => "french",
-        "hi" => "hindi",
-        "it" => "italian",
-        "lt" => "lithuanian",
-        "pl" => "polish",
-        "pt" => "portuguese",
-        "ru" => "russian",
-        "sr" => "serbian",
-        "sv" => "swedish",
-        "tr" => "turkish",
-        "uk" => "ukrainian",
-        "vi" => "vietnamese",
-        "zh" => "chinese",
-        _ => code,
+fn radio_browser_language_name(code: &str) -> String {
+    if let Some(name) = dynamic_language_name(code) {
+        return name.to_string();
     }
+    locale_display_names::english_language_name(code).unwrap_or_else(|| code.to_string())
 }
+
 fn fetch_community_radio_stations(
     language_code: &str,
     name_query: Option<&str>,
@@ -2918,7 +3431,8 @@ fn fetch_community_radio_stations(
 }
 
 fn community_language_from_radio_code(code: &str) -> Option<&'static str> {
-    match code {
+    let canonical_code = canonical_language_option_code(code);
+    match canonical_code.as_str() {
         "it" | "country:it" => Some("italian"),
         "en" | "country:us" | "country:gb" | "country:ca" | "country:au" | "country:ie" => {
             Some("english")
@@ -2953,12 +3467,7 @@ fn fetch_radio_browser_stations(
         .build()
         .map_err(|e| e.to_string())?;
     let mut last = None;
-    for mirror in [
-        "https://all.api.radio-browser.info",
-        "https://de1.api.radio-browser.info",
-        "https://fi1.api.radio-browser.info",
-        "https://at1.api.radio-browser.info",
-    ] {
+    for mirror in radio_browser_mirrors() {
         let mut url =
             Url::parse(&format!("{mirror}/json/stations/search")).map_err(|e| e.to_string())?;
         {
@@ -2982,7 +3491,8 @@ fn fetch_radio_browser_stations(
                 } else if let Some(city) = language_code.strip_prefix("city:") {
                     query.append_pair("state", city);
                 } else if language_code != "all" {
-                    query.append_pair("language", radio_browser_language_name(language_code));
+                    let browser_language = radio_browser_language_name(language_code);
+                    query.append_pair("language", &browser_language);
                     query.append_pair("languageExact", "true");
                 }
             }
@@ -3057,5 +3567,200 @@ fn normalize_stream_url(raw_url: &str) -> String {
             .trim_start_matches("https://")
             .trim_end_matches('/')
             .to_lowercase(),
+    }
+}
+
+#[cfg(test)]
+mod radio_directory_tests {
+    use super::*;
+
+    #[test]
+    fn radio_browser_language_names_are_mapped_to_standard_codes() {
+        assert_eq!(
+            radio_code_from_browser_language("Italian").as_deref(),
+            Some("it")
+        );
+        assert_eq!(
+            radio_code_from_browser_language("en").as_deref(),
+            Some("en")
+        );
+        assert_eq!(
+            radio_code_from_browser_language("German").as_deref(),
+            Some("de")
+        );
+        assert_eq!(
+            radio_code_from_browser_language("Türkçe").as_deref(),
+            Some("tr")
+        );
+        assert_eq!(
+            radio_code_from_browser_language("Čeština").as_deref(),
+            Some("cs")
+        );
+        assert_eq!(
+            radio_code_from_browser_language("American English").as_deref(),
+            Some("en-us")
+        );
+    }
+
+    #[test]
+    fn uncommon_standard_languages_are_fully_localized() {
+        let code = dynamic_language_code(Some("ace"), "acehnese");
+        assert_eq!(code, "language:ace:acehnese");
+        assert_eq!(
+            dynamic_language_parts(&code),
+            Some((Some("ace"), "acehnese"))
+        );
+        assert_eq!(language_label(Language::Italian, &code), "accinese");
+        assert_eq!(language_label(Language::French, &code), "aceh");
+        assert_eq!(radio_browser_language_name(&code), "acehnese");
+    }
+
+    #[test]
+    fn foreign_language_names_are_translated_and_combined_labels_are_preserved() {
+        let entries = vec![
+            RadioBrowserDirectoryEntry {
+                name: "Английский Русский".to_string(),
+                iso_639: None,
+                stationcount: 12,
+            },
+            RadioBrowserDirectoryEntry {
+                name: "Беларуская".to_string(),
+                iso_639: None,
+                stationcount: 7,
+            },
+            RadioBrowserDirectoryEntry {
+                name: "ภาษาไทย".to_string(),
+                iso_639: None,
+                stationcount: 5,
+            },
+        ];
+        let options = language_options_from_directory_entries(Language::Italian, entries);
+        assert_eq!(options.len(), 3);
+        assert_eq!(options[0].label, "inglese / russo");
+        assert_eq!(options[1].label, "bielorusso");
+        assert_eq!(options[2].label, "thailandese");
+    }
+
+    #[test]
+    fn invalid_radio_browser_language_labels_are_filtered_out() {
+        let entries = [
+            "#japan",
+            "+7 Languages",
+            "10 Additional Languages",
+            "111",
+            "80s",
+            "Aboriginal Languages",
+            "Afghan",
+            "音乐",
+            "中国",
+            "Неизвестен",
+        ]
+        .into_iter()
+        .map(|name| RadioBrowserDirectoryEntry {
+            name: name.to_string(),
+            iso_639: None,
+            stationcount: 1,
+        })
+        .collect();
+        assert!(language_options_from_directory_entries(Language::Italian, entries).is_empty());
+    }
+
+    #[test]
+    fn numbered_valid_language_labels_are_cleaned_and_translated() {
+        let entries = vec![RadioBrowserDirectoryEntry {
+            name: "128 Brazilian Portuguese".to_string(),
+            iso_639: None,
+            stationcount: 3,
+        }];
+        let options = language_options_from_directory_entries(Language::Italian, entries);
+        assert_eq!(options.len(), 1);
+        assert_eq!(options[0].label, "portoghese (Brasile)");
+    }
+
+    #[test]
+    fn localized_language_options_do_not_contain_duplicate_visible_rows() {
+        let dynamic = vec![
+            RadioDirectoryOption {
+                code: dynamic_language_code(None, "english russian"),
+                label: "inglese / russo".to_string(),
+                station_count: 10,
+            },
+            RadioDirectoryOption {
+                code: dynamic_language_code(None, "english/russian"),
+                label: "inglese / russo".to_string(),
+                station_count: 25,
+            },
+            RadioDirectoryOption {
+                code: dynamic_language_code(None, "английский русский"),
+                label: "inglese / russo".to_string(),
+                station_count: 15,
+            },
+            RadioDirectoryOption {
+                code: dynamic_language_code(Some("sr-me"), "montenegrin"),
+                label: "serbo".to_string(),
+                station_count: 4,
+            },
+            RadioDirectoryOption {
+                code: dynamic_language_code(Some("sr"), "serbian"),
+                label: "serbo".to_string(),
+                station_count: 30,
+            },
+        ];
+
+        let options = merge_language_directory_options(Language::Italian, dynamic);
+        assert_eq!(
+            options
+                .iter()
+                .filter(|(_, label)| label == "inglese / russo")
+                .count(),
+            1
+        );
+        assert_eq!(
+            options.iter().filter(|(_, label)| label == "serbo").count(),
+            1
+        );
+        assert!(options.iter().any(|(code, label)| {
+            label == "inglese / russo" && radio_browser_language_name(code) == "english/russian"
+        }));
+        assert!(options.iter().any(|(code, label)| {
+            label == "serbo" && canonical_language_option_code(code) == "sr"
+        }));
+    }
+
+    #[test]
+    fn country_labels_replace_iso_codes_with_localized_names() {
+        assert_eq!(country_name_with_code("Italia", "it"), "Italia (IT)");
+        assert_eq!(country_name_with_code("IT", "it"), "IT");
+        assert_eq!(
+            locale_display_names::territory_name(Language::Italian, "DE").as_deref(),
+            Some("Germania")
+        );
+        assert_eq!(
+            locale_display_names::territory_name(Language::Hindi, "DE").as_deref(),
+            Some("जर्मनी")
+        );
+    }
+
+    #[test]
+    fn radio_browser_language_directory_response_is_deserialized() {
+        let entries: Vec<RadioBrowserDirectoryEntry> = serde_json::from_str(
+            r#"[{"name":"italian","iso_639":"it","stationcount":"321"},{"name":"american english","iso_639":null,"stationcount":8},{"name":"afrikaans","stationcount":12}]"#,
+        )
+        .expect("valid Radio Browser language directory response");
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].name, "italian");
+        assert_eq!(entries[0].iso_639.as_deref(), Some("it"));
+        assert_eq!(entries[0].stationcount, 321);
+        assert_eq!(entries[1].iso_639, None);
+    }
+
+    #[test]
+    fn radio_browser_country_directory_response_is_deserialized() {
+        let entries: Vec<RadioBrowserCountryEntry> =
+            serde_json::from_str(r#"[{"name":"IT","stationcount":"456"}]"#)
+                .expect("valid Radio Browser country-code directory response");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "IT");
+        assert_eq!(entries[0].stationcount, 456);
     }
 }

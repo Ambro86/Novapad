@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "Ar tikrai norite atšaukti garso knygos kūrimą?",
   "audiobook.finalizing_progress": "Garso knygos užbaigimas. Pažanga: {pct}%",
   "audiobook.progress": "Garso knygos kūrimas. Pažanga: {pct}%",
-  "audiobook.sapi4_threads_body": "Kiek vienu metu vykstančių procesų norite naudoti, kad pagreitintumėte kūrimą? (Rekomenduojama: 10–30). Pastaba: per daug procesų gali sulėtinti sistemą arba sukelti klaidas SAPI4 variklyje.",
+  "audiobook.sapi4_threads_body": "Kiek vienu metu vykstančių procesų norite naudoti, kad pagreitintumėte kūrimą? (Rekomenduojama: 10–30). Pastaba: per daug procesų gali sulėtinti sistemą arba sukelti klaidas SAPI4 variklyje.\nLeistinas diapazonas: 1–64.",
   "audiobook.sapi4_threads_title": "SAPI4 procesai",
   "audiobook.title": "Garso knygos kūrimas",
   "batch_audiobooks.add_files": "Pridėti failus...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "Kursoriaus judinimas skaitant",
   "options.label.multilingual": "Rodyti tik daugiakalbes balsas",
   "options.label.network_proxy": "Tinklo proxy (globalus):",
+  "options.label.network_proxy_port": "Tarpinio serverio prievadas:",
   "options.label.network_proxy_password": "Proxy slaptažodis:",
   "options.label.network_proxy_username": "Proxy vartotojo vardas:",
   "options.label.open": "Atviras elgesys:",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "Pasirinkite skyrių arba poskyrį ir paspauskite Enter.",
   "epub_index.announcement": "Šiame EPUB yra turinys. Norėdami jį atverti, eikite į meniu Peržiūrėti ir pasirinkite Rodyti turinį.",
   "epub_index.no_index": "Šiame EPUB nėra pasiekiamo turinio.",
-  "recordings.back_to_search": "Grįžti į paiešką"
+  "recordings.back_to_search": "Grįžti į paiešką",
+  "dictionary.lookup.language.de": "Vokiečių"
 }

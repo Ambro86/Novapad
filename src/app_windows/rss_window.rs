@@ -319,8 +319,8 @@ fn normalize_article_text(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        decode_basic_html_entities, ensure_opml_extension, format_google_news_source_title,
-        normalize_rss_url_key,
+        build_google_news_rss_url, decode_basic_html_entities, ensure_opml_extension,
+        format_google_news_source_title, normalize_rss_url_key,
     };
     use std::path::PathBuf;
 
@@ -334,6 +334,22 @@ mod tests {
     fn normalize_rss_url_key_removes_fragment_only() {
         let key = normalize_rss_url_key("https://servis.idnes.cz/rss.aspx?c=technet#section");
         assert_eq!(key, "servis.idnes.cz/rss.aspx?c=technet");
+    }
+
+    #[test]
+    fn google_news_search_uses_selected_english_rss_language() {
+        let url = build_google_news_rss_url("technology", "en");
+        assert!(url.contains("hl=en"));
+        assert!(url.contains("gl=US"));
+        assert!(url.contains("ceid=US:en"));
+    }
+
+    #[test]
+    fn google_news_search_uses_selected_italian_rss_language() {
+        let url = build_google_news_rss_url("tecnologia", "it");
+        assert!(url.contains("hl=it"));
+        assert!(url.contains("gl=IT"));
+        assert!(url.contains("ceid=IT:it"));
     }
 
     #[test]
@@ -893,34 +909,12 @@ fn decode_mail_text_component(input: &str) -> String {
         .to_string()
 }
 
-fn google_news_params(
-    language: crate::settings::Language,
-) -> (&'static str, &'static str, &'static str) {
-    match language {
-        crate::settings::Language::Italian => ("it", "IT", "IT:it"),
-        crate::settings::Language::Spanish => ("es", "ES", "ES:es"),
-        crate::settings::Language::Portuguese => ("pt", "PT", "PT:pt"),
-        crate::settings::Language::Swedish => ("sv", "SE", "SE:sv"),
-        crate::settings::Language::Vietnamese => ("vi", "VN", "VN:vi"),
-        crate::settings::Language::Czech => ("cs", "CZ", "CZ:cs"),
-        crate::settings::Language::Polish => ("pl", "PL", "PL:pl"),
-        crate::settings::Language::French => ("fr", "FR", "FR:fr"),
-        crate::settings::Language::Serbian => ("sr", "RS", "RS:sr"),
-        crate::settings::Language::Russian => ("ru", "RU", "RU:ru"),
-        crate::settings::Language::Hindi => ("hi", "IN", "IN:hi"),
-        crate::settings::Language::Ukrainian
-        | crate::settings::Language::English
-        | crate::settings::Language::Lithuanian
-        | crate::settings::Language::Chinese => ("en", "US", "US:en"),
-    }
-}
-
-fn build_google_news_rss_url(keyword: &str, language: crate::settings::Language) -> String {
-    let (hl, gl, ceid) = google_news_params(language);
+fn build_google_news_rss_url(keyword: &str, news_language_code: &str) -> String {
+    let locale = google_news_locale(news_language_code);
     let query = percent_encode(keyword.trim());
     format!(
         "https://news.google.com/rss/search?q={}&hl={}&gl={}&ceid={}",
-        query, hl, gl, ceid
+        query, locale.hl, locale.gl, locale.ceid
     )
 }
 
@@ -9543,7 +9537,8 @@ fn search_keyword_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LP
                         );
                         return LRESULT(0);
                     }
-                    let url = build_google_news_rss_url(&keyword, language);
+                    let news_language = active_news_language_code(main_hwnd);
+                    let url = build_google_news_rss_url(&keyword, &news_language);
                     let source_title = format_google_news_source_title(&keyword);
                     show_add_dialog_with_prefill_options(parent, source_title, url, true);
                     crate::log_if_err!(crate::destroy_window_safe(hwnd));
@@ -9832,12 +9827,11 @@ fn input_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> 
                         if !url.trim().is_empty() {
                             let parent = windows::Win32::UI::WindowsAndMessaging::GetParent(hwnd);
                             let main_hwnd = with_rss_state(parent, |s| s.parent).unwrap_or(HWND(0));
-                            let language =
-                                with_state(main_hwnd, |s| s.settings.language).unwrap_or_default();
                             let mut source_url = url.trim().to_string();
                             let mut source_title = title.trim().to_string();
                             if !is_valid_article_url(&source_url) {
-                                source_url = build_google_news_rss_url(&source_url, language);
+                                let news_language = active_news_language_code(main_hwnd);
+                                source_url = build_google_news_rss_url(&source_url, &news_language);
                                 if source_title.is_empty() {
                                     source_title = format_google_news_source_title(url.trim());
                                 }

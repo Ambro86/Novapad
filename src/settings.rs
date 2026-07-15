@@ -879,6 +879,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub network_proxy_url: String,
     #[serde(default)]
+    pub network_proxy_port: String,
+    #[serde(default)]
     pub network_proxy_username: String,
     #[serde(default)]
     pub network_proxy_password: String,
@@ -1286,6 +1288,7 @@ impl Default for AppSettings {
             installed_release_tag: String::new(),
             prompt_program: "cmd.exe".to_string(),
             network_proxy_url: String::new(),
+            network_proxy_port: String::new(),
             network_proxy_username: String::new(),
             network_proxy_password: String::new(),
             remember_bdciechi_credentials: false,
@@ -2118,6 +2121,7 @@ fn normalize_rss_favorite_articles(items: &mut Vec<RssItem>) {
 
 fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     settings.network_proxy_url = settings.network_proxy_url.trim().to_string();
+    settings.network_proxy_port = settings.network_proxy_port.trim().to_string();
     settings.network_proxy_username = settings.network_proxy_username.trim().to_string();
     settings.network_proxy_password = settings.network_proxy_password.trim().to_string();
     settings.bdciechi_username = settings.bdciechi_username.trim().to_string();
@@ -2963,27 +2967,64 @@ pub fn save_settings(settings: AppSettings) {
     }
 }
 
-pub fn apply_network_proxy_settings(settings: &AppSettings) {
-    let proxy = settings.network_proxy_url.trim();
-    if proxy.is_empty() {
-        // Keep behavior explicit: no configured proxy means clear app-level overrides.
-        unsafe {
-            std::env::remove_var("HTTP_PROXY");
-            std::env::remove_var("HTTPS_PROXY");
-            std::env::remove_var("ALL_PROXY");
-            std::env::remove_var("http_proxy");
-            std::env::remove_var("https_proxy");
-            std::env::remove_var("all_proxy");
+pub fn build_network_proxy_url(
+    proxy_url: &str,
+    proxy_port: &str,
+) -> Result<Option<String>, String> {
+    let proxy_url = proxy_url.trim();
+    let proxy_port = proxy_port.trim();
+    if proxy_url.is_empty() {
+        if proxy_port.is_empty() {
+            return Ok(None);
         }
-        return;
+        return Err("La porta del proxy richiede un indirizzo proxy".to_string());
     }
+
+    let mut url = reqwest::Url::parse(proxy_url)
+        .map_err(|err| format!("Indirizzo proxy non valido: {err}"))?;
+    if !matches!(
+        url.scheme(),
+        "http" | "https" | "socks4" | "socks4a" | "socks5" | "socks5h"
+    ) {
+        return Err("Protocollo proxy non supportato".to_string());
+    }
+    if url.host_str().is_none() {
+        return Err("L'indirizzo proxy deve contenere un host".to_string());
+    }
+    if !proxy_port.is_empty() {
+        let port = proxy_port.parse::<u16>().map_err(|_| {
+            "La porta del proxy deve essere un numero compreso tra 1 e 65535".to_string()
+        })?;
+        if port == 0 {
+            return Err("La porta del proxy deve essere compresa tra 1 e 65535".to_string());
+        }
+        url.set_port(Some(port))
+            .map_err(|_| "Impossibile impostare la porta del proxy".to_string())?;
+    }
+    Ok(Some(url.to_string()))
+}
+
+pub fn apply_network_proxy_settings(settings: &AppSettings) {
+    let proxy =
+        match build_network_proxy_url(&settings.network_proxy_url, &settings.network_proxy_port) {
+            Ok(Some(proxy)) => proxy,
+            Ok(None) => {
+                clear_network_proxy_environment();
+                return;
+            }
+            Err(err) => {
+                crate::log_debug(&format!("Invalid network proxy configuration: {err}"));
+                clear_network_proxy_environment();
+                return;
+            }
+        };
 
     let username = settings.network_proxy_username.trim();
     let password = settings.network_proxy_password.trim();
     let proxy_with_auth = if !username.is_empty() {
-        inject_proxy_credentials(proxy, username, password).unwrap_or_else(|| proxy.to_string())
+        inject_proxy_credentials(&proxy, username, password).unwrap_or(proxy)
     } else {
-        proxy.to_string()
+        proxy
     };
 
     unsafe {
@@ -2996,19 +3037,69 @@ pub fn apply_network_proxy_settings(settings: &AppSettings) {
     }
 }
 
+fn clear_network_proxy_environment() {
+    unsafe {
+        std::env::remove_var("HTTP_PROXY");
+        std::env::remove_var("HTTPS_PROXY");
+        std::env::remove_var("ALL_PROXY");
+        std::env::remove_var("http_proxy");
+        std::env::remove_var("https_proxy");
+        std::env::remove_var("all_proxy");
+    }
+}
+
 fn inject_proxy_credentials(proxy: &str, username: &str, password: &str) -> Option<String> {
-    let scheme_pos = proxy.find("://")?;
-    let scheme = &proxy[..scheme_pos + 3];
-    let rest = &proxy[scheme_pos + 3..];
-    if rest.is_empty() || rest.contains('@') {
+    let mut url = reqwest::Url::parse(proxy).ok()?;
+    if url.set_username(username).is_err() {
         return None;
     }
-    let creds = if password.is_empty() {
-        username.to_string()
-    } else {
-        format!("{username}:{password}")
-    };
-    Some(format!("{scheme}{creds}@{rest}"))
+    if password.is_empty() {
+        let _password_clear_result = url.set_password(None);
+    } else if url.set_password(Some(password)).is_err() {
+        return None;
+    }
+    Some(url.to_string())
+}
+
+#[cfg(test)]
+mod network_proxy_tests {
+    use super::build_network_proxy_url;
+
+    #[test]
+    fn proxy_port_is_added_to_url() {
+        let url = build_network_proxy_url("http://proxy.example", "8080")
+            .expect("valid proxy")
+            .expect("configured proxy");
+        assert_eq!(url, "http://proxy.example:8080/");
+    }
+
+    #[test]
+    fn proxy_port_replaces_existing_port() {
+        let url = build_network_proxy_url("https://proxy.example:3128", "8443")
+            .expect("valid proxy")
+            .expect("configured proxy");
+        assert_eq!(url, "https://proxy.example:8443/");
+    }
+
+    #[test]
+    fn proxy_port_must_be_in_valid_range() {
+        assert!(build_network_proxy_url("http://proxy.example", "0").is_err());
+        assert!(build_network_proxy_url("http://proxy.example", "65536").is_err());
+        assert!(build_network_proxy_url("http://proxy.example", "abc").is_err());
+    }
+
+    #[test]
+    fn proxy_port_is_optional() {
+        let url = build_network_proxy_url("http://proxy.example:3128", "")
+            .expect("valid proxy")
+            .expect("configured proxy");
+        assert_eq!(url, "http://proxy.example:3128/");
+        assert!(
+            build_network_proxy_url("", "")
+                .expect("empty proxy")
+                .is_none()
+        );
+    }
 }
 
 pub fn save_settings_with_default_copy(settings: AppSettings, _keep_default_copy: bool) {

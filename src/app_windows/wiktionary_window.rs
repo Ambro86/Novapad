@@ -67,26 +67,10 @@ fn wiktionary_labels(language: crate::settings::Language) -> WiktionaryLabels {
     }
 }
 
-fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
-    let lang = match language {
-        Language::Italian => "it",
-        Language::Ukrainian | Language::English => "en",
-        Language::Lithuanian => "lt",
-        Language::Spanish => "es",
-        Language::Portuguese => "pt",
-        Language::Swedish => "sv",
-        Language::Vietnamese => "vi",
-        Language::Czech => "cs",
-        Language::Polish => "pl",
-        Language::French => "fr",
-        Language::Serbian => "sr",
-        Language::Russian => "ru",
-        Language::Chinese => "zh",
-        Language::Hindi => "hi",
-    };
+fn dictionary_cache_key(dictionary_lang: &str, pref: &str, word: &str) -> String {
     format!(
         "{}|{}|{}",
-        lang,
+        dictionary_lang.trim().to_ascii_lowercase(),
         pref.trim().to_ascii_lowercase(),
         word.trim().to_ascii_lowercase()
     )
@@ -365,6 +349,7 @@ fn wiktionary_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                     (labels.language_auto.clone(), "auto"),
                     (i18n::tr(language, "options.lang.it"), "it"),
                     (i18n::tr(language, "options.lang.en"), "en"),
+                    (i18n::tr(language, "dictionary.lookup.language.de"), "de"),
                     (i18n::tr(language, "options.lang.es"), "es"),
                     (i18n::tr(language, "options.lang.pt"), "pt"),
                     (i18n::tr(language, "options.lang.sv"), "sv"),
@@ -785,26 +770,32 @@ fn run_lookup(hwnd: HWND) {
         match sel {
             1 => "it",
             2 => "en",
-            3 => "es",
-            4 => "pt",
-            5 => "sv",
-            6 => "vi",
-            7 => "cs",
-            8 => "pl",
-            9 => "fr",
-            10 => "sr",
-            11 => "uk",
-            12 => "lt",
-            13 => "zh",
-            14 => "hi",
+            3 => "de",
+            4 => "es",
+            5 => "pt",
+            6 => "sv",
+            7 => "vi",
+            8 => "cs",
+            9 => "pl",
+            10 => "fr",
+            11 => "sr",
+            12 => "uk",
+            13 => "lt",
+            14 => "zh",
+            15 => "hi",
             _ => "auto",
         }
         .to_string()
     };
-    let lookup_language = if lookup_pref == "auto" {
+    let result_language = if lookup_pref == "auto" {
         ui_language
     } else {
         language_from_code(&lookup_pref, ui_language)
+    };
+    let dictionary_lang = if lookup_pref == "de" {
+        "de".to_string()
+    } else {
+        wiktionary::language_to_code(result_language).to_string()
     };
 
     let len = crate::get_window_text_length_w_safe(input);
@@ -853,14 +844,14 @@ fn run_lookup(hwnd: HWND) {
         crate::settings::save_settings(settings_clone);
     }
 
-    let key = dictionary_cache_key(lookup_language, &pref, &trimmed);
+    let key = dictionary_cache_key(&dictionary_lang, &pref, &trimmed);
     let cached_lines =
         { with_state(parent, |state| state.dictionary_cache.get(&key).cloned()) }.unwrap_or(None);
     if let Some(lines) = cached_lines {
-        if is_dictionary_not_found_cache_entry(lookup_language, &lines) {
+        if is_dictionary_not_found_cache_entry(result_language, &lines) {
             remove_dictionary_cache(parent, &key);
         } else {
-            let text = format_cached_output(lookup_language, &lines);
+            let text = format_cached_output(result_language, &lines);
             if let Err(_e) = crate::set_window_text_w_safe(
                 output,
                 PCWSTR(to_wide(&to_windows_newlines(&text)).as_ptr()),
@@ -884,19 +875,19 @@ fn run_lookup(hwnd: HWND) {
     let parent_hwnd = parent;
     let cache_key = key.clone();
     std::thread::spawn(move || {
-        let result = wiktionary::lookup_for_language_with_meta(&trimmed, lookup_language, &pref);
+        let result = wiktionary::lookup_for_code_with_meta(&trimmed, &dictionary_lang, &pref);
         let text = match result {
             Ok((entry, _is_large)) => {
-                let lines = wiktionary::format_menu_lines(lookup_language, &entry);
+                let lines = wiktionary::format_menu_lines(result_language, &entry);
                 update_dictionary_cache(parent_hwnd, cache_key.clone(), lines.clone());
-                wiktionary::format_output_text(lookup_language, &entry)
+                wiktionary::format_output_text(result_language, &entry)
             }
             Err(wiktionary::LookupError::NotFound { .. }) => {
-                i18n::tr(lookup_language, "dictionary.not_found")
+                i18n::tr(result_language, "dictionary.not_found")
             }
             Err(err) => {
                 log_debug(&format!("Dictionary lookup failed: {err}"));
-                i18n::tr(lookup_language, "dictionary.not_found")
+                i18n::tr(result_language, "dictionary.not_found")
             }
         };
         let text = to_windows_newlines(&text);

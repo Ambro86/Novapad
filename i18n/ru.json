@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "Вы уверены, что хотите отменить создание аудиокниги?",
   "audiobook.finalizing_progress": "Завершение аудиокниги. Прогресс: {pct}%",
   "audiobook.progress": "Создание аудиокниги. Прогресс: {pct}%",
-  "audiobook.sapi4_threads_body": "Сколько одновременных процессов вы хотите использовать для ускорения создания? (Рекомендуется: 10-30).\r\nПримечание: слишком большое количество процессов может замедлить систему или вызвать ошибки в движке SAPI4.",
+  "audiobook.sapi4_threads_body": "Сколько одновременных процессов вы хотите использовать для ускорения создания? (Рекомендуется: 10-30).\r\nПримечание: слишком большое количество процессов может замедлить систему или вызвать ошибки в движке SAPI4.\nДопустимый диапазон: 1–64.",
   "audiobook.sapi4_threads_title": "Процессы SAPI4",
   "audiobook.title": "Создание аудиокниги",
   "batch_audiobooks.add_files": "Добавить файлы...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "Перемещать курсор во время чтения",
   "options.label.multilingual": "Показывать только многоязычные голоса",
   "options.label.network_proxy": "Сетевой прокси (глобальный):",
+  "options.label.network_proxy_port": "Порт прокси:",
   "options.label.network_proxy_password": "Пароль прокси:",
   "options.label.network_proxy_username": "Имя пользователя прокси:",
   "options.label.open": "Поведение при открытии:",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "Выберите главу или подраздел и нажмите Enter.",
   "epub_index.announcement": "Этот EPUB содержит оглавление. Чтобы открыть его, перейдите в меню Вид и выберите Показать оглавление.",
   "epub_index.no_index": "В этом EPUB нет доступного оглавления.",
-  "recordings.back_to_search": "Вернуться к поиску"
+  "recordings.back_to_search": "Вернуться к поиску",
+  "dictionary.lookup.language.de": "Немецкий"
 }

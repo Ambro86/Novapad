@@ -1,5 +1,148 @@
 # Dziennik zmian
 
+Wersja 0.8.0 – 2026-07-15
+
+Słownik internetowy
+• Dodano język niemiecki do internetowego słownika Wiktionary.
+• Niemieckie definicje i synonimy są teraz prawidłowo rozpoznawane zgodnie ze strukturą niemieckiego Wiktionary.
+
+Niezawodność audiobooków SAPI5
+• Tworzenie audiobooków SAPI5 nadal używa do 12 równoległych procesów roboczych, gdy wybrany głos generuje prawidłowe wyniki.
+• Każda część jest sprawdzana na podstawie rozmiaru pliku, szacowanego czasu i ostrożnego porównania z przypisanym tekstem.
+• Brakujące lub podejrzane części są automatycznie generowane ponownie przy stopniowo mniejszej współbieżności: 12, 8, 6, 4, 2 i na końcu 1 proces. Powtarzane są tylko problematyczne części.
+• Niezawodny limit jest zapamiętywany oddzielnie dla każdego głosu SAPI5, bez spowalniania głosów działających poprawnie z 12 procesami.
+• Kontrola końcowa zapobiega cichemu zaakceptowaniu pliku MP3 znacznie krótszego niż wygenerowane części.
+• Szczegóły są zapisywane w `sapi5_audiobook_diagnostic.log`.
+• Każda jednostka syntezy SAPI5 działa teraz w oddzielnym, ukrytym procesie Sonarpad. Jeśli głos firmy trzeciej ulegnie awarii, zamykany jest tylko ten worker, a główna aplikacja pozostaje uruchomiona.
+• Podczas tego samego tworzenia audiobooka niedokończone części są natychmiast ponawiane z następnym niższym poziomem współbieżności; części już zweryfikowane zostają zachowane.
+• Odzyskiwanie przy następnym uruchomieniu pozostaje dodatkowym zabezpieczeniem tylko na wypadek przerwania głównej aplikacji lub pracy komputera.
+
+Procesy audiobooków SAPI4
+• Liczba procesów SAPI4 wybrana przez użytkownika jest teraz respektowana do technicznego maksimum 64; usunięto wcześniejszy ukryty limit 16.
+• Rzeczywista liczba jest zmniejszana tylko wtedy, gdy audiobook zawiera mniej jednostek pracy niż zażądano.
+• Jeśli jeden lub więcej procesów mostka SAPI4 ulegnie awarii, ukończone części są zachowywane, a tylko nieudane jednostki są automatycznie ponawiane z coraz mniejszą współbieżnością.
+• Sonarpad sprawdza teraz kod zakończenia mostka SAPI4 i odrzuca puste lub nieprawidłowe części audio.
+
+Konfiguracja proxy
+• W ustawieniach sieci dodano osobne pole portu proxy.
+• Port można podać niezależnie od adresu proxy; jest sprawdzany w zakresie od 1 do 65535 i prawidłowo zastępuje port już obecny w adresie URL.
+
+Wyszukiwanie radia według języka i kraju
+• Filtry Język i Kraj są teraz uzupełniane wszystkimi pozycjami dostępnymi w katalogu Radio Browser i nie są już ograniczone do stałej listy.
+• Nazwy języków są teraz rozpoznawane również wtedy, gdy Radio Browser podaje je w innym alfabecie, w formie rodzimej, jako skróty lub połączenia kilku języków, i są wyświetlane w aktualnym języku interfejsu. Wartości, które nie są rzeczywistymi językami, takie jak liczby, gatunki muzyczne, kraje lub ogólne opisy, są odfiltrowywane.
+• Katalog jest aktualizowany w tle, a w razie niedostępności Radio Browsera nadal działa lista zapasowa.
+• Zduplikowane pozycje językowe Radio Browsera, które po tłumaczeniu mają identyczną nazwę, są teraz łączone w jeden element listy, co zapobiega cichym przejściom w czytnikach ekranu.
+
+Najważniejsze ulepszenie: synchronizacja czytania i kursora
+• Synchronizacja odczytu głosowego z ruchem kursora została znacząco ulepszona dla wszystkich obsługiwanych silników mowy.
+• Po włączeniu opcji „Przesuwaj kursor podczas czytania” Sonarpad korzysta ze wspólnego systemu postępu dla Microsoft Edge Neural, Google TTS, SAPI4, SAPI5 i OneCore.
+• Kursor dokładniej podąża za faktycznie wypowiadanym tekstem, z bardziej spójnym podziałem zdań i ich fragmentów.
+• Znacznie ograniczono wyprzedzanie, opóźnienia, nieregularne skoki i różnice między silnikami mowy.
+• Prawidłowa pozycja jest lepiej zachowywana po wstrzymaniu, wznowieniu, wyszukiwaniu w dokumencie lub zmianie silnika.
+
+Oddzielne pliki podczas nagrywania podcastu
+• Dodano opcję „Zapisz mikrofon oraz dźwięk systemowy lub dźwięk aplikacji w osobnych plikach”.
+• Podczas jednoczesnego nagrywania mikrofonu i innego źródła Sonarpad może utworzyć jeden plik tylko z mikrofonem oraz drugi z dźwiękiem systemowym, jedną aplikacją lub wybranymi aplikacjami.
+• Rozdzielanie źródeł jest dostępne w MP3 i WAV.
+• Gdy opcja jest wyłączona, nadal tworzony jest jeden zmiksowany plik.
+• Oddzielne pliki ułatwiają regulację głośności, usuwanie szumów i późniejszy montaż podcastów, wywiadów i poradników.
+
+Planowane nagrania radiowe
+• Nagrania radiowe można teraz planować z wyprzedzeniem.
+• Dla każdego nagrania można wybrać stację, dzień, godzinę i minutę rozpoczęcia oraz czas trwania.
+• Dostępny jest własny czas trwania od 1 do 1440 minut.
+• Nagranie może zostać wykonane raz, codziennie lub co tydzień.
+• Okno wyraźniej pokazuje trwające i zaplanowane nagrania, planowaną datę i godzinę, czas trwania oraz czas pozostały do rozpoczęcia.
+• Harmonogram zadań Windows może uruchomić nagranie automatycznie, nawet gdy Sonarpad nie jest otwarty.
+
+Kalendarz
+• Dodano kompletny kalendarz dostępny z klawiatury.
+• Można przeglądać poprzednie i następne dni, szybko wrócić do dzisiaj oraz sprawdzić święta i rocznice.
+• Dodano patrona dnia i cytat dnia, które można przeczytać, odsłuchać lub skopiować.
+• Przypomnienia można tworzyć, edytować, usuwać, odkładać i oznaczać jako wykonane.
+• Powiadomienia mogą pojawiać się o dokładnej godzinie lub wcześniej i korzystać z harmonogramu Windows również przy zamkniętym Sonarpadzie.
+
+Pogoda
+• Dodano sekcję prognozy pogody.
+• Można wyszukać miasto i szybko ponownie otworzyć ostatnio sprawdzane miejsca.
+• Dostępne są bieżące warunki, temperatura, minimum i maksimum, wilgotność, prawdopodobieństwo opadów oraz prognoza na kolejne dni.
+• Można wybrać stopnie Celsjusza, Fahrenheita lub tryb automatyczny.
+
+Filmy w kinach
+• Dodano sekcję z filmami aktualnie wyświetlanymi w kinach i nadchodzącymi premierami.
+• Dostępne są wyszukiwanie po tytule, opis fabuły, data premiery i odtwarzanie zwiastuna.
+
+Synteza mowy Google
+• Dodano Google TTS do czytania dokumentów i tworzenia audiobooków.
+• Dodano menedżer głosów pozwalający je wyświetlać, filtrować według języka, pobierać i usuwać niepotrzebne głosy.
+• Można regulować szybkość, głośność i wysokość głosu.
+• Wysokość głosów Google Natural jest stosowana bezpośrednio przez silnik, co daje bardziej naturalny i stabilny rezultat.
+• Poprawiono szybkość reakcji i niezawodność Google TTS, dostosowując limity czasu syntezy do wybranej szybkości.
+• Ograniczono zbędne oczekiwanie i poprawiono obsługę błędów i przerwań.
+
+Spis treści EPUB
+• Sonarpad rozpoznaje teraz spis treści osadzony w książkach EPUB.
+• Jego obecność jest ogłaszana i można go otworzyć z menu Widok.
+• Rozdziały i podrozdziały są wyświetlane hierarchicznie.
+• Naciśnięcie Enter natychmiast przenosi do wybranego miejsca.
+
+Wiadomości i źródła RSS
+• Rozszerzono sekcję Wiadomości o nowe narzędzia wyszukiwania i organizacji.
+• Dodano wybór języka wiadomości.
+• Można przeszukiwać źródła RSS i czytać wiadomości ze swojego miasta.
+• Źródła społeczności można przeglądać, dodawać do własnej kolekcji i przesyłać społeczności Sonarpad.
+
+Nagrywanie podcastów
+• Można nagrywać tylko mikrofon, cały dźwięk systemowy, jedną aplikację, wiele wybranych aplikacji albo mikrofon i aplikacje jednocześnie.
+• Można wybrać urządzenie mikrofonowe i źródło dźwięku, osobno regulować głośność i obserwować poziomy w czasie rzeczywistym.
+• Dodano wstrzymywanie i wznawianie, zapis MP3 lub WAV, wybór bitrate MP3 i folderu docelowego.
+• Podczas nagrywania komputer może pozostać aktywny.
+
+Radio
+• Sekcja Radio została gruntownie przeorganizowana.
+• Stacje można wyszukiwać według nazwy lub dowolnego tekstu, języka, kraju, miasta, gatunku muzycznego lub kategorii.
+• Poprawiono zarządzanie ulubionymi i dodano szybkie zerowanie wszystkich filtrów.
+• Stacje można przesyłać społeczności Sonarpad.
+• Dodano nagrywanie na żywo, tryb „Nagrywaj i odtwarzaj”, listę nagrań oraz ich zarządzanie i usuwanie.
+• Nagrania radiowe są przechowywane we własnym folderze w głównym katalogu nagrań.
+
+Odtwarzanie multimediów
+• Znacząco poprawiono stabilność odtwarzacza multimedialnego.
+• Naprawiono problem mogący blokować mpv i poprawiono komunikację z odtwarzaczem.
+• Ulepszono otwieranie różnych typów plików multimedialnych.
+• Sonarpad zapamiętuje teraz używany poziom głośności.
+• Poprawiono obsługę strumieni i nagrań.
+• Naprawiono otwieranie plików z Windows przez dwukrotne kliknięcie lub „Otwórz za pomocą”.
+
+Dokumenty PDF
+• Dodano rozpoznawanie pól formularzy w PDF.
+• Sonarpad może odnaleźć pola do wypełnienia, przedstawić je w dostępnej postaci tekstowej, umożliwić edycję i zapisać dane w PDF.
+• Poprawiono obliczanie pozycji kursora podczas czytania, szczególnie przy znakach wielobajtowych i złożonych strukturach.
+
+Dostępność i klawiatura
+• Poprawiono standardowe polecenia edycji w całym programie.
+• Kopiuj, wytnij, wklej, zaznacz wszystko, cofnij i ponów są prawidłowo wysyłane do pola z fokusem, także w oknach dodatkowych i dialogach.
+• Naprawiono problem z aktualizacją monitorów brajlowskich.
+• Poprawiono zarządzanie fokusem i wybór języka w Wikipedii.
+• Dodano grupowanie funkcji menu Narzędzia według kategorii.
+• Dodano konfigurowalne działania do szybkiego otwierania Kalendarza, Pogody i Filmów w kinach.
+
+Audiobooki
+• Poprawiono tworzenie audiobooków przy otwartych oknach dialogowych lub modalnych.
+• Obsługa postępu jest bardziej odporna i ignoruje nieaktualne aktualizacje dźwięku.
+• Google TTS może być używany również do tworzenia audiobooków z regulacją szybkości, głośności i wysokości.
+
+Sztuczna inteligencja
+• Domyślny model Gemini został zaktualizowany do `gemini-3.5-flash`.
+
+Poprawki ogólne
+• Naprawiono kilka zawieszeń podczas odtwarzania przez mpv.
+• Naprawiono otwieranie niektórych plików audio i wideo.
+• Poprawiono zarządzanie poleceniami wysyłanymi do odtwarzacza.
+• Naprawiono przywracanie kursora podczas czytania.
+• Poprawiono stabilność tworzenia audiobooków.
+• Poprawiono ogólną obsługę multimediów, RSS, radia i EPUB.
+
 Wersja 0.7.1 – 2026-05-13
 
 Nowości i ulepszenia
@@ -459,14 +602,3 @@ Improvements
 
 ## 0.1.0 - 2025-12-25
 - Initial release: project structure and README.
-
-
-
-
-
-
-
-
-
-
-

@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "Bạn có chắc chắn muốn hủy quá trình tạo sách nói không?",
   "audiobook.finalizing_progress": "Đang hoàn tất sách nói. Tiến độ: {pct}%",
   "audiobook.progress": "Đang tạo sách nói. Tiến độ: {pct}%",
-  "audiobook.sapi4_threads_body": "Bạn muốn dùng bao nhiêu tiến trình đồng thời để tăng tốc tạo? (Khuyến nghị: 10–30).\nLưu ý: quá nhiều tiến trình có thể làm chậm hệ thống hoặc gây lỗi cho bộ máy SAPI4.",
+  "audiobook.sapi4_threads_body": "Bạn muốn dùng bao nhiêu tiến trình đồng thời để tăng tốc tạo? (Khuyến nghị: 10–30).\nLưu ý: quá nhiều tiến trình có thể làm chậm hệ thống hoặc gây lỗi cho bộ máy SAPI4.\nPhạm vi cho phép: 1–64.",
   "audiobook.sapi4_threads_title": "Tiến trình SAPI4",
   "audiobook.title": "Đang tạo sách nói",
   "batch_audiobooks.add_files": "Thêm tệp...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "Di chuyển con trỏ trong khi đọc",
   "options.label.multilingual": "Chỉ hiện các giọng đọc đa ngôn ngữ",
   "options.label.network_proxy": "Proxy mạng (toàn cục):",
+  "options.label.network_proxy_port": "Cổng proxy:",
   "options.label.network_proxy_password": "Mật khẩu proxy:",
   "options.label.network_proxy_username": "Tên người dùng proxy:",
   "options.label.open": "Cách thức mở tệp:",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "Chọn một chương hoặc mục con rồi nhấn Enter.",
   "epub_index.announcement": "EPUB này có mục lục. Để mở mục lục, hãy vào menu Hiển thị và chọn Hiển thị mục lục.",
   "epub_index.no_index": "EPUB này không có mục lục khả dụng.",
-  "recordings.back_to_search": "Quay lại tìm kiếm"
+  "recordings.back_to_search": "Quay lại tìm kiếm",
+  "dictionary.lookup.language.de": "Tiếng Đức"
 }

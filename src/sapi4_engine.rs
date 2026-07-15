@@ -60,20 +60,27 @@ pub fn speak_sapi4_to_file(
         .creation_flags(0x08000000)
         .spawn()
         .map_err(|e| e.to_string())?;
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(text.as_bytes())
-            .map_err(|e| e.to_string())?;
+    {
+        let Some(mut stdin) = child.stdin.take() else {
+            crate::log_if_err!(child.kill());
+            return Err("SAPI4 bridge stdin is not available".to_string());
+        };
+        if let Err(error) = stdin.write_all(text.as_bytes()) {
+            crate::log_if_err!(child.kill());
+            crate::log_if_err!(child.wait());
+            return Err(error.to_string());
+        }
     }
     let mut reported = 0usize;
     let max_report = chunks.len().saturating_sub(1);
     let mut last_size = 0u64;
-    loop {
+    let exit_status = loop {
         if options.cancel.load(Ordering::SeqCst) {
             crate::log_if_err!(child.kill());
+            crate::log_if_err!(child.wait());
             return Err("Cancelled".to_string());
         }
-        let size = std::fs::metadata(&wav_path).map(|m| m.len()).unwrap_or(0);
+        let size = std::fs::metadata(&wav_path).map_or(0, |metadata| metadata.len());
         if size > last_size {
             last_size = size;
             if reported < max_report {
@@ -82,10 +89,22 @@ pub fn speak_sapi4_to_file(
             }
         }
         match child.try_wait() {
-            Ok(Some(_)) => break,
+            Ok(Some(status)) => break status,
             Ok(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
             Err(e) => return Err(e.to_string()),
         }
+    };
+
+    if !exit_status.success() {
+        return Err(format!("SAPI4 bridge exited with status {}", exit_status));
+    }
+
+    let output_size = std::fs::metadata(&wav_path).map_or(0, |metadata| metadata.len());
+    if output_size <= 44 {
+        return Err(format!(
+            "SAPI4 bridge completed without producing valid audio: {}",
+            wav_path.display()
+        ));
     }
 
     for _ in reported..chunks.len() {

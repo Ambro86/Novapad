@@ -1,5 +1,148 @@
 # परिवर्तन सूची
 
+Version 0.8.0 – 2026-07-15
+
+Online dictionary
+• Wiktionary online dictionary में German भाषा जोड़ी गई है।
+• German definitions और synonyms अब German Wiktionary की विशेष संरचना के अनुसार सही तरीके से पहचाने जाते हैं।
+
+SAPI5 audiobook reliability
+• चुनी गई voice विश्वसनीय output बनाती है तो SAPI5 audiobook creation अधिकतम 12 parallel workers का उपयोग जारी रखती है।
+• हर generated part को file size, estimated duration और assigned text के साथ सावधानीपूर्ण तुलना द्वारा जाँचा जाता है।
+• Missing या suspicious parts को 12, 8, 6, 4, 2 और अंत में 1 worker के साथ automatically दोबारा बनाया जाता है। केवल problematic parts ही दोहराए जाते हैं।
+• विश्वसनीय worker limit हर SAPI5 voice के लिए अलग से याद रखी जाती है, इसलिए 12 workers के साथ सही चलने वाली voices धीमी नहीं होतीं।
+• Final integrity check Sonarpad को generated parts से बहुत छोटा MP3 चुपचाप स्वीकार करने से रोकता है।
+• विवरण `sapi5_audiobook_diagnostic.log` में लिखे जाते हैं।
+• हर SAPI5 synthesis unit अब अलग और अदृश्य Sonarpad process में चलती है। यदि किसी third-party voice का worker crash हो जाए, तो केवल वही worker बंद होता है और main application खुली रहती है।
+• उसी audiobook creation के दौरान अधूरी parts को अगले कम concurrency level के साथ तुरंत दोबारा बनाया जाता है; पहले से validated parts सुरक्षित रहती हैं।
+• अगली शुरुआत का recovery केवल तब अतिरिक्त सुरक्षा के रूप में रहता है जब main application या computer स्वयं रुक जाए।
+
+SAPI4 audiobook processes
+• User द्वारा चुनी गई SAPI4 processes की संख्या अब 64 की technical maximum सीमा तक पूरी तरह उपयोग की जाती है; पहले की छिपी हुई 16 processes की सीमा हटा दी गई है।
+• Effective संख्या केवल तब घटती है जब audiobook में requested संख्या से कम work units हों।
+• यदि एक या अधिक SAPI4 bridge processes fail हों, तो completed parts सुरक्षित रहती हैं और केवल failed units को progressively कम concurrency के साथ automatically दोबारा बनाया जाता है।
+• Sonarpad अब SAPI4 bridge exit status की जाँच करता है और empty या invalid audio parts को successful नहीं मानता।
+
+प्रॉक्सी कॉन्फ़िगरेशन
+• नेटवर्क सेटिंग्स में proxy port के लिए अलग field जोड़ा गया है।
+• Port को proxy address से अलग दर्ज किया जा सकता है, 1 से 65535 तक validate किया जाता है और URL में पहले से मौजूद port को सही ढंग से बदल देता है।
+
+भाषा और देश के अनुसार रेडियो खोज
+• Language और Country filters अब fixed list तक सीमित नहीं हैं और Radio Browser directory में उपलब्ध सभी entries से update होते हैं।
+• भाषा के नाम अब तब भी पहचाने जाते हैं जब Radio Browser उन्हें किसी दूसरी लिपि, मूल नाम, संक्षिप्त रूप या कई भाषाओं के संयोजन के रूप में देता है, और उन्हें वर्तमान interface भाषा में अनुवादित करके दिखाया जाता है। संख्या, music genre, country या सामान्य label जैसी वे entries जो वास्तविक भाषा नहीं हैं, हटा दी जाती हैं।
+• Directory background में update होती है और Radio Browser उपलब्ध न होने पर fallback list का उपयोग किया जाता है।
+• अनुवाद के बाद एक जैसे दिखने वाले Radio Browser language entries अब combo box में एक ही item में जोड़े जाते हैं, जिससे screen reader के साथ silent steps नहीं होते।
+
+मुख्य सुधार: पढ़ने और कर्सर के बीच सिंक्रोनाइज़ेशन
+• सभी समर्थित speech engines के लिए voice reading और cursor movement के बीच synchronization को बहुत बेहतर किया गया है।
+• “पठन के दौरान कर्सर ले जाएँ” विकल्प चालू होने पर Sonarpad अब Microsoft Edge Neural, Google TTS, SAPI4, SAPI5 और OneCore के लिए एक समान progress system का उपयोग करता है।
+• Cursor अब वास्तव में बोले जा रहे text का अधिक सटीक रूप से अनुसरण करता है और sentences तथा sentence fragments का विभाजन अधिक consistent है।
+• Cursor के पहले चलने, देर से चलने, अनियमित jumps और अलग-अलग speech engines के व्यवहार में अंतर को काफी कम किया गया है।
+• Pause, resume, document search या engine बदलने के बाद सही position बेहतर तरीके से बनी रहती है।
+
+Podcast recording के लिए अलग files
+• “माइक्रोफ़ोन और सिस्टम या ऐप ऑडियो को अलग-अलग फ़ाइलों में सहेजें” विकल्प जोड़ा गया है।
+• Microphone और किसी अन्य source को साथ रिकॉर्ड करते समय Sonarpad एक file केवल microphone के लिए और दूसरी file system audio, एक application या selected applications के लिए बना सकता है।
+• Separate source recording MP3 और WAV दोनों में उपलब्ध है।
+• विकल्प बंद होने पर Sonarpad पहले की तरह एक mixed file बनाता है।
+• अलग files volume adjustment, noise removal और podcasts, interviews तथा tutorials की बाद की editing को आसान बनाती हैं।
+
+Scheduled radio recordings
+• Radio recordings को अब पहले से schedule किया जा सकता है।
+• हर recording के लिए station, दिन, शुरू होने का घंटा और minute तथा duration चुना जा सकता है।
+• 1 से 1,440 minutes तक custom duration उपलब्ध है।
+• Recording एक बार, हर दिन या हर सप्ताह चल सकती है।
+• Window active और scheduled recordings, planned date and time, duration और start होने से पहले का remaining time अधिक स्पष्ट रूप से दिखाती है।
+• Windows Task Scheduler recording को automatically शुरू कर सकता है, भले ही Sonarpad पहले से खुला न हो।
+
+Calendar
+• Keyboard से पूरी तरह accessible calendar जोड़ा गया है।
+• Previous और next days देखे जा सकते हैं, आज की date पर जल्दी लौटा जा सकता है और holidays तथा observances देखे जा सकते हैं।
+• Saint of the day और quote of the day जोड़े गए हैं, जिन्हें पढ़ा, सुना या copy किया जा सकता है।
+• Reminders बनाए, बदले, हटाए, postpone किए और completed चिह्नित किए जा सकते हैं।
+• Alerts exact time पर या पहले दिखाई दे सकते हैं और Sonarpad बंद होने पर भी Windows scheduling का उपयोग कर सकते हैं।
+
+Weather
+• Weather forecast section जोड़ा गया है।
+• City search और recently viewed locations को जल्दी खोलने की सुविधा उपलब्ध है।
+• Current conditions, temperature, minimum and maximum, humidity, precipitation probability और आगे के दिनों की forecast उपलब्ध है।
+• Celsius, Fahrenheit या automatic selection चुना जा सकता है।
+
+Movies in theaters
+• वर्तमान में theaters में चल रही movies और upcoming releases के लिए section जोड़ा गया है।
+• Title search, plot, release date और trailer playback उपलब्ध हैं।
+
+Google text-to-speech
+• Document reading और audiobook creation के लिए Google TTS जोड़ा गया है।
+• Voices दिखाने, language से filter करने, download करने और अनावश्यक voices हटाने के लिए voice manager जोड़ा गया है।
+• Speed, volume और pitch बदले जा सकते हैं।
+• Google Natural voices का pitch सीधे engine से लागू होता है, जिससे result अधिक natural और stable है।
+• Google TTS की responsiveness और reliability बेहतर की गई है और synthesis limits selected speed के अनुसार बदलती हैं।
+• Engine के response न करने पर unnecessary waiting कम की गई है और errors तथा interruptions की handling बेहतर की गई है।
+
+EPUB table of contents
+• Sonarpad अब EPUB books में embedded table of contents को पहचानता है।
+• इसकी मौजूदगी announce की जाती है और इसे View menu से खोला जा सकता है।
+• Chapters और subchapters hierarchy में दिखाए जाते हैं।
+• Enter दबाने पर selected position पर तुरंत पहुँचा जाता है।
+
+News and RSS sources
+• News section में नए search और organization tools जोड़े गए हैं।
+• News language selection जोड़ा गया है।
+• RSS sources में search और अपने city की news पढ़ी जा सकती है।
+• Community sources browse किए जा सकते हैं, personal collection में जोड़े जा सकते हैं और Sonarpad community को भेजे जा सकते हैं।
+
+Podcast recording
+• केवल microphone, पूरा system audio, एक application, कई selected applications या microphone और applications साथ रिकॉर्ड किए जा सकते हैं।
+• Microphone device और audio source चुने जा सकते हैं, volumes अलग-अलग बदले जा सकते हैं और levels real time में monitor किए जा सकते हैं।
+• Pause और resume, MP3 या WAV output, MP3 bitrate और destination folder selection जोड़े गए हैं।
+• Recording के दौरान computer को active रखा जा सकता है।
+
+Radio
+• Radio section को व्यापक रूप से reorganize किया गया है।
+• Stations को name या free text, language, country, city, music genre या category से खोजा जा सकता है।
+• Favorites management बेहतर की गई है और सभी filters जल्दी reset किए जा सकते हैं।
+• Stations को Sonarpad community में भेजा जा सकता है।
+• Live recording, “Record and Play”, recordings list और recordings की management तथा deletion जोड़ी गई है।
+• Radio recordings मुख्य recordings directory के अंदर अलग folder में रखी जाती हैं।
+
+Media playback
+• Media player stability को काफी बेहतर किया गया है।
+• mpv को block करने वाली समस्या ठीक की गई है और player के साथ communication अधिक reliable बनाया गया है।
+• अलग-अलग media file types खोलना बेहतर किया गया है।
+• Sonarpad अब playback volume याद रखता है।
+• Streams और recordings की handling बेहतर की गई है।
+• Windows से double-click या “Open with” के जरिए files खोलना ठीक किया गया है।
+
+PDF documents
+• PDF form fields की पहचान जोड़ी गई है।
+• Sonarpad fillable fields खोज सकता है, उन्हें accessible text form में दिखा सकता है, values बदलने दे सकता है और entered data को PDF में save कर सकता है।
+• Reading के दौरान cursor position calculation ठीक किया गया है, विशेष रूप से multibyte characters और complex structures के साथ।
+
+Accessibility and keyboard
+• Program में standard editing commands बेहतर किए गए हैं।
+• Copy, cut, paste, select all, undo और redo अब focused field को सही तरीके से भेजे जाते हैं, secondary windows और dialogs में भी।
+• Braille display update की समस्या ठीक की गई है।
+• Focus handling बेहतर की गई है और Wikipedia language selection ठीक किया गया है।
+• Tools menu functions को category से group करने का विकल्प जोड़ा गया है।
+• Calendar, Weather और Movies in theaters जल्दी खोलने के लिए configurable actions जोड़े गए हैं।
+
+Audiobooks
+• Dialogs या modal windows खुले होने पर audiobook creation बेहतर किया गया है।
+• Progress handling अधिक robust है और पुराने audio updates को ignore करती है।
+• Google TTS को speed, volume और pitch controls के साथ audiobook creation में भी उपयोग किया जा सकता है।
+
+Artificial intelligence
+• Default Gemini model को `gemini-3.5-flash` में update किया गया है।
+
+General fixes
+• mpv playback के कई freezes ठीक किए गए हैं।
+• कुछ audio और video files खोलने की समस्या ठीक की गई है।
+• Player को भेजे जाने वाले commands की handling बेहतर की गई है।
+• Reading के दौरान cursor restoration ठीक किया गया है।
+• Audiobook creation stability बेहतर की गई है।
+• Media, RSS, radio और EPUB की overall handling बेहतर की गई है।
+
 Version 0.7.1 – 2026-05-13
 
 नई सुविधाएँ और सुधार

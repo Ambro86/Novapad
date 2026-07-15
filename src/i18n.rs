@@ -17,6 +17,8 @@ const LT_JSON: &str = include_str!("../i18n/lt.json");
 const RU_JSON: &str = include_str!("../i18n/ru.json");
 const ZH_JSON: &str = include_str!("../i18n/zh.json");
 const HI_JSON: &str = include_str!("../i18n/hi.json");
+const TRECCANI_IT_JSON: &str = include_str!("../i18n/features/treccani_it.json");
+const TV_IT_JSON: &str = include_str!("../i18n/features/tv/it.json");
 
 fn load_map(raw: &str) -> HashMap<String, String> {
     let mut map: HashMap<String, String> = serde_json::from_str(raw).unwrap_or_default();
@@ -218,11 +220,36 @@ pub fn tr(language: Language, key: &str) -> String {
         .unwrap_or_else(|| key.to_string())
 }
 
-pub fn tr_f(language: Language, key: &str, args: &[(&str, &str)]) -> String {
-    let mut out = tr(language, key);
+pub fn tr_treccani(key: &str) -> String {
+    static TRECCANI_IT: OnceLock<HashMap<String, String>> = OnceLock::new();
+    TRECCANI_IT
+        .get_or_init(|| load_map(TRECCANI_IT_JSON))
+        .get(key)
+        .cloned()
+        .unwrap_or_else(|| key.to_string())
+}
+
+pub fn tr_tv(key: &str) -> String {
+    static TV_IT: OnceLock<HashMap<String, String>> = OnceLock::new();
+    TV_IT
+        .get_or_init(|| load_map(TV_IT_JSON))
+        .get(key)
+        .cloned()
+        .unwrap_or_else(|| key.to_string())
+}
+
+fn replace_named_args(mut text: String, args: &[(&str, &str)]) -> String {
     for (name, value) in args {
         let token = format!("{{{name}}}");
-        out = out.replace(&token, value);
+        text = text.replace(&token, value);
     }
-    out
+    text
+}
+
+pub fn tr_tv_f(key: &str, args: &[(&str, &str)]) -> String {
+    replace_named_args(tr_tv(key), args)
+}
+
+pub fn tr_f(language: Language, key: &str, args: &[(&str, &str)]) -> String {
+    replace_named_args(tr(language, key), args)
 }

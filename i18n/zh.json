@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "您确定要取消有声书的创建吗？",
   "audiobook.finalizing_progress": "正在完成有声书。进度：{pct}%",
   "audiobook.progress": "创建有声书。进度：{pct}%",
-  "audiobook.sapi4_threads_body": "您希望使用多少个并发进程来加速创建过程？（推荐：10-30）。注意：进程过多可能导致系统运行缓慢或引发SAPI4引擎错误。",
+  "audiobook.sapi4_threads_body": "您希望使用多少个并发进程来加速创建过程？（推荐：10-30）。注意：进程过多可能导致系统运行缓慢或引发SAPI4引擎错误。\n允许范围：1–64。",
   "audiobook.sapi4_threads_title": "SAPI4 进程",
   "audiobook.title": "创建有声读物",
   "batch_audiobooks.add_files": "添加文件...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "阅读时移动光标",
   "options.label.multilingual": "仅显示多语言配音",
   "options.label.network_proxy": "网络代理（全局）：",
+  "options.label.network_proxy_port": "代理端口:",
   "options.label.network_proxy_password": "代理密码：",
   "options.label.network_proxy_username": "代理用户名：",
   "options.label.open": "打开方式：",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "选择章节或子章节，然后按 Enter 键。",
   "epub_index.announcement": "此 EPUB 包含目录。要打开目录，请转到“查看”菜单并选择“显示目录”。",
   "epub_index.no_index": "此 EPUB 没有可用的目录。",
-  "recordings.back_to_search": "返回搜索"
+  "recordings.back_to_search": "返回搜索",
+  "dictionary.lookup.language.de": "德语"
 }

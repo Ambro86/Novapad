@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "Czy na pewno chcesz anulować tworzenie audiobooka?",
   "audiobook.finalizing_progress": "Finalizowanie audiobooka. Postęp: {pct}%",
   "audiobook.progress": "Tworzenie audiobooka. Postęp: {pct}%",
-  "audiobook.sapi4_threads_body": "Ile równoległych procesów chcesz użyć, aby przyspieszyć tworzenie? (Zalecane: 10-30).\nUwaga: zbyt wiele procesów może spowolnić system lub spowodować błędy w silniku SAPI4.",
+  "audiobook.sapi4_threads_body": "Ile równoległych procesów chcesz użyć, aby przyspieszyć tworzenie? (Zalecane: 10-30).\nUwaga: zbyt wiele procesów może spowolnić system lub spowodować błędy w silniku SAPI4.\nDozwolony zakres: 1-64.",
   "audiobook.sapi4_threads_title": "Procesy SAPI4",
   "audiobook.title": "Tworzenie audiobooka",
   "batch_audiobooks.add_files": "Dodaj pliki...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "Przesuwaj kursor podczas czytania",
   "options.label.multilingual": "Pokaż tylko głosy wielojęzyczne",
   "options.label.network_proxy": "Proxy sieciowe (globalne):",
+  "options.label.network_proxy_port": "Port proxy:",
   "options.label.network_proxy_password": "Hasło proxy:",
   "options.label.network_proxy_username": "Nazwa użytkownika proxy:",
   "options.label.open": "Zachowanie przy otwieraniu:",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "Wybierz rozdział lub podrozdział i naciśnij Enter.",
   "epub_index.announcement": "Ten plik EPUB zawiera spis treści. Aby go otworzyć, przejdź do menu Widok i wybierz Pokaż spis treści.",
   "epub_index.no_index": "Ten plik EPUB nie zawiera dostępnego spisu treści.",
-  "recordings.back_to_search": "Wróć do wyszukiwania"
+  "recordings.back_to_search": "Wróć do wyszukiwania",
+  "dictionary.lookup.language.de": "Niemiecki"
 }

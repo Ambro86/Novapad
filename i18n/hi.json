@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "क्या आप वाकई ऑडियोबुक निर्माण रद्द करना चाहते हैं?",
   "audiobook.finalizing_progress": "ऑडियोबुक अंतिम रूप दी जा रही है। प्रगति: {pct}%",
   "audiobook.progress": "ऑडियोबुक बनाई जा रही है। प्रगति: {pct}%",
-  "audiobook.sapi4_threads_body": "निर्माण को तेज़ करने के लिए आप कितनी समकालिक प्रक्रियाएँ उपयोग करना चाहते हैं? (अनुशंसित: 10-30)।\nनोट: बहुत अधिक प्रक्रियाएँ सिस्टम को धीमा कर सकती हैं या SAPI4 इंजन में त्रुटियाँ पैदा कर सकती हैं।",
+  "audiobook.sapi4_threads_body": "निर्माण को तेज़ करने के लिए आप कितनी समकालिक प्रक्रियाएँ उपयोग करना चाहते हैं? (अनुशंसित: 10-30)।\nनोट: बहुत अधिक प्रक्रियाएँ सिस्टम को धीमा कर सकती हैं या SAPI4 इंजन में त्रुटियाँ पैदा कर सकती हैं।\nस्वीकृत सीमा: 1–64।",
   "audiobook.sapi4_threads_title": "SAPI4 प्रक्रियाएँ",
   "audiobook.title": "ऑडियोबुक बनाई जा रही है",
   "batch_audiobooks.add_files": "फ़ाइलें जोड़ें...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "पठन के दौरान कर्सर ले जाएँ",
   "options.label.multilingual": "केवल बहुभाषी वॉइस दिखाएँ",
   "options.label.network_proxy": "नेटवर्क प्रॉक्सी (वैश्विक):",
+  "options.label.network_proxy_port": "प्रॉक्सी पोर्ट:",
   "options.label.network_proxy_password": "प्रॉक्सी पासवर्ड:",
   "options.label.network_proxy_username": "प्रॉक्सी उपयोगकर्ता नाम:",
   "options.label.open": "खोलने का व्यवहार:",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "कोई अध्याय या उप-अध्याय चुनें और Enter दबाएँ।",
   "epub_index.announcement": "इस EPUB में विषय-सूची उपलब्ध है। इसे खोलने के लिए दृश्य मेनू में जाएँ और विषय-सूची दिखाएँ चुनें।",
   "epub_index.no_index": "इस EPUB में कोई उपलब्ध विषय-सूची नहीं है।",
-  "recordings.back_to_search": "खोज पर वापस जाएँ"
+  "recordings.back_to_search": "खोज पर वापस जाएँ",
+  "dictionary.lookup.language.de": "जर्मन"
 }

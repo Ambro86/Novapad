@@ -180,6 +180,70 @@ fn strip_html_comments(mut s: String) -> String {
     s
 }
 
+fn strip_ref_blocks(mut s: String) -> String {
+    loop {
+        let lower = s.to_ascii_lowercase();
+        let Some(start) = lower.find("<ref") else {
+            break;
+        };
+        let Some(open_end) = lower[start..].find('>').map(|offset| start + offset) else {
+            s.truncate(start);
+            break;
+        };
+        if lower[start..=open_end].trim_end().ends_with("/>") {
+            s.replace_range(start..=open_end, " ");
+            continue;
+        }
+        let Some(close_start) = lower[open_end + 1..]
+            .find("</ref>")
+            .map(|offset| open_end + 1 + offset)
+        else {
+            s.truncate(start);
+            break;
+        };
+        s.replace_range(start..close_start + "</ref>".len(), " ");
+    }
+    s
+}
+
+fn split_template_parts(inner: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut start = 0usize;
+    let mut link_depth = 0usize;
+    let mut template_depth = 0usize;
+    let mut index = 0usize;
+    while index < inner.len() {
+        if inner[index..].starts_with("[[") {
+            link_depth += 1;
+            index += 2;
+            continue;
+        }
+        if inner[index..].starts_with("]]") && link_depth > 0 {
+            link_depth -= 1;
+            index += 2;
+            continue;
+        }
+        if inner[index..].starts_with("{{") {
+            template_depth += 1;
+            index += 2;
+            continue;
+        }
+        if inner[index..].starts_with("}}") && template_depth > 0 {
+            template_depth -= 1;
+            index += 2;
+            continue;
+        }
+        let character = inner[index..].chars().next().unwrap_or('\0');
+        if character == '|' && link_depth == 0 && template_depth == 0 {
+            parts.push(&inner[start..index]);
+            start = index + 1;
+        }
+        index += character.len_utf8().max(1);
+    }
+    parts.push(&inner[start..]);
+    parts
+}
+
 fn strip_templates(s: String) -> String {
     if !s.contains("{{") {
         return s;
@@ -208,7 +272,7 @@ fn strip_templates(s: String) -> String {
 }
 
 fn simplify_template_inner(inner: &str) -> String {
-    let parts: Vec<&str> = inner.split('|').collect();
+    let parts = split_template_parts(inner);
     if parts.len() <= 1 {
         return String::new();
     }
@@ -224,7 +288,17 @@ fn simplify_template_inner(inner: &str) -> String {
     let mut last_with_letters = "";
     for arg in parts.iter().skip(1) {
         let trimmed = arg.trim();
-        if trimmed.is_empty() || trimmed.contains('=') {
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some((name, value)) = trimmed.split_once('=') {
+            let value = value.trim();
+            if name.trim().eq_ignore_ascii_case("ft")
+                && value.chars().any(|character| character.is_alphabetic())
+            {
+                last_nonempty = value;
+                last_with_letters = value;
+            }
             continue;
         }
         last_nonempty = trimmed;
@@ -299,6 +373,7 @@ fn strip_html_tags(s: String) -> String {
 
 fn clean_wikitext_line(s: String) -> String {
     let mut x = strip_html_comments(s);
+    x = strip_ref_blocks(x);
     x = simplify_templates(x);
     x = strip_html_tags(x);
     x = strip_links(x);
@@ -671,6 +746,91 @@ fn extract_definitions_with_subpoints(
     out
 }
 
+fn parse_numbered_colon_item(line: &str) -> Option<&str> {
+    let trimmed = line.trim_start();
+    let rest = trimmed.strip_prefix(':')?.trim_start();
+    if !rest.starts_with('[') {
+        return None;
+    }
+    let closing = rest.find(']')?;
+    let marker = &rest[1..closing];
+    if marker.is_empty()
+        || !marker.chars().all(|c| {
+            c.is_ascii_digit()
+                || c.is_whitespace()
+                || matches!(c, ',' | '-' | '–' | '—' | '?' | '*')
+        })
+    {
+        return None;
+    }
+    let text = rest[closing + 1..].trim();
+    (!text.is_empty()).then_some(text)
+}
+
+fn extract_numbered_template_block(wikitext: &str, marker: &str, max_items: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut in_block = false;
+
+    for line in wikitext.lines() {
+        let trimmed = line.trim_start();
+        if let Some(remainder) = trimmed.strip_prefix(marker) {
+            in_block = true;
+            if let Some(item) = parse_numbered_colon_item(remainder.trim_start()) {
+                let cleaned = normalize_definition_noise(&clean_wikitext_line(item.to_string()));
+                let truncated = cleaned.chars().take(MAX_CHARS_PER_DEF).collect::<String>();
+                if !truncated.is_empty() && truncated.chars().any(|c| c.is_alphanumeric()) {
+                    out.push(truncated);
+                    if out.len() >= max_items {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
+        if !in_block {
+            continue;
+        }
+        if trimmed.starts_with("{{") {
+            in_block = false;
+            continue;
+        }
+        let Some(item) = parse_numbered_colon_item(trimmed) else {
+            continue;
+        };
+        let cleaned = normalize_definition_noise(&clean_wikitext_line(item.to_string()));
+        let truncated = cleaned.chars().take(MAX_CHARS_PER_DEF).collect::<String>();
+        if !truncated.is_empty() && truncated.chars().any(|c| c.is_alphanumeric()) {
+            out.push(truncated);
+            if out.len() >= max_items {
+                break;
+            }
+        }
+    }
+
+    out
+}
+
+fn extract_definitions_for_language(
+    wikitext: &str,
+    language: &str,
+    max_main_defs: usize,
+    max_total_lines: usize,
+) -> Vec<String> {
+    if language.eq_ignore_ascii_case("de") {
+        extract_numbered_template_block(wikitext, "{{Bedeutungen}}", max_main_defs)
+    } else {
+        extract_definitions_with_subpoints(wikitext, max_main_defs, max_total_lines)
+    }
+}
+
+fn extract_synonyms_for_language(wikitext: &str, language: &str, max_syns: usize) -> Vec<String> {
+    if language.eq_ignore_ascii_case("de") {
+        extract_numbered_template_block(wikitext, "{{Synonyme}}", max_syns)
+    } else {
+        extract_synonyms(wikitext, max_syns)
+    }
+}
+
 fn extract_synonyms(wikitext: &str, max_syns: usize) -> Vec<String> {
     let mut out = Vec::new();
     let start_pos = match wikitext.find("{{-sin-}}") {
@@ -888,11 +1048,12 @@ impl WiktionaryService {
         } else {
             (usize::MAX, usize::MAX)
         };
-        let defs = extract_definitions_with_subpoints(&wikitext, max_defs, max_lines);
+        let defs =
+            extract_definitions_for_language(&wikitext, dictionary_lang, max_defs, max_lines);
         let syns = if length > MAX_PAGE_LENGTH {
             Vec::new()
         } else {
-            extract_synonyms(&wikitext, usize::MAX)
+            extract_synonyms_for_language(&wikitext, dictionary_lang, usize::MAX)
         };
 
         if defs.is_empty() {
@@ -936,7 +1097,7 @@ impl WiktionaryService {
         } else {
             (usize::MAX, usize::MAX)
         };
-        let defs = extract_definitions_with_subpoints(&wikitext, max_defs, max_lines);
+        let defs = extract_definitions_for_language(&wikitext, target_lang, max_defs, max_lines);
         if defs.is_empty() {
             return Err(LookupError::NotFound {
                 lang: target_lang.to_string(),
@@ -1021,7 +1182,7 @@ impl WiktionaryService {
     }
 }
 
-fn language_to_code(language: Language) -> &'static str {
+pub(crate) fn language_to_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
         Language::Ukrainian | Language::English => "en",
@@ -1040,43 +1201,30 @@ fn language_to_code(language: Language) -> &'static str {
     }
 }
 
-fn translation_target(language: Language, preference: &str) -> Option<String> {
+fn translation_target_for_code(dictionary_lang: &str, preference: &str) -> Option<String> {
     let pref = preference.trim().to_ascii_lowercase();
     if pref.is_empty() || pref == "auto" {
-        return match language {
-            Language::Ukrainian | Language::English => None,
-            _ => Some("en".to_string()),
-        };
+        return (!dictionary_lang.eq_ignore_ascii_case("en")).then(|| "en".to_string());
     }
     if pref == "none" {
         return None;
     }
     let code = match pref.as_str() {
-        "it" => "it",
-        "en" => "en",
-        "es" => "es",
-        "pt" => "pt",
-        "sv" => "sv",
-        "vi" => "vi",
-        "cs" => "cs",
-        "pl" => "pl",
-        "fr" => "fr",
-        "lt" => "lt",
-        "ru" => "ru",
-        "zh" => "zh",
+        "it" | "en" | "de" | "es" | "pt" | "sv" | "vi" | "cs" | "pl" | "fr" | "lt" | "ru"
+        | "zh" => pref.as_str(),
         _ => {
-            return match language {
-                Language::Ukrainian | Language::English => None,
-                _ => Some("en".to_string()),
-            };
+            return (!dictionary_lang.eq_ignore_ascii_case("en")).then(|| "en".to_string());
         }
     };
-    let dict_lang = language_to_code(language);
-    if code.eq_ignore_ascii_case(dict_lang) {
+    if code.eq_ignore_ascii_case(dictionary_lang) {
         None
     } else {
         Some(code.to_string())
     }
+}
+
+fn translation_target(language: Language, preference: &str) -> Option<String> {
+    translation_target_for_code(language_to_code(language), preference)
 }
 
 pub fn lookup_for_language(
@@ -1094,19 +1242,19 @@ pub fn lookup_for_language(
     svc.dictionary_and_translation(dict_lang, target_lang.as_deref(), trimmed)
 }
 
-pub fn lookup_for_language_with_meta(
+pub fn lookup_for_code_with_meta(
     word: &str,
-    language: Language,
+    dictionary_lang: &str,
     translation_preference: &str,
 ) -> Result<(DictionaryAndTranslation, bool), LookupError> {
     let trimmed = word.trim();
     if trimmed.is_empty() {
         return Err(LookupError::Other("Empty word".to_string()));
     }
+    validate_lang_subdomain(dictionary_lang)?;
     let svc = WiktionaryService::new()?;
-    let dict_lang = language_to_code(language);
-    let target_lang = translation_target(language, translation_preference);
-    svc.dictionary_and_translation_with_meta(dict_lang, target_lang.as_deref(), trimmed)
+    let target_lang = translation_target_for_code(dictionary_lang, translation_preference);
+    svc.dictionary_and_translation_with_meta(dictionary_lang, target_lang.as_deref(), trimmed)
 }
 
 fn push_definitions_menu(lines: &mut Vec<String>, definitions: &[String]) {
@@ -1234,10 +1382,237 @@ fn format_definition_lines(definitions: &[String]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use super::extract_definitions_for_language;
     use super::extract_definitions_with_subpoints;
+    use super::extract_synonyms_for_language;
     use super::is_pure_grammar_marker_definition;
+    use super::translation_target_for_code;
     use std::fs;
     use std::path::PathBuf;
+
+    #[test]
+    fn german_haus_extracts_numbered_meanings() {
+        let wikitext = "== Haus ({{Sprache|Deutsch}}) ==\n{{Bedeutungen}}\n:[1] zu einem bestimmten Zweck erbautes [[Gebäude]]\n:[2] zum Wohnen dienendes und genutztes [[Gebäude]]\n{{Abkürzungen}}\n:[[H.]]";
+        let defs = extract_definitions_for_language(wikitext, "de", usize::MAX, usize::MAX);
+        assert_eq!(
+            defs,
+            vec![
+                "zu einem bestimmten Zweck erbautes Gebäude".to_string(),
+                "zum Wohnen dienendes und genutztes Gebäude".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn german_haus_extracts_synonyms_only_from_synonym_block() {
+        let wikitext = "{{Bedeutungen}}\n:[1] ein Gebäude\n{{Synonyme}}\n:[1, 2] [[Wohnhaus]], [[Wohngebäude]]\n:[3] [[Heim]], [[Wohnung]], [[Zuhause]]\n{{Sinnverwandte Wörter}}\n:[1] [[Bau]]";
+        let synonyms = extract_synonyms_for_language(wikitext, "de", usize::MAX);
+        assert_eq!(
+            synonyms,
+            vec![
+                "Wohnhaus, Wohngebäude".to_string(),
+                "Heim, Wohnung, Zuhause".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn german_multiple_meaning_blocks_are_combined() {
+        let wikitext = "{{Bedeutungen}}\n:[1] erste Bedeutung\n{{Herkunft}}\n:erste Herkunft\n{{Bedeutungen}}\n:[1] zweite Bedeutung\n{{Beispiele}}\n:[1] Beispiel";
+        let defs = extract_definitions_for_language(wikitext, "de", usize::MAX, usize::MAX);
+        assert_eq!(
+            defs,
+            vec![
+                "erste Bedeutung".to_string(),
+                "zweite Bedeutung".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn german_tag_keeps_piped_link_inside_context_template() {
+        let wikitext = "{{Bedeutungen}}\n:[5] {{K|ft=in den [[bergmännisch]]en [[Ausdruck|Ausdrücken]] „zu Tage“, „über Tage“ und „unter Tage“}} die [[Erdoberfläche]]";
+        let definitions = extract_definitions_for_language(wikitext, "de", usize::MAX, usize::MAX);
+        assert_eq!(
+            definitions,
+            [
+                "in den bergmännischen Ausdrücken „zu Tage“, „über Tage“ und „unter Tage“ die Erdoberfläche"
+            ]
+        );
+        assert!(!definitions[0].contains("]]"));
+    }
+
+    #[test]
+    fn german_lernen_removes_reference_bibliography_from_meaning() {
+        let wikitext = "{{Bedeutungen}}\n:[5] {{K|Bedva.|landsch.}} [[lehren]], auch in alter Zeit nicht häufig,<ref>{{Ref-Grimm|Lernen}}, Abschnitte I 1) und II 2)</ref> galt als veraltet,<ref>{{Literatur|Autor=[[w:Johannes Saß|Johannes Sass]]|Titel=Wörterbuch}}</ref> heute regional";
+        let definitions = extract_definitions_for_language(wikitext, "de", usize::MAX, usize::MAX);
+        assert_eq!(definitions.len(), 1);
+        assert!(definitions[0].contains("lehren"));
+        assert!(definitions[0].contains("heute regional"));
+        assert!(!definitions[0].contains("Lernen, Abschnitte"));
+        assert!(!definitions[0].contains("Johannes"));
+    }
+
+    #[test]
+    fn german_dictionary_auto_translation_targets_english() {
+        assert_eq!(
+            translation_target_for_code("de", "auto"),
+            Some("en".to_string())
+        );
+        assert_eq!(translation_target_for_code("de", "de"), None);
+    }
+
+    #[test]
+    #[ignore = "requires 50 live German Wiktionary lookups"]
+    fn german_wiktionary_live_50_words_return_clean_definitions() {
+        let words = [
+            "Haus",
+            "Baum",
+            "Wasser",
+            "Feuer",
+            "Erde",
+            "Luft",
+            "Mensch",
+            "Kind",
+            "Frau",
+            "Mann",
+            "Freund",
+            "Familie",
+            "Schule",
+            "Buch",
+            "Sprache",
+            "Stadt",
+            "Straße",
+            "Arbeit",
+            "Zeit",
+            "Tag",
+            "Nacht",
+            "Liebe",
+            "Glück",
+            "Freiheit",
+            "Gesundheit",
+            "gehen",
+            "kommen",
+            "sehen",
+            "hören",
+            "sprechen",
+            "lesen",
+            "schreiben",
+            "essen",
+            "trinken",
+            "schlafen",
+            "arbeiten",
+            "lernen",
+            "denken",
+            "wissen",
+            "machen",
+            "groß",
+            "klein",
+            "schnell",
+            "langsam",
+            "schön",
+            "schwierig",
+            "möglich",
+            "glücklich",
+            "freundlich",
+            "Überraschung",
+        ];
+        let mut url = reqwest::Url::parse("https://de.wiktionary.org/w/api.php")
+            .expect("German Wiktionary API URL");
+        url.query_pairs_mut()
+            .append_pair("action", "query")
+            .append_pair("prop", "revisions")
+            .append_pair("rvprop", "content")
+            .append_pair("rvslots", "main")
+            .append_pair("titles", &words.join("|"))
+            .append_pair("redirects", "1")
+            .append_pair("format", "json")
+            .append_pair("formatversion", "2");
+        let response: serde_json::Value = reqwest::blocking::Client::builder()
+            .user_agent("Sonarpad/0.8.0 (German Wiktionary 50-word integration test)")
+            .build()
+            .expect("German Wiktionary test client")
+            .get(url)
+            .send()
+            .expect("German Wiktionary batch request")
+            .error_for_status()
+            .expect("successful German Wiktionary batch response")
+            .json()
+            .expect("German Wiktionary batch JSON");
+        let pages = response["query"]["pages"]
+            .as_array()
+            .expect("German Wiktionary pages array");
+        assert_eq!(pages.len(), 50, "expected 50 German Wiktionary pages");
+        let mut failures = Vec::new();
+        let mut total_definitions = 0usize;
+
+        for page in pages {
+            let word = page["title"].as_str().unwrap_or("<missing title>");
+            let Some(complete_wikitext) = page["revisions"][0]["slots"]["main"]["content"].as_str()
+            else {
+                failures.push(format!("{word}: missing live wikitext"));
+                continue;
+            };
+            let mut section_wikitext = String::new();
+            let mut in_first_section = false;
+            for line in complete_wikitext.lines() {
+                let trimmed = line.trim();
+                let is_level_two_heading = trimmed.starts_with("== ")
+                    && trimmed.ends_with(" ==")
+                    && !trimmed.starts_with("===");
+                if is_level_two_heading {
+                    if in_first_section {
+                        break;
+                    }
+                    in_first_section = true;
+                }
+                if in_first_section {
+                    section_wikitext.push_str(line);
+                    section_wikitext.push('\n');
+                }
+            }
+            let definitions =
+                extract_definitions_for_language(&section_wikitext, "de", usize::MAX, usize::MAX);
+            let synonyms = extract_synonyms_for_language(&section_wikitext, "de", usize::MAX);
+            if definitions.is_empty() {
+                failures.push(format!("{word}: no definitions"));
+                continue;
+            }
+
+            for definition in &definitions {
+                let lower = definition.to_ascii_lowercase();
+                if definition.trim().is_empty()
+                    || is_pure_grammar_marker_definition(definition)
+                    || definition.contains("{{")
+                    || definition.contains("}}")
+                    || definition.contains("[[")
+                    || definition.contains("]]")
+                    || lower.contains("<ref")
+                    || lower.contains("wikidata")
+                {
+                    failures.push(format!("{word}: noisy definition: {definition}"));
+                }
+            }
+
+            total_definitions += definitions.len();
+            eprintln!(
+                "{word} | {} definitions | {} synonyms | {}",
+                definitions.len(),
+                synonyms.len(),
+                definitions[0]
+            );
+        }
+
+        assert!(
+            failures.is_empty(),
+            "German Wiktionary failures:\n{}",
+            failures.join("\n")
+        );
+        assert!(
+            total_definitions >= 50,
+            "expected at least one definition per German word"
+        );
+    }
 
     #[test]
     fn spanish_hola_keeps_definition_text_inside_template() {

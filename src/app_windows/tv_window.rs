@@ -12,7 +12,7 @@ use crate::app_windows::{scheduled_recording_window, tv_guide_window};
 use crate::settings::{Language, TvFavorite, load_settings, save_settings};
 use crate::stream_recording::{self, StreamRecordingKind};
 use crate::tools::tv::{self, TvChannel, TvProgram};
-use crate::{show_error, with_state};
+use crate::{i18n, show_error, with_state};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum TvPage {
@@ -98,7 +98,8 @@ impl TvCatalog {
 
         for (index, channel) in channels.iter().enumerate() {
             if channel.is_regional() {
-                let region = channel.regional_name().unwrap_or("Altre regioni");
+                let fallback_region = i18n::tr_tv("tv.other_regions");
+                let region = channel.regional_name().unwrap_or(fallback_region.as_str());
                 push_group_index(&mut regions, region, index);
             } else {
                 push_group_index(&mut categories, &channel.category, index);
@@ -152,7 +153,7 @@ impl TvCatalog {
         if !favorites.is_empty() {
             entries.push(TvEntry {
                 id: "favorites".to_string(),
-                title: "Canali preferiti".to_string(),
+                title: i18n::tr_tv("tv.favorites"),
                 description: Some(channel_count_description(favorites.len())),
                 kind: TvEntryKind::Page(TvPage::Favorites),
             });
@@ -178,19 +179,22 @@ impl TvCatalog {
                 .sum::<usize>();
             entries.push(TvEntry {
                 id: "regions".to_string(),
-                title: "Regionali".to_string(),
-                description: Some(format!(
-                    "{} regioni, {}",
-                    self.regions.len(),
-                    channel_count_description(channel_count)
-                )),
+                title: i18n::tr_tv("tv.regions"),
+                description: Some({
+                    let region_count = self.regions.len().to_string();
+                    let channel_count = channel_count_description(channel_count);
+                    i18n::tr_tv_f(
+                        "tv.regions_summary",
+                        &[("regions", &region_count), ("channels", &channel_count)],
+                    )
+                }),
                 kind: TvEntryKind::Page(TvPage::Regions),
             });
         }
         entries.push(TvEntry {
             id: "recordings".to_string(),
-            title: "Registrazioni TV".to_string(),
-            description: Some("Apri le registrazioni dei canali TV".to_string()),
+            title: i18n::tr_tv("tv.recordings"),
+            description: Some(i18n::tr_tv("tv.recordings_description")),
             kind: TvEntryKind::Recordings,
         });
         entries
@@ -250,7 +254,12 @@ impl TvCatalog {
 
     fn channel_accessible_title(&self, channel: &TvChannel) -> String {
         tv::current_program_for_channel(&self.current_programs, channel)
-            .map(|program| format!("{}. Ora in onda: {}", channel.name, program.title))
+            .map(|program| {
+                i18n::tr_tv_f(
+                    "tv.now_playing",
+                    &[("channel", &channel.name), ("program", &program.title)],
+                )
+            })
             .unwrap_or_else(|| channel.name.clone())
     }
 }
@@ -260,15 +269,16 @@ pub fn open(parent: HWND) {
     if language != Language::Italian {
         return;
     }
+    let access_title = i18n::tr_tv("tv.access_title");
     if !crate::app_windows::rai_audiodescrizioni_window::ensure_rai_luce_access_with_title(
         parent,
         language,
-        Some("TV"),
+        Some(access_title.as_str()),
     ) {
         return;
     }
 
-    crate::screen_reader_speak("Caricamento canali TV");
+    crate::screen_reader_speak(&i18n::tr_tv("tv.loading_channels"));
     let load_result = match tv::load_channels_with_cache() {
         Ok(result) => result,
         Err(err) => {
@@ -277,7 +287,7 @@ pub fn open(parent: HWND) {
         }
     };
     if load_result.channels.is_empty() {
-        show_error(parent, language, "Nessun canale TV disponibile.");
+        show_error(parent, language, &i18n::tr_tv("tv.no_channels"));
         return;
     }
     if let Some(warning) = load_result.cache_warning.as_deref() {
@@ -311,9 +321,9 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
                 TvPage::Search(query) => show_error(
                     parent,
                     language,
-                    &format!("Nessun canale TV trovato per {query}."),
+                    &i18n::tr_tv_f("tv.search_no_results", &[("query", query)]),
                 ),
-                _ => show_error(parent, language, "Questa sezione TV è vuota."),
+                _ => show_error(parent, language, &i18n::tr_tv("tv.empty_section")),
             }
             if let Some((previous_page, previous_selected_id)) = history.pop() {
                 page = previous_page;
@@ -341,7 +351,7 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
             selected_id.clone(),
             MultilineSearchOptions {
                 initial_query: search_query.clone(),
-                search_button_label: "Cerca".to_string(),
+                search_button_label: i18n::tr_tv("tv.search_button"),
                 show_search_edit: true,
                 secondary_action_label: None,
                 context_actions: tv_context_actions(Arc::clone(&catalog)),
@@ -423,11 +433,7 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
             .into_iter()
             .find(|entry| entry.id == selected_entry_id)
         else {
-            show_error(
-                parent,
-                language,
-                "Impossibile aprire l'elemento TV selezionato.",
-            );
+            show_error(parent, language, &i18n::tr_tv("tv.open_selected_error"));
             continue;
         };
 
@@ -441,7 +447,7 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
             }
             TvEntryKind::Channel(index) => {
                 let Some(channel) = catalog.channels.get(index) else {
-                    show_error(parent, language, "Canale TV non disponibile.");
+                    show_error(parent, language, &i18n::tr_tv("tv.channel_unavailable"));
                     continue;
                 };
                 play_channel(parent, language, channel);
@@ -546,7 +552,10 @@ fn tv_context_actions(catalog: Arc<TvCatalog>) -> Vec<InterpreterContextAction> 
                     .then_with(|| a.url.cmp(&b.url))
             });
             save_settings(settings);
-            crate::screen_reader_speak(&format!("{} aggiunto ai preferiti", channel.name));
+            crate::screen_reader_speak(&i18n::tr_tv_f(
+                "tv.favorite_added",
+                &[("channel", &channel.name)],
+            ));
             set_tv_deferred_action(TvDeferredAction::Refresh);
             close_tv_browser_dialog();
         }
@@ -574,7 +583,10 @@ fn tv_context_actions(catalog: Arc<TvCatalog>) -> Vec<InterpreterContextAction> 
             .retain(|favorite| !tv_favorite_matches_channel(favorite, &channel));
         if settings.tv_favorites.len() != before {
             save_settings(settings);
-            crate::screen_reader_speak(&format!("{} rimosso dai preferiti", channel.name));
+            crate::screen_reader_speak(&i18n::tr_tv_f(
+                "tv.favorite_removed",
+                &[("channel", &channel.name)],
+            ));
             set_tv_deferred_action(TvDeferredAction::Refresh);
             close_tv_browser_dialog();
         }
@@ -631,31 +643,31 @@ fn tv_context_actions(catalog: Arc<TvCatalog>) -> Vec<InterpreterContextAction> 
 
     vec![
         InterpreterContextAction {
-            label: "Aggiungi ai preferiti".to_string(),
+            label: i18n::tr_tv("tv.action.add_favorite"),
             ctrl_c_shortcut: false,
             enabled: add_enabled,
             handler: add_handler,
         },
         InterpreterContextAction {
-            label: "Rimuovi dai preferiti".to_string(),
+            label: i18n::tr_tv("tv.action.remove_favorite"),
             ctrl_c_shortcut: false,
             enabled: remove_enabled,
             handler: remove_handler,
         },
         InterpreterContextAction {
-            label: "Registra e riproduci canale".to_string(),
+            label: i18n::tr_tv("tv.action.record_and_play"),
             ctrl_c_shortcut: false,
             enabled: record_enabled,
             handler: record_handler,
         },
         InterpreterContextAction {
-            label: "Visualizza la guida TV".to_string(),
+            label: i18n::tr_tv("tv.action.show_guide"),
             ctrl_c_shortcut: false,
             enabled: guide_enabled,
             handler: guide_handler,
         },
         InterpreterContextAction {
-            label: "Programma registrazione".to_string(),
+            label: i18n::tr_tv("tv.action.schedule_recording"),
             ctrl_c_shortcut: false,
             enabled: schedule_enabled,
             handler: schedule_handler,
@@ -664,18 +676,24 @@ fn tv_context_actions(catalog: Arc<TvCatalog>) -> Vec<InterpreterContextAction> 
 }
 
 fn record_tv_channel(parent: HWND, language: Language, channel: &TvChannel) {
-    crate::screen_reader_speak(&format!("Avvio registrazione di {}", channel.name));
+    crate::screen_reader_speak(&i18n::tr_tv_f(
+        "tv.recording_starting",
+        &[("channel", &channel.name)],
+    ));
     let resolved_url = match tv::resolve_stream_url(channel) {
         Ok(url) if !url.trim().is_empty() => url,
         Ok(_) => {
-            show_error(parent, language, "Lo stream TV risolto è vuoto.");
+            show_error(parent, language, &i18n::tr_tv("tv.stream_empty"));
             return;
         }
         Err(err) => {
             show_error(
                 parent,
                 language,
-                &format!("Impossibile registrare {}: {err}", channel.name),
+                &i18n::tr_tv_f(
+                    "tv.record_error",
+                    &[("channel", &channel.name), ("error", &err)],
+                ),
             );
             return;
         }
@@ -689,10 +707,10 @@ fn record_tv_channel(parent: HWND, language: Language, channel: &TvChannel) {
         tv::is_rai_audio_description_channel(channel),
     ) {
         Ok(path) => {
-            crate::screen_reader_speak(&format!(
-                "Registrazione di {} avviata. Il file sarà salvato in {}. La registrazione terminerà chiudendo il player.",
-                channel.name,
-                path.display()
+            let path_text = path.display().to_string();
+            crate::screen_reader_speak(&i18n::tr_tv_f(
+                "tv.recording_started",
+                &[("channel", &channel.name), ("path", &path_text)],
             ));
         }
         Err(err) => show_error(parent, language, &err),
@@ -700,18 +718,24 @@ fn record_tv_channel(parent: HWND, language: Language, channel: &TvChannel) {
 }
 
 fn play_channel(parent: HWND, language: Language, channel: &TvChannel) {
-    crate::screen_reader_speak(&format!("Avvio {}", channel.name));
+    crate::screen_reader_speak(&i18n::tr_tv_f(
+        "tv.playback_starting",
+        &[("channel", &channel.name)],
+    ));
     let resolved_url = match tv::resolve_stream_url(channel) {
         Ok(url) if !url.trim().is_empty() => url,
         Ok(_) => {
-            show_error(parent, language, "Lo stream TV risolto è vuoto.");
+            show_error(parent, language, &i18n::tr_tv("tv.stream_empty"));
             return;
         }
         Err(err) => {
             show_error(
                 parent,
                 language,
-                &format!("Impossibile avviare {}: {err}", channel.name),
+                &i18n::tr_tv_f(
+                    "tv.start_error",
+                    &[("channel", &channel.name), ("error", &err)],
+                ),
             );
             return;
         }
@@ -734,19 +758,22 @@ fn play_channel(parent: HWND, language: Language, channel: &TvChannel) {
         show_error(
             parent,
             language,
-            &format!("Impossibile riprodurre {}: {err}", channel.name),
+            &i18n::tr_tv_f(
+                "tv.play_error",
+                &[("channel", &channel.name), ("error", &err)],
+            ),
         );
     }
 }
 
 fn page_title(page: &TvPage) -> String {
     match page {
-        TvPage::Root => "TV in diretta".to_string(),
-        TvPage::Category(category) => format!("TV - {category}"),
-        TvPage::Regions => "TV regionali".to_string(),
-        TvPage::Region(region) => format!("TV regionali - {region}"),
-        TvPage::Favorites => "Canali TV preferiti".to_string(),
-        TvPage::Search(query) => format!("Risultati TV per {query}"),
+        TvPage::Root => i18n::tr_tv("tv.page.root"),
+        TvPage::Category(category) => i18n::tr_tv_f("tv.page.category", &[("category", category)]),
+        TvPage::Regions => i18n::tr_tv("tv.page.regions"),
+        TvPage::Region(region) => i18n::tr_tv_f("tv.page.region", &[("region", region)]),
+        TvPage::Favorites => i18n::tr_tv("tv.page.favorites"),
+        TvPage::Search(query) => i18n::tr_tv_f("tv.page.search", &[("query", query)]),
     }
 }
 
@@ -760,9 +787,10 @@ fn push_group_index(groups: &mut Vec<(String, Vec<usize>)>, name: &str, index: u
 
 fn channel_count_description(count: usize) -> String {
     if count == 1 {
-        "1 canale".to_string()
+        i18n::tr_tv("tv.channel_count.one")
     } else {
-        format!("{count} canali")
+        let count_text = count.to_string();
+        i18n::tr_tv_f("tv.channel_count.many", &[("count", &count_text)])
     }
 }
 

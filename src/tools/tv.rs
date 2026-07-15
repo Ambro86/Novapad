@@ -167,21 +167,26 @@ pub(crate) fn load_programs_for_date(
         .user_agent(DEFAULT_USER_AGENT)
         .timeout(Duration::from_secs(10))
         .build()
-        .map_err(|err| format!("Impossibile inizializzare la guida TV: {err}"))?;
-    let response = client
-        .get(url)
-        .send()
-        .map_err(|err| format!("Impossibile scaricare la guida TV: {err}"))?;
+        .map_err(|err| {
+            crate::i18n::tr_tv_f("tv.error.guide_init", &[("error", &err.to_string())])
+        })?;
+    let response = client.get(url).send().map_err(|err| {
+        crate::i18n::tr_tv_f("tv.error.guide_download", &[("error", &err.to_string())])
+    })?;
     let status = response.status();
     if !status.is_success() {
-        return Err(format!(
-            "Impossibile scaricare la guida TV: errore HTTP {}.",
-            status.as_u16()
+        let status_text = status.as_u16().to_string();
+        return Err(crate::i18n::tr_tv_f(
+            "tv.error.guide_http",
+            &[("status", &status_text)],
         ));
     }
-    let root: Value = response
-        .json()
-        .map_err(|err| format!("Risposta della guida TV non valida: {err}"))?;
+    let root: Value = response.json().map_err(|err| {
+        crate::i18n::tr_tv_f(
+            "tv.error.guide_invalid_response",
+            &[("error", &err.to_string())],
+        )
+    })?;
     let mut programs_by_channel = HashMap::<String, Vec<TvProgram>>::new();
     collect_tv_guide_programs_from_timeline_root(&root, &mut programs_by_channel);
     for programs in programs_by_channel.values_mut() {
@@ -206,7 +211,9 @@ pub(crate) fn load_channel_guide(
         .user_agent(DEFAULT_USER_AGENT)
         .timeout(Duration::from_secs(10))
         .build()
-        .map_err(|err| format!("Impossibile inizializzare la guida TV: {err}"))?;
+        .map_err(|err| {
+            crate::i18n::tr_tv_f("tv.error.guide_init", &[("error", &err.to_string())])
+        })?;
 
     let exact_channel =
         resolve_exact_guide_channel_name(&client, &date_text, &requested_normalized)
@@ -217,24 +224,27 @@ pub(crate) fn load_channel_guide(
     let url = template
         .replace("{channel}", &encoded_channel)
         .replace("{date}", &date_text);
-    let response = client
-        .get(url)
-        .send()
-        .map_err(|err| format!("Impossibile scaricare la guida TV: {err}"))?;
+    let response = client.get(url).send().map_err(|err| {
+        crate::i18n::tr_tv_f("tv.error.guide_download", &[("error", &err.to_string())])
+    })?;
     let status = response.status();
     if !status.is_success() {
-        return Err(format!(
-            "Impossibile scaricare la guida TV: errore HTTP {}.",
-            status.as_u16()
+        let status_text = status.as_u16().to_string();
+        return Err(crate::i18n::tr_tv_f(
+            "tv.error.guide_http",
+            &[("status", &status_text)],
         ));
     }
 
-    let root: Value = response
-        .json()
-        .map_err(|err| format!("Risposta della guida TV non valida: {err}"))?;
-    let items = root.as_array().ok_or_else(|| {
-        "Risposta della guida TV non valida: elenco programmi assente.".to_string()
+    let root: Value = response.json().map_err(|err| {
+        crate::i18n::tr_tv_f(
+            "tv.error.guide_invalid_response",
+            &[("error", &err.to_string())],
+        )
     })?;
+    let items = root
+        .as_array()
+        .ok_or_else(|| crate::i18n::tr_tv("tv.error.guide_missing_programs"))?;
     let mut programs = Vec::new();
     for item in items {
         let Some(object) = item.as_object() else {
@@ -444,29 +454,38 @@ fn decode_tv_guide_channel_url() -> Result<String, String> {
 
 fn decode_tv_guide_payload(payload_json: &str) -> Result<String, String> {
     let secret = crate::settings::load_saved_rai_luce_code()
-        .ok_or_else(|| "Codice RaiLuce non disponibile per la guida TV.".to_string())?;
+        .ok_or_else(|| crate::i18n::tr_tv("tv.error.guide_code_missing"))?;
     let secret = secret.trim();
     if secret.is_empty() {
-        return Err("Codice RaiLuce non valido per la guida TV.".to_string());
+        return Err(crate::i18n::tr_tv("tv.error.guide_code_invalid"));
     }
-    let payload: EncryptedTvGuidePayload = serde_json::from_str(payload_json)
-        .map_err(|err| format!("Payload della guida TV non valido: {err}"))?;
+    let payload: EncryptedTvGuidePayload = serde_json::from_str(payload_json).map_err(|err| {
+        crate::i18n::tr_tv_f(
+            "tv.error.guide_payload_invalid",
+            &[("error", &err.to_string())],
+        )
+    })?;
     if payload.algorithm != "gzip-xor-base64-v1" {
-        return Err(format!(
-            "Algoritmo della guida TV non supportato: {}",
-            payload.algorithm
+        return Err(crate::i18n::tr_tv_f(
+            "tv.error.guide_algorithm_unsupported",
+            &[("algorithm", &payload.algorithm)],
         ));
     }
 
     let encrypted = base64::engine::general_purpose::STANDARD
         .decode(payload.payload_b64)
-        .map_err(|err| format!("Payload base64 della guida TV non valido: {err}"))?;
+        .map_err(|err| {
+            crate::i18n::tr_tv_f(
+                "tv.error.guide_base64_invalid",
+                &[("error", &err.to_string())],
+            )
+        })?;
     let mut key = secret.as_bytes().to_vec();
     for part in TV_GUIDE_STATIC_KEY_PARTS {
         key.extend_from_slice(part);
     }
     if key.is_empty() {
-        return Err("Chiave della guida TV non valida.".to_string());
+        return Err(crate::i18n::tr_tv("tv.error.guide_key_invalid"));
     }
     let decrypted = encrypted
         .iter()
@@ -475,11 +494,14 @@ fn decode_tv_guide_payload(payload_json: &str) -> Result<String, String> {
         .collect::<Vec<_>>();
     let mut decoder = GzDecoder::new(decrypted.as_slice());
     let mut decoded = String::new();
-    decoder
-        .read_to_string(&mut decoded)
-        .map_err(|err| format!("Payload gzip della guida TV non valido: {err}"))?;
+    decoder.read_to_string(&mut decoded).map_err(|err| {
+        crate::i18n::tr_tv_f(
+            "tv.error.guide_gzip_invalid",
+            &[("error", &err.to_string())],
+        )
+    })?;
     if decoded.trim().is_empty() {
-        return Err("URL della guida TV vuoto.".to_string());
+        return Err(crate::i18n::tr_tv("tv.error.guide_url_empty"));
     }
     Ok(decoded)
 }
@@ -533,14 +555,12 @@ pub(crate) fn load_channels_with_cache() -> Result<TvChannelLoadResult, String> 
                 cache_warning: None,
             })
         }
-        Ok(_) => load_channels_from_cache(
-            "Il server non ha restituito canali TV. Uso l'ultima lista salvata.",
-        ),
+        Ok(_) => load_channels_from_cache(&crate::i18n::tr_tv("tv.warning.server_empty_use_cache")),
         Err(err) => {
             crate::log_debug(&format!("TV channel server request failed: {err}"));
-            load_channels_from_cache(
-                "Connessione assente o server TV non raggiungibile. Uso l'ultima lista salvata.",
-            )
+            load_channels_from_cache(&crate::i18n::tr_tv(
+                "tv.warning.server_unreachable_use_cache",
+            ))
             .map_err(|_| err)
         }
     }
@@ -548,38 +568,43 @@ pub(crate) fn load_channels_with_cache() -> Result<TvChannelLoadResult, String> 
 
 fn load_channels_from_server() -> Result<Vec<TvChannel>, String> {
     if TV_API_CLIENT_TOKEN.trim().is_empty() {
-        return Err(
-            "Token tecnico TV non configurato nella build di Sonarpad. Configura SONARPAD_ROUTE_CLIENT_TOKEN."
-                .to_string(),
-        );
+        return Err(crate::i18n::tr_tv("tv.error.token_missing"));
     }
 
     let client = Client::builder()
         .user_agent(DEFAULT_USER_AGENT)
         .timeout(Duration::from_secs(10))
         .build()
-        .map_err(|err| format!("Impossibile inizializzare il collegamento TV: {err}"))?;
+        .map_err(|err| {
+            crate::i18n::tr_tv_f("tv.error.connection_init", &[("error", &err.to_string())])
+        })?;
     let response = client
         .get(TV_CHANNELS_URL)
         .header(TV_API_TOKEN_HEADER, TV_API_CLIENT_TOKEN)
         .header(ROUTE_API_TOKEN_HEADER, TV_API_CLIENT_TOKEN)
         .send()
-        .map_err(|err| format!("Impossibile scaricare la lista TV: {err}"))?;
+        .map_err(|err| {
+            crate::i18n::tr_tv_f("tv.error.list_download", &[("error", &err.to_string())])
+        })?;
 
     let status = response.status();
     if status.as_u16() == 401 || status.as_u16() == 403 {
-        return Err("Client TV non autorizzato dal server.".to_string());
+        return Err(crate::i18n::tr_tv("tv.error.client_unauthorized"));
     }
     if !status.is_success() {
-        return Err(format!(
-            "Impossibile scaricare la lista TV: errore HTTP {}.",
-            status.as_u16()
+        let status_text = status.as_u16().to_string();
+        return Err(crate::i18n::tr_tv_f(
+            "tv.error.list_http",
+            &[("status", &status_text)],
         ));
     }
 
-    let payload: TvServerResponse = response
-        .json()
-        .map_err(|err| format!("Risposta della lista TV non valida: {err}"))?;
+    let payload: TvServerResponse = response.json().map_err(|err| {
+        crate::i18n::tr_tv_f(
+            "tv.error.list_invalid_response",
+            &[("error", &err.to_string())],
+        )
+    })?;
     let mut channels = Vec::new();
     for raw in payload.channels {
         if let Some(channel) = normalize_server_channel(raw) {
@@ -603,7 +628,7 @@ fn normalize_server_channel(raw: TvServerChannel) -> Option<TvChannel> {
 
     let group_title = raw.group_title.as_deref().unwrap_or_default().trim();
     let category = if group_title.is_empty() {
-        "Altri".to_string()
+        crate::i18n::tr_tv("tv.category.other")
     } else {
         group_title.to_string()
     };
@@ -660,8 +685,9 @@ fn channels_cache_path() -> std::path::PathBuf {
 fn write_channels_cache(channels: &[TvChannel]) -> Result<(), String> {
     let path = channels_cache_path();
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|err| format!("Impossibile creare la cartella cache TV: {err}"))?;
+        fs::create_dir_all(parent).map_err(|err| {
+            crate::i18n::tr_tv_f("tv.error.cache_directory", &[("error", &err.to_string())])
+        })?;
     }
     let saved_at_unix = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -671,18 +697,21 @@ fn write_channels_cache(channels: &[TvChannel]) -> Result<(), String> {
         saved_at_unix,
         channels: channels.to_vec(),
     };
-    let bytes = serde_json::to_vec(&cache)
-        .map_err(|err| format!("Impossibile preparare la cache TV: {err}"))?;
-    fs::write(path, bytes).map_err(|err| format!("Impossibile salvare la cache TV: {err}"))
+    let bytes = serde_json::to_vec(&cache).map_err(|err| {
+        crate::i18n::tr_tv_f("tv.error.cache_prepare", &[("error", &err.to_string())])
+    })?;
+    fs::write(path, bytes)
+        .map_err(|err| crate::i18n::tr_tv_f("tv.error.cache_save", &[("error", &err.to_string())]))
 }
 
 fn load_channels_from_cache(warning: &str) -> Result<TvChannelLoadResult, String> {
     let path = channels_cache_path();
-    let bytes = fs::read(path).map_err(|_| "Nessuna lista TV salvata disponibile.".to_string())?;
-    let cache: TvChannelsCache = serde_json::from_slice(&bytes)
-        .map_err(|err| format!("La lista TV salvata non è valida: {err}"))?;
+    let bytes = fs::read(path).map_err(|_| crate::i18n::tr_tv("tv.error.cache_missing"))?;
+    let cache: TvChannelsCache = serde_json::from_slice(&bytes).map_err(|err| {
+        crate::i18n::tr_tv_f("tv.error.cache_invalid", &[("error", &err.to_string())])
+    })?;
     if cache.channels.is_empty() {
-        return Err("La lista TV salvata è vuota.".to_string());
+        return Err(crate::i18n::tr_tv("tv.error.cache_empty"));
     }
     let _cache_saved_at_unix = cache.saved_at_unix;
     Ok(TvChannelLoadResult {
@@ -749,30 +778,42 @@ fn resolve_aurora_channel(channel: &TvChannel, channel_id: &str) -> Result<Strin
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36")
         .timeout(Duration::from_secs(15))
         .build()
-        .map_err(|err| format!("Impossibile inizializzare il resolver Aurora: {err}"))?;
-    let mut token_url = Url::parse(&format!("{endpoint}/token"))
-        .map_err(|err| format!("URL token Aurora non valido: {err}"))?;
+        .map_err(|err| {
+            crate::i18n::tr_tv_f("tv.error.aurora_init", &[("error", &err.to_string())])
+        })?;
+    let mut token_url = Url::parse(&format!("{endpoint}/token")).map_err(|err| {
+        crate::i18n::tr_tv_f("tv.error.aurora_token_url", &[("error", &err.to_string())])
+    })?;
     token_url.query_pairs_mut().append_pair("realm", realm);
     let referer = channel.url.trim();
 
     let token_response = add_aurora_headers(client.get(token_url), realm, referer)
         .send()
-        .map_err(|err| format!("Richiesta token Aurora non riuscita: {err}"))?;
+        .map_err(|err| {
+            crate::i18n::tr_tv_f(
+                "tv.error.aurora_token_request",
+                &[("error", &err.to_string())],
+            )
+        })?;
     if !token_response.status().is_success() {
-        return Err(format!(
-            "Richiesta token Aurora: errore HTTP {}.",
-            token_response.status().as_u16()
+        let status_text = token_response.status().as_u16().to_string();
+        return Err(crate::i18n::tr_tv_f(
+            "tv.error.aurora_token_http",
+            &[("status", &status_text)],
         ));
     }
-    let token_json: Value = token_response
-        .json()
-        .map_err(|err| format!("Risposta token Aurora non valida: {err}"))?;
+    let token_json: Value = token_response.json().map_err(|err| {
+        crate::i18n::tr_tv_f(
+            "tv.error.aurora_token_response",
+            &[("error", &err.to_string())],
+        )
+    })?;
     let token = token_json
         .pointer("/data/attributes/token")
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| "Token Aurora non disponibile.".to_string())?;
+        .ok_or_else(|| crate::i18n::tr_tv("tv.error.aurora_token_missing"))?;
 
     let playback_url = format!("{endpoint}/playback/v3/channelPlaybackInfo");
     let body = serde_json::json!({
@@ -796,18 +837,27 @@ fn resolve_aurora_channel(channel: &TvChannel, channel_id: &str) -> Result<Strin
         .bearer_auth(token)
         .json(&body)
         .send()
-        .map_err(|err| format!("Richiesta riproduzione Aurora non riuscita: {err}"))?;
+        .map_err(|err| {
+            crate::i18n::tr_tv_f(
+                "tv.error.aurora_playback_request",
+                &[("error", &err.to_string())],
+            )
+        })?;
     if !playback_response.status().is_success() {
-        return Err(format!(
-            "Richiesta riproduzione Aurora: errore HTTP {}.",
-            playback_response.status().as_u16()
+        let status_text = playback_response.status().as_u16().to_string();
+        return Err(crate::i18n::tr_tv_f(
+            "tv.error.aurora_playback_http",
+            &[("status", &status_text)],
         ));
     }
-    let playback_json: Value = playback_response
-        .json()
-        .map_err(|err| format!("Risposta riproduzione Aurora non valida: {err}"))?;
+    let playback_json: Value = playback_response.json().map_err(|err| {
+        crate::i18n::tr_tv_f(
+            "tv.error.aurora_playback_response",
+            &[("error", &err.to_string())],
+        )
+    })?;
     find_stream_url(&playback_json, ".m3u8")
-        .ok_or_else(|| "URL HLS non trovato nella risposta Aurora.".to_string())
+        .ok_or_else(|| crate::i18n::tr_tv("tv.error.aurora_hls_missing"))
 }
 
 fn add_aurora_headers(
@@ -847,8 +897,9 @@ fn find_stream_url(value: &Value, extension: &str) -> Option<String> {
 }
 
 fn resolve_rai_relinker(channel: &TvChannel) -> Result<String, String> {
-    let mut url = Url::parse(channel.url.trim())
-        .map_err(|err| format!("URL relinker RAI non valido: {err}"))?;
+    let mut url = Url::parse(channel.url.trim()).map_err(|err| {
+        crate::i18n::tr_tv_f("tv.error.rai_relinker_url", &[("error", &err.to_string())])
+    })?;
     let mut query = url
         .query_pairs()
         .filter(|(key, _)| key != "output")
@@ -867,23 +918,34 @@ fn resolve_rai_relinker(channel: &TvChannel) -> Result<String, String> {
         .user_agent(channel.playback_user_agent())
         .timeout(Duration::from_secs(10))
         .build()
-        .map_err(|err| format!("Impossibile inizializzare il relinker RAI: {err}"))?;
+        .map_err(|err| {
+            crate::i18n::tr_tv_f("tv.error.rai_relinker_init", &[("error", &err.to_string())])
+        })?;
     let response = client
         .get(url)
         .header("Origin", "https://www.raiplay.it")
         .header("Referer", "https://www.raiplay.it/")
         .send()
-        .map_err(|err| format!("Impossibile risolvere lo stream RAI: {err}"))?;
+        .map_err(|err| {
+            crate::i18n::tr_tv_f(
+                "tv.error.rai_stream_resolve",
+                &[("error", &err.to_string())],
+            )
+        })?;
     if !response.status().is_success() {
-        return Err(format!(
-            "Il relinker RAI ha restituito l'errore HTTP {}.",
-            response.status().as_u16()
+        let status_text = response.status().as_u16().to_string();
+        return Err(crate::i18n::tr_tv_f(
+            "tv.error.rai_relinker_http",
+            &[("status", &status_text)],
         ));
     }
     let final_url = response.url().to_string();
-    let body = response
-        .text()
-        .map_err(|err| format!("Risposta del relinker RAI non leggibile: {err}"))?;
+    let body = response.text().map_err(|err| {
+        crate::i18n::tr_tv_f(
+            "tv.error.rai_relinker_response",
+            &[("error", &err.to_string())],
+        )
+    })?;
     let trimmed = body.trim();
     if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
         return Ok(trimmed.to_string());
@@ -893,7 +955,7 @@ fn resolve_rai_relinker(channel: &TvChannel) -> Result<String, String> {
     }
     extract_xml_url(trimmed, true)
         .or_else(|| extract_xml_url(trimmed, false))
-        .ok_or_else(|| "Stream TV non trovato nella risposta del relinker RAI.".to_string())
+        .ok_or_else(|| crate::i18n::tr_tv("tv.error.rai_stream_missing"))
 }
 
 fn extract_xml_url(xml: &str, require_content_type: bool) -> Option<String> {

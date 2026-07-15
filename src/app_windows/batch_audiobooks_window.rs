@@ -1461,7 +1461,8 @@ fn prepare_batch_tts_preflight(state: &mut BatchState, tts: &mut TtsSettings) ->
             return false;
         };
         if let Ok(parsed) = value.parse::<u32>() {
-            tts.sapi4_threads = Some(parsed.clamp(1, 100));
+            tts.sapi4_threads =
+                Some(parsed.clamp(1, crate::tts_engine::SAPI4_MAX_PARALLEL_WORKERS as u32));
         }
     }
 

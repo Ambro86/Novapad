@@ -13,12 +13,15 @@ use futures_util::{SinkExt, StreamExt, future::join_all};
 use rand::Rng;
 use rodio::buffer::SamplesBuffer;
 use rodio::{Decoder, OutputStreamBuilder, Sink, Source};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::io::{BufWriter, Cursor, Write};
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc;
 use tokio_tungstenite::{
@@ -28,6 +31,9 @@ use tokio_tungstenite::{
 use url::Url;
 use uuid::Uuid;
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+use windows::Win32::System::Diagnostics::Debug::{
+    SEM_FAILCRITICALERRORS, SEM_NOGPFAULTERRORBOX, SetErrorMode,
+};
 use windows::Win32::System::Power::{ES_CONTINUOUS, ES_SYSTEM_REQUIRED, SetThreadExecutionState};
 use windows::Win32::System::Threading::{
     GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_BELOW_NORMAL,
@@ -66,14 +72,23 @@ fn lower_current_audiobook_worker_priority(context: &str) {
     }
 }
 
-fn responsive_audiobook_worker_limit(requested: usize) -> usize {
-    let logical_cores = std::thread::available_parallelism()
-        .map(|value| value.get())
-        .unwrap_or(2);
-    // Leave enough scheduler time for the Win32 message loop and NVDA while
-    // still allowing parallel synthesis.  This mainly protects old 1-4 core PCs.
-    let automatic_limit = logical_cores.saturating_mul(2).clamp(2, 16);
-    requested.max(1).min(automatic_limit)
+pub(crate) const SAPI4_MAX_PARALLEL_WORKERS: usize = 64;
+
+fn requested_sapi4_worker_limit(requested: usize) -> usize {
+    requested.clamp(1, SAPI4_MAX_PARALLEL_WORKERS)
+}
+
+fn sapi4_next_lower_worker_limit(current: usize) -> usize {
+    match current {
+        0..=2 => 1,
+        3..=4 => 2,
+        5..=8 => 4,
+        9..=12 => 8,
+        13..=20 => 12,
+        21..=32 => 20,
+        33..=48 => 32,
+        _ => 48,
+    }
 }
 
 pub const WM_TTS_PLAYBACK_DONE: u32 = WM_APP + 3;
@@ -5351,7 +5366,7 @@ fn start_audiobook_with_text(
             crate::app_windows::prompt_window::prompt_user(hwnd, &title, &body, "30", language)
         {
             if let Ok(val) = val_str.parse::<u32>() {
-                sapi4_threads = Some(val.clamp(1, 100));
+                sapi4_threads = Some(val.clamp(1, SAPI4_MAX_PARALLEL_WORKERS as u32));
             }
         } else {
             // User cancelled the prompt, abort the whole process
@@ -6228,163 +6243,316 @@ pub(crate) fn run_sapi4_parallel_part(
         ));
     std::fs::create_dir_all(&temp_dir).ok();
 
-    let mut internal_parts = Vec::new();
-    let requested_pool_size = options.sapi4_threads.unwrap_or(30) as usize;
-    let pool_size = responsive_audiobook_worker_limit(requested_pool_size);
-    if pool_size != requested_pool_size {
-        crate::log_debug(&format!(
-            "Audiobook SAPI4: worker count reduced from {} to {} to preserve UI responsiveness",
-            requested_pool_size, pool_size
-        ));
+    struct Sapi4WorkUnit {
+        chunks: Vec<String>,
+        wav_output: PathBuf,
     }
-    let chunks_count = chunks.len();
-    let sub_parts_count = if chunks_count < pool_size {
-        chunks_count
-    } else {
-        pool_size
-    };
-    let chunks_per_sub = chunks_count.div_ceil(sub_parts_count);
 
+    enum Sapi4UnitOutcome {
+        Completed(PathBuf),
+        RetryableError(String),
+        FatalError(String),
+        Cancelled,
+    }
+
+    let requested_pool_size = options.sapi4_threads.unwrap_or(30) as usize;
+    let selected_pool_size = requested_sapi4_worker_limit(requested_pool_size);
+    let chunks_count = chunks.len();
+    let initial_pool_size = selected_pool_size.min(chunks_count);
+    crate::log_debug(&format!(
+        "Audiobook SAPI4: requested_workers={} selected_workers={} effective_workers={} chunks={} max_allowed={}",
+        requested_pool_size,
+        selected_pool_size,
+        initial_pool_size,
+        chunks_count,
+        SAPI4_MAX_PARALLEL_WORKERS
+    ));
+
+    let sub_parts_count = initial_pool_size;
+    let chunks_per_sub = chunks_count.div_ceil(sub_parts_count);
+    let mut units = Vec::with_capacity(sub_parts_count);
     for i in 0..sub_parts_count {
-        let s = i * chunks_per_sub;
-        let e = std::cmp::min(s + chunks_per_sub, chunks_count);
-        if s >= e {
+        let start = i * chunks_per_sub;
+        let end = std::cmp::min(start + chunks_per_sub, chunks_count);
+        if start >= end {
             break;
         }
-        let sub_chunks = chunks[s..e].to_vec();
-        let sub_output = temp_dir.join(format!("sub_{}.wav", i));
-        internal_parts.push((sub_chunks, sub_output));
+        units.push(Sapi4WorkUnit {
+            chunks: chunks[start..end].to_vec(),
+            wav_output: temp_dir.join(format!("sub_{}.wav", i)),
+        });
     }
 
-    let progress_counter = Arc::new(std::sync::atomic::AtomicUsize::new(*global_progress));
-    let (tx, rx) = std::sync::mpsc::channel::<Result<PathBuf, String>>();
-    let parts_shared = Arc::new(Mutex::new(internal_parts.into_iter()));
-    let mut handles = Vec::new();
+    let units = Arc::new(units);
+    let progress_start = *global_progress;
+    let progress_counter = Arc::new(std::sync::atomic::AtomicUsize::new(progress_start));
+    let mut completed_files: Vec<Option<PathBuf>> = vec![None; units.len()];
+    let mut pending_indices: Vec<usize> = (0..units.len()).collect();
+    let mut worker_limit = initial_pool_size;
+    let mut attempt = 1usize;
+    let mut final_error: Option<String> = None;
 
-    for _ in 0..pool_size {
-        let tx = tx.clone();
-        let parts_shared = parts_shared.clone();
-        let progress_counter = progress_counter.clone();
-        let cancel_token = options.cancel.clone();
-        let (r, p, v) = (options.rate, options.pitch, options.volume);
-        let mp3_bitrate_kbps = options.audiobook_bitrate_kbps;
-        let progress_hwnd = options.progress_hwnd;
+    while !pending_indices.is_empty() {
+        if options.cancel.load(Ordering::Relaxed) {
+            std::fs::remove_dir_all(&temp_dir).ok();
+            return Err(cancelled_message(options.language));
+        }
 
-        let handle = std::thread::spawn(move || {
-            lower_current_audiobook_worker_priority("SAPI4 worker");
-            loop {
-                let part = {
-                    let mut guard = parts_shared.lock().unwrap_or_else(|e| e.into_inner());
-                    guard.next()
-                };
-                let Some((sub_chunks, sub_output)) = part else {
-                    break;
-                };
-                if cancel_token.load(Ordering::Relaxed) {
-                    tx.send(Err("Cancelled".to_string())).ok();
-                    break;
-                }
+        let actual_workers = worker_limit.min(pending_indices.len());
+        crate::log_debug(&format!(
+            "Audiobook SAPI4: attempt={} workers={} pending_units={}",
+            attempt,
+            actual_workers,
+            pending_indices.len()
+        ));
 
-                let res = crate::sapi4_engine::speak_sapi4_to_file(
-                    &sub_chunks,
-                    voice_idx,
-                    &sub_output,
-                    crate::sapi4_engine::Sapi4Options {
-                        rate: r,
-                        pitch: p,
-                        volume: v,
-                        mp3_bitrate_kbps,
-                        cancel: cancel_token.clone(),
-                    },
-                    |_| {
-                        let current = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
-                        if progress_hwnd.0 != 0 {
-                            unsafe {
-                                if PostMessageW(
-                                    progress_hwnd,
-                                    crate::WM_UPDATE_PROGRESS,
-                                    WPARAM(current),
-                                    LPARAM(0),
-                                )
-                                .ok()
-                                .is_some()
-                                {}
+        for &unit_index in &pending_indices {
+            let wav = &units[unit_index].wav_output;
+            std::fs::remove_file(wav).ok();
+            std::fs::remove_file(wav.with_extension("mp3")).ok();
+        }
+
+        let pending_for_attempt = pending_indices.clone();
+        let parts_shared = Arc::new(Mutex::new(pending_for_attempt.clone().into_iter()));
+        let (tx, rx) = std::sync::mpsc::channel::<(usize, Sapi4UnitOutcome)>();
+        let mut handles = Vec::with_capacity(actual_workers);
+        let report_progress = attempt == 1;
+
+        for _ in 0..actual_workers {
+            let tx = tx.clone();
+            let parts_shared = parts_shared.clone();
+            let units = units.clone();
+            let progress_counter = progress_counter.clone();
+            let cancel_token = options.cancel.clone();
+            let (rate, pitch, volume) = (options.rate, options.pitch, options.volume);
+            let mp3_bitrate_kbps = options.audiobook_bitrate_kbps;
+            let progress_hwnd = options.progress_hwnd;
+
+            let handle = std::thread::spawn(move || {
+                lower_current_audiobook_worker_priority("SAPI4 worker");
+                loop {
+                    let unit_index = {
+                        let mut guard = parts_shared.lock().unwrap_or_else(|e| e.into_inner());
+                        guard.next()
+                    };
+                    let Some(unit_index) = unit_index else {
+                        break;
+                    };
+                    let unit = &units[unit_index];
+
+                    if cancel_token.load(Ordering::Relaxed) {
+                        tx.send((unit_index, Sapi4UnitOutcome::Cancelled)).ok();
+                        break;
+                    }
+
+                    let synthesis = crate::sapi4_engine::speak_sapi4_to_file(
+                        &unit.chunks,
+                        voice_idx,
+                        &unit.wav_output,
+                        crate::sapi4_engine::Sapi4Options {
+                            rate,
+                            pitch,
+                            volume,
+                            mp3_bitrate_kbps,
+                            cancel: cancel_token.clone(),
+                        },
+                        |_| {
+                            if report_progress {
+                                let current = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
+                                if progress_hwnd.0 != 0 {
+                                    unsafe {
+                                        let _post_result = PostMessageW(
+                                            progress_hwnd,
+                                            crate::WM_UPDATE_PROGRESS,
+                                            WPARAM(current),
+                                            LPARAM(0),
+                                        );
+                                    }
+                                }
+                            }
+                        },
+                    );
+
+                    let result = match synthesis {
+                        Err(error) => {
+                            std::fs::remove_file(&unit.wav_output).ok();
+                            std::fs::remove_file(unit.wav_output.with_extension("mp3")).ok();
+                            Sapi4UnitOutcome::RetryableError(error)
+                        }
+                        Ok(()) => {
+                            let wav_valid = std::fs::metadata(&unit.wav_output)
+                                .is_ok_and(|metadata| metadata.len() > 44);
+                            if !wav_valid {
+                                std::fs::remove_file(&unit.wav_output).ok();
+                                Sapi4UnitOutcome::RetryableError(format!(
+                                    "SAPI4 bridge produced an empty or invalid WAV for unit {}",
+                                    unit_index
+                                ))
+                            } else if is_mp3 {
+                                let encoded_sub = unit.wav_output.with_extension("mp3");
+                                let ff_settings = crate::ffmpeg_export::ConvertAudioSettings {
+                                    format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
+                                    quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
+                                        mp3_bitrate_kbps,
+                                    ),
+                                };
+                                let mut ff_progress = |_progress: u32| {};
+                                match crate::ffmpeg_export::convert_audio_file(
+                                    &unit.wav_output,
+                                    &encoded_sub,
+                                    &ff_settings,
+                                    None,
+                                    Some(&mut ff_progress),
+                                ) {
+                                    Ok(()) => {
+                                        std::fs::remove_file(&unit.wav_output).ok();
+                                        let mp3_valid = std::fs::metadata(&encoded_sub)
+                                            .is_ok_and(|metadata| metadata.len() > 0);
+                                        if mp3_valid {
+                                            Sapi4UnitOutcome::Completed(encoded_sub)
+                                        } else {
+                                            std::fs::remove_file(&encoded_sub).ok();
+                                            Sapi4UnitOutcome::FatalError(format!(
+                                                "Parallel SAPI4 MP3 encode produced an empty file for unit {}",
+                                                unit_index
+                                            ))
+                                        }
+                                    }
+                                    Err(error) => {
+                                        std::fs::remove_file(&unit.wav_output).ok();
+                                        std::fs::remove_file(&encoded_sub).ok();
+                                        Sapi4UnitOutcome::FatalError(format!(
+                                            "Parallel audio encode failed: {}",
+                                            error
+                                        ))
+                                    }
+                                }
+                            } else {
+                                Sapi4UnitOutcome::Completed(unit.wav_output.clone())
                             }
                         }
-                    },
-                );
+                    };
 
-                if let Err(e) = res {
-                    std::fs::remove_file(&sub_output).ok();
-                    tx.send(Err(e)).ok();
-                    break;
-                } else {
-                    // Only parallel encode for MP3 because they can be concatenated binary.
-                    // AAC/M4B must be joined as WAV first and then encoded as a whole.
-                    if is_mp3 {
-                        let encoded_sub = sub_output.with_extension("mp3");
-                        let ff_settings = crate::ffmpeg_export::ConvertAudioSettings {
-                            format: crate::ffmpeg_export::ConvertAudioFormat::Mp3,
-                            quality: crate::ffmpeg_export::ConvertAudioQuality::BitrateKbps(
-                                mp3_bitrate_kbps,
-                            ),
-                        };
-                        let mut ff_progress = |_p: u32| {};
-                        if let Err(e) = crate::ffmpeg_export::convert_audio_file(
-                            &sub_output,
-                            &encoded_sub,
-                            &ff_settings,
-                            None,
-                            Some(&mut ff_progress),
-                        ) {
-                            std::fs::remove_file(&sub_output).ok();
-                            tx.send(Err(format!("Parallel audio encode failed: {}", e)))
-                                .ok();
-                            break;
-                        }
-                        std::fs::remove_file(&sub_output).ok();
-                        tx.send(Ok(encoded_sub)).ok();
-                    } else {
-                        // Keep as WAV for now (M4B or standard WAV)
-                        tx.send(Ok(sub_output)).ok();
-                    }
+                    tx.send((unit_index, result)).ok();
                 }
-            }
-        });
-        handles.push(handle);
-    }
+            });
+            handles.push(handle);
+        }
+        {
+            let _sender = tx;
+        }
 
-    {
-        let _tx = tx;
-    }
-    let mut produced_files: Vec<PathBuf> = Vec::new();
-    let mut error = None;
-    for res in rx {
-        match res {
-            Ok(path) => produced_files.push(path),
-            Err(e) => {
-                if error.is_none() {
-                    error = Some(e);
+        let mut received = vec![false; units.len()];
+        let mut failed_indices = Vec::new();
+        let mut attempt_error: Option<String> = None;
+        let mut fatal_error: Option<String> = None;
+        let mut was_cancelled = false;
+        for (unit_index, outcome) in rx {
+            if unit_index >= units.len() {
+                continue;
+            }
+            received[unit_index] = true;
+            match outcome {
+                Sapi4UnitOutcome::Completed(path) => {
+                    completed_files[unit_index] = Some(path);
+                }
+                Sapi4UnitOutcome::RetryableError(error) => {
+                    crate::log_debug(&format!(
+                        "Audiobook SAPI4: attempt={} unit={} failed: {}",
+                        attempt, unit_index, error
+                    ));
+                    if attempt_error.is_none() {
+                        attempt_error = Some(error);
+                    }
+                    failed_indices.push(unit_index);
+                }
+                Sapi4UnitOutcome::FatalError(error) => {
+                    crate::log_debug(&format!(
+                        "Audiobook SAPI4: attempt={} unit={} fatal error: {}",
+                        attempt, unit_index, error
+                    ));
+                    if fatal_error.is_none() {
+                        fatal_error = Some(error);
+                    }
+                    failed_indices.push(unit_index);
+                }
+                Sapi4UnitOutcome::Cancelled => {
+                    was_cancelled = true;
+                    failed_indices.push(unit_index);
                 }
             }
         }
-    }
-    for h in handles {
-        h.join().ok();
+
+        for handle in handles {
+            if handle.join().is_err() {
+                crate::log_debug(&format!(
+                    "Audiobook SAPI4: a worker thread panicked during attempt {}",
+                    attempt
+                ));
+            }
+        }
+
+        for &unit_index in &pending_for_attempt {
+            if !received[unit_index] {
+                failed_indices.push(unit_index);
+                if attempt_error.is_none() {
+                    attempt_error = Some(format!(
+                        "SAPI4 worker ended without returning a result for unit {}",
+                        unit_index
+                    ));
+                }
+            }
+        }
+        failed_indices.sort_unstable();
+        failed_indices.dedup();
+
+        if options.cancel.load(Ordering::Relaxed) || was_cancelled {
+            std::fs::remove_dir_all(&temp_dir).ok();
+            return Err(cancelled_message(options.language));
+        }
+
+        if let Some(error) = fatal_error {
+            std::fs::remove_dir_all(&temp_dir).ok();
+            return Err(error);
+        }
+
+        if failed_indices.is_empty() {
+            crate::log_debug(&format!(
+                "Audiobook SAPI4: attempt={} completed successfully with {} workers",
+                attempt, actual_workers
+            ));
+            break;
+        }
+
+        final_error = attempt_error;
+        if worker_limit <= 1 {
+            std::fs::remove_dir_all(&temp_dir).ok();
+            return Err(final_error
+                .unwrap_or_else(|| "SAPI4 audiobook creation failed with one worker".to_string()));
+        }
+
+        let lower_limit = sapi4_next_lower_worker_limit(worker_limit).min(failed_indices.len());
+        crate::log_debug(&format!(
+            "Audiobook SAPI4: retrying {} failed units; workers {} -> {}",
+            failed_indices.len(),
+            actual_workers,
+            lower_limit
+        ));
+        pending_indices = failed_indices;
+        worker_limit = lower_limit;
+        attempt += 1;
     }
 
-    if error.is_some() || options.cancel.load(Ordering::Relaxed) {
+    let mut produced_files: Vec<PathBuf> = completed_files.into_iter().flatten().collect();
+    if produced_files.len() != units.len() {
         std::fs::remove_dir_all(&temp_dir).ok();
-        let msg = if let Some(e) = error {
-            e
-        } else {
-            "Cancelled".to_string()
-        };
-        return Err(if msg == "Cancelled" {
-            cancelled_message(options.language)
-        } else {
-            msg
-        });
+        return Err(final_error.unwrap_or_else(|| {
+            format!(
+                "SAPI4 produced {} parts out of {}",
+                produced_files.len(),
+                units.len()
+            )
+        }));
     }
 
     produced_files.sort_by_key(|p: &PathBuf| {
@@ -6407,7 +6575,19 @@ pub(crate) fn run_sapi4_parallel_part(
     };
 
     std::fs::remove_dir_all(&temp_dir).ok();
-    *global_progress = progress_counter.load(Ordering::SeqCst);
+    let exact_progress = progress_start.saturating_add(chunks.len());
+    progress_counter.store(exact_progress, Ordering::SeqCst);
+    if options.progress_hwnd.0 != 0 {
+        unsafe {
+            let _post_result = PostMessageW(
+                options.progress_hwnd,
+                crate::WM_UPDATE_PROGRESS,
+                WPARAM(exact_progress),
+                LPARAM(0),
+            );
+        }
+    }
+    *global_progress = exact_progress;
     result
 }
 
@@ -6511,9 +6691,11 @@ mod tests {
         is_edge_text_usable, normalize_for_tts, optimize_google_playback_startup,
         parse_edge_binary_audio_payload, parse_sapi4_part_index, parse_voice_tag_override,
         prepare_tts_text, preview_for_log, render_edge_ssml_text_with_pause_tags,
-        render_sapi_ssml_text_with_pause_tags, sanitize_edge_text, split_into_tts_chunks,
-        split_long_sentence_edge_with_limit, split_sentences, split_text_for_engine,
-        split_voice_tag_spans, strip_dashed_lines, utf16_len, wav_interleaved_sample_count,
+        render_sapi_ssml_text_with_pause_tags, sanitize_edge_text,
+        sapi5_minimum_plausible_duration_ms, sapi5_mp3_duration_from_size_ms, sapi5_worker_levels,
+        split_into_tts_chunks, split_long_sentence_edge_with_limit, split_sentences,
+        split_text_for_engine, split_voice_tag_spans, strip_dashed_lines, utf16_len,
+        wav_interleaved_sample_count,
     };
 
     #[test]
@@ -6944,6 +7126,26 @@ mod tests {
     }
 
     #[test]
+    fn sapi5_adaptive_worker_levels_reduce_progressively() {
+        assert_eq!(sapi5_worker_levels(12), vec![12, 8, 6, 4, 2, 1]);
+        assert_eq!(sapi5_worker_levels(6), vec![6, 4, 2, 1]);
+        assert_eq!(sapi5_worker_levels(1), vec![1]);
+    }
+
+    #[test]
+    fn sapi5_size_based_duration_matches_cbr_bitrate() {
+        assert_eq!(sapi5_mp3_duration_from_size_ms(8_000_000, 64), 1_000_000);
+        assert_eq!(sapi5_mp3_duration_from_size_ms(8_000_000, 128), 500_000);
+    }
+
+    #[test]
+    fn sapi5_plausibility_guard_flags_large_normal_rate_truncation() {
+        let minimum = sapi5_minimum_plausible_duration_ms(30_000, 0);
+        assert!(minimum > 420_000);
+        assert!(minimum < 900_000);
+    }
+
+    #[test]
     fn sapi4_audiobook_chunks_merge_in_order() {
         let mut produced_files = vec![
             std::path::PathBuf::from("sub_10.wav"),
@@ -7203,6 +7405,1118 @@ fn merge_and_finalize_sapi4_audio(
     Ok(())
 }
 
+const SAPI5_MAX_PARALLEL_WORKERS: usize = 12;
+const SAPI5_MIN_OUTPUT_BYTES: u64 = 1_024;
+const SAPI5_FINAL_DURATION_TOLERANCE_PERCENT: u64 = 82;
+
+#[derive(Clone)]
+struct Sapi5ParallelUnit {
+    index: usize,
+    start_chunk: usize,
+    end_chunk: usize,
+    chunks: Vec<String>,
+    output: PathBuf,
+    text_chars: usize,
+}
+
+struct Sapi5PartMetrics {
+    bytes: u64,
+    size_duration_ms: u64,
+    decoded_duration_ms: Option<u64>,
+    minimum_duration_ms: u64,
+    suspicious_reason: Option<String>,
+}
+
+fn sapi5_diagnostic_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn sapi5_compatibility_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn sapi5_diagnostic_path() -> PathBuf {
+    crate::settings::settings_dir().join("sapi5_audiobook_diagnostic.log")
+}
+
+fn sapi5_compatibility_path() -> PathBuf {
+    crate::settings::settings_dir().join("sapi5_audiobook_compatibility_process.json")
+}
+
+fn sapi5_active_attempt_path() -> PathBuf {
+    crate::settings::settings_dir().join("sapi5_audiobook_active_attempt.json")
+}
+
+fn sapi5_next_lower_worker_limit(current: usize) -> usize {
+    sapi5_worker_levels(current)
+        .into_iter()
+        .find(|candidate| *candidate < current.max(1))
+        .unwrap_or(1)
+}
+
+fn sapi5_extract_log_field<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+    let marker = format!("{}=", key);
+    let start = line.find(&marker)?.saturating_add(marker.len());
+    let rest = &line[start..];
+    if let Some(stripped) = rest.strip_prefix('"') {
+        let end = stripped.find('"')?;
+        Some(&stripped[..end])
+    } else {
+        let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+        Some(&rest[..end])
+    }
+}
+
+fn sapi5_recover_interrupted_attempt_from_log() -> Option<(String, usize, u128)> {
+    let contents = std::fs::read_to_string(sapi5_diagnostic_path()).ok()?;
+    let mut latest: Option<(String, usize, u128, bool)> = None;
+    for line in contents.lines() {
+        if line.contains("SESSION_START") && line.contains("isolation=process") {
+            let id = sapi5_extract_log_field(line, "id")?.parse::<u128>().ok()?;
+            let voice = sapi5_extract_log_field(line, "voice")?.to_string();
+            let limit = sapi5_extract_log_field(line, "initial_limit")?
+                .parse::<usize>()
+                .ok()?;
+            latest = Some((voice, limit, id, false));
+            continue;
+        }
+        let Some((_voice, _limit, id, completed)) = latest.as_mut() else {
+            continue;
+        };
+        let id_marker = format!("id={}", id);
+        if line.contains(&id_marker)
+            && (line.contains("SESSION_SUCCESS")
+                || line.contains("SESSION_ERROR")
+                || line.contains("SESSION_RECOVERED"))
+        {
+            *completed = true;
+        }
+    }
+    latest.and_then(|(voice, limit, id, completed)| (!completed).then_some((voice, limit, id)))
+}
+
+fn sapi5_read_active_attempt() -> Option<(String, usize, u128)> {
+    let contents = std::fs::read_to_string(sapi5_active_attempt_path()).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&contents).ok()?;
+    if value.get("isolation").and_then(|mode| mode.as_str()) != Some("process") {
+        // Ignore and remove guards created by the previous in-process implementation.
+        // The isolated worker model must receive a fresh trial rather than inheriting
+        // a lower limit from a crash mode that it was specifically introduced to fix.
+        sapi5_clear_active_attempt();
+        return None;
+    }
+    let voice = value.get("voice")?.as_str()?.to_string();
+    let worker_limit = value.get("worker_limit")?.as_u64()? as usize;
+    let session_id = value.get("session_id")?.as_u64()? as u128;
+    Some((voice, worker_limit, session_id))
+}
+
+fn sapi5_write_active_attempt(voice: &str, worker_limit: usize, session_id: u128) {
+    let path = sapi5_active_attempt_path();
+    if let Some(parent) = path.parent()
+        && let Err(err) = std::fs::create_dir_all(parent)
+    {
+        crate::log_debug(&format!(
+            "SAPI5 recovery: failed to create settings directory: {}",
+            err
+        ));
+        return;
+    }
+    let value = serde_json::json!({
+        "voice": voice,
+        "worker_limit": worker_limit.clamp(1, SAPI5_MAX_PARALLEL_WORKERS),
+        "session_id": session_id.min(u128::from(u64::MAX)) as u64,
+        "isolation": "process",
+    });
+    match serde_json::to_string_pretty(&value) {
+        Ok(json) => {
+            if let Err(err) = std::fs::write(&path, json) {
+                crate::log_debug(&format!(
+                    "SAPI5 recovery: failed to write {:?}: {}",
+                    path, err
+                ));
+            }
+        }
+        Err(err) => crate::log_debug(&format!(
+            "SAPI5 recovery: failed to serialize active attempt: {}",
+            err
+        )),
+    }
+}
+
+fn sapi5_clear_active_attempt() {
+    let path = sapi5_active_attempt_path();
+    if path.exists()
+        && let Err(err) = std::fs::remove_file(&path)
+    {
+        crate::log_debug(&format!(
+            "SAPI5 recovery: failed to remove {:?}: {}",
+            path, err
+        ));
+    }
+}
+
+fn sapi5_recover_interrupted_attempt() {
+    let recovered = sapi5_read_active_attempt().or_else(sapi5_recover_interrupted_attempt_from_log);
+    let Some((voice, failed_limit, session_id)) = recovered else {
+        return;
+    };
+    let lower_limit = sapi5_next_lower_worker_limit(failed_limit);
+    let existing_limit = load_sapi5_worker_limit(&voice);
+    let recovered_limit = existing_limit
+        .map(|limit| limit.min(lower_limit))
+        .unwrap_or(lower_limit);
+    save_sapi5_worker_limit(&voice, recovered_limit);
+    sapi5_clear_active_attempt();
+    sapi5_log_diagnostic(&format!(
+        "SESSION_RECOVERED id={} voice={:?} interrupted_worker_limit={} recovered_worker_limit={} reason=previous process ended before attempt completion",
+        session_id, voice, failed_limit, recovered_limit
+    ));
+}
+
+fn sapi5_log_diagnostic(message: &str) {
+    let _guard = sapi5_diagnostic_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let path = sapi5_diagnostic_path();
+    if let Some(parent) = path.parent()
+        && let Err(err) = std::fs::create_dir_all(parent)
+    {
+        crate::log_debug(&format!(
+            "SAPI5 diagnostic: failed to create log directory: {}",
+            err
+        ));
+        return;
+    }
+    let opened = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path);
+    let mut file = match opened {
+        Ok(file) => file,
+        Err(err) => {
+            crate::log_debug(&format!(
+                "SAPI5 diagnostic: failed to open {:?}: {}",
+                path, err
+            ));
+            return;
+        }
+    };
+    let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    if writeln!(file, "{} {}", timestamp, message).is_err() {
+        crate::log_debug("SAPI5 diagnostic: failed to append a log line");
+    }
+}
+
+fn sapi5_voice_compatibility_key(voice: &str) -> String {
+    voice.trim().to_lowercase()
+}
+
+fn load_sapi5_compatibility_map() -> BTreeMap<String, usize> {
+    let path = sapi5_compatibility_path();
+    let Ok(json) = std::fs::read_to_string(path) else {
+        return BTreeMap::new();
+    };
+    serde_json::from_str(&json).unwrap_or_default()
+}
+
+fn load_sapi5_worker_limit(voice: &str) -> Option<usize> {
+    let _guard = sapi5_compatibility_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    load_sapi5_compatibility_map()
+        .get(&sapi5_voice_compatibility_key(voice))
+        .copied()
+        .map(|value| value.clamp(1, SAPI5_MAX_PARALLEL_WORKERS))
+}
+
+fn save_sapi5_worker_limit(voice: &str, limit: usize) {
+    let _guard = sapi5_compatibility_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let path = sapi5_compatibility_path();
+    let mut map = load_sapi5_compatibility_map();
+    map.insert(
+        sapi5_voice_compatibility_key(voice),
+        limit.clamp(1, SAPI5_MAX_PARALLEL_WORKERS),
+    );
+    if let Some(parent) = path.parent()
+        && let Err(err) = std::fs::create_dir_all(parent)
+    {
+        crate::log_debug(&format!(
+            "SAPI5 compatibility: failed to create directory: {}",
+            err
+        ));
+        return;
+    }
+    match serde_json::to_string_pretty(&map) {
+        Ok(json) => {
+            if let Err(err) = std::fs::write(&path, json) {
+                crate::log_debug(&format!(
+                    "SAPI5 compatibility: failed to write {:?}: {}",
+                    path, err
+                ));
+            }
+        }
+        Err(err) => crate::log_debug(&format!(
+            "SAPI5 compatibility: failed to serialize worker limits: {}",
+            err
+        )),
+    }
+}
+
+fn sapi5_worker_levels(initial: usize) -> Vec<usize> {
+    let initial = initial.clamp(1, SAPI5_MAX_PARALLEL_WORKERS);
+    let mut levels = vec![initial];
+    for candidate in [8usize, 6, 4, 2, 1] {
+        if candidate < initial && !levels.contains(&candidate) {
+            levels.push(candidate);
+        }
+    }
+    levels
+}
+
+fn sapi5_text_char_count(chunks: &[String]) -> usize {
+    chunks
+        .iter()
+        .flat_map(|chunk| chunk.chars())
+        .filter(|ch| ch.is_alphanumeric())
+        .count()
+}
+
+fn sapi5_max_plausible_chars_per_second(rate: i32) -> u64 {
+    let mapped_rate = (rate / 10).clamp(-10, 10);
+    if mapped_rate >= 0 {
+        45u64.saturating_add((mapped_rate as u64).saturating_mul(4))
+    } else {
+        45u64.saturating_sub(((-mapped_rate) as u64).min(10))
+    }
+    .max(20)
+}
+
+fn sapi5_minimum_plausible_duration_ms(text_chars: usize, rate: i32) -> u64 {
+    if text_chars == 0 {
+        return 0;
+    }
+    let chars_per_second = sapi5_max_plausible_chars_per_second(rate);
+    let chars = text_chars as u64;
+    chars
+        .saturating_mul(1_000)
+        .saturating_div(chars_per_second.max(1))
+        .max(500)
+}
+
+fn sapi5_mp3_duration_from_size_ms(bytes: u64, bitrate_kbps: u32) -> u64 {
+    if bitrate_kbps == 0 {
+        return 0;
+    }
+    bytes
+        .saturating_mul(8)
+        .saturating_div(u64::from(bitrate_kbps))
+}
+
+fn sapi5_decoded_duration_ms(path: &Path) -> Option<u64> {
+    let mp3_ms = mp3_duration::from_path(path)
+        .ok()
+        .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64);
+    let mf_ms = crate::mf_encoder::get_audio_duration_mf(path)
+        .ok()
+        .map(|seconds| seconds.saturating_mul(1_000));
+    match (mp3_ms, mf_ms) {
+        (Some(a), Some(b)) => Some(a.max(b)),
+        (Some(value), None) | (None, Some(value)) => Some(value),
+        (None, None) => None,
+    }
+}
+
+fn validate_sapi5_parallel_output(
+    unit: &Sapi5ParallelUnit,
+    bitrate_kbps: u32,
+    rate: i32,
+) -> Sapi5PartMetrics {
+    let bytes = std::fs::metadata(&unit.output)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
+    let size_duration_ms = sapi5_mp3_duration_from_size_ms(bytes, bitrate_kbps);
+    let decoded_duration_ms = sapi5_decoded_duration_ms(&unit.output);
+    let minimum_duration_ms = sapi5_minimum_plausible_duration_ms(unit.text_chars, rate);
+    let suspicious_reason = if bytes == 0 {
+        Some("missing or empty MP3 output".to_string())
+    } else if bytes < SAPI5_MIN_OUTPUT_BYTES && unit.text_chars >= 100 {
+        Some(format!("MP3 output is only {} bytes", bytes))
+    } else if unit.text_chars >= 400 && size_duration_ms < minimum_duration_ms {
+        Some(format!(
+            "size-based duration {} ms is below conservative minimum {} ms for {} text characters",
+            size_duration_ms, minimum_duration_ms, unit.text_chars
+        ))
+    } else {
+        None
+    };
+    Sapi5PartMetrics {
+        bytes,
+        size_duration_ms,
+        decoded_duration_ms,
+        minimum_duration_ms,
+        suspicious_reason,
+    }
+}
+
+const SAPI5_WORKER_MODE_ARG: &str = "--sapi5-audiobook-worker";
+const SAPI5_WORKER_POLL_MS: u64 = 100;
+const SAPI5_WORKER_MIN_STALL_TIMEOUT_SECS: u64 = 300;
+const SAPI5_WORKER_MAX_STALL_TIMEOUT_SECS: u64 = 900;
+const CREATE_NO_WINDOW_FLAG: u32 = 0x0800_0000;
+const SAPI5_ATTEMPT_ABORTED_MSG: &str =
+    "Retry requested because another isolated SAPI5 worker failed";
+
+#[derive(Serialize, Deserialize)]
+struct Sapi5WorkerRequest {
+    chunks: Vec<String>,
+    voice_name: String,
+    output_path: PathBuf,
+    language: Language,
+    rate: i32,
+    pitch: i32,
+    volume: i32,
+    audiobook_bitrate_kbps: u32,
+    heartbeat_path: PathBuf,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Sapi5WorkerResult {
+    success: bool,
+    error: Option<String>,
+    completed_chunks: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Sapi5WorkerHeartbeat {
+    completed_chunks: usize,
+    updated_unix_ms: u64,
+    phase: String,
+}
+
+struct Sapi5ProcessWorkerContext {
+    voice: String,
+    language: Language,
+    rate: i32,
+    pitch: i32,
+    volume: i32,
+    audiobook_bitrate_kbps: u32,
+    cancel: Arc<AtomicBool>,
+    attempt_abort: Arc<AtomicBool>,
+    progress_hwnd: HWND,
+    progress_counter: Arc<std::sync::atomic::AtomicUsize>,
+    report_progress: bool,
+}
+
+fn sapi5_worker_now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
+        .unwrap_or(0)
+}
+
+fn sapi5_write_json_atomic<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("Invalid worker file path: {:?}", path))?;
+    std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    let json = serde_json::to_vec(value).map_err(|err| err.to_string())?;
+    let temporary = path.with_extension(format!(
+        "{}.tmp",
+        path.extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or("json")
+    ));
+    std::fs::write(&temporary, json).map_err(|err| err.to_string())?;
+    if path.exists() {
+        std::fs::remove_file(path).map_err(|err| err.to_string())?;
+    }
+    std::fs::rename(&temporary, path).map_err(|err| err.to_string())
+}
+
+fn sapi5_write_worker_heartbeat(
+    path: &Path,
+    completed_chunks: usize,
+    phase: &str,
+) -> Result<(), String> {
+    sapi5_write_json_atomic(
+        path,
+        &Sapi5WorkerHeartbeat {
+            completed_chunks,
+            updated_unix_ms: sapi5_worker_now_ms(),
+            phase: phase.to_string(),
+        },
+    )
+}
+
+fn sapi5_read_worker_heartbeat(path: &Path) -> Option<Sapi5WorkerHeartbeat> {
+    let bytes = std::fs::read(path).ok()?;
+    serde_json::from_slice(&bytes).ok()
+}
+
+fn sapi5_worker_stall_timeout(chunks: &[String], rate: i32) -> Duration {
+    let largest_chunk_chars = chunks
+        .iter()
+        .map(|chunk| chunk.chars().filter(|ch| ch.is_alphanumeric()).count())
+        .max()
+        .unwrap_or(0) as u64;
+    let mapped_rate = (rate / 10).clamp(-10, 10);
+    let conservative_chars_per_second = if mapped_rate >= 0 {
+        5u64.saturating_add(mapped_rate as u64)
+    } else {
+        5u64.saturating_sub(((-mapped_rate) as u64).min(3))
+    }
+    .max(2);
+    let estimated_seconds = largest_chunk_chars
+        .saturating_div(conservative_chars_per_second)
+        .saturating_add(180);
+    Duration::from_secs(estimated_seconds.clamp(
+        SAPI5_WORKER_MIN_STALL_TIMEOUT_SECS,
+        SAPI5_WORKER_MAX_STALL_TIMEOUT_SECS,
+    ))
+}
+
+fn sapi5_cleanup_worker_protocol_files(paths: &[&Path]) {
+    for path in paths {
+        if path.exists()
+            && let Err(err) = std::fs::remove_file(path)
+        {
+            crate::log_debug(&format!(
+                "SAPI5 process worker: failed to remove protocol file {:?}: {}",
+                path, err
+            ));
+        }
+    }
+}
+
+fn sapi5_worker_protocol_dir() -> PathBuf {
+    std::env::temp_dir().join("sonarpad_sapi5_workers")
+}
+
+fn sapi5_cleanup_stale_worker_protocol_files() {
+    let directory = sapi5_worker_protocol_dir();
+    let Ok(entries) = std::fs::read_dir(&directory) else {
+        return;
+    };
+    let maximum_age = Duration::from_secs(24 * 60 * 60);
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_stale = entry
+            .metadata()
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|elapsed| elapsed >= maximum_age);
+        if is_stale && let Err(err) = std::fs::remove_file(&path) {
+            crate::log_debug(&format!(
+                "SAPI5 process worker: failed to remove stale protocol file {:?}: {}",
+                path, err
+            ));
+        }
+    }
+}
+
+pub(crate) fn run_sapi5_audiobook_worker_from_args(args: &[String]) -> Option<i32> {
+    let index = args
+        .iter()
+        .position(|argument| argument == SAPI5_WORKER_MODE_ARG)?;
+    let request_path = match args.get(index + 1) {
+        Some(value) => PathBuf::from(value),
+        None => return Some(2),
+    };
+    let result_path = match args.get(index + 2) {
+        Some(value) => PathBuf::from(value),
+        None => return Some(2),
+    };
+    Some(run_sapi5_audiobook_worker(&request_path, &result_path))
+}
+
+fn run_sapi5_audiobook_worker(request_path: &Path, result_path: &Path) -> i32 {
+    unsafe {
+        let _previous_error_mode = SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    }
+    lower_current_audiobook_worker_priority("isolated SAPI5 process");
+    let request_bytes = match std::fs::read(request_path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            crate::log_debug(&format!(
+                "SAPI5 process worker: failed to read request {:?}: {}",
+                request_path, err
+            ));
+            return 2;
+        }
+    };
+    let request: Sapi5WorkerRequest = match serde_json::from_slice(&request_bytes) {
+        Ok(request) => request,
+        Err(err) => {
+            crate::log_debug(&format!(
+                "SAPI5 process worker: invalid request {:?}: {}",
+                request_path, err
+            ));
+            return 2;
+        }
+    };
+    if let Err(err) = sapi5_write_worker_heartbeat(&request.heartbeat_path, 0, "starting") {
+        crate::log_debug(&format!(
+            "SAPI5 process worker: failed to write initial heartbeat: {}",
+            err
+        ));
+    }
+
+    let cancel = Arc::new(AtomicBool::new(false));
+    let mut completed_chunks = 0usize;
+    let synthesis_result = crate::sapi5_engine::speak_sapi_to_file(
+        crate::sapi5_engine::SapiExportOptions {
+            chunks: &request.chunks,
+            voice_name: &request.voice_name,
+            output_path: &request.output_path,
+            language: request.language,
+            rate: request.rate,
+            pitch: request.pitch,
+            volume: request.volume,
+            audiobook_bitrate_kbps: request.audiobook_bitrate_kbps,
+            cancel,
+        },
+        |completed| {
+            completed_chunks = completed_chunks.max(completed);
+            if let Err(err) = sapi5_write_worker_heartbeat(
+                &request.heartbeat_path,
+                completed_chunks,
+                "synthesizing",
+            ) {
+                crate::log_debug(&format!(
+                    "SAPI5 process worker: failed to update heartbeat: {}",
+                    err
+                ));
+            }
+        },
+    );
+
+    let (success, error, exit_code) = match synthesis_result {
+        Ok(()) => (true, None, 0),
+        Err(err) => (false, Some(err), 1),
+    };
+    let phase = if success { "completed" } else { "error" };
+    if let Err(err) = sapi5_write_worker_heartbeat(&request.heartbeat_path, completed_chunks, phase)
+    {
+        crate::log_debug(&format!(
+            "SAPI5 process worker: failed to write final heartbeat: {}",
+            err
+        ));
+    }
+    let result = Sapi5WorkerResult {
+        success,
+        error,
+        completed_chunks,
+    };
+    if let Err(err) = sapi5_write_json_atomic(result_path, &result) {
+        crate::log_debug(&format!(
+            "SAPI5 process worker: failed to write result {:?}: {}",
+            result_path, err
+        ));
+        return 2;
+    }
+    exit_code
+}
+
+fn sapi5_post_completed_chunks(
+    count: usize,
+    progress_counter: &Arc<std::sync::atomic::AtomicUsize>,
+    progress_hwnd: HWND,
+) {
+    for _ in 0..count {
+        let current = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
+        if progress_hwnd.0 != 0 {
+            unsafe {
+                if let Err(err) = PostMessageW(
+                    progress_hwnd,
+                    crate::WM_UPDATE_PROGRESS,
+                    WPARAM(current),
+                    LPARAM(0),
+                ) {
+                    crate::log_debug(&format!(
+                        "Failed to post WM_UPDATE_PROGRESS from SAPI5 process worker: {}",
+                        err
+                    ));
+                }
+            }
+        }
+    }
+}
+
+fn run_sapi5_unit_subprocess(
+    unit: &Sapi5ParallelUnit,
+    worker_slot: usize,
+    actual_workers: usize,
+    attempt: usize,
+    context: &Sapi5ProcessWorkerContext,
+) -> Result<Sapi5PartMetrics, String> {
+    // Keep the worker protocol on a short system-temp path. Long audiobook
+    // titles can otherwise make the JSON/heartbeat paths exceed legacy Windows limits.
+    let protocol_dir = sapi5_worker_protocol_dir();
+    let protocol_prefix = format!(
+        "p{}_a{}_u{}_{}",
+        std::process::id(),
+        attempt,
+        unit.index,
+        Uuid::new_v4().simple()
+    );
+    let request_path = protocol_dir.join(format!("{}.request.json", protocol_prefix));
+    let result_path = protocol_dir.join(format!("{}.result.json", protocol_prefix));
+    let heartbeat_path = protocol_dir.join(format!("{}.heartbeat.json", protocol_prefix));
+    sapi5_cleanup_worker_protocol_files(&[&request_path, &result_path, &heartbeat_path]);
+
+    let request = Sapi5WorkerRequest {
+        chunks: unit.chunks.clone(),
+        voice_name: context.voice.clone(),
+        output_path: unit.output.clone(),
+        language: context.language,
+        rate: context.rate,
+        pitch: context.pitch,
+        volume: context.volume,
+        audiobook_bitrate_kbps: context.audiobook_bitrate_kbps,
+        heartbeat_path: heartbeat_path.clone(),
+    };
+    sapi5_write_json_atomic(&request_path, &request)?;
+
+    let executable = std::env::current_exe().map_err(|err| {
+        format!(
+            "Unable to locate Sonarpad executable for SAPI5 worker: {}",
+            err
+        )
+    })?;
+    let mut command = Command::new(&executable);
+    command
+        .arg(SAPI5_WORKER_MODE_ARG)
+        .arg(&request_path)
+        .arg(&result_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .env("SONARPAD_SAPI5_WORKER", "1")
+        .creation_flags(CREATE_NO_WINDOW_FLAG);
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(err) => {
+            sapi5_cleanup_worker_protocol_files(&[&request_path, &result_path, &heartbeat_path]);
+            return Err(format!("Unable to start isolated SAPI5 worker: {}", err));
+        }
+    };
+
+    sapi5_log_diagnostic(&format!(
+        "WORKER_PROCESS_START attempt={} worker_slot={}/{} unit={} pid={} executable={:?} request={:?}",
+        attempt,
+        worker_slot + 1,
+        actual_workers,
+        unit.index,
+        child.id(),
+        executable,
+        request_path
+    ));
+
+    let stall_timeout = sapi5_worker_stall_timeout(&unit.chunks, context.rate);
+    let monitor_started = Instant::now();
+    let mut last_activity = Instant::now();
+    let mut last_completed_chunks = 0usize;
+
+    let status = loop {
+        if context.cancel.load(Ordering::Relaxed) {
+            if let Err(err) = child.kill() {
+                crate::log_debug(&format!(
+                    "SAPI5 process worker: failed to terminate cancelled worker {}: {}",
+                    child.id(),
+                    err
+                ));
+            }
+            if let Err(err) = child.wait() {
+                crate::log_debug(&format!(
+                    "SAPI5 process worker: failed to wait for cancelled worker: {}",
+                    err
+                ));
+            }
+            sapi5_cleanup_worker_protocol_files(&[&request_path, &result_path, &heartbeat_path]);
+            return Err("Cancelled".to_string());
+        }
+
+        if context.attempt_abort.load(Ordering::Acquire) {
+            let pid = child.id();
+            if let Err(err) = child.kill() {
+                crate::log_debug(&format!(
+                    "SAPI5 process worker: failed to terminate worker {} after peer failure: {}",
+                    pid, err
+                ));
+            }
+            if let Err(err) = child.wait() {
+                crate::log_debug(&format!(
+                    "SAPI5 process worker: failed to wait for worker {} after peer failure: {}",
+                    pid, err
+                ));
+            }
+            sapi5_log_diagnostic(&format!(
+                "WORKER_PROCESS_ABORTED attempt={} unit={} pid={} reason=peer worker failure",
+                attempt, unit.index, pid
+            ));
+            sapi5_cleanup_worker_protocol_files(&[&request_path, &result_path, &heartbeat_path]);
+            return Err(SAPI5_ATTEMPT_ABORTED_MSG.to_string());
+        }
+
+        if let Some(heartbeat) = sapi5_read_worker_heartbeat(&heartbeat_path) {
+            let completed = heartbeat.completed_chunks.min(unit.chunks.len());
+            if completed > last_completed_chunks {
+                let delta = completed.saturating_sub(last_completed_chunks);
+                if context.report_progress {
+                    sapi5_post_completed_chunks(
+                        delta,
+                        &context.progress_counter,
+                        context.progress_hwnd,
+                    );
+                }
+                last_completed_chunks = completed;
+                last_activity = Instant::now();
+                sapi5_log_diagnostic(&format!(
+                    "WORKER_HEARTBEAT attempt={} unit={} pid={} completed_chunks={}/{} phase={} updated_unix_ms={}",
+                    attempt,
+                    unit.index,
+                    child.id(),
+                    completed,
+                    unit.chunks.len(),
+                    heartbeat.phase,
+                    heartbeat.updated_unix_ms
+                ));
+            }
+        }
+
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {}
+            Err(err) => {
+                if let Err(kill_err) = child.kill() {
+                    crate::log_debug(&format!(
+                        "SAPI5 process worker: failed to terminate worker after wait error: {}",
+                        kill_err
+                    ));
+                }
+                if let Err(wait_err) = child.wait() {
+                    crate::log_debug(&format!(
+                        "SAPI5 process worker: failed to wait after wait error: {}",
+                        wait_err
+                    ));
+                }
+                sapi5_cleanup_worker_protocol_files(&[
+                    &request_path,
+                    &result_path,
+                    &heartbeat_path,
+                ]);
+                return Err(format!("Unable to monitor isolated SAPI5 worker: {}", err));
+            }
+        }
+
+        if last_activity.elapsed() >= stall_timeout {
+            let pid = child.id();
+            if let Err(err) = child.kill() {
+                crate::log_debug(&format!(
+                    "SAPI5 process worker: failed to terminate stalled worker {}: {}",
+                    pid, err
+                ));
+            }
+            if let Err(err) = child.wait() {
+                crate::log_debug(&format!(
+                    "SAPI5 process worker: failed to wait for stalled worker {}: {}",
+                    pid, err
+                ));
+            }
+            sapi5_log_diagnostic(&format!(
+                "WORKER_PROCESS_STALLED attempt={} unit={} pid={} elapsed_ms={} no_progress_ms={} timeout_ms={}",
+                attempt,
+                unit.index,
+                pid,
+                monitor_started.elapsed().as_millis(),
+                last_activity.elapsed().as_millis(),
+                stall_timeout.as_millis()
+            ));
+            sapi5_cleanup_worker_protocol_files(&[&request_path, &result_path, &heartbeat_path]);
+            return Err(format!(
+                "Isolated SAPI5 worker stopped responding for {} seconds",
+                stall_timeout.as_secs()
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(SAPI5_WORKER_POLL_MS));
+    };
+
+    if let Some(heartbeat) = sapi5_read_worker_heartbeat(&heartbeat_path) {
+        let completed = heartbeat.completed_chunks.min(unit.chunks.len());
+        if completed > last_completed_chunks {
+            if context.report_progress {
+                sapi5_post_completed_chunks(
+                    completed.saturating_sub(last_completed_chunks),
+                    &context.progress_counter,
+                    context.progress_hwnd,
+                );
+            }
+            last_completed_chunks = completed;
+        }
+    }
+
+    let exit_code = status
+        .code()
+        .map(|code| code.to_string())
+        .unwrap_or_else(|| "unavailable".to_string());
+    let result = std::fs::read(&result_path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Sapi5WorkerResult>(&bytes).ok());
+    let result_completed_chunks = result
+        .as_ref()
+        .map(|worker_result| worker_result.completed_chunks.min(unit.chunks.len()))
+        .unwrap_or(0);
+    if result_completed_chunks > last_completed_chunks && context.report_progress {
+        sapi5_post_completed_chunks(
+            result_completed_chunks.saturating_sub(last_completed_chunks),
+            &context.progress_counter,
+            context.progress_hwnd,
+        );
+    }
+
+    sapi5_log_diagnostic(&format!(
+        "WORKER_PROCESS_EXIT attempt={} unit={} pid={} elapsed_ms={} success={} exit_code={} result_present={} completed_chunks={}/{}",
+        attempt,
+        unit.index,
+        child.id(),
+        monitor_started.elapsed().as_millis(),
+        status.success(),
+        exit_code,
+        result.is_some(),
+        result_completed_chunks,
+        unit.chunks.len()
+    ));
+    sapi5_cleanup_worker_protocol_files(&[&request_path, &result_path, &heartbeat_path]);
+
+    if let Some(worker_result) = result.as_ref()
+        && !worker_result.success
+    {
+        return Err(worker_result
+            .error
+            .clone()
+            .unwrap_or_else(|| "Isolated SAPI5 worker reported an unknown error".to_string()));
+    }
+    if !status.success() {
+        return Err(format!(
+            "Isolated SAPI5 worker terminated unexpectedly (exit code {})",
+            exit_code
+        ));
+    }
+    if result.is_none() {
+        return Err("Isolated SAPI5 worker exited without returning a result".to_string());
+    }
+
+    Ok(validate_sapi5_parallel_output(
+        unit,
+        context.audiobook_bitrate_kbps,
+        context.rate,
+    ))
+}
+
+fn run_sapi5_unit_batch(
+    units: Vec<Sapi5ParallelUnit>,
+    worker_limit: usize,
+    attempt: usize,
+    options: &AudiobookCommonOptions,
+    progress_counter: Arc<std::sync::atomic::AtomicUsize>,
+    report_progress: bool,
+) -> Vec<(Sapi5ParallelUnit, Result<Sapi5PartMetrics, String>)> {
+    if units.is_empty() {
+        return Vec::new();
+    }
+    let actual_workers = units.len().min(worker_limit.max(1));
+    let expected_results = units.len();
+    let (tx, rx) =
+        std::sync::mpsc::channel::<(Sapi5ParallelUnit, Result<Sapi5PartMetrics, String>)>();
+    let units_shared = Arc::new(Mutex::new(units.into_iter()));
+    let attempt_abort = Arc::new(AtomicBool::new(false));
+    let mut handles = Vec::with_capacity(actual_workers);
+
+    for worker_idx in 0..actual_workers {
+        let tx = tx.clone();
+        let units_shared = units_shared.clone();
+        let progress_counter = progress_counter.clone();
+        let cancel_token = options.cancel.clone();
+        let attempt_abort = attempt_abort.clone();
+        let progress_hwnd = options.progress_hwnd;
+        let voice = options.voice.to_string();
+        let language = options.language;
+        let rate = options.rate;
+        let pitch = options.pitch;
+        let volume = options.volume;
+        let bitrate = options.audiobook_bitrate_kbps;
+
+        handles.push(std::thread::spawn(move || {
+            lower_current_audiobook_worker_priority("SAPI5 worker");
+            // Avoid activating every native COM voice in the same scheduler instant.
+            // The delay is below half a second even with 12 workers and does not
+            // reduce steady-state parallelism once synthesis has started.
+            let startup_delay_ms = (worker_idx as u64).saturating_mul(35).min(385);
+            if startup_delay_ms > 0 {
+                std::thread::sleep(Duration::from_millis(startup_delay_ms));
+            }
+            let process_context = Sapi5ProcessWorkerContext {
+                voice,
+                language,
+                rate,
+                pitch,
+                volume,
+                audiobook_bitrate_kbps: bitrate,
+                cancel: cancel_token,
+                attempt_abort,
+                progress_hwnd,
+                progress_counter,
+                report_progress,
+            };
+            loop {
+                let unit = {
+                    let mut guard = units_shared
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner());
+                    guard.next()
+                };
+                let Some(unit) = unit else {
+                    break;
+                };
+                if process_context.cancel.load(Ordering::Relaxed) {
+                    if tx.send((unit, Err("Cancelled".to_string()))).is_err() {
+                        break;
+                    }
+                    continue;
+                }
+                if process_context.attempt_abort.load(Ordering::Acquire) {
+                    if tx
+                        .send((unit, Err(SAPI5_ATTEMPT_ABORTED_MSG.to_string())))
+                        .is_err()
+                    {
+                        break;
+                    }
+                    continue;
+                }
+                if unit.output.exists()
+                    && let Err(err) = std::fs::remove_file(&unit.output)
+                {
+                    crate::log_debug(&format!(
+                        "SAPI5 adaptive: failed to remove old part {:?}: {}",
+                        unit.output, err
+                    ));
+                }
+
+                let started = Instant::now();
+                sapi5_log_diagnostic(&format!(
+                    "PART_START attempt={} worker_slot={}/{} unit={} chunks={}..{} chunk_count={} chars={} output={:?}",
+                    attempt,
+                    worker_idx + 1,
+                    actual_workers,
+                    unit.index,
+                    unit.start_chunk + 1,
+                    unit.end_chunk,
+                    unit.chunks.len(),
+                    unit.text_chars,
+                    unit.output
+                ));
+                let result = run_sapi5_unit_subprocess(
+                    &unit,
+                    worker_idx,
+                    actual_workers,
+                    attempt,
+                    &process_context,
+                );
+
+                if let Err(err) = result.as_ref()
+                    && err != "Cancelled"
+                    && err != SAPI5_ATTEMPT_ABORTED_MSG
+                {
+                    process_context.attempt_abort.store(true, Ordering::Release);
+                    sapi5_log_diagnostic(&format!(
+                        "ATTEMPT_ABORT_REQUESTED attempt={} unit={} reason={}",
+                        attempt,
+                        unit.index,
+                        err.replace(['\r', '\n'], " ")
+                    ));
+                }
+
+                let checked = match result {
+                    Ok(metrics) => {
+                        sapi5_log_diagnostic(&format!(
+                            "PART_DONE attempt={} unit={} elapsed_ms={} bytes={} size_duration_ms={} decoded_duration_ms={} minimum_duration_ms={} status={} reason={}",
+                            attempt,
+                            unit.index,
+                            started.elapsed().as_millis(),
+                            metrics.bytes,
+                            metrics.size_duration_ms,
+                            metrics
+                                .decoded_duration_ms
+                                .map(|value| value.to_string())
+                                .unwrap_or_else(|| "unavailable".to_string()),
+                            metrics.minimum_duration_ms,
+                            if metrics.suspicious_reason.is_some() {
+                                "SUSPICIOUS"
+                            } else {
+                                "OK"
+                            },
+                            metrics
+                                .suspicious_reason
+                                .as_deref()
+                                .unwrap_or("none")
+                        ));
+                        Ok(metrics)
+                    }
+                    Err(err) => {
+                        sapi5_log_diagnostic(&format!(
+                            "PART_ERROR attempt={} unit={} elapsed_ms={} error={}",
+                            attempt,
+                            unit.index,
+                            started.elapsed().as_millis(),
+                            err.replace(['\r', '\n'], " ")
+                        ));
+                        if unit.output.exists()
+                            && let Err(remove_err) = std::fs::remove_file(&unit.output)
+                        {
+                            crate::log_debug(&format!(
+                                "Failed to remove SAPI5 subpart after process error: {}",
+                                remove_err
+                            ));
+                        }
+                        Err(err)
+                    }
+                };
+                if tx.send((unit, checked)).is_err() {
+                    break;
+                }
+            }
+        }));
+    }
+    {
+        let _sender = tx;
+    }
+
+    let mut results = Vec::with_capacity(expected_results);
+    for result in rx {
+        results.push(result);
+    }
+    for handle in handles {
+        if let Err(err) = handle.join() {
+            crate::log_debug(&format!("SAPI5 adaptive worker join error: {:?}", err));
+        }
+    }
+    if results.len() != expected_results {
+        sapi5_log_diagnostic(&format!(
+            "BATCH_RESULT_MISMATCH attempt={} expected={} received={}",
+            attempt,
+            expected_results,
+            results.len()
+        ));
+    }
+    results
+}
+
 fn run_sapi5_parallel_part(
     chunks: &[String],
     global_progress: &mut usize,
@@ -7211,6 +8525,8 @@ fn run_sapi5_parallel_part(
     if chunks.is_empty() {
         return Ok(());
     }
+
+    sapi5_cleanup_stale_worker_protocol_files();
 
     let extension = options
         .output
@@ -7234,195 +8550,325 @@ fn run_sapi5_parallel_part(
                 .and_then(|s| s.to_str())
                 .unwrap_or("part")
         ));
+    if temp_dir.exists()
+        && let Err(err) = std::fs::remove_dir_all(&temp_dir)
+    {
+        crate::log_debug(&format!(
+            "SAPI5 adaptive: failed to remove stale temp directory {:?}: {}",
+            temp_dir, err
+        ));
+    }
     std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
 
+    let session_started = Instant::now();
     let chunks_count = chunks.len();
-    let worker_count = chunks_count.min(
-        std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(4)
-            .clamp(2, 12),
-    );
-    let chunks_per_sub = chunks_count.div_ceil(worker_count.max(1));
-
-    // Important: we split by chunk boundaries only; chunks are already sentence-safe upstream.
-    let mut internal_parts: Vec<(Vec<String>, PathBuf)> = Vec::new();
-    for i in 0..worker_count {
-        let s = i * chunks_per_sub;
-        let e = std::cmp::min(s + chunks_per_sub, chunks_count);
-        if s >= e {
+    let automatic_limit = chunks_count
+        .min(
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(4)
+                .clamp(2, SAPI5_MAX_PARALLEL_WORKERS),
+        )
+        .max(1);
+    sapi5_recover_interrupted_attempt();
+    let stored_limit = load_sapi5_worker_limit(options.voice);
+    let initial_limit = stored_limit
+        .unwrap_or(automatic_limit)
+        .min(automatic_limit)
+        .max(1);
+    let chunks_per_unit = chunks_count.div_ceil(initial_limit.max(1));
+    let mut units = Vec::new();
+    for index in 0..initial_limit {
+        let start_chunk = index.saturating_mul(chunks_per_unit);
+        let end_chunk = std::cmp::min(start_chunk.saturating_add(chunks_per_unit), chunks_count);
+        if start_chunk >= end_chunk {
             break;
         }
-        let sub_chunks = chunks[s..e].to_vec();
-        let sub_output = temp_dir.join(format!("sub_{}.mp3", i));
-        internal_parts.push((sub_chunks, sub_output));
+        let unit_chunks = chunks[start_chunk..end_chunk].to_vec();
+        units.push(Sapi5ParallelUnit {
+            index,
+            start_chunk,
+            end_chunk,
+            text_chars: sapi5_text_char_count(&unit_chunks),
+            chunks: unit_chunks,
+            output: temp_dir.join(format!("sub_{}.mp3", index)),
+        });
     }
-    let expected_parts = internal_parts.len();
 
-    let progress_counter = Arc::new(std::sync::atomic::AtomicUsize::new(*global_progress));
-    let (tx, rx) = std::sync::mpsc::channel::<Result<PathBuf, String>>();
-    let parts_shared = Arc::new(Mutex::new(internal_parts.into_iter()));
-    let mut handles = Vec::new();
+    let session_id = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    sapi5_log_diagnostic(&format!(
+        "SESSION_START id={} voice={:?} output={:?} chunks={} automatic_limit={} stored_limit={} initial_limit={} units={} bitrate_kbps={} rate={} pitch={} volume={} isolation=process",
+        session_id,
+        options.voice,
+        options.output,
+        chunks_count,
+        automatic_limit,
+        stored_limit
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "none".to_string()),
+        initial_limit,
+        units.len(),
+        options.audiobook_bitrate_kbps,
+        options.rate,
+        options.pitch,
+        options.volume
+    ));
 
-    for _worker_idx in 0..worker_count {
-        let tx = tx.clone();
-        let parts_shared = parts_shared.clone();
-        let progress_counter = progress_counter.clone();
-        let cancel_token = options.cancel.clone();
-        let progress_hwnd = options.progress_hwnd;
-        let voice = options.voice.to_string();
-        let language = options.language;
-        let rate = options.rate;
-        let pitch = options.pitch;
-        let volume = options.volume;
-        let bitrate = options.audiobook_bitrate_kbps;
+    let base_progress = *global_progress;
+    let progress_counter = Arc::new(std::sync::atomic::AtomicUsize::new(base_progress));
+    let worker_levels = sapi5_worker_levels(initial_limit);
+    let mut pending_units = units;
+    let mut successful_parts: BTreeMap<usize, (PathBuf, Sapi5PartMetrics)> = BTreeMap::new();
+    let mut effective_limit = initial_limit;
+    let mut had_adaptive_retry = false;
+    let mut final_error: Option<String> = None;
 
-        let handle = std::thread::spawn(move || {
-            lower_current_audiobook_worker_priority("SAPI5 worker");
-            loop {
-                let part = {
-                    let mut guard = parts_shared.lock().unwrap_or_else(|e| e.into_inner());
-                    guard.next()
-                };
-                let Some((sub_chunks, sub_output)) = part else {
-                    break;
-                };
+    for (attempt_index, worker_limit) in worker_levels.iter().copied().enumerate() {
+        if pending_units.is_empty() {
+            break;
+        }
+        if options.cancel.load(Ordering::Relaxed) {
+            final_error = Some("Cancelled".to_string());
+            break;
+        }
+        sapi5_log_diagnostic(&format!(
+            "ATTEMPT_START id={} attempt={} requested_worker_limit={} pending_units={}",
+            session_id,
+            attempt_index + 1,
+            worker_limit,
+            pending_units.len()
+        ));
+        let current_units = std::mem::take(&mut pending_units);
+        let expected_results = current_units.len();
+        sapi5_write_active_attempt(options.voice, worker_limit, session_id);
+        sapi5_log_diagnostic(&format!(
+            "ATTEMPT_GUARD_ARMED id={} attempt={} worker_limit={}",
+            session_id,
+            attempt_index + 1,
+            worker_limit
+        ));
+        let results = run_sapi5_unit_batch(
+            current_units,
+            worker_limit,
+            attempt_index + 1,
+            options,
+            progress_counter.clone(),
+            attempt_index == 0,
+        );
+        sapi5_clear_active_attempt();
+        sapi5_log_diagnostic(&format!(
+            "ATTEMPT_GUARD_CLEARED id={} attempt={} worker_limit={}",
+            session_id,
+            attempt_index + 1,
+            worker_limit
+        ));
+        if results.len() != expected_results {
+            final_error = Some(format!(
+                "SAPI5 adaptive integrity check failed: expected {} results, got {}",
+                expected_results,
+                results.len()
+            ));
+            break;
+        }
 
-                if cancel_token.load(Ordering::Relaxed) {
-                    let _ignored = tx.send(Err("Cancelled".to_string()));
-                    break;
-                }
-
-                let res = crate::sapi5_engine::speak_sapi_to_file(
-                    crate::sapi5_engine::SapiExportOptions {
-                        chunks: &sub_chunks,
-                        voice_name: &voice,
-                        output_path: &sub_output,
-                        language,
-                        rate,
-                        pitch,
-                        volume,
-                        audiobook_bitrate_kbps: bitrate,
-                        cancel: cancel_token.clone(),
-                    },
-                    |_| {
-                        let current = progress_counter.fetch_add(1, Ordering::SeqCst) + 1;
-                        if progress_hwnd.0 != 0 {
-                            unsafe {
-                                if let Err(e) = PostMessageW(
-                                    progress_hwnd,
-                                    crate::WM_UPDATE_PROGRESS,
-                                    WPARAM(current),
-                                    LPARAM(0),
-                                ) {
-                                    crate::log_debug(&format!(
-                                        "Failed to post WM_UPDATE_PROGRESS: {}",
-                                        e
-                                    ));
-                                }
-                            }
-                        }
-                    },
-                );
-
-                match res {
-                    Ok(()) => {
-                        let _ignored = tx.send(Ok(sub_output));
-                    }
-                    Err(e) => {
-                        if let Err(rem_err) = std::fs::remove_file(&sub_output) {
+        for (unit, result) in results {
+            match result {
+                Ok(metrics) => {
+                    if let Some(reason) = metrics.suspicious_reason.as_deref() {
+                        had_adaptive_retry = true;
+                        sapi5_log_diagnostic(&format!(
+                            "PART_RETRY_SCHEDULED id={} unit={} current_worker_limit={} reason={}",
+                            session_id, unit.index, worker_limit, reason
+                        ));
+                        if unit.output.exists()
+                            && let Err(err) = std::fs::remove_file(&unit.output)
+                        {
                             crate::log_debug(&format!(
-                                "Failed to remove SAPI5 subpart after error: {}",
-                                rem_err
+                                "SAPI5 adaptive: failed to remove suspicious part {:?}: {}",
+                                unit.output, err
                             ));
                         }
-                        let _ignored = tx.send(Err(e));
-                        break;
+                        pending_units.push(unit);
+                    } else {
+                        successful_parts.insert(unit.index, (unit.output.clone(), metrics));
                     }
                 }
-            }
-        });
-        handles.push(handle);
-    }
-
-    {
-        let _tx = tx;
-    }
-
-    let mut produced_files: Vec<PathBuf> = Vec::new();
-    let mut error: Option<String> = None;
-    for res in rx {
-        match res {
-            Ok(path) => produced_files.push(path),
-            Err(e) => {
-                if error.is_none() {
-                    error = Some(e);
+                Err(err) => {
+                    if err == "Cancelled" {
+                        final_error = Some(err);
+                        break;
+                    }
+                    had_adaptive_retry = true;
+                    sapi5_log_diagnostic(&format!(
+                        "PART_RETRY_SCHEDULED id={} unit={} current_worker_limit={} reason=generation error: {}",
+                        session_id,
+                        unit.index,
+                        worker_limit,
+                        err.replace(['\r', '\n'], " ")
+                    ));
+                    pending_units.push(unit);
                 }
             }
         }
-    }
-    for h in handles {
-        if let Err(e) = h.join() {
-            crate::log_debug(&format!("SAPI5 parallel worker join error: {:?}", e));
+        if final_error.is_some() {
+            break;
         }
-    }
-
-    if error.is_some() || options.cancel.load(Ordering::Relaxed) {
-        if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
-            crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", e));
+        if pending_units.is_empty() {
+            effective_limit = worker_limit;
+            sapi5_log_diagnostic(&format!(
+                "ATTEMPT_SUCCESS id={} attempt={} worker_limit={} total_valid_parts={}",
+                session_id,
+                attempt_index + 1,
+                worker_limit,
+                successful_parts.len()
+            ));
+            break;
         }
-        let msg = if let Some(e) = error {
-            e
-        } else {
-            "Cancelled".to_string()
-        };
-        return Err(if msg == "Cancelled" {
-            cancelled_message(options.language)
-        } else {
-            msg
-        });
-    }
-
-    if produced_files.len() != expected_parts {
-        if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
-            crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", e));
-        }
-        return Err(format!(
-            "SAPI5 parallel integrity check failed: expected {} parts, got {}",
-            expected_parts,
-            produced_files.len()
+        sapi5_log_diagnostic(&format!(
+            "ATTEMPT_RETRY id={} attempt={} failed_or_suspicious_units={} next_worker_limit={}",
+            session_id,
+            attempt_index + 1,
+            pending_units.len(),
+            worker_levels
+                .get(attempt_index + 1)
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_string())
         ));
     }
 
-    produced_files.sort_by_key(|p: &PathBuf| {
-        let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-        parse_sapi4_part_index(name)
-    });
-
-    for file in &produced_files {
-        let size = std::fs::metadata(file).map_err(|e| e.to_string())?.len();
-        if size == 0 {
-            if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
-                crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", e));
+    if final_error.is_none() && !pending_units.is_empty() {
+        final_error = Some(format!(
+            "SAPI5 adaptive validation failed for {} part(s) even with one worker. Temporary files kept in {:?}",
+            pending_units.len(),
+            temp_dir
+        ));
+    }
+    if let Some(error) = final_error {
+        sapi5_clear_active_attempt();
+        sapi5_log_diagnostic(&format!(
+            "SESSION_ERROR id={} elapsed_ms={} error={} temp_dir={:?}",
+            session_id,
+            session_started.elapsed().as_millis(),
+            error.replace(['\r', '\n'], " "),
+            temp_dir
+        ));
+        if error == "Cancelled" {
+            if let Err(err) = std::fs::remove_dir_all(&temp_dir) {
+                crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", err));
             }
-            return Err(format!(
-                "SAPI5 parallel integrity check failed: empty chunk output {:?}",
-                file
-            ));
+            return Err(cancelled_message(options.language));
         }
+        return Err(error);
     }
 
-    merge_and_finalize_sapi4_mp3(
+    let expected_parts = successful_parts.len();
+    if expected_parts == 0 {
+        return Err("SAPI5 adaptive validation produced no audio parts".to_string());
+    }
+    let produced_files: Vec<PathBuf> = successful_parts
+        .values()
+        .map(|(path, _metrics)| path.clone())
+        .collect();
+    let expected_duration_ms = successful_parts
+        .values()
+        .map(|(_path, metrics)| metrics.size_duration_ms)
+        .fold(0u64, u64::saturating_add);
+
+    sapi5_log_diagnostic(&format!(
+        "MERGE_START id={} parts={} expected_size_duration_ms={}",
+        session_id, expected_parts, expected_duration_ms
+    ));
+    if let Err(err) = merge_and_finalize_sapi4_mp3(
         &produced_files,
         options.output,
         options.language,
         options.audiobook_bitrate_kbps,
         options.progress_hwnd,
-    )?;
-    if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
-        crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", e));
+    ) {
+        sapi5_log_diagnostic(&format!(
+            "SESSION_ERROR id={} elapsed_ms={} error=merge failed: {} temp_dir={:?}",
+            session_id,
+            session_started.elapsed().as_millis(),
+            err.replace(['\r', '\n'], " "),
+            temp_dir
+        ));
+        return Err(err);
     }
-    *global_progress = progress_counter.load(Ordering::SeqCst);
+
+    let final_bytes = std::fs::metadata(options.output)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
+    let final_size_duration_ms =
+        sapi5_mp3_duration_from_size_ms(final_bytes, options.audiobook_bitrate_kbps);
+    let final_decoded_duration_ms = sapi5_decoded_duration_ms(options.output);
+    let minimum_final_duration_ms = expected_duration_ms
+        .saturating_mul(SAPI5_FINAL_DURATION_TOLERANCE_PERCENT)
+        .saturating_div(100);
+    sapi5_log_diagnostic(&format!(
+        "MERGE_DONE id={} final_bytes={} final_size_duration_ms={} final_decoded_duration_ms={} minimum_expected_ms={} status={}",
+        session_id,
+        final_bytes,
+        final_size_duration_ms,
+        final_decoded_duration_ms
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "unavailable".to_string()),
+        minimum_final_duration_ms,
+        if final_size_duration_ms >= minimum_final_duration_ms {
+            "OK"
+        } else {
+            "TRUNCATED"
+        }
+    ));
+
+    if expected_duration_ms > 0 && final_size_duration_ms < minimum_final_duration_ms {
+        if options.output.exists()
+            && let Err(err) = std::fs::remove_file(options.output)
+        {
+            crate::log_debug(&format!(
+                "SAPI5 adaptive: failed to remove incomplete final MP3 {:?}: {}",
+                options.output, err
+            ));
+        }
+        sapi5_log_diagnostic(&format!(
+            "SESSION_ERROR id={} elapsed_ms={} error=final MP3 duration guard failed temp_dir={:?}",
+            session_id,
+            session_started.elapsed().as_millis(),
+            temp_dir
+        ));
+        return Err(format!(
+            "SAPI5 final MP3 integrity check failed: expected at least about {} seconds, generated about {} seconds. Temporary parts were kept in {:?}. See {:?}",
+            minimum_final_duration_ms / 1_000,
+            final_size_duration_ms / 1_000,
+            temp_dir,
+            sapi5_diagnostic_path()
+        ));
+    }
+
+    let remembered_limit = if had_adaptive_retry {
+        effective_limit
+    } else {
+        initial_limit
+    };
+    save_sapi5_worker_limit(options.voice, remembered_limit);
+    sapi5_clear_active_attempt();
+    sapi5_log_diagnostic(&format!(
+        "SESSION_SUCCESS id={} elapsed_ms={} initial_limit={} effective_limit={} adaptive_retry={} remembered_limit={} output={:?}",
+        session_id,
+        session_started.elapsed().as_millis(),
+        initial_limit,
+        effective_limit,
+        had_adaptive_retry,
+        remembered_limit,
+        options.output
+    ));
+
+    if let Err(err) = std::fs::remove_dir_all(&temp_dir) {
+        crate::log_debug(&format!("Failed to remove SAPI5 temp dir: {}", err));
+    }
+    *global_progress = base_progress.saturating_add(chunks_count);
     Ok(())
 }
 
@@ -9055,6 +10501,89 @@ pub(crate) fn render_mixed_audiobook_part(
         output
     ));
     Ok(())
+}
+
+#[cfg(test)]
+mod sapi5_adaptive_recovery_tests {
+    use super::*;
+
+    #[test]
+    fn interrupted_worker_limit_moves_to_the_next_lower_level() {
+        assert_eq!(sapi5_next_lower_worker_limit(12), 8);
+        assert_eq!(sapi5_next_lower_worker_limit(8), 6);
+        assert_eq!(sapi5_next_lower_worker_limit(6), 4);
+        assert_eq!(sapi5_next_lower_worker_limit(4), 2);
+        assert_eq!(sapi5_next_lower_worker_limit(2), 1);
+        assert_eq!(sapi5_next_lower_worker_limit(1), 1);
+    }
+
+    #[test]
+    fn diagnostic_field_parser_reads_quoted_and_plain_values() {
+        let line = r#"SESSION_START id=123 voice="Code Factory Vocalizer Paola (Italiano) - Embedded Pro" initial_limit=12"#;
+        assert_eq!(sapi5_extract_log_field(line, "id"), Some("123"));
+        assert_eq!(
+            sapi5_extract_log_field(line, "voice"),
+            Some("Code Factory Vocalizer Paola (Italiano) - Embedded Pro")
+        );
+        assert_eq!(sapi5_extract_log_field(line, "initial_limit"), Some("12"));
+    }
+
+    #[test]
+    fn isolated_worker_protocol_uses_a_fixed_short_directory() {
+        let directory = sapi5_worker_protocol_dir();
+        assert_eq!(
+            directory.file_name().and_then(|name| name.to_str()),
+            Some("sonarpad_sapi5_workers")
+        );
+        assert!(
+            directory
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.len() <= 32)
+        );
+    }
+
+    #[test]
+    fn isolated_worker_stall_timeout_stays_within_safe_bounds() {
+        let short = vec!["testo breve".to_string()];
+        assert_eq!(
+            sapi5_worker_stall_timeout(&short, 0),
+            Duration::from_secs(SAPI5_WORKER_MIN_STALL_TIMEOUT_SECS)
+        );
+
+        let very_long = vec!["a".repeat(20_000)];
+        assert_eq!(
+            sapi5_worker_stall_timeout(&very_long, -100),
+            Duration::from_secs(SAPI5_WORKER_MAX_STALL_TIMEOUT_SECS)
+        );
+    }
+}
+
+#[cfg(test)]
+mod sapi4_worker_tests {
+    use super::*;
+
+    #[test]
+    fn sapi4_user_worker_limit_is_respected_up_to_sixty_four() {
+        assert_eq!(requested_sapi4_worker_limit(0), 1);
+        assert_eq!(requested_sapi4_worker_limit(1), 1);
+        assert_eq!(requested_sapi4_worker_limit(30), 30);
+        assert_eq!(requested_sapi4_worker_limit(64), 64);
+        assert_eq!(requested_sapi4_worker_limit(100), 64);
+    }
+
+    #[test]
+    fn sapi4_retry_worker_limit_decreases_progressively() {
+        assert_eq!(sapi4_next_lower_worker_limit(64), 48);
+        assert_eq!(sapi4_next_lower_worker_limit(48), 32);
+        assert_eq!(sapi4_next_lower_worker_limit(30), 20);
+        assert_eq!(sapi4_next_lower_worker_limit(20), 12);
+        assert_eq!(sapi4_next_lower_worker_limit(12), 8);
+        assert_eq!(sapi4_next_lower_worker_limit(8), 4);
+        assert_eq!(sapi4_next_lower_worker_limit(4), 2);
+        assert_eq!(sapi4_next_lower_worker_limit(2), 1);
+        assert_eq!(sapi4_next_lower_worker_limit(1), 1);
+    }
 }
 
 #[cfg(test)]

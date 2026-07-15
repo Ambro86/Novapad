@@ -26,7 +26,7 @@
   "audiobook.cancel_confirm": "Är du säker på att du vill avbryta skapandet av ljudboken?",
   "audiobook.finalizing_progress": "Slutför ljudbok. Förlopp: {pct}%",
   "audiobook.progress": "Skapar ljudbok. Förlopp: {pct}%",
-  "audiobook.sapi4_threads_body": "Hur många samtidiga processer vill du använda för att snabba upp skapandet? (Rekommenderat: 10–30).\nObs: för många processer kan göra systemet långsammare eller orsaka fel i SAPI4-motorn.",
+  "audiobook.sapi4_threads_body": "Hur många samtidiga processer vill du använda för att snabba upp skapandet? (Rekommenderat: 10–30).\nObs: för många processer kan göra systemet långsammare eller orsaka fel i SAPI4-motorn.\nTillåtet intervall: 1–64.",
   "audiobook.sapi4_threads_title": "SAPI4-processer",
   "audiobook.title": "Skapar ljudbok",
   "batch_audiobooks.add_files": "Lägg till filer...",
@@ -554,6 +554,7 @@
   "options.label.move_cursor": "Flytta markören under läsning",
   "options.label.multilingual": "Visa endast flerspråkiga röster",
   "options.label.network_proxy": "Nätverksproxy (global):",
+  "options.label.network_proxy_port": "Proxyport:",
   "options.label.network_proxy_password": "Proxy-lösenord:",
   "options.label.network_proxy_username": "Proxy-användarnamn:",
   "options.label.open": "Öppna-beteende:",
@@ -1831,5 +1832,6 @@
   "epub_index.hint": "Välj ett kapitel eller underkapitel och tryck på Enter.",
   "epub_index.announcement": "Denna EPUB innehåller en innehållsförteckning. Öppna menyn Visa och välj Visa innehållsförteckning för att läsa den.",
   "epub_index.no_index": "Denna EPUB saknar en tillgänglig innehållsförteckning.",
-  "recordings.back_to_search": "Tillbaka till sökningen"
+  "recordings.back_to_search": "Tillbaka till sökningen",
+  "dictionary.lookup.language.de": "Tyska"
 }

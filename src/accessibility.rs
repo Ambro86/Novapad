@@ -22,9 +22,14 @@ pub const ES_CENTER: u32 = 0x0001;
 pub const ES_READONLY: u32 = 0x0800;
 
 /// Converts a Rust string slice to a wide string (UTF-16) null-terminated vector.
+/// Embedded NUL characters are removed because Win32 treats them as end-of-string markers.
 /// Essential for all Win32 UI calls.
 pub fn to_wide(value: &str) -> Vec<u16> {
-    value.encode_utf16().chain(std::iter::once(0)).collect()
+    value
+        .encode_utf16()
+        .filter(|unit| *unit != 0)
+        .chain(std::iter::once(0))
+        .collect()
 }
 
 /// Converts a Rust string slice to a wide string (UTF-16) null-terminated vector,
@@ -511,3 +516,31 @@ pub fn nvda_speak(text: &str) -> bool {
 
 // Le DLL nvdaControllerClient64.dll e SoundTouch64.dll sono ora embedded
 // nell'exe e estratte automaticamente da embedded_deps::extract_all()
+
+#[cfg(test)]
+mod tests {
+    use super::{to_wide, to_wide_normalized};
+
+    #[test]
+    fn wide_conversion_removes_embedded_nuls_and_keeps_one_terminator() {
+        let wide = to_wide("testo prima\0testo dopo");
+        let expected: Vec<u16> = "testo primatesto dopo"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        assert_eq!(wide, expected);
+        assert_eq!(wide.iter().filter(|unit| **unit == 0).count(), 1);
+    }
+
+    #[test]
+    fn normalized_wide_conversion_preserves_text_after_embedded_nul() {
+        let wide = to_wide_normalized("prima\0dopo\nseconda riga");
+        let expected: Vec<u16> = "primadopo\r\nseconda riga"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        assert_eq!(wide, expected);
+    }
+}

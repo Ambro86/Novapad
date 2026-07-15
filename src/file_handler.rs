@@ -2010,9 +2010,17 @@ fn decode_basic_html_entities(value: &str) -> String {
 mod tests {
     use super::{
         EpubResourcePlacement, Language, WINDOWS_1250, WINDOWS_1252, align_epub_target_to_title,
-        byte_offset_to_editor_utf16, choose_ansi_decoding, decode_ansi_best_effort, html_to_text,
-        is_epub_metadata_noise_line,
+        byte_offset_to_editor_utf16, choose_ansi_decoding, decode_ansi_best_effort,
+        embedded_nul_count, html_to_text, is_epub_metadata_noise_line, strip_embedded_nuls,
     };
+
+    #[test]
+    fn pdf_embedded_nuls_are_removed_without_truncating_following_text() {
+        let cleaned = strip_embedded_nuls("testo prima\0testo dopo".to_string(), "unit test");
+
+        assert_eq!(cleaned, "testo primatesto dopo");
+        assert_eq!(embedded_nul_count(&cleaned), 0);
+    }
 
     #[test]
     fn html_to_text_keeps_text_after_inline_comment() {
@@ -2986,6 +2994,7 @@ pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfT
                 normalize_pdf_paragraphs(&text)
             };
             let normalized = append_pdf_form_fields_if_any(path, normalized, language);
+            let normalized = strip_embedded_nuls(normalized, "normalized PDF output");
             crate::log_debug(&format!(
                 "PDF: Normalization completed in {:?}, final length={}",
                 norm_start.elapsed(),
@@ -3014,6 +3023,8 @@ pub fn read_pdf_text_with_status(path: &Path, language: Language) -> Result<PdfT
                         normalize_pdf_paragraphs(&text)
                     };
                     let normalized = append_pdf_form_fields_if_any(path, normalized, language);
+                    let normalized =
+                        strip_embedded_nuls(normalized, "PDFium panic fallback output");
                     if normalized.trim().is_empty() {
                         Ok(PdfTextResult::NoText)
                     } else {
@@ -3420,11 +3431,57 @@ fn pdf_object_text(obj: &LoObject) -> Option<String> {
     }
 }
 
+fn embedded_nul_count(text: &str) -> usize {
+    text.matches('\0').count()
+}
+
+fn strip_embedded_nuls(text: String, source: &str) -> String {
+    let count = embedded_nul_count(&text);
+    if count == 0 {
+        return text;
+    }
+
+    crate::log_debug(&format!(
+        "PDF: Removed {count} embedded NUL characters from {source}."
+    ));
+    text.replace('\0', "")
+}
+
 fn extract_pdf_text_with_fallback(path: &Path, language: Language) -> Result<String, String> {
     let extract_result =
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| extract_text(path)));
     match extract_result {
-        Ok(Ok(text)) => Ok(text),
+        Ok(Ok(text)) => {
+            let nul_count = embedded_nul_count(&text);
+            if nul_count == 0 {
+                return Ok(text);
+            }
+
+            crate::log_debug(&format!(
+                "PDF: pdf_extract returned {nul_count} embedded NUL characters; retrying with PDFium."
+            ));
+            let sanitized_pdf_extract = strip_embedded_nuls(text, "pdf_extract fallback text");
+            match extract_pdf_text_pdfium(path) {
+                Ok(pdfium_text) if !pdfium_text.trim().is_empty() => {
+                    crate::log_debug(
+                        "PDF: PDFium extraction succeeded after embedded NUL detection.",
+                    );
+                    Ok(pdfium_text)
+                }
+                Ok(_) => {
+                    crate::log_debug(
+                        "PDF: PDFium returned no text after embedded NUL detection; using sanitized pdf_extract text.",
+                    );
+                    Ok(sanitized_pdf_extract)
+                }
+                Err(pdfium_err) => {
+                    crate::log_debug(&format!(
+                        "PDF: PDFium fallback after embedded NUL detection failed: {pdfium_err}; using sanitized pdf_extract text."
+                    ));
+                    Ok(sanitized_pdf_extract)
+                }
+            }
+        }
         Ok(Err(err)) => {
             let err_str = err.to_string();
             crate::log_debug(&format!("PDF: pdf_extract failed: {}", err_str));
@@ -3497,7 +3554,7 @@ fn extract_pdf_text_pdfium(path: &Path) -> Result<String, String> {
             out.push_str(&text);
         }
     }
-    Ok(out)
+    Ok(strip_embedded_nuls(out, "PDFium output"))
 }
 
 fn panic_payload_to_string(panic: &Box<dyn std::any::Any + Send>) -> String {

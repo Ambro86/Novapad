@@ -1,12 +1,16 @@
 # परिवर्तन सूची
 
-Version 0.8.1 – 2026-07-15
+Version 0.8.1 – 2026-07-16
 
 Google text-to-speech
 • उन Windows प्रणालियों पर Google TTS startup ठीक किया गया है जहाँ internal browser server द्वारा स्वीकार किए गए connections non-blocking socket mode प्राप्त कर लेते थे, जिससे error 10035 आता था और downloaded voices बोल नहीं पाती थीं।
 • Voice preview या F5 reading शुरू करने से पहले Sonarpad अब Chrome या Edge के WASM engine के पूरी तरह load होने की प्रतीक्षा करता है, जिससे “Chrome WASM TTS engine was not loaded” error नहीं आता।
 • Hidden browser में page translation और renderer accessibility बंद रहती हैं, ताकि “Translate page” जैसे announcements और reading commands में interference न हो।
 • “Voices in editor” panel में Google engine चुने जाने पर अब “Manage Google voices...” button दिखाई देता है, और manager बंद होते ही installed voices की सूची तुरंत refresh होती है।
+
+PDF documents
+• उन PDF फ़ाइलों को ठीक किया गया है जिनके embedded text में NUL characters थे और editor में load करते समय text पहले NUL पर कट जाता था।
+• यदि pdf-extract embedded NULs लौटाता है, तो Sonarpad PDFium से extraction दोबारा करता है; Windows controls को text भेजने से पहले बचे हुए NULs हटा दिए जाते हैं, इसलिए document का बाकी हिस्सा सुरक्षित रहता है।
 
 Menu accessibility
 • Runtime mnemonic calculation हटा दिया गया है: access keys अब सभी 15 interface translations में स्पष्ट रूप से लिखी गई हैं और हर startup पर समान रहती हैं।

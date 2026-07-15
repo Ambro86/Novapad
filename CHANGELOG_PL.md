@@ -1,6 +1,6 @@
 # Dziennik zmian
 
-Wersja 0.8.1 – 2026-07-15
+Wersja 0.8.1 – 2026-07-16
 
 Synteza mowy Google
 • Naprawiono uruchamianie Google TTS w systemach Windows, w których połączenia zaakceptowane przez wewnętrzny serwer przeglądarki dziedziczyły nieblokujący tryb gniazda, powodując błąd 10035 i uniemożliwiając działanie pobranych głosów.
@@ -11,6 +11,10 @@ Synteza mowy Google
 
 Obsługa aktualizacji
 • Po automatycznej aktualizacji okno zakończenia z listą zmian otwiera się po początkowym przywróceniu fokusu i pozostaje na pierwszym planie, zamiast pojawiać się dopiero po naciśnięciu klawisza Tab.
+
+Dokumenty PDF
+• Naprawiono pliki PDF, których osadzony tekst zawierał znaki NUL i był obcinany przy pierwszym z nich podczas wczytywania do edytora.
+• Gdy pdf-extract zwróci osadzone znaki NUL, Sonarpad ponawia ekstrakcję przez PDFium; pozostałe znaki NUL są usuwane przed przekazaniem tekstu do kontrolek Windows, dzięki czemu dalsza część dokumentu zostaje zachowana.
 
 Dostępność menu
 • Usunięto obliczanie mnemonik w czasie działania programu: klawisze dostępu są teraz zapisane jawnie we wszystkich 15 tłumaczeniach interfejsu i pozostają takie same przy każdym uruchomieniu.

@@ -1,6 +1,6 @@
 # Journal des modifications
 
-Version 0.8.1 – 2026-07-15
+Version 0.8.1 – 2026-07-16
 
 Synthèse vocale Google
 • Correction du démarrage de Google TTS sur les systèmes Windows où les connexions acceptées par le serveur interne du navigateur héritaient du mode socket non bloquant, provoquant l’erreur 10035 et empêchant les voix téléchargées de parler.
@@ -11,6 +11,10 @@ Synthèse vocale Google
 
 Expérience de mise à jour
 • Après une mise à jour automatique, la fenêtre de confirmation avec le journal des modifications s’ouvre après la restauration initiale du focus et reste au premier plan, au lieu de n’apparaître qu’après l’appui sur Tab.
+
+Documents PDF
+• Correction des PDF dont le texte intégré contenait des caractères NUL et était tronqué à leur première occurrence lors du chargement dans l’éditeur.
+• Lorsque pdf-extract renvoie des caractères NUL intégrés, Sonarpad relance l’extraction avec PDFium ; tout NUL résiduel est supprimé avant l’envoi du texte aux contrôles Windows, afin de conserver le reste du document.
 
 Accessibilité des menus
 • Le calcul des mnémoniques à l’exécution a été supprimé : les touches d’accès sont désormais écrites explicitement dans chacune des 15 traductions de l’interface et restent donc identiques à chaque démarrage.

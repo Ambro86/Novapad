@@ -1,6 +1,6 @@
 # Nhật ký thay đổi
 
-Phiên bản 0.8.1 – 2026-07-15
+Phiên bản 0.8.1 – 2026-07-16
 
 Tổng hợp giọng nói Google
 • Đã sửa lỗi khởi động Google TTS trên một số hệ thống Windows, nơi các kết nối được máy chủ trình duyệt nội bộ chấp nhận kế thừa chế độ socket không chặn, gây lỗi 10035 và khiến các giọng đã tải xuống không thể phát âm.
@@ -11,6 +11,10 @@ Tổng hợp giọng nói Google
 
 Trải nghiệm cập nhật
 • Sau khi cập nhật tự động, cửa sổ hoàn tất kèm nhật ký thay đổi sẽ mở sau khi việc khôi phục tiêu điểm ban đầu kết thúc và luôn ở phía trước, thay vì chỉ xuất hiện sau khi nhấn Tab.
+
+Tài liệu PDF
+• Đã sửa các tệp PDF có văn bản nhúng chứa ký tự NUL khiến nội dung bị cắt tại ký tự đầu tiên khi tải vào trình soạn thảo.
+• Khi pdf-extract trả về ký tự NUL nhúng, Sonarpad sẽ thử lại bằng PDFium; mọi ký tự NUL còn lại được loại bỏ trước khi gửi văn bản tới các điều khiển Windows, nhờ đó phần còn lại của tài liệu được giữ nguyên.
 
 Khả năng truy cập của menu
 • Đã loại bỏ việc tính ký tự gợi nhớ trong lúc chạy: phím truy cập giờ được ghi rõ trong cả 15 bản dịch giao diện và luôn giữ nguyên giữa các lần khởi động.

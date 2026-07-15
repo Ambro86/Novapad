@@ -1,6 +1,6 @@
 # Changelog
 
-Version 0.8.1 – 2026-07-15
+Version 0.8.1 – 2026-07-16
 
 Google text-to-speech
 • Fixed Google TTS startup on Windows systems where connections accepted by the internal browser server inherited non-blocking socket mode, causing error 10035 and preventing downloaded voices from speaking.
@@ -11,6 +11,10 @@ Google text-to-speech
 
 Update experience
 • After an automatic update, the completion and changelog window now opens after the initial editor focus restoration and remains in the foreground instead of appearing only after pressing Tab.
+
+PDF documents
+• Fixed PDF files whose embedded text contained NUL characters and was cut off at the first occurrence when loaded into the editor.
+• When pdf-extract returns embedded NULs, Sonarpad now retries with PDFium; any remaining NULs are removed before text is sent to Windows controls, so the rest of the document is preserved.
 
 Menu accessibility
 • Removed runtime mnemonic generation: access keys are now written explicitly in each of the 15 interface translations and therefore remain identical across launches.

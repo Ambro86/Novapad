@@ -1,6 +1,6 @@
 # Přehled změn
 
-Verze 0.8.1 – 2026-07-15
+Verze 0.8.1 – 2026-07-16
 
 Google TTS
 • Opraveno spouštění Google TTS v systémech Windows, kde připojení přijatá interním serverem prohlížeče dědila neblokující režim socketu, což způsobovalo chybu 10035 a znemožňovalo přehrávání stažených hlasů.
@@ -11,6 +11,10 @@ Google TTS
 
 Průběh aktualizace
 • Po automatické aktualizaci se okno dokončení se seznamem změn otevře až po počátečním obnovení fokusu a zůstane v popředí, místo aby se zobrazilo teprve po stisknutí klávesy Tab.
+
+Dokumenty PDF
+• Opraveny soubory PDF, jejichž vložený text obsahoval znaky NUL a při načtení do editoru se u prvního z nich ořízl.
+• Pokud pdf-extract vrátí vložené znaky NUL, Sonarpad zkusí extrakci znovu pomocí PDFium; zbývající znaky NUL se před předáním textu ovládacím prvkům Windows odstraní, takže zbytek dokumentu zůstane zachován.
 
 Přístupnost nabídek
 • Výpočet mnemotechnických kláves za běhu byl odstraněn: přístupové klávesy jsou nyní výslovně zapsány ve všech 15 překladech rozhraní a při každém spuštění zůstávají stejné.

@@ -1,6 +1,6 @@
 # Changelog
 
-Versione 0.8.1 – 2026-07-15
+Versione 0.8.1 – 2026-07-16
 
 Sintesi vocale Google
 • Corretto l’avvio di Google TTS nei sistemi Windows in cui le connessioni accettate dal server interno del browser ereditavano la modalità socket non bloccante, provocando l’errore 10035 e impedendo alle voci scaricate di parlare.
@@ -11,6 +11,10 @@ Sintesi vocale Google
 
 Esperienza di aggiornamento
 • Dopo un aggiornamento automatico, la finestra di completamento con il registro modifiche si apre dopo il ripristino iniziale del focus e resta in primo piano, invece di comparire soltanto dopo aver premuto Tab.
+
+Documenti PDF
+• Corretti i PDF in cui il testo incorporato conteneva caratteri NUL e veniva troncato alla prima occorrenza durante il caricamento nell’editor.
+• Se pdf-extract restituisce NUL incorporati, Sonarpad riprova con PDFium; eventuali NUL residui vengono rimossi prima di inviare il testo ai controlli Windows, preservando il resto del documento.
 
 Accessibilità dei menu
 • Rimosso il calcolo delle mnemoniche durante l’esecuzione: le lettere di accesso sono ora scritte esplicitamente in ciascuna delle 15 traduzioni dell’interfaccia e restano quindi identiche a ogni avvio.

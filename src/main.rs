@@ -12519,9 +12519,7 @@ fn cycle_favorite_voice(hwnd: HWND, direction: i32) {
     let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
     app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
     refresh_voice_panel(hwnd);
-    if let Some(settings) = { with_state(hwnd, |state| state.settings.clone()) } {
-        save_settings(settings);
-    }
+    save_settings_with_synced_active_voice_profile(hwnd);
     restart_tts_from_current_offset(hwnd);
 }
 
@@ -12731,6 +12729,15 @@ fn set_active_tts_tuning(settings: &mut AppSettings, engine: TtsEngine, tuning: 
         settings.tts_rate = tuning.rate;
         settings.tts_pitch = tuning.pitch;
         settings.tts_volume = tuning.volume;
+    }
+}
+
+fn save_settings_with_synced_active_voice_profile(hwnd: HWND) {
+    if let Some(settings) = with_state(hwnd, |state| {
+        sync_active_voice_profile_from_settings_fields(&mut state.settings);
+        state.settings.clone()
+    }) {
+        save_settings(settings);
     }
 }
 
@@ -14238,9 +14245,7 @@ fn handle_voice_panel_engine_change(hwnd: HWND) {
         }
         let changed = new_engine != old_engine || new_voice != old_voice;
         if changed {
-            if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-                save_settings(settings);
-            }
+            save_settings_with_synced_active_voice_profile(hwnd);
             restart_tts_from_current_offset(hwnd);
         }
     }
@@ -14292,9 +14297,7 @@ fn handle_voice_panel_voice_change(hwnd: HWND) {
                 with_state(hwnd, |state| {
                     state.settings.tts_voice = voice_name;
                 });
-                if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-                    save_settings(settings);
-                }
+                save_settings_with_synced_active_voice_profile(hwnd);
                 restart_tts_from_current_offset(hwnd);
             }
         }
@@ -14321,9 +14324,7 @@ fn handle_voice_panel_multilingual_toggle(hwnd: HWND) {
         with_state(hwnd, |state| {
             state.settings.tts_only_multilingual = checked;
         });
-        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-            save_settings(settings);
-        }
+        save_settings_with_synced_active_voice_profile(hwnd);
         refresh_voice_panel_voice_list(hwnd);
     }
 }
@@ -14502,9 +14503,7 @@ fn handle_voice_panel_tuning_combo_change(hwnd: HWND) {
         })
         .unwrap_or(false);
         if changed {
-            if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-                save_settings(settings);
-            }
+            save_settings_with_synced_active_voice_profile(hwnd);
             if was_active && (old_rate != rate || old_pitch != pitch || old_volume != volume) {
                 restart_tts_from_current_offset(hwnd);
             }
@@ -14612,9 +14611,7 @@ fn handle_voice_panel_tuning_edit_change(hwnd: HWND) {
         })
         .unwrap_or(false);
         if changed {
-            if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-                save_settings(settings);
-            }
+            save_settings_with_synced_active_voice_profile(hwnd);
             if was_active && (old_rate != rate || old_pitch != pitch || old_volume != volume) {
                 restart_tts_from_current_offset(hwnd);
             }
@@ -14676,9 +14673,7 @@ fn handle_voice_panel_favorite_change(hwnd: HWND) {
         let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
         app_windows::options_window::ensure_voice_lists_loaded(hwnd, language);
         refresh_voice_panel(hwnd);
-        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-            save_settings(settings);
-        }
+        save_settings_with_synced_active_voice_profile(hwnd);
         restart_tts_from_current_offset(hwnd);
     }
 }
@@ -14719,8 +14714,8 @@ pub(crate) fn refresh_google_voice_settings(hwnd: HWND) {
     })
     .unwrap_or(false);
     refresh_voice_panel(hwnd);
-    if changed && let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
-        save_settings(settings);
+    if changed {
+        save_settings_with_synced_active_voice_profile(hwnd);
     }
 }
 

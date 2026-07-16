@@ -1070,6 +1070,25 @@ pub fn apply_voice_profile_to_settings_fields(settings: &mut AppSettings, profil
     settings.dialogue_secondary_voice_volume = profile.dialogue_secondary_voice_volume;
 }
 
+pub fn sync_active_voice_profile_from_settings_fields(settings: &mut AppSettings) {
+    let active_name = if settings.active_voice_profile.trim().is_empty() {
+        DEFAULT_VOICE_PROFILE_NAME.to_string()
+    } else {
+        settings.active_voice_profile.trim().to_string()
+    };
+    let updated = voice_profile_from_settings_fields(active_name.clone(), settings);
+    if let Some(profile) = settings
+        .voice_profiles
+        .iter_mut()
+        .find(|profile| profile.name.eq_ignore_ascii_case(&active_name))
+    {
+        *profile = updated;
+    } else {
+        settings.voice_profiles.push(updated);
+    }
+    settings.active_voice_profile = active_name;
+}
+
 pub fn tts_tuning_for_engine(settings: &AppSettings, engine: TtsEngine) -> TtsTuning {
     match engine {
         TtsEngine::Edge => settings.edge_tts_tuning,
@@ -3099,6 +3118,44 @@ mod network_proxy_tests {
                 .expect("empty proxy")
                 .is_none()
         );
+    }
+}
+
+#[cfg(test)]
+mod voice_profile_tests {
+    use super::{
+        AppSettings, DEFAULT_VOICE_PROFILE_NAME, TtsEngine, VoiceProfile, normalize_voice_profiles,
+        sync_active_voice_profile_from_settings_fields,
+    };
+
+    #[test]
+    fn syncing_active_profile_preserves_google_selection_after_reload_normalization() {
+        let mut settings = AppSettings {
+            active_voice_profile: DEFAULT_VOICE_PROFILE_NAME.to_string(),
+            voice_profiles: vec![VoiceProfile {
+                name: DEFAULT_VOICE_PROFILE_NAME.to_string(),
+                tts_engine: TtsEngine::Sapi4,
+                tts_voice: "SAPI4 voice".to_string(),
+                ..Default::default()
+            }],
+            tts_engine: TtsEngine::Google,
+            tts_voice: "Google italiano 6 (Natural)".to_string(),
+            ..Default::default()
+        };
+
+        sync_active_voice_profile_from_settings_fields(&mut settings);
+
+        let active_profile = settings
+            .voice_profiles
+            .iter()
+            .find(|profile| profile.name == DEFAULT_VOICE_PROFILE_NAME)
+            .expect("default voice profile");
+        assert!(active_profile.tts_engine == TtsEngine::Google);
+        assert_eq!(active_profile.tts_voice, "Google italiano 6 (Natural)");
+
+        normalize_voice_profiles(&mut settings);
+        assert!(settings.tts_engine == TtsEngine::Google);
+        assert_eq!(settings.tts_voice, "Google italiano 6 (Natural)");
     }
 }
 

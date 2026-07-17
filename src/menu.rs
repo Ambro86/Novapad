@@ -163,6 +163,9 @@ pub const IDM_TOOLS_WEATHER: usize = 5019;
 pub const IDM_TOOLS_CINEMA: usize = 5020;
 pub const IDM_TOOLS_CALENDAR: usize = 5021;
 pub const IDM_TOOLS_TRECCANI: usize = 5022;
+pub const IDM_TOOLS_GUTENBERG: usize = 5023;
+pub const IDM_TOOLS_INTERNET_ARCHIVE: usize = 5024;
+pub const IDM_TOOLS_LIBRIVOX: usize = 5025;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -198,6 +201,9 @@ pub struct MenuLabels {
     pub menu_dictionary: String,
     pub menu_dictionary_lookup: String,
     pub menu_wikipedia_import: String,
+    pub menu_gutenberg: String,
+    pub menu_internet_archive: String,
+    pub menu_librivox: String,
     pub menu_treccani: String,
     pub menu_import_youtube: String,
     pub menu_stream_audio: String,
@@ -324,6 +330,9 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         menu_dictionary: i18n::tr(language, "menu.dictionary"),
         menu_dictionary_lookup: i18n::tr(language, "menu.dictionary_lookup"),
         menu_wikipedia_import: i18n::tr(language, "menu.wikipedia_import"),
+        menu_gutenberg: i18n::tr(language, "menu.gutenberg"),
+        menu_internet_archive: i18n::tr(language, "menu.internet_archive"),
+        menu_librivox: i18n::tr(language, "menu.librivox"),
         menu_treccani: if language == Language::Italian {
             i18n::tr_treccani("menu.treccani")
         } else {
@@ -1057,6 +1066,18 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
         labels.menu_prompt = label_with_shortcut(&labels.menu_prompt, shortcuts.open_terminal);
         labels.menu_wikipedia_import =
             label_with_shortcut(&labels.menu_wikipedia_import, shortcuts.import_wikipedia);
+        labels.menu_gutenberg = label_with_shortcut(
+            &labels.menu_gutenberg,
+            ShortcutBinding::new(false, true, true, 'U' as u16),
+        );
+        labels.menu_internet_archive = label_with_shortcut(
+            &labels.menu_internet_archive,
+            ShortcutBinding::new(false, true, true, 'I' as u16),
+        );
+        labels.menu_librivox = label_with_shortcut(
+            &labels.menu_librivox,
+            ShortcutBinding::new(true, true, false, 'V' as u16),
+        );
         labels.menu_import_youtube =
             label_with_shortcut(&labels.menu_import_youtube, shortcuts.import_youtube);
         labels.edit_find = label_with_shortcut(&labels.edit_find, shortcuts.find);
@@ -1578,6 +1599,24 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 IDM_TOOLS_WIKIPEDIA_IMPORT,
                 &labels.menu_wikipedia_import,
             );
+            append_menu_string(
+                reading_content_menu,
+                MF_STRING,
+                IDM_TOOLS_GUTENBERG,
+                &labels.menu_gutenberg,
+            );
+            append_menu_string(
+                reading_content_menu,
+                MF_STRING,
+                IDM_TOOLS_INTERNET_ARCHIVE,
+                &labels.menu_internet_archive,
+            );
+            append_menu_string(
+                reading_content_menu,
+                MF_STRING,
+                IDM_TOOLS_LIBRIVOX,
+                &labels.menu_librivox,
+            );
             if language == Language::Italian {
                 append_menu_string(
                     reading_content_menu,
@@ -1725,6 +1764,24 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 MF_STRING,
                 IDM_TOOLS_WIKIPEDIA_IMPORT,
                 &labels.menu_wikipedia_import,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_GUTENBERG,
+                &labels.menu_gutenberg,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_INTERNET_ARCHIVE,
+                &labels.menu_internet_archive,
+            );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_LIBRIVOX,
+                &labels.menu_librivox,
             );
             if language == Language::Italian {
                 append_menu_string(

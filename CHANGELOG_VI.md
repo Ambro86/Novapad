@@ -1,5 +1,20 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.8.2 – 2026-07-17
+
+Thư viện số và sách nói
+• Đã thêm Project Gutenberg, cho phép tìm kiếm theo tiêu đề hoặc tác giả và chọn ngôn ngữ.
+• Sách EPUB từ Project Gutenberg được tải xuống thư mục Documents\Sonarpad\Documents; khi hoàn tất, Sonarpad sẽ hỏi có muốn mở sách ngay trong trình soạn thảo hay không.
+• Đã thêm Internet Archive để tìm kiếm và nghe các bộ sưu tập âm thanh, bao gồm chương trình phát thanh cũ, bài phát biểu và nhạc trực tiếp.
+• Đã thêm LibriVox để tìm sách nói theo tiêu đề hoặc tác giả và phát trực tiếp từng chương bằng cùng trình phát được dùng cho podcast.
+• Ba chức năng mới có trong menu Công cụ và, khi bật nhóm menu, trong phần Đọc.
+
+Phiên âm thanh dài
+• Đã sửa lỗi phiên âm các tệp âm thanh dài: âm thanh giờ được tự động chia thành các phần 15 phút, phiên âm lần lượt rồi ghép lại, tránh các lỗi có thể xảy ra với bản ghi dài.
+
+YouTube
+• Đã thêm lệnh “Sao chép liên kết”, cũng có thể dùng bằng Ctrl+C, để sao chép URL của video, danh sách phát hoặc kênh YouTube đang chọn vào bảng tạm.
+
 Phiên bản 0.8.1 – 2026-07-16
 
 Tổng hợp giọng nói Google

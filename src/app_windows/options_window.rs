@@ -728,6 +728,18 @@ fn find_fixed_shortcut_conflict_label(
                 "BDCiechi\tAlt+Shift+B".to_string()
             },
         ),
+        (
+            ShortcutBinding::new(false, true, true, 'U' as u16),
+            labels.menu_gutenberg,
+        ),
+        (
+            ShortcutBinding::new(false, true, true, 'I' as u16),
+            labels.menu_internet_archive,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'V' as u16),
+            labels.menu_librivox,
+        ),
     ];
     fixed
         .into_iter()

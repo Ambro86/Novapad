@@ -258,12 +258,34 @@ pub(crate) fn play_youtube_video_in_mpv(
 fn ytdlp_command(path: &Path) -> Command {
     const BELOW_NORMAL_PRIORITY_CLASS_FLAG: u32 = 0x0000_4000;
     let mut cmd = Command::new(path);
+    // yt-dlp otherwise writes human-readable fields using the active Windows
+    // code page.  The captured bytes are then ambiguous (for example CP1250
+    // Polish text can be mistaken for CP1252), corrupting both UI titles and
+    // the filenames Sonarpad derives from them.
+    cmd.arg("--encoding").arg("utf-8");
     cmd.stdin(Stdio::null());
     // yt-dlp may launch FFmpeg for merging/conversion.  Keep the whole child
     // process tree below the UI priority so older PCs continue servicing the
     // Sonarpad message loop and screen readers do not report "not responding".
     cmd.creation_flags(CREATE_NO_WINDOW.0 | BELOW_NORMAL_PRIORITY_CLASS_FLAG);
     cmd
+}
+
+#[cfg(test)]
+mod ytdlp_command_tests {
+    use super::ytdlp_command;
+    use std::path::Path;
+
+    #[test]
+    fn forces_utf8_for_captured_ytdlp_output() {
+        let command = ytdlp_command(Path::new("yt-dlp.exe"));
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(&args[..2], ["--encoding", "utf-8"]);
+    }
 }
 
 fn youtube_ui_language_code(language: Language) -> &'static str {
@@ -2220,6 +2242,32 @@ fn choose_stream_collection_entry_page(
                 })
             },
         };
+    let copy_link_action =
+        crate::app_windows::interpreter_select_window::InterpreterContextAction {
+            label: format!("{} (Ctrl+C)", i18n::tr(language, "stream_audio.copy_link")),
+            ctrl_c_shortcut: true,
+            enabled: {
+                let favorite_candidates = Arc::clone(&favorite_candidates);
+                Arc::new(move |selected: &str| {
+                    favorite_candidates
+                        .iter()
+                        .any(|entry| entry.label == selected)
+                })
+            },
+            handler: {
+                let favorite_candidates = Arc::clone(&favorite_candidates);
+                Arc::new(move |selected: String| {
+                    if let Some(entry) = favorite_candidates
+                        .iter()
+                        .find(|entry| entry.label == selected)
+                    {
+                        crate::app_windows::rai_audiodescrizioni_window::copy_text_to_clipboard(
+                            parent, &entry.url,
+                        );
+                    }
+                })
+            },
+        };
     let view_comments_action =
         crate::app_windows::interpreter_select_window::InterpreterContextAction {
             label: tr_or(language, "stream_audio.view_comments", "View comments"),
@@ -2261,7 +2309,11 @@ fn choose_stream_collection_entry_page(
         language,
         i18n::tr(language, "stream_audio.prompt_title"),
         initial_selected_label.map(ToOwned::to_owned),
-        vec![view_comments_action, add_to_favorites_action],
+        vec![
+            copy_link_action,
+            view_comments_action,
+            add_to_favorites_action,
+        ],
     )
 }
 

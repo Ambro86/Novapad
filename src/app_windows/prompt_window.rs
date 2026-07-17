@@ -1173,6 +1173,8 @@ fn credentials_prompt_wndproc_inner(
                     let primary_labels = &config.primary_labels;
                     let secondary_label = &config.secondary_label;
                     let tertiary_label = &config.tertiary_label;
+                    let show_secondary =
+                        !secondary_label.trim().is_empty() || !password_value.is_empty();
                     let show_tertiary =
                         !tertiary_label.trim().is_empty() || !tertiary_value.is_empty();
                     let show_secondary_kind = !secondary_options.is_empty();
@@ -1397,7 +1399,11 @@ fn credentials_prompt_wndproc_inner(
                             Default::default(),
                             WC_STATIC,
                             PCWSTR(to_wide(secondary_label).as_ptr()),
-                            WS_CHILD | WS_VISIBLE,
+                            if show_secondary {
+                                WS_CHILD | WS_VISIBLE
+                            } else {
+                                WS_CHILD
+                            },
                             20,
                             y + 4,
                             100,
@@ -1413,10 +1419,14 @@ fn credentials_prompt_wndproc_inner(
                             WS_EX_CLIENTEDGE,
                             WC_EDIT,
                             PCWSTR(to_wide(&password_value).as_ptr()),
-                            WS_CHILD
-                                | WS_VISIBLE
-                                | WS_TABSTOP
-                                | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                            if show_secondary {
+                                WS_CHILD
+                                    | WS_VISIBLE
+                                    | WS_TABSTOP
+                                    | WINDOW_STYLE(ES_AUTOHSCROLL as u32)
+                            } else {
+                                WS_CHILD | WINDOW_STYLE(ES_AUTOHSCROLL as u32)
+                            },
                             128,
                             y,
                             250,
@@ -1427,7 +1437,9 @@ fn credentials_prompt_wndproc_inner(
                             None,
                         )
                     };
-                    y += 36;
+                    if show_secondary {
+                        y += 36;
+                    }
                     let tertiary_label_hwnd = unsafe {
                         CreateWindowExW(
                             Default::default(),

@@ -2558,6 +2558,31 @@ fn podcast_partial_cache_path(file_path: &Path) -> PathBuf {
     PathBuf::from(format!("{}.part", file_path.to_string_lossy()))
 }
 
+fn is_usable_podcast_cache_file(path: &Path) -> bool {
+    const MIN_MEDIA_BYTES: u64 = 1024;
+    let Ok(meta) = path.metadata() else {
+        return false;
+    };
+    if !meta.is_file() || meta.len() < MIN_MEDIA_BYTES {
+        return false;
+    }
+
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+    let mut header = [0u8; 512];
+    let read = std::io::Read::read(&mut file, &mut header).unwrap_or(0);
+    if read == 0 {
+        return false;
+    }
+    let prefix = String::from_utf8_lossy(&header[..read]);
+    let prefix = prefix.trim_start().to_ascii_lowercase();
+    !prefix.starts_with("<!doctype")
+        && !prefix.starts_with("<html")
+        && !prefix.starts_with("<?xml")
+        && !prefix.starts_with("{\"error\"")
+}
+
 fn podcast_cache_path_for_url(url: &str, mime: Option<&str>, title: Option<&str>) -> PathBuf {
     use sha2::Digest;
 
@@ -4737,10 +4762,20 @@ fn play_podcast_episode_from_url_internal(
     screen_reader_speak(&i18n::tr(language, "podcasts.loading"));
     open_podcast_play_progress_window(hwnd, language);
     std::thread::spawn(move || {
-        let cache_ok = cache_path
-            .metadata()
-            .map(|meta| meta.is_file() && meta.len() > 0)
-            .unwrap_or(false);
+        let cache_ok = is_usable_podcast_cache_file(&cache_path);
+        if cache_path.exists() && !cache_ok {
+            log_debug(&format!(
+                "podcast cache invalid, removing before download: {}",
+                cache_path.display()
+            ));
+            if let Err(err) = std::fs::remove_file(&cache_path) {
+                log_debug(&format!(
+                    "failed to remove invalid podcast cache {}: {}",
+                    cache_path.display(),
+                    err
+                ));
+            }
+        }
         let result = if cache_ok {
             Ok(())
         } else {
@@ -4811,6 +4846,23 @@ fn download_podcast_episode_cache_with_resume(
 
         match result {
             Ok(_) => {
+                if !is_usable_podcast_cache_file(&partial_file_path) {
+                    let invalid_size = partial_file_path
+                        .metadata()
+                        .map(|meta| meta.len())
+                        .unwrap_or(0);
+                    if let Err(err) = std::fs::remove_file(&partial_file_path) {
+                        log_debug(&format!(
+                            "failed to remove invalid partial podcast cache {}: {}",
+                            partial_file_path.display(),
+                            err
+                        ));
+                    }
+                    return Err(format!(
+                        "downloaded response is not valid media ({} bytes)",
+                        invalid_size
+                    ));
+                }
                 std::fs::rename(&partial_file_path, cache_path).map_err(|err| {
                     format!(
                         "failed to finalize cache file {} from {}: {}",
@@ -7480,8 +7532,21 @@ pub(crate) fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
             toggle_audiobook_pause(hwnd);
         }
         PlayerCommand::Stop => {
+            let stopped_url =
+                with_state(hwnd, |state| state.active_podcast_episode_url.clone()).flatten();
             save_automatic_bookmark_for_active_raiplaysound_episode(hwnd);
             stop_audiobook_playback(hwnd);
+            let restored_archive =
+                app_windows::internet_archive_window::restore_episode_list_after_stop(
+                    hwnd,
+                    stopped_url.as_deref(),
+                );
+            if !restored_archive {
+                app_windows::librivox_window::restore_chapter_list_after_stop(
+                    hwnd,
+                    stopped_url.as_deref(),
+                );
+            }
         }
         PlayerCommand::StopOnly => {
             save_automatic_bookmark_for_active_raiplaysound_episode(hwnd);
@@ -8600,6 +8665,13 @@ fn run_app(
                     app_windows::find_in_files_window::reopen_results(hwnd);
                     continue;
                 }
+                if let Some(hwnd_edit) = get_active_edit(hwnd)
+                    && GetFocus() == hwnd_edit
+                    && app_windows::gutenberg_window::current_document_has_return_context(hwnd)
+                {
+                    app_windows::gutenberg_window::reopen_results(hwnd);
+                    continue;
+                }
                 let wikipedia_hwnd =
                     with_state(hwnd, |state| state.wikipedia_window).unwrap_or(HWND(0));
                 if wikipedia_hwnd.0 != 0
@@ -8848,6 +8920,7 @@ fn run_app(
                             let from_rai = state.active_podcast_episode_from_rai;
                             let youtube_return_context =
                                 state.active_youtube_return_context.clone();
+                            let stopped_url = state.active_podcast_episode_url.clone();
                             let is_mpv = state.active_mpv_session.is_some();
                             if is_stop {
                                 // close_current_document() already stops audiobook playback
@@ -8875,9 +8948,20 @@ fn run_app(
                                         hwnd,
                                         youtube_return_context,
                                     );
-                                } else if podcasts_window.0 != 0 {
-                                    SetForegroundWindow(podcasts_window);
-                                    app_windows::podcasts_window::focus_library(podcasts_window);
+                                } else {
+                                    let restored_catalog = app_windows::internet_archive_window::restore_episode_list_after_stop(
+                                        hwnd,
+                                        stopped_url.as_deref(),
+                                    ) || app_windows::librivox_window::restore_chapter_list_after_stop(
+                                        hwnd,
+                                        stopped_url.as_deref(),
+                                    );
+                                    if !restored_catalog && podcasts_window.0 != 0 {
+                                        SetForegroundWindow(podcasts_window);
+                                        app_windows::podcasts_window::focus_library(
+                                            podcasts_window,
+                                        );
+                                    }
                                 }
                             } else {
                                 handle_player_command(hwnd, command);
@@ -12229,6 +12313,21 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_TOOLS_WIKIPEDIA_IMPORT => {
                         log_debug("Menu: Wikipedia import");
                         app_windows::wikipedia_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_GUTENBERG => {
+                        log_debug("Menu: Project Gutenberg");
+                        app_windows::gutenberg_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_INTERNET_ARCHIVE => {
+                        log_debug("Menu: Internet Archive");
+                        app_windows::internet_archive_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_LIBRIVOX => {
+                        log_debug("Menu: LibriVox");
+                        app_windows::librivox_window::open(hwnd);
                         LRESULT(0)
                     }
                     IDM_TOOLS_TRECCANI => {
@@ -18567,6 +18666,18 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     .unwrap_or(false);
     if key == 'B' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_BDCIECHI);
+        return true;
+    }
+    if key == 'U' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_GUTENBERG);
+        return true;
+    }
+    if key == 'I' as u16 && !ctrl_down && shift_down && alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_INTERNET_ARCHIVE);
+        return true;
+    }
+    if key == 'V' as u16 && ctrl_down && shift_down && !alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_LIBRIVOX);
         return true;
     }
     if key == 'S' as u16 && !ctrl_down && shift_down && alt_down {

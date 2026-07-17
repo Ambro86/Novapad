@@ -1,5 +1,20 @@
 # Přehled změn
 
+Verze 0.8.2 – 2026-07-17
+
+Digitální knihovny a audioknihy
+• Přidán Project Gutenberg s vyhledáváním podle názvu nebo autora a s volbou jazyka.
+• Knihy EPUB z Project Gutenberg se stahují do složky Dokumenty\Sonarpad\Documents; po dokončení se Sonarpad zeptá, zda má knihu ihned otevřít v editoru.
+• Přidán Internet Archive pro vyhledávání a poslech zvukových sbírek, včetně historického rozhlasu, projevů a živé hudby.
+• Přidán LibriVox pro vyhledávání audioknih podle názvu nebo autora a přímé přehrávání kapitol stejným přehrávačem, jaký používají podcasty.
+• Všechny tři nové funkce jsou dostupné v nabídce Nástroje a při zapnutém seskupování nabídek také v části Čtení.
+
+Dlouhé zvukové přepisy
+• Opraven přepis dlouhých zvukových souborů: zvuk se nyní automaticky rozdělí na patnáctiminutové části, postupně se přepíše a poté znovu spojí, čímž se předchází chybám u dlouhých nahrávek.
+
+YouTube
+• Přidána položka „Kopírovat odkaz“, dostupná také pomocí Ctrl+C, která zkopíruje do schránky URL vybraného videa, playlistu nebo kanálu YouTube.
+
 Verze 0.8.1 – 2026-07-16
 
 Google TTS

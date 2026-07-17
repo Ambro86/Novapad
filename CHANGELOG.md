@@ -1,5 +1,20 @@
 # Changelog
 
+Version 0.8.2 – 2026-07-17
+
+Digital libraries and audiobooks
+• Added Project Gutenberg, with search by title or author and language selection.
+• Project Gutenberg EPUB books are downloaded to Documents\Sonarpad\Documents; when the download finishes, Sonarpad asks whether to open the book immediately in the editor.
+• Added Internet Archive for searching and listening to audio collections, including old-time radio, speeches and live music.
+• Added LibriVox for searching audiobooks by title or author and playing chapters directly with the same player used for podcasts.
+• The three new features are available in the Tools menu and, when menu grouping is enabled, in the Reading section.
+
+Long audio transcriptions
+• Fixed transcription of long audio files: audio is now automatically divided into 15-minute parts, transcribed one part at a time and then joined again, preventing errors that could occur with long recordings.
+
+YouTube
+• Added “Copy link”, also available with Ctrl+C, to copy the URL of the selected YouTube video, playlist or channel to the clipboard.
+
 Version 0.8.1 – 2026-07-16
 
 Google text-to-speech

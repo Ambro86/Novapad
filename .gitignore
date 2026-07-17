@@ -51,3 +51,6 @@ scripts/__pycache__/
 .aider*
 rustnotepad.zip
 .antigravitycli/
+
+# Local documentation workspace
+docs/

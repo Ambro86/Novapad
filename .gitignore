@@ -47,7 +47,8 @@ dll/whisper-cuda-runtime-win64-cu12.zip.010
 dll/whisper-cuda-runtime-win64-cu12.zip.011
 dll/whisper-cuda-runtime-win64-cu12.zip.012
 scripts/thegroove_series_dump.py
-scripts/__pycache__/
+**/__pycache__/
+**/*.py[cod]
 .aider*
 rustnotepad.zip
 .antigravitycli/

@@ -16,6 +16,7 @@ use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTAT
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const BRIDGE_FILE_NAME: &str = "faster_whisper_bridge.exe";
+const BRIDGE_CACHE_FILE_NAME: &str = "faster_whisper_bridge_v2.exe";
 const BRIDGE_MIN_VALID_SIZE_BYTES: u64 = 1_000_000;
 const CUDA_PACKAGE_FILE_NAME: &str = "whisper-cuda-runtime-win64-cu12.zip";
 const DICTATION_WORKER_IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
@@ -513,7 +514,7 @@ fn strip_hallucinations(text: &str) -> String {
 fn bridge_install_path() -> PathBuf {
     crate::settings::settings_dir()
         .join("tools")
-        .join(BRIDGE_FILE_NAME)
+        .join(BRIDGE_CACHE_FILE_NAME)
 }
 
 fn cuda_runtime_dir() -> PathBuf {

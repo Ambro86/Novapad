@@ -730,8 +730,13 @@ fn handle_http_request(stream: &mut TcpStream) -> Result<(), String> {
             )
         }
     };
+    let content_language = if content_type.starts_with("text/html") {
+        "Content-Language: zxx\r\n"
+    } else {
+        ""
+    };
     let header = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\nCross-Origin-Opener-Policy: same-origin\r\nCross-Origin-Embedder-Policy: require-corp\r\nCross-Origin-Resource-Policy: same-origin\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\n{content_language}Content-Length: {}\r\nConnection: close\r\nCross-Origin-Opener-Policy: same-origin\r\nCross-Origin-Embedder-Policy: require-corp\r\nCross-Origin-Resource-Policy: same-origin\r\n\r\n",
         body.len()
     );
     stream
@@ -1627,6 +1632,16 @@ mod tests {
     }
 
     #[test]
+    fn embedded_google_tts_pages_disable_translation() {
+        for page in [INDEX_HTML, OFFSCREEN_HTML] {
+            let html = String::from_utf8_lossy(page);
+            assert!(html.contains("lang=\"zxx\""));
+            assert!(html.contains("translate=\"no\""));
+            assert!(html.contains("name=\"google\" content=\"notranslate\""));
+        }
+    }
+
+    #[test]
     fn embedded_http_handler_waits_for_a_delayed_partial_request() {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind test listener");
         listener
@@ -1636,7 +1651,7 @@ mod tests {
         let client = thread::spawn(move || {
             let mut stream = TcpStream::connect(address).expect("connect test client");
             stream
-                .write_all(b"GET /missing HTTP/1.1\r\nHost: 127.0.0.1")
+                .write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1")
                 .expect("write first request part");
             thread::sleep(Duration::from_millis(40));
             stream
@@ -1669,6 +1684,7 @@ mod tests {
 
         let response = client.join().expect("join test client");
         let response = String::from_utf8_lossy(&response);
-        assert!(response.starts_with("HTTP/1.1 404 Not Found"));
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        assert!(response.contains("\r\nContent-Language: zxx\r\n"));
     }
 }

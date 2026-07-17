@@ -31,6 +31,8 @@ const TV_GUIDE_FALLBACK_MAX_AGE_SECS: i64 = 6 * 60 * 60;
 pub(crate) struct TvChannel {
     pub(crate) name: String,
     pub(crate) url: String,
+    #[serde(default)]
+    pub(crate) dash_url: Option<String>,
     pub(crate) category: String,
     #[serde(default)]
     pub(crate) stream_resolver: Option<String>,
@@ -114,6 +116,8 @@ struct TvServerChannel {
     name: Option<String>,
     #[serde(default)]
     url: Option<String>,
+    #[serde(default)]
+    dash_url: Option<String>,
     #[serde(default)]
     group_title: Option<String>,
     #[serde(default)]
@@ -636,6 +640,7 @@ fn normalize_server_channel(raw: TvServerChannel) -> Option<TvChannel> {
     Some(TvChannel {
         name,
         url,
+        dash_url: trimmed_option(raw.dash_url),
         category,
         stream_resolver: trimmed_option(raw.stream_resolver),
         resolver_endpoint: trimmed_option(raw.resolver_endpoint),
@@ -746,6 +751,19 @@ pub(crate) fn resolve_stream_url(channel: &TvChannel) -> Result<String, String> 
 
     if channel.url.contains("/relinker/relinkerServlet") {
         return resolve_rai_relinker(channel);
+    }
+
+    if let Some(dash_url) = channel
+        .dash_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|url| !url.is_empty())
+    {
+        crate::log_debug(&format!(
+            "TV direct stream: using DASH alternative for {}",
+            channel.name
+        ));
+        return Ok(dash_url.to_string());
     }
 
     Ok(channel.url.trim().to_string())
@@ -1027,6 +1045,28 @@ mod tests {
         assert_eq!(
             extract_xml_url(xml, true).as_deref(),
             Some("https://example.test/live.m3u8")
+        );
+    }
+
+    #[test]
+    fn direct_channel_prefers_server_dash_url() {
+        let raw: TvServerChannel = serde_json::from_value(serde_json::json!({
+            "name": "[6] Italia 1",
+            "url": "https://live02-seg.example.test/live/ch-i1/index.m3u8",
+            "dash_url": "  https://live03-col.example.test/live/ch-i1/manifest.mpd  ",
+            "group_title": "Mediaset"
+        }))
+        .expect("server channel should deserialize");
+        let channel = normalize_server_channel(raw).expect("channel should normalize");
+
+        assert_eq!(channel.name, "Italia 1");
+        assert_eq!(
+            channel.dash_url.as_deref(),
+            Some("https://live03-col.example.test/live/ch-i1/manifest.mpd")
+        );
+        assert_eq!(
+            resolve_stream_url(&channel).expect("direct stream should resolve"),
+            "https://live03-col.example.test/live/ch-i1/manifest.mpd"
         );
     }
 

@@ -68,7 +68,7 @@ enum RecordingRecurrence {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 enum ScheduledRecordingSource {
     Radio { name: String, url: String },
-    Tv { channel: TvChannel },
+    Tv { channel: Box<TvChannel> },
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -110,7 +110,9 @@ pub(crate) fn open_for_tv(parent: HWND, channel: TvChannel) {
         parent,
         Language::Italian,
         channel.name.clone(),
-        ScheduledRecordingSource::Tv { channel },
+        ScheduledRecordingSource::Tv {
+            channel: Box::new(channel),
+        },
     );
 }
 

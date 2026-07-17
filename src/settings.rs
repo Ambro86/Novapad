@@ -651,6 +651,8 @@ pub enum WeatherTemperatureUnit {
 pub struct TvFavorite {
     pub name: String,
     pub url: String,
+    #[serde(default)]
+    pub dash_url: Option<String>,
     pub category: String,
     #[serde(default)]
     pub stream_resolver: Option<String>,

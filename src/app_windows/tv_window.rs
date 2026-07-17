@@ -472,6 +472,7 @@ fn favorite_from_channel(channel: &TvChannel) -> TvFavorite {
     TvFavorite {
         name: channel.name.clone(),
         url: channel.url.clone(),
+        dash_url: channel.dash_url.clone(),
         category: channel.category.clone(),
         stream_resolver: channel.stream_resolver.clone(),
         resolver_endpoint: channel.resolver_endpoint.clone(),
@@ -487,6 +488,7 @@ fn channel_from_favorite(favorite: &TvFavorite) -> TvChannel {
     TvChannel {
         name: favorite.name.clone(),
         url: favorite.url.clone(),
+        dash_url: favorite.dash_url.clone(),
         category: favorite.category.clone(),
         stream_resolver: favorite.stream_resolver.clone(),
         resolver_endpoint: favorite.resolver_endpoint.clone(),
@@ -802,6 +804,7 @@ mod tests {
         TvChannel {
             name: name.to_string(),
             url: "https://example.test/live.m3u8".to_string(),
+            dash_url: None,
             category: category.to_string(),
             stream_resolver: None,
             resolver_endpoint: None,

@@ -15,6 +15,7 @@ use std::{fs, io::Write};
 use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+#[cfg(debug_assertions)]
 const BRIDGE_FILE_NAME: &str = "faster_whisper_bridge.exe";
 const BRIDGE_CACHE_FILE_NAME: &str = "faster_whisper_bridge_v2.exe";
 const BRIDGE_MIN_VALID_SIZE_BYTES: u64 = 1_000_000;

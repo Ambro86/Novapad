@@ -4194,10 +4194,18 @@ fn launch_stream_url_in_mpv_with_options(
     if force_video {
         command.arg("--aid=auto").arg("--audio-channels=stereo");
     }
-    if force_video && url.to_ascii_lowercase().contains(".m3u8") {
-        // Come i player mobile, preferiamo una variante HLS contenente video
-        // invece di lasciare che una playlist audio-only venga scelta per prima.
-        command.arg("--hls-bitrate=max");
+    if live_tv && !url.to_ascii_lowercase().contains(".mpd") {
+        // I resolver TV possono nascondere la playlist HLS dietro un redirect
+        // PHP. Applichiamo quindi il limite a tutti i canali live non DASH.
+        command.arg("--hls-bitrate=3000000");
+        log_debug("Managed mpv HLS bitrate cap enabled: 3000000");
+    }
+    if live_tv && url.to_ascii_lowercase().contains(".mpd") {
+        // I manifest DASH live descrivono gia le tracce disponibili. Evitiamo
+        // il buffering aggiuntivo durante l'analisi iniziale di FFmpeg, senza
+        // disattivare la cache di mpv usata durante la riproduzione.
+        command.arg("--demuxer-lavf-o-add=fflags=+nobuffer");
+        log_debug("Managed mpv fast DASH startup enabled");
     }
     if hwnd_video.0 != 0 {
         command

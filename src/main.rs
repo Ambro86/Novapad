@@ -4072,7 +4072,10 @@ fn is_mediaset_cdn_stream(url: &str) -> bool {
     lower.contains("mediaset.net") || lower.contains("mediaset.it") || lower.contains("msf.cdn")
 }
 
-fn preferred_tv_video_track_id(tracks: &[serde_json::Value]) -> Option<i64> {
+fn preferred_tv_video_track_id(
+    tracks: &[serde_json::Value],
+    preferred_audio_id: Option<i64>,
+) -> Option<i64> {
     let is_track_type = |track: &&serde_json::Value, kind: &str| {
         track.get("type").and_then(serde_json::Value::as_str) == Some(kind)
     };
@@ -4080,16 +4083,25 @@ fn preferred_tv_video_track_id(tracks: &[serde_json::Value]) -> Option<i64> {
         .iter()
         .filter(|track| is_track_type(track, "video"))
         .collect::<Vec<_>>();
-    let reference_audio = tracks
+    let audio_tracks = tracks
         .iter()
         .filter(|track| is_track_type(track, "audio"))
-        .find(|track| {
-            track
-                .get("selected")
-                .and_then(serde_json::Value::as_bool)
-                .unwrap_or(false)
+        .collect::<Vec<_>>();
+    let reference_audio = preferred_audio_id
+        .and_then(|preferred_id| {
+            audio_tracks.iter().copied().find(|track| {
+                track.get("id").and_then(serde_json::Value::as_i64) == Some(preferred_id)
+            })
         })
-        .or_else(|| tracks.iter().find(|track| is_track_type(track, "audio")));
+        .or_else(|| {
+            audio_tracks.iter().copied().find(|track| {
+                track
+                    .get("selected")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false)
+            })
+        })
+        .or_else(|| audio_tracks.first().copied());
 
     let matching_video = reference_audio.and_then(|audio| {
         audio
@@ -4119,7 +4131,12 @@ fn preferred_tv_video_track_id(tracks: &[serde_json::Value]) -> Option<i64> {
         .and_then(serde_json::Value::as_i64)
 }
 
-fn configure_tv_tracks_after_load(hwnd: HWND, url: &str, generation: u64) {
+fn configure_tv_tracks_after_load(
+    hwnd: HWND,
+    url: &str,
+    generation: u64,
+    prefer_audio_description: bool,
+) {
     let mediaset = is_mediaset_cdn_stream(url);
 
     // Il pipe IPC è disponibile prima che mpv abbia realmente caricato il file.
@@ -4172,16 +4189,57 @@ fn configure_tv_tracks_after_load(hwnd: HWND, url: &str, generation: u64) {
             "TV mpv tracks ready attempt={attempt} mediaset={mediaset}: {summary}"
         ));
 
-        let video_tracks = tracks
+        let preferred_audio_id = prefer_audio_description
+            .then(|| preferred_mpv_audio_track_id(&track_list))
+            .flatten();
+        let audio_tracks = tracks
             .iter()
-            .filter(|track| track.get("type").and_then(serde_json::Value::as_str) == Some("video"))
+            .filter(|track| track.get("type").and_then(serde_json::Value::as_str) == Some("audio"))
             .collect::<Vec<_>>();
-        if !video_tracks.iter().any(|track| {
+        let selected_audio_id = audio_tracks.iter().find_map(|track| {
             track
                 .get("selected")
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false)
-        }) && let Some(video_id) = preferred_tv_video_track_id(tracks)
+                .then(|| track.get("id").and_then(serde_json::Value::as_i64))
+                .flatten()
+        });
+        let target_audio_id = preferred_audio_id.or(selected_audio_id).or_else(|| {
+            audio_tracks
+                .first()
+                .and_then(|track| track.get("id"))
+                .and_then(serde_json::Value::as_i64)
+        });
+
+        if let Some(audio_id) = target_audio_id
+            && selected_audio_id != Some(audio_id)
+        {
+            let command = format!(r#"{{"command":["set_property","aid",{}]}}"#, audio_id);
+            match try_send_command_to_managed_mpv_transient(hwnd, &command) {
+                Ok(()) if prefer_audio_description => log_debug(&format!(
+                    "TV mpv selected preferred Rai audiodescription audio track id={audio_id}"
+                )),
+                Ok(()) => log_debug(&format!("TV mpv selected first audio track id={audio_id}")),
+                Err(err) => log_debug(&format!(
+                    "TV mpv failed to select audio track id={audio_id}: {err}"
+                )),
+            }
+        }
+
+        let video_tracks = tracks
+            .iter()
+            .filter(|track| track.get("type").and_then(serde_json::Value::as_str) == Some("video"))
+            .collect::<Vec<_>>();
+        let selected_video_id = video_tracks.iter().find_map(|track| {
+            track
+                .get("selected")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+                .then(|| track.get("id").and_then(serde_json::Value::as_i64))
+                .flatten()
+        });
+        if let Some(video_id) = preferred_tv_video_track_id(tracks, target_audio_id)
+            && selected_video_id != Some(video_id)
         {
             let command = format!(r#"{{"command":["set_property","vid",{}]}}"#, video_id);
             match try_send_command_to_managed_mpv_transient(hwnd, &command) {
@@ -4190,29 +4248,6 @@ fn configure_tv_tracks_after_load(hwnd: HWND, url: &str, generation: u64) {
                 )),
                 Err(err) => log_debug(&format!(
                     "TV mpv failed to select video track id={video_id}: {err}"
-                )),
-            }
-        }
-
-        let audio_tracks = tracks
-            .iter()
-            .filter(|track| track.get("type").and_then(serde_json::Value::as_str) == Some("audio"))
-            .collect::<Vec<_>>();
-        if !audio_tracks.iter().any(|track| {
-            track
-                .get("selected")
-                .and_then(serde_json::Value::as_bool)
-                .unwrap_or(false)
-        }) && let Some(audio_id) = audio_tracks
-            .first()
-            .and_then(|track| track.get("id"))
-            .and_then(serde_json::Value::as_i64)
-        {
-            let command = format!(r#"{{"command":["set_property","aid",{}]}}"#, audio_id);
-            match try_send_command_to_managed_mpv_transient(hwnd, &command) {
-                Ok(()) => log_debug(&format!("TV mpv selected first audio track id={audio_id}")),
-                Err(err) => log_debug(&format!(
-                    "TV mpv failed to select audio track id={audio_id}: {err}"
                 )),
             }
         }
@@ -4233,13 +4268,23 @@ fn configure_tv_tracks_after_load(hwnd: HWND, url: &str, generation: u64) {
     ));
 }
 
-fn schedule_tv_track_configuration(hwnd: HWND, url: &str, generation: u64) {
+fn schedule_tv_track_configuration(
+    hwnd: HWND,
+    url: &str,
+    generation: u64,
+    prefer_audio_description: bool,
+) {
     // Passiamo al thread soltanto il valore numerico dell'handle: in alcune
     // versioni del crate windows HWND contiene un puntatore grezzo non Send.
     let hwnd_value = hwnd.0;
     let url = url.to_string();
     std::thread::spawn(move || {
-        configure_tv_tracks_after_load(HWND(hwnd_value), &url, generation);
+        configure_tv_tracks_after_load(
+            HWND(hwnd_value),
+            &url,
+            generation,
+            prefer_audio_description,
+        );
     });
 }
 
@@ -4446,7 +4491,12 @@ fn launch_stream_url_in_mpv_with_options(
                 ));
             }
             if force_video {
-                schedule_tv_track_configuration(hwnd, url, mpv_generation);
+                schedule_tv_track_configuration(
+                    hwnd,
+                    url,
+                    mpv_generation,
+                    prefer_audio_description,
+                );
             }
             prevent_sleep(true);
             menu::update_playback_menu(hwnd, true);
@@ -20189,8 +20239,8 @@ mod tests {
         COPYDATA_RESULT_DEFERRED_MODAL, COPYDATA_RESULT_HANDLED, SentenceNavigationDirection,
         append_debug_log, audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
         is_bad_executable_format_error, normalize_soft_line_breaks_for_translation,
-        preferred_tv_video_track_id, relative_audiobook_bookmark, sentence_navigation_target,
-        sentence_start_offsets_utf16, should_defer_external_file_open,
+        preferred_mpv_audio_track_id, preferred_tv_video_track_id, relative_audiobook_bookmark,
+        sentence_navigation_target, sentence_start_offsets_utf16, should_defer_external_file_open,
         should_focus_existing_window_after_copydata,
     };
     use crate::bookmarks::Bookmark;
@@ -20218,7 +20268,24 @@ mod tests {
         ]);
 
         assert_eq!(
-            preferred_tv_video_track_id(tracks.as_array().unwrap()),
+            preferred_tv_video_track_id(tracks.as_array().unwrap(), None),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn tv_rai_prefers_audiodescription_and_its_video_variant() {
+        let tracks = serde_json::json!([
+            {"type": "video", "id": 1, "program-id": 0, "selected": true},
+            {"type": "video", "id": 3, "program-id": 2, "selected": false},
+            {"type": "audio", "id": 4, "program-id": 0, "lang": "ita", "selected": true},
+            {"type": "audio", "id": 6, "program-id": 2, "lang": "des", "title": "Audiodescrizione", "selected": false}
+        ]);
+
+        let audio_id = preferred_mpv_audio_track_id(&tracks);
+        assert_eq!(audio_id, Some(6));
+        assert_eq!(
+            preferred_tv_video_track_id(tracks.as_array().unwrap(), audio_id),
             Some(3)
         );
     }
@@ -20232,7 +20299,7 @@ mod tests {
         ]);
 
         assert_eq!(
-            preferred_tv_video_track_id(tracks.as_array().unwrap()),
+            preferred_tv_video_track_id(tracks.as_array().unwrap(), None),
             Some(7)
         );
     }

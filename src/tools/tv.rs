@@ -1253,8 +1253,8 @@ fn extract_xml_url(xml: &str, require_content_type: bool) -> Option<String> {
 }
 
 pub(crate) fn is_rai_audio_description_channel(channel: &TvChannel) -> bool {
-    channel.name.trim().to_ascii_lowercase().starts_with("rai")
-        && channel.url.contains("mediapolis.rai.it/relinker/")
+    channel.category.trim().eq_ignore_ascii_case("rai")
+        && channel.name.trim().to_ascii_lowercase().starts_with("rai")
 }
 
 pub(crate) fn matches_search(channel: &TvChannel, query: &str) -> bool {
@@ -1302,6 +1302,25 @@ mod tests {
             extract_xml_url(xml, true).as_deref(),
             Some("https://example.test/live.m3u8")
         );
+    }
+
+    #[test]
+    fn all_rai_category_channels_try_audiodescription() {
+        let channel = TvChannel {
+            name: "Rai 4".to_string(),
+            url: "https://example.test/direct/master.m3u8".to_string(),
+            dash_url: None,
+            category: "Rai".to_string(),
+            stream_resolver: None,
+            resolver_endpoint: None,
+            resolver_realm: None,
+            resolver_channel_id: None,
+            tvg_id: String::new(),
+            tvg_name: String::new(),
+            http_user_agent: String::new(),
+        };
+
+        assert!(is_rai_audio_description_channel(&channel));
     }
 
     #[test]

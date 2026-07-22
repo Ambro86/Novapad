@@ -16,6 +16,9 @@ Portoghese brasiliano e Google News
 • Google News supporta ora la localizzazione del Brasile, le categorie brasiliane e fonti RSS brasiliane predefinite separate.
 • Quando il feed le fornisce, le diverse fonti Google News relative alla stessa notizia vengono mostrate come elementi figli accessibili nell’albero.
 
+TV in diretta
+• Come già avveniva per RaiPlay, durante la riproduzione dei canali Rai della TV in diretta Sonarpad prova ora a selezionare automaticamente la traccia audiodescritta, quando disponibile.
+
 Versione 0.8.2 – 2026-07-17
 
 Biblioteche digitali e audiolibri

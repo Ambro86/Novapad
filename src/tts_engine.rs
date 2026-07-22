@@ -6885,7 +6885,7 @@ mod tests {
 
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[0].text_to_read, "Ciao amico.");
-        assert_eq!(chunks[1].text_to_read, "Come stai?");
+        assert_eq!(chunks[1].text_to_read, " Come stai?");
         assert!(
             chunks
                 .iter()

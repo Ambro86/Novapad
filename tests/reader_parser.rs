@@ -7,8 +7,10 @@ mod settings {
         English,
         Italian,
         French,
+        German,
         Spanish,
         Portuguese,
+        PortugueseBrazilian,
         Swedish,
         Czech,
         Polish,
@@ -30,8 +32,9 @@ mod i18n {
             "reader.no_title" => match language {
                 Language::Italian => "Nessun titolo".to_string(),
                 Language::French => "Sans titre".to_string(),
+                Language::German => "Kein Titel".to_string(),
                 Language::Spanish => "Sin título".to_string(),
-                Language::Portuguese => "Sem título".to_string(),
+                Language::Portuguese | Language::PortugueseBrazilian => "Sem título".to_string(),
                 Language::Swedish => "Ingen titel".to_string(),
                 Language::Vietnamese => "Không có tiêu đề".to_string(),
                 Language::Czech => "Bez názvu".to_string(),
@@ -46,8 +49,11 @@ mod i18n {
             "reader.external_link" => match language {
                 Language::Italian => "Link esterno:\n{url}".to_string(),
                 Language::French => "Lien externe :\n{url}".to_string(),
+                Language::German => "Externer Link:\n{url}".to_string(),
                 Language::Spanish => "Enlace externo:\n{url}".to_string(),
-                Language::Portuguese => "Link externo:\n{url}".to_string(),
+                Language::Portuguese | Language::PortugueseBrazilian => {
+                    "Link externo:\n{url}".to_string()
+                }
                 Language::Swedish => "Extern länk:\n{url}".to_string(),
                 Language::Vietnamese => "Liên kết ngoài:\n{url}".to_string(),
                 Language::Czech => "Externí odkaz:\n{url}".to_string(),

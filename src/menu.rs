@@ -117,6 +117,7 @@ pub const IDM_VIEW_READ_ONLY: usize = 6103;
 pub const IDM_VIEW_WORD_WRAP: usize = 6104;
 pub const IDM_VIEW_SHOW_VIDEO_DURING_PLAYBACK: usize = 6105;
 pub const IDM_VIEW_SHOW_EPUB_INDEX: usize = 6106;
+pub const IDM_VIEW_DARK_MODE: usize = 6107;
 pub const IDM_VIEW_FONT_ARIAL: usize = 6401;
 pub const IDM_VIEW_FONT_CALIBRI: usize = 6402;
 pub const IDM_VIEW_FONT_CONSOLAS: usize = 6403;
@@ -242,6 +243,7 @@ pub struct MenuLabels {
     pub view_read_only: String,
     pub view_word_wrap: String,
     pub view_show_video_during_playback: String,
+    pub view_dark_mode: String,
     pub view_font: String,
     pub file_new: String,
     pub file_open: String,
@@ -399,6 +401,7 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         view_read_only: i18n::tr(language, "view.read_only"),
         view_word_wrap: i18n::tr(language, "view.word_wrap"),
         view_show_video_during_playback: i18n::tr(language, "view.show_video_during_playback"),
+        view_dark_mode: i18n::tr(language, "view.dark_mode"),
         view_font: i18n::tr(language, "view.font"),
         file_new: i18n::tr(language, "file.new"),
         file_open: i18n::tr(language, "file.open"),
@@ -1288,6 +1291,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
             IDM_VIEW_SHOW_VIDEO_DURING_PLAYBACK,
             &labels.view_show_video_during_playback,
         );
+        append_menu_string(
+            view_menu,
+            MF_STRING,
+            IDM_VIEW_DARK_MODE,
+            &labels.view_dark_mode,
+        );
         crate::log_if_err!(AppendMenuW(view_menu, MF_SEPARATOR, 0, PCWSTR::null()));
         append_menu_string(
             view_font_menu,
@@ -2083,6 +2092,7 @@ mod tests {
             view_read_only,
             view_word_wrap,
             view_show_video_during_playback,
+            view_dark_mode,
             view_font,
             view_text_color,
             view_text_size,
@@ -2241,8 +2251,10 @@ mod tests {
         let languages = [
             (Language::Italian, "it"),
             (Language::English, "en"),
+            (Language::German, "de"),
             (Language::Spanish, "es"),
             (Language::Portuguese, "pt"),
+            (Language::PortugueseBrazilian, "pt-BR"),
             (Language::Swedish, "sv"),
             (Language::Vietnamese, "vi"),
             (Language::Czech, "cs"),
@@ -2269,8 +2281,10 @@ mod tests {
         let languages = [
             (Language::Italian, "it"),
             (Language::English, "en"),
+            (Language::German, "de"),
             (Language::Spanish, "es"),
             (Language::Portuguese, "pt"),
+            (Language::PortugueseBrazilian, "pt-BR"),
             (Language::Swedish, "sv"),
             (Language::Vietnamese, "vi"),
             (Language::Czech, "cs"),
@@ -2314,6 +2328,7 @@ mod tests {
                     labels.view_read_only.as_str(),
                     labels.view_word_wrap.as_str(),
                     labels.view_show_video_during_playback.as_str(),
+                    labels.view_dark_mode.as_str(),
                     epub_index.as_str(),
                     labels.view_font.as_str(),
                     labels.view_text_color.as_str(),
@@ -2328,8 +2343,10 @@ mod tests {
         let languages = [
             (Language::Italian, "it"),
             (Language::English, "en"),
+            (Language::German, "de"),
             (Language::Spanish, "es"),
             (Language::Portuguese, "pt"),
+            (Language::PortugueseBrazilian, "pt-BR"),
             (Language::Swedish, "sv"),
             (Language::Vietnamese, "vi"),
             (Language::Czech, "cs"),

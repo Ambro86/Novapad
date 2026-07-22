@@ -1,5 +1,21 @@
 # Changelog
 
+Version 0.8.3 – 2026-07-22
+
+Dark mode
+• Added a dark mode that can be enabled from the View menu and is saved in the user preferences.
+• The dark theme is applied to the editor, menus, secondary windows and main controls, with text colors adapted to preserve readability and accessibility.
+
+German language
+• Added German as a complete interface language, selectable from Options.
+• News and RSS, the spell checker, the calendar and all quotations, donations, the guide and the changelog are fully available in German.
+
+Brazilian Portuguese and Google News
+• Added Brazilian Portuguese as a complete interface language, separate from Portuguese (Portugal) and selectable from Options.
+• The complete interface, calendar entries and quotations, spell checker, donations, guide and changelog are available in Brazilian Portuguese.
+• Google News now supports the Brazilian localization, Brazilian categories and separate default Brazilian RSS sources.
+• Related Google News sources for the same story are shown as accessible child items in the tree when the feed provides them.
+
 Version 0.8.2 – 2026-07-17
 
 Digital libraries and audiobooks

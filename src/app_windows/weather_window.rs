@@ -793,6 +793,7 @@ fn day_label(language: Language, index: usize, date: &str) -> String {
 fn localized_numeric_date(language: Language, date: NaiveDate) -> String {
     use chrono::Datelike;
     match language {
+        Language::German => format!("{:02}.{:02}.{:04}", date.day(), date.month(), date.year()),
         Language::English => format!("{:02}/{:02}/{:04}", date.month(), date.day(), date.year()),
         Language::Chinese => {
             format!(

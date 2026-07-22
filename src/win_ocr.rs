@@ -13,8 +13,10 @@ fn language_tag(language: Language) -> HSTRING {
     match language {
         Language::Italian => HSTRING::from("it-IT"),
         Language::Ukrainian | Language::English => HSTRING::from("en-US"),
+        Language::German => HSTRING::from("de-DE"),
         Language::Spanish => HSTRING::from("es-ES"),
         Language::Portuguese => HSTRING::from("pt-PT"),
+        Language::PortugueseBrazilian => HSTRING::from("pt-BR"),
         Language::Swedish => HSTRING::from("sv-SE"),
         Language::Vietnamese => HSTRING::from("vi-VN"),
         Language::Czech => HSTRING::from("cs-CZ"),

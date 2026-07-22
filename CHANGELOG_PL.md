@@ -1,5 +1,21 @@
 # Dziennik zmian
 
+Wersja 0.8.3 – 2026-07-22
+
+Tryb ciemny
+• Dodano tryb ciemny, który można włączyć w menu Widok i który jest zapisywany w preferencjach użytkownika.
+• Ciemny motyw obejmuje edytor, menu, okna dodatkowe i główne elementy sterujące, a kolory tekstu są dostosowywane w celu zachowania czytelności i dostępności.
+
+Język niemiecki
+• Dodano język niemiecki jako pełny język interfejsu, wybierany w Opcjach.
+• Wiadomości i RSS, sprawdzanie pisowni, kalendarz i wszystkie cytaty, darowizny, przewodnik oraz dziennik zmian są w całości dostępne po niemiecku.
+
+Portugalski brazylijski i Wiadomości Google
+• Dodano portugalski brazylijski jako pełny język interfejsu, niezależny od portugalskiego używanego w Portugalii i dostępny w Opcjach.
+• Cały interfejs, kalendarz i wszystkie cytaty, sprawdzanie pisowni, darowizny, podręcznik oraz dziennik zmian są dostępne po portugalsku brazylijskim.
+• Wiadomości Google obsługują teraz lokalizację brazylijską, kategorie brazylijskie i osobne domyślne brazylijskie źródła RSS.
+• Gdy kanał je udostępnia, powiązane źródła tej samej wiadomości są wyświetlane jako dostępne elementy podrzędne w drzewie.
+
 Wersja 0.8.2 – 2026-07-17
 
 Biblioteki cyfrowe i audiobooki

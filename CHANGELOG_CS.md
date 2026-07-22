@@ -1,5 +1,21 @@
 # Přehled změn
 
+Verze 0.8.3 – 2026-07-22
+
+Tmavý režim
+• Přidán tmavý režim, který lze zapnout v nabídce Zobrazení a který se ukládá do uživatelských nastavení.
+• Tmavý motiv se použije v editoru, nabídkách, vedlejších oknech a hlavních ovládacích prvcích; barvy textu se přizpůsobí tak, aby zůstala zachována čitelnost a přístupnost.
+
+Německý jazyk
+• Přidána němčina jako úplný jazyk uživatelského rozhraní, který lze vybrat v Možnostech.
+• Zprávy a RSS, kontrola pravopisu, kalendář a všechny citáty, informace o darech, nápověda i přehled změn jsou kompletně dostupné v němčině.
+
+Brazilská portugalština a Zprávy Google
+• Byla přidána brazilská portugalština jako úplný jazyk rozhraní, oddělený od portugalštiny používané v Portugalsku a volitelný v Možnostech.
+• Celé rozhraní, kalendář a všechny citáty, kontrola pravopisu, dary, příručka a seznam změn jsou dostupné v brazilské portugalštině.
+• Zprávy Google nyní podporují brazilské místní nastavení, brazilské kategorie a samostatné výchozí brazilské zdroje RSS.
+• Pokud je kanál poskytuje, související zdroje stejné zprávy se zobrazí jako přístupné podřízené položky ve stromu.
+
 Verze 0.8.2 – 2026-07-17
 
 Digitální knihovny a audioknihy

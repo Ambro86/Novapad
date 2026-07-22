@@ -402,9 +402,10 @@ pub fn prewarm_shared_worker(model: BridgeModel, use_cuda_runtime: bool) {
 fn language_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
+        Language::German => "de",
         Language::English => "en",
         Language::Spanish => "es",
-        Language::Portuguese => "pt",
+        Language::Portuguese | Language::PortugueseBrazilian => "pt",
         Language::Swedish => "sv",
         Language::Vietnamese => "vi",
         Language::Czech => "cs",

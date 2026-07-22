@@ -10,9 +10,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 fn language_hint(language: crate::settings::Language) -> &'static str {
     match language {
         crate::settings::Language::Italian => "Italian",
+        crate::settings::Language::German => "German",
         crate::settings::Language::English => "English",
         crate::settings::Language::Spanish => "Spanish",
-        crate::settings::Language::Portuguese => "Portuguese",
+        crate::settings::Language::Portuguese => "Portuguese (Portugal)",
+        crate::settings::Language::PortugueseBrazilian => "Portuguese (Brazil)",
         crate::settings::Language::Swedish => "Swedish",
         crate::settings::Language::Vietnamese => "Vietnamese",
         crate::settings::Language::Czech => "Czech",
@@ -23,6 +25,7 @@ fn language_hint(language: crate::settings::Language) -> &'static str {
         crate::settings::Language::Lithuanian => "Lithuanian",
         crate::settings::Language::Russian => "Russian",
         crate::settings::Language::Chinese => "Chinese",
+        crate::settings::Language::Hindi => "Hindi",
     }
 }
 

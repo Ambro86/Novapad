@@ -1,5 +1,21 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.8.3 – 2026-07-22
+
+Chế độ tối
+• Đã thêm chế độ tối, có thể bật trong menu Xem và được lưu trong tùy chọn của người dùng.
+• Giao diện tối được áp dụng cho trình soạn thảo, menu, cửa sổ phụ và các điều khiển chính; màu chữ được điều chỉnh để duy trì khả năng đọc và trợ năng.
+
+Ngôn ngữ tiếng Đức
+• Đã thêm tiếng Đức làm ngôn ngữ giao diện hoàn chỉnh, có thể chọn trong Tùy chọn.
+• Tin tức và RSS, kiểm tra chính tả, lịch cùng toàn bộ trích dẫn, quyên góp, hướng dẫn và nhật ký thay đổi đều có đầy đủ bằng tiếng Đức.
+
+Tiếng Bồ Đào Nha Brazil và Google Tin tức
+• Đã thêm tiếng Bồ Đào Nha Brazil như một ngôn ngữ giao diện đầy đủ, tách biệt với tiếng Bồ Đào Nha tại Bồ Đào Nha và có thể chọn trong Tùy chọn.
+• Toàn bộ giao diện, lịch và mọi câu trích dẫn, kiểm tra chính tả, thông tin quyên góp, hướng dẫn và nhật ký thay đổi đều có bản tiếng Bồ Đào Nha Brazil.
+• Google Tin tức hiện hỗ trợ bản địa hóa Brazil, các danh mục Brazil và các nguồn RSS Brazil mặc định riêng biệt.
+• Khi nguồn cấp cung cấp, các nguồn liên quan của cùng một tin được hiển thị dưới dạng mục con có thể truy cập trong cây.
+
 Phiên bản 0.8.2 – 2026-07-17
 
 Thư viện số và sách nói

@@ -1,10 +1,15 @@
-use reqwest::blocking::Client;
+use reqwest::{StatusCode, blocking::Client};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock, mpsc};
 use std::time::Duration;
 use url::Url;
 use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
+use windows::Win32::UI::WindowsAndMessaging::{
+    DispatchMessageW, MSG, PM_REMOVE, PeekMessageW, PostQuitMessage, SetForegroundWindow,
+    TranslateMessage, WM_QUIT,
+};
 
 use crate::app_windows::prompt_window;
 use crate::app_windows::youtube_transcript_window::{
@@ -17,8 +22,9 @@ const API_BASE: &str = "https://librivox.org/api/feed/audiobooks";
 const USER_AGENT: &str = concat!("Sonarpad/", env!("CARGO_PKG_VERSION"));
 const PAGE_LIMIT: usize = 50;
 const SEARCH_CANDIDATE_LIMIT: usize = 100;
-const FALLBACK_PAGE_LIMIT: usize = 500;
-const FALLBACK_MAX_BOOKS: usize = 2_000;
+const SEARCH_API_TERM_LIMIT: usize = 4;
+const API_MAX_ATTEMPTS: usize = 2;
+const API_RETRY_DELAYS_MS: [u64; API_MAX_ATTEMPTS - 1] = [400];
 
 #[derive(Clone)]
 struct LibrivoxClient {
@@ -119,7 +125,8 @@ impl Default for LibrivoxClient {
     fn default() -> Self {
         let client = Client::builder()
             .user_agent(USER_AGENT)
-            .timeout(Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(15))
             .build()
             .unwrap_or_else(|error| {
                 crate::log_debug(&format!("LibriVox HTTP client setup failed: {error}"));
@@ -147,70 +154,51 @@ impl LibrivoxClient {
         }
 
         let mut candidates = HashMap::<i64, LibrivoxBook>::new();
+        let mut first_error = None;
+        let mut successful_requests = 0usize;
+        let target_count = offset.saturating_add(limit).saturating_add(1);
         let mut api_terms = vec![normalized_query.to_string()];
-        for term in &terms {
+        for term in terms.iter().take(SEARCH_API_TERM_LIMIT) {
             if !api_terms.iter().any(|value| value == term) {
                 api_terms.push(term.clone());
             }
         }
 
-        for term in api_terms {
+        'api_terms: for term in api_terms {
             for field in ["title", "author"] {
-                if let Ok(books) =
-                    self.fetch_books(SEARCH_CANDIDATE_LIMIT, 0, Some(field), Some(&term))
-                {
-                    for book in books {
-                        candidates.insert(book.id, book);
+                match self.fetch_books(SEARCH_CANDIDATE_LIMIT, 0, Some(field), Some(&term)) {
+                    Ok(books) => {
+                        successful_requests = successful_requests.saturating_add(1);
+                        for book in books {
+                            candidates.insert(book.id, book);
+                        }
+                    }
+                    Err(error) => {
+                        first_error.get_or_insert(error);
                     }
                 }
             }
-        }
-
-        let target_count = offset.saturating_add(limit).saturating_add(1);
-        let mut matches = sorted_matches(candidates.values(), &terms);
-        let mut reached_end = true;
-        if matches.len() < target_count {
-            reached_end = false;
-            let mut scan_offset = 0usize;
-            let mut scanned = 0usize;
-            while scan_offset < FALLBACK_MAX_BOOKS {
-                let books = match self.fetch_books(FALLBACK_PAGE_LIMIT, scan_offset, None, None) {
-                    Ok(books) => books,
-                    Err(_) => {
-                        reached_end = true;
-                        break;
-                    }
-                };
-                if books.is_empty() {
-                    reached_end = true;
-                    break;
-                }
-                for book in books.iter().filter(|book| matches_all_terms(book, &terms)) {
-                    candidates.insert(book.id, book.clone());
-                }
-                if candidates
-                    .values()
-                    .filter(|book| matches_all_terms(book, &terms))
-                    .count()
-                    >= target_count
-                {
-                    break;
-                }
-                scanned = scanned.saturating_add(books.len());
-                scan_offset = scan_offset.saturating_add(books.len());
-                if books.len() < FALLBACK_PAGE_LIMIT || scanned >= FALLBACK_MAX_BOOKS {
-                    reached_end = true;
-                    break;
-                }
+            if candidates
+                .values()
+                .filter(|book| matches_all_terms(book, &terms))
+                .count()
+                >= target_count
+            {
+                break 'api_terms;
             }
-            matches = sorted_matches(candidates.values(), &terms);
         }
 
+        if successful_requests == 0 {
+            return Err(first_error
+                .unwrap_or_else(|| "LibriVox search failed without a response".to_string()));
+        }
+
+        let matches = sorted_matches(candidates.values(), &terms);
         let start = offset.min(matches.len());
         let end = start.saturating_add(limit).min(matches.len());
         Ok(LibrivoxPage {
             books: matches[start..end].to_vec(),
-            has_more: end < matches.len() || !reached_end,
+            has_more: end < matches.len(),
         })
     }
 
@@ -247,8 +235,12 @@ impl LibrivoxClient {
             url,
             &[
                 ("format", "json"),
-                ("extended", "1"),
-                ("coverart", "1"),
+                ("fields[]", "id"),
+                ("fields[]", "title"),
+                ("fields[]", "description"),
+                ("fields[]", "language"),
+                ("fields[]", "totaltime"),
+                ("fields[]", "authors"),
                 ("limit", limit_value.as_str()),
                 ("offset", offset_value.as_str()),
             ],
@@ -267,7 +259,6 @@ impl LibrivoxClient {
         let mut query = vec![
             ("format", "json"),
             ("extended", "1"),
-            ("coverart", "1"),
             ("limit", limit_value.as_str()),
             ("offset", offset_value.as_str()),
         ];
@@ -280,30 +271,136 @@ impl LibrivoxClient {
         url: Url,
         query: &[(&str, &str)],
     ) -> Result<Vec<LibrivoxBook>, String> {
-        let response = self
-            .client
-            .get(url)
-            .query(query)
-            .header("Accept", "application/json")
-            .send()
-            .map_err(|error| format!("LibriVox network error: {error}"))?;
-        if response.status().as_u16() == 404 {
-            return Ok(Vec::new());
+        for attempt in 1..=API_MAX_ATTEMPTS {
+            let response = self
+                .client
+                .get(url.clone())
+                .query(query)
+                .header("Accept", "application/json")
+                .send();
+
+            let error = match response {
+                Ok(response) if response.status() == StatusCode::NOT_FOUND => {
+                    return Ok(Vec::new());
+                }
+                Ok(response) if response.status().is_success() => match response.json::<Value>() {
+                    Ok(root) => {
+                        return Ok(root
+                            .get("books")
+                            .and_then(Value::as_array)
+                            .into_iter()
+                            .flatten()
+                            .filter_map(parse_book)
+                            .collect());
+                    }
+                    Err(error) => format!("Invalid LibriVox response: {error}"),
+                },
+                Ok(response) => {
+                    let status = response.status();
+                    let message = match response.error_for_status_ref() {
+                        Err(error) => format!("LibriVox server error: {error}"),
+                        Ok(_) => format!("LibriVox server error: HTTP {status}"),
+                    };
+                    if !is_retryable_status(status) {
+                        return Err(message);
+                    }
+                    message
+                }
+                Err(error) => format!("LibriVox network error: {error}"),
+            };
+
+            if attempt == API_MAX_ATTEMPTS {
+                return Err(error);
+            }
+
+            let delay = Duration::from_millis(API_RETRY_DELAYS_MS[attempt - 1]);
+            crate::log_debug(&format!(
+                "LibriVox request attempt {attempt}/{API_MAX_ATTEMPTS} failed: {error}; retrying in {} ms",
+                delay.as_millis()
+            ));
+            std::thread::sleep(delay);
         }
-        let response = response
-            .error_for_status()
-            .map_err(|error| format!("LibriVox server error: {error}"))?;
-        let root = response
-            .json::<Value>()
-            .map_err(|error| format!("Invalid LibriVox response: {error}"))?;
-        Ok(root
-            .get("books")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(parse_book)
-            .collect())
+
+        unreachable!("the LibriVox retry loop always returns")
     }
+}
+
+fn is_retryable_status(status: StatusCode) -> bool {
+    status == StatusCode::REQUEST_TIMEOUT
+        || status == StatusCode::TOO_MANY_REQUESTS
+        || status.is_server_error()
+}
+
+fn search_responsive(
+    parent: HWND,
+    client: &LibrivoxClient,
+    query: &str,
+    offset: usize,
+    limit: usize,
+) -> Result<LibrivoxPage, String> {
+    let client = client.clone();
+    let query = query.to_string();
+    run_librivox_task(parent, "librivox-search", move || {
+        client.search(&query, offset, limit)
+    })
+}
+
+fn fetch_book_responsive(
+    parent: HWND,
+    client: &LibrivoxClient,
+    id: i64,
+) -> Result<LibrivoxBook, String> {
+    let client = client.clone();
+    run_librivox_task(parent, "librivox-book", move || client.fetch_book(id))
+}
+
+fn run_librivox_task<T, F>(parent: HWND, worker_name: &str, task: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    let (sender, receiver) = mpsc::sync_channel(1);
+    std::thread::Builder::new()
+        .name(worker_name.to_string())
+        .spawn(move || {
+            if sender.send(task()).is_err() {
+                crate::log_debug("LibriVox worker result receiver was dropped");
+            }
+        })
+        .map_err(|error| format!("Unable to start LibriVox worker: {error}"))?;
+
+    unsafe {
+        EnableWindow(parent, false);
+    }
+    let result = loop {
+        match receiver.try_recv() {
+            Ok(result) => break result,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                break Err("LibriVox worker stopped unexpectedly".to_string());
+            }
+            Err(mpsc::TryRecvError::Empty) => pump_librivox_messages(),
+        }
+    };
+    unsafe {
+        EnableWindow(parent, true);
+        SetForegroundWindow(parent);
+    }
+    result
+}
+
+fn pump_librivox_messages() {
+    unsafe {
+        let mut message = MSG::default();
+        while PeekMessageW(&mut message, HWND(0), 0, 0, PM_REMOVE).as_bool() {
+            if message.message == WM_QUIT {
+                PostQuitMessage(message.wParam.0 as i32);
+                continue;
+            }
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+    std::thread::sleep(Duration::from_millis(10));
 }
 
 pub fn open(parent: HWND) {
@@ -322,7 +419,7 @@ pub fn open(parent: HWND) {
 
     loop {
         crate::screen_reader_speak(&i18n::tr(language, "librivox.loading"));
-        let first_page = match client.search(&query, 0, PAGE_LIMIT) {
+        let first_page = match search_responsive(parent, &client, &query, 0, PAGE_LIMIT) {
             Ok(page) => page,
             Err(error) => {
                 show_librivox_error(parent, language, &error);
@@ -389,7 +486,7 @@ pub fn open(parent: HWND) {
                         continue;
                     }
                     crate::screen_reader_speak(&i18n::tr(language, "librivox.loading"));
-                    match client.search(&query, offset, PAGE_LIMIT) {
+                    match search_responsive(parent, &client, &query, offset, PAGE_LIMIT) {
                         Ok(mut page) => {
                             offset = offset.saturating_add(page.books.len());
                             books.append(&mut page.books);
@@ -427,7 +524,7 @@ fn browse_book(
 ) -> bool {
     crate::screen_reader_speak(&i18n::tr(language, "librivox.loading_tracks"));
     let book = if summary.sections.is_empty() {
-        match client.fetch_book(summary.id) {
+        match fetch_book_responsive(parent, client, summary.id) {
             Ok(book) => book,
             Err(error) => {
                 show_librivox_error(parent, language, &error);
@@ -544,7 +641,7 @@ fn browse_parent_list(parent: HWND, language: Language, mut context: LibrivoxPar
             MultilineSelectionResult::Search(query) => {
                 context.query = query.trim().to_string();
                 crate::screen_reader_speak(&i18n::tr(language, "librivox.loading"));
-                match client.search(&context.query, 0, PAGE_LIMIT) {
+                match search_responsive(parent, &client, &context.query, 0, PAGE_LIMIT) {
                     Ok(page) if !page.books.is_empty() => {
                         context.books = page.books;
                         context.has_more = page.has_more;
@@ -562,7 +659,8 @@ fn browse_parent_list(parent: HWND, language: Language, mut context: LibrivoxPar
                     continue;
                 }
                 crate::screen_reader_speak(&i18n::tr(language, "librivox.loading"));
-                match client.search(&context.query, context.offset, PAGE_LIMIT) {
+                match search_responsive(parent, &client, &context.query, context.offset, PAGE_LIMIT)
+                {
                     Ok(mut page) => {
                         context.offset = context.offset.saturating_add(page.books.len());
                         context.books.append(&mut page.books);
@@ -813,4 +911,19 @@ fn show_librivox_error(parent: HWND, language: Language, error: &str) {
     crate::log_debug(&format!("LibriVox error: {error}"));
     let message = i18n::tr_f(language, "librivox.error", &[("err", error)]);
     show_error(parent, language, &message);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_retryable_status;
+    use reqwest::StatusCode;
+
+    #[test]
+    fn retries_only_transient_http_failures() {
+        assert!(is_retryable_status(StatusCode::REQUEST_TIMEOUT));
+        assert!(is_retryable_status(StatusCode::TOO_MANY_REQUESTS));
+        assert!(is_retryable_status(StatusCode::BAD_GATEWAY));
+        assert!(!is_retryable_status(StatusCode::BAD_REQUEST));
+        assert!(!is_retryable_status(StatusCode::NOT_FOUND));
+    }
 }

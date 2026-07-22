@@ -1578,6 +1578,7 @@
   "view.font": "&Carattere",
   "view.read_only": "&Modalità sola lettura",
   "view.show_favorites": "Visualizza le voci pre&ferite",
+  "view.dark_mode": "Modalità &scura",
   "view.show_video_during_playback": "Mostra video durante &la riproduzione",
   "view.show_voices": "Visualizza &voci nell'editor",
   "view.text_color": "Colore &testo",
@@ -1923,5 +1924,7 @@
   "librivox.error": "Errore LibriVox: {err}",
   "librivox.unknown_author": "Autore sconosciuto",
   "librivox.language_value": "Lingua:",
-  "librivox.duration_value": "Durata:"
+  "librivox.duration_value": "Durata:",
+  "rss.related_sources_count": "{count} fonti correlate",
+  "options.lang.pt_br": "Portoghese (Brasile)"
 }

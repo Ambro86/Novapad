@@ -1526,6 +1526,7 @@
   "view.font": "&फ़ॉन्ट",
   "view.read_only": "&केवल-पठन मोड",
   "view.show_favorites": "पसं&दीदा वॉइस दिखाएँ",
+  "view.dark_mode": "डार्क मोड (&1)",
   "view.show_video_during_playback": "प्&लेबैक के दौरान वीडियो दिखाएँ",
   "view.show_voices": "&एडिटर में वॉइस दिखाएँ",
   "view.text_color": "पा&ठ रंग",
@@ -1871,5 +1872,7 @@
   "librivox.error": "LibriVox त्रुटि: {err}",
   "librivox.unknown_author": "अज्ञात लेखक",
   "librivox.language_value": "भाषा:",
-  "librivox.duration_value": "अवधि:"
+  "librivox.duration_value": "अवधि:",
+  "rss.related_sources_count": "{count} संबंधित स्रोत",
+  "options.lang.pt_br": "पुर्तगाली (ब्राज़ील)"
 }

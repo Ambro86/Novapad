@@ -219,9 +219,10 @@ fn normalize_route_country(country: &str) -> Option<&'static str> {
 fn default_route_country(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
+        Language::German => "de",
         Language::English => "us",
         Language::Spanish => "es",
-        Language::Portuguese => "pt",
+        Language::Portuguese | Language::PortugueseBrazilian => "pt",
         Language::Swedish => "se",
         Language::Vietnamese => "vn",
         Language::Czech => "cz",

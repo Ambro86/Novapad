@@ -544,6 +544,7 @@ impl TranslatorDeepLFree {
         progress: &mut dyn FnMut(usize, usize),
     ) -> Result<String, TranslatorError> {
         const MAX_CHUNK_CHARS: usize = 3_000;
+        const MAX_CHUNK_ATTEMPTS: usize = 3;
 
         let chunks = Self::split_translation_chunks(text, MAX_CHUNK_CHARS);
         if chunks.len() == 1 {
@@ -572,20 +573,48 @@ impl TranslatorDeepLFree {
                 continue;
             }
 
-            match self.translate(chunk).await {
-                Ok(translated_chunk) => {
-                    translated_text.push_str(&translated_chunk);
-                    progress(index + 1, chunks.len());
+            let mut last_error = None;
+            for attempt in 1..=MAX_CHUNK_ATTEMPTS {
+                if cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+                    return Err(TranslatorError::Cancelled);
                 }
-                Err(err) if !translated_text.trim().is_empty() => {
-                    crate::log_debug(&format!(
-                        "Google translation: chunk {} failed after partial output: {}",
-                        index + 1,
-                        err
-                    ));
-                    return Ok(translated_text);
+                match self.translate(chunk).await {
+                    Ok(translated_chunk) => {
+                        translated_text.push_str(&translated_chunk);
+                        progress(index + 1, chunks.len());
+                        last_error = None;
+                        break;
+                    }
+                    Err(err) => {
+                        let rate_limited =
+                            matches!(&err, TranslatorError::HttpStatus { status: 429, .. });
+                        crate::log_debug(&format!(
+                            "DeepL translation: chunk {} attempt {}/{} failed: {}",
+                            index + 1,
+                            attempt,
+                            MAX_CHUNK_ATTEMPTS,
+                            err
+                        ));
+                        last_error = Some(err);
+                        if attempt < MAX_CHUNK_ATTEMPTS {
+                            let delay_seconds = if rate_limited {
+                                15 * attempt as u64
+                            } else {
+                                rand::thread_rng().gen_range(1u64..=3u64)
+                            };
+                            tokio::time::sleep(Duration::from_secs(delay_seconds)).await;
+                        }
+                    }
                 }
-                Err(err) => return Err(err),
+            }
+
+            if let Some(err) = last_error {
+                crate::log_debug(&format!(
+                    "DeepL translation: chunk {} failed after retries; discarding partial output so the complete-document fallback can continue: {}",
+                    index + 1,
+                    err
+                ));
+                return Err(err);
             }
         }
 

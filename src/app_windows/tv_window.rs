@@ -294,7 +294,7 @@ pub fn open(parent: HWND) {
         crate::screen_reader_speak(warning);
     }
 
-    let current_programs = match tv::load_current_programs() {
+    let current_programs = match tv::load_current_programs(&load_result.channels) {
         Ok(programs) => programs,
         Err(err) => {
             crate::log_debug(&format!(

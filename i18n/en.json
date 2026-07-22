@@ -1526,6 +1526,7 @@
   "view.font": "&Font",
   "view.read_only": "&Read-Only Mode",
   "view.show_favorites": "&Show Favorite Voices",
+  "view.dark_mode": "Dar&k mode",
   "view.show_video_during_playback": "Show vi&deo during playback",
   "view.show_voices": "Show &Voices in Editor",
   "view.text_color": "Text &Color",
@@ -1871,5 +1872,7 @@
   "librivox.error": "LibriVox error: {err}",
   "librivox.unknown_author": "Unknown author",
   "librivox.language_value": "Language:",
-  "librivox.duration_value": "Duration:"
+  "librivox.duration_value": "Duration:",
+  "rss.related_sources_count": "{count} related sources",
+  "options.lang.pt_br": "Portuguese (Brazil)"
 }

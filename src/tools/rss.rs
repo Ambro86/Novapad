@@ -82,6 +82,8 @@ pub struct RssItem {
     pub guid: String,
     #[serde(default)]
     pub pub_date: Option<i64>,
+    #[serde(default)]
+    pub related_items: Vec<RssItem>,
 }
 
 #[derive(Debug, Clone)]
@@ -518,6 +520,120 @@ fn compute_backoff(attempt: usize, max_secs: u64) -> Duration {
     Duration::from_secs(secs)
 }
 
+fn normalize_related_google_news_url(href: &str) -> Option<String> {
+    let href = href.trim();
+    if href.is_empty() || href.starts_with('#') || href.starts_with("javascript:") {
+        return None;
+    }
+    if let Ok(url) = Url::parse(href) {
+        return matches!(url.scheme(), "http" | "https").then(|| url.to_string());
+    }
+    let base = Url::parse("https://news.google.com/").ok()?;
+    let joined = base.join(href).ok()?;
+    matches!(joined.scheme(), "http" | "https").then(|| joined.to_string())
+}
+
+fn compact_element_text<'a>(parts: impl Iterator<Item = &'a str>) -> String {
+    parts
+        .flat_map(str::split_whitespace)
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn extract_google_news_related_items(
+    description_html: &str,
+    parent_title: &str,
+    parent_link: &str,
+    pub_date: Option<i64>,
+) -> Vec<RssItem> {
+    if !is_google_news_article_url(parent_link)
+        && !description_html
+            .to_ascii_lowercase()
+            .contains("news.google.com")
+    {
+        return Vec::new();
+    }
+
+    let document = Html::parse_fragment(description_html);
+    let Ok(li_selector) = Selector::parse("li") else {
+        return Vec::new();
+    };
+    let Ok(anchor_selector) = Selector::parse("a[href]") else {
+        return Vec::new();
+    };
+    let mut related = Vec::new();
+    let mut seen = HashSet::new();
+
+    for li in document.select(&li_selector) {
+        let Some(anchor) = li.select(&anchor_selector).next() else {
+            continue;
+        };
+        let Some(href) = anchor.value().attr("href") else {
+            continue;
+        };
+        let Some(link) = normalize_related_google_news_url(href) else {
+            continue;
+        };
+        let key = canonicalize_url(&link);
+        if key.is_empty() || !seen.insert(key.clone()) {
+            continue;
+        }
+
+        let article_title = compact_element_text(anchor.text());
+        if article_title.is_empty() {
+            continue;
+        }
+        let whole_line = compact_element_text(li.text());
+        let source = whole_line
+            .strip_prefix(&article_title)
+            .unwrap_or_default()
+            .trim_matches(|ch: char| ch.is_whitespace() || matches!(ch, '-' | '–' | '—' | '·'))
+            .trim();
+        let display_title = if source.is_empty() || article_title.ends_with(source) {
+            article_title
+        } else {
+            format!("{article_title} — {source}")
+        };
+        related.push(RssItem {
+            title: display_title,
+            link,
+            description: String::new(),
+            is_folder: false,
+            guid: format!("related:{key}"),
+            pub_date,
+            related_items: Vec::new(),
+        });
+    }
+
+    // Some Google News variants omit the primary link from the HTML list.
+    let parent_key = canonicalize_url(parent_link);
+    if !parent_link.trim().is_empty()
+        && !parent_title.trim().is_empty()
+        && !seen.contains(&parent_key)
+    {
+        related.insert(
+            0,
+            RssItem {
+                title: parent_title.to_string(),
+                link: parent_link.to_string(),
+                description: String::new(),
+                is_folder: false,
+                guid: format!("related:{parent_key}"),
+                pub_date,
+                related_items: Vec::new(),
+            },
+        );
+    }
+
+    // A single link does not add useful hierarchy.
+    if related.len() < 2 {
+        Vec::new()
+    } else {
+        related
+    }
+}
+
 fn parse_feed_bytes(
     bytes: Vec<u8>,
     fallback_title: &str,
@@ -551,14 +667,16 @@ fn parse_feed_bytes(
             } else {
                 title.clone()
             };
-            let description = entry
+            let raw_description = entry
                 .summary
                 .as_ref()
                 .map(|s| s.content.clone())
                 .unwrap_or_default();
-            let description = decode_basic_html_entities(&description);
-            let description = truncate_excerpt(&description, max_excerpt_chars);
             let pub_date = entry.published.or(entry.updated).map(|d| d.timestamp());
+            let related_items =
+                extract_google_news_related_items(&raw_description, &title, &link, pub_date);
+            let description = decode_basic_html_entities(&raw_description);
+            let description = truncate_excerpt(&description, max_excerpt_chars);
             RssItem {
                 title,
                 link,
@@ -566,6 +684,7 @@ fn parse_feed_bytes(
                 is_folder: false,
                 guid,
                 pub_date,
+                related_items,
             }
         })
         .collect();
@@ -1814,4 +1933,35 @@ fn fetch_raiplaysound_podcast_page(
         items,
         cache,
     })
+}
+
+#[cfg(test)]
+mod related_news_tests {
+    use super::extract_google_news_related_items;
+
+    #[test]
+    fn extracts_google_news_related_sources() {
+        let html = r#"<ol><li><a href="https://news.google.com/rss/articles/AAA">Título principal</a> Fonte A</li><li><a href="./rss/articles/BBB">Outro enfoque</a> Fonte B</li></ol>"#;
+        let items = extract_google_news_related_items(
+            html,
+            "Título principal",
+            "https://news.google.com/rss/articles/AAA",
+            None,
+        );
+        assert_eq!(items.len(), 2);
+        assert!(items[0].title.contains("Fonte A"));
+        assert!(items[1].link.contains("news.google.com/rss/articles/BBB"));
+    }
+
+    #[test]
+    fn ignores_single_google_news_link() {
+        let html = r#"<ol><li><a href="https://news.google.com/rss/articles/AAA">Título</a> Fonte</li></ol>"#;
+        let items = extract_google_news_related_items(
+            html,
+            "Título",
+            "https://news.google.com/rss/articles/AAA",
+            None,
+        );
+        assert!(items.is_empty());
+    }
 }

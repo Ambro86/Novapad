@@ -28,9 +28,11 @@ const READONLY_TEXT_CLASS_NAME: &str = "SonarpadReadonlyText";
 const READONLY_TEXT_ID_OK: usize = 7013;
 const DONATIONS_IT: &str = include_str!("../../donations_it.txt");
 const DONATIONS_EN: &str = include_str!("../../donations_en.txt");
+const DONATIONS_DE: &str = include_str!("../../donations_de.txt");
 const DONATIONS_UK: &str = include_str!("../../donations_uk.txt");
 const DONATIONS_ES: &str = include_str!("../../donations_es.txt");
 const DONATIONS_PT: &str = include_str!("../../donations_pt.txt");
+const DONATIONS_PT_BR: &str = include_str!("../../donations_pt_BR.txt");
 const DONATIONS_SV: &str = include_str!("../../donations_sv.txt");
 const DONATIONS_CS: &str = include_str!("../../donations_cs.txt");
 const DONATIONS_PL: &str = include_str!("../../donations_pl.txt");
@@ -414,9 +416,13 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                     HelpWindowKind::Guide => match init.language {
                         Language::Italian => include_str!("../../guida.txt").to_string(),
                         Language::Ukrainian => include_str!("../../guida_uk.txt").to_string(),
+                        Language::German => include_str!("../../guida_de.txt").to_string(),
                         Language::English => include_str!("../../guida_en.txt").to_string(),
                         Language::Spanish => include_str!("../../guida_es.txt").to_string(),
                         Language::Portuguese => include_str!("../../guida_pt.txt").to_string(),
+                        Language::PortugueseBrazilian => {
+                            include_str!("../../guida_pt_BR.txt").to_string()
+                        }
                         Language::Swedish => read_override_text("guida_sv.txt")
                             .unwrap_or_else(|| include_str!("../../guida_sv.txt").to_string()),
                         Language::Vietnamese => include_str!("../../guida_vi.txt").to_string(),
@@ -592,10 +598,12 @@ fn update_completed_changelog_title(language: Language) -> String {
 fn changelog_content(language: Language) -> String {
     match language {
         Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
+        Language::German => include_str!("../../CHANGELOG_DE.md").to_string(),
         Language::Ukrainian | Language::English => include_str!("../../CHANGELOG.md").to_string(),
         Language::Hindi => include_str!("../../CHANGELOG-HI.txt").to_string(),
         Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
         Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
+        Language::PortugueseBrazilian => include_str!("../../CHANGELOG_PT_BR.md").to_string(),
         Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
         Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
         Language::Czech => include_str!("../../CHANGELOG_CS.md").to_string(),
@@ -620,9 +628,11 @@ fn donations_content(language: Language) -> String {
     match language {
         Language::Italian => DONATIONS_IT.to_string(),
         Language::Ukrainian => DONATIONS_UK.to_string(),
+        Language::German => DONATIONS_DE.to_string(),
         Language::English => DONATIONS_EN.to_string(),
         Language::Spanish => DONATIONS_ES.to_string(),
         Language::Portuguese => DONATIONS_PT.to_string(),
+        Language::PortugueseBrazilian => DONATIONS_PT_BR.to_string(),
         Language::Swedish => {
             read_override_text("donations_sv.txt").unwrap_or_else(|| DONATIONS_SV.to_string())
         }

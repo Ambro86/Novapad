@@ -176,6 +176,7 @@ fn language_from_code(code: &str, fallback: Language) -> Language {
         "en" => Language::English,
         "es" => Language::Spanish,
         "pt" => Language::Portuguese,
+        "pt-br" => Language::PortugueseBrazilian,
         "sv" => Language::Swedish,
         "vi" => Language::Vietnamese,
         "cs" => Language::Czech,

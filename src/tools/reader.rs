@@ -466,10 +466,11 @@ pub fn clean_text(input: &str) -> String {
 fn author_prefix(language: Language) -> &'static str {
     match language {
         Language::Ukrainian | Language::English => "By",
+        Language::German => "Von",
         Language::Italian => "Di",
         Language::French => "Par",
         Language::Spanish => "Por",
-        Language::Portuguese => "Por",
+        Language::Portuguese | Language::PortugueseBrazilian => "Por",
         Language::Swedish => "Av",
         Language::Czech => "Od",
         Language::Polish => "Autor",
@@ -886,8 +887,10 @@ mod tests {
         let languages = [
             Language::Italian,
             Language::English,
+            Language::German,
             Language::Spanish,
             Language::Portuguese,
+            Language::PortugueseBrazilian,
             Language::Swedish,
             Language::Vietnamese,
             Language::Czech,
@@ -905,8 +908,10 @@ mod tests {
             let name = match language {
                 Language::Italian => "Italian",
                 Language::Ukrainian | Language::English => "English",
+                Language::German => "German",
                 Language::Spanish => "Spanish",
-                Language::Portuguese => "Portuguese",
+                Language::Portuguese => "Portuguese (Portugal)",
+                Language::PortugueseBrazilian => "Portuguese (Brazil)",
                 Language::Swedish => "Swedish",
                 Language::Vietnamese => "Vietnamese",
                 Language::Czech => "Czech",

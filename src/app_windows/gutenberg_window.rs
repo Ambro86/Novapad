@@ -637,10 +637,11 @@ fn resolve_page_url(value: &str) -> String {
 fn default_language_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
+        Language::German => "de",
         Language::English => "en",
         Language::Spanish => "es",
         Language::French => "fr",
-        Language::Portuguese => "pt",
+        Language::Portuguese | Language::PortugueseBrazilian => "pt",
         Language::Polish => "pl",
         _ => "en",
     }

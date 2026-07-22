@@ -157,9 +157,10 @@ pub fn language_to_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
         Language::Ukrainian | Language::English => "en",
+        Language::German => "de",
         Language::Lithuanian => "lt",
         Language::Spanish => "es",
-        Language::Portuguese => "pt",
+        Language::Portuguese | Language::PortugueseBrazilian => "pt",
         Language::Swedish => "sv",
         Language::Vietnamese => "vi",
         Language::Czech => "cs",

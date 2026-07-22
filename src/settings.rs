@@ -139,10 +139,14 @@ pub enum Language {
     Italian,
     #[serde(rename = "en")]
     English,
+    #[serde(rename = "de")]
+    German,
     #[serde(rename = "es")]
     Spanish,
     #[serde(rename = "pt")]
     Portuguese,
+    #[serde(rename = "pt-BR")]
+    PortugueseBrazilian,
     #[serde(rename = "sv")]
     Swedish,
     #[serde(rename = "vi")]
@@ -716,6 +720,8 @@ pub struct AppSettings {
     pub group_tools_menu_by_category: bool,
     #[serde(default = "default_true")]
     pub show_video_during_playback: bool,
+    #[serde(default)]
+    pub dark_mode: bool,
     pub wrap_width: u32,
     pub smart_quotes: bool,
     #[serde(default)]
@@ -947,6 +953,10 @@ pub struct AppSettings {
     #[serde(default)]
     pub rss_default_en_keys: Vec<String>,
     #[serde(default)]
+    pub rss_removed_default_de: Vec<String>,
+    #[serde(default)]
+    pub rss_default_de_keys: Vec<String>,
+    #[serde(default)]
     pub rss_removed_default_it: Vec<String>,
     #[serde(default)]
     pub rss_default_it_keys: Vec<String>,
@@ -958,6 +968,10 @@ pub struct AppSettings {
     pub rss_removed_default_pt: Vec<String>,
     #[serde(default)]
     pub rss_default_pt_keys: Vec<String>,
+    #[serde(default)]
+    pub rss_removed_default_pt_br: Vec<String>,
+    #[serde(default)]
+    pub rss_default_pt_br_keys: Vec<String>,
     #[serde(default)]
     pub rss_removed_default_vi: Vec<String>,
     #[serde(default)]
@@ -1206,6 +1220,7 @@ impl Default for AppSettings {
             word_wrap: true,
             group_tools_menu_by_category: true,
             show_video_during_playback: true,
+            dark_mode: false,
             wrap_width: 80,
             smart_quotes: false,
             strip_markdown_keep_bullets: false,
@@ -1346,12 +1361,16 @@ impl Default for AppSettings {
             rss_favorite_articles: Vec::new(),
             rss_removed_default_en: Vec::new(),
             rss_default_en_keys: Vec::new(),
+            rss_removed_default_de: Vec::new(),
+            rss_default_de_keys: Vec::new(),
             rss_removed_default_it: Vec::new(),
             rss_default_it_keys: Vec::new(),
             rss_removed_default_es: Vec::new(),
             rss_default_es_keys: Vec::new(),
             rss_removed_default_pt: Vec::new(),
             rss_default_pt_keys: Vec::new(),
+            rss_removed_default_pt_br: Vec::new(),
+            rss_default_pt_br_keys: Vec::new(),
             rss_removed_default_vi: Vec::new(),
             rss_default_vi_keys: Vec::new(),
             rss_removed_default_cs: Vec::new(),
@@ -1721,6 +1740,9 @@ fn system_language() -> Language {
         }
         if lower.starts_with("es") {
             return Language::Spanish;
+        }
+        if lower.starts_with("pt-br") {
+            return Language::PortugueseBrazilian;
         }
         if lower.starts_with("pt") {
             return Language::Portuguese;

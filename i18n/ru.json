@@ -1526,6 +1526,7 @@
   "view.font": "&Шрифт",
   "view.read_only": "&Режим только для чтения",
   "view.show_favorites": "Показывать &избранные голоса",
+  "view.dark_mode": "Тёмный режи&м",
   "view.show_video_during_playback": "Показы&вать видео во время воспроизведения",
   "view.show_voices": "Показывать г&олоса в редакторе",
   "view.text_color": "&Цвет текста",
@@ -1871,5 +1872,7 @@
   "librivox.error": "Ошибка LibriVox: {err}",
   "librivox.unknown_author": "Неизвестный автор",
   "librivox.language_value": "Язык:",
-  "librivox.duration_value": "Продолжительность:"
+  "librivox.duration_value": "Продолжительность:",
+  "rss.related_sources_count": "{count} связанных источников",
+  "options.lang.pt_br": "Португальский (Бразилия)"
 }

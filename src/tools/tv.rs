@@ -7,7 +7,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use url::Url;
 
 const TV_CHANNELS_URL: &str = "https://sonarpad.com/api/tv_channels_resolver.php?resolve=0";
@@ -26,6 +27,11 @@ const TV_GUIDE_CHANNEL_PAYLOAD_JSON: &str = r#"{"payload_b64":"csAxIXZQMnhMMiawF
 const TV_GUIDE_TIMELINE_PAYLOAD_JSON: &str = r#"{"payload_b64":"csAxIXZQMnhMMuhZfR1S+OWXPRn4oJR5K4nkpYbgWGup/jgB+m6jPWForBe9oLtOwaBOreEeoqetOYbKLTxeLIC4fDkh4S9vy3U4I3E=","algorithm":"gzip-xor-base64-v1"}"#;
 const TV_GUIDE_STATIC_KEY_PARTS: &[&[u8]] = &[b"sonar", b"pad-", b"SonarSecure-"];
 const TV_GUIDE_FALLBACK_MAX_AGE_SECS: i64 = 6 * 60 * 60;
+const TV_GUIDE_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
+
+static TV_CHANNEL_GUIDE_CACHE: OnceLock<Mutex<HashMap<String, CachedTvChannelGuide>>> =
+    OnceLock::new();
+static TV_TIMELINE_CACHE: OnceLock<Mutex<Option<CachedTvTimeline>>> = OnceLock::new();
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct TvChannel {
@@ -98,6 +104,25 @@ pub(crate) struct TvProgram {
     pub(crate) end_time: i64,
 }
 
+#[derive(Clone)]
+struct CachedTvChannelGuide {
+    fetched_at: Instant,
+    programs: Vec<TvProgram>,
+}
+
+#[derive(Clone)]
+struct CachedTvTimeline {
+    date: NaiveDate,
+    fetched_at: Instant,
+    programs_by_channel: HashMap<String, Vec<TvProgram>>,
+    exact_channel_names: HashMap<String, String>,
+}
+
+struct TvTimelineData {
+    programs_by_channel: HashMap<String, Vec<TvProgram>>,
+    exact_channel_names: HashMap<String, String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct EncryptedTvGuidePayload {
     payload_b64: String,
@@ -142,27 +167,118 @@ struct TvChannelsCache {
     channels: Vec<TvChannel>,
 }
 
-pub(crate) fn load_current_programs() -> Result<HashMap<String, TvProgram>, String> {
+pub(crate) fn load_current_programs(
+    channels: &[TvChannel],
+) -> Result<HashMap<String, TvProgram>, String> {
     let now = Local::now();
-    let programs_by_channel = load_programs_for_date(now.date_naive())?;
+    let timeline = load_timeline_programs_for_date(now.date_naive())?;
+    let programs_by_channel = timeline.programs_by_channel;
     let now_seconds = now.timestamp();
     let mut current_programs = HashMap::new();
     for (channel, programs) in programs_by_channel {
-        let current = programs
-            .iter()
-            .find(|program| program.start_time <= now_seconds && program.end_time > now_seconds)
-            .cloned()
-            .or_else(|| latest_started_program(&programs, now_seconds));
+        let current = current_program_at(&programs, now_seconds);
         if let Some(program) = current {
             current_programs.insert(channel, program);
         }
     }
+    refresh_missing_or_expired_current_programs_from_channel_guides(
+        channels,
+        now.date_naive(),
+        now_seconds,
+        &timeline.exact_channel_names,
+        &mut current_programs,
+    );
     Ok(current_programs)
 }
 
-pub(crate) fn load_programs_for_date(
+fn refresh_missing_or_expired_current_programs_from_channel_guides(
+    channels: &[TvChannel],
     date: NaiveDate,
-) -> Result<HashMap<String, Vec<TvProgram>>, String> {
+    now_seconds: i64,
+    exact_channel_names: &HashMap<String, String>,
+    current_programs: &mut HashMap<String, TvProgram>,
+) {
+    // The timeline endpoint is intentionally compact and sometimes omits a
+    // few channels even though their channel-specific guide is populated
+    // (currently Boing and Italia 2 are examples).  Only enable the more
+    // expensive per-channel fallback for provider groups that are actually
+    // covered by the timeline.  This keeps regional/local channels, for which
+    // the guide service has no data, from causing hundreds of empty requests.
+    let mut category_coverage = HashMap::<&str, (usize, usize)>::new();
+    for channel in channels {
+        let coverage = category_coverage
+            .entry(channel.category.as_str())
+            .or_insert((0, 0));
+        coverage.0 += 1;
+        if current_program_for_channel(current_programs, channel).is_some() {
+            coverage.1 += 1;
+        }
+    }
+
+    let mut refreshed_keys = std::collections::HashSet::new();
+    for channel in channels {
+        let Some(&(category_channels, covered_channels)) =
+            category_coverage.get(channel.category.as_str())
+        else {
+            continue;
+        };
+        if covered_channels == 0 || covered_channels.saturating_mul(2) < category_channels {
+            continue;
+        }
+
+        let keys = guide_lookup_keys(channel);
+        let Some(key) = keys
+            .iter()
+            .find(|key| current_programs.contains_key(*key))
+            .cloned()
+            .or_else(|| keys.into_iter().next())
+        else {
+            continue;
+        };
+        let is_expired = current_programs
+            .get(&key)
+            .is_some_and(|program| program.end_time <= now_seconds);
+        let is_missing = !current_programs.contains_key(&key);
+        if (!is_missing && !is_expired) || !refreshed_keys.insert(key.clone()) {
+            continue;
+        }
+
+        let exact_channel = exact_channel_names
+            .get(&key)
+            .map(String::as_str)
+            .unwrap_or_else(|| guide_channel_name(channel));
+        match load_channel_guide_for_exact_name(exact_channel, date) {
+            Ok(programs) => {
+                if let Some(program) = current_program_at(&programs, now_seconds) {
+                    crate::log_debug(&format!(
+                        "TV current programme refreshed from channel guide: channel={:?} missing={} program={:?}",
+                        channel.name, is_missing, program.title
+                    ));
+                    current_programs.insert(key, program);
+                }
+            }
+            Err(err) => crate::log_debug(&format!(
+                "TV current programme channel-guide refresh failed: channel={:?} error={err}",
+                channel.name
+            )),
+        }
+    }
+}
+
+fn load_timeline_programs_for_date(date: NaiveDate) -> Result<TvTimelineData, String> {
+    let cache = TV_TIMELINE_CACHE.get_or_init(|| Mutex::new(None));
+    if let Ok(cache) = cache.lock()
+        && let Some(cached) = cache.as_ref()
+        && cached.date == date
+        && cached.fetched_at.elapsed() < TV_GUIDE_CACHE_TTL
+    {
+        crate::log_debug(&format!("TV guide timeline cache hit: date={date}"));
+        return Ok(TvTimelineData {
+            programs_by_channel: cached.programs_by_channel.clone(),
+            exact_channel_names: cached.exact_channel_names.clone(),
+        });
+    }
+
     let template = decode_tv_guide_timeline_url()?;
     let date_text = date.format("%Y-%m-%d").to_string();
     let url = template.replace("{date}", &date_text);
@@ -191,8 +307,10 @@ pub(crate) fn load_programs_for_date(
             &[("error", &err.to_string())],
         )
     })?;
+    crate::log_debug(&format!("TV guide timeline API: date={date}"));
     let mut programs_by_channel = HashMap::<String, Vec<TvProgram>>::new();
-    collect_tv_guide_programs_from_timeline_root(&root, &mut programs_by_channel);
+    let exact_channel_names =
+        collect_tv_guide_programs_from_timeline_root(&root, &mut programs_by_channel);
     for programs in programs_by_channel.values_mut() {
         programs.sort_by_key(|program| program.start_time);
         programs.dedup_by(|left, right| {
@@ -201,7 +319,18 @@ pub(crate) fn load_programs_for_date(
                 && left.title == right.title
         });
     }
-    Ok(programs_by_channel)
+    if let Ok(mut cache) = cache.lock() {
+        *cache = Some(CachedTvTimeline {
+            date,
+            fetched_at: Instant::now(),
+            programs_by_channel: programs_by_channel.clone(),
+            exact_channel_names: exact_channel_names.clone(),
+        });
+    }
+    Ok(TvTimelineData {
+        programs_by_channel,
+        exact_channel_names,
+    })
 }
 
 pub(crate) fn load_channel_guide(
@@ -223,8 +352,42 @@ pub(crate) fn load_channel_guide(
         resolve_exact_guide_channel_name(&client, &date_text, &requested_normalized)
             .unwrap_or_else(|| requested_channel.to_string());
 
+    load_channel_guide_for_exact_name(&exact_channel, date)
+}
+
+fn load_channel_guide_for_exact_name(
+    exact_channel: &str,
+    date: NaiveDate,
+) -> Result<Vec<TvProgram>, String> {
+    let cache_key = format!(
+        "{}\0{}",
+        date.format("%Y-%m-%d"),
+        exact_channel.trim().to_ascii_lowercase()
+    );
+    let cache = TV_CHANNEL_GUIDE_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Ok(cache) = cache.lock()
+        && let Some(cached) = cache.get(&cache_key)
+        && cached.fetched_at.elapsed() < TV_GUIDE_CACHE_TTL
+    {
+        crate::log_debug(&format!(
+            "TV guide channel cache hit: exact={:?} date={} programs={}",
+            exact_channel,
+            date,
+            cached.programs.len()
+        ));
+        return Ok(cached.programs.clone());
+    }
+
+    let date_text = date.format("%Y-%m-%d").to_string();
+    let client = Client::builder()
+        .user_agent(DEFAULT_USER_AGENT)
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|err| {
+            crate::i18n::tr_tv_f("tv.error.guide_init", &[("error", &err.to_string())])
+        })?;
     let template = decode_tv_guide_channel_url()?;
-    let encoded_channel = encode_uri_component(&exact_channel);
+    let encoded_channel = encode_uri_component(exact_channel);
     let url = template
         .replace("{channel}", &encoded_channel)
         .replace("{date}", &date_text);
@@ -280,12 +443,20 @@ pub(crate) fn load_channel_guide(
             && left.title == right.title
     });
     crate::log_debug(&format!(
-        "TV guide channel API: requested={:?} exact={:?} date={} programs={}",
-        requested_channel,
+        "TV guide channel API: exact={:?} date={} programs={}",
         exact_channel,
         date,
         programs.len()
     ));
+    if let Ok(mut cache) = cache.lock() {
+        cache.insert(
+            cache_key,
+            CachedTvChannelGuide {
+                fetched_at: Instant::now(),
+                programs: programs.clone(),
+            },
+        );
+    }
     Ok(programs)
 }
 
@@ -358,10 +529,41 @@ fn encode_uri_component(value: &str) -> String {
 fn collect_tv_guide_programs_from_timeline_root(
     root: &Value,
     programs_by_channel: &mut HashMap<String, Vec<TvProgram>>,
-) {
+) -> HashMap<String, String> {
     let Some(groups) = root.as_array() else {
-        return;
+        return HashMap::new();
     };
+    // The timeline can contain multiple schedules whose names normalize to the
+    // same Sonarpad channel (for example "Italia 1 (DTT)" and "Italia 1").
+    // The channel-specific guide deliberately selects the first exact variant
+    // returned by this timeline.  Keep that same variant here instead of
+    // merging conflicting schedules and picking an arbitrary current program.
+    let mut selected_exact_channels = HashMap::<String, String>::new();
+    // Resolve the exact variant in a separate first pass, just like
+    // `resolve_exact_guide_channel_name`.  Some timeline rows identify the
+    // channel but do not yet contain a usable programme; they must still
+    // determine which variant the channel-specific guide would select.
+    for group in groups {
+        let Some(items) = group.as_array() else {
+            continue;
+        };
+        for item in items {
+            let Some(object) = item.as_object() else {
+                continue;
+            };
+            let guide_channel = object
+                .get("ch")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim();
+            let key = normalize_channel_name(guide_channel);
+            if !key.is_empty() {
+                selected_exact_channels
+                    .entry(key)
+                    .or_insert_with(|| guide_channel.to_string());
+            }
+        }
+    }
     for group in groups {
         let Some(items) = group.as_array() else {
             continue;
@@ -392,6 +594,9 @@ fn collect_tv_guide_programs_from_timeline_root(
             if key.is_empty() {
                 continue;
             }
+            if selected_exact_channels.get(&key).map(String::as_str) != Some(guide_channel) {
+                continue;
+            }
             programs_by_channel.entry(key).or_default().push(TvProgram {
                 title: title.to_string(),
                 start_time,
@@ -399,6 +604,7 @@ fn collect_tv_guide_programs_from_timeline_root(
             });
         }
     }
+    selected_exact_channels
 }
 
 pub(crate) fn current_program_for_channel<'a>(
@@ -435,6 +641,18 @@ fn latest_started_program(programs: &[TvProgram], now_seconds: i64) -> Option<Tv
         .filter(|program| program.start_time <= now_seconds)
         .max_by_key(|program| program.start_time)?;
     (now_seconds - latest.start_time <= TV_GUIDE_FALLBACK_MAX_AGE_SECS).then(|| latest.clone())
+}
+
+fn current_program_at(programs: &[TvProgram], now_seconds: i64) -> Option<TvProgram> {
+    // EPG feeds occasionally contain overlapping entries.  Once a newer
+    // programme has started it must supersede an older entry whose end time
+    // incorrectly extends beyond the real changeover.
+    programs
+        .iter()
+        .filter(|program| program.start_time <= now_seconds && program.end_time > now_seconds)
+        .max_by_key(|program| program.start_time)
+        .cloned()
+        .or_else(|| latest_started_program(programs, now_seconds))
 }
 
 fn read_json_i64(object: &serde_json::Map<String, Value>, camel_key: &str, snake_key: &str) -> i64 {
@@ -539,6 +757,7 @@ pub(crate) fn normalize_channel_name(name: &str) -> String {
         "canale5mediaset" | "mediasetcanale5" => "canale5".to_string(),
         "italia1mediaset" | "mediasetitalia1" => "italia1".to_string(),
         "italia2mediaset" | "mediasetitalia2" => "italia2".to_string(),
+        "focustv" | "tvfocus" | "mediasetfocus" | "focusmediaset" => "focus".to_string(),
         "sportitalialive24" => "sportitalia".to_string(),
         "virginradio" => "virginradiotv".to_string(),
         _ if normalized.contains("rete4") || normalized.contains("retequattro") => {
@@ -1037,6 +1256,7 @@ mod tests {
     fn normalizes_common_channel_aliases() {
         assert_eq!(normalize_channel_name("[20] Rete Quattro HD"), "rete4");
         assert_eq!(normalize_channel_name("Twenty Seven"), "27");
+        assert_eq!(normalize_channel_name("Focus Tv"), "focus");
     }
 
     #[test]
@@ -1097,5 +1317,94 @@ mod tests {
             .expect("Italia 2 should be collected from the main timeline row");
         assert_eq!(italy_two.len(), 1);
         assert_eq!(italy_two[0].title, "Occhi di gatto");
+    }
+
+    #[test]
+    fn timeline_parser_does_not_merge_conflicting_channel_variants() {
+        let root = serde_json::json!([
+            [
+                {
+                    "ch": "Italia 1 (DTT)",
+                    "title": "Transatlantici",
+                    "startTime": 100,
+                    "endTime": 200
+                },
+                {
+                    "ch": "Italia 1",
+                    "title": "Ramses",
+                    "startTime": 100,
+                    "endTime": 200
+                },
+                {
+                    "ch": "Italia 1 (DTT)",
+                    "title": "Programma successivo",
+                    "startTime": 200,
+                    "endTime": 300
+                }
+            ]
+        ]);
+        let mut programs = HashMap::new();
+
+        collect_tv_guide_programs_from_timeline_root(&root, &mut programs);
+
+        let italy_one = programs
+            .get("italia1")
+            .expect("Italia 1 should use the first exact timeline variant");
+        assert_eq!(italy_one.len(), 2);
+        assert_eq!(italy_one[0].title, "Transatlantici");
+        assert_eq!(italy_one[1].title, "Programma successivo");
+    }
+
+    #[test]
+    fn current_program_prefers_latest_start_when_guide_entries_overlap() {
+        let programs = vec![
+            TvProgram {
+                title: "Chicago Med".to_string(),
+                start_time: 3 * 60,
+                end_time: 4 * 60,
+            },
+            TvProgram {
+                title: "Show reel".to_string(),
+                start_time: 3 * 60 + 40,
+                end_time: 4 * 60 + 15,
+            },
+        ];
+
+        let current = current_program_at(&programs, 3 * 60 + 50)
+            .expect("an overlapping current programme should be selected");
+
+        assert_eq!(current.title, "Show reel");
+    }
+
+    #[test]
+    fn timeline_variant_selection_matches_guide_even_if_first_row_is_incomplete() {
+        let root = serde_json::json!([
+            [
+                {
+                    "ch": "20"
+                },
+                {
+                    "ch": "20 Mediaset",
+                    "title": "Chicago Med",
+                    "startTime": 180,
+                    "endTime": 240
+                },
+                {
+                    "ch": "20",
+                    "title": "Show reel",
+                    "startTime": 220,
+                    "endTime": 255
+                }
+            ]
+        ]);
+        let mut programs = HashMap::new();
+
+        collect_tv_guide_programs_from_timeline_root(&root, &mut programs);
+
+        let mediaset_twenty = programs
+            .get("20")
+            .expect("the exact variant selected by the guide should be retained");
+        assert_eq!(mediaset_twenty.len(), 1);
+        assert_eq!(mediaset_twenty[0].title, "Show reel");
     }
 }

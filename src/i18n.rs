@@ -3,9 +3,11 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 
 const EN_JSON: &str = include_str!("../i18n/en.json");
+const DE_JSON: &str = include_str!("../i18n/de.json");
 const IT_JSON: &str = include_str!("../i18n/it.json");
 const ES_JSON: &str = include_str!("../i18n/es.json");
 const PT_JSON: &str = include_str!("../i18n/pt.json");
+const PT_BR_JSON: &str = include_str!("../i18n/pt-BR.json");
 const SV_JSON: &str = include_str!("../i18n/sv.json");
 const VI_JSON: &str = include_str!("../i18n/vi.json");
 const CS_JSON: &str = include_str!("../i18n/cs.json");
@@ -180,9 +182,11 @@ fn load_fr_map() -> HashMap<String, String> {
 
 fn map_for_language(language: Language) -> &'static HashMap<String, String> {
     static EN: OnceLock<HashMap<String, String>> = OnceLock::new();
+    static DE: OnceLock<HashMap<String, String>> = OnceLock::new();
     static IT: OnceLock<HashMap<String, String>> = OnceLock::new();
     static ES: OnceLock<HashMap<String, String>> = OnceLock::new();
     static PT: OnceLock<HashMap<String, String>> = OnceLock::new();
+    static PT_BR: OnceLock<HashMap<String, String>> = OnceLock::new();
     static SV: OnceLock<HashMap<String, String>> = OnceLock::new();
     static VI: OnceLock<HashMap<String, String>> = OnceLock::new();
     static CS: OnceLock<HashMap<String, String>> = OnceLock::new();
@@ -198,6 +202,7 @@ fn map_for_language(language: Language) -> &'static HashMap<String, String> {
         Language::Italian => IT.get_or_init(|| load_map(IT_JSON)),
         Language::Spanish => ES.get_or_init(|| load_map(ES_JSON)),
         Language::Portuguese => PT.get_or_init(|| load_map(PT_JSON)),
+        Language::PortugueseBrazilian => PT_BR.get_or_init(|| load_map(PT_BR_JSON)),
         Language::Swedish => SV.get_or_init(load_sv_map),
         Language::Vietnamese => VI.get_or_init(|| load_map(VI_JSON)),
         Language::Czech => CS.get_or_init(load_cs_map),
@@ -209,6 +214,7 @@ fn map_for_language(language: Language) -> &'static HashMap<String, String> {
         Language::Russian => RU.get_or_init(|| load_map(RU_JSON)),
         Language::Chinese => ZH.get_or_init(|| load_map(ZH_JSON)),
         Language::Hindi => HI.get_or_init(|| load_map(HI_JSON)),
+        Language::German => DE.get_or_init(|| load_map(DE_JSON)),
         Language::English => EN.get_or_init(|| load_map(EN_JSON)),
     }
 }

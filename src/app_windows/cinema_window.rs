@@ -221,6 +221,7 @@ fn format_date(raw: &str, language: Language) -> String {
         return raw.to_string();
     };
     match language {
+        Language::German => format!("{:02}.{:02}.{}", date.day(), date.month(), date.year()),
         Language::English => format!("{:02}/{:02}/{}", date.month(), date.day(), date.year()),
         Language::Chinese => format!("{}年{}月{}日", date.year(), date.month(), date.day()),
         _ => format!("{:02}/{:02}/{}", date.day(), date.month(), date.year()),

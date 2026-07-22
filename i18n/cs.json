@@ -1526,6 +1526,7 @@
   "view.font": "&Písmo",
   "view.read_only": "&Režim jen pro čtení",
   "view.show_favorites": "Zobrazit &oblíbené hlasy",
+  "view.dark_mode": "Tmavý rež&im",
   "view.show_video_during_playback": "Zobr&azit video během přehrávání",
   "view.show_voices": "Zobrazit &hlasy v editoru",
   "view.text_color": "&Barva textu",
@@ -1871,5 +1872,7 @@
   "librivox.error": "Chyba LibriVox: {err}",
   "librivox.unknown_author": "Neznámý autor",
   "librivox.language_value": "Jazyk:",
-  "librivox.duration_value": "Délka:"
+  "librivox.duration_value": "Délka:",
+  "rss.related_sources_count": "{count} souvisejících zdrojů",
+  "options.lang.pt_br": "Portugalština (Brazílie)"
 }

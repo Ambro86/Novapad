@@ -2422,6 +2422,18 @@ fn holiday_for_date(language: Language, date: NaiveDate) -> Option<String> {
             (25, 12) => "Natal",
             _ => return None,
         },
+        Language::PortugueseBrazilian => match (day, month) {
+            (1, 1) => "Confraternização Universal",
+            (21, 4) => "Tiradentes",
+            (1, 5) => "Dia do Trabalho",
+            (7, 9) => "Independência do Brasil",
+            (12, 10) => "Nossa Senhora Aparecida",
+            (2, 11) => "Finados",
+            (15, 11) => "Proclamação da República",
+            (20, 11) => "Dia Nacional de Zumbi e da Consciência Negra",
+            (25, 12) => "Natal",
+            _ => return None,
+        },
         Language::Polish => match (day, month) {
             (1, 1) => "Nowy Rok",
             (6, 1) => "Święto Trzech Króli",
@@ -2432,6 +2444,14 @@ fn holiday_for_date(language: Language, date: NaiveDate) -> Option<String> {
             (11, 11) => "Narodowe Święto Niepodległości",
             (25, 12) => "Boże Narodzenie",
             (26, 12) => "Drugi dzień Świąt Bożego Narodzenia",
+            _ => return None,
+        },
+        Language::German => match (day, month) {
+            (1, 1) => "Neujahr",
+            (1, 5) => "Tag der Arbeit",
+            (3, 10) => "Tag der Deutschen Einheit",
+            (25, 12) => "Erster Weihnachtstag",
+            (26, 12) => "Zweiter Weihnachtstag",
             _ => return None,
         },
         Language::Czech => match (day, month) {
@@ -2480,7 +2500,7 @@ fn localized_date_names(
     match language {
         Language::Italian => (&WEEKDAYS_IT, &MONTHS_IT),
         Language::Spanish => (&WEEKDAYS_ES, &MONTHS_ES),
-        Language::Portuguese => (&WEEKDAYS_PT, &MONTHS_PT),
+        Language::Portuguese | Language::PortugueseBrazilian => (&WEEKDAYS_PT, &MONTHS_PT),
         Language::Swedish => (&WEEKDAYS_SV, &MONTHS_SV),
         Language::Vietnamese => (&WEEKDAYS_VI, &MONTHS_VI),
         Language::Czech => (&WEEKDAYS_CS, &MONTHS_CS),
@@ -2492,6 +2512,7 @@ fn localized_date_names(
         Language::Russian => (&WEEKDAYS_RU, &MONTHS_RU),
         Language::Chinese => (&WEEKDAYS_ZH, &MONTHS_ZH),
         Language::Hindi => (&WEEKDAYS_HI, &MONTHS_HI),
+        Language::German => (&WEEKDAYS_DE, &MONTHS_DE),
         Language::English => (&WEEKDAYS_EN, &MONTHS_EN),
     }
 }
@@ -2501,9 +2522,11 @@ fn language_code(language: Language) -> &'static str {
         Language::Italian => "it",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
+        Language::PortugueseBrazilian => "pt-BR",
         Language::Czech => "cs",
         Language::Polish => "pl",
         Language::French => "fr",
+        Language::German => "de",
         Language::English => "en",
         Language::Swedish => "sv",
         Language::Vietnamese => "vi",
@@ -2844,6 +2867,29 @@ fn tr(language: Language, key: &str) -> String {
     i18n::tr(language, key)
 }
 
+const WEEKDAYS_DE: [&str; 7] = [
+    "Montag",
+    "Dienstag",
+    "Mittwoch",
+    "Donnerstag",
+    "Freitag",
+    "Samstag",
+    "Sonntag",
+];
+const MONTHS_DE: [&str; 12] = [
+    "Januar",
+    "Februar",
+    "März",
+    "April",
+    "Mai",
+    "Juni",
+    "Juli",
+    "August",
+    "September",
+    "Oktober",
+    "November",
+    "Dezember",
+];
 const WEEKDAYS_EN: [&str; 7] = [
     "Monday",
     "Tuesday",

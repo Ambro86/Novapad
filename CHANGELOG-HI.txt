@@ -1,5 +1,21 @@
 # परिवर्तन सूची
 
+Version 0.8.3 – 2026-07-22
+
+डार्क मोड
+• डार्क मोड जोड़ा गया है, जिसे View menu से चालू किया जा सकता है और जो user preferences में सहेजा रहता है।
+• डार्क theme editor, menus, secondary windows और मुख्य controls पर लागू होती है; readability और accessibility बनाए रखने के लिए text colors अपने आप अनुकूलित किए जाते हैं।
+
+जर्मन भाषा
+• जर्मन को पूर्ण interface language के रूप में जोड़ा गया है और इसे Options में चुना जा सकता है।
+• समाचार और RSS, spell checker, calendar की सभी quotations, donations, guide और changelog पूरी तरह जर्मन में उपलब्ध हैं।
+
+ब्राज़ीली पुर्तगाली और Google समाचार
+• ब्राज़ीली पुर्तगाली को पूर्ण interface language के रूप में जोड़ा गया है। यह पुर्तगाल की पुर्तगाली से अलग है और Options में चुनी जा सकती है।
+• पूरा interface, calendar और सभी quotations, spell checker, donations, guide तथा changelog ब्राज़ीली पुर्तगाली में उपलब्ध हैं।
+• Google समाचार अब Brazil localization, Brazilian categories और अलग default Brazilian RSS sources का समर्थन करता है।
+• Feed में उपलब्ध होने पर एक ही समाचार से जुड़ी अलग-अलग sources tree में accessible child items के रूप में दिखाई जाती हैं।
+
 Version 0.8.2 – 2026-07-17
 
 डिजिटल पुस्तकालय और ऑडियोबुक

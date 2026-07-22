@@ -1672,7 +1672,8 @@ fn apply_text_appearance(hwnd_edit: HWND, text_color: u32, text_size: i32) {
     let mut format = CHARFORMAT2W::default();
     format.Base.cbSize = std::mem::size_of::<CHARFORMAT2W>() as u32;
     format.Base.dwMask = CFM_COLOR | CFM_SIZE;
-    format.Base.crTextColor = windows::Win32::Foundation::COLORREF(text_color);
+    let visible_text_color = crate::theme::effective_editor_text_color(text_color);
+    format.Base.crTextColor = windows::Win32::Foundation::COLORREF(visible_text_color);
     if text_size > 0 {
         format.Base.yHeight = text_size.saturating_mul(20);
     }
@@ -4513,6 +4514,7 @@ pub fn create_edit(
             let proc_ptr = edit_subclass_proc as *const () as usize;
             let prev = SetWindowLongPtrW(hwnd_edit, GWLP_WNDPROC, proc_ptr as isize);
             SetWindowLongPtrW(hwnd_edit, GWLP_USERDATA, prev);
+            crate::theme::apply_to_window(hwnd_edit);
         }
         hwnd_edit
     }

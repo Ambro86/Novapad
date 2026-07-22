@@ -1300,6 +1300,7 @@ struct OptionsLabels {
     lang_en: String,
     lang_es: String,
     lang_pt: String,
+    lang_pt_br: String,
     lang_sv: String,
     lang_vi: String,
     lang_cs: String,
@@ -1311,6 +1312,7 @@ struct OptionsLabels {
     lang_ru: String,
     lang_zh: String,
     lang_hi: String,
+    lang_de: String,
     marker_position_end: String,
     marker_position_beginning: String,
     open_new_tab: String,
@@ -1649,6 +1651,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         lang_en: i18n::tr(language, "options.lang.en"),
         lang_es: i18n::tr(language, "options.lang.es"),
         lang_pt: i18n::tr(language, "options.lang.pt"),
+        lang_pt_br: i18n::tr(language, "options.lang.pt_br"),
         lang_sv: i18n::tr(language, "options.lang.sv"),
         lang_vi: i18n::tr(language, "options.lang.vi"),
         lang_cs: i18n::tr(language, "options.lang.cs"),
@@ -1694,6 +1697,7 @@ fn options_labels(language: Language) -> OptionsLabels {
                 value
             }
         },
+        lang_de: i18n::tr(language, "options.lang.de"),
         lang_hi: {
             let value = i18n::tr(language, "options.lang.hi");
             if value == "options.lang.hi" {
@@ -1795,7 +1799,9 @@ fn localized_voice_language_name(language: Language, labels: &OptionsLabels, cod
             Language::Italian => "Tedesco".to_string(),
             Language::Spanish => "Aleman".to_string(),
             Language::Portuguese => "Alemao".to_string(),
+            Language::PortugueseBrazilian => "Alemão".to_string(),
             Language::French => "Allemand".to_string(),
+            Language::German => "Deutsch".to_string(),
             _ => "German".to_string(),
         },
         _ => code.to_ascii_uppercase(),
@@ -7565,6 +7571,12 @@ fn initialize_options_dialog(hwnd: HWND) {
             combo_lang,
             CB_ADDSTRING,
             WPARAM(0),
+            LPARAM(to_wide(&labels.lang_pt_br).as_ptr() as isize),
+        );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
             LPARAM(to_wide(&labels.lang_sv).as_ptr() as isize),
         );
         SendMessageW(
@@ -7627,23 +7639,31 @@ fn initialize_options_dialog(hwnd: HWND) {
             WPARAM(0),
             LPARAM(to_wide(&labels.lang_hi).as_ptr() as isize),
         );
+        SendMessageW(
+            combo_lang,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(to_wide(&labels.lang_de).as_ptr() as isize),
+        );
 
         let lang_index = match settings.language {
             Language::Italian => 0,
             Language::English => 1,
             Language::Spanish => 2,
             Language::Portuguese => 3,
-            Language::Swedish => 4,
-            Language::Vietnamese => 5,
-            Language::Czech => 6,
-            Language::Polish => 7,
-            Language::French => 8,
-            Language::Serbian => 9,
-            Language::Ukrainian => 10,
-            Language::Lithuanian => 11,
-            Language::Russian => 12,
-            Language::Chinese => 13,
-            Language::Hindi => 14,
+            Language::PortugueseBrazilian => 4,
+            Language::Swedish => 5,
+            Language::Vietnamese => 6,
+            Language::Czech => 7,
+            Language::Polish => 8,
+            Language::French => 9,
+            Language::Serbian => 10,
+            Language::Ukrainian => 11,
+            Language::Lithuanian => 12,
+            Language::Russian => 13,
+            Language::Chinese => 14,
+            Language::Hindi => 15,
+            Language::German => 16,
         };
         SendMessageW(combo_lang, CB_SETCURSEL, WPARAM(lang_index), LPARAM(0));
 
@@ -8317,6 +8337,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             (labels.lang_ru.clone(), "ru"),
             (labels.lang_zh.clone(), "zh"),
             (labels.lang_hi.clone(), "hi"),
+            (labels.lang_de.clone(), "de"),
         ];
         let current_dict_lang = settings
             .dictionary_translation_language
@@ -8363,6 +8384,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             (labels.lang_ru.clone(), "ru"),
             (labels.lang_zh.clone(), "zh"),
             (labels.lang_hi.clone(), "hi"),
+            (labels.lang_de.clone(), "de"),
         ];
         let current_wikipedia_lang = settings.wikipedia_language.trim().to_ascii_lowercase();
         let mut wiki_selected_idx = 0;
@@ -11622,17 +11644,19 @@ fn apply_options_dialog(hwnd: HWND) {
             1 => Language::English,
             2 => Language::Spanish,
             3 => Language::Portuguese,
-            4 => Language::Swedish,
-            5 => Language::Vietnamese,
-            6 => Language::Czech,
-            7 => Language::Polish,
-            8 => Language::French,
-            9 => Language::Serbian,
-            10 => Language::Ukrainian,
-            11 => Language::Lithuanian,
-            12 => Language::Russian,
-            13 => Language::Chinese,
-            14 => Language::Hindi,
+            4 => Language::PortugueseBrazilian,
+            5 => Language::Swedish,
+            6 => Language::Vietnamese,
+            7 => Language::Czech,
+            8 => Language::Polish,
+            9 => Language::French,
+            10 => Language::Serbian,
+            11 => Language::Ukrainian,
+            12 => Language::Lithuanian,
+            13 => Language::Russian,
+            14 => Language::Chinese,
+            15 => Language::Hindi,
+            16 => Language::German,
             _ => Language::Italian,
         };
 

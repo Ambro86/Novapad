@@ -291,9 +291,10 @@ mod ytdlp_command_tests {
 fn youtube_ui_language_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
+        Language::German => "de",
         Language::English => "en",
         Language::Spanish => "es",
-        Language::Portuguese => "pt",
+        Language::Portuguese | Language::PortugueseBrazilian => "pt",
         Language::Swedish => "sv",
         Language::Vietnamese => "vi",
         Language::Czech => "cs",

@@ -1,5 +1,21 @@
 # Changelog
 
+Versione 0.8.3 – 2026-07-22
+
+Modalità scura
+• Aggiunta la modalità scura, attivabile dal menu Visualizza e salvata nelle preferenze.
+• Il tema scuro viene applicato all’editor, ai menu, alle finestre secondarie e ai principali controlli di Sonarpad, adattando i colori del testo per mantenere leggibilità e accessibilità.
+
+Lingua tedesca
+• Aggiunta la lingua tedesca completa, selezionabile dalle Opzioni.
+• Notizie e RSS, correttore ortografico, calendario e tutte le citazioni, donazioni, guida e changelog sono interamente disponibili in tedesco.
+
+Portoghese brasiliano e Google News
+• Aggiunto il portoghese brasiliano come lingua completa dell’interfaccia, separata dal portoghese del Portogallo e selezionabile dalle Opzioni.
+• Interfaccia, calendario e citazioni, correttore ortografico, donazioni, guida e changelog sono interamente disponibili in portoghese brasiliano.
+• Google News supporta ora la localizzazione del Brasile, le categorie brasiliane e fonti RSS brasiliane predefinite separate.
+• Quando il feed le fornisce, le diverse fonti Google News relative alla stessa notizia vengono mostrate come elementi figli accessibili nell’albero.
+
 Versione 0.8.2 – 2026-07-17
 
 Biblioteche digitali e audiolibri

@@ -132,10 +132,12 @@ const SEARCH_OK_ID: usize = 1502;
 const SEARCH_CANCEL_ID: usize = 1503;
 
 const FEED_EN_DATA: &str = include_str!("../../i18n/feed_en.txt");
+const FEED_DE_DATA: &str = include_str!("../../i18n/feed_de.txt");
 const FEED_UK_DATA: &str = include_str!("../../i18n/feed_uk.txt");
 const FEED_IT_DATA: &str = include_str!("../../i18n/feed_it.txt");
 const FEED_ES_DATA: &str = include_str!("../../i18n/feed_es.txt");
 const FEED_PT_DATA: &str = include_str!("../../i18n/feed_pt.txt");
+const FEED_PT_BR_DATA: &str = include_str!("../../i18n/feed_pt_BR.txt");
 const FEED_VI_DATA: &str = include_str!("../../i18n/feed_vi.txt");
 const FEED_CS_DATA: &str = include_str!("../../i18n/feed_cs.txt");
 const FEED_PL_DATA: &str = include_str!("../../i18n/feed_pl.txt");
@@ -152,14 +154,16 @@ const COMMUNITY_NEWS_SOURCES_URL: &str = "https://sonarpad.com/api/get_community
 const ADD_COMMUNITY_NEWS_SOURCE_URL: &str =
     "https://sonarpad.com/api/add_community_news_source.php";
 const COMMUNITY_USER_AGENT: &str = "SonarpadWindows/0.7 (https://sonarpad.com)";
-const NEWS_LANGUAGE_CODES: [&str; 7] = ["it", "en", "fr", "es", "pt", "pl", "cs"];
+const NEWS_LANGUAGE_CODES: [&str; 9] = ["it", "en", "de", "fr", "es", "pt", "pt-br", "pl", "cs"];
 
 fn default_news_language_code(language: crate::settings::Language) -> &'static str {
     match language {
+        crate::settings::Language::German => "de",
         crate::settings::Language::English => "en",
         crate::settings::Language::French => "fr",
         crate::settings::Language::Spanish => "es",
         crate::settings::Language::Portuguese => "pt",
+        crate::settings::Language::PortugueseBrazilian => "pt-br",
         crate::settings::Language::Polish => "pl",
         crate::settings::Language::Czech => "cs",
         _ => "it",
@@ -176,9 +180,11 @@ fn normalize_news_language_code(code: &str) -> Option<&'static str> {
 fn news_language_as_app_language(code: &str) -> crate::settings::Language {
     match normalize_news_language_code(code).unwrap_or("it") {
         "en" => crate::settings::Language::English,
+        "de" => crate::settings::Language::German,
         "fr" => crate::settings::Language::French,
         "es" => crate::settings::Language::Spanish,
         "pt" => crate::settings::Language::Portuguese,
+        "pt-br" => crate::settings::Language::PortugueseBrazilian,
         "pl" => crate::settings::Language::Polish,
         "cs" => crate::settings::Language::Czech,
         _ => crate::settings::Language::Italian,
@@ -186,7 +192,10 @@ fn news_language_as_app_language(code: &str) -> crate::settings::Language {
 }
 
 fn news_language_label(ui_language: crate::settings::Language, code: &str) -> String {
-    i18n::tr(ui_language, &format!("options.lang.{}", code))
+    i18n::tr(
+        ui_language,
+        &format!("options.lang.{}", code.replace('-', "_")),
+    )
 }
 
 fn active_news_language_code_from_state(state: &crate::AppState) -> String {
@@ -350,6 +359,14 @@ mod tests {
         assert!(url.contains("hl=it"));
         assert!(url.contains("gl=IT"));
         assert!(url.contains("ceid=IT:it"));
+    }
+
+    #[test]
+    fn google_news_search_uses_brazilian_portuguese_locale() {
+        let url = build_google_news_rss_url("tecnologia", "pt-br");
+        assert!(url.contains("hl=pt-BR"));
+        assert!(url.contains("gl=BR"));
+        assert!(url.contains("ceid=BR:pt-419"));
     }
 
     #[test]
@@ -618,12 +635,15 @@ fn format_timestamp_for_list(
     let ts = timestamp?;
     let dt = Local.timestamp_opt(ts, 0).single()?;
     let (date_pattern, time_pattern) = match language {
+        crate::settings::Language::German => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::English
         | crate::settings::Language::Lithuanian
         | crate::settings::Language::Chinese => ("%m/%d/%Y", "%I:%M %p"),
         crate::settings::Language::Italian => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Spanish => ("%d/%m/%Y", "%H:%M"),
-        crate::settings::Language::Portuguese => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Portuguese | crate::settings::Language::PortugueseBrazilian => {
+            ("%d/%m/%Y", "%H:%M")
+        }
         crate::settings::Language::Swedish => ("%Y-%m-%d", "%H:%M"),
         crate::settings::Language::Vietnamese => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Czech => ("%d.%m.%Y", "%H:%M"),
@@ -671,12 +691,15 @@ fn format_timestamp_for_language(
     let ts = timestamp?;
     let dt = Local.timestamp_opt(ts, 0).single()?;
     let (date_pattern, time_pattern) = match language {
+        crate::settings::Language::German => ("%d.%m.%Y", "%H:%M"),
         crate::settings::Language::English
         | crate::settings::Language::Lithuanian
         | crate::settings::Language::Chinese => ("%m/%d/%Y", "%I:%M %p"),
         crate::settings::Language::Italian => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Spanish => ("%d/%m/%Y", "%H:%M"),
-        crate::settings::Language::Portuguese => ("%d/%m/%Y", "%H:%M"),
+        crate::settings::Language::Portuguese | crate::settings::Language::PortugueseBrazilian => {
+            ("%d/%m/%Y", "%H:%M")
+        }
         crate::settings::Language::Swedish => ("%Y-%m-%d", "%H:%M"),
         crate::settings::Language::Vietnamese => ("%d/%m/%Y", "%H:%M"),
         crate::settings::Language::Czech => ("%d.%m.%Y", "%H:%M"),
@@ -1626,6 +1649,7 @@ fn append_load_more_node(
 
 fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
     let file_name = match language {
+        crate::settings::Language::German => "feed_de.txt",
         crate::settings::Language::Ukrainian => "feed_uk.txt",
         crate::settings::Language::English
         | crate::settings::Language::Lithuanian
@@ -1633,6 +1657,7 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
         crate::settings::Language::Italian => "feed_it.txt",
         crate::settings::Language::Spanish => "feed_es.txt",
         crate::settings::Language::Portuguese => "feed_pt.txt",
+        crate::settings::Language::PortugueseBrazilian => "feed_pt_BR.txt",
         crate::settings::Language::Swedish => "feed_en.txt",
         crate::settings::Language::Vietnamese => "feed_vi.txt",
         crate::settings::Language::Czech => "feed_cs.txt",
@@ -1657,6 +1682,7 @@ fn default_feed_path(language: crate::settings::Language) -> Option<PathBuf> {
 
 fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
     match language {
+        crate::settings::Language::German => FEED_DE_DATA,
         crate::settings::Language::Ukrainian => FEED_UK_DATA,
         crate::settings::Language::English
         | crate::settings::Language::Lithuanian
@@ -1664,6 +1690,7 @@ fn embedded_default_feeds(language: crate::settings::Language) -> &'static str {
         crate::settings::Language::Italian => FEED_IT_DATA,
         crate::settings::Language::Spanish => FEED_ES_DATA,
         crate::settings::Language::Portuguese => FEED_PT_DATA,
+        crate::settings::Language::PortugueseBrazilian => FEED_PT_BR_DATA,
         crate::settings::Language::Swedish => FEED_EN_DATA,
         crate::settings::Language::Vietnamese => FEED_VI_DATA,
         crate::settings::Language::Czech => FEED_CS_DATA,
@@ -1703,7 +1730,8 @@ fn is_default_key(
     key: &str,
 ) -> bool {
     match language {
-        crate::settings::Language::Ukrainian
+        crate::settings::Language::German
+        | crate::settings::Language::Ukrainian
         | crate::settings::Language::English
         | crate::settings::Language::Lithuanian
         | crate::settings::Language::Chinese
@@ -1725,6 +1753,10 @@ fn is_default_key(
             .any(|k| normalize_rss_url_key(k) == key),
         crate::settings::Language::Portuguese => settings
             .rss_default_pt_keys
+            .iter()
+            .any(|k| normalize_rss_url_key(k) == key),
+        crate::settings::Language::PortugueseBrazilian => settings
+            .rss_default_pt_br_keys
             .iter()
             .any(|k| normalize_rss_url_key(k) == key),
         crate::settings::Language::Vietnamese => settings
@@ -1893,6 +1925,12 @@ fn apply_defaults_for_news_language(
     defaults: &[(String, String)],
 ) -> bool {
     match language {
+        crate::settings::Language::German => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_de,
+            &mut settings.rss_default_de_keys,
+            defaults,
+        ),
         crate::settings::Language::Italian => apply_default_sources(
             &mut settings.rss_sources,
             &settings.rss_removed_default_it,
@@ -1909,6 +1947,12 @@ fn apply_defaults_for_news_language(
             &mut settings.rss_sources,
             &settings.rss_removed_default_pt,
             &mut settings.rss_default_pt_keys,
+            defaults,
+        ),
+        crate::settings::Language::PortugueseBrazilian => apply_default_sources(
+            &mut settings.rss_sources,
+            &settings.rss_removed_default_pt_br,
+            &mut settings.rss_default_pt_br_keys,
             defaults,
         ),
         crate::settings::Language::Czech => apply_default_sources(
@@ -2111,6 +2155,21 @@ fn google_news_locale(code: &str) -> GoogleNewsLocale {
             hl: "pt-PT",
             gl: "PT",
             ceid: "PT:pt-150",
+        },
+        "pt-br" => GoogleNewsLocale {
+            root_title: "Google Notícias Brasil",
+            top_title: "Principais notícias",
+            local_title: "Minha cidade",
+            nation_title: "Brasil",
+            world_title: "Mundo",
+            business_title: "Negócios",
+            technology_title: "Ciência e tecnologia",
+            entertainment_title: "Entretenimento",
+            sports_title: "Esportes",
+            health_title: "Saúde",
+            hl: "pt-BR",
+            gl: "BR",
+            ceid: "BR:pt-419",
         },
         "pl" => GoogleNewsLocale {
             root_title: "Google News Polska",
@@ -2789,6 +2848,7 @@ fn normalize_community_language_key(value: &str) -> Option<&'static str> {
         "portuguese" | "portoghese" | "português" | "portugues" => Some("portuguese"),
         "polish" | "polacco" | "polski" => Some("polish"),
         "czech" | "ceco" | "čeština" | "cestina" => Some("czech"),
+        "german" | "tedesco" | "deutsch" => Some("german"),
         _ => match primary {
             "it" => Some("italian"),
             "en" => Some("english"),
@@ -2797,6 +2857,7 @@ fn normalize_community_language_key(value: &str) -> Option<&'static str> {
             "pt" => Some("portuguese"),
             "pl" => Some("polish"),
             "cs" | "cz" => Some("czech"),
+            "de" => Some("german"),
             _ => None,
         },
     }
@@ -2812,9 +2873,11 @@ fn community_source_url_key(url: &str) -> String {
 fn app_language_code(language: crate::settings::Language) -> &'static str {
     match language {
         crate::settings::Language::Italian => "it",
+        crate::settings::Language::German => "de",
         crate::settings::Language::English => "en",
         crate::settings::Language::Spanish => "es",
         crate::settings::Language::Portuguese => "pt",
+        crate::settings::Language::PortugueseBrazilian => "pt-br",
         crate::settings::Language::Swedish => "sv",
         crate::settings::Language::Vietnamese => "vi",
         crate::settings::Language::Czech => "cs",
@@ -6367,11 +6430,70 @@ fn set_source_unread(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM,
     }
 }
 
+fn populate_related_article_nodes(
+    hwnd: HWND,
+    parent_hitem: windows::Win32::UI::Controls::HTREEITEM,
+    parent_item: &RssItem,
+) {
+    if parent_item.related_items.is_empty() {
+        return;
+    }
+    let hwnd_tree = with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
+    if hwnd_tree.0 == 0 {
+        return;
+    }
+    let first_child = crate::send_message_w_safe(
+        hwnd_tree,
+        TVM_GETNEXTITEM,
+        WPARAM(TVGN_CHILD as usize),
+        LPARAM(parent_hitem.0),
+    );
+    if first_child.0 != 0 {
+        return;
+    }
+
+    for related in &parent_item.related_items {
+        let text = to_wide(&related.title);
+        let mut insert = TVINSERTSTRUCTW {
+            hParent: parent_hitem,
+            hInsertAfter: TVI_LAST,
+            Anonymous: TVINSERTSTRUCTW_0 {
+                item: TVITEMW {
+                    mask: TVIF_TEXT | TVIF_PARAM,
+                    pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                    lParam: LPARAM(0),
+                    ..Default::default()
+                },
+            },
+        };
+        let child = windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_INSERTITEMW,
+                WPARAM(0),
+                LPARAM(&mut insert as *mut _ as isize),
+            )
+            .0,
+        );
+        if child.0 != 0 {
+            with_rss_state(hwnd, |state| {
+                state
+                    .node_data
+                    .insert(child.0, NodeData::Item(related.clone()));
+            });
+        }
+    }
+}
+
 fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
     let node = with_rss_state(hwnd, |state| state.node_data.get(&hitem.0).cloned()).flatten();
     match node.as_ref() {
         Some(NodeData::GoogleNewsRoot) => {
             populate_google_news_categories(hwnd, hitem);
+            return;
+        }
+        Some(NodeData::Item(item)) if !item.related_items.is_empty() => {
+            populate_related_article_nodes(hwnd, hitem, item);
             return;
         }
         Some(NodeData::GoogleNewsCategory(category)) if category.is_local => {
@@ -7186,15 +7308,25 @@ fn load_more_items(
                 date_mode: rss_date_mode,
                 time_mode: rss_time_mode,
             };
-            let display_title = rss_item_display_title(
+            let mut display_title = rss_item_display_title(
                 &item.title,
                 item_unread,
                 item.pub_date,
                 has_multiple_items_same_day(item.pub_date, &day_counts),
                 title_ctx,
             );
+            if !item.related_items.is_empty() {
+                let related_label = i18n::tr(language, "rss.related_sources_count")
+                    .replace("{count}", &item.related_items.len().to_string());
+                display_title.push_str(", ");
+                display_title.push_str(&related_label);
+            }
             let text = to_wide(&display_title);
-            let c_children = if item.is_folder { 1 } else { 0 };
+            let c_children = if item.is_folder || !item.related_items.is_empty() {
+                1
+            } else {
+                0
+            };
             let mut tvis = TVINSERTSTRUCTW {
                 hParent: hitem,
                 hInsertAfter: TVI_LAST,
@@ -7292,11 +7424,11 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
         return;
     }
 
-    let item_opt = with_rss_state(hwnd, |s| match s.node_data.get(&hitem.0) {
-        Some(NodeData::Item(item)) if !item.is_folder => Some(item.clone()),
+    let selected_node = with_rss_state(hwnd, |s| s.node_data.get(&hitem.0).cloned()).flatten();
+    let item_opt = match selected_node {
+        Some(NodeData::Item(item)) if !item.is_folder => Some(item),
         _ => None,
-    })
-    .flatten();
+    };
 
     if let Some(item) = item_opt {
         let item_key = rss_item_key(&item);
@@ -7437,10 +7569,12 @@ fn handle_delete(hwnd: HWND) {
                     if matches!(
                         news_language,
                         crate::settings::Language::English
+                            | crate::settings::Language::German
                             | crate::settings::Language::Swedish
                             | crate::settings::Language::Italian
                             | crate::settings::Language::Spanish
                             | crate::settings::Language::Portuguese
+                            | crate::settings::Language::PortugueseBrazilian
                             | crate::settings::Language::Vietnamese
                             | crate::settings::Language::Czech
                             | crate::settings::Language::Polish
@@ -7466,6 +7600,9 @@ fn handle_delete(hwnd: HWND) {
                                     | crate::settings::Language::Russian => {
                                         &mut ps.settings.rss_removed_default_en
                                     }
+                                    crate::settings::Language::German => {
+                                        &mut ps.settings.rss_removed_default_de
+                                    }
                                     crate::settings::Language::Swedish => {
                                         &mut ps.settings.rss_removed_default_en
                                     }
@@ -7477,6 +7614,9 @@ fn handle_delete(hwnd: HWND) {
                                     }
                                     crate::settings::Language::Portuguese => {
                                         &mut ps.settings.rss_removed_default_pt
+                                    }
+                                    crate::settings::Language::PortugueseBrazilian => {
+                                        &mut ps.settings.rss_removed_default_pt_br
                                     }
                                     crate::settings::Language::Vietnamese => {
                                         &mut ps.settings.rss_removed_default_vi
@@ -7694,7 +7834,7 @@ fn undo_last_delete(hwnd: HWND) {
         match last_removed {
             RssLastRemoved::Source {
                 index,
-                source,
+                source: removed_source,
                 language,
                 default_removed_key_added,
             } => {
@@ -7706,7 +7846,7 @@ fn undo_last_delete(hwnd: HWND) {
                 with_state(parent, |ps| {
                     let insert_at = index.min(ps.settings.rss_sources.len());
                     restored_index = insert_at;
-                    ps.settings.rss_sources.insert(insert_at, source);
+                    ps.settings.rss_sources.insert(insert_at, removed_source);
                     if let Some(key) = default_removed_key_added {
                         let removed_list = match language {
                             crate::settings::Language::Ukrainian
@@ -7715,6 +7855,9 @@ fn undo_last_delete(hwnd: HWND) {
                             | crate::settings::Language::Chinese
                             | crate::settings::Language::Russian => {
                                 &mut ps.settings.rss_removed_default_en
+                            }
+                            crate::settings::Language::German => {
+                                &mut ps.settings.rss_removed_default_de
                             }
                             crate::settings::Language::Swedish => {
                                 &mut ps.settings.rss_removed_default_en
@@ -7727,6 +7870,9 @@ fn undo_last_delete(hwnd: HWND) {
                             }
                             crate::settings::Language::Portuguese => {
                                 &mut ps.settings.rss_removed_default_pt
+                            }
+                            crate::settings::Language::PortugueseBrazilian => {
+                                &mut ps.settings.rss_removed_default_pt_br
                             }
                             crate::settings::Language::Vietnamese => {
                                 &mut ps.settings.rss_removed_default_vi

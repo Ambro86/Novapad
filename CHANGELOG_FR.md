@@ -1,5 +1,21 @@
 # Journal des modifications
 
+Version 0.8.3 – 2026-07-22
+
+Mode sombre
+• Ajout d’un mode sombre, activable depuis le menu Affichage et enregistré dans les préférences.
+• Le thème sombre est appliqué à l’éditeur, aux menus, aux fenêtres secondaires et aux principaux contrôles, avec des couleurs de texte adaptées pour préserver la lisibilité et l’accessibilité.
+
+Langue allemande
+• Ajout de l’allemand comme langue complète de l’interface, sélectionnable dans les Options.
+• Les actualités et RSS, le correcteur orthographique, le calendrier et toutes les citations, les dons, le guide et le journal des modifications sont entièrement disponibles en allemand.
+
+Portugais brésilien et Google Actualités
+• Ajout du portugais brésilien comme langue complète de l’interface, distincte du portugais du Portugal et sélectionnable dans les Options.
+• L’interface, le calendrier et toutes les citations, le correcteur orthographique, les dons, le guide et le journal des modifications sont entièrement disponibles en portugais brésilien.
+• Google Actualités prend désormais en charge la localisation brésilienne, les catégories du Brésil et des sources RSS brésiliennes par défaut distinctes.
+• Lorsque le flux les fournit, les sources Google Actualités liées à un même sujet sont affichées comme éléments enfants accessibles dans l’arborescence.
+
 Version 0.8.2 – 2026-07-17
 
 Bibliothèques numériques et livres audio

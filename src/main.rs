@@ -16,6 +16,7 @@ mod diagnostics;
 mod sentry_integration;
 mod settings;
 mod telemetry;
+mod theme;
 mod translator;
 mod watchdog;
 use editor_manager::Document;
@@ -1777,9 +1778,11 @@ fn confirm_menu_action(hwnd: HWND, key: &str) {
 fn dictionary_cache_key(language: Language, pref: &str, word: &str) -> String {
     let lang = match language {
         Language::Italian => "it",
+        Language::German => "de",
         Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
+        Language::PortugueseBrazilian => "pt-BR",
         Language::Swedish => "sv",
         Language::Vietnamese => "vi",
         Language::Czech => "cs",
@@ -2695,6 +2698,7 @@ pub(crate) fn play_live_stream_audio_from_url_with_rai_origin(
 
 const MPV_RUNTIME_URL: &str =
     "https://github.com/Ambro86/Sonarpad-Tools/releases/download/0.7/mpv.zip";
+const WINDOWS_ERROR_BAD_EXE_FORMAT: i32 = 193;
 
 fn mpv_runtime_dir() -> PathBuf {
     settings::settings_dir().join("mpv")
@@ -2881,6 +2885,66 @@ pub(crate) fn ensure_mpv_runtime_available(hwnd: HWND) -> Result<PathBuf, String
             runtime_dir.display()
         )
     })
+}
+
+fn is_bad_executable_format_error(error: &std::io::Error) -> bool {
+    error.raw_os_error() == Some(WINDOWS_ERROR_BAD_EXE_FORMAT)
+}
+
+fn reinstall_managed_mpv_runtime(hwnd: HWND, failed_executable: &Path) -> Result<PathBuf, String> {
+    let runtime_dir = mpv_runtime_dir();
+    if !failed_executable.starts_with(&runtime_dir) {
+        return Err(format!(
+            "Il file mpv non valido non appartiene alla cartella gestita da Sonarpad: {}.",
+            failed_executable.display()
+        ));
+    }
+
+    log_debug(&format!(
+        "mpv executable has invalid Win32 format; reinstalling managed runtime from {} (path={})",
+        MPV_RUNTIME_URL,
+        failed_executable.display()
+    ));
+    if runtime_dir.exists() {
+        std::fs::remove_dir_all(&runtime_dir).map_err(|err| {
+            format!(
+                "Impossibile rimuovere la copia danneggiata di mpv da {}: {err}",
+                runtime_dir.display()
+            )
+        })?;
+    }
+
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+    let result = download_and_extract_mpv_runtime(hwnd, language, &runtime_dir);
+    close_podcast_save_progress_window(hwnd);
+    result?;
+    installed_mpv_runtime_executable().map_err(|_| {
+        format!(
+            "mpv riscaricato ma mpv.exe non trovato in {}.",
+            runtime_dir.display()
+        )
+    })
+}
+
+fn spawn_mpv_with_runtime_repair(
+    hwnd: HWND,
+    mpv_executable: &Path,
+    command: &mut std::process::Command,
+) -> Result<std::process::Child, String> {
+    match command.spawn() {
+        Ok(child) => Ok(child),
+        Err(error) if is_bad_executable_format_error(&error) => {
+            log_debug(&format!(
+                "mpv launch failed with Windows error {}: {}; starting automatic runtime repair",
+                WINDOWS_ERROR_BAD_EXE_FORMAT, error
+            ));
+            reinstall_managed_mpv_runtime(hwnd, mpv_executable)?;
+            command.spawn().map_err(|retry_error| {
+                format!("Impossibile avviare mpv dopo il ripristino automatico: {retry_error}")
+            })
+        }
+        Err(error) => Err(format!("Impossibile avviare mpv: {error}")),
+    }
 }
 
 fn clear_managed_mpv_state(hwnd: HWND) {
@@ -3741,10 +3805,10 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
     if let Some(title) = title.filter(|value| !value.trim().is_empty()) {
         command.arg(format!("--title={title}"));
     }
-    let mut child = command.spawn().map_err(|err| {
-        set_local_mpv_video_mode(hwnd, false);
-        format!("Impossibile avviare mpv: {err}")
-    })?;
+    let mut child =
+        spawn_mpv_with_runtime_repair(hwnd, &mpv_exe, &mut command).inspect_err(|_| {
+            set_local_mpv_video_mode(hwnd, false);
+        })?;
     for _ in 0..40 {
         if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
             if stop_obsolete_mpv_child(hwnd, mpv_generation, &mut child, "rai ipc ready") {
@@ -4008,6 +4072,53 @@ fn is_mediaset_cdn_stream(url: &str) -> bool {
     lower.contains("mediaset.net") || lower.contains("mediaset.it") || lower.contains("msf.cdn")
 }
 
+fn preferred_tv_video_track_id(tracks: &[serde_json::Value]) -> Option<i64> {
+    let is_track_type = |track: &&serde_json::Value, kind: &str| {
+        track.get("type").and_then(serde_json::Value::as_str) == Some(kind)
+    };
+    let video_tracks = tracks
+        .iter()
+        .filter(|track| is_track_type(track, "video"))
+        .collect::<Vec<_>>();
+    let reference_audio = tracks
+        .iter()
+        .filter(|track| is_track_type(track, "audio"))
+        .find(|track| {
+            track
+                .get("selected")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+        })
+        .or_else(|| tracks.iter().find(|track| is_track_type(track, "audio")));
+
+    let matching_video = reference_audio.and_then(|audio| {
+        audio
+            .get("program-id")
+            .and_then(serde_json::Value::as_i64)
+            .and_then(|program_id| {
+                video_tracks.iter().copied().find(|video| {
+                    video.get("program-id").and_then(serde_json::Value::as_i64) == Some(program_id)
+                })
+            })
+            .or_else(|| {
+                audio
+                    .get("hls-bitrate")
+                    .and_then(serde_json::Value::as_i64)
+                    .and_then(|bitrate| {
+                        video_tracks.iter().copied().find(|video| {
+                            video.get("hls-bitrate").and_then(serde_json::Value::as_i64)
+                                == Some(bitrate)
+                        })
+                    })
+            })
+    });
+
+    matching_video
+        .or_else(|| video_tracks.first().copied())
+        .and_then(|track| track.get("id"))
+        .and_then(serde_json::Value::as_i64)
+}
+
 fn configure_tv_tracks_after_load(hwnd: HWND, url: &str, generation: u64) {
     let mediaset = is_mediaset_cdn_stream(url);
 
@@ -4070,14 +4181,13 @@ fn configure_tv_tracks_after_load(hwnd: HWND, url: &str, generation: u64) {
                 .get("selected")
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false)
-        }) && let Some(video_id) = video_tracks
-            .first()
-            .and_then(|track| track.get("id"))
-            .and_then(serde_json::Value::as_i64)
+        }) && let Some(video_id) = preferred_tv_video_track_id(tracks)
         {
             let command = format!(r#"{{"command":["set_property","vid",{}]}}"#, video_id);
             match try_send_command_to_managed_mpv_transient(hwnd, &command) {
-                Ok(()) => log_debug(&format!("TV mpv selected first video track id={video_id}")),
+                Ok(()) => log_debug(&format!(
+                    "TV mpv selected video track matching audio variant id={video_id}"
+                )),
                 Err(err) => log_debug(&format!(
                     "TV mpv failed to select video track id={video_id}: {err}"
                 )),
@@ -4271,10 +4381,10 @@ fn launch_stream_url_in_mpv_with_options(
     }
     command.creation_flags(CREATE_NO_WINDOW_FLAGS);
 
-    let mut child = command.spawn().map_err(|err| {
-        set_local_mpv_video_mode(hwnd, false);
-        format!("Impossibile avviare mpv: {err}")
-    })?;
+    let mut child =
+        spawn_mpv_with_runtime_repair(hwnd, &mpv_exe, &mut command).inspect_err(|_| {
+            set_local_mpv_video_mode(hwnd, false);
+        })?;
     for _ in 0..40 {
         if send_mpv_ipc_command(&ipc_path, r#"{"command":["get_property","pause"]}"#).is_ok() {
             if stop_obsolete_mpv_child(hwnd, mpv_generation, &mut child, "stream ipc ready") {
@@ -4440,11 +4550,11 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
         command.arg(format!("--start={bookmark_start_secs}"));
     }
 
-    let mut child = match command.spawn() {
+    let mut child = match spawn_mpv_with_runtime_repair(hwnd, &mpv_exe, &mut command) {
         Ok(child) => child,
         Err(err) => {
             set_local_mpv_video_mode(hwnd, false);
-            return Err(format!("Impossibile avviare mpv: {err}"));
+            return Err(err);
         }
     };
     for _ in 0..40 {
@@ -4806,6 +4916,8 @@ fn download_podcast_episode_cache_with_resume(
     cache_path: &Path,
     language: Language,
 ) -> Result<(), String> {
+    const MAX_INVALID_MEDIA_ATTEMPTS: u32 = 3;
+
     if let Some(parent) = cache_path.parent() {
         std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }
@@ -4858,9 +4970,20 @@ fn download_podcast_episode_cache_with_resume(
                             err
                         ));
                     }
+                    if attempt < MAX_INVALID_MEDIA_ATTEMPTS {
+                        log_debug(&format!(
+                            "podcast_episode_save_invalid_media attempt={} url={} bytes={}; retrying from zero",
+                            attempt, url, invalid_size
+                        ));
+                        last_reported_pct = 0;
+                        std::thread::sleep(std::time::Duration::from_millis(
+                            500u64 * attempt as u64,
+                        ));
+                        continue;
+                    }
                     return Err(format!(
-                        "downloaded response is not valid media ({} bytes)",
-                        invalid_size
+                        "downloaded response is not valid media after {} attempts ({} bytes)",
+                        attempt, invalid_size
                     ));
                 }
                 std::fs::rename(&partial_file_path, cache_path).map_err(|err| {
@@ -7085,9 +7208,11 @@ fn apply_dictation_result(hwnd: HWND, result: DictationResult) {
 fn dictation_language_name(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
+        Language::German => "de",
         Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
+        Language::PortugueseBrazilian => "pt-BR",
         Language::Swedish => "sv",
         Language::Vietnamese => "vi",
         Language::Czech => "cs",
@@ -8219,6 +8344,8 @@ fn run_app(
     unsafe {
         crate::log_if_err!(LoadLibraryW(w!("Msftedit.dll")));
         let hinstance = HINSTANCE(GetModuleHandleW(None)?.0);
+        let mut settings = load_settings();
+        theme::initialize(settings.dark_mode);
         let class_name = w!("SonarpadWin32");
 
         let wc = WNDCLASSW {
@@ -8239,7 +8366,6 @@ fn run_app(
             Vec::new()
         };
         let current_version = env!("CARGO_PKG_VERSION");
-        let mut settings = load_settings();
         if settings.last_seen_changelog_version != current_version
             && app_windows::rss_window::sync_default_sources_for_settings(&mut settings)
         {
@@ -8328,6 +8454,7 @@ fn run_app(
         if hwnd.0 == 0 {
             return Ok(());
         }
+        theme::apply_to_window(hwnd);
         refresh_voice_panel(hwnd);
         app_windows::calendar_window::initialize_reminder_system(hwnd, calendar_reminder_id);
         crate::log_if_err!(PostMessageW(
@@ -12199,6 +12326,27 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         update_voice_panel_menu_check(hwnd);
                         LRESULT(0)
                     }
+                    IDM_VIEW_DARK_MODE => {
+                        let (dark_mode, text_color, text_size) = with_state(hwnd, |state| {
+                            state.settings.dark_mode = !state.settings.dark_mode;
+                            (
+                                state.settings.dark_mode,
+                                state.settings.text_color,
+                                state.settings.text_size,
+                            )
+                        })
+                        .unwrap_or((false, 0x000000, 12));
+                        if let Some(settings) = with_state(hwnd, |state| state.settings.clone()) {
+                            save_settings(settings);
+                        }
+                        theme::set_dark_mode(dark_mode);
+                        editor_manager::apply_text_appearance_to_all_edits(
+                            hwnd, text_color, text_size,
+                        );
+                        update_voice_panel_menu_check(hwnd);
+                        focus_editor(hwnd);
+                        LRESULT(0)
+                    }
                     IDM_VIEW_SHOW_VIDEO_DURING_PLAYBACK => {
                         let show_video = with_state(hwnd, |state| {
                             state.settings.show_video_during_playback =
@@ -12749,7 +12897,9 @@ fn localized_voice_language_name(language: Language, code: &str) -> String {
             Language::Italian => "Tedesco".to_string(),
             Language::Spanish => "Aleman".to_string(),
             Language::Portuguese => "Alemao".to_string(),
+            Language::PortugueseBrazilian => "Alemão".to_string(),
             Language::French => "Allemand".to_string(),
+            Language::German => "Deutsch".to_string(),
             _ => "German".to_string(),
         },
         _ => code.to_ascii_uppercase(),
@@ -13267,6 +13417,7 @@ pub(crate) fn update_voice_panel_menu_check(hwnd: HWND) {
         read_only,
         word_wrap,
         show_video,
+        dark_mode,
         automatic_bookmark,
     ) = {
         with_state(hwnd, |state| {
@@ -13278,11 +13429,12 @@ pub(crate) fn update_voice_panel_menu_check(hwnd: HWND) {
                 state.settings.editor_read_only,
                 state.settings.word_wrap,
                 state.settings.show_video_during_playback,
+                state.settings.dark_mode,
                 state.settings.automatic_bookmark,
             )
         })
     }
-    .unwrap_or((false, false, 0x000000, 12, false, true, true, false));
+    .unwrap_or((false, false, 0x000000, 12, false, true, true, false, false));
     let hmenu = crate::get_menu_safe(hwnd);
     if hmenu.0 == 0 {
         return;
@@ -13329,6 +13481,15 @@ pub(crate) fn update_voice_panel_menu_check(hwnd: HWND) {
     ) == 0xFFFFFFFF
     {
         crate::log_debug("CheckMenuItem failed for IDM_VIEW_SHOW_VIDEO_DURING_PLAYBACK");
+    }
+    let dark_mode_flags = if dark_mode { MF_CHECKED } else { MF_UNCHECKED };
+    if crate::check_menu_item_safe(
+        hmenu,
+        IDM_VIEW_DARK_MODE as u32,
+        (MF_BYCOMMAND | dark_mode_flags).0,
+    ) == 0xFFFFFFFF
+    {
+        crate::log_debug("CheckMenuItem failed for IDM_VIEW_DARK_MODE");
     }
     let automatic_bookmark_flags = if automatic_bookmark {
         MF_CHECKED
@@ -20027,14 +20188,54 @@ mod tests {
     use super::{
         COPYDATA_RESULT_DEFERRED_MODAL, COPYDATA_RESULT_HANDLED, SentenceNavigationDirection,
         append_debug_log, audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
-        normalize_soft_line_breaks_for_translation, relative_audiobook_bookmark,
-        sentence_navigation_target, sentence_start_offsets_utf16, should_defer_external_file_open,
+        is_bad_executable_format_error, normalize_soft_line_breaks_for_translation,
+        preferred_tv_video_track_id, relative_audiobook_bookmark, sentence_navigation_target,
+        sentence_start_offsets_utf16, should_defer_external_file_open,
         should_focus_existing_window_after_copydata,
     };
     use crate::bookmarks::Bookmark;
     use std::collections::HashSet;
     use std::sync::{Arc, Barrier};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn mpv_runtime_repair_only_matches_bad_executable_format() {
+        assert!(is_bad_executable_format_error(
+            &std::io::Error::from_raw_os_error(193)
+        ));
+        assert!(!is_bad_executable_format_error(
+            &std::io::Error::from_raw_os_error(2)
+        ));
+    }
+
+    #[test]
+    fn tv_video_track_matches_selected_audio_hls_program() {
+        let tracks = serde_json::json!([
+            {"type": "video", "id": 1, "program-id": 0, "hls-bitrate": 5689632},
+            {"type": "video", "id": 3, "program-id": 2, "hls-bitrate": 2793078},
+            {"type": "audio", "id": 4, "program-id": 0, "selected": false},
+            {"type": "audio", "id": 6, "program-id": 2, "selected": true}
+        ]);
+
+        assert_eq!(
+            preferred_tv_video_track_id(tracks.as_array().unwrap()),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn tv_video_track_keeps_first_video_as_safe_fallback() {
+        let tracks = serde_json::json!([
+            {"type": "audio", "id": 1, "selected": true},
+            {"type": "video", "id": 7},
+            {"type": "video", "id": 8}
+        ]);
+
+        assert_eq!(
+            preferred_tv_video_track_id(tracks.as_array().unwrap()),
+            Some(7)
+        );
+    }
 
     #[test]
     fn concurrent_debug_log_writes_keep_lines_intact() {

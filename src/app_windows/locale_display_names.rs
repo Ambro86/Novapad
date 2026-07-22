@@ -36,9 +36,11 @@ fn language_name_aliases() -> &'static HashMap<String, String> {
 pub fn app_locale(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
+        Language::German => "de",
         Language::English => "en",
         Language::Spanish => "es",
         Language::Portuguese => "pt",
+        Language::PortugueseBrazilian => "pt",
         Language::Swedish => "sv",
         Language::Vietnamese => "vi",
         Language::Czech => "cs",
@@ -536,6 +538,7 @@ mod tests {
             Language::English,
             Language::Spanish,
             Language::Portuguese,
+            Language::PortugueseBrazilian,
             Language::Swedish,
             Language::Vietnamese,
             Language::Czech,

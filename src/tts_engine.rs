@@ -993,6 +993,11 @@ pub fn stop_tts_playback(hwnd: HWND) {
                 }
             }
             state.tts_session = None;
+            // A future playback session starts from the editor caret and its
+            // chunk offsets are relative to that new position.  Keeping the
+            // previous session's offset would make the monotonicity guard
+            // clamp the new progress to the old value after Stop -> Start.
+            state.tts_last_offset = 0;
             state.tts_pending_start_pos = None;
         })
     }
@@ -4249,13 +4254,39 @@ fn match_len_case_insensitive(text: &str, start: usize, needle: &str) -> Option<
     Some(consumed)
 }
 
+fn normalize_ellipsis_for_tts(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut dot_run = 0usize;
+
+    let flush_dots = |out: &mut String, dot_run: &mut usize| {
+        if *dot_run >= 3 {
+            out.push('.');
+        } else {
+            out.extend(std::iter::repeat_n('.', *dot_run));
+        }
+        *dot_run = 0;
+    };
+
+    for ch in text.chars() {
+        if ch == '.' {
+            dot_run += 1;
+            continue;
+        }
+        flush_dots(&mut out, &mut dot_run);
+        out.push(ch);
+    }
+    flush_dots(&mut out, &mut dot_run);
+    out
+}
+
 pub(crate) fn prepare_tts_text(
     text: &str,
     split_on_newline: bool,
     dictionary: &[DictionaryEntry],
 ) -> String {
     let normalized = normalize_for_tts(text, split_on_newline);
-    apply_dictionary(&normalized, dictionary)
+    let prepared = apply_dictionary(&normalized, dictionary);
+    normalize_ellipsis_for_tts(&prepared)
 }
 
 fn normalize_newlines(text: &str) -> String {
@@ -5117,11 +5148,9 @@ pub fn split_into_tts_chunks(
                 current_len += ch.len_utf16();
                 let is_terminal = matches!(ch, '.' | '!' | '?' | ';' | ':');
                 let next_ch = chars.get(idx + 1).copied();
-                let edge_dot_run =
-                    span_engine == TtsEngine::Edge && ch == '.' && matches!(next_ch, Some('.'));
-                if is_terminal && !edge_dot_run {
-                    let should_split = span_engine != TtsEngine::Edge
-                        || current_sentence.chars().any(|c| c.is_alphanumeric());
+                let dot_run_continues = ch == '.' && matches!(next_ch, Some('.'));
+                if is_terminal && !dot_run_continues {
+                    let should_split = current_sentence.chars().any(|c| c.is_alphanumeric());
                     if should_split && !current_sentence.trim().is_empty() {
                         sentences.push((current_sentence.clone(), current_len));
                         current_sentence.clear();
@@ -6839,6 +6868,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn prepare_tts_text_collapses_ellipsis_for_all_engines() {
+        assert_eq!(prepare_tts_text("Ciao amico...", false, &[]), "Ciao amico.");
+        assert_eq!(
+            prepare_tts_text("Ciao amico....", false, &[]),
+            "Ciao amico."
+        );
+        assert_eq!(prepare_tts_text("Ciao..", false, &[]), "Ciao..");
+    }
+
+    #[test]
+    fn sapi5_ellipsis_does_not_create_punctuation_only_chunks() {
+        let chunks =
+            split_into_tts_chunks("Ciao amico... Come stai?", false, &[], TtsEngine::Sapi5);
+
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0].text_to_read, "Ciao amico.");
+        assert_eq!(chunks[1].text_to_read, "Come stai?");
+        assert!(
+            chunks
+                .iter()
+                .all(|chunk| chunk.text_to_read.chars().any(char::is_alphanumeric))
+        );
+    }
     #[test]
     fn pause_tags_render_as_edge_breaks_from_raw_or_escaped_text() {
         assert_eq!(

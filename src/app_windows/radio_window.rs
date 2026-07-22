@@ -1255,9 +1255,10 @@ fn create_add_radio_controls(hwnd: HWND, parent: HWND) {
     }
     let current_code = match language {
         Language::Italian => "radio.community_lang.it",
+        Language::German => "radio.community_lang.de",
         Language::English => "radio.community_lang.en",
         Language::Spanish => "radio.community_lang.es",
-        Language::Portuguese => "radio.community_lang.pt",
+        Language::Portuguese | Language::PortugueseBrazilian => "radio.community_lang.pt",
         Language::French => "radio.community_lang.fr",
         Language::Hindi => "radio.community_lang.hi",
         _ => "radio.community_lang.en",
@@ -1499,9 +1500,10 @@ fn post_community_radio(
 fn app_language_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
+        Language::German => "de",
         Language::English => "en",
         Language::Spanish => "es",
-        Language::Portuguese => "pt",
+        Language::Portuguese | Language::PortugueseBrazilian => "pt",
         Language::Swedish => "sv",
         Language::Vietnamese => "vi",
         Language::Czech => "cs",
@@ -2518,9 +2520,10 @@ fn translated_country_name(language: Language, code: &str) -> Option<String> {
 fn default_country_code(language: Language) -> &'static str {
     match language {
         Language::Italian => "it",
+        Language::German => "de",
         Language::English => "us",
         Language::Spanish => "es",
-        Language::Portuguese => "pt",
+        Language::Portuguese | Language::PortugueseBrazilian => "pt",
         Language::Swedish => "se",
         Language::Polish => "pl",
         Language::French => "fr",

@@ -1526,6 +1526,7 @@
   "view.font": "&字体",
   "view.read_only": "&只读模式",
   "view.show_favorites": "显示&收藏的语音",
+  "view.dark_mode": "深色模式 (&1)",
   "view.show_video_during_playback": "&播放时显示视频",
   "view.show_voices": "&在编辑器中显示语音",
   "view.text_color": "文&本与颜色",
@@ -1871,5 +1872,7 @@
   "librivox.error": "LibriVox 错误：{err}",
   "librivox.unknown_author": "未知作者",
   "librivox.language_value": "语言：",
-  "librivox.duration_value": "时长："
+  "librivox.duration_value": "时长：",
+  "rss.related_sources_count": "{count} 个相关来源",
+  "options.lang.pt_br": "葡萄牙语（巴西）"
 }

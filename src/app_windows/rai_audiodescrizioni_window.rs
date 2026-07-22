@@ -690,9 +690,10 @@ fn handle_missing_luce_key(
 fn app_language_label(language: Language) -> &'static str {
     match language {
         Language::Italian => "Italiano",
+        Language::German => "Deutsch",
         Language::English => "English",
         Language::Spanish => "Español",
-        Language::Portuguese => "Português",
+        Language::Portuguese | Language::PortugueseBrazilian => "Português",
         Language::Swedish => "Svenska",
         Language::Vietnamese => "Tiếng Việt",
         Language::Czech => "Čeština",

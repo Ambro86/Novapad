@@ -1,5 +1,21 @@
 # Changelog
 
+Versão 0.8.3 – 2026-07-22
+
+Modo escuro
+• Adicionado um modo escuro, que pode ser ativado no menu Ver e fica guardado nas preferências.
+• O tema escuro é aplicado ao editor, aos menus, às janelas secundárias e aos principais controlos, adaptando as cores do texto para manter a legibilidade e a acessibilidade.
+
+Idioma alemão
+• Adicionado o alemão como idioma completo da interface, selecionável nas Opções.
+• Notícias e RSS, corretor ortográfico, calendário e todas as citações, donativos, guia e changelog estão integralmente disponíveis em alemão.
+
+Português do Brasil e Google Notícias
+• Adicionado o Português (Brasil) como idioma completo da interface, separado do Português (Portugal) e selecionável nas Opções.
+• A interface, o calendário e todas as citações, o corretor ortográfico, as doações, o guia e o registo de alterações estão integralmente disponíveis em português brasileiro.
+• O Google Notícias suporta agora a localização brasileira, as categorias do Brasil e fontes RSS brasileiras predefinidas separadas.
+• Quando o feed as fornece, as fontes do Google Notícias relacionadas com a mesma notícia são apresentadas como itens filhos acessíveis na árvore.
+
 Versão 0.8.2 – 2026-07-17
 
 Bibliotecas digitais e audiolivros

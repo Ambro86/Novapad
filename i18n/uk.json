@@ -1526,6 +1526,7 @@
   "view.font": "&Шрифт",
   "view.read_only": "Режим &лише читання",
   "view.show_favorites": "Показувати &обрані голоси",
+  "view.dark_mode": "Те&мний режим",
   "view.show_video_during_playback": "Показу&вати відео під час відтворення",
   "view.show_voices": "Показувати &голоси в редакторі",
   "view.text_color": "&Колір тексту",
@@ -1871,5 +1872,7 @@
   "librivox.error": "Помилка LibriVox: {err}",
   "librivox.unknown_author": "Невідомий автор",
   "librivox.language_value": "Мова:",
-  "librivox.duration_value": "Тривалість:"
+  "librivox.duration_value": "Тривалість:",
+  "rss.related_sources_count": "{count} пов’язаних джерел",
+  "options.lang.pt_br": "Португальська (Бразилія)"
 }

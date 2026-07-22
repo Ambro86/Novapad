@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_RETURN, VK_RIGHT};
 use windows::Win32::UI::WindowsAndMessaging::WM_CLOSE;
 
 use crate::app_windows::interpreter_select_window::InterpreterContextAction;
@@ -22,6 +23,29 @@ enum TvPage {
     Region(String),
     Favorites,
     Search(String),
+}
+
+fn program_page_cache_key(page: &TvPage) -> Option<String> {
+    match page {
+        TvPage::Category(category) => Some(format!("category:{category}")),
+        TvPage::Region(region) => Some(format!("region:{region}")),
+        TvPage::Favorites => Some("favorites".to_string()),
+        TvPage::Search(query) => Some(format!("search:{}", query.trim().to_lowercase())),
+        TvPage::Root | TvPage::Regions => None,
+    }
+}
+
+fn wait_for_tv_navigation_accept_keys_release() {
+    const PRESSED_MASK: i16 = 0x8000u16 as i16;
+    for _ in 0..200 {
+        let return_down = unsafe { GetAsyncKeyState(VK_RETURN.0 as i32) } & PRESSED_MASK != 0;
+        let right_down = unsafe { GetAsyncKeyState(VK_RIGHT.0 as i32) } & PRESSED_MASK != 0;
+        if !return_down && !right_down {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    crate::log_debug("TV: timed out waiting for navigation accept keys to be released");
 }
 
 #[derive(Clone, Debug)]
@@ -83,16 +107,17 @@ struct TvEntry {
     kind: TvEntryKind,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct TvCatalog {
     channels: Vec<TvChannel>,
     categories: Vec<(String, Vec<usize>)>,
     regions: Vec<(String, Vec<usize>)>,
-    current_programs: HashMap<String, TvProgram>,
+    current_programs: Mutex<HashMap<String, TvProgram>>,
+    loaded_program_pages: Mutex<HashSet<String>>,
 }
 
 impl TvCatalog {
-    fn new(channels: Vec<TvChannel>, current_programs: HashMap<String, TvProgram>) -> Self {
+    fn new(channels: Vec<TvChannel>) -> Self {
         let mut categories = Vec::<(String, Vec<usize>)>::new();
         let mut regions = Vec::<(String, Vec<usize>)>::new();
 
@@ -110,7 +135,71 @@ impl TvCatalog {
             channels,
             categories,
             regions,
-            current_programs,
+            current_programs: Mutex::new(HashMap::new()),
+            loaded_program_pages: Mutex::new(HashSet::new()),
+        }
+    }
+
+    fn load_current_programs_for_page(&self, page: &TvPage) -> Result<bool, String> {
+        let Some(page_key) = program_page_cache_key(page) else {
+            return Ok(false);
+        };
+        {
+            let mut loaded_pages = self
+                .loaded_program_pages
+                .lock()
+                .unwrap_or_else(|err| err.into_inner());
+            if !loaded_pages.insert(page_key) {
+                return Ok(false);
+            }
+        }
+
+        let channels = self.channels_for_program_page(page);
+        if channels.is_empty() {
+            return Ok(false);
+        }
+        crate::screen_reader_speak(&i18n::tr_tv("tv.loading_programs"));
+        let programs = tv::load_current_programs(&channels)?;
+        self.current_programs
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .extend(programs);
+        Ok(true)
+    }
+
+    fn channels_for_program_page(&self, page: &TvPage) -> Vec<TvChannel> {
+        let indices = match page {
+            TvPage::Category(category) => self
+                .categories
+                .iter()
+                .find(|(name, _)| name == category)
+                .map(|(_, indices)| indices.as_slice()),
+            TvPage::Region(region) => self
+                .regions
+                .iter()
+                .find(|(name, _)| name == region)
+                .map(|(_, indices)| indices.as_slice()),
+            _ => None,
+        };
+        if let Some(indices) = indices {
+            return indices
+                .iter()
+                .filter_map(|index| self.channels.get(*index).cloned())
+                .collect();
+        }
+        match page {
+            TvPage::Favorites => load_settings()
+                .tv_favorites
+                .iter()
+                .map(channel_from_favorite)
+                .collect(),
+            TvPage::Search(query) => self
+                .channels
+                .iter()
+                .filter(|channel| tv::matches_search(channel, query))
+                .cloned()
+                .collect(),
+            _ => Vec::new(),
         }
     }
 
@@ -253,7 +342,11 @@ impl TvCatalog {
     }
 
     fn channel_accessible_title(&self, channel: &TvChannel) -> String {
-        tv::current_program_for_channel(&self.current_programs, channel)
+        let current_programs = self
+            .current_programs
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        tv::current_program_for_channel(&current_programs, channel)
             .map(|program| {
                 i18n::tr_tv_f(
                     "tv.now_playing",
@@ -294,17 +387,7 @@ pub fn open(parent: HWND) {
         crate::screen_reader_speak(warning);
     }
 
-    let current_programs = match tv::load_current_programs(&load_result.channels) {
-        Ok(programs) => programs,
-        Err(err) => {
-            crate::log_debug(&format!(
-                "TV: programmi correnti non disponibili, mostro comunque i canali: {err}"
-            ));
-            HashMap::new()
-        }
-    };
-
-    let catalog = Arc::new(TvCatalog::new(load_result.channels, current_programs));
+    let catalog = Arc::new(TvCatalog::new(load_result.channels));
     browse_catalog(parent, language, catalog);
 }
 
@@ -315,6 +398,11 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
     let mut search_query = String::new();
 
     loop {
+        if let Err(err) = catalog.load_current_programs_for_page(&page) {
+            crate::log_debug(&format!(
+                "TV: programmi correnti non disponibili per {page:?}, mostro comunque i canali: {err}"
+            ));
+        }
         let entries = catalog.entries_for_page(&page);
         if entries.is_empty() {
             match &page {
@@ -355,6 +443,10 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
                 show_search_edit: true,
                 secondary_action_label: None,
                 context_actions: tv_context_actions(Arc::clone(&catalog)),
+                // Freccia destra apre sia le pagine sia il canale selezionato.
+                // Dopo l'apertura di una pagina aspettiamo il rilascio del tasto
+                // prima di mostrare la lista successiva, così la stessa pressione
+                // non può propagarsi fino al primo canale.
                 right_arrow_accepts_selection: true,
                 // Nelle sottopagine Freccia sinistra torna alla pagina TV
                 // precedente. Nella radice non deve mai cadere nell'editor:
@@ -444,6 +536,7 @@ fn browse_catalog(parent: HWND, language: Language, catalog: Arc<TvCatalog>) {
                 history.push((page, selected_id.clone()));
                 page = next_page;
                 selected_id = None;
+                wait_for_tv_navigation_accept_keys_release();
             }
             TvEntryKind::Channel(index) => {
                 let Some(channel) = catalog.channels.get(index) else {
@@ -614,7 +707,11 @@ fn tv_context_actions(catalog: Arc<TvCatalog>) -> Vec<InterpreterContextAction> 
         let Some(channel) = selected_channel_from_id(&guide_catalog, id) else {
             return false;
         };
-        tv::current_program_for_channel(&guide_catalog.current_programs, &channel).is_some()
+        let current_programs = guide_catalog
+            .current_programs
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        tv::current_program_for_channel(&current_programs, &channel).is_some()
     });
     let guide_catalog_handler = Arc::clone(&catalog);
     let guide_handler = Arc::new(move |id: String| {
@@ -818,13 +915,10 @@ mod tests {
 
     #[test]
     fn catalog_groups_regional_channels_separately() {
-        let catalog = TvCatalog::new(
-            vec![
-                channel("Rai 1", "Rai"),
-                channel("TGR Piemonte", "Regionali - Piemonte"),
-            ],
-            HashMap::new(),
-        );
+        let catalog = TvCatalog::new(vec![
+            channel("Rai 1", "Rai"),
+            channel("TGR Piemonte", "Regionali - Piemonte"),
+        ]);
         assert_eq!(catalog.categories.len(), 1);
         assert_eq!(catalog.regions.len(), 1);
         assert_eq!(catalog.regions[0].0, "Piemonte");

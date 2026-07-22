@@ -9,6 +9,7 @@
   "tv.recordings_description": "Apri le registrazioni dei canali TV",
   "tv.now_playing": "{channel}. Ora in onda: {program}",
   "tv.loading_channels": "Caricamento canali TV",
+  "tv.loading_programs": "Caricamento ora in onda",
   "tv.no_channels": "Nessun canale TV disponibile.",
   "tv.search_no_results": "Nessun canale TV trovato per {query}.",
   "tv.empty_section": "Questa sezione TV è vuota.",

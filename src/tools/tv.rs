@@ -115,12 +115,12 @@ struct CachedTvTimeline {
     date: NaiveDate,
     fetched_at: Instant,
     programs_by_channel: HashMap<String, Vec<TvProgram>>,
-    exact_channel_names: HashMap<String, String>,
+    exact_channel_names: HashMap<String, Vec<String>>,
 }
 
 struct TvTimelineData {
     programs_by_channel: HashMap<String, Vec<TvProgram>>,
-    exact_channel_names: HashMap<String, String>,
+    exact_channel_names: HashMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -195,7 +195,7 @@ fn refresh_missing_or_expired_current_programs_from_channel_guides(
     channels: &[TvChannel],
     date: NaiveDate,
     now_seconds: i64,
-    exact_channel_names: &HashMap<String, String>,
+    exact_channel_names: &HashMap<String, Vec<String>>,
     current_programs: &mut HashMap<String, TvProgram>,
 ) {
     // The timeline endpoint is intentionally compact and sometimes omits a
@@ -243,24 +243,51 @@ fn refresh_missing_or_expired_current_programs_from_channel_guides(
             continue;
         }
 
-        let exact_channel = exact_channel_names
-            .get(&key)
-            .map(String::as_str)
-            .unwrap_or_else(|| guide_channel_name(channel));
-        match load_channel_guide_for_exact_name(exact_channel, date) {
-            Ok(programs) => {
-                if let Some(program) = current_program_at(&programs, now_seconds) {
+        let mut channel_variants = exact_channel_names.get(&key).cloned().unwrap_or_default();
+        let requested_channel = guide_channel_name(channel).to_string();
+        if !channel_variants
+            .iter()
+            .any(|variant| variant.eq_ignore_ascii_case(&requested_channel))
+        {
+            channel_variants.push(requested_channel.clone());
+        }
+        let dtt_channel = format!("{requested_channel} (DTT)");
+        if !channel_variants
+            .iter()
+            .any(|variant| variant.eq_ignore_ascii_case(&dtt_channel))
+        {
+            channel_variants.push(dtt_channel);
+        }
+        if normalize_channel_name(&requested_channel) == "cine34"
+            && !channel_variants
+                .iter()
+                .any(|variant| variant.eq_ignore_ascii_case("Cine 34"))
+        {
+            channel_variants.push("Cine 34".to_string());
+        }
+
+        let mut refreshed_program = None;
+        for exact_channel in channel_variants {
+            match load_channel_guide_for_exact_name(&exact_channel, date) {
+                Ok(programs) => {
+                    let Some(program) = current_program_at(&programs, now_seconds) else {
+                        continue;
+                    };
                     crate::log_debug(&format!(
-                        "TV current programme refreshed from channel guide: channel={:?} missing={} program={:?}",
-                        channel.name, is_missing, program.title
+                        "TV current programme refreshed from channel guide: channel={:?} exact={:?} missing={} program={:?}",
+                        channel.name, exact_channel, is_missing, program.title
                     ));
-                    current_programs.insert(key, program);
+                    refreshed_program = Some(program);
+                    break;
                 }
+                Err(err) => crate::log_debug(&format!(
+                    "TV current programme channel-guide variant failed: channel={:?} exact={:?} error={err}",
+                    channel.name, exact_channel
+                )),
             }
-            Err(err) => crate::log_debug(&format!(
-                "TV current programme channel-guide refresh failed: channel={:?} error={err}",
-                channel.name
-            )),
+        }
+        if let Some(program) = refreshed_program {
+            current_programs.insert(key, program);
         }
     }
 }
@@ -529,7 +556,7 @@ fn encode_uri_component(value: &str) -> String {
 fn collect_tv_guide_programs_from_timeline_root(
     root: &Value,
     programs_by_channel: &mut HashMap<String, Vec<TvProgram>>,
-) -> HashMap<String, String> {
+) -> HashMap<String, Vec<String>> {
     let Some(groups) = root.as_array() else {
         return HashMap::new();
     };
@@ -538,7 +565,7 @@ fn collect_tv_guide_programs_from_timeline_root(
     // The channel-specific guide deliberately selects the first exact variant
     // returned by this timeline.  Keep that same variant here instead of
     // merging conflicting schedules and picking an arbitrary current program.
-    let mut selected_exact_channels = HashMap::<String, String>::new();
+    let mut exact_channel_names = HashMap::<String, Vec<String>>::new();
     // Resolve the exact variant in a separate first pass, just like
     // `resolve_exact_guide_channel_name`.  Some timeline rows identify the
     // channel but do not yet contain a usable programme; they must still
@@ -558,9 +585,13 @@ fn collect_tv_guide_programs_from_timeline_root(
                 .trim();
             let key = normalize_channel_name(guide_channel);
             if !key.is_empty() {
-                selected_exact_channels
-                    .entry(key)
-                    .or_insert_with(|| guide_channel.to_string());
+                let variants = exact_channel_names.entry(key).or_default();
+                if !variants
+                    .iter()
+                    .any(|variant| variant.eq_ignore_ascii_case(guide_channel))
+                {
+                    variants.push(guide_channel.to_string());
+                }
             }
         }
     }
@@ -594,7 +625,12 @@ fn collect_tv_guide_programs_from_timeline_root(
             if key.is_empty() {
                 continue;
             }
-            if selected_exact_channels.get(&key).map(String::as_str) != Some(guide_channel) {
+            if exact_channel_names
+                .get(&key)
+                .and_then(|variants| variants.first())
+                .map(String::as_str)
+                != Some(guide_channel)
+            {
                 continue;
             }
             programs_by_channel.entry(key).or_default().push(TvProgram {
@@ -604,7 +640,7 @@ fn collect_tv_guide_programs_from_timeline_root(
             });
         }
     }
-    selected_exact_channels
+    exact_channel_names
 }
 
 pub(crate) fn current_program_for_channel<'a>(

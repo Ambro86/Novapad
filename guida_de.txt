@@ -1,0 +1,802 @@
+SONARPAD – VOLLSTÄNDIGES DEUTSCHES HANDBUCH
+
+INHALT
+1. Einführung
+2. Barrierefreiheit und grundlegende Bedienung
+3. Deutsche Benutzeroberfläche einstellen
+4. Dokumente und unterstützte Formate
+5. Menü Datei
+6. Bearbeiten und Textwerkzeuge
+7. Ansicht und Darstellung
+8. Lesezeichen
+9. Sprachausgabe und Stimmen
+10. Hörbücher erstellen
+11. Medienplayer und Wiedergabe
+12. Untertitel und Kapitel
+13. Audio konvertieren und Medien teilen
+14. Transkription mit Whisper
+15. Sprachdiktat
+16. Podcast-Aufnahme
+17. Podcasts anhören und verwalten
+18. Nachrichten und RSS
+19. Radio
+20. YouTube und Streaming-Audio
+21. Kalender und Erinnerungen
+22. Wetter und Kinofilme
+23. Wörterbuch, Wiktionary und Wikipedia
+24. Routen und Navigation
+25. Project Gutenberg, Internet Archive und LibriVox
+26. Barrierefreies Terminal
+27. Optionen
+28. Rechtschreibprüfung
+29. Aktualisierungen, Diagnose und Hilfe
+30. Spenden
+31. Wichtige Tastenkürzel
+
+1. EINFÜHRUNG
+
+Sonarpad ist ein barrierefreier Texteditor und ein Werkzeug zum Lesen, Schreiben, Hören und Verwalten von Dokumenten und Medien unter Windows.
+
+Das Programm verbindet klassische Textbearbeitung mit Sprachausgabe, Hörbucherstellung, Audio- und Videowiedergabe, Transkription, Podcast-Aufnahme, Nachrichten, RSS, Podcasts, Radio, Kalender, Wetter, Wörterbüchern und digitalen Bibliotheken.
+
+Sonarpad wurde besonders für die Bedienung mit Screenreadern wie NVDA und JAWS entwickelt. Die meisten Funktionen sind vollständig mit der Tastatur erreichbar. Dialoge, Listen, Kombinationsfelder und Schaltflächen besitzen Beschriftungen, die von Screenreadern angesagt werden.
+
+2. BARRIEREFREIHEIT UND GRUNDLEGENDE BEDIENUNG
+
+Mit Alt öffnen Sie die Menüleiste. Mit Pfeil Links und Pfeil Rechts wechseln Sie zwischen den Hauptmenüs. Pfeil Auf und Pfeil Ab bewegen sich innerhalb eines Menüs. Eingabe aktiviert den gewählten Befehl. Esc schließt das aktuelle Menü oder Fenster.
+
+Mit Tab und Umschalt+Tab wechseln Sie in Dialogen zwischen Eingabefeldern, Listen, Kombinationsfeldern und Schaltflächen. Strg+Tab und Strg+Umschalt+Tab wechseln in den Optionen zwischen Registerkarten.
+
+Viele Menüeinträge besitzen Zugriffstasten. Der Buchstabe nach dem kaufmännischen Und-Zeichen ist die Zugriffstaste. Diese Tasten bleiben bei jedem Programmstart gleich.
+
+Sonarpad sendet Statusmeldungen an unterstützte Screenreader. Dazu gehören Ladezustände, Fortschritt, Auswahl, Fehler, Abschlussmeldungen und Informationen zur Wiedergabe.
+
+Die Statusleiste des Hauptfensters zeigt Zeichen, Wörter, Zeile und Spalte an, ohne den Fokus des Screenreaders zu stören.
+
+3. DEUTSCHE BENUTZEROBERFLÄCHE EINSTELLEN
+
+Öffnen Sie Werkzeuge beziehungsweise Datei > Optionen oder drücken Sie Strg+Umschalt+O.
+
+Wechseln Sie zur Registerkarte Allgemein.
+
+Suchen Sie das Feld „Sprache der Benutzeroberfläche“ und wählen Sie „Deutsch“.
+
+Bestätigen Sie mit OK. Falls Sonarpad einen Neustart verlangt, schließen und öffnen Sie das Programm erneut.
+
+Die deutsche Übersetzung umfasst die gesamte Benutzeroberfläche, Nachrichten und RSS, Rechtschreibprüfung, Kalender, Zitate des Tages, Spendendaten, Handbuch und Änderungsprotokoll.
+
+4. DOKUMENTE UND UNTERSTÜTZTE FORMATE
+
+Sonarpad kann unter anderem folgende Formate öffnen:
+
+• TXT und weitere reine Textdateien
+• Markdown-Dateien mit der Erweiterung MD
+• RTF
+• HTML und HTM
+• PDF einschließlich automatischer Texterkennung bei nicht zugänglichen Dokumenten
+• DOC und DOCX
+• Excel- und ODS-Tabellen
+• PPT und PPTX
+• EPUB
+• Google-Drive-Verweisdateien wie GDOC, GSHEET und GSLIDES
+• zahlreiche Audio- und Videoformate
+
+Bei Formaten, die nicht sicher überschrieben werden dürfen, wechselt Speichern automatisch zu Speichern unter und schlägt eine TXT-Datei vor. Dadurch werden PDF-, EPUB-, Office- oder andere Originaldateien nicht beschädigt.
+
+Beim Öffnen einer Textdatei kann die Zeichencodierung ausgewählt werden. Sonarpad erkennt UTF-8, UTF-16 und verschiedene Windows-Zeichensätze. Für mitteleuropäische, chinesische und japanische Dateien stehen zusätzliche Erkennungsverfahren zur Verfügung.
+
+PDF-Dokumente
+
+Sonarpad versucht zunächst, den eingebetteten Text zu lesen. Ist kein zugänglicher Text vorhanden, kann automatisch OCR verwendet werden. PDFium dient als zusätzlicher Ersatz für problematische Dateien.
+
+Ausfüllbare PDF-Formularfelder werden erkannt und in einer zugänglichen Textdarstellung angeboten. Werte können bearbeitet und wieder in der PDF-Datei gespeichert werden.
+
+EPUB-Bücher
+
+EPUB-Bücher werden als Text geöffnet. Wenn ein Inhaltsverzeichnis vorhanden ist, wird es angesagt. Öffnen Sie Ansicht > Inhaltsverzeichnis anzeigen, um Kapitel und Unterkapitel hierarchisch zu durchsuchen. Eingabe springt zur ausgewählten Stelle.
+
+5. MENÜ DATEI
+
+Neu – Strg+N
+Erstellt ein neues leeres Dokument.
+
+Öffnen – Strg+O
+Öffnet eine oder mehrere Dateien. Mehrere Mediendateien werden als Wiedergabewarteschlange behandelt.
+
+Speichern – Strg+S
+Speichert das aktuelle Textdokument. Audio- und Videodateien werden nicht mit Strg+S überschrieben.
+
+Speichern unter
+Speichert das aktuelle Dokument unter einem neuen Namen oder Format.
+
+Alle speichern – Alt+Umschalt+S
+Speichert sämtliche geänderten Dokumente. Für neue oder nicht direkt überschreibbare Dateien wird Speichern unter geöffnet.
+
+Drucken
+TXT-Dateien werden direkt von Sonarpad gedruckt. Andere Formate werden an das zugeordnete Windows-Programm übergeben, damit das ursprüngliche Layout möglichst erhalten bleibt.
+
+Bild speichern
+Speichert eine visuelle Darstellung, beispielsweise die Karte einer berechneten Route.
+
+Datei mit Interpreter ausführen – Strg+Umschalt+F5
+Führt das aktuelle Skript mit dem in den Optionen ausgewählten Interpreter aus. HTML-Dateien werden im Browser geöffnet.
+
+Zuletzt verwendete Dateien
+Zeigt kürzlich geöffnete Dokumente. Die Liste kann vollständig geleert werden.
+
+Registerkarte schließen – Strg+W
+Schließt das aktuelle Dokument.
+
+Andere Dateien schließen – Strg+Umschalt+W
+Schließt alle Dokumente außer dem aktuellen.
+
+Beenden
+Schließt Sonarpad. Bei ungespeicherten Änderungen erscheint eine Rückfrage.
+
+6. BEARBEITEN UND TEXTWERKZEUGE
+
+Rückgängig – Strg+Z
+Macht die letzte Bearbeitung oder unterstützte Textaktion rückgängig. Der Menüeintrag nennt nach Möglichkeit die betroffene Aktion.
+
+Ausschneiden, Kopieren und Einfügen
+Strg+X, Strg+C und Strg+V wirken auf das aktuell fokussierte Textfeld, auch in Nebenfenstern.
+
+Alles auswählen – Strg+A
+Markiert den gesamten Text und bestätigt die Auswahl über den Screenreader.
+
+Suchen – Strg+F
+Sucht im aktuellen Dokument. F3 sucht das nächste und Umschalt+F3 das vorherige Vorkommen.
+
+Ersetzen – Strg+H
+Ersetzt Text einzeln oder vollständig. Reguläre Ausdrücke werden unterstützt. Nach „Alle ersetzen“ wird die Anzahl der Ersetzungen angesagt.
+
+In Dateien suchen – Strg+Umschalt+F
+Durchsucht Dateien in einem Ordner. Eingabe auf einem Ergebnis öffnet die Datei genau an der Fundstelle. Esc kehrt zur Ergebnisliste zurück.
+
+Gehe zu Zeile – Strg+J
+Springt zu einer bestimmten Zeilennummer. Das Feld ist mit der aktuellen Zeile vorbelegt.
+
+Textstatistik – Alt+Y
+Zeigt Zeichen, Wörter, Zeilen und weitere Angaben zum aktuellen Text oder zur Auswahl.
+
+Leerraum vereinheitlichen – Strg+Umschalt+Eingabe
+Entfernt überflüssige Leerzeichen und vereinheitlicht Abstände.
+
+Harter Zeilenumbruch
+Bricht Text nach einer festgelegten Breite in echte Zeilen um.
+
+Zeilen verbinden – Strg+Umschalt+J
+Verbindet ausgewählte Zeilen zu fortlaufendem Text.
+
+Markdown-Tags entfernen – Strg+Umschalt+M
+Entfernt Markdown-Auszeichnungen und kann Aufzählungen je nach Einstellung beibehalten.
+
+Automatisch für die Sprachausgabe formatieren
+Entfernt störende Auszeichnungen, Anführungszeichen und künstliche Zeilenumbrüche, damit ein Text natürlicher vorgelesen wird.
+
+Trennstriche am Zeilenende entfernen – Alt+Umschalt+H
+Verbindet durch OCR oder Spaltenumbruch getrennte Wörter.
+
+Doppelte Zeilen entfernen – Strg+D
+Entfernt identische Zeilen aus der Auswahl oder dem Dokument.
+
+Aufeinanderfolgende doppelte Zeilen entfernen – Strg+Umschalt+C
+Entfernt nur direkt wiederholte Zeilen.
+
+Elemente sortieren – Alt+Umschalt+O
+Sortiert ausgewählte Zeilen.
+
+Nur einmalige Elemente behalten – Alt+Umschalt+K
+Behält jeden Listeneintrag nur einmal.
+
+Elemente umkehren – Alt+Umschalt+Z
+Kehrt die Reihenfolge ausgewählter Zeilen um.
+
+Zeilen zitieren – Strg+Q
+Fügt jeder ausgewählten Zeile ein Zitatzeichen hinzu.
+
+Zitierung entfernen – Strg+Umschalt+Q
+Entfernt die Zitatzeichen wieder.
+
+Einrücken und Ausrücken
+Strg+Umschalt+Punkt rückt Zeilen ein. Strg+Umschalt+Komma verringert die Einrückung.
+
+Auslassungszeichen einfügen – Strg+Punkt
+Fügt das einzelne Zeichen „…“ ein.
+
+7. ANSICHT UND DARSTELLUNG
+
+Zeilenumbruch
+Schaltet den visuellen Zeilenumbruch sofort für bereits geöffnete Dokumente ein oder aus.
+
+Schreibgeschützter Modus
+Verhindert unbeabsichtigte Änderungen, lässt aber Lesen, Navigation und Auswahl weiterhin zu.
+
+Dunkler Modus
+Schaltet das dunkle Design für Editor, Menüs, Nebenfenster und wichtige Steuerelemente ein oder aus. Die Auswahl wird gespeichert.
+
+Schriftart
+Bietet häufig verwendete Schriftarten wie Arial, Calibri, Consolas, Segoe UI, Tahoma, Verdana, Times New Roman und Georgia.
+
+Textgröße
+Wählt Klein, Normal, Groß, Sehr groß oder Extra groß.
+
+Textfarbe
+Wählt verschiedene helle und dunkle Textfarben.
+
+Stimmen im Editor anzeigen
+Blendet einen per Tab erreichbaren Stimmbereich ein. Dort können Engine, Sprache, Stimme, Geschwindigkeit, Tonhöhe und Lautstärke geändert werden.
+
+Bevorzugte Stimmen anzeigen
+Blendet den Bereich der Stimmfavoriten ein.
+
+Video während der Wiedergabe anzeigen
+Zeigt das Video lokaler oder gestreamter Dateien in einem vergrößerten Fenster. Bedienelemente werden mit Alt oder durch Bewegung der Maus an den oberen Rand sichtbar.
+
+EPUB-Inhaltsverzeichnis anzeigen
+Öffnet die Kapitelstruktur eines EPUB-Buchs.
+
+8. LESEZEICHEN
+
+Lesezeichen können in Texten und Medien gesetzt werden.
+
+In Textdateien speichern sie eine Cursorposition. In Medien speichern sie eine Wiedergabezeit.
+
+Über das Lesezeichenmenü können Sie ein Lesezeichen hinzufügen, zur gespeicherten Position springen, einzelne Einträge löschen oder alle Lesezeichen der aktuellen Datei entfernen.
+
+Bei aktivierter automatischer Lesezeichenverwaltung speichert Sonarpad beim Schließen die letzte Text- oder Medienposition und setzt beim nächsten Öffnen dort fort. Wird das Ende eines Mediums erreicht, wird das automatische Lesezeichen gelöscht.
+
+9. SPRACHAUSGABE UND STIMMEN
+
+Vorlesen starten – F5
+Beginnt an der aktuellen Cursorposition.
+
+Vorlesen anhalten oder fortsetzen – F4
+Pausiert die Sprachausgabe oder setzt sie an der erwarteten Stelle fort.
+
+Vorlesen stoppen – F6
+Beendet die Sprachausgabe.
+
+Vorheriger und nächster Satz
+Springen während der Textwiedergabe satzweise zurück oder vor. Die Tastenkürzel können in den Optionen geändert werden.
+
+Unterstützte Engines
+
+• Microsoft Edge Neural
+• Google TTS
+• SAPI5 und OneCore
+• SAPI4 über eine Bridge
+
+Je nach Engine stehen Sprache, Stimme, Geschwindigkeit, Tonhöhe und Lautstärke zur Verfügung.
+
+Stimmfavoriten
+
+Stimmen können als Favoriten gespeichert werden. F9 wechselt zur vorherigen und F10 zur nächsten bevorzugten Stimme.
+
+Stimmprofile
+
+Unter Optionen > Stimme können Profile hinzugefügt, umbenannt und gelöscht werden. Jedes Profil behält Einstellungen getrennt nach Engine.
+
+Aussprachewörterbuch
+
+Das Aussprachewörterbuch ersetzt benutzerdefinierte Wörter oder Zeichenfolgen während des Vorlesens und der Hörbucherstellung. Für jeden Eintrag kann die Beachtung der Groß-/Kleinschreibung festgelegt werden.
+
+Sprach-Tags
+
+Mit Sprach-Tags kann die Stimme innerhalb eines Dokuments wechseln. Beispiele:
+
+<voice edge de-DE-KatjaNeural>Dieser Text verwendet eine Edge-Stimme.</voice>
+<voice sapi5 Name der Stimme>Dieser Text verwendet SAPI5.</voice>
+<voice sapi4 #1>Dieser Text verwendet SAPI4.</voice>
+
+Zusätzliche Attribute können Geschwindigkeit, Tonhöhe und Lautstärke ändern.
+
+Pausen-Tags
+
+Über Optionen oder den Stimmbereich können Pausen von 250 Millisekunden, 500 Millisekunden, einer Sekunde, zwei Sekunden oder benutzerdefinierter Dauer eingefügt werden.
+
+Dialogstimmen
+
+Optional können eine erste und eine zweite Dialogstimme eingerichtet werden. Sonarpad verwendet sie abwechselnd für erkannte Dialoge, ohne den sichtbaren Dokumenttext zu verändern.
+
+Google-Stimmen verwalten
+
+Bei ausgewählter Google-Engine öffnet „Google-Stimmen verwalten...“ eine Liste verfügbarer Pakete. Stimmen können nach Sprache gefiltert, heruntergeladen und entfernt werden. Abhängige Pakete werden vor dem Entfernen gemeldet.
+
+10. HÖRBÜCHER ERSTELLEN
+
+Hörbuch aufnehmen – Strg+R
+Erstellt aus dem aktuellen Dokument oder einer Auswahl ein Hörbuch.
+
+Hörbücher im Stapel erstellen – Strg+Umschalt+B
+Verarbeitet mehrere Dateien oder ganze Ordner.
+
+Unterstützte Engines sind Edge, Google TTS, SAPI5, OneCore und SAPI4.
+
+Ausgabeformate
+
+• MP3
+• M4B mit Kapitelmetadaten
+
+Teilungsarten
+
+• Nicht aufteilen
+• Nach Anzahl der Teile
+• Nach Zeit
+• Nach Textmarkierung, zum Beispiel „Kapitel“
+• Bei EPUB nach Kapiteln
+
+Bei der Teilung nach Text kann verlangt werden, dass die Markierung am Zeilenanfang steht. Einleitung und Autorentext vor dem ersten Kapitel werden dem ersten Teil zugeordnet.
+
+Bei geteilter Ausgabe kann Sonarpad automatisch einen eigenen Unterordner anlegen. Das Namensformat kann Titel + Nummer, nur Nummer oder Nummer + Titel sein.
+
+SAPI5 und SAPI4 verwenden getrennte Arbeitsprozesse und prüfen die erzeugten Teile. Fehlende oder verdächtige Abschnitte werden mit geringerer Parallelität neu erstellt, ohne bereits gültige Dateien zu verlieren.
+
+Nach der Synthese zeigt Sonarpad eine eigene Abschlussphase an. Brechen Sie das Programm nicht ab, solange die Finalisierung läuft.
+
+11. MEDIENPLAYER UND WIEDERGABE
+
+Sonarpad öffnet lokale Audio- und Videodateien sowie direkte Streams. Mehrere geöffnete Dateien bilden eine Warteschlange.
+
+Leertaste
+Wiedergabe oder Pause.
+
+Punkt
+Stoppt den aktuellen Titel.
+
+Pfeil Links und Pfeil Rechts
+Springen zurück oder vor. Umschalt und Strg ändern je nach Einstellung die Sprungweite.
+
+Pos1 und Ende
+Springen zum Anfang oder Ende.
+
+Plus und Minus
+Erhöhen oder verringern die Wiedergabegeschwindigkeit.
+
+Umschalt+Plus und Umschalt+Minus
+Ändern die Tonhöhe.
+
+Strg+I
+Sagt aktuelle Zeit und Gesamtdauer an.
+
+Strg+T
+Öffnet „Zu Zeitpunkt wechseln“.
+
+Strg+Bild Auf und Strg+Bild Ab
+Wechseln zum vorherigen oder nächsten Titel.
+
+M
+Schaltet stumm oder wieder ein.
+
+Lautstärke, Geschwindigkeit und Tonhöhe können im Untermenü Zurücksetzen auf die Normalwerte gesetzt werden.
+
+Bei Medien mit mehreren Audiospuren kann die gewünschte Spur im Wiedergabemenü gewählt werden.
+
+„Medium speichern unter...“ speichert einen heruntergeladenen oder zwischengespeicherten Inhalt dauerhaft.
+
+12. UNTERTITEL UND KAPITEL
+
+Sonarpad unterstützt unter anderem SRT, VTT, ASS, SUB, SBV, LRC und SMI.
+
+Eine Untertiteldatei mit demselben Namen wie das Medium wird automatisch gefunden. Andere Dateien können über „Untertitel hinzufügen...“ ausgewählt und über „Geladene Untertitel entfernen“ wieder getrennt werden.
+
+Untertitel können mit NVDA, einer ausgewählten Stimme oder in eine Datei ausgegeben werden. Der Modus wird in den Audiooptionen gewählt.
+
+Alt+Umschalt+L öffnet die Kapitelliste.
+
+Alt+Umschalt+P und Alt+Umschalt+N wechseln zum vorherigen oder nächsten Kapitel. Zusätzlich können Strg+Alt+Bild Auf und Strg+Alt+Bild Ab verwendet werden.
+
+Kapitel werden aus Podcast-Feeds, URLs oder eingebetteten Metadaten lokaler Dateien geladen.
+
+13. AUDIO KONVERTIEREN UND MEDIEN TEILEN
+
+Audio konvertieren – Strg+Umschalt+A
+Konvertiert unterstützte Medien nach MP3, AAC, OGG, Opus, FLAC, WAV oder AIFF. Je nach Format können Bitrate und Qualität gewählt werden.
+
+M4B steht als Hörbuchformat mit Kapitelunterstützung zur Verfügung.
+
+Medium aufteilen
+Teilt das aktuell wiedergegebene Medium entweder in eine bestimmte Anzahl von Teilen oder in Abschnitte mit festgelegter Dauer.
+
+14. TRANSKRIPTION MIT WHISPER
+
+„Aktuelles Audio transkribieren“ erstellt aus der aktiven Audio- oder Videodatei ein Textdokument.
+
+„Aktuellen Ordner transkribieren“ verarbeitet sämtliche unterstützten Audiodateien des Ordners und führt die Ergebnisse in einem Dokument zusammen.
+
+Lange Dateien werden automatisch in 15-minütige Abschnitte geteilt, nacheinander transkribiert und wieder zusammengeführt.
+
+Unter Optionen > KI und Transkription können Sie einstellen:
+
+• Whisper-Modell: klein, mittel oder groß v3
+• CUDA für NVIDIA-Grafikkarten
+• Originalsprache beibehalten
+• Zeitstempel aufnehmen
+
+Beim ersten Einsatz werden erforderliche Bridge- und Modelldateien geladen. CUDA benötigt zusätzliche Laufzeitpakete.
+
+Läuft bereits eine Medienwiedergabe, pausiert Sonarpad sie vor dem Start der Transkription.
+
+Fertige Transkriptionen werden automatisch gespeichert oder beim Schließen zum Speichern angeboten. Der vorgeschlagene Dateiname verwendet den Namen der Mediendatei.
+
+15. SPRACHDIKTAT
+
+Standardmäßig startet Strg+Umschalt+Leertaste das Offline-Diktat. Dieselbe Tastenkombination beendet es. Das Kürzel ist in den Optionen änderbar.
+
+Ab der zweiten Verwendung kann die Engine im Speicher bereit bleiben und dadurch schneller starten. Auf Geräten mit weniger als 4 GB RAM wird diese Wiederverwendung automatisch deaktiviert.
+
+Der erkannte Text wird an der aktuellen Cursorposition eingefügt.
+
+16. PODCAST-AUFNAHME
+
+Podcast aufnehmen – Strg+Umschalt+R
+
+Mögliche Quellen:
+
+• nur Mikrofon
+• gesamtes Systemaudio
+• eine bestimmte Anwendung
+• mehrere ausgewählte Anwendungen
+• Mikrofon und System- oder Anwendungsaudio gemeinsam
+
+Mikrofon und andere Quellen können getrennt in Dateien gespeichert werden. Dadurch lassen sich Lautstärke, Rauschen und Schnitt später unabhängig bearbeiten.
+
+Die Aufnahme kann als MP3 oder WAV gespeichert werden. Für MP3 ist die Bitrate wählbar.
+
+Pegel werden in Echtzeit angezeigt. Mikrofon und Quellen besitzen eigene Lautstärkeregler.
+
+Die Aufnahme kann pausiert und fortgesetzt werden. Sonarpad kann den Computer während der Aufnahme wach halten.
+
+17. PODCASTS ANHÖREN UND VERWALTEN
+
+Podcasts – Strg+Umschalt+P
+
+Podcasts können über iTunes, Spreaker oder Podcast Index gesucht werden. Podcast Index benötigt einen kostenlosen API-Schlüssel und ein Geheimnis.
+
+Suchen Sie einen Podcast und drücken Sie Eingabe, um ihn zu abonnieren. Über das Kontextmenü können Episoden auch ohne Abonnement angezeigt werden.
+
+Abonnements lassen sich alphabetisch oder nach Datum sortieren und neu anordnen.
+
+Episoden zeigen gelesen-/ungelesen- beziehungsweise gespielt-/ungespielt-Status, Datum und bei Bedarf Uhrzeit.
+
+Eingabe startet die Episode. Esc stoppt die Wiedergabe und kehrt zur Liste zurück.
+
+OPML-Import und -Export sichern oder übernehmen Abonnements.
+
+Der Podcast-Cache wird unter Optionen > Audio begrenzt. Mit „Podcast behalten“ wird eine Episode vor automatischer Bereinigung geschützt.
+
+Kapitel aus Feed, URL oder Mediendatei werden unterstützt.
+
+Unter Optionen > RSS und Podcast können das Verzeichnisland, Löschbestätigungen und Statusansagen eingestellt werden.
+
+18. NACHRICHTEN UND RSS
+
+RSS / Artikel – Strg+Umschalt+U
+
+Die Nachrichtensprache kann im RSS-Fenster gewählt werden. Wählen Sie Deutsch, um deutsche Standardquellen zu verwenden.
+
+Eine Quelle hinzufügen
+
+„Quelle hinzufügen“ akzeptiert:
+
+• eine direkte RSS- oder Atom-URL
+• einen Suchbegriff, aus dem Sonarpad eine Google-News-RSS-Suche erstellt
+
+Quellen können bearbeitet, gelöscht, nach oben oder unten verschoben oder an eine bestimmte Position gesetzt werden.
+
+Strg+Umschalt+Pfeil Auf und Strg+Umschalt+Pfeil Ab verschieben die ausgewählte Quelle.
+
+Artikel lesen
+
+Die Liste zeigt Titel, Datum, Uhrzeit und gelesen-/ungelesen-Status. Eine Vorschau ist mit Tab erreichbar. Eingabe öffnet den vollständigen Artikel im Editor. Umschalt+Eingabe öffnet die ursprüngliche Website.
+
+„Weitere Nachrichten laden“ lädt den nächsten Block, wenn noch Artikel vorhanden sind.
+
+Favoriten
+
+Über das Kontextmenü wird ein Artikel dem Favoriten-Feed hinzugefügt. Wird der Favoriten-Feed gelöscht, entsteht er beim nächsten Favoriten automatisch neu.
+
+Teilen und Kopieren
+
+Artikel können per E-Mail, WhatsApp, Facebook oder X geteilt werden. Strg+C kann je nach Option Titel, URL, Inhalt oder alles gemeinsam kopieren.
+
+Import und Export
+
+RSS-Quellen können aus OPML oder TXT importiert und nach OPML exportiert werden.
+
+Gemeinschaftsquellen
+
+Quellen der Sonarpad-Gemeinschaft können durchsucht und zur eigenen Sammlung hinzugefügt werden. Eigene Quellen können der Gemeinschaft vorgeschlagen werden.
+
+Deutsche Standardquellen umfassen unter anderem Tagesschau, ZDFheute, Deutschlandfunk, Deutsche Welle, DER SPIEGEL, ZEIT ONLINE, FAZ, Süddeutsche Zeitung, heise, Golem, Netzpolitik.org und Spektrum.de.
+
+19. RADIO
+
+„Radio aus aller Welt...“ öffnet das Radioverzeichnis.
+
+Sender können nach Name oder Freitext, Sprache, Land, Stadt, Musikgenre und Kategorie gefiltert werden. Alle Filter lassen sich zurücksetzen.
+
+Eingabe startet die Wiedergabe. Sender können als Favoriten gespeichert oder der Sonarpad-Gemeinschaft vorgeschlagen werden.
+
+Live-Aufnahme
+
+Ein Sender kann aufgenommen oder gleichzeitig aufgenommen und wiedergegeben werden. Radioaufnahmen werden in einem eigenen Unterordner des Aufnahmeordners gespeichert.
+
+Geplante Aufnahme
+
+Wählen Sie Sender, Datum, Startstunde, Startminute, Dauer und Wiederholung. Wiederholungen können einmalig, täglich oder wöchentlich sein. Eine benutzerdefinierte Dauer von 1 bis 1.440 Minuten ist möglich.
+
+Über die Windows-Aufgabenplanung kann eine Aufnahme auch starten, wenn Sonarpad nicht geöffnet ist.
+
+Das Aufnahmefenster zeigt aktive und geplante Aufnahmen, Datum, Uhrzeit, Dauer und Restzeit bis zum Start.
+
+20. YOUTUBE UND STREAMING-AUDIO
+
+YouTube-Transkript importieren – Strg+Y
+
+Fügen Sie eine YouTube-URL ein, wählen Sie die Sprache der Untertitel und entscheiden Sie, ob Zeitstempel enthalten sein sollen. Das Transkript wird in den Editor importiert.
+
+Streaming-Audio wiedergeben – Alt+Umschalt+S
+
+Fügen Sie eine direkte Medien- oder YouTube-URL ein oder geben Sie einen Suchbegriff ein. Auch Kanal- und Playlist-Links werden unterstützt.
+
+YouTube-Ergebnisse zeigen Titel, Dauer, Kanal und Aufrufzahl. Kanäle und Playlists können als Favoriten gespeichert werden.
+
+Über das Kontextmenü lassen sich Kommentare und Antworten lesen. Mit Pfeil Rechts werden Kommentarzweige erweitert.
+
+„Link kopieren“ beziehungsweise Strg+C kopiert die URL eines ausgewählten Videos, Kanals oder einer Playlist.
+
+Bei geschützten Websites kann Sonarpad Zugangsdaten abfragen, speichern und später unter Optionen > Audio verwalten.
+
+Vor der Wiedergabe prüft Sonarpad, ob der Inhalt unterstützt wird. Mix-Playlists werden ebenfalls verarbeitet.
+
+21. KALENDER UND ERINNERUNGEN
+
+Kalender
+
+Der Kalender ist vollständig per Tastatur bedienbar. Sie können zum vorherigen oder nächsten Tag wechseln oder direkt zu Heute springen.
+
+Für jeden Tag zeigt Sonarpad das Datum, Feiertage oder Gedenktage, den Namenstag und das Zitat des Tages. Für Deutsch sind alle 365 Kalendereinträge und sämtliche 128 Zitate übersetzt.
+
+Namenstag und Zitat können gelesen, mit der Sprachausgabe wiedergegeben oder kopiert werden.
+
+Erinnerungen
+
+Erinnerungen können hinzugefügt, bearbeitet, gelöscht, verschoben oder als erledigt markiert werden.
+
+Ein Hinweis kann genau zum Termin oder eine festgelegte Zeit vorher erscheinen.
+
+Mit Windows-Aufgabenplanung können Hinweise auch dann ausgelöst werden, wenn Sonarpad geschlossen ist.
+
+22. WETTER UND KINOFILME
+
+Wetter
+
+Suchen Sie nach einer Stadt oder öffnen Sie einen zuletzt verwendeten Ort.
+
+Angezeigt werden aktuelle Bedingungen, Temperatur, Mindest- und Höchsttemperatur, Luftfeuchtigkeit, Niederschlagswahrscheinlichkeit und Vorhersage der nächsten Tage.
+
+Die Einheit kann automatisch, Celsius oder Fahrenheit sein.
+
+Kinofilme
+
+Der Kinobereich zeigt aktuell laufende und demnächst erscheinende Filme. Sie können nach einem Titel suchen, Handlung und Erscheinungsdatum lesen und den Trailer abspielen.
+
+23. WÖRTERBUCH, WIKTIONARY UND WIKIPEDIA
+
+Wörterbuch
+
+Öffnen Sie „Stimme und Wörterbuch“ mit Strg+Umschalt+D oder schlagen Sie das aktuelle Wort mit Alt+Umschalt+D nach.
+
+Die Sprache kann automatisch aus der Benutzeroberfläche übernommen oder manuell gewählt werden. Das deutsche Wiktionary wird mit seiner eigenen Seitenstruktur ausgewertet und liefert Definitionen sowie, falls vorhanden, Synonyme und Übersetzungen.
+
+Wikipedia
+
+„In Wikipedia suchen und importieren...“ – Alt+Umschalt+W
+
+Wählen Sie die Wikipedia-Sprache, suchen Sie einen Begriff und wählen Sie ein Ergebnis.
+
+Sie können einen einzelnen Abschnitt lesen und mit Esc zur Suche zurückkehren oder den gesamten Artikel importieren. Zitatblöcke werden übernommen.
+
+Übersetzen und zusammenfassen
+
+Über das Editor-Kontextmenü können Dokumente mit DeepL oder Google Übersetzer ohne API-Schlüssel übersetzt werden. Mit einem Gemini-API-Schlüssel stehen Gemini-Übersetzung und Textzusammenfassung zur Verfügung.
+
+24. ROUTEN UND NAVIGATION
+
+Öffnen Sie „Routen und Navigation“.
+
+Geben Sie Start und Ziel ein und wählen Sie:
+
+• zu Fuß
+• Fahrrad
+• Auto
+• Rollstuhl
+
+Wählen Sie außerdem kürzeste oder schnellste Route und ob durchquerte Gemeinden angezeigt werden sollen.
+
+Die Route wird als Text in Sonarpad importiert. Eine visuelle Karte kann über Datei > Bild speichern gesichert werden.
+
+25. PROJECT GUTENBERG, INTERNET ARCHIVE UND LIBRIVOX
+
+Diese Funktionen befinden sich im Menü Werkzeuge und bei aktivierter Gruppierung unter Lesen und Inhalte.
+
+Project Gutenberg
+
+Suchen Sie nach Titel oder Autor und wählen Sie die Sprache. EPUB-Bücher werden nach Dokumente\Sonarpad\Documents geladen. Nach Abschluss fragt Sonarpad, ob das Buch sofort im Editor geöffnet werden soll.
+
+Internet Archive
+
+Sucht Audiosammlungen, historische Radiosendungen, Reden, Live-Musik und weitere Archive. Ein ausgewählter Inhalt wird direkt mit dem Sonarpad-Player wiedergegeben.
+
+LibriVox
+
+Sucht gemeinfreie Hörbücher nach Titel oder Autor. Kapitel werden wie Podcast-Episoden angezeigt und direkt mit demselben Player wiedergegeben.
+
+26. BARRIEREFREIES TERMINAL
+
+Barrierefreies Terminal – Strg+Umschalt+T
+
+Das Terminal ist für große Ausgaben und Screenreader optimiert.
+
+Alt+I wechselt zum Eingabefeld. Alt+O wechselt zur Ausgabe.
+
+Als Shell stehen Eingabeaufforderung, PowerShell oder Codex CLI zur Verfügung.
+
+Optionen umfassen automatisches Scrollen, Entfernen von ANSI-Steuerzeichen, Signal bei Inaktivität, Verhindern des Energiesparmodus und Ansage neuer Zeilen mit NVDA.
+
+27. OPTIONEN
+
+Öffnen Sie die Optionen mit Strg+Umschalt+O.
+
+Registerkarte Allgemein
+
+• Sprache der Benutzeroberfläche
+• Öffnen in neuer Registerkarte oder neuem Fenster
+• Position des Sternchens für geänderte Dokumente
+• automatisches Aktualisieren
+• anonyme Fehlerberichte
+• Proxy-Adresse und Proxy-Port
+• Gruppierung des Menüs Werkzeuge
+• Schnellaktionen für Kalender, Wetter und Kinofilme
+
+Registerkarte Stimme
+
+• Sprach-Engine
+• Sprache und Stimme
+• Geschwindigkeit, Tonhöhe und Lautstärke
+• Stimmprofile
+• Favoriten
+• Stimmen im Editor
+• Microsoft- und Google-Stimmen
+• erste und zweite Dialogstimme
+• Aussprachewörterbuch
+
+Registerkarte Editor
+
+• Zeilenumbruch und Umbruchbreite
+• Einrückung mit Tabs oder Leerzeichen
+• Cursor beim Lesen bewegen
+• Cursor mit Auf und Ab an den Zeilenanfang setzen
+• Esc schließt den Editor
+• automatisches Lesezeichen
+• schreibgeschützter Modus
+• Rechtschreibprüfung und Prüfsprache
+
+Registerkarte Audio
+
+• Standardordner für Hörbücher, Medien und Aufnahmen
+• MP3-Bitrate
+• Teilungs- und Namensoptionen für Hörbücher
+• Cachegröße
+• Sprungintervalle
+• Untertitelmodus
+• Website-Zugangsdaten
+• Standardlautstärke und Wiedergabeeinstellungen
+
+Registerkarte RSS und Podcast
+
+• Nachrichtensprache
+• Podcast-Verzeichnis und Land
+• API-Daten für Podcast Index
+• Statusansagen
+• Löschbestätigungen
+• Verhalten von Strg+C in RSS
+• Datums- und Zeitanzeige
+
+Registerkarte KI und Transkription
+
+• Whisper-Modell
+• CUDA-Unterstützung
+• Originalsprache
+• Zeitstempel
+• Gemini-API-Schlüssel
+
+Registerkarte Tastenkürzel
+
+Wählen Sie eine Aktion, drücken Sie „Ändern...“ und geben Sie eine neue Kombination ein. Sonarpad warnt bei Konflikten. „Standard“ setzt die aktuelle Aktion, „Alle zurücksetzen“ alle Aktionen zurück.
+
+28. RECHTSCHREIBPRÜFUNG
+
+Aktivieren Sie die Rechtschreibprüfung unter Optionen > Editor.
+
+Wählen Sie „Deutsch (Deutschland)“ für das Windows-Wörterbuch de-DE oder „Sprache des Editors übernehmen“.
+
+F7 springt zum vorherigen, F8 zum nächsten Rechtschreibfehler.
+
+Das Kontextmenü zeigt Korrekturvorschläge für das aktuelle Wort. Ein Fehler wird erneut gemeldet, wenn er später wieder erreicht oder nach Löschen neu eingegeben wird.
+
+Die deutsche Rechtschreibprüfung muss in Windows installiert sein. Fehlt das Wörterbuch, installieren Sie das deutsche Sprachpaket beziehungsweise die deutschen grundlegenden Eingabefunktionen in den Windows-Spracheinstellungen.
+
+29. AKTUALISIERUNGEN, DIAGNOSE UND HILFE
+
+F1 öffnet dieses Handbuch.
+
+F2 sucht nach Aktualisierungen.
+
+Nach einer automatischen Aktualisierung erscheint ein Abschlussfenster mit dem Änderungsprotokoll im Vordergrund.
+
+„Änderungsprotokoll“ im Hilfemenü zeigt sämtliche Versionen auf Deutsch.
+
+„Diagnose-ZIP erstellen“ sammelt technische Protokolle für eine Fehlermeldung. Prüfen Sie persönliche Daten, bevor Sie ein Diagnosearchiv weitergeben.
+
+„sonarpad.com besuchen“ öffnet die offizielle Website.
+
+Die Einträge Info und Lizenz zeigen Programmversion, Autor und rechtliche Hinweise.
+
+30. SPENDEN
+
+Der Eintrag Spenden im Hilfemenü enthält Informationen zu PayPal und Banküberweisung.
+
+Spenden sind freiwillig. Sie unterstützen Entwicklung, Tests, Serverdienste, Barrierefreiheit und Pflege von Sonarpad.
+
+Die vollständigen deutschen Spendendaten befinden sich in der entsprechenden Spendenansicht.
+
+31. WICHTIGE TASTENKÜRZEL
+
+Strg+N – Neues Dokument
+Strg+O – Datei öffnen
+Strg+S – Speichern
+Alt+Umschalt+S – Alle speichern
+Strg+W – Aktuelle Registerkarte schließen
+Strg+Umschalt+W – Andere Dateien schließen
+Strg+F – Suchen
+F3 – Nächstes Vorkommen
+Umschalt+F3 – Vorheriges Vorkommen
+Strg+H – Ersetzen
+Strg+Umschalt+F – In Dateien suchen
+Strg+J – Zu Zeile wechseln
+Strg+A – Alles auswählen
+Strg+Q – Zeilen zitieren
+Strg+Umschalt+Q – Zitierung entfernen
+Strg+Punkt – Auslassungszeichen einfügen
+F5 – Vorlesen starten
+F4 – Vorlesen anhalten oder fortsetzen
+F6 – Vorlesen stoppen
+F9 – Vorherige bevorzugte Stimme
+F10 – Nächste bevorzugte Stimme
+Strg+R – Hörbuch aufnehmen
+Strg+Umschalt+B – Stapel-Hörbücher
+Strg+Umschalt+R – Podcast aufnehmen
+Strg+Umschalt+A – Audio konvertieren
+Strg+Umschalt+P – Podcasts
+Strg+Umschalt+U – RSS und Artikel
+Alt+Umschalt+S – Streaming-Audio wiedergeben
+Strg+Y – YouTube-Transkript importieren
+Alt+Umschalt+W – Wikipedia suchen und importieren
+Alt+Umschalt+D – Im Wörterbuch nachschlagen
+Strg+Umschalt+D – Stimme und Wörterbuch
+Strg+Umschalt+T – Barrierefreies Terminal
+F7 – Vorheriger Rechtschreibfehler
+F8 – Nächster Rechtschreibfehler
+Leertaste – Medienwiedergabe oder Pause
+Punkt – Aktuellen Titel stoppen
+Pfeil Links/Rechts – Zurück- oder vorspulen
+Strg+I – Wiedergabezeit ansagen
+Strg+T – Zu Zeitpunkt wechseln
+Strg+Bild Auf/Bild Ab – Vorheriger/nächster Titel
+Alt+Umschalt+L – Kapitelliste
+F1 – Handbuch
+F2 – Nach Aktualisierungen suchen
+
+ENDE DES HANDBUCHS

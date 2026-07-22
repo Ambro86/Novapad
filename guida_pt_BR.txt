@@ -1,0 +1,325 @@
+SONARPAD – GUIA COMPLETO EM PORTUGUÊS DO BRASIL
+
+CONTEÚDO
+1. Introdução
+2. Acessibilidade e operação básica
+3. Como selecionar Português (Brasil)
+4. Documentos e formatos compatíveis
+5. Menu Arquivo
+6. Edição e ferramentas de texto
+7. Visualização e aparência
+8. Marcadores
+9. Leitura por voz e vozes
+10. Criação de audiolivros
+11. Player de mídia e reprodução
+12. Legendas e capítulos
+13. Conversão de áudio e divisão de mídia
+14. Transcrição com Whisper
+15. Ditado por voz
+16. Gravação de podcasts
+17. Podcasts
+18. Notícias e RSS
+19. Rádio
+20. YouTube e áudio de streaming
+21. Calendário e lembretes
+22. Clima e cinema
+23. Dicionário, Wiktionary e Wikipedia
+24. Rotas e navegação
+25. Project Gutenberg, Internet Archive e LibriVox
+26. Terminal acessível
+27. Opções
+28. Corretor ortográfico
+29. Atualizações, diagnóstico e ajuda
+30. Doações
+31. Atalhos principais
+
+1. INTRODUÇÃO
+
+Sonarpad é um editor de texto acessível e um conjunto de ferramentas para leitura, escrita, voz, documentos, áudio, vídeo e conteúdo on-line no Windows.
+
+O programa foi desenvolvido com atenção especial a usuários de leitores de tela, incluindo NVDA e JAWS. As funções principais podem ser usadas inteiramente pelo teclado. Janelas, listas, botões, caixas de edição e listas suspensas têm nomes acessíveis e mensagens de estado.
+
+Além da edição de texto, o Sonarpad oferece leitura por voz, criação de audiolivros, reprodução e conversão de mídia, transcrição, ditado, podcasts, rádio, notícias, RSS, calendário, clima, cinema, dicionários e bibliotecas digitais.
+
+2. ACESSIBILIDADE E OPERAÇÃO BÁSICA
+
+Pressione Alt para abrir a barra de menus. Use as setas esquerda e direita para mudar de menu, e as setas para cima e para baixo para percorrer os comandos. Pressione Enter para ativar a opção selecionada e Esc para fechar o menu ou a janela atual.
+
+Nas janelas de diálogo, use Tab e Shift+Tab para navegar entre os controles. Nas Opções, Ctrl+Tab e Ctrl+Shift+Tab alternam entre as abas.
+
+O Sonarpad envia ao leitor de tela mensagens de carregamento, conclusão, erro, progresso, seleção, posição de reprodução e outras informações importantes. A barra de status mostra caracteres, palavras, linha e coluna sem deslocar o foco.
+
+3. COMO SELECIONAR PORTUGUÊS (BRASIL)
+
+Abra Opções com Ctrl+Shift+O. Na aba Geral, localize Idioma da interface e selecione Português (Brasil). Confirme com OK e reinicie o Sonarpad quando solicitado.
+
+Português (Brasil) é uma língua independente de Português (Portugal). Ao selecionar a variante brasileira, o Sonarpad usa textos brasileiros, corretor pt-BR, calendário e feriados do Brasil, Google Notícias Brasil, fontes RSS brasileiras, guia, doações e registro de alterações em português brasileiro.
+
+4. DOCUMENTOS E FORMATOS COMPATÍVEIS
+
+O Sonarpad abre TXT, Markdown, RTF, HTML, PDF, DOC, DOCX, planilhas, apresentações, EPUB e muitos formatos de áudio e vídeo. Também reconhece arquivos de referência do Google Drive, como GDOC, GSHEET e GSLIDES.
+
+Arquivos de texto podem usar UTF-8, UTF-16 e diversas codificações do Windows. Quando um formato não pode ser sobrescrito com segurança, Salvar abre automaticamente Salvar como e sugere um arquivo de texto, preservando o documento original.
+
+PDF
+O Sonarpad tenta extrair o texto incorporado. Se o PDF não tiver texto acessível, pode usar OCR. Também existe uma alternativa com PDFium para documentos problemáticos. Formulários PDF acessíveis podem ser apresentados como texto editável.
+
+EPUB
+Livros EPUB são abertos como texto. Quando existe sumário, use Visualizar > Mostrar índice EPUB para navegar por capítulos e subseções. Pressione Enter no item escolhido para ir à posição correspondente.
+
+5. MENU ARQUIVO
+
+Novo – Ctrl+N
+Cria um documento vazio.
+
+Abrir – Ctrl+O
+Abre um ou mais arquivos. Vários arquivos de mídia podem formar uma fila de reprodução.
+
+Salvar – Ctrl+S
+Salva o documento atual.
+
+Salvar como
+Salva com outro nome, codificação ou formato.
+
+Salvar tudo – Alt+Shift+S
+Salva todos os documentos modificados.
+
+Imprimir
+Imprime textos diretamente ou envia outros formatos ao aplicativo associado do Windows.
+
+Executar com interpretador – Ctrl+Shift+F5
+Executa o arquivo atual com o interpretador configurado. Arquivos HTML são abertos no navegador.
+
+Arquivos recentes
+Mostra documentos abertos recentemente e permite limpar a lista.
+
+Fechar aba – Ctrl+W
+Fecha o documento atual.
+
+Fechar outros arquivos – Ctrl+Shift+W
+Fecha todos os documentos, exceto o atual.
+
+6. EDIÇÃO E FERRAMENTAS DE TEXTO
+
+Desfazer – Ctrl+Z
+Desfaz a última edição compatível.
+
+Recortar, copiar e colar – Ctrl+X, Ctrl+C e Ctrl+V
+Funcionam no controle de texto que estiver com o foco.
+
+Selecionar tudo – Ctrl+A
+Seleciona o texto atual e anuncia a seleção.
+
+Localizar – Ctrl+F
+Pesquisa no documento. F3 encontra o próximo resultado e Shift+F3 o anterior.
+
+Substituir – Ctrl+H
+Substitui uma ocorrência ou todas. Expressões regulares são aceitas.
+
+Pesquisar em arquivos – Ctrl+Shift+F
+Pesquisa em uma pasta. Enter abre o arquivo exatamente no resultado.
+
+Ir para linha – Ctrl+J
+Move o cursor para uma linha específica.
+
+Estatísticas de texto – Alt+Y
+Mostra caracteres, palavras, linhas e outras informações.
+
+O menu Editar também inclui padronização de espaços, quebra física de linhas, união de linhas, remoção de marcação Markdown, formatação para voz, correção de palavras separadas por hífen, remoção de duplicatas, ordenação, inversão, citação e recuo.
+
+Inserir reticências – Ctrl+Ponto
+Insere o caractere único de reticências.
+
+7. VISUALIZAÇÃO E APARÊNCIA
+
+Quebra automática de linha
+Ativa ou desativa a quebra visual sem alterar o conteúdo.
+
+Somente leitura
+Protege o documento contra alterações acidentais.
+
+Modo escuro
+Aplica uma aparência escura ao editor, menus, janelas auxiliares e controles principais. A escolha é salva.
+
+Fonte
+Permite selecionar família e tamanho da fonte.
+
+Índice EPUB
+Exibe capítulos e subseções em uma árvore acessível.
+
+8. MARCADORES
+
+Marcadores registram posições importantes do documento. É possível adicionar, excluir, renomear e acessar marcadores pelo teclado. O marcador automático ajuda a retomar a leitura na posição anterior.
+
+9. LEITURA POR VOZ E VOZES
+
+F5 inicia ou retoma a leitura. A tecla de pausa configurada interrompe temporariamente. Esc encerra a leitura quando o foco está no editor.
+
+Os mecanismos disponíveis incluem Microsoft Edge Neural, Google TTS, SAPI5 e SAPI4. Nas Opções, escolha mecanismo, voz, velocidade, tom e volume. O painel de vozes permite filtrar por idioma e administrar vozes do Google.
+
+Mover cursor durante a leitura mantém o cursor próximo ao trecho pronunciado. A leitura pode começar no cursor, na seleção ou no início, conforme o comando utilizado.
+
+O dicionário de pronúncia substitui palavras durante a fala sem modificar o documento. É possível respeitar maiúsculas e minúsculas e escolher uma voz específica para determinada entrada.
+
+10. CRIAÇÃO DE AUDIOLIVROS
+
+O Sonarpad cria audiolivros em MP3, AAC ou WAV, dependendo do mecanismo de voz. O texto pode ser dividido por tempo, tamanho, capítulos, títulos, linhas ou número de partes.
+
+A criação em lote processa vários arquivos e oferece pasta de saída, subpastas, prevenção de sobrescrita e relatório final.
+
+SAPI5 e SAPI4 usam processos separados para reduzir o risco de travamento. Partes ausentes ou suspeitas são repetidas com menor paralelismo, preservando as partes válidas.
+
+11. PLAYER DE MÍDIA E REPRODUÇÃO
+
+O Sonarpad reproduz áudio e vídeo, transmissões ao vivo, playlists e capítulos. Use os comandos de reprodução para tocar, pausar, parar, avançar, voltar, alterar velocidade e ajustar volume.
+
+A fila permite abrir vários arquivos. Informações de duração, posição e estado são anunciadas pelo leitor de tela.
+
+12. LEGENDAS E CAPÍTULOS
+
+Legendas podem ser enviadas ao NVDA, mostradas ao usuário ou gravadas. O Sonarpad reconhece formatos comuns e acompanha o tempo de reprodução.
+
+Capítulos de podcasts, audiolivros e mídia podem ser listados em uma janela acessível. Enter vai ao capítulo selecionado.
+
+13. CONVERSÃO DE ÁUDIO E DIVISÃO DE MÍDIA
+
+A ferramenta Converter áudio transforma arquivos entre formatos compatíveis, com opções de qualidade e taxa de bits.
+
+A ferramenta de divisão corta por tempo, marcadores ou partes. É possível ajustar os pontos em segundos e décimos de segundo, ouvir a região e exportar o resultado.
+
+14. TRANSCRIÇÃO COM WHISPER
+
+Whisper converte fala em texto. Selecione o modelo, o idioma e o arquivo. Arquivos longos são divididos em blocos de 15 minutos e reunidos automaticamente para evitar falhas.
+
+Também é possível usar serviços compatíveis, como Gemini, quando configurados. Revise sempre nomes próprios, números e pontuação.
+
+15. DITADO POR VOZ
+
+O ditado insere no editor o texto reconhecido pelo microfone. Selecione o idioma Português (Brasil) quando disponível no mecanismo do Windows.
+
+Use um microfone adequado e fale em frases curtas. O resultado pode ser corrigido normalmente no editor.
+
+16. GRAVAÇÃO DE PODCASTS
+
+O gravador captura microfone, áudio do sistema ou aplicativos selecionados. Pode criar uma faixa misturada ou arquivos separados para microfone e sistema.
+
+Escolha formato, pasta, dispositivos e níveis. Faça uma gravação curta de teste antes de uma sessão longa.
+
+17. PODCASTS
+
+A seção Podcasts permite adicionar feeds, pesquisar, atualizar, ordenar, marcar episódios como lidos e importar ou exportar OPML.
+
+Enter abre ou reproduz o episódio. Os capítulos, quando disponíveis, aparecem em uma lista acessível. O Sonarpad mantém a posição de reprodução.
+
+18. NOTÍCIAS E RSS
+
+Abra Notícias e RSS com Ctrl+Shift+U. Escolha o idioma das notícias independentemente do idioma da interface.
+
+Para conteúdo brasileiro, selecione Português (Brasil). O Google Notícias passa a usar a localização do Brasil e mostra as categorias Principais notícias, Minha cidade, Brasil, Mundo, Negócios, Ciência e tecnologia, Entretenimento, Esportes e Saúde.
+
+As fontes RSS brasileiras padrão são mantidas separadamente das fontes de Portugal. Fontes adicionadas pelo usuário também são salvas por idioma.
+
+Notícias relacionadas
+Quando um item do Google Notícias inclui várias matérias sobre o mesmo assunto, o título aparece como item expansível. Pressione seta para a direita para abrir as fontes relacionadas. Cada item filho mostra uma matéria e sua fonte. Pressione Enter para importar o artigo ou Shift+Enter para abri-lo no navegador.
+
+Se o Google Notícias não fornecer matérias relacionadas, o título continua funcionando como um artigo comum.
+
+É possível adicionar, editar, excluir e reordenar fontes, marcar notícias como favoritas, copiar título, link ou conteúdo, compartilhar e pesquisar por palavra-chave. A pesquisa do Google Notícias respeita o idioma selecionado.
+
+19. RÁDIO
+
+A seção Rádio pesquisa estações por nome, país, idioma e categoria. Favoritos ficam disponíveis rapidamente.
+
+A gravação pode começar imediatamente ou ser programada para uma data e hora, com repetição diária ou semanal. O Agendador de Tarefas do Windows pode iniciar uma gravação com o Sonarpad fechado.
+
+20. YOUTUBE E ÁUDIO DE STREAMING
+
+O Sonarpad pesquisa vídeos, canais e playlists, reproduz áudio e copia o link selecionado com Ctrl+C. Funções de download devem ser usadas respeitando direitos autorais e condições do serviço.
+
+21. CALENDÁRIO E LEMBRETES
+
+O calendário é totalmente acessível pelo teclado. Mostra data, feriados brasileiros, efeméride, santo do dia, citação e lembretes.
+
+Português (Brasil) possui conteúdo para os 365 dias e todas as citações disponíveis. Os principais feriados nacionais brasileiros são reconhecidos.
+
+Lembretes podem ter hora, aviso antecipado, repetição e adiamento. Também podem usar o agendamento do Windows.
+
+22. CLIMA E CINEMA
+
+Clima pesquisa cidades e mostra condições atuais, temperaturas, umidade, precipitação e previsão. Escolha Celsius, Fahrenheit ou modo automático.
+
+Cinema pesquisa filmes em cartaz e próximas estreias, com título, sinopse, data e trailer quando disponível.
+
+23. DICIONÁRIO, WIKTIONARY E WIKIPEDIA
+
+O dicionário consulta definições e traduções. Wiktionary e Wikipedia podem seguir automaticamente Português (Brasil), usando conteúdo em português.
+
+Selecione uma palavra antes de abrir a ferramenta para preencher a pesquisa automaticamente.
+
+24. ROTAS E NAVEGAÇÃO
+
+Rotas calcula trajetos e apresenta instruções passo a passo. É possível copiar o resultado e salvar uma representação visual do mapa.
+
+Confirme origem, destino e modo de transporte antes de iniciar a pesquisa.
+
+25. PROJECT GUTENBERG, INTERNET ARCHIVE E LIBRIVOX
+
+Project Gutenberg pesquisa ebooks por título, autor e idioma. O livro é baixado para a pasta de documentos do Sonarpad e pode ser aberto no editor.
+
+Internet Archive pesquisa coleções de áudio e permite reproduzir itens como podcasts.
+
+LibriVox pesquisa audiolivros gratuitos e abre capítulos no player. A pesquisa ocorre em segundo plano para não bloquear a interface.
+
+26. TERMINAL ACESSÍVEL
+
+O terminal integrado oferece Prompt de Comando, PowerShell e ferramentas configuradas. Saída ANSI pode ser limpa, novas linhas podem ser anunciadas e a janela pode rolar automaticamente.
+
+Revise qualquer comando antes de executá-lo, especialmente comandos que apagam ou alteram arquivos.
+
+27. OPÇÕES
+
+As Opções reúnem configurações gerais, idioma, aparência, abertura e salvamento, voz, audiolivros, mídia, legendas, rede, proxy, RSS, podcasts, rádio, atalhos, corretor ortográfico, ditado, OCR e serviços on-line.
+
+Português (Brasil) aparece como opção própria. Alterar o idioma da interface não substitui as fontes de notícias de outros idiomas; cada conjunto permanece separado.
+
+28. CORRETOR ORTOGRÁFICO
+
+O corretor pode seguir o idioma do editor ou usar uma língua fixa. Para textos brasileiros, selecione Português (Brasil), código pt-BR.
+
+Palavras desconhecidas podem ser ignoradas, adicionadas ao dicionário ou substituídas por uma sugestão. A disponibilidade depende dos pacotes de idioma instalados no Windows.
+
+29. ATUALIZAÇÕES, DIAGNÓSTICO E AJUDA
+
+O Sonarpad verifica atualizações e mostra o registro de alterações ao concluir. A janela Ajuda abre este guia, o changelog e as informações de doação.
+
+A ferramenta de diagnóstico reúne versões, configurações técnicas e registros úteis para suporte. Revise o conteúdo antes de compartilhar, pois arquivos de diagnóstico podem conter caminhos e informações do ambiente.
+
+30. DOAÇÕES
+
+Sonarpad é gratuito. A seção Doações informa as formas de apoiar o desenvolvimento. A contribuição é opcional e não altera as funções disponíveis.
+
+31. ATALHOS PRINCIPAIS
+
+Ctrl+N – novo documento
+Ctrl+O – abrir
+Ctrl+S – salvar
+Ctrl+W – fechar aba
+Ctrl+F – localizar
+F3 – próximo resultado
+Shift+F3 – resultado anterior
+Ctrl+H – substituir
+Ctrl+J – ir para linha
+Ctrl+A – selecionar tudo
+Ctrl+C – copiar
+Ctrl+X – recortar
+Ctrl+V – colar
+Ctrl+Z – desfazer
+Ctrl+Shift+F – pesquisar em arquivos
+Ctrl+Shift+O – Opções
+Ctrl+Shift+U – Notícias e RSS
+F5 – iniciar ou retomar leitura
+Ctrl+Ponto – inserir reticências
+Alt – abrir a barra de menus
+Esc – fechar janela, menu ou interromper a ação atual
+
+FIM DO GUIA

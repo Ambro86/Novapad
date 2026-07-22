@@ -1,0 +1,8 @@
+Agência Brasil|https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml
+CNN Brasil - Últimas notícias|https://www.cnnbrasil.com.br/ultimas-noticias/feed/
+G1 - Últimas notícias|https://g1.globo.com/rss/g1/
+Folha de S.Paulo - Em cima da hora|https://feeds.folha.uol.com.br/emcimadahora/rss091.xml
+UOL Notícias|https://rss.uol.com.br/feed/noticias.xml
+Tecnoblog|https://tecnoblog.net/feed/
+Canaltech|https://canaltech.com.br/rss/
+Olhar Digital|https://olhardigital.com.br/feed/

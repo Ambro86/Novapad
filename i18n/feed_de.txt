@@ -1,0 +1,12 @@
+Tagesschau | https://www.tagesschau.de/xml/rss2/
+ZDFheute | https://www.zdf.de/rss/zdf/nachrichten
+Deutschlandfunk Nachrichten | https://www.deutschlandfunk.de/nachrichten-100.xml
+Deutsche Welle Deutsch | https://rss.dw.com/xml/rss-de-all
+DER SPIEGEL | https://www.spiegel.de/schlagzeilen/index.rss
+ZEIT ONLINE | https://newsfeed.zeit.de/index
+FAZ Aktuell | https://www.faz.net/rss/aktuell/
+Süddeutsche Zeitung | https://rss.sueddeutsche.de/rss/Topthemen
+heise online | https://www.heise.de/rss/heise-atom.xml
+Golem.de | https://rss.golem.de/rss.php?feed=RSS2.0
+Netzpolitik.org | https://netzpolitik.org/feed/
+Spektrum.de | https://www.spektrum.de/alias/rss/spektrum-de-rss-feed/996406

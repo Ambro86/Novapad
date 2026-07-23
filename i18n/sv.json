@@ -1875,5 +1875,13 @@
   "librivox.language_value": "Språk:",
   "librivox.duration_value": "Längd:",
   "rss.related_sources_count": "{count} relaterade källor",
-  "options.lang.pt_br": "Portugisiska (Brasilien)"
+  "options.lang.pt_br": "Portugisiska (Brasilien)",
+  "options.label.audiobook_part_announcement": "Meddelande i början av varje del:",
+  "options.choice.audiobook_part_announcement.none": "Inget meddelande",
+  "options.choice.audiobook_part_announcement.title": "Boktitel",
+  "options.choice.audiobook_part_announcement.title_part_number": "Boktitel + delnummer",
+  "options.choice.audiobook_part_announcement.file_name": "Filnamn",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "Filnamn + delnummer",
+  "audiobook.part_announcement.title_part_number": "{title}, del {number}",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}, del {number}"
 }

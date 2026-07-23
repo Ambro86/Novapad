@@ -1,6 +1,6 @@
 # Changelog
 
-Versión 0.8.3 – 2026-07-22
+Versión 0.8.3 – 2026-07-23
 
 Modo oscuro
 • Añadido un modo oscuro que puede activarse desde el menú Ver y se guarda en las preferencias.
@@ -15,6 +15,19 @@ Portugués de Brasil y Google News
 • La interfaz, el calendario y todas las citas, el corrector ortográfico, las donaciones, la guía y el registro de cambios están disponibles íntegramente en portugués de Brasil.
 • Google News admite ahora la localización de Brasil, las categorías brasileñas y fuentes RSS brasileñas predeterminadas independientes.
 • Cuando el canal las proporciona, las fuentes de Google News relacionadas con la misma noticia se muestran como elementos secundarios accesibles en el árbol.
+
+LibriVox
+• Se ha optimizado la búsqueda de LibriVox para evitar solicitudes excesivas al servicio y bloqueos de la interfaz. Se eliminaron los recorridos extensos del catálogo, se redujeron los intentos y se introdujeron tiempos de espera más breves.
+
+Síntesis de voz
+• Las secuencias de tres o más puntos ahora se normalizan antes de la lectura, evitando que algunas voces pronuncien «punto punto» o generen segmentos formados únicamente por signos de puntuación.
+
+Artículos relacionados de Google Noticias
+• Para cada noticia, cuando están disponibles, ahora se muestran artículos relacionados, es decir, otros artículos que tratan la misma noticia. Para leerlos, basta con expandir el artículo principal cuando Sonarpad indique que hay artículos relacionados disponibles. Quien no quiera expandir esta sección solo tiene que pulsar Intro sobre el artículo principal y leer la noticia como siempre.
+• Los artículos relacionados ahora utilizan el mismo sistema de leído/no leído que los artículos principales, incluidos los anuncios accesibles, la fecha y la hora, el guardado del estado y su conservación tras actualizar las fuentes o reiniciar Sonarpad.
+
+Anuncios en las partes de los audiolibros
+• Se añadió a las opciones de audio el cuadro combinado «Anuncio al inicio de cada parte». En los audiolibros divididos en varios archivos, cada parte puede comenzar sin anuncio, con el título del libro, el título y el número de parte, el nombre del archivo o el nombre del archivo y el número de parte.
 
 Versión 0.8.2 – 2026-07-17
 

@@ -1,6 +1,6 @@
 # Journal des modifications
 
-Version 0.8.3 – 2026-07-22
+Version 0.8.3 – 2026-07-23
 
 Mode sombre
 • Ajout d’un mode sombre, activable depuis le menu Affichage et enregistré dans les préférences.
@@ -15,6 +15,19 @@ Portugais brésilien et Google Actualités
 • L’interface, le calendrier et toutes les citations, le correcteur orthographique, les dons, le guide et le journal des modifications sont entièrement disponibles en portugais brésilien.
 • Google Actualités prend désormais en charge la localisation brésilienne, les catégories du Brésil et des sources RSS brésiliennes par défaut distinctes.
 • Lorsque le flux les fournit, les sources Google Actualités liées à un même sujet sont affichées comme éléments enfants accessibles dans l’arborescence.
+
+LibriVox
+• La recherche LibriVox a été optimisée afin d’éviter un nombre excessif de requêtes au service et les blocages de l’interface. Les analyses étendues du catalogue ont été supprimées, le nombre de tentatives réduit et des délais d’attente plus courts ont été introduits.
+
+Synthèse vocale
+• Les suites de trois points ou plus sont désormais normalisées avant la lecture, afin d’éviter que certaines voix prononcent « point point » ou produisent des segments composés uniquement de ponctuation.
+
+Articles Google Actualités associés
+• Pour chaque actualité, des articles associés sont désormais affichés lorsqu’ils sont disponibles, c’est-à-dire d’autres articles traitant de la même information. Pour les lire, il suffit de développer l’article principal lorsque Sonarpad signale que des articles associés sont disponibles. Si vous ne souhaitez pas développer cette section, il suffit d’appuyer sur Entrée sur l’article principal et de lire l’actualité comme d’habitude.
+• Les articles associés utilisent désormais le même système lu/non lu que les articles principaux, avec les annonces accessibles, la date et l’heure, l’enregistrement de l’état et sa conservation après l’actualisation des sources ou le redémarrage de Sonarpad.
+
+Annonces dans les parties des livres audio
+• Ajout dans les options audio de la liste « Annonce au début de chaque partie ». Pour les livres audio divisés en plusieurs fichiers, chaque partie peut commencer sans annonce, avec le titre du livre, le titre et le numéro de partie, le nom du fichier ou le nom du fichier et le numéro de partie.
 
 Version 0.8.2 – 2026-07-17
 

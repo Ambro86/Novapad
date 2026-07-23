@@ -1,6 +1,6 @@
 # Änderungsprotokoll
 
-Version 0.8.3 – 2026-07-22
+Version 0.8.3 – 2026-07-23
 
 Dunkler Modus
 • Ein dunkler Modus wurde hinzugefügt. Er kann über das Menü Ansicht aktiviert werden und wird in den Benutzereinstellungen gespeichert.
@@ -21,6 +21,19 @@ Brasilianisches Portugiesisch und Google News
 • Die vollständige Oberfläche, der Kalender mit allen Zitaten, die Rechtschreibprüfung, Spendeninformationen, das Handbuch und das Änderungsprotokoll sind auf brasilianischem Portugiesisch verfügbar.
 • Google News unterstützt nun die brasilianische Lokalisierung, brasilianische Kategorien und getrennte brasilianische Standard-RSS-Quellen.
 • Wenn der Feed sie bereitstellt, werden weitere Quellen zum selben Thema als barrierefrei zugängliche Untereinträge in der Baumansicht angezeigt.
+
+LibriVox
+• Die LibriVox-Suche wurde optimiert, um übermäßige Anfragen an den Dienst und ein Blockieren der Benutzeroberfläche zu vermeiden. Umfangreiche Katalogscans wurden entfernt, die Anzahl der Versuche reduziert und kürzere Zeitlimits eingeführt.
+
+Sprachausgabe
+• Folgen aus drei oder mehr Punkten werden jetzt vor dem Vorlesen normalisiert. Dadurch wird verhindert, dass einige Stimmen „Punkt Punkt“ aussprechen oder Abschnitte erzeugen, die nur aus Satzzeichen bestehen.
+
+Verwandte Google-News-Artikel
+• Für jede Nachricht werden jetzt, sofern verfügbar, verwandte Artikel angezeigt, also weitere Artikel zum selben Ereignis. Um sie zu lesen, genügt es, den Hauptartikel zu erweitern, wenn Sonarpad meldet, dass verwandte Artikel verfügbar sind. Wer diesen Bereich nicht erweitern möchte, kann beim Hauptartikel einfach die Eingabetaste drücken und die Nachricht wie gewohnt lesen.
+• Verwandte Artikel verwenden jetzt dasselbe Gelesen/Ungelesen-System wie Hauptartikel, einschließlich zugänglicher Ansagen, Datum und Uhrzeit, Speicherung des Status sowie dessen Beibehaltung nach einer Aktualisierung der Quellen oder einem Neustart von Sonarpad.
+
+Ansagen in Audiobuchteilen
+• In den Audiooptionen wurde das Kombinationsfeld „Ansage am Anfang jedes Teils“ hinzugefügt. Bei in mehrere Dateien aufgeteilten Audiobüchern kann jeder Teil ohne Ansage oder mit Buchtitel, Buchtitel und Teilenummer, Dateiname oder Dateiname und Teilenummer beginnen.
 
 Version 0.8.2 – 2026-07-17
 

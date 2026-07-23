@@ -1875,5 +1875,13 @@
   "librivox.language_value": "Idioma:",
   "librivox.duration_value": "Duração:",
   "rss.related_sources_count": "{count} fontes relacionadas",
-  "options.lang.pt_br": "Português (Brasil)"
+  "options.lang.pt_br": "Português (Brasil)",
+  "options.label.audiobook_part_announcement": "Anúncio no início de cada parte:",
+  "options.choice.audiobook_part_announcement.none": "Sem anúncio",
+  "options.choice.audiobook_part_announcement.title": "Título do livro",
+  "options.choice.audiobook_part_announcement.title_part_number": "Título do livro + número da parte",
+  "options.choice.audiobook_part_announcement.file_name": "Nome do ficheiro",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "Nome do ficheiro + número da parte",
+  "audiobook.part_announcement.title_part_number": "{title}, parte {number}",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}, parte {number}"
 }

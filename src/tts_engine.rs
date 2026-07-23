@@ -3,8 +3,8 @@ use crate::file_handler::{is_epub_path, read_epub_chapters};
 use crate::i18n;
 use crate::settings;
 use crate::settings::{
-    AudiobookPartNamingMode, AudiobookResult, DictionaryEntry, Language, TRUSTED_CLIENT_TOKEN,
-    TtsEngine,
+    AudiobookPartAnnouncementMode, AudiobookPartNamingMode, AudiobookResult, DictionaryEntry,
+    Language, TRUSTED_CLIENT_TOKEN, TtsEngine,
 };
 use crate::{get_active_edit, log_debug, save_audio_dialog, show_error, with_state};
 use chrono::Local;
@@ -400,6 +400,8 @@ pub struct AudiobookCommonOptions<'a> {
     pub cancel: Arc<AtomicBool>,
     pub language: Language,
     pub part_naming_mode: AudiobookPartNamingMode,
+    pub part_announcement_mode: AudiobookPartAnnouncementMode,
+    pub audiobook_title: &'a str,
     pub audiobook_bitrate_kbps: u32,
     pub rate: i32,
     pub pitch: i32,
@@ -2852,6 +2854,181 @@ async fn download_edge_chunk_ws_with_retry(
     Err(last_err)
 }
 
+fn normalize_spoken_label(value: &str) -> String {
+    let value = value
+        .trim()
+        .trim_end_matches(['.', ',', ';', ':', '!', '?']);
+    value
+        .replace(['_', '-'], " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn audiobook_part_announcement_text(
+    options: &AudiobookCommonOptions<'_>,
+    part_output: &Path,
+    part_number: u32,
+) -> Option<String> {
+    if options.part_announcement_mode == AudiobookPartAnnouncementMode::None {
+        return None;
+    }
+    let title = normalize_spoken_label(options.audiobook_title);
+    let fallback_title = part_output
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .map(normalize_spoken_label)
+        .unwrap_or_default();
+    let title = if title.is_empty() {
+        fallback_title.as_str()
+    } else {
+        title.as_str()
+    };
+    let file_name = part_output
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .map(|value| {
+            let cleaned = if let Some(marker_pos) = value.find(".chapbuild.") {
+                let prefix = &value[..marker_pos];
+                let suffix = value[marker_pos..]
+                    .find(" Part ")
+                    .map(|offset| &value[marker_pos + offset..])
+                    .unwrap_or("");
+                format!("{prefix}{suffix}")
+            } else {
+                value.to_string()
+            };
+            normalize_spoken_label(&cleaned)
+        })
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| title.to_string());
+    let number = part_number.to_string();
+    let text = match options.part_announcement_mode {
+        AudiobookPartAnnouncementMode::None => return None,
+        AudiobookPartAnnouncementMode::Title => title.to_string(),
+        AudiobookPartAnnouncementMode::TitlePartNumber => i18n::tr_f(
+            options.language,
+            "audiobook.part_announcement.title_part_number",
+            &[("title", title), ("number", &number)],
+        ),
+        AudiobookPartAnnouncementMode::FileName => file_name,
+        AudiobookPartAnnouncementMode::FileNamePartNumber => i18n::tr_f(
+            options.language,
+            "audiobook.part_announcement.file_name_part_number",
+            &[("file_name", &file_name), ("number", &number)],
+        ),
+    };
+    let text = text.trim();
+    if text.is_empty() {
+        None
+    } else {
+        Some(format!("{text}."))
+    }
+}
+
+pub(crate) fn prepend_part_announcement(
+    chunks: &[String],
+    options: &AudiobookCommonOptions<'_>,
+    part_output: &Path,
+    part_number: u32,
+) -> Vec<String> {
+    let Some(announcement) = audiobook_part_announcement_text(options, part_output, part_number)
+    else {
+        return chunks.to_vec();
+    };
+    let mut result = Vec::with_capacity(chunks.len() + 1);
+    result.push(announcement);
+    result.extend_from_slice(chunks);
+    result
+}
+
+pub(crate) fn prepend_mixed_part_announcement(
+    chunks: &[TtsChunk],
+    options: &AudiobookCommonOptions<'_>,
+    part_output: &Path,
+    part_number: u32,
+) -> Vec<TtsChunk> {
+    let Some(announcement) = audiobook_part_announcement_text(options, part_output, part_number)
+    else {
+        return chunks.to_vec();
+    };
+    let mut result = Vec::with_capacity(chunks.len() + 1);
+    result.push(TtsChunk {
+        original_len: utf16_len(&announcement),
+        text_to_read: announcement,
+        override_voice: None,
+        pause_ms: None,
+    });
+    result.extend_from_slice(chunks);
+    result
+}
+
+pub(crate) fn prepend_mixed_announcement_to_audio_file(
+    audio_file: &Path,
+    part_number: u32,
+    options: &AudiobookCommonOptions<'_>,
+    main_engine: TtsEngine,
+) -> Result<(), String> {
+    let Some(announcement) = audiobook_part_announcement_text(options, audio_file, part_number)
+    else {
+        return Ok(());
+    };
+    let stem = audio_file
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("part");
+    let ext = audio_file
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("mp3");
+    let announcement_file = audio_file.with_file_name(format!("{stem}.announcement.tmp.{ext}"));
+    let merged_file = audio_file.with_file_name(format!("{stem}.merged.tmp.{ext}"));
+    let chunk = TtsChunk {
+        original_len: utf16_len(&announcement),
+        text_to_read: announcement,
+        override_voice: None,
+        pause_ms: None,
+    };
+    let mut progress = 0usize;
+    let config = MixedAudiobookConfig { main_engine };
+    if let Err(error) = render_mixed_audiobook_part(
+        &[chunk],
+        &mut progress,
+        &announcement_file,
+        options,
+        &config,
+    ) {
+        if let Err(cleanup_error) = std::fs::remove_file(&announcement_file) {
+            crate::log_debug(&format!(
+                "Failed to remove incomplete part announcement: {cleanup_error}"
+            ));
+        }
+        return Err(error);
+    }
+    let merge_result = crate::ffmpeg_export::concatenate_audio_files_copy(
+        &[announcement_file.clone(), audio_file.to_path_buf()],
+        &merged_file,
+    );
+    if let Err(error) = std::fs::remove_file(&announcement_file) {
+        crate::log_debug(&format!(
+            "Failed to remove temporary part announcement: {error}"
+        ));
+    }
+    if let Err(error) = merge_result {
+        if let Err(cleanup_error) = std::fs::remove_file(&merged_file) {
+            crate::log_debug(&format!(
+                "Failed to remove incomplete merged audiobook part: {cleanup_error}"
+            ));
+        }
+        return Err(error);
+    }
+    std::fs::remove_file(audio_file).map_err(|error| {
+        format!("Failed to replace audiobook part after adding announcement: {error}")
+    })?;
+    std::fs::rename(&merged_file, audio_file)
+        .map_err(|error| format!("Failed to finalize audiobook part announcement: {error}"))
+}
+
 pub(crate) fn format_audiobook_part_filename(
     stem: &str,
     ext: &str,
@@ -3329,6 +3506,50 @@ fn run_split_audiobook_by_time_edge(
                             std::fs::File::create(&part_output).map_err(|e| e.to_string())?;
                         part_writer = Some(BufWriter::new(file));
                     }
+                    if let Some(announcement) = audiobook_part_announcement_text(
+                        &options,
+                        &part_output,
+                        start_number.saturating_add(part_index),
+                    ) {
+                        let announcement_chunk = TtsChunk {
+                            original_len: utf16_len(&announcement),
+                            text_to_read: announcement,
+                            override_voice: None,
+                            pause_ms: None,
+                        };
+                        let announcement_audio = download_edge_chunk_ws_with_retry(
+                            &announcement_chunk,
+                            &stream_options,
+                            usize::MAX.saturating_sub(part_index as usize),
+                            CHUNK_RETRIES,
+                        )
+                        .await?;
+                        if let Some(ref mut w) = wav_writer {
+                            let (announcement_samples, announcement_rate, announcement_channels) =
+                                decode_mp3_to_pcm(&announcement_audio)?;
+                            let target_rate = wav_rate.unwrap_or(announcement_rate);
+                            let target_channels = wav_channels.unwrap_or(announcement_channels);
+                            let announcement_duration = announcement_samples.len() as f64
+                                / (announcement_rate as f64 * announcement_channels as f64);
+                            let output_samples = if announcement_rate != target_rate
+                                || announcement_channels != target_channels
+                            {
+                                resample_pcm(
+                                    &announcement_samples,
+                                    announcement_rate,
+                                    announcement_channels,
+                                    target_rate,
+                                    target_channels,
+                                )
+                            } else {
+                                announcement_samples
+                            };
+                            w.write_samples_f32(&output_samples).map_err(|e| e.to_string())?;
+                            current_duration += announcement_duration;
+                        } else if let Some(ref mut writer) = part_writer {
+                            writer.write_all(&announcement_audio).map_err(|e| e.to_string())?;
+                        }
+                    }
                 }
 
                 if let Some(ref mut w) = wav_writer {
@@ -3486,6 +3707,39 @@ fn run_split_audiobook_by_time_sapi(
                 let writer = WavWriter::create(&part_output, src_rate, src_channels, 16)
                     .map_err(|e| e.to_string())?;
                 wav_writer = Some(writer);
+            }
+            if let Some(announcement) = audiobook_part_announcement_text(
+                &options,
+                &part_output,
+                start_number.saturating_add(part_index),
+            ) {
+                let announcement_bytes =
+                    rt.block_on(synthesize_segment_bytes(&announcement, &config))?;
+                let (announcement_samples, announcement_rate, announcement_channels) =
+                    decode_wav_to_pcm(&announcement_bytes)?;
+                let target_rate = wav_rate.unwrap_or(announcement_rate);
+                let target_channels = wav_channels.unwrap_or(announcement_channels);
+                let announcement_duration = announcement_samples.len() as f64
+                    / (announcement_rate as f64 * announcement_channels as f64);
+                let output_samples = if announcement_rate != target_rate
+                    || announcement_channels != target_channels
+                {
+                    resample_pcm(
+                        &announcement_samples,
+                        announcement_rate,
+                        announcement_channels,
+                        target_rate,
+                        target_channels,
+                    )
+                } else {
+                    announcement_samples
+                };
+                if let Some(ref mut writer) = wav_writer {
+                    writer
+                        .write_samples_f32(&output_samples)
+                        .map_err(|e| e.to_string())?;
+                }
+                current_duration += announcement_duration;
             }
         }
 
@@ -5261,6 +5515,7 @@ fn start_audiobook_with_text(
         audiobook_split_minutes,
         audiobook_split_start_number,
         audiobook_part_naming_mode,
+        audiobook_part_announcement_mode,
         initial_audiobook_m4b_bitrate,
         tts_engine,
         dictionary,
@@ -5281,6 +5536,7 @@ fn start_audiobook_with_text(
                 state.settings.audiobook_split_minutes,
                 state.settings.audiobook_split_start_number,
                 state.settings.audiobook_part_naming_mode,
+                state.settings.audiobook_part_announcement_mode,
                 state.settings.audiobook_m4b_bitrate,
                 state.settings.tts_engine,
                 state.settings.dictionary.clone(),
@@ -5302,6 +5558,7 @@ fn start_audiobook_with_text(
         5,
         1,
         AudiobookPartNamingMode::TitleNumber,
+        AudiobookPartAnnouncementMode::None,
         128,
         TtsEngine::Edge,
         Vec::new(),
@@ -5552,6 +5809,12 @@ fn start_audiobook_with_text(
         output = nested_output;
     }
 
+    let audiobook_title = output
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("audiobook")
+        .to_string();
+
     let chunks_len = if let Some(parts) = &mixed_marker_parts {
         parts.iter().map(|part| part.len()).sum()
     } else if let Some(parts) = &marker_parts {
@@ -5612,9 +5875,11 @@ fn start_audiobook_with_text(
             voice: &voice,
             output: &chapter_work_output,
             progress_hwnd,
-            cancel: cancel_clone,
+            cancel: cancel_clone.clone(),
             language,
             part_naming_mode: audiobook_part_naming_mode,
+            part_announcement_mode: audiobook_part_announcement_mode,
+            audiobook_title: &audiobook_title,
             audiobook_bitrate_kbps: audiobook_m4b_bitrate,
             rate: tts_rate,
             pitch: tts_pitch,
@@ -5656,8 +5921,18 @@ fn start_audiobook_with_text(
                         } else {
                             options.output.to_path_buf()
                         };
+                        let announced_chunks = if parts_len > 1 && emit_part_files {
+                            prepend_mixed_part_announcement(
+                                part_chunks,
+                                &options,
+                                &part_output,
+                                (part_idx + 1) as u32,
+                            )
+                        } else {
+                            part_chunks.to_vec()
+                        };
                         render_mixed_audiobook_part(
-                            part_chunks,
+                            &announced_chunks,
                             &mut current_global_progress,
                             &part_output,
                             &options,
@@ -5683,8 +5958,18 @@ fn start_audiobook_with_text(
                         } else {
                             options.output.to_path_buf()
                         };
+                        let announced_chunks = if parts_len > 1 && emit_part_files {
+                            prepend_mixed_part_announcement(
+                                part_chunks,
+                                &options,
+                                &part_output,
+                                (part_idx + 1) as u32,
+                            )
+                        } else {
+                            part_chunks.to_vec()
+                        };
                         render_mixed_audiobook_part(
-                            part_chunks,
+                            &announced_chunks,
                             &mut current_global_progress,
                             &part_output,
                             &options,
@@ -5808,6 +6093,48 @@ fn start_audiobook_with_text(
                 segment_seconds,
                 split_start_number,
             );
+            if result.is_ok()
+                && audiobook_part_announcement_mode != AudiobookPartAnnouncementMode::None
+            {
+                let announcement_options = AudiobookCommonOptions {
+                    voice: &voice,
+                    output: &final_output,
+                    progress_hwnd: HWND(0),
+                    cancel: cancel_clone.clone(),
+                    language,
+                    part_naming_mode: audiobook_part_naming_mode,
+                    part_announcement_mode: audiobook_part_announcement_mode,
+                    audiobook_title: &audiobook_title,
+                    audiobook_bitrate_kbps: audiobook_m4b_bitrate,
+                    rate: tts_rate,
+                    pitch: tts_pitch,
+                    volume: tts_volume,
+                    sapi4_threads,
+                };
+                let mut part_index = 0u32;
+                loop {
+                    let part_file = time_split_part_output(
+                        &final_output,
+                        part_index,
+                        split_start_number,
+                        audiobook_part_naming_mode,
+                    );
+                    if !part_file.exists() {
+                        break;
+                    }
+                    let part_number = split_start_number.saturating_add(part_index);
+                    if let Err(error) = prepend_mixed_announcement_to_audio_file(
+                        &part_file,
+                        part_number,
+                        &announcement_options,
+                        tts_engine,
+                    ) {
+                        result = Err(error);
+                        break;
+                    }
+                    part_index = part_index.saturating_add(1);
+                }
+            }
             if result.is_ok()
                 && let Err(e) = std::fs::remove_file(&final_output)
             {
@@ -6076,6 +6403,8 @@ fn run_split_audiobook(
             cancel: options.cancel.clone(),
             language: options.language,
             part_naming_mode: options.part_naming_mode,
+            part_announcement_mode: options.part_announcement_mode,
+            audiobook_title: options.audiobook_title,
             audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
@@ -6083,7 +6412,21 @@ fn run_split_audiobook(
             sapi4_threads: options.sapi4_threads,
         };
 
-        run_tts_audiobook_part(part_chunks, &mut current_global_progress, &part_options)?;
+        let announced_chunks = if parts > 1 {
+            prepend_part_announcement(
+                part_chunks,
+                &part_options,
+                &part_output,
+                (part_idx + 1) as u32,
+            )
+        } else {
+            part_chunks.to_vec()
+        };
+        run_tts_audiobook_part(
+            &announced_chunks,
+            &mut current_global_progress,
+            &part_options,
+        )?;
     }
     Ok(())
 }
@@ -6117,6 +6460,8 @@ fn run_marker_split_audiobook(
             cancel: options.cancel.clone(),
             language: options.language,
             part_naming_mode: options.part_naming_mode,
+            part_announcement_mode: options.part_announcement_mode,
+            audiobook_title: options.audiobook_title,
             audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
@@ -6124,7 +6469,21 @@ fn run_marker_split_audiobook(
             sapi4_threads: options.sapi4_threads,
         };
 
-        run_tts_audiobook_part(part_chunks, &mut current_global_progress, &part_options)?;
+        let announced_chunks = if parts_len > 1 {
+            prepend_part_announcement(
+                part_chunks,
+                &part_options,
+                &part_output,
+                (part_idx + 1) as u32,
+            )
+        } else {
+            part_chunks.to_vec()
+        };
+        run_tts_audiobook_part(
+            &announced_chunks,
+            &mut current_global_progress,
+            &part_options,
+        )?;
     }
     Ok(())
 }
@@ -6176,6 +6535,8 @@ fn run_split_sapi4_audiobook(
             cancel: options.cancel.clone(),
             language: options.language,
             part_naming_mode: options.part_naming_mode,
+            part_announcement_mode: options.part_announcement_mode,
+            audiobook_title: options.audiobook_title,
             audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
@@ -6183,8 +6544,18 @@ fn run_split_sapi4_audiobook(
             sapi4_threads: options.sapi4_threads,
         };
 
+        let announced_chunks = if parts_count > 1 {
+            prepend_part_announcement(
+                part_chunks,
+                &part_options,
+                &part_output,
+                (part_idx + 1) as u32,
+            )
+        } else {
+            part_chunks.to_vec()
+        };
         run_sapi4_parallel_part(
-            part_chunks,
+            &announced_chunks,
             voice_idx,
             &mut current_global_progress,
             &part_options,
@@ -6222,6 +6593,8 @@ fn run_marker_split_sapi4_audiobook(
             cancel: options.cancel.clone(),
             language: options.language,
             part_naming_mode: options.part_naming_mode,
+            part_announcement_mode: options.part_announcement_mode,
+            audiobook_title: options.audiobook_title,
             audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
             rate: options.rate,
             pitch: options.pitch,
@@ -6229,8 +6602,18 @@ fn run_marker_split_sapi4_audiobook(
             sapi4_threads: options.sapi4_threads,
         };
 
+        let announced_chunks = if parts.len() > 1 {
+            prepend_part_announcement(
+                part_chunks,
+                &part_options,
+                &part_output,
+                (part_idx + 1) as u32,
+            )
+        } else {
+            part_chunks.to_vec()
+        };
         run_sapi4_parallel_part(
-            part_chunks,
+            &announced_chunks,
             voice_idx,
             &mut current_global_progress,
             &part_options,
@@ -8952,11 +9335,35 @@ fn run_split_sapi_audiobook(
         }
 
         let part_chunks = &chunks[start_idx..end_idx];
-
         let part_output = if parts > 1 {
             split_part_output(options.output, part_idx, parts, options.part_naming_mode)
         } else {
             options.output.to_path_buf()
+        };
+        let part_options = AudiobookCommonOptions {
+            voice: options.voice,
+            output: &part_output,
+            progress_hwnd: options.progress_hwnd,
+            cancel: options.cancel.clone(),
+            language: options.language,
+            part_naming_mode: options.part_naming_mode,
+            part_announcement_mode: options.part_announcement_mode,
+            audiobook_title: options.audiobook_title,
+            audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
+            rate: options.rate,
+            pitch: options.pitch,
+            volume: options.volume,
+            sapi4_threads: options.sapi4_threads,
+        };
+        let announced_chunks = if parts > 1 {
+            prepend_part_announcement(
+                part_chunks,
+                &part_options,
+                &part_output,
+                (part_idx + 1) as u32,
+            )
+        } else {
+            part_chunks.to_vec()
         };
 
         let extension = part_output
@@ -8966,20 +9373,11 @@ fn run_split_sapi_audiobook(
             .to_lowercase();
         let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
         if extension == "mp3" {
-            let part_options = AudiobookCommonOptions {
-                voice: options.voice,
-                output: &part_output,
-                progress_hwnd: options.progress_hwnd,
-                cancel: options.cancel.clone(),
-                language: options.language,
-                part_naming_mode: options.part_naming_mode,
-                audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
-                rate: options.rate,
-                pitch: options.pitch,
-                volume: options.volume,
-                sapi4_threads: options.sapi4_threads,
-            };
-            run_sapi5_parallel_part(part_chunks, &mut current_global_progress, &part_options)?;
+            run_sapi5_parallel_part(
+                &announced_chunks,
+                &mut current_global_progress,
+                &part_options,
+            )?;
             continue;
         }
         let actual_output = if is_aac {
@@ -8993,7 +9391,7 @@ fn run_split_sapi_audiobook(
 
         crate::sapi5_engine::speak_sapi_to_file(
             crate::sapi5_engine::SapiExportOptions {
-                chunks: part_chunks,
+                chunks: &announced_chunks,
                 voice_name: options.voice,
                 output_path: &actual_output,
                 language: options.language,
@@ -9072,6 +9470,31 @@ fn run_marker_split_sapi_audiobook(
         } else {
             options.output.to_path_buf()
         };
+        let part_options = AudiobookCommonOptions {
+            voice: options.voice,
+            output: &part_output,
+            progress_hwnd: options.progress_hwnd,
+            cancel: options.cancel.clone(),
+            language: options.language,
+            part_naming_mode: options.part_naming_mode,
+            part_announcement_mode: options.part_announcement_mode,
+            audiobook_title: options.audiobook_title,
+            audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
+            rate: options.rate,
+            pitch: options.pitch,
+            volume: options.volume,
+            sapi4_threads: options.sapi4_threads,
+        };
+        let announced_chunks = if parts_len > 1 {
+            prepend_part_announcement(
+                part_chunks,
+                &part_options,
+                &part_output,
+                (part_idx + 1) as u32,
+            )
+        } else {
+            part_chunks.to_vec()
+        };
 
         let extension = part_output
             .extension()
@@ -9080,20 +9503,11 @@ fn run_marker_split_sapi_audiobook(
             .to_lowercase();
         let is_aac = extension == "m4b" || extension == "m4a" || extension == "mp4";
         if extension == "mp3" {
-            let part_options = AudiobookCommonOptions {
-                voice: options.voice,
-                output: &part_output,
-                progress_hwnd: options.progress_hwnd,
-                cancel: options.cancel.clone(),
-                language: options.language,
-                part_naming_mode: options.part_naming_mode,
-                audiobook_bitrate_kbps: options.audiobook_bitrate_kbps,
-                rate: options.rate,
-                pitch: options.pitch,
-                volume: options.volume,
-                sapi4_threads: options.sapi4_threads,
-            };
-            run_sapi5_parallel_part(part_chunks, &mut current_global_progress, &part_options)?;
+            run_sapi5_parallel_part(
+                &announced_chunks,
+                &mut current_global_progress,
+                &part_options,
+            )?;
             continue;
         }
         let actual_output = if is_aac {
@@ -9107,7 +9521,7 @@ fn run_marker_split_sapi_audiobook(
 
         crate::sapi5_engine::speak_sapi_to_file(
             crate::sapi5_engine::SapiExportOptions {
-                chunks: part_chunks,
+                chunks: &announced_chunks,
                 voice_name: options.voice,
                 output_path: &actual_output,
                 language: options.language,
@@ -10726,6 +11140,8 @@ mod google_audiobook_optimization_tests {
             cancel,
             language: Language::Italian,
             part_naming_mode: AudiobookPartNamingMode::TitleNumber,
+            part_announcement_mode: AudiobookPartAnnouncementMode::None,
+            audiobook_title: "",
             audiobook_bitrate_kbps: 128,
             rate: 0,
             pitch: 0,
@@ -10791,6 +11207,8 @@ mod google_audiobook_optimization_tests {
             cancel: Arc::new(AtomicBool::new(false)),
             language: Language::Italian,
             part_naming_mode: AudiobookPartNamingMode::TitleNumber,
+            part_announcement_mode: AudiobookPartAnnouncementMode::None,
+            audiobook_title: "",
             audiobook_bitrate_kbps: 128,
             rate: 0,
             pitch: 0,

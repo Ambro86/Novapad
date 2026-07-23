@@ -1875,5 +1875,13 @@
   "librivox.language_value": "语言：",
   "librivox.duration_value": "时长：",
   "rss.related_sources_count": "{count} 个相关来源",
-  "options.lang.pt_br": "葡萄牙语（巴西）"
+  "options.lang.pt_br": "葡萄牙语（巴西）",
+  "options.label.audiobook_part_announcement": "每个分段开头的播报：",
+  "options.choice.audiobook_part_announcement.none": "不播报",
+  "options.choice.audiobook_part_announcement.title": "书名",
+  "options.choice.audiobook_part_announcement.title_part_number": "书名 + 分段编号",
+  "options.choice.audiobook_part_announcement.file_name": "文件名",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "文件名 + 分段编号",
+  "audiobook.part_announcement.title_part_number": "{title}，第 {number} 部分",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}，第 {number} 部分"
 }

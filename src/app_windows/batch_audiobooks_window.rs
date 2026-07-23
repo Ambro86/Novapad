@@ -44,13 +44,17 @@ use crate::file_handler::{
     read_spreadsheet_text,
 };
 use crate::i18n;
-use crate::settings::{AudiobookPartNamingMode, DictionaryEntry, Language, TtsEngine};
+use crate::settings::{
+    AudiobookPartAnnouncementMode, AudiobookPartNamingMode, DictionaryEntry, Language, TtsEngine,
+};
 use crate::tts_engine::{
     MixedAudiobookConfig, TtsChunk, build_audiobook_parts_by_positions,
     build_audiobook_parts_from_sections, build_mixed_audiobook_parts_by_positions,
     build_mixed_audiobook_parts_from_sections, collect_marker_entries,
-    format_audiobook_part_filename, has_voice_tags, prepare_tts_text, render_mixed_audiobook_part,
-    run_tts_audiobook_part, split_into_tts_chunks, strip_dashed_lines,
+    format_audiobook_part_filename, has_voice_tags, prepare_tts_text,
+    prepend_mixed_announcement_to_audio_file, prepend_mixed_part_announcement,
+    prepend_part_announcement, render_mixed_audiobook_part, run_tts_audiobook_part,
+    split_into_tts_chunks, strip_dashed_lines,
 };
 use crate::{log_debug, sanitize_filename, show_error, with_state};
 
@@ -304,6 +308,7 @@ struct TtsSettings {
     audiobook_split_minutes: u32,
     audiobook_split_start_number: u32,
     audiobook_part_naming_mode: AudiobookPartNamingMode,
+    audiobook_part_announcement_mode: AudiobookPartAnnouncementMode,
     audiobook_m4b_bitrate: u32,
     tts_engine: TtsEngine,
     dictionary: Vec<DictionaryEntry>,
@@ -2018,6 +2023,7 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             audiobook_split_minutes: state.settings.audiobook_split_minutes,
             audiobook_split_start_number: state.settings.audiobook_split_start_number,
             audiobook_part_naming_mode: state.settings.audiobook_part_naming_mode,
+            audiobook_part_announcement_mode: state.settings.audiobook_part_announcement_mode,
             audiobook_m4b_bitrate: state.settings.audiobook_m4b_bitrate,
             tts_engine: state.settings.tts_engine,
             dictionary: state.settings.dictionary.clone(),
@@ -2041,6 +2047,7 @@ fn load_tts_settings(parent: HWND, voice: String, language: Language) -> TtsSett
             audiobook_split_minutes: 5,
             audiobook_split_start_number: 1,
             audiobook_part_naming_mode: AudiobookPartNamingMode::TitleNumber,
+            audiobook_part_announcement_mode: AudiobookPartAnnouncementMode::None,
             audiobook_m4b_bitrate: 128,
             tts_engine: TtsEngine::Edge,
             dictionary: Vec::new(),
@@ -2287,6 +2294,11 @@ fn export_single_audiobook(
     progress_hwnd: HWND,
     sapi_voice: Option<&crate::sapi5_engine::SapiVoice>,
 ) -> Result<Vec<PathBuf>, String> {
+    let audiobook_title = input
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("audiobook")
+        .to_string();
     let use_epub_split = tts.audiobook_split_by_epub_chapter && is_epub_path(input);
     let epub_chapters = if use_epub_split {
         read_epub_chapters(input, tts.language)?
@@ -2457,7 +2469,14 @@ fn export_single_audiobook(
             tts.audiobook_part_naming_mode,
             split_by_time,
         );
-        match export_parts_mixed(&parts, &render_outputs, tts, cancel.clone(), progress_hwnd) {
+        match export_parts_mixed(
+            &parts,
+            &render_outputs,
+            tts,
+            &audiobook_title,
+            cancel.clone(),
+            progress_hwnd,
+        ) {
             Ok(()) => {
                 if split_by_time {
                     let Some(output) = render_outputs.first() else {
@@ -2474,9 +2493,21 @@ fn export_single_audiobook(
                             final_output,
                             split_minutes,
                             split_start_number,
+                            tts,
+                            &audiobook_title,
+                            cancel.clone(),
                         );
                     }
-                    return segment_batch_output(output, split_minutes, split_start_number);
+                    let part_files =
+                        segment_batch_output(output, split_minutes, split_start_number)?;
+                    prepend_batch_segment_announcements(
+                        &part_files,
+                        split_start_number,
+                        tts,
+                        &audiobook_title,
+                        cancel.clone(),
+                    )?;
+                    return Ok(part_files);
                 }
                 if merge_m4b {
                     let Some(final_output) = final_outputs.first() else {
@@ -2534,6 +2565,7 @@ fn export_single_audiobook(
             &parts,
             &render_outputs,
             tts,
+            &audiobook_title,
             cancel.clone(),
             progress_hwnd,
             sapi_voice,
@@ -2554,9 +2586,21 @@ fn export_single_audiobook(
                             final_output,
                             split_minutes,
                             split_start_number,
+                            tts,
+                            &audiobook_title,
+                            cancel.clone(),
                         );
                     }
-                    return segment_batch_output(output, split_minutes, split_start_number);
+                    let part_files =
+                        segment_batch_output(output, split_minutes, split_start_number)?;
+                    prepend_batch_segment_announcements(
+                        &part_files,
+                        split_start_number,
+                        tts,
+                        &audiobook_title,
+                        cancel.clone(),
+                    )?;
+                    return Ok(part_files);
                 }
                 if merge_m4b {
                     let Some(final_output) = final_outputs.first() else {
@@ -2650,10 +2694,58 @@ fn segment_batch_output_and_merge_m4b(
     final_output: &Path,
     split_minutes: u32,
     split_start_number: u32,
+    tts: &TtsSettings,
+    audiobook_title: &str,
+    cancel: Arc<AtomicBool>,
 ) -> Result<Vec<PathBuf>, String> {
     let part_files = segment_batch_output(work_output, split_minutes, split_start_number)?;
+    prepend_batch_segment_announcements(
+        &part_files,
+        split_start_number,
+        tts,
+        audiobook_title,
+        cancel,
+    )?;
     merge_batch_m4b_outputs(&part_files, final_output, None)?;
     Ok(vec![final_output.to_path_buf()])
+}
+
+fn prepend_batch_segment_announcements(
+    part_files: &[PathBuf],
+    split_start_number: u32,
+    tts: &TtsSettings,
+    audiobook_title: &str,
+    cancel: Arc<AtomicBool>,
+) -> Result<(), String> {
+    if part_files.is_empty()
+        || tts.audiobook_part_announcement_mode == AudiobookPartAnnouncementMode::None
+    {
+        return Ok(());
+    }
+    let options = crate::tts_engine::AudiobookCommonOptions {
+        voice: &tts.voice,
+        output: &part_files[0],
+        progress_hwnd: HWND(0),
+        cancel,
+        language: tts.language,
+        part_naming_mode: tts.audiobook_part_naming_mode,
+        part_announcement_mode: tts.audiobook_part_announcement_mode,
+        audiobook_title,
+        audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
+        rate: tts.tts_rate,
+        pitch: tts.tts_pitch,
+        volume: tts.tts_volume,
+        sapi4_threads: tts.sapi4_threads,
+    };
+    for (part_idx, part_file) in part_files.iter().enumerate() {
+        prepend_mixed_announcement_to_audio_file(
+            part_file,
+            split_start_number.saturating_add(part_idx as u32),
+            &options,
+            tts.tts_engine,
+        )?;
+    }
+    Ok(())
 }
 
 fn merge_batch_m4b_outputs(
@@ -2898,6 +2990,7 @@ fn export_parts(
     parts: &[Vec<String>],
     outputs: &[PathBuf],
     tts: &TtsSettings,
+    audiobook_title: &str,
     cancel: Arc<AtomicBool>,
     progress_hwnd: HWND,
     sapi_voice: Option<&crate::sapi5_engine::SapiVoice>,
@@ -2905,11 +2998,16 @@ fn export_parts(
     if parts.len() != outputs.len() {
         return Err("Output count mismatch.".to_string());
     }
+    let announce_parts = parts.len() > 1
+        && tts.audiobook_part_announcement_mode != AudiobookPartAnnouncementMode::None;
+    let announcement_units = if announce_parts { 1 } else { 0 };
     let mut progress = 0usize;
     let total_units: usize = outputs
         .iter()
         .zip(parts.iter())
-        .map(|(output, part_chunks)| progress_units_for_output(output, part_chunks.len()))
+        .map(|(output, part_chunks)| {
+            progress_units_for_output(output, part_chunks.len() + announcement_units)
+        })
         .sum::<usize>()
         .max(1);
     let mut progress_base = 0usize;
@@ -2918,57 +3016,42 @@ fn export_parts(
             return Err(i18n::tr(tts.language, "tts.cancelled"));
         }
         let output = &outputs[part_idx];
+        let options = crate::tts_engine::AudiobookCommonOptions {
+            voice: &tts.voice,
+            output,
+            progress_hwnd,
+            cancel: cancel.clone(),
+            language: tts.language,
+            part_naming_mode: tts.audiobook_part_naming_mode,
+            part_announcement_mode: tts.audiobook_part_announcement_mode,
+            audiobook_title,
+            audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
+            rate: tts.tts_rate,
+            pitch: tts.tts_pitch,
+            volume: tts.tts_volume,
+            sapi4_threads: tts.sapi4_threads,
+        };
+        let announced_chunks = if announce_parts {
+            prepend_part_announcement(part_chunks, &options, output, (part_idx + 1) as u32)
+        } else {
+            part_chunks.to_vec()
+        };
         post_batch_progress_context(progress_hwnd, progress_base, total_units);
         match tts.tts_engine {
             TtsEngine::Edge => {
-                let options = crate::tts_engine::AudiobookCommonOptions {
-                    voice: &tts.voice,
-                    output,
-                    progress_hwnd,
-                    cancel: cancel.clone(),
-                    language: tts.language,
-                    part_naming_mode: tts.audiobook_part_naming_mode,
-                    audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
-                    rate: tts.tts_rate,
-                    pitch: tts.tts_pitch,
-                    volume: tts.tts_volume,
-                    sapi4_threads: tts.sapi4_threads,
-                };
-                run_tts_audiobook_part(part_chunks, &mut progress, &options)?;
+                run_tts_audiobook_part(&announced_chunks, &mut progress, &options)?;
             }
             TtsEngine::Google => {
-                let options = crate::tts_engine::AudiobookCommonOptions {
-                    voice: &tts.voice,
-                    output,
-                    progress_hwnd,
-                    cancel: cancel.clone(),
-                    language: tts.language,
-                    part_naming_mode: tts.audiobook_part_naming_mode,
-                    audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
-                    rate: tts.tts_rate,
-                    pitch: tts.tts_pitch,
-                    volume: tts.tts_volume,
-                    sapi4_threads: None,
-                };
-                crate::tts_engine::run_google_audiobook_part(part_chunks, &mut progress, &options)?;
+                crate::tts_engine::run_google_audiobook_part(
+                    &announced_chunks,
+                    &mut progress,
+                    &options,
+                )?;
             }
             TtsEngine::Sapi4 => {
                 let voice_idx = crate::tts_engine::parse_sapi4_voice_index(&tts.voice);
-                let options = crate::tts_engine::AudiobookCommonOptions {
-                    voice: &tts.voice,
-                    output,
-                    progress_hwnd,
-                    cancel: cancel.clone(),
-                    language: tts.language,
-                    part_naming_mode: tts.audiobook_part_naming_mode,
-                    audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
-                    rate: tts.tts_rate,
-                    pitch: tts.tts_pitch,
-                    volume: tts.tts_volume,
-                    sapi4_threads: tts.sapi4_threads,
-                };
                 crate::tts_engine::run_sapi4_parallel_part(
-                    part_chunks,
+                    &announced_chunks,
                     voice_idx,
                     &mut progress,
                     &options,
@@ -2978,7 +3061,7 @@ fn export_parts(
                 crate::log_debug(&format!(
                     "Batch SAPI5 part start. part_idx={} chunks={} output={}",
                     part_idx + 1,
-                    part_chunks.len(),
+                    announced_chunks.len(),
                     output.display()
                 ));
                 let is_mp3 = output
@@ -2986,8 +3069,8 @@ fn export_parts(
                     .is_some_and(|e| e.eq_ignore_ascii_case("mp3"));
                 if is_mp3 {
                     let wav_path = output.with_extension("wav.tmp");
-                    let options = crate::sapi5_engine::SapiExportOptions {
-                        chunks: part_chunks,
+                    let sapi_options = crate::sapi5_engine::SapiExportOptions {
+                        chunks: &announced_chunks,
                         voice_name: &tts.voice,
                         output_path: &wav_path,
                         language: tts.language,
@@ -3000,7 +3083,7 @@ fn export_parts(
                     if let Some(voice) = sapi_voice {
                         crate::sapi5_engine::speak_sapi_to_file_with_sapi_voice(
                             voice,
-                            options,
+                            sapi_options,
                             |_chunk_idx| {
                                 progress += 1;
                                 if progress_hwnd.0 != 0 {
@@ -3014,7 +3097,7 @@ fn export_parts(
                             },
                         )?;
                     } else {
-                        crate::sapi5_engine::speak_sapi_to_file(options, |_chunk_idx| {
+                        crate::sapi5_engine::speak_sapi_to_file(sapi_options, |_chunk_idx| {
                             progress += 1;
                             if progress_hwnd.0 != 0 {
                                 crate::send_message_w_safe(
@@ -3064,8 +3147,8 @@ fn export_parts(
                         }
                     }
                 } else {
-                    let options = crate::sapi5_engine::SapiExportOptions {
-                        chunks: part_chunks,
+                    let sapi_options = crate::sapi5_engine::SapiExportOptions {
+                        chunks: &announced_chunks,
                         voice_name: &tts.voice,
                         output_path: output,
                         language: tts.language,
@@ -3078,7 +3161,7 @@ fn export_parts(
                     if let Some(voice) = sapi_voice {
                         crate::sapi5_engine::speak_sapi_to_file_with_sapi_voice(
                             voice,
-                            options,
+                            sapi_options,
                             |_chunk_idx| {
                                 progress += 1;
                                 if progress_hwnd.0 != 0 {
@@ -3092,7 +3175,7 @@ fn export_parts(
                             },
                         )?;
                     } else {
-                        crate::sapi5_engine::speak_sapi_to_file(options, |_chunk_idx| {
+                        crate::sapi5_engine::speak_sapi_to_file(sapi_options, |_chunk_idx| {
                             progress += 1;
                             if progress_hwnd.0 != 0 {
                                 crate::send_message_w_safe(
@@ -3113,7 +3196,7 @@ fn export_parts(
             }
         }
         progress_base =
-            progress_base.saturating_add(progress_units_for_output(output, part_chunks.len()));
+            progress_base.saturating_add(progress_units_for_output(output, announced_chunks.len()));
     }
     Ok(())
 }
@@ -3160,17 +3243,23 @@ fn export_parts_mixed(
     parts: &[Vec<TtsChunk>],
     outputs: &[PathBuf],
     tts: &TtsSettings,
+    audiobook_title: &str,
     cancel: Arc<AtomicBool>,
     progress_hwnd: HWND,
 ) -> Result<(), String> {
     if parts.len() != outputs.len() {
         return Err("Output count mismatch.".to_string());
     }
+    let announce_parts = parts.len() > 1
+        && tts.audiobook_part_announcement_mode != AudiobookPartAnnouncementMode::None;
+    let announcement_units = if announce_parts { 1 } else { 0 };
     let mut progress = 0usize;
     let total_units: usize = outputs
         .iter()
         .zip(parts.iter())
-        .map(|(output, part_chunks)| progress_units_for_output(output, part_chunks.len()))
+        .map(|(output, part_chunks)| {
+            progress_units_for_output(output, part_chunks.len() + announcement_units)
+        })
         .sum::<usize>()
         .max(1);
     let mut progress_base = 0usize;
@@ -3179,7 +3268,6 @@ fn export_parts_mixed(
             return Err(i18n::tr(tts.language, "tts.cancelled"));
         }
         let output = &outputs[part_idx];
-        post_batch_progress_context(progress_hwnd, progress_base, total_units);
         let options = crate::tts_engine::AudiobookCommonOptions {
             voice: &tts.voice,
             output,
@@ -3187,18 +3275,26 @@ fn export_parts_mixed(
             cancel: cancel.clone(),
             language: tts.language,
             part_naming_mode: tts.audiobook_part_naming_mode,
+            part_announcement_mode: tts.audiobook_part_announcement_mode,
+            audiobook_title,
             audiobook_bitrate_kbps: tts.audiobook_m4b_bitrate,
             rate: tts.tts_rate,
             pitch: tts.tts_pitch,
             volume: tts.tts_volume,
             sapi4_threads: tts.sapi4_threads,
         };
+        let announced_chunks = if announce_parts {
+            prepend_mixed_part_announcement(part_chunks, &options, output, (part_idx + 1) as u32)
+        } else {
+            part_chunks.to_vec()
+        };
+        post_batch_progress_context(progress_hwnd, progress_base, total_units);
         let config = MixedAudiobookConfig {
             main_engine: tts.tts_engine,
         };
-        render_mixed_audiobook_part(part_chunks, &mut progress, output, &options, &config)?;
+        render_mixed_audiobook_part(&announced_chunks, &mut progress, output, &options, &config)?;
         progress_base =
-            progress_base.saturating_add(progress_units_for_output(output, part_chunks.len()));
+            progress_base.saturating_add(progress_units_for_output(output, announced_chunks.len()));
     }
     Ok(())
 }

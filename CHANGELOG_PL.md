@@ -1,6 +1,6 @@
 # Dziennik zmian
 
-Wersja 0.8.3 – 2026-07-22
+Wersja 0.8.3 – 2026-07-23
 
 Tryb ciemny
 • Dodano tryb ciemny, który można włączyć w menu Widok i który jest zapisywany w preferencjach użytkownika.
@@ -15,6 +15,19 @@ Portugalski brazylijski i Wiadomości Google
 • Cały interfejs, kalendarz i wszystkie cytaty, sprawdzanie pisowni, darowizny, podręcznik oraz dziennik zmian są dostępne po portugalsku brazylijskim.
 • Wiadomości Google obsługują teraz lokalizację brazylijską, kategorie brazylijskie i osobne domyślne brazylijskie źródła RSS.
 • Gdy kanał je udostępnia, powiązane źródła tej samej wiadomości są wyświetlane jako dostępne elementy podrzędne w drzewie.
+
+LibriVox
+• Zoptymalizowano wyszukiwanie w LibriVox, aby uniknąć nadmiernej liczby zapytań do usługi i zawieszania interfejsu. Usunięto rozległe skanowanie katalogu, zmniejszono liczbę prób i wprowadzono krótsze limity czasu.
+
+Synteza mowy
+• Sekwencje trzech lub większej liczby kropek są teraz normalizowane przed odczytem, dzięki czemu niektóre głosy nie wypowiadają „kropka kropka” ani nie tworzą fragmentów złożonych wyłącznie ze znaków interpunkcyjnych.
+
+Powiązane artykuły Google News
+• Dla każdej wiadomości, jeśli są dostępne, wyświetlane są teraz powiązane artykuły, czyli inne artykuły opisujące tę samą wiadomość. Aby je przeczytać, wystarczy rozwinąć artykuł główny, gdy Sonarpad poinformuje, że dostępne są powiązane artykuły. Jeśli ktoś nie chce rozwijać tej sekcji, wystarczy nacisnąć Enter na artykule głównym i przeczytać wiadomość tak jak dotychczas.
+• Powiązane artykuły korzystają teraz z tego samego systemu przeczytane/nieprzeczytane co artykuły główne, wraz z dostępnymi komunikatami, datą i godziną, zapisywaniem stanu oraz jego zachowaniem po odświeżeniu źródeł lub ponownym uruchomieniu Sonarpada.
+
+Zapowiedzi w częściach audiobooków
+• W opcjach dźwięku dodano pole kombi „Zapowiedź na początku każdej części”. W audiobookach podzielonych na wiele plików każda część może rozpoczynać się bez zapowiedzi albo od tytułu książki, tytułu i numeru części, nazwy pliku lub nazwy pliku i numeru części.
 
 Wersja 0.8.2 – 2026-07-17
 

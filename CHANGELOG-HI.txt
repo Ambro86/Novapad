@@ -1,6 +1,6 @@
 # परिवर्तन सूची
 
-Version 0.8.3 – 2026-07-22
+Version 0.8.3 – 2026-07-23
 
 डार्क मोड
 • डार्क मोड जोड़ा गया है, जिसे View menu से चालू किया जा सकता है और जो user preferences में सहेजा रहता है।
@@ -15,6 +15,9 @@ Version 0.8.3 – 2026-07-22
 • पूरा interface, calendar और सभी quotations, spell checker, donations, guide तथा changelog ब्राज़ीली पुर्तगाली में उपलब्ध हैं।
 • Google समाचार अब Brazil localization, Brazilian categories और अलग default Brazilian RSS sources का समर्थन करता है।
 • Feed में उपलब्ध होने पर एक ही समाचार से जुड़ी अलग-अलग sources tree में accessible child items के रूप में दिखाई जाती हैं।
+
+ऑडियोबुक के भागों की घोषणाएँ
+• Audio Options में “हर भाग की शुरुआत में घोषणा” combo box जोड़ा गया है। कई files में विभाजित audiobooks में हर भाग की शुरुआत बिना घोषणा के, पुस्तक के शीर्षक, शीर्षक और भाग संख्या, file name, या file name और भाग संख्या के साथ की जा सकती है।
 
 Version 0.8.2 – 2026-07-17
 

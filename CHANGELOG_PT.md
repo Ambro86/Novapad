@@ -1,6 +1,6 @@
 # Changelog
 
-Versão 0.8.3 – 2026-07-22
+Versão 0.8.3 – 2026-07-23
 
 Modo escuro
 • Adicionado um modo escuro, que pode ser ativado no menu Ver e fica guardado nas preferências.
@@ -15,6 +15,19 @@ Português do Brasil e Google Notícias
 • A interface, o calendário e todas as citações, o corretor ortográfico, as doações, o guia e o registo de alterações estão integralmente disponíveis em português brasileiro.
 • O Google Notícias suporta agora a localização brasileira, as categorias do Brasil e fontes RSS brasileiras predefinidas separadas.
 • Quando o feed as fornece, as fontes do Google Notícias relacionadas com a mesma notícia são apresentadas como itens filhos acessíveis na árvore.
+
+LibriVox
+• A pesquisa do LibriVox foi otimizada para evitar pedidos excessivos ao serviço e bloqueios da interface. Foram removidas as pesquisas extensas no catálogo, reduzidas as tentativas e introduzidos tempos limite mais curtos.
+
+Síntese de voz
+• As sequências de três ou mais pontos são agora normalizadas antes da leitura, evitando que algumas vozes pronunciem «ponto ponto» ou criem segmentos formados apenas por pontuação.
+
+Artigos relacionados do Google Notícias
+• Para cada notícia, quando disponíveis, são agora apresentados artigos relacionados, ou seja, outros artigos que tratam da mesma notícia. Para os ler, basta expandir o artigo principal quando o Sonarpad indicar que existem artigos relacionados disponíveis. Quem não quiser expandir esta secção só precisa de premir Enter no artigo principal e ler a notícia como sempre.
+• Os artigos relacionados utilizam agora o mesmo sistema lido/não lido dos artigos principais, incluindo anúncios acessíveis, data e hora, gravação do estado e a sua conservação após a atualização das fontes ou o reinício do Sonarpad.
+
+Anúncios nas partes dos audiolivros
+• Foi adicionada às Opções de áudio a caixa de combinação «Anúncio no início de cada parte». Nos audiolivros divididos em vários ficheiros, cada parte pode começar sem anúncio, com o título do livro, o título e o número da parte, o nome do ficheiro ou o nome do ficheiro e o número da parte.
 
 Versão 0.8.2 – 2026-07-17
 

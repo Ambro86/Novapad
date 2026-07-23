@@ -1,6 +1,6 @@
 # Nhật ký thay đổi
 
-Phiên bản 0.8.3 – 2026-07-22
+Phiên bản 0.8.3 – 2026-07-23
 
 Chế độ tối
 • Đã thêm chế độ tối, có thể bật trong menu Xem và được lưu trong tùy chọn của người dùng.
@@ -15,6 +15,19 @@ Tiếng Bồ Đào Nha Brazil và Google Tin tức
 • Toàn bộ giao diện, lịch và mọi câu trích dẫn, kiểm tra chính tả, thông tin quyên góp, hướng dẫn và nhật ký thay đổi đều có bản tiếng Bồ Đào Nha Brazil.
 • Google Tin tức hiện hỗ trợ bản địa hóa Brazil, các danh mục Brazil và các nguồn RSS Brazil mặc định riêng biệt.
 • Khi nguồn cấp cung cấp, các nguồn liên quan của cùng một tin được hiển thị dưới dạng mục con có thể truy cập trong cây.
+
+LibriVox
+• Đã tối ưu hóa tìm kiếm LibriVox để tránh gửi quá nhiều yêu cầu đến dịch vụ và làm treo giao diện. Việc quét danh mục trên diện rộng đã được loại bỏ, số lần thử được giảm và thời gian chờ ngắn hơn được áp dụng.
+
+Tổng hợp giọng nói
+• Các chuỗi gồm ba dấu chấm trở lên giờ được chuẩn hóa trước khi đọc, tránh việc một số giọng phát âm “chấm chấm” hoặc tạo ra các đoạn chỉ gồm dấu câu.
+
+Bài viết liên quan trên Google Tin tức
+• Với mỗi tin tức, các bài viết liên quan sẽ được hiển thị khi có, tức là những bài viết khác nói về cùng một tin. Để đọc chúng, chỉ cần mở rộng bài viết chính khi Sonarpad thông báo rằng có bài viết liên quan. Nếu không muốn mở rộng phần này, chỉ cần nhấn Enter trên bài viết chính và đọc tin như vẫn làm trước đây.
+• Các bài viết liên quan giờ sử dụng cùng hệ thống đã đọc/chưa đọc như bài viết chính, bao gồm thông báo hỗ trợ tiếp cận, ngày giờ, lưu trạng thái và giữ nguyên trạng thái sau khi cập nhật nguồn hoặc khởi động lại Sonarpad.
+
+Thông báo trong các phần sách nói
+• Đã thêm hộp kết hợp “Thông báo ở đầu mỗi phần” vào Tùy chọn âm thanh. Với sách nói được chia thành nhiều tệp, mỗi phần có thể bắt đầu mà không có thông báo, bằng tên sách, tên sách và số phần, tên tệp hoặc tên tệp và số phần.
 
 Phiên bản 0.8.2 – 2026-07-17
 

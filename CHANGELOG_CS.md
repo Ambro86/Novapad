@@ -1,6 +1,6 @@
 # Přehled změn
 
-Verze 0.8.3 – 2026-07-22
+Verze 0.8.3 – 2026-07-23
 
 Tmavý režim
 • Přidán tmavý režim, který lze zapnout v nabídce Zobrazení a který se ukládá do uživatelských nastavení.
@@ -15,6 +15,19 @@ Brazilská portugalština a Zprávy Google
 • Celé rozhraní, kalendář a všechny citáty, kontrola pravopisu, dary, příručka a seznam změn jsou dostupné v brazilské portugalštině.
 • Zprávy Google nyní podporují brazilské místní nastavení, brazilské kategorie a samostatné výchozí brazilské zdroje RSS.
 • Pokud je kanál poskytuje, související zdroje stejné zprávy se zobrazí jako přístupné podřízené položky ve stromu.
+
+LibriVox
+• Vyhledávání v LibriVoxu bylo optimalizováno, aby nedocházelo k nadměrnému počtu požadavků na službu a k zamrzání rozhraní. Bylo odstraněno rozsáhlé procházení katalogu, snížen počet pokusů a zavedeny kratší časové limity.
+
+Syntéza řeči
+• Posloupnosti tří nebo více teček se nyní před čtením normalizují, takže některé hlasy již nevyslovují „tečka tečka“ ani nevytvářejí úseky tvořené pouze interpunkcí.
+
+Související články Google News
+• U každé zprávy se nyní, pokud jsou k dispozici, zobrazují související články, tedy další články pojednávající o stejné události. Chcete-li si je přečíst, stačí rozbalit hlavní článek, když Sonarpad oznámí, že jsou k dispozici související články. Pokud tuto část nechcete rozbalit, stačí stisknout Enter na hlavním článku a přečíst si zprávu jako dosud.
+• Související články nyní používají stejný systém přečteno/nepřečteno jako hlavní články, včetně přístupných oznámení, data a času, ukládání stavu a jeho zachování po aktualizaci zdrojů nebo restartování Sonarpadu.
+
+Oznámení v částech audioknih
+• Do možností zvuku byl přidán rozbalovací seznam „Oznámení na začátku každé části“. U audioknih rozdělených do více souborů může každá část začínat bez oznámení, názvem knihy, názvem a číslem části, názvem souboru nebo názvem souboru a číslem části.
 
 Verze 0.8.2 – 2026-07-17
 

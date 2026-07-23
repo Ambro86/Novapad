@@ -165,6 +165,9 @@ fn ensure_tts_cache(
                         cancel,
                         language: settings.language,
                         part_naming_mode: crate::settings::AudiobookPartNamingMode::TitleNumber,
+                        part_announcement_mode:
+                            crate::settings::AudiobookPartAnnouncementMode::None,
+                        audiobook_title: "",
                         audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
                         rate: settings.tts_rate,
                         pitch: settings.tts_pitch,
@@ -215,6 +218,8 @@ fn ensure_tts_cache(
                     cancel,
                     language: settings.language,
                     part_naming_mode: crate::settings::AudiobookPartNamingMode::TitleNumber,
+                    part_announcement_mode: crate::settings::AudiobookPartAnnouncementMode::None,
+                    audiobook_title: "",
                     audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
                     rate: settings.tts_rate,
                     pitch: settings.tts_pitch,
@@ -243,6 +248,9 @@ fn ensure_tts_cache(
                         cancel,
                         language: settings.language,
                         part_naming_mode: crate::settings::AudiobookPartNamingMode::TitleNumber,
+                        part_announcement_mode:
+                            crate::settings::AudiobookPartAnnouncementMode::None,
+                        audiobook_title: "",
                         audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
                         rate: settings.tts_rate,
                         pitch: settings.tts_pitch,
@@ -286,6 +294,9 @@ fn ensure_tts_cache(
                         cancel,
                         language: settings.language,
                         part_naming_mode: crate::settings::AudiobookPartNamingMode::TitleNumber,
+                        part_announcement_mode:
+                            crate::settings::AudiobookPartAnnouncementMode::None,
+                        audiobook_title: "",
                         audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
                         rate: settings.tts_rate,
                         pitch: settings.tts_pitch,
@@ -776,6 +787,22 @@ pub fn merge_audio_files_with_chapters_copy(
     output_path: &Path,
     chapter_titles: Option<&[String]>,
 ) -> Result<(), String> {
+    merge_audio_files_copy_internal(input_files, output_path, chapter_titles, true)
+}
+
+pub(crate) fn concatenate_audio_files_copy(
+    input_files: &[PathBuf],
+    output_path: &Path,
+) -> Result<(), String> {
+    merge_audio_files_copy_internal(input_files, output_path, None, false)
+}
+
+fn merge_audio_files_copy_internal(
+    input_files: &[PathBuf],
+    output_path: &Path,
+    chapter_titles: Option<&[String]>,
+    include_chapters: bool,
+) -> Result<(), String> {
     if input_files.len() < 2 {
         return Err("FFmpeg: at least 2 input files are required".to_string());
     }
@@ -865,52 +892,56 @@ pub fn merge_audio_files_with_chapters_copy(
         (*out_stream).time_base = (*in_stream).time_base;
     }
 
-    let chapter_count = input_files.len();
-    let chapters_ptr = unsafe {
-        (api.av_mallocz)((chapter_count * std::mem::size_of::<*mut AVChapter>()) as libc::size_t)
-            as *mut *mut AVChapter
-    };
-    if chapters_ptr.is_null() {
-        unsafe {
-            (api.avformat_close_input)(&mut first_in_ctx);
-            (api.avformat_free_context)(out_ctx);
-        }
-        return Err("FFmpeg: failed to allocate chapter array".to_string());
-    }
-    let mut cumulative_ms = 0u64;
-    for (idx, dur_ms) in durations_ms.iter().enumerate() {
-        let chapter = unsafe { (api.av_mallocz)(std::mem::size_of::<AVChapter>() as libc::size_t) }
-            as *mut AVChapter;
-        if chapter.is_null() {
+    if include_chapters {
+        let chapter_count = input_files.len();
+        let chapters_ptr = unsafe {
+            (api.av_mallocz)(
+                (chapter_count * std::mem::size_of::<*mut AVChapter>()) as libc::size_t,
+            ) as *mut *mut AVChapter
+        };
+        if chapters_ptr.is_null() {
             unsafe {
                 (api.avformat_close_input)(&mut first_in_ctx);
                 (api.avformat_free_context)(out_ctx);
             }
-            return Err("FFmpeg: failed to allocate chapter".to_string());
+            return Err("FFmpeg: failed to allocate chapter array".to_string());
         }
-        let start_ms = cumulative_ms as i64;
-        let end_ms = cumulative_ms.saturating_add(*dur_ms) as i64;
-        cumulative_ms = cumulative_ms.saturating_add(*dur_ms);
-        let title = chapter_titles
-            .and_then(|titles| titles.get(idx))
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("Part {:02}", idx + 1));
-        let mut dict: *mut AVDictionary = ptr::null_mut();
-        dict_set_str(api, &mut dict, "title", &title)?;
+        let mut cumulative_ms = 0u64;
+        for (idx, dur_ms) in durations_ms.iter().enumerate() {
+            let chapter =
+                unsafe { (api.av_mallocz)(std::mem::size_of::<AVChapter>() as libc::size_t) }
+                    as *mut AVChapter;
+            if chapter.is_null() {
+                unsafe {
+                    (api.avformat_close_input)(&mut first_in_ctx);
+                    (api.avformat_free_context)(out_ctx);
+                }
+                return Err("FFmpeg: failed to allocate chapter".to_string());
+            }
+            let start_ms = cumulative_ms as i64;
+            let end_ms = cumulative_ms.saturating_add(*dur_ms) as i64;
+            cumulative_ms = cumulative_ms.saturating_add(*dur_ms);
+            let title = chapter_titles
+                .and_then(|titles| titles.get(idx))
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| format!("Part {:02}", idx + 1));
+            let mut dict: *mut AVDictionary = ptr::null_mut();
+            dict_set_str(api, &mut dict, "title", &title)?;
+            unsafe {
+                (*chapter).id = idx as i64;
+                (*chapter).time_base = AVRational { num: 1, den: 1000 };
+                (*chapter).start = start_ms;
+                (*chapter).end = end_ms;
+                (*chapter).metadata = dict;
+                *chapters_ptr.add(idx) = chapter;
+            }
+        }
         unsafe {
-            (*chapter).id = idx as i64;
-            (*chapter).time_base = AVRational { num: 1, den: 1000 };
-            (*chapter).start = start_ms;
-            (*chapter).end = end_ms;
-            (*chapter).metadata = dict;
-            *chapters_ptr.add(idx) = chapter;
+            (*out_ctx).chapters = chapters_ptr;
+            (*out_ctx).nb_chapters = chapter_count as u32;
         }
-    }
-    unsafe {
-        (*out_ctx).chapters = chapters_ptr;
-        (*out_ctx).nb_chapters = chapter_count as u32;
     }
 
     let mut io: *mut AVIOContext = ptr::null_mut();

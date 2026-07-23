@@ -1,6 +1,6 @@
 # Changelog
 
-Version 0.8.3 – 2026-07-22
+Version 0.8.3 – 2026-07-23
 
 Dark mode
 • Added a dark mode that can be enabled from the View menu and is saved in the user preferences.
@@ -15,6 +15,19 @@ Brazilian Portuguese and Google News
 • The complete interface, calendar entries and quotations, spell checker, donations, guide and changelog are available in Brazilian Portuguese.
 • Google News now supports the Brazilian localization, Brazilian categories and separate default Brazilian RSS sources.
 • Related Google News sources for the same story are shown as accessible child items in the tree when the feed provides them.
+
+LibriVox
+• Optimized LibriVox searches to avoid excessive requests to the service and interface freezes. Large catalog scans were removed, attempts were reduced and shorter timeouts were introduced.
+
+Speech synthesis
+• Sequences of three or more dots are now normalized before reading, preventing some voices from saying “dot dot” or generating segments made up only of punctuation.
+
+Related Google News articles
+• For each news story, related articles are now shown when available, meaning other articles covering the same story. To read them, simply expand the main article when Sonarpad announces that related articles are available. Users who do not want to expand this section can simply press Enter on the main article and read the news story as usual.
+• Related articles now use the same read/unread system as main articles, including accessible announcements, date and time, saved status, and preservation after feed updates or restarting Sonarpad.
+
+Audiobook part announcements
+• Added an “Announcement at the beginning of each part” combo box to Audio Options. For audiobooks split into multiple files, each part can begin with no announcement, the book title, the title and part number, the file name, or the file name and part number.
 
 Version 0.8.2 – 2026-07-17
 

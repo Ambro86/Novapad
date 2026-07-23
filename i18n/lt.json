@@ -1875,5 +1875,13 @@
   "librivox.language_value": "Kalba:",
   "librivox.duration_value": "Trukmė:",
   "rss.related_sources_count": "{count} susiję šaltiniai",
-  "options.lang.pt_br": "Portugalų (Brazilija)"
+  "options.lang.pt_br": "Portugalų (Brazilija)",
+  "options.label.audiobook_part_announcement": "Pranešimas kiekvienos dalies pradžioje:",
+  "options.choice.audiobook_part_announcement.none": "Be pranešimo",
+  "options.choice.audiobook_part_announcement.title": "Knygos pavadinimas",
+  "options.choice.audiobook_part_announcement.title_part_number": "Knygos pavadinimas + dalies numeris",
+  "options.choice.audiobook_part_announcement.file_name": "Failo pavadinimas",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "Failo pavadinimas + dalies numeris",
+  "audiobook.part_announcement.title_part_number": "{title}, {number} dalis",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}, {number} dalis"
 }

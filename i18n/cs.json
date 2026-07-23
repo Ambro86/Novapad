@@ -1875,5 +1875,13 @@
   "librivox.language_value": "Jazyk:",
   "librivox.duration_value": "Délka:",
   "rss.related_sources_count": "{count} souvisejících zdrojů",
-  "options.lang.pt_br": "Portugalština (Brazílie)"
+  "options.lang.pt_br": "Portugalština (Brazílie)",
+  "options.label.audiobook_part_announcement": "Oznámení na začátku každé části:",
+  "options.choice.audiobook_part_announcement.none": "Bez oznámení",
+  "options.choice.audiobook_part_announcement.title": "Název knihy",
+  "options.choice.audiobook_part_announcement.title_part_number": "Název knihy + číslo části",
+  "options.choice.audiobook_part_announcement.file_name": "Název souboru",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "Název souboru + číslo části",
+  "audiobook.part_announcement.title_part_number": "{title}, část {number}",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}, část {number}"
 }

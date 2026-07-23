@@ -1875,5 +1875,13 @@
   "librivox.language_value": "Ngôn ngữ:",
   "librivox.duration_value": "Thời lượng:",
   "rss.related_sources_count": "{count} nguồn liên quan",
-  "options.lang.pt_br": "Tiếng Bồ Đào Nha (Brasil)"
+  "options.lang.pt_br": "Tiếng Bồ Đào Nha (Brasil)",
+  "options.label.audiobook_part_announcement": "Thông báo ở đầu mỗi phần:",
+  "options.choice.audiobook_part_announcement.none": "Không thông báo",
+  "options.choice.audiobook_part_announcement.title": "Tên sách",
+  "options.choice.audiobook_part_announcement.title_part_number": "Tên sách + số phần",
+  "options.choice.audiobook_part_announcement.file_name": "Tên tệp",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "Tên tệp + số phần",
+  "audiobook.part_announcement.title_part_number": "{title}, phần {number}",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}, phần {number}"
 }

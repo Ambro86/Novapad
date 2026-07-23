@@ -1,6 +1,6 @@
 # Changelog
 
-Versione 0.8.3 – 2026-07-22
+Versione 0.8.3 – 2026-07-23
 
 Modalità scura
 • Aggiunta la modalità scura, attivabile dal menu Visualizza e salvata nelle preferenze.
@@ -18,6 +18,21 @@ Portoghese brasiliano e Google News
 
 TV in diretta
 • Come già avveniva per RaiPlay, durante la riproduzione dei canali Rai della TV in diretta Sonarpad prova ora a selezionare automaticamente la traccia audiodescritta, quando disponibile.
+• Velocizzata l’apertura della TV: i programmi in onda vengono caricati soltanto per la categoria, la regione, la ricerca o la pagina dei preferiti visualizzata e vengono riutilizzati temporaneamente.
+• Corretto un problema per cui la pressione di Invio o Freccia destra utilizzata per aprire una categoria poteva propagarsi e avviare immediatamente il primo canale.
+
+LibriVox
+• Ottimizzata la ricerca di LibriVox per evitare richieste eccessive al servizio e blocchi dell’interfaccia. Sono state eliminate le scansioni estese del catalogo, ridotti i tentativi e introdotti tempi massimi più brevi.
+
+Sintesi vocale
+• Le sequenze di tre o più punti vengono ora normalizzate prima della lettura, evitando che alcune voci pronuncino “punto punto” o generino segmenti composti soltanto da punteggiatura.
+
+Articoli correlati di Google News
+• Per ogni notizia, quando disponibili, vengono ora mostrati gli articoli correlati, ossia altri articoli che trattano la stessa notizia. Per leggerli è sufficiente espandere l’articolo principale quando Sonarpad segnala che sono disponibili articoli correlati. Per chi non voglia espandere questa sezione, è sufficiente premere Invio sull’articolo principale e leggere la notizia come si è sempre fatto.
+• Gli articoli correlati utilizzano ora lo stesso sistema letto/non letto degli articoli principali, compresi l’annuncio accessibile, la data e l’ora, il salvataggio dello stato e la sua conservazione dopo l’aggiornamento delle fonti o il riavvio di Sonarpad.
+
+Annunci nelle parti degli audiolibri
+• Aggiunta nelle Opzioni audio la casella combinata “Annuncio all’inizio di ogni parte”. Negli audiolibri suddivisi in più file è possibile non inserire alcun annuncio oppure far leggere all’inizio di ogni parte il titolo del libro, il titolo con il numero della parte, il nome del file o il nome del file con il numero della parte.
 
 Versione 0.8.2 – 2026-07-17
 

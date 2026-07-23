@@ -51,6 +51,8 @@ scripts/thegroove_series_dump.py
 **/*.py[cod]
 .aider*
 rustnotepad.zip
+rustnotepad_source.zip
+rustnotepad_source_*/
 .antigravitycli/
 
 # Local documentation workspace

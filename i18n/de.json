@@ -1927,5 +1927,13 @@
   "excluded_from_testing.bdciechi.title": "bdCiechi",
   "options.lang.de": "Deutsch",
   "rss.related_sources_count": "{count} verwandte Quellen",
-  "options.lang.pt_br": "Portugiesisch (Brasilien)"
+  "options.lang.pt_br": "Portugiesisch (Brasilien)",
+  "options.label.audiobook_part_announcement": "Ansage am Anfang jedes Teils:",
+  "options.choice.audiobook_part_announcement.none": "Keine Ansage",
+  "options.choice.audiobook_part_announcement.title": "Buchtitel",
+  "options.choice.audiobook_part_announcement.title_part_number": "Buchtitel + Teilenummer",
+  "options.choice.audiobook_part_announcement.file_name": "Dateiname",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "Dateiname + Teilenummer",
+  "audiobook.part_announcement.title_part_number": "{title}, Teil {number}",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}, Teil {number}"
 }

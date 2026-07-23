@@ -1875,5 +1875,13 @@
   "librivox.language_value": "Jezik:",
   "librivox.duration_value": "Trajanje:",
   "rss.related_sources_count": "{count} povezanih izvora",
-  "options.lang.pt_br": "Portugalski (Brazil)"
+  "options.lang.pt_br": "Portugalski (Brazil)",
+  "options.label.audiobook_part_announcement": "Најава на почетку сваког дела:",
+  "options.choice.audiobook_part_announcement.none": "Без најаве",
+  "options.choice.audiobook_part_announcement.title": "Наслов књиге",
+  "options.choice.audiobook_part_announcement.title_part_number": "Наслов књиге + број дела",
+  "options.choice.audiobook_part_announcement.file_name": "Назив датотеке",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "Назив датотеке + број дела",
+  "audiobook.part_announcement.title_part_number": "{title}, део {number}",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}, део {number}"
 }

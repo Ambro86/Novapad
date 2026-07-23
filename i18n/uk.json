@@ -1875,5 +1875,13 @@
   "librivox.language_value": "Мова:",
   "librivox.duration_value": "Тривалість:",
   "rss.related_sources_count": "{count} пов’язаних джерел",
-  "options.lang.pt_br": "Португальська (Бразилія)"
+  "options.lang.pt_br": "Португальська (Бразилія)",
+  "options.label.audiobook_part_announcement": "Оголошення на початку кожної частини:",
+  "options.choice.audiobook_part_announcement.none": "Без оголошення",
+  "options.choice.audiobook_part_announcement.title": "Назва книги",
+  "options.choice.audiobook_part_announcement.title_part_number": "Назва книги + номер частини",
+  "options.choice.audiobook_part_announcement.file_name": "Ім’я файлу",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "Ім’я файлу + номер частини",
+  "audiobook.part_announcement.title_part_number": "{title}, частина {number}",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}, частина {number}"
 }

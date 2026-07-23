@@ -1927,5 +1927,13 @@
   "youtube.ytdlp_path_update_prompt": "yt-dlp foi encontrado no PATH do sistema, mas esta cópia não é gerenciada pelo Sonarpad.\nVersão encontrada: {current}\nÚltima versão disponível: {latest}\n\nDeseja baixar uma cópia local do yt-dlp que o Sonarpad possa atualizar automaticamente?",
   "youtube.ytdlp_prompt_download": "O yt-dlp é necessário para usar este recurso. Deseja baixá-lo agora?",
   "youtube.ytdlp_update_failed": "Falha ao atualizar o yt-dlp.",
-  "youtube.ytdlp_update_prompt": "Há uma atualização do yt-dlp.\nVersão instalada: {current}\nNova versão: {latest}\n\nDeseja baixar a atualização?"
+  "youtube.ytdlp_update_prompt": "Há uma atualização do yt-dlp.\nVersão instalada: {current}\nNova versão: {latest}\n\nDeseja baixar a atualização?",
+  "options.label.audiobook_part_announcement": "Anúncio no início de cada parte:",
+  "options.choice.audiobook_part_announcement.none": "Sem anúncio",
+  "options.choice.audiobook_part_announcement.title": "Título do livro",
+  "options.choice.audiobook_part_announcement.title_part_number": "Título do livro + número da parte",
+  "options.choice.audiobook_part_announcement.file_name": "Nome do arquivo",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "Nome do arquivo + número da parte",
+  "audiobook.part_announcement.title_part_number": "{title}, parte {number}",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}, parte {number}"
 }

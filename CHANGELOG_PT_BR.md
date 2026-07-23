@@ -1,6 +1,6 @@
 # Changelog
 
-Versão 0.8.3 – 2026-07-22
+Versão 0.8.3 – 2026-07-23
 
 Modo escuro
 • Adicionado um modo escuro, que pode ser ativado no menu Ver e é salvo nas preferências.
@@ -17,6 +17,19 @@ Português (Brasil) e Google Notícias
 • O Google Notícias usa a localização do Brasil e oferece as categorias Brasil, Mundo, Negócios, Ciência e tecnologia, Entretenimento, Esportes e Saúde.
 • Adicionadas fontes RSS brasileiras padrão, mantidas separadamente das fontes portuguesas.
 • As notícias do Google Notícias podem mostrar as diferentes fontes relacionadas ao mesmo assunto como itens filhos acessíveis pela árvore.
+
+LibriVox
+• A pesquisa do LibriVox foi otimizada para evitar solicitações excessivas ao serviço e travamentos da interface. As varreduras extensas do catálogo foram removidas, o número de tentativas foi reduzido e tempos limite menores foram introduzidos.
+
+Síntese de voz
+• As sequências de três ou mais pontos agora são normalizadas antes da leitura, evitando que algumas vozes pronunciem “ponto ponto” ou criem segmentos formados apenas por pontuação.
+
+Artigos relacionados do Google Notícias
+• Para cada notícia, quando disponíveis, agora são exibidos artigos relacionados, ou seja, outros artigos que tratam da mesma notícia. Para lê-los, basta expandir o artigo principal quando o Sonarpad informar que há artigos relacionados disponíveis. Quem não quiser expandir essa seção só precisa pressionar Enter no artigo principal e ler a notícia como sempre.
+• Os artigos relacionados agora usam o mesmo sistema lido/não lido dos artigos principais, incluindo anúncios acessíveis, data e hora, salvamento do estado e sua conservação após a atualização das fontes ou a reinicialização do Sonarpad.
+
+Anúncios nas partes dos audiolivros
+• Foi adicionada às Opções de áudio a caixa de combinação “Anúncio no início de cada parte”. Nos audiolivros divididos em vários arquivos, cada parte pode começar sem anúncio, com o título do livro, o título e o número da parte, o nome do arquivo ou o nome do arquivo e o número da parte.
 
 Versão 0.8.2 – 2026-07-17
 

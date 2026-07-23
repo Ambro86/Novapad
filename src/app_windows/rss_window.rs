@@ -329,7 +329,7 @@ fn normalize_article_text(s: &str) -> String {
 mod tests {
     use super::{
         build_google_news_rss_url, decode_basic_html_entities, ensure_opml_extension,
-        format_google_news_source_title, normalize_rss_url_key,
+        format_google_news_source_title, load_default_feeds, normalize_rss_url_key,
     };
     use std::path::PathBuf;
 
@@ -346,6 +346,36 @@ mod tests {
     }
 
     #[test]
+    fn german_default_feeds_include_requested_german_language_newspapers() {
+        let feeds = load_default_feeds(crate::settings::Language::German);
+        let expected = [
+            (
+                "Deutsche Welle Deutsch",
+                "https://rss.dw.com/xml/rss-de-all",
+            ),
+            (
+                "Süddeutsche Zeitung",
+                "https://rss.sueddeutsche.de/rss/Topthemen",
+            ),
+            (
+                "Frankfurter Allgemeine Zeitung",
+                "https://www.faz.net/rss/aktuell/",
+            ),
+            ("Neue Zürcher Zeitung", "https://www.nzz.ch/recent.rss"),
+            ("DER STANDARD", "https://www.derstandard.at/rss"),
+        ];
+
+        for (expected_title, expected_url) in expected {
+            assert!(
+                feeds
+                    .iter()
+                    .any(|(title, url)| title == expected_title && url == expected_url),
+                "missing German RSS source: {expected_title} ({expected_url})"
+            );
+        }
+    }
+
+    #[test]
     fn google_news_search_uses_selected_english_rss_language() {
         let url = build_google_news_rss_url("technology", "en");
         assert!(url.contains("hl=en"));
@@ -359,6 +389,14 @@ mod tests {
         assert!(url.contains("hl=it"));
         assert!(url.contains("gl=IT"));
         assert!(url.contains("ceid=IT:it"));
+    }
+
+    #[test]
+    fn google_news_search_uses_selected_german_rss_language() {
+        let url = build_google_news_rss_url("technologie", "de");
+        assert!(url.contains("hl=de"));
+        assert!(url.contains("gl=DE"));
+        assert!(url.contains("ceid=DE:de"));
     }
 
     #[test]
@@ -598,6 +636,28 @@ fn rss_item_display_title(
     base
 }
 
+fn rss_item_tree_display_title(
+    item: &RssItem,
+    item_unread: bool,
+    has_multiple_items_same_day: bool,
+    ctx: RssItemTitleContext,
+) -> String {
+    let mut display_title = rss_item_display_title(
+        &item.title,
+        item_unread,
+        item.pub_date,
+        has_multiple_items_same_day,
+        ctx,
+    );
+    if !item.related_items.is_empty() {
+        let related_label = i18n::tr(ctx.language, "rss.related_sources_count")
+            .replace("{count}", &item.related_items.len().to_string());
+        display_title.push_str(", ");
+        display_title.push_str(&related_label);
+    }
+    display_title
+}
+
 fn day_from_timestamp(timestamp: Option<i64>) -> Option<NaiveDate> {
     let ts = timestamp?;
     Local
@@ -770,18 +830,8 @@ fn show_selected_properties(hwnd: HWND) {
         let item_unread = match &node {
             Some(NodeData::Item(item)) => {
                 let key = rss_item_key(item);
-                let parent_item = windows::Win32::UI::Controls::HTREEITEM(
-                    crate::send_message_w_safe(
-                        s.hwnd_tree,
-                        TVM_GETNEXTITEM,
-                        WPARAM(TVGN_PARENT as usize),
-                        LPARAM(hitem.0),
-                    )
-                    .0,
-                );
-                let unread = s
-                    .source_items
-                    .get(&parent_item.0)
+                let unread = source_ancestor_hitem(s, hitem)
+                    .and_then(|source_hitem| s.source_items.get(&source_hitem.0))
                     .map(|state| !state.read_item_keys.contains(&key))
                     .unwrap_or(true);
                 Some(unread)
@@ -1211,6 +1261,34 @@ fn rss_item_key(item: &RssItem) -> String {
     item.title.trim().to_string()
 }
 
+fn collect_rss_item_keys(item: &RssItem, keys: &mut HashSet<String>) {
+    keys.insert(rss_item_key(item));
+    for related in &item.related_items {
+        collect_rss_item_keys(related, keys);
+    }
+}
+
+fn source_ancestor_hitem(
+    state: &RssWindowState,
+    mut hitem: windows::Win32::UI::Controls::HTREEITEM,
+) -> Option<windows::Win32::UI::Controls::HTREEITEM> {
+    while hitem.0 != 0 {
+        if matches!(state.node_data.get(&hitem.0), Some(NodeData::Source(_))) {
+            return Some(hitem);
+        }
+        hitem = windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
+                state.hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_PARENT as usize),
+                LPARAM(hitem.0),
+            )
+            .0,
+        );
+    }
+    None
+}
+
 fn select_newest_item_key(items: &[RssItem], removed_keys: &HashSet<String>) -> Option<String> {
     let mut best: Option<(i64, usize, String)> = None;
     for (idx, item) in items.iter().enumerate() {
@@ -1379,10 +1457,13 @@ fn prune_persisted_read_keys_for_source(
     };
 
     let current_item_keys: HashSet<String> = with_rss_state(hwnd, |s| {
-        s.source_items
-            .get(&hitem.0)
-            .map(|state| state.items.iter().map(rss_item_key).collect())
-            .unwrap_or_default()
+        let mut keys = HashSet::new();
+        if let Some(state) = s.source_items.get(&hitem.0) {
+            for item in &state.items {
+                collect_rss_item_keys(item, &mut keys);
+            }
+        }
+        keys
     })
     .unwrap_or_default();
 
@@ -2110,6 +2191,21 @@ fn google_news_locale(code: &str) -> GoogleNewsLocale {
             hl: "en",
             gl: "US",
             ceid: "US:en",
+        },
+        "de" => GoogleNewsLocale {
+            root_title: "Google News Deutschland",
+            top_title: "Schlagzeilen",
+            local_title: "Meine Stadt",
+            nation_title: "Deutschland",
+            world_title: "Welt",
+            business_title: "Wirtschaft",
+            technology_title: "Wissenschaft und Technik",
+            entertainment_title: "Unterhaltung",
+            sports_title: "Sport",
+            health_title: "Gesundheit",
+            hl: "de",
+            gl: "DE",
+            ceid: "DE:de",
         },
         "fr" => GoogleNewsLocale {
             root_title: "Google News France",
@@ -5302,14 +5398,21 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         ListTimeDisplayMode::Always,
                     ));
                     let day_counts = with_rss_state(hwnd, |s| {
-                        s.source_items
-                            .values()
-                            .find(|state| {
-                                state
-                                    .items
-                                    .iter()
-                                    .any(|x| rss_item_key(x) == msg_data.item_key)
-                            })
+                        let parent_hitem = windows::Win32::UI::Controls::HTREEITEM(
+                            crate::send_message_w_safe(
+                                s.hwnd_tree,
+                                TVM_GETNEXTITEM,
+                                WPARAM(TVGN_PARENT as usize),
+                                LPARAM(hitem.0),
+                            )
+                            .0,
+                        );
+                        if let Some(NodeData::Item(parent_item)) = s.node_data.get(&parent_hitem.0)
+                        {
+                            return build_day_counts(&parent_item.related_items);
+                        }
+                        source_ancestor_hitem(s, hitem)
+                            .and_then(|source_hitem| s.source_items.get(&source_hitem.0))
                             .map(|state| build_day_counts(&state.items))
                             .unwrap_or_default()
                     })
@@ -5322,13 +5425,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         date_mode: rss_date_mode,
                         time_mode: rss_time_mode,
                     };
-                    let updated = rss_item_display_title(
-                        &item.title,
-                        false,
-                        item.pub_date,
-                        same_day,
-                        title_ctx,
-                    );
+                    let updated = rss_item_tree_display_title(&item, false, same_day, title_ctx);
                     let text = to_wide(&updated);
                     let mut tv_item = TVITEMW {
                         mask: TVIF_TEXT,
@@ -6452,8 +6549,57 @@ fn populate_related_article_nodes(
         return;
     }
 
+    let (language, announce_unread, unread_label_position, rss_date_mode, rss_time_mode) =
+        with_rss_state(hwnd, |state| {
+            with_state(state.parent, |parent_state| {
+                (
+                    parent_state.settings.language,
+                    parent_state.settings.announce_unread_rss_podcast_items,
+                    parent_state.settings.rss_podcast_unread_label_position,
+                    parent_state.settings.rss_articles_date_display,
+                    parent_state.settings.rss_articles_time_display,
+                )
+            })
+            .unwrap_or((
+                crate::settings::Language::English,
+                true,
+                crate::settings::RssPodcastUnreadLabelPosition::Before,
+                ListDateDisplayMode::Always,
+                ListTimeDisplayMode::Always,
+            ))
+        })
+        .unwrap_or((
+            crate::settings::Language::English,
+            true,
+            crate::settings::RssPodcastUnreadLabelPosition::Before,
+            ListDateDisplayMode::Always,
+            ListTimeDisplayMode::Always,
+        ));
+    let read_item_keys = with_rss_state(hwnd, |state| {
+        source_ancestor_hitem(state, parent_hitem)
+            .and_then(|source_hitem| state.source_items.get(&source_hitem.0))
+            .map(|source_state| source_state.read_item_keys.clone())
+            .unwrap_or_default()
+    })
+    .unwrap_or_default();
+    let day_counts = build_day_counts(&parent_item.related_items);
+    let title_ctx = RssItemTitleContext {
+        language,
+        announce_unread,
+        unread_label_position,
+        date_mode: rss_date_mode,
+        time_mode: rss_time_mode,
+    };
+
     for related in &parent_item.related_items {
-        let text = to_wide(&related.title);
+        let item_unread = !read_item_keys.contains(&rss_item_key(related));
+        let display_title = rss_item_tree_display_title(
+            related,
+            item_unread,
+            has_multiple_items_same_day(related.pub_date, &day_counts),
+            title_ctx,
+        );
+        let text = to_wide(&display_title);
         let mut insert = TVINSERTSTRUCTW {
             hParent: parent_hitem,
             hInsertAfter: TVI_LAST,
@@ -7308,19 +7454,12 @@ fn load_more_items(
                 date_mode: rss_date_mode,
                 time_mode: rss_time_mode,
             };
-            let mut display_title = rss_item_display_title(
-                &item.title,
+            let display_title = rss_item_tree_display_title(
+                item,
                 item_unread,
-                item.pub_date,
                 has_multiple_items_same_day(item.pub_date, &day_counts),
                 title_ctx,
             );
-            if !item.related_items.is_empty() {
-                let related_label = i18n::tr(language, "rss.related_sources_count")
-                    .replace("{count}", &item.related_items.len().to_string());
-                display_title.push_str(", ");
-                display_title.push_str(&related_label);
-            }
             let text = to_wide(&display_title);
             let c_children = if item.is_folder || !item.related_items.is_empty() {
                 1
@@ -7433,24 +7572,12 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
     if let Some(item) = item_opt {
         let item_key = rss_item_key(&item);
         with_rss_state(hwnd, |s| {
-            let parent = windows::Win32::UI::Controls::HTREEITEM(
-                crate::send_message_w_safe(
-                    s.hwnd_tree,
-                    TVM_GETNEXTITEM,
-                    WPARAM(TVGN_PARENT as usize),
-                    LPARAM(hitem.0),
-                )
-                .0,
-            );
-            if parent.0 != 0
-                && let Some(state) = s.source_items.get_mut(&parent.0)
-            {
-                state.read_item_keys.insert(item_key.clone());
-            }
-            if parent.0 != 0
-                && let Some(NodeData::Source(source_index)) = s.node_data.get(&parent.0)
-            {
-                {
+            let source_hitem = source_ancestor_hitem(s, hitem);
+            if let Some(source_hitem) = source_hitem {
+                if let Some(state) = s.source_items.get_mut(&source_hitem.0) {
+                    state.read_item_keys.insert(item_key.clone());
+                }
+                if let Some(NodeData::Source(source_index)) = s.node_data.get(&source_hitem.0) {
                     with_state(s.parent, |ps| {
                         if let Some(src) = ps.settings.rss_sources.get_mut(*source_index)
                             && !src.read_item_keys.iter().any(|k| k == &item_key)
@@ -8037,10 +8164,9 @@ fn undo_last_delete(hwnd: HWND) {
                                     date_mode: rss_date_mode,
                                     time_mode: rss_time_mode,
                                 };
-                                let display_title = rss_item_display_title(
-                                    &entry.title,
+                                let display_title = rss_item_tree_display_title(
+                                    entry,
                                     item_unread,
-                                    entry.pub_date,
                                     has_multiple_items_same_day(entry.pub_date, &day_counts),
                                     title_ctx,
                                 );
@@ -8487,10 +8613,9 @@ fn rebuild_source_children_from_state(
                     date_mode: rss_date_mode,
                     time_mode: rss_time_mode,
                 };
-                let display_title = rss_item_display_title(
-                    &entry.title,
+                let display_title = rss_item_tree_display_title(
+                    entry,
                     item_unread,
-                    entry.pub_date,
                     has_multiple_items_same_day(entry.pub_date, &day_counts),
                     title_ctx,
                 );

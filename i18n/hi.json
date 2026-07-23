@@ -1875,5 +1875,13 @@
   "librivox.language_value": "भाषा:",
   "librivox.duration_value": "अवधि:",
   "rss.related_sources_count": "{count} संबंधित स्रोत",
-  "options.lang.pt_br": "पुर्तगाली (ब्राज़ील)"
+  "options.lang.pt_br": "पुर्तगाली (ब्राज़ील)",
+  "options.label.audiobook_part_announcement": "हर भाग की शुरुआत में घोषणा:",
+  "options.choice.audiobook_part_announcement.none": "कोई घोषणा नहीं",
+  "options.choice.audiobook_part_announcement.title": "पुस्तक का शीर्षक",
+  "options.choice.audiobook_part_announcement.title_part_number": "पुस्तक का शीर्षक + भाग संख्या",
+  "options.choice.audiobook_part_announcement.file_name": "फ़ाइल नाम",
+  "options.choice.audiobook_part_announcement.file_name_part_number": "फ़ाइल नाम + भाग संख्या",
+  "audiobook.part_announcement.title_part_number": "{title}, भाग {number}",
+  "audiobook.part_announcement.file_name_part_number": "{file_name}, भाग {number}"
 }

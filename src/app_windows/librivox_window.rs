@@ -5,10 +5,8 @@ use std::sync::{Mutex, OnceLock, mpsc};
 use std::time::Duration;
 use url::Url;
 use windows::Win32::Foundation::HWND;
-use windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
-    DispatchMessageW, MSG, PM_REMOVE, PeekMessageW, PostQuitMessage, SetForegroundWindow,
-    TranslateMessage, WM_QUIT,
+    DispatchMessageW, MSG, PM_REMOVE, PeekMessageW, PostQuitMessage, TranslateMessage, WM_QUIT,
 };
 
 use crate::app_windows::prompt_window;
@@ -21,6 +19,8 @@ use crate::{RaiAudioOrigin, i18n, show_error, with_state};
 const API_BASE: &str = "https://librivox.org/api/feed/audiobooks";
 const USER_AGENT: &str = concat!("Sonarpad/", env!("CARGO_PKG_VERSION"));
 const PAGE_LIMIT: usize = 50;
+const PREVIOUS_RESULTS_ID: &str = "__sonarpad_librivox_previous_results__";
+const NEXT_RESULTS_ID: &str = "__sonarpad_librivox_next_results__";
 const SEARCH_CANDIDATE_LIMIT: usize = 100;
 const SEARCH_API_TERM_LIMIT: usize = 4;
 const API_MAX_ATTEMPTS: usize = 2;
@@ -359,31 +359,85 @@ where
     T: Send + 'static,
     F: FnOnce() -> Result<T, String> + Send + 'static,
 {
+    let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
+    let status_key = if worker_name == "librivox-book" {
+        "librivox.loading_tracks"
+    } else {
+        "librivox.loading"
+    };
+    let progress_dialog = crate::app_windows::podcast_save_window::open_with_labels(
+        parent,
+        language,
+        crate::app_windows::podcast_save_window::SaveDialogLabels {
+            title: i18n::tr(language, "librivox.title"),
+            in_progress: i18n::tr(language, status_key),
+            cancel: i18n::tr(language, "podcast.save.cancel"),
+            cancel_confirm: i18n::tr(language, "podcast.cancel_confirm"),
+        },
+        false,
+    );
+    if progress_dialog.0 != 0 {
+        crate::app_windows::podcast_save_window::disable_fake_progress(progress_dialog);
+        crate::bring_modal_window_to_foreground(progress_dialog);
+        crate::app_windows::podcast_save_window::focus_cancel_button(progress_dialog);
+        crate::log_debug(&format!(
+            "LibriVox focus guard opened worker={} dialog={:?} parent={:?}",
+            worker_name, progress_dialog, parent
+        ));
+    } else {
+        crate::log_debug(&format!(
+            "LibriVox focus guard could not be opened worker={} parent={:?}",
+            worker_name, parent
+        ));
+    }
+
     let (sender, receiver) = mpsc::sync_channel(1);
-    std::thread::Builder::new()
+    let spawn_result = std::thread::Builder::new()
         .name(worker_name.to_string())
         .spawn(move || {
             if sender.send(task()).is_err() {
                 crate::log_debug("LibriVox worker result receiver was dropped");
             }
-        })
-        .map_err(|error| format!("Unable to start LibriVox worker: {error}"))?;
-
-    unsafe {
-        EnableWindow(parent, false);
-    }
-    let result = loop {
-        match receiver.try_recv() {
-            Ok(result) => break result,
-            Err(mpsc::TryRecvError::Disconnected) => {
-                break Err("LibriVox worker stopped unexpectedly".to_string());
+        });
+    let result = match spawn_result {
+        Ok(_worker) => loop {
+            match receiver.try_recv() {
+                Ok(result) => break result,
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    break Err("LibriVox worker stopped unexpectedly".to_string());
+                }
+                Err(mpsc::TryRecvError::Empty) => {
+                    pump_librivox_messages();
+                    if progress_dialog.0 != 0
+                        && crate::is_window_handle_valid(progress_dialog)
+                        && crate::get_foreground_window_safe() != progress_dialog
+                    {
+                        crate::log_debug(&format!(
+                            "LibriVox focus guard reclaiming foreground worker={} dialog={:?} escaped_to={:?}",
+                            worker_name,
+                            progress_dialog,
+                            crate::get_foreground_window_safe()
+                        ));
+                        crate::bring_modal_window_to_foreground(progress_dialog);
+                        crate::app_windows::podcast_save_window::focus_cancel_button(
+                            progress_dialog,
+                        );
+                    }
+                }
             }
-            Err(mpsc::TryRecvError::Empty) => pump_librivox_messages(),
-        }
+        },
+        Err(error) => Err(format!("Unable to start LibriVox worker: {error}")),
     };
-    unsafe {
-        EnableWindow(parent, true);
-        SetForegroundWindow(parent);
+
+    if progress_dialog.0 != 0 {
+        crate::log_debug(&format!(
+            "LibriVox focus guard closing worker={} dialog={:?} foreground={:?} focus={:?}",
+            worker_name,
+            progress_dialog,
+            crate::get_foreground_window_safe(),
+            crate::get_focus_safe()
+        ));
+        crate::log_if_err!(crate::destroy_window_safe(progress_dialog));
     }
     result
 }
@@ -428,7 +482,7 @@ pub fn open(parent: HWND) {
         };
         let mut books = first_page.books;
         let mut has_more = first_page.has_more;
-        let mut offset = books.len();
+        let mut offset = 0usize;
         let mut selected_id = None;
 
         if books.is_empty() {
@@ -447,15 +501,8 @@ pub fn open(parent: HWND) {
         }
 
         loop {
-            let list = books
-                .iter()
-                .map(|book| MultilineSelectionItem {
-                    id: book.id.to_string(),
-                    title: book.title.clone(),
-                    description: Some(book_description(book, language)),
-                })
-                .collect();
-            let result = youtube_transcript_window::select_multiline_items_with_search(
+            let list = librivox_result_items(&books, language, offset > 0, has_more);
+            let result = youtube_transcript_window::select_multiline_items_with_search_without_parent_restore_on_action(
                 parent,
                 language,
                 i18n::tr(language, "librivox.title"),
@@ -465,8 +512,7 @@ pub fn open(parent: HWND) {
                     initial_query: query.clone(),
                     search_button_label: i18n::tr(language, "podcasts.search.button"),
                     show_search_edit: true,
-                    secondary_action_label: has_more
-                        .then(|| i18n::tr(language, "podcasts.categories.load_more_results")),
+                    secondary_action_label: None,
                     context_actions: Vec::new(),
                     right_arrow_accepts_selection: true,
                     left_arrow_closes: true,
@@ -481,21 +527,38 @@ pub fn open(parent: HWND) {
                     query = value.trim().to_string();
                     break;
                 }
-                MultilineSelectionResult::SecondaryAction => {
-                    if !has_more {
+                MultilineSelectionResult::SecondaryAction => {}
+                MultilineSelectionResult::Selected(id) => {
+                    if id == PREVIOUS_RESULTS_ID || id == NEXT_RESULTS_ID {
+                        let requested_offset = if id == PREVIOUS_RESULTS_ID {
+                            offset.saturating_sub(PAGE_LIMIT)
+                        } else {
+                            offset.saturating_add(PAGE_LIMIT)
+                        };
+                        crate::screen_reader_speak(&i18n::tr(language, "librivox.loading"));
+                        match search_responsive(
+                            parent,
+                            &client,
+                            &query,
+                            requested_offset,
+                            PAGE_LIMIT,
+                        ) {
+                            Ok(page) if !page.books.is_empty() => {
+                                books = page.books;
+                                has_more = page.has_more;
+                                offset = requested_offset;
+                                selected_id =
+                                    Some(first_librivox_result_id(&books, offset > 0, has_more));
+                            }
+                            Ok(_) => {
+                                if id == NEXT_RESULTS_ID {
+                                    has_more = false;
+                                }
+                            }
+                            Err(error) => show_librivox_error(parent, language, &error),
+                        }
                         continue;
                     }
-                    crate::screen_reader_speak(&i18n::tr(language, "librivox.loading"));
-                    match search_responsive(parent, &client, &query, offset, PAGE_LIMIT) {
-                        Ok(mut page) => {
-                            offset = offset.saturating_add(page.books.len());
-                            books.append(&mut page.books);
-                            has_more = page.has_more;
-                        }
-                        Err(error) => show_librivox_error(parent, language, &error),
-                    }
-                }
-                MultilineSelectionResult::Selected(id) => {
                     selected_id = Some(id.clone());
                     if let Some(book) = books.iter().find(|book| book.id.to_string() == id) {
                         let parent_list = LibrivoxParentListContext {
@@ -558,7 +621,7 @@ fn browse_loaded_book(
                 description: (!track.play_time.trim().is_empty()).then(|| track.play_time.clone()),
             })
             .collect();
-        match youtube_transcript_window::select_multiline_items_with_search(
+        match youtube_transcript_window::select_multiline_items_with_search_without_parent_restore_on_action(
             parent,
             language,
             book.title.clone(),
@@ -608,16 +671,13 @@ fn browse_loaded_book(
 fn browse_parent_list(parent: HWND, language: Language, mut context: LibrivoxParentListContext) {
     let client = LibrivoxClient::default();
     loop {
-        let list = context
-            .books
-            .iter()
-            .map(|book| MultilineSelectionItem {
-                id: book.id.to_string(),
-                title: book.title.clone(),
-                description: Some(book_description(book, language)),
-            })
-            .collect();
-        match youtube_transcript_window::select_multiline_items_with_search(
+        let list = librivox_result_items(
+            &context.books,
+            language,
+            context.offset > 0,
+            context.has_more,
+        );
+        match youtube_transcript_window::select_multiline_items_with_search_without_parent_restore_on_action(
             parent,
             language,
             i18n::tr(language, "librivox.title"),
@@ -627,9 +687,7 @@ fn browse_parent_list(parent: HWND, language: Language, mut context: LibrivoxPar
                 initial_query: context.query.clone(),
                 search_button_label: i18n::tr(language, "podcasts.search.button"),
                 show_search_edit: true,
-                secondary_action_label: context
-                    .has_more
-                    .then(|| i18n::tr(language, "podcasts.categories.load_more_results")),
+                secondary_action_label: None,
                 context_actions: Vec::new(),
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
@@ -645,7 +703,7 @@ fn browse_parent_list(parent: HWND, language: Language, mut context: LibrivoxPar
                     Ok(page) if !page.books.is_empty() => {
                         context.books = page.books;
                         context.has_more = page.has_more;
-                        context.offset = context.books.len();
+                        context.offset = 0;
                         context.selected_id = context.books[0].id.to_string();
                     }
                     Ok(_) => {
@@ -654,22 +712,41 @@ fn browse_parent_list(parent: HWND, language: Language, mut context: LibrivoxPar
                     Err(error) => show_librivox_error(parent, language, &error),
                 }
             }
-            MultilineSelectionResult::SecondaryAction => {
-                if !context.has_more {
+            MultilineSelectionResult::SecondaryAction => {}
+            MultilineSelectionResult::Selected(id) => {
+                if id == PREVIOUS_RESULTS_ID || id == NEXT_RESULTS_ID {
+                    let requested_offset = if id == PREVIOUS_RESULTS_ID {
+                        context.offset.saturating_sub(PAGE_LIMIT)
+                    } else {
+                        context.offset.saturating_add(PAGE_LIMIT)
+                    };
+                    crate::screen_reader_speak(&i18n::tr(language, "librivox.loading"));
+                    match search_responsive(
+                        parent,
+                        &client,
+                        &context.query,
+                        requested_offset,
+                        PAGE_LIMIT,
+                    ) {
+                        Ok(page) if !page.books.is_empty() => {
+                            context.books = page.books;
+                            context.has_more = page.has_more;
+                            context.offset = requested_offset;
+                            context.selected_id = first_librivox_result_id(
+                                &context.books,
+                                context.offset > 0,
+                                context.has_more,
+                            );
+                        }
+                        Ok(_) => {
+                            if id == NEXT_RESULTS_ID {
+                                context.has_more = false;
+                            }
+                        }
+                        Err(error) => show_librivox_error(parent, language, &error),
+                    }
                     continue;
                 }
-                crate::screen_reader_speak(&i18n::tr(language, "librivox.loading"));
-                match search_responsive(parent, &client, &context.query, context.offset, PAGE_LIMIT)
-                {
-                    Ok(mut page) => {
-                        context.offset = context.offset.saturating_add(page.books.len());
-                        context.books.append(&mut page.books);
-                        context.has_more = page.has_more;
-                    }
-                    Err(error) => show_librivox_error(parent, language, &error),
-                }
-            }
-            MultilineSelectionResult::Selected(id) => {
                 context.selected_id = id.clone();
                 if let Some(book) = context
                     .books
@@ -682,6 +759,47 @@ fn browse_parent_list(parent: HWND, language: Language, mut context: LibrivoxPar
                 }
             }
         }
+    }
+}
+
+fn librivox_result_items(
+    books: &[LibrivoxBook],
+    language: Language,
+    has_previous: bool,
+    has_more: bool,
+) -> Vec<MultilineSelectionItem> {
+    let mut items = Vec::with_capacity(books.len().saturating_add(2));
+    if has_previous {
+        items.push(MultilineSelectionItem {
+            id: PREVIOUS_RESULTS_ID.to_string(),
+            title: i18n::tr(language, "podcasts.categories.previous_results"),
+            description: None,
+        });
+    }
+    items.extend(books.iter().map(|book| MultilineSelectionItem {
+        id: book.id.to_string(),
+        title: book.title.clone(),
+        description: Some(book_description(book, language)),
+    }));
+    if has_more {
+        items.push(MultilineSelectionItem {
+            id: NEXT_RESULTS_ID.to_string(),
+            title: i18n::tr(language, "podcasts.categories.next_results"),
+            description: None,
+        });
+    }
+    items
+}
+
+fn first_librivox_result_id(books: &[LibrivoxBook], has_previous: bool, has_more: bool) -> String {
+    if has_previous {
+        PREVIOUS_RESULTS_ID.to_string()
+    } else if let Some(book) = books.first() {
+        book.id.to_string()
+    } else if has_more {
+        NEXT_RESULTS_ID.to_string()
+    } else {
+        String::new()
     }
 }
 

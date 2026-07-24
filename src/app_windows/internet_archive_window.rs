@@ -14,6 +14,8 @@ use crate::{RaiAudioOrigin, i18n, show_error, with_state};
 const SEARCH_URL: &str = "https://archive.org/advancedsearch.php";
 const USER_AGENT: &str = concat!("Sonarpad/", env!("CARGO_PKG_VERSION"));
 const PAGE_ROWS: usize = 50;
+const PREVIOUS_RESULTS_ID: &str = "__sonarpad_internet_archive_previous_results__";
+const NEXT_RESULTS_ID: &str = "__sonarpad_internet_archive_next_results__";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ArchiveSource {
@@ -241,15 +243,8 @@ pub fn open(parent: HWND) {
         }
 
         loop {
-            let list = items
-                .iter()
-                .map(|item| MultilineSelectionItem {
-                    id: item.identifier.clone(),
-                    title: item.title.clone(),
-                    description: Some(item_description(item)),
-                })
-                .collect();
-            let result = youtube_transcript_window::select_multiline_items_with_search(
+            let list = archive_result_items(&items, language, current_page > 1, has_more);
+            let result = youtube_transcript_window::select_multiline_items_with_search_without_parent_restore_on_action(
                 parent,
                 language,
                 i18n::tr(language, "internet_archive.title"),
@@ -259,8 +254,7 @@ pub fn open(parent: HWND) {
                     initial_query: search.query.clone(),
                     search_button_label: i18n::tr(language, "podcasts.search.button"),
                     show_search_edit: true,
-                    secondary_action_label: has_more
-                        .then(|| i18n::tr(language, "podcasts.categories.load_more_results")),
+                    secondary_action_label: None,
                     context_actions: Vec::new(),
                     right_arrow_accepts_selection: true,
                     left_arrow_closes: true,
@@ -275,21 +269,35 @@ pub fn open(parent: HWND) {
                     search.query = query.trim().to_string();
                     break;
                 }
-                MultilineSelectionResult::SecondaryAction => {
-                    if !has_more {
+                MultilineSelectionResult::SecondaryAction => {}
+                MultilineSelectionResult::Selected(identifier) => {
+                    if identifier == PREVIOUS_RESULTS_ID || identifier == NEXT_RESULTS_ID {
+                        let requested_page = if identifier == PREVIOUS_RESULTS_ID {
+                            current_page.saturating_sub(1).max(1)
+                        } else {
+                            current_page.saturating_add(1)
+                        };
+                        crate::screen_reader_speak(&i18n::tr(language, "internet_archive.loading"));
+                        match client.search(&search, requested_page) {
+                            Ok(page) if !page.items.is_empty() => {
+                                items = page.items;
+                                has_more = page.has_more;
+                                current_page = requested_page;
+                                selected_id = Some(first_archive_result_id(
+                                    &items,
+                                    current_page > 1,
+                                    has_more,
+                                ));
+                            }
+                            Ok(_) => {
+                                if identifier == NEXT_RESULTS_ID {
+                                    has_more = false;
+                                }
+                            }
+                            Err(error) => show_archive_error(parent, language, &error),
+                        }
                         continue;
                     }
-                    crate::screen_reader_speak(&i18n::tr(language, "internet_archive.loading"));
-                    match client.search(&search, current_page + 1) {
-                        Ok(mut page) => {
-                            items.append(&mut page.items);
-                            current_page += 1;
-                            has_more = page.has_more;
-                        }
-                        Err(error) => show_archive_error(parent, language, &error),
-                    }
-                }
-                MultilineSelectionResult::Selected(identifier) => {
                     selected_id = Some(identifier.clone());
                     if let Some(item) = items.iter().find(|item| item.identifier == identifier) {
                         let parent_list = ArchiveParentListContext {
@@ -456,16 +464,13 @@ fn browse_loaded_tracks(
 fn browse_parent_list(parent: HWND, language: Language, mut context: ArchiveParentListContext) {
     let client = ArchiveClient::default();
     loop {
-        let list = context
-            .items
-            .iter()
-            .map(|item| MultilineSelectionItem {
-                id: item.identifier.clone(),
-                title: item.title.clone(),
-                description: Some(item_description(item)),
-            })
-            .collect();
-        match youtube_transcript_window::select_multiline_items_with_search(
+        let list = archive_result_items(
+            &context.items,
+            language,
+            context.current_page > 1,
+            context.has_more,
+        );
+        match youtube_transcript_window::select_multiline_items_with_search_without_parent_restore_on_action(
             parent,
             language,
             i18n::tr(language, "internet_archive.title"),
@@ -475,9 +480,7 @@ fn browse_parent_list(parent: HWND, language: Language, mut context: ArchivePare
                 initial_query: context.search.query.clone(),
                 search_button_label: i18n::tr(language, "podcasts.search.button"),
                 show_search_edit: true,
-                secondary_action_label: context
-                    .has_more
-                    .then(|| i18n::tr(language, "podcasts.categories.load_more_results")),
+                secondary_action_label: None,
                 context_actions: Vec::new(),
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
@@ -504,21 +507,35 @@ fn browse_parent_list(parent: HWND, language: Language, mut context: ArchivePare
                     Err(error) => show_archive_error(parent, language, &error),
                 }
             }
-            MultilineSelectionResult::SecondaryAction => {
-                if !context.has_more {
+            MultilineSelectionResult::SecondaryAction => {}
+            MultilineSelectionResult::Selected(identifier) => {
+                if identifier == PREVIOUS_RESULTS_ID || identifier == NEXT_RESULTS_ID {
+                    let requested_page = if identifier == PREVIOUS_RESULTS_ID {
+                        context.current_page.saturating_sub(1).max(1)
+                    } else {
+                        context.current_page.saturating_add(1)
+                    };
+                    crate::screen_reader_speak(&i18n::tr(language, "internet_archive.loading"));
+                    match client.search(&context.search, requested_page) {
+                        Ok(page) if !page.items.is_empty() => {
+                            context.items = page.items;
+                            context.has_more = page.has_more;
+                            context.current_page = requested_page;
+                            context.selected_id = first_archive_result_id(
+                                &context.items,
+                                context.current_page > 1,
+                                context.has_more,
+                            );
+                        }
+                        Ok(_) => {
+                            if identifier == NEXT_RESULTS_ID {
+                                context.has_more = false;
+                            }
+                        }
+                        Err(error) => show_archive_error(parent, language, &error),
+                    }
                     continue;
                 }
-                crate::screen_reader_speak(&i18n::tr(language, "internet_archive.loading"));
-                match client.search(&context.search, context.current_page + 1) {
-                    Ok(mut page) => {
-                        context.items.append(&mut page.items);
-                        context.current_page += 1;
-                        context.has_more = page.has_more;
-                    }
-                    Err(error) => show_archive_error(parent, language, &error),
-                }
-            }
-            MultilineSelectionResult::Selected(identifier) => {
                 context.selected_id = identifier.clone();
                 if let Some(item) = context
                     .items
@@ -531,6 +548,47 @@ fn browse_parent_list(parent: HWND, language: Language, mut context: ArchivePare
                 }
             }
         }
+    }
+}
+
+fn archive_result_items(
+    items: &[ArchiveItem],
+    language: Language,
+    has_previous: bool,
+    has_more: bool,
+) -> Vec<MultilineSelectionItem> {
+    let mut result = Vec::with_capacity(items.len().saturating_add(2));
+    if has_previous {
+        result.push(MultilineSelectionItem {
+            id: PREVIOUS_RESULTS_ID.to_string(),
+            title: i18n::tr(language, "podcasts.categories.previous_results"),
+            description: None,
+        });
+    }
+    result.extend(items.iter().map(|item| MultilineSelectionItem {
+        id: item.identifier.clone(),
+        title: item.title.clone(),
+        description: Some(item_description(item)),
+    }));
+    if has_more {
+        result.push(MultilineSelectionItem {
+            id: NEXT_RESULTS_ID.to_string(),
+            title: i18n::tr(language, "podcasts.categories.next_results"),
+            description: None,
+        });
+    }
+    result
+}
+
+fn first_archive_result_id(items: &[ArchiveItem], has_previous: bool, has_more: bool) -> String {
+    if has_previous {
+        PREVIOUS_RESULTS_ID.to_string()
+    } else if let Some(item) = items.first() {
+        item.identifier.clone()
+    } else if has_more {
+        NEXT_RESULTS_ID.to_string()
+    } else {
+        String::new()
     }
 }
 

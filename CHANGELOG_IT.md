@@ -1,5 +1,30 @@
 # Changelog
 
+Versione 0.8.4 – 2026-07-24
+
+Modifica dei documenti EPUB
+• Sonarpad è ora in grado non solo di aprire i documenti EPUB, ma anche di modificarli e salvarli nuovamente in formato EPUB mantenendo la formattazione originale, l’indice, le note a piè di pagina, le immagini, i fogli di stile, i metadati e i collegamenti interni.
+• In “Salva con nome” il formato EPUB è disponibile per i documenti aperti da un EPUB. Il salvataggio aggiorna soltanto il testo modificato e conserva intatta la struttura del libro.
+
+Registrazioni con audiodescrizione
+• Corrette le registrazioni con traccia audiodescritta. Sonarpad riesce ora a registrare correttamente il video originale insieme alla traccia audio dei canali con audiodescrizione.
+
+Affidabilità degli audiolibri
+• Corretto un problema intermittente per cui, dopo cinque tentativi Google TTS falliti, un’unità di sintesi veniva eliminata silenziosamente e nell’audiolibro finale poteva mancare una parte del testo.
+• Le unità Google vengono ora ritentate finché riescono oppure finché l’utente annulla. L’avvio dei processi viene scaglionato per ridurre i conflitti temporanei con Chrome e con i file; Sonarpad interrompe inoltre la creazione invece di salvare un audiolibro a cui manca un segmento.
+• Anche gli audiolibri Edge ora ritentano senza limite gli errori temporanei di rete, WebSocket, timeout, limitazione del servizio e audio non valido, fino al successo o all’annullamento dell’utente, comprese le voci miste e la divisione per durata. SAPI4 e SAPI5 mantengono tentativi adattivi e finiti; se un segmento continua a fallire, Sonarpad interrompe l’operazione senza salvare un audiolibro incompleto.
+
+Navigazione delle biblioteche digitali
+• I risultati di LibriVox, Internet Archive e Project Gutenberg usano ora una navigazione a pagine come YouTube: “Vai ai risultati precedenti” compare all’inizio dell’elenco e “Vai ai risultati successivi” alla fine.
+• Corretto il passaggio del focus in LibriVox: aprendo un libro o un capitolo, NVDA non viene più spostato nell’editor principale prima dell’apertura dell’elenco successivo o del lettore.
+• Aggiunta una protezione del focus durante le ricerche e il caricamento dei libri LibriVox: una finestra di caricamento localizzata rimane in primo piano per tutta la richiesta, impedendo al focus di NVDA di passare al Prompt dei comandi, a Windows Terminal o a un’altra applicazione.
+
+Download delle playlist YouTube
+• Aggiunto alle playlist YouTube un comando accessibile di selezione multipla, che permette di scegliere quali video scaricare senza modificare il comando “Salva media” relativo all’elemento attualmente in riproduzione.
+• Gli elementi selezionati vengono scaricati uno alla volta usando il formato e la qualità scelti all’apertura della playlist, ricevono nomi numerati che mantengono l’ordine originale e vengono salvati in una cartella dedicata all’interno della cartella Media configurata.
+• La finestra comprende “Seleziona tutto” e “Deseleziona tutto”, annuncia quanti elementi sono selezionati, consente di annullare conservando i file già completati e segnala chiaramente gli elementi che non è stato possibile scaricare.
+• Gli elementi della playlist sono ora vere caselle di controllo native: NVDA e gli altri lettori di schermo annunciano automaticamente titolo, tipo di controllo e stato attivato o disattivato, senza mostrare parole aggiuntive nel titolo e senza annunci vocali forzati.
+
 Versione 0.8.3 – 2026-07-23
 
 Modalità scura

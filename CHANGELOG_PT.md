@@ -1,5 +1,27 @@
 # Changelog
 
+Versão 0.8.4 – 2026-07-24
+
+Edição de documentos EPUB
+• O Sonarpad consegue agora não só abrir documentos EPUB, mas também editá-los e voltar a guardá-los em formato EPUB, preservando a formatação original, o índice, as notas de rodapé, as imagens, as folhas de estilo, os metadados e as ligações internas.
+• O formato EPUB está disponível em «Guardar como» para documentos abertos a partir de um EPUB. Ao guardar, apenas o texto alterado é atualizado e a estrutura do livro permanece intacta.
+
+Fiabilidade dos audiolivros
+• Corrigido um problema intermitente em que, após cinco tentativas falhados do Google TTS, uma unidade de síntese era descartada silenciosamente e podia faltar uma parte do texto no audiolivro final.
+• As unidades Google são agora repetidas até terem êxito ou até o utilizador cancelar. O arranque dos processos é escalonado para reduzir conflitos temporários com o Chrome e os ficheiros; o Sonarpad também interrompe a criação em vez de guardar um audiolivro com um segmento em falta.
+• Os audiolivros Edge passam a repetir sem limite fixo os erros temporários de rede, WebSocket, tempo limite, limitação do serviço e áudio inválido, até obter êxito ou o utilizador cancelar, incluindo vozes mistas e divisão por duração. SAPI4 e SAPI5 mantêm tentativas adaptativas e limitadas; se um segmento continuar a falhar, o Sonarpad interrompe a operação sem guardar um audiolivro incompleto.
+
+Navegação nas bibliotecas digitais
+• Os resultados do LibriVox, Internet Archive e Project Gutenberg utilizam agora navegação por páginas como o YouTube: “Ir para os resultados anteriores” aparece no início da lista e “Ir para os próximos resultados” no fim.
+• Foram corrigidas as transições de foco no LibriVox: ao abrir um livro ou capítulo, o foco do NVDA já não passa para o editor principal antes de abrir a lista seguinte ou o leitor.
+• Foi adicionada uma proteção do foco durante as pesquisas e o carregamento de livros do LibriVox: uma janela de carregamento localizada permanece em primeiro plano durante todo o pedido, impedindo que o foco do NVDA passe para a Linha de Comandos, o Windows Terminal ou outra aplicação.
+
+Transferência de listas de reprodução do YouTube
+• Foi adicionado às listas de reprodução do YouTube um comando acessível de seleção múltipla, que permite escolher os vídeos a descarregar sem alterar o comando existente “Guardar multimédia” para o elemento em reprodução.
+• Os itens selecionados são descarregados um de cada vez com o formato e a qualidade escolhidos ao abrir a lista, recebem nomes numerados que preservam a ordem original e são guardados numa pasta própria dentro da pasta Multimédia configurada.
+• A janela inclui “Selecionar tudo” e “Desmarcar tudo”, anuncia o número de itens selecionados, permite cancelar mantendo os ficheiros já concluídos e indica claramente os itens que não foi possível descarregar.
+• Os elementos da lista de reprodução são agora caixas de verificação nativas: os leitores de ecrã anunciam automaticamente o título, o tipo de controlo e o estado marcado ou desmarcado, sem acrescentar palavras ao título visível nem utilizar anúncios de voz forçados.
+
 Versão 0.8.3 – 2026-07-23
 
 Modo escuro

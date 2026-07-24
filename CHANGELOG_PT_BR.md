@@ -1,5 +1,27 @@
 # Changelog
 
+Versão 0.8.4 – 2026-07-24
+
+Edição de documentos EPUB
+• O Sonarpad agora consegue não apenas abrir documentos EPUB, mas também editá-los e salvá-los novamente em formato EPUB, preservando a formatação original, o sumário, as notas de rodapé, as imagens, as folhas de estilo, os metadados e os links internos.
+• O formato EPUB está disponível em “Salvar como” para documentos abertos a partir de um EPUB. Ao salvar, apenas o texto alterado é atualizado e a estrutura do livro permanece intacta.
+
+Confiabilidade dos audiolivros
+• Corrigido um problema intermitente em que, após cinco tentativas com falha do Google TTS, uma unidade de síntese era descartada silenciosamente e uma parte do texto podia faltar no audiolivro final.
+• As unidades do Google agora são repetidas até funcionarem ou até o usuário cancelar. A inicialização dos processos é escalonada para reduzir conflitos temporários com o Chrome e com arquivos; o Sonarpad também interrompe a criação em vez de salvar um audiolivro com um segmento ausente.
+• Os audiolivros com Edge agora repetem sem limite fixo os erros temporários de rede, WebSocket, tempo limite, limitação do serviço e áudio inválido, até funcionar ou o usuário cancelar, inclusive com vozes mistas e divisão por duração. SAPI4 e SAPI5 mantêm tentativas adaptativas e limitadas; se um segmento continuar falhando, o Sonarpad interrompe o processo sem salvar um audiolivro incompleto.
+
+Navegação nas bibliotecas digitais
+• Os resultados do LibriVox, Internet Archive e Project Gutenberg agora usam navegação por páginas como o YouTube: “Ir para os resultados anteriores” aparece no início da lista e “Ir para os próximos resultados” no final.
+• Foram corrigidas as transições de foco no LibriVox: ao abrir um livro ou capítulo, o foco do NVDA não vai mais para o editor principal antes da abertura da próxima lista ou do player.
+• Foi adicionada uma proteção de foco durante as pesquisas e o carregamento de livros do LibriVox: uma janela de carregamento traduzida permanece em primeiro plano durante toda a solicitação, impedindo que o foco do NVDA passe para o Prompt de Comando, o Windows Terminal ou outro aplicativo.
+
+Download de playlists do YouTube
+• Foi adicionado às playlists do YouTube um comando acessível de seleção múltipla, permitindo escolher quais vídeos baixar sem alterar o comando existente “Salvar mídia” do item em reprodução.
+• Os itens selecionados são baixados um de cada vez usando o formato e a qualidade escolhidos ao abrir a playlist, recebem nomes numerados que preservam a ordem original e são salvos em uma pasta própria dentro da pasta Mídia configurada.
+• A janela inclui “Selecionar tudo” e “Desmarcar tudo”, anuncia quantos itens estão selecionados, permite cancelar mantendo os arquivos já concluídos e informa claramente os itens que não puderam ser baixados.
+• Os itens da playlist agora são caixas de seleção nativas: os leitores de tela anunciam automaticamente o título, o tipo de controle e o estado marcado ou desmarcado, sem acrescentar palavras ao título visível nem usar anúncios de voz forçados.
+
 Versão 0.8.3 – 2026-07-23
 
 Modo escuro

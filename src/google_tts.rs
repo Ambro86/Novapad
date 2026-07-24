@@ -26,6 +26,28 @@ const VOICE_SEPARATOR: char = '\u{001f}';
 static PROFILE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 type CdpEventHandler<'a> = Option<&'a mut dyn FnMut(&Value) -> Result<(), String>>;
 
+fn runtime_start_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn lock_runtime_start(
+    cancel: &Arc<AtomicBool>,
+) -> Result<std::sync::MutexGuard<'static, ()>, String> {
+    loop {
+        match runtime_start_lock().try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                if cancel.load(Ordering::Relaxed) {
+                    return Err("cancelled".to_string());
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+            Err(std::sync::TryLockError::Poisoned(error)) => return Ok(error.into_inner()),
+        }
+    }
+}
+
 /// Google/NVDA pitch values are exposed to users as an exact 0..=100 scale.
 /// We encode new values outside the legacy -12..=12 semitone range so old
 /// settings and document voice tags remain readable without ambiguity.
@@ -809,6 +831,15 @@ struct GoogleTtsRuntime {
 
 impl GoogleTtsRuntime {
     fn start(cancel: &Arc<AtomicBool>) -> Result<Self, String> {
+        let startup_lock_started = Instant::now();
+        let _startup_guard = lock_runtime_start(cancel)?;
+        crate::log_debug(&format!(
+            "Google TTS runtime startup lock acquired after {} ms",
+            startup_lock_started.elapsed().as_millis()
+        ));
+        if cancel.load(Ordering::Relaxed) {
+            return Err("cancelled".to_string());
+        }
         if !has_installed_voices() {
             return Err("No Google TTS voice packages are installed.".to_string());
         }

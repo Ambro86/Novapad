@@ -54,6 +54,7 @@ pub(crate) struct LoadedDocument {
     pub(crate) format: FileFormat,
     pub(crate) opened_text_encoding: Option<TextEncoding>,
     pub(crate) epub_index: Vec<EpubIndexEntry>,
+    pub(crate) epub_original_text: Option<String>,
 }
 
 pub(crate) struct DocumentLoadResult {
@@ -1358,6 +1359,7 @@ pub struct Document {
     pub prefer_mpv_playback: bool,
     pub route_map: Option<RouteMapData>,
     pub epub_index: Vec<EpubIndexEntry>,
+    pub epub_original_text: Option<String>,
 }
 
 #[derive(Clone)]
@@ -1389,6 +1391,7 @@ impl Default for Document {
             prefer_mpv_playback: false,
             route_map: None,
             epub_index: Vec::new(),
+            epub_original_text: None,
         }
     }
 }
@@ -3284,6 +3287,7 @@ pub fn new_document(hwnd: HWND) {
                 prefer_mpv_playback: false,
                 route_map: None,
                 epub_index: Vec::new(),
+                epub_original_text: None,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -3332,6 +3336,7 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
                 prefer_mpv_playback: false,
                 route_map: None,
                 epub_index: Vec::new(),
+                epub_original_text: None,
             };
             SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
             ShowWindow(hwnd_edit, SW_HIDE);
@@ -3406,6 +3411,7 @@ fn load_document_content(
             format: FileFormat::Docx,
             opened_text_encoding: None,
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
     if is_odt_path(path) {
@@ -3415,6 +3421,7 @@ fn load_document_content(
             format: FileFormat::Odt,
             opened_text_encoding: None,
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
     if is_pptx_path(path) {
@@ -3424,6 +3431,7 @@ fn load_document_content(
             format: FileFormat::Pptx,
             opened_text_encoding: None,
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
     if is_ppt_path(path) {
@@ -3433,6 +3441,7 @@ fn load_document_content(
             format: FileFormat::Ppt,
             opened_text_encoding: None,
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
     if is_odp_path(path) {
@@ -3442,15 +3451,18 @@ fn load_document_content(
             format: FileFormat::Odp,
             opened_text_encoding: None,
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
     if is_epub_path(path) {
         let document = read_epub_document(path, language)?;
+        let original_text = document.text.clone();
         return Ok(Some(LoadedDocument {
             content: document.text,
             format: FileFormat::Epub,
             opened_text_encoding: None,
             epub_index: document.index,
+            epub_original_text: Some(original_text),
         }));
     }
     if is_html_path(path) {
@@ -3460,6 +3472,7 @@ fn load_document_content(
             format: FileFormat::Html,
             opened_text_encoding: None,
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
     let is_rtf = path
@@ -3475,6 +3488,7 @@ fn load_document_content(
             format: FileFormat::Text(TextEncoding::Utf8),
             opened_text_encoding: None,
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
     if is_gdoc_path(path) {
@@ -3521,6 +3535,7 @@ fn load_document_content(
             format: FileFormat::Text(encoding),
             opened_text_encoding: Some(encoding),
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
     if is_doc_path(path) {
@@ -3530,6 +3545,7 @@ fn load_document_content(
             format: FileFormat::Doc,
             opened_text_encoding: None,
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
     if is_spreadsheet_path(path) {
@@ -3539,6 +3555,7 @@ fn load_document_content(
             format: FileFormat::Spreadsheet,
             opened_text_encoding: None,
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
 
@@ -3551,6 +3568,7 @@ fn load_document_content(
             format: FileFormat::Text(encoding),
             opened_text_encoding: Some(encoding),
             epub_index: Vec::new(),
+            epub_original_text: None,
         }));
     }
     let (text, encoding) = decode_text(&bytes, language)?;
@@ -3559,6 +3577,7 @@ fn load_document_content(
         format: FileFormat::Text(encoding),
         opened_text_encoding: Some(encoding),
         epub_index: Vec::new(),
+        epub_original_text: None,
     }))
 }
 
@@ -3856,6 +3875,7 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
                 prefer_mpv_playback: false,
                 route_map: None,
                 epub_index: Vec::new(),
+                epub_original_text: None,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
@@ -4562,6 +4582,13 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
             let language = state.settings.language;
             let text = get_edit_text(state.docs[index].hwnd_edit);
             let original_path = state.docs[index].path.clone();
+            let epub_original_text = state.docs[index].epub_original_text.clone();
+            let source_is_epub = matches!(state.docs[index].format, FileFormat::Epub);
+            let allow_epub_save = source_is_epub
+                && original_path
+                    .as_deref()
+                    .is_some_and(crate::file_handler::is_epub_path)
+                && epub_original_text.is_some();
             let prefer_title_for_save_suggestion =
                 state.docs[index].prefer_title_for_save_suggestion;
             let is_lossy_doc = matches!(
@@ -4571,7 +4598,6 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                     | FileFormat::Doc
                     | FileFormat::Pdf
                     | FileFormat::Spreadsheet
-                    | FileFormat::Epub
                     | FileFormat::Html
                     | FileFormat::Ppt
                     | FileFormat::Pptx
@@ -4581,10 +4607,14 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                 .path
                 .as_ref()
                 .and_then(|path| {
-                    if path.exists() {
+                    if source_is_epub {
                         path.file_stem()
                             .and_then(|name| name.to_str())
-                            .map(|s| s.to_string())
+                            .map(ToString::to_string)
+                    } else if path.exists() {
+                        path.file_stem()
+                            .and_then(|name| name.to_str())
+                            .map(ToString::to_string)
                     } else {
                         None
                     }
@@ -4627,6 +4657,8 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                         hwnd,
                         Some(&suggested_name),
                         initial_encoding,
+                        allow_epub_save,
+                        allow_epub_save.then_some("epub"),
                     ) {
                         Some((path, enc)) => (path, Some(enc)),
                         None => return None,
@@ -4637,6 +4669,7 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                 return None;
             }
 
+            let is_epub = crate::file_handler::is_epub_path(&path);
             let is_pdf = crate::file_handler::is_pdf_path(&path);
             let is_docx = crate::file_handler::is_docx_path(&path);
             let is_doc = path
@@ -4650,7 +4683,76 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                 .map(|s| s.eq_ignore_ascii_case("rtf"))
                 .unwrap_or(false);
 
-            if is_pdf {
+            if is_epub {
+                let Some(source_path) = original_path.as_deref() else {
+                    crate::show_error(
+                        hwnd,
+                        language,
+                        &crate::settings::error_save_file_message(
+                            language,
+                            "An EPUB can be saved only when the document was opened from an EPUB file.",
+                        ),
+                    );
+                    return None;
+                };
+                let Some(original_epub_text) = epub_original_text.as_deref() else {
+                    crate::show_error(
+                        hwnd,
+                        language,
+                        &crate::settings::error_save_file_message(
+                            language,
+                            "The original EPUB text map is not available. Reopen the book before saving it.",
+                        ),
+                    );
+                    return None;
+                };
+                if let Err(message) = crate::epub_editor::write_epub_preserving_structure(
+                    source_path,
+                    &path,
+                    original_epub_text,
+                    &text,
+                    language,
+                ) {
+                    crate::show_error(hwnd, language, &message);
+                    return None;
+                }
+                let saved_document = match crate::file_handler::read_epub_document(&path, language)
+                {
+                    Ok(document) => document,
+                    Err(message) => {
+                        crate::show_error(hwnd, language, &message);
+                        return None;
+                    }
+                };
+                let saved_text = saved_document.text;
+                let saved_index = saved_document.index;
+                if saved_text != text {
+                    let hwnd_edit = state.docs[index].hwnd_edit;
+                    let mut selection = CHARRANGE { cpMin: 0, cpMax: 0 };
+                    SendMessageW(
+                        hwnd_edit,
+                        EM_EXGETSEL,
+                        WPARAM(0),
+                        LPARAM(&mut selection as *mut _ as isize),
+                    );
+                    set_edit_text(hwnd_edit, &saved_text);
+                    let maximum_position = saved_text.encode_utf16().count() as i32;
+                    selection.cpMin = selection.cpMin.clamp(0, maximum_position);
+                    selection.cpMax = selection.cpMax.clamp(0, maximum_position);
+                    SendMessageW(
+                        hwnd_edit,
+                        EM_EXSETSEL,
+                        WPARAM(0),
+                        LPARAM(&mut selection as *mut _ as isize),
+                    );
+                    SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
+                }
+                state.docs[index].format = FileFormat::Epub;
+                state.docs[index].opened_text_encoding = None;
+                state.docs[index].current_save_text_encoding = None;
+                state.docs[index].epub_original_text = Some(saved_text);
+                state.docs[index].epub_index = saved_index;
+            } else if is_pdf {
                 let pdf_title = path
                     .file_stem()
                     .and_then(|s| s.to_str())
@@ -4735,6 +4837,11 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                     return None;
                 }
                 state.docs[index].format = FileFormat::Text(encoding);
+            }
+
+            if !is_epub {
+                state.docs[index].epub_original_text = None;
+                state.docs[index].epub_index.clear();
             }
 
             let hwnd_edit = state.docs[index].hwnd_edit;

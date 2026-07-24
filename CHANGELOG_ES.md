@@ -1,5 +1,27 @@
 # Changelog
 
+Versión 0.8.4 – 2026-07-24
+
+Edición de documentos EPUB
+• Sonarpad ahora no solo puede abrir documentos EPUB, sino también modificarlos y volver a guardarlos en formato EPUB, conservando el formato original, el índice, las notas al pie, las imágenes, las hojas de estilo, los metadatos y los enlaces internos.
+• El formato EPUB está disponible en «Guardar como» para los documentos abiertos desde un EPUB. Al guardar, solo se actualiza el texto modificado y se mantiene intacta la estructura del libro.
+
+Fiabilidad de los audiolibros
+• Corregido un problema intermitente por el que, después de cinco intentos fallidos de Google TTS, una unidad de síntesis se descartaba silenciosamente y podía faltar parte del texto en el audiolibro final.
+• Las unidades de Google se vuelven a intentar hasta que funcionan o hasta que el usuario cancela. El inicio de los procesos se escalona para reducir conflictos temporales con Chrome y los archivos; además, Sonarpad detiene la creación en lugar de guardar un audiolibro al que le falte un segmento.
+• Los audiolibros con Edge ahora reintentan sin un límite fijo los errores temporales de red, WebSocket, tiempo de espera, limitación del servicio y audio no válido hasta que la síntesis finaliza o el usuario cancela, también con voces mixtas y división por tiempo. SAPI4 y SAPI5 conservan reintentos adaptativos y limitados; si un segmento sigue fallando, Sonarpad detiene el proceso sin guardar un audiolibro incompleto.
+
+Navegación de las bibliotecas digitales
+• Los resultados de LibriVox, Internet Archive y Project Gutenberg ahora usan una navegación por páginas como YouTube: «Ir a los resultados anteriores» aparece al principio de la lista e «Ir a los siguientes resultados» al final.
+• Corregidas las transiciones del foco en LibriVox: al abrir un libro o un capítulo, el foco de NVDA ya no pasa al editor principal antes de abrirse la lista siguiente o el reproductor.
+• Añadida una protección del foco durante las búsquedas y la carga de libros de LibriVox: una ventana de carga traducida permanece en primer plano durante toda la solicitud, evitando que el foco de NVDA pase al símbolo del sistema, Windows Terminal u otra aplicación.
+
+Descarga de listas de reproducción de YouTube
+• Añadido a las listas de reproducción de YouTube un comando accesible de selección múltiple que permite elegir qué vídeos descargar sin modificar el comando «Guardar multimedia» del elemento que se está reproduciendo.
+• Los elementos seleccionados se descargan de uno en uno con el formato y la calidad elegidos al abrir la lista, reciben nombres numerados que conservan el orden original y se guardan en una carpeta propia dentro de la carpeta Multimedia configurada.
+• La ventana incluye «Seleccionar todo» y «Deseleccionar todo», anuncia cuántos elementos están seleccionados, permite cancelar conservando los archivos ya terminados e informa claramente de los elementos que no pudieron descargarse.
+• Los elementos de la lista de reproducción son ahora casillas de verificación nativas: los lectores de pantalla anuncian automáticamente el título, el tipo de control y el estado marcado o desmarcado, sin añadir palabras al título visible ni utilizar anuncios de voz forzados.
+
 Versión 0.8.3 – 2026-07-23
 
 Modo oscuro

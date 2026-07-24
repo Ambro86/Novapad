@@ -1615,36 +1615,62 @@ fn filter_epub_text_with_anchors(
 
     for segment in cleaned.split_inclusive('\n') {
         let line = segment.strip_suffix('\n').unwrap_or(segment);
-        let trimmed = line.trim();
+        let explicit_break = line.ends_with(SONARPAD_EXPLICIT_BREAK_MARKER);
+        let visible_line = line
+            .strip_suffix(SONARPAD_EXPLICIT_BREAK_MARKER)
+            .unwrap_or(line);
+        let trimmed = visible_line.trim();
         if !trimmed.is_empty()
             && !is_epub_metadata_noise_line(trimmed)
             && !(trimmed.starts_with("part") && trimmed.len() <= 12)
         {
-            let leading = line.find(trimmed).unwrap_or(0);
+            let leading = visible_line.find(trimmed).unwrap_or(0);
             let text_start = source_start.saturating_add(leading);
             let text_end = text_start.saturating_add(trimmed.len());
             let destination_start = output.len();
             output.push_str(trimmed);
             output.push('\n');
             kept_ranges.push((text_start, text_end, destination_start));
+        } else if explicit_break {
+            let marker_start = source_start.saturating_add(visible_line.len());
+            let destination_start = output.len();
+            output.push('\n');
+            kept_ranges.push((
+                marker_start,
+                marker_start.saturating_add(SONARPAD_EXPLICIT_BREAK_MARKER.len_utf8()),
+                destination_start,
+            ));
         }
         source_start = source_start.saturating_add(segment.len());
     }
 
     if source_start < cleaned.len() {
         let line = &cleaned[source_start..];
-        let trimmed = line.trim();
+        let explicit_break = line.ends_with(SONARPAD_EXPLICIT_BREAK_MARKER);
+        let visible_line = line
+            .strip_suffix(SONARPAD_EXPLICIT_BREAK_MARKER)
+            .unwrap_or(line);
+        let trimmed = visible_line.trim();
         if !trimmed.is_empty()
             && !is_epub_metadata_noise_line(trimmed)
             && !(trimmed.starts_with("part") && trimmed.len() <= 12)
         {
-            let leading = line.find(trimmed).unwrap_or(0);
+            let leading = visible_line.find(trimmed).unwrap_or(0);
             let text_start = source_start.saturating_add(leading);
             let text_end = text_start.saturating_add(trimmed.len());
             let destination_start = output.len();
             output.push_str(trimmed);
             output.push('\n');
             kept_ranges.push((text_start, text_end, destination_start));
+        } else if explicit_break {
+            let marker_start = source_start.saturating_add(visible_line.len());
+            let destination_start = output.len();
+            output.push('\n');
+            kept_ranges.push((
+                marker_start,
+                marker_start.saturating_add(SONARPAD_EXPLICIT_BREAK_MARKER.len_utf8()),
+                destination_start,
+            ));
         }
     }
 
@@ -1736,8 +1762,13 @@ pub fn read_html_text(path: &Path, language: Language) -> Result<(String, TextEn
     Ok((cleaned, encoding))
 }
 
+const SONARPAD_LINE_BREAK_CLASS: &str = "sonarpad-preserve-line-break";
+const SONARPAD_EXPLICIT_BREAK_MARKER: char = '\u{E000}';
+
 fn html_to_text(html: &str) -> String {
-    html_to_text_with_anchors(html).0
+    html_to_text_with_anchors(html)
+        .0
+        .replace(SONARPAD_EXPLICIT_BREAK_MARKER, "")
 }
 
 fn html_to_text_with_anchors(html: &str) -> (String, std::collections::HashMap<String, usize>) {
@@ -1794,7 +1825,17 @@ fn html_to_text_with_anchors(html: &str) -> (String, std::collections::HashMap<S
                     tag.clear();
                     continue;
                 }
-                if matches!(
+                let explicit_sonarpad_break = tag_name == "br"
+                    && html_tag_attribute(tag_trimmed, "class").is_some_and(|classes| {
+                        classes
+                            .split_ascii_whitespace()
+                            .any(|class| class == SONARPAD_LINE_BREAK_CLASS)
+                    });
+                if explicit_sonarpad_break && skip_stack.is_empty() && !out.is_empty() {
+                    out.push(SONARPAD_EXPLICIT_BREAK_MARKER);
+                    out.push('\n');
+                    last_newline = true;
+                } else if matches!(
                     tag_name.as_str(),
                     "br" | "p"
                         | "div"
@@ -2011,8 +2052,17 @@ mod tests {
     use super::{
         EpubResourcePlacement, Language, WINDOWS_1250, WINDOWS_1252, align_epub_target_to_title,
         byte_offset_to_editor_utf16, choose_ansi_decoding, decode_ansi_best_effort,
-        embedded_nul_count, html_to_text, is_epub_metadata_noise_line, strip_embedded_nuls,
+        embedded_nul_count, filter_epub_text_with_anchors, html_to_text, html_to_text_with_anchors,
+        is_epub_metadata_noise_line, strip_embedded_nuls,
     };
+
+    #[test]
+    fn marked_epub_breaks_survive_filtering_consecutively() {
+        let html = "<p>Prima<br class=\"sonarpad-preserve-line-break\"/><br class=\"sonarpad-preserve-line-break\"/><br class=\"sonarpad-preserve-line-break\"/><br class=\"sonarpad-preserve-line-break\"/>Seconda</p>";
+        let (cleaned, anchors) = html_to_text_with_anchors(html);
+        let (filtered, _) = filter_epub_text_with_anchors(&cleaned, &anchors);
+        assert_eq!(filtered, "Prima\n\n\n\nSeconda\n");
+    }
 
     #[test]
     fn pdf_embedded_nuls_are_removed_without_truncating_following_text() {

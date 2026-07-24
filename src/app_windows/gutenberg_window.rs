@@ -21,6 +21,8 @@ use crate::{editor_manager, i18n, show_error, with_state};
 const SEARCH_URL: &str = "https://sonarpad.com/api/gutenberg/search.php";
 const DOWNLOAD_URL: &str = "https://sonarpad.com/api/gutenberg/download.php";
 const PAGE_SIZE: usize = 20;
+const PREVIOUS_RESULTS_ID: &str = "__sonarpad_gutenberg_previous_results__";
+const NEXT_RESULTS_ID: &str = "__sonarpad_gutenberg_next_results__";
 const USER_AGENT: &str = concat!("Sonarpad/", env!("CARGO_PKG_VERSION"));
 
 #[derive(Clone)]
@@ -53,6 +55,8 @@ struct GutenbergPage {
     #[serde(default)]
     next: Option<String>,
     #[serde(default)]
+    previous: Option<String>,
+    #[serde(default)]
     results: Vec<GutenbergBook>,
 }
 
@@ -66,6 +70,7 @@ struct GutenbergSearch {
 struct GutenbergReturnContext {
     search: GutenbergSearch,
     books: Vec<GutenbergBook>,
+    previous_page: Option<String>,
     next_page: Option<String>,
     selected_id: String,
     opened_path: Option<PathBuf>,
@@ -202,6 +207,7 @@ pub fn open(parent: HWND) {
             }
         };
         let mut books = page.results;
+        let mut previous_page = page.previous.take();
         let mut next_page = page.next.take();
         let mut selected_id = None;
 
@@ -219,15 +225,13 @@ pub fn open(parent: HWND) {
         }
 
         loop {
-            let items = books
-                .iter()
-                .map(|book| MultilineSelectionItem {
-                    id: book.id.to_string(),
-                    title: book.title.clone(),
-                    description: Some(book_description(book, language)),
-                })
-                .collect();
-            let result = youtube_transcript_window::select_multiline_items_with_search(
+            let items = gutenberg_result_items(
+                &books,
+                language,
+                previous_page.is_some(),
+                next_page.is_some(),
+            );
+            let result = youtube_transcript_window::select_multiline_items_with_search_without_parent_restore_on_action(
                 parent,
                 language,
                 i18n::tr(language, "gutenberg.title"),
@@ -237,9 +241,7 @@ pub fn open(parent: HWND) {
                     initial_query: search.query.clone(),
                     search_button_label: i18n::tr(language, "podcasts.search.button"),
                     show_search_edit: true,
-                    secondary_action_label: next_page
-                        .as_ref()
-                        .map(|_| i18n::tr(language, "podcasts.categories.load_more_results")),
+                    secondary_action_label: None,
                     context_actions: Vec::new(),
                     right_arrow_accepts_selection: true,
                     left_arrow_closes: true,
@@ -254,27 +256,46 @@ pub fn open(parent: HWND) {
                     search.query = query.trim().to_string();
                     break;
                 }
-                MultilineSelectionResult::SecondaryAction => {
-                    let Some(url) = next_page.clone() else {
-                        continue;
-                    };
-                    crate::screen_reader_speak(&i18n::tr(language, "gutenberg.loading"));
-                    match client.search(&search, Some(&url)) {
-                        Ok(mut loaded) => {
-                            books.append(&mut loaded.results);
-                            next_page = loaded.next;
-                        }
-                        Err(error) => {
-                            show_catalog_error(parent, language, "gutenberg.error", &error)
-                        }
-                    }
-                }
+                MultilineSelectionResult::SecondaryAction => {}
                 MultilineSelectionResult::Selected(id) => {
+                    if id == PREVIOUS_RESULTS_ID || id == NEXT_RESULTS_ID {
+                        let page_url = if id == PREVIOUS_RESULTS_ID {
+                            previous_page.clone()
+                        } else {
+                            next_page.clone()
+                        };
+                        let Some(page_url) = page_url else {
+                            continue;
+                        };
+                        crate::screen_reader_speak(&i18n::tr(language, "gutenberg.loading"));
+                        match client.search(&search, Some(&page_url)) {
+                            Ok(loaded) if !loaded.results.is_empty() => {
+                                books = loaded.results;
+                                previous_page = loaded.previous;
+                                next_page = loaded.next;
+                                selected_id = Some(first_gutenberg_result_id(
+                                    &books,
+                                    previous_page.is_some(),
+                                    next_page.is_some(),
+                                ));
+                            }
+                            Ok(_) => {
+                                if id == NEXT_RESULTS_ID {
+                                    next_page = None;
+                                }
+                            }
+                            Err(error) => {
+                                show_catalog_error(parent, language, "gutenberg.error", &error)
+                            }
+                        }
+                        continue;
+                    }
                     selected_id = Some(id.clone());
                     if let Some(book) = books.iter().find(|book| book.id.to_string() == id) {
                         let context = GutenbergReturnContext {
                             search: search.clone(),
                             books: books.clone(),
+                            previous_page: previous_page.clone(),
                             next_page: next_page.clone(),
                             selected_id: id,
                             opened_path: None,
@@ -292,16 +313,13 @@ pub fn open(parent: HWND) {
 fn browse_return_results(parent: HWND, language: Language, mut context: GutenbergReturnContext) {
     let client = GutenbergClient::default();
     loop {
-        let items = context
-            .books
-            .iter()
-            .map(|book| MultilineSelectionItem {
-                id: book.id.to_string(),
-                title: book.title.clone(),
-                description: Some(book_description(book, language)),
-            })
-            .collect();
-        match youtube_transcript_window::select_multiline_items_with_search(
+        let items = gutenberg_result_items(
+            &context.books,
+            language,
+            context.previous_page.is_some(),
+            context.next_page.is_some(),
+        );
+        match youtube_transcript_window::select_multiline_items_with_search_without_parent_restore_on_action(
             parent,
             language,
             i18n::tr(language, "gutenberg.title"),
@@ -311,10 +329,7 @@ fn browse_return_results(parent: HWND, language: Language, mut context: Gutenber
                 initial_query: context.search.query.clone(),
                 search_button_label: i18n::tr(language, "podcasts.search.button"),
                 show_search_edit: true,
-                secondary_action_label: context
-                    .next_page
-                    .as_ref()
-                    .map(|_| i18n::tr(language, "podcasts.categories.load_more_results")),
+                secondary_action_label: None,
                 context_actions: Vec::new(),
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
@@ -334,6 +349,7 @@ fn browse_return_results(parent: HWND, language: Language, mut context: Gutenber
                     Ok(page) if !page.results.is_empty() => {
                         context.search = search;
                         context.books = page.results;
+                        context.previous_page = page.previous;
                         context.next_page = page.next;
                         context.selected_id = context.books[0].id.to_string();
                     }
@@ -345,20 +361,40 @@ fn browse_return_results(parent: HWND, language: Language, mut context: Gutenber
                     Err(error) => show_catalog_error(parent, language, "gutenberg.error", &error),
                 }
             }
-            MultilineSelectionResult::SecondaryAction => {
-                let Some(url) = context.next_page.clone() else {
-                    continue;
-                };
-                crate::screen_reader_speak(&i18n::tr(language, "gutenberg.loading"));
-                match client.search(&context.search, Some(&url)) {
-                    Ok(mut page) => {
-                        context.books.append(&mut page.results);
-                        context.next_page = page.next;
-                    }
-                    Err(error) => show_catalog_error(parent, language, "gutenberg.error", &error),
-                }
-            }
+            MultilineSelectionResult::SecondaryAction => {}
             MultilineSelectionResult::Selected(id) => {
+                if id == PREVIOUS_RESULTS_ID || id == NEXT_RESULTS_ID {
+                    let page_url = if id == PREVIOUS_RESULTS_ID {
+                        context.previous_page.clone()
+                    } else {
+                        context.next_page.clone()
+                    };
+                    let Some(page_url) = page_url else {
+                        continue;
+                    };
+                    crate::screen_reader_speak(&i18n::tr(language, "gutenberg.loading"));
+                    match client.search(&context.search, Some(&page_url)) {
+                        Ok(page) if !page.results.is_empty() => {
+                            context.books = page.results;
+                            context.previous_page = page.previous;
+                            context.next_page = page.next;
+                            context.selected_id = first_gutenberg_result_id(
+                                &context.books,
+                                context.previous_page.is_some(),
+                                context.next_page.is_some(),
+                            );
+                        }
+                        Ok(_) => {
+                            if id == NEXT_RESULTS_ID {
+                                context.next_page = None;
+                            }
+                        }
+                        Err(error) => {
+                            show_catalog_error(parent, language, "gutenberg.error", &error)
+                        }
+                    }
+                    continue;
+                }
                 context.selected_id = id.clone();
                 if let Some(book) = context
                     .books
@@ -371,6 +407,51 @@ fn browse_return_results(parent: HWND, language: Language, mut context: Gutenber
                 }
             }
         }
+    }
+}
+
+fn gutenberg_result_items(
+    books: &[GutenbergBook],
+    language: Language,
+    has_previous: bool,
+    has_more: bool,
+) -> Vec<MultilineSelectionItem> {
+    let mut items = Vec::with_capacity(books.len().saturating_add(2));
+    if has_previous {
+        items.push(MultilineSelectionItem {
+            id: PREVIOUS_RESULTS_ID.to_string(),
+            title: i18n::tr(language, "podcasts.categories.previous_results"),
+            description: None,
+        });
+    }
+    items.extend(books.iter().map(|book| MultilineSelectionItem {
+        id: book.id.to_string(),
+        title: book.title.clone(),
+        description: Some(book_description(book, language)),
+    }));
+    if has_more {
+        items.push(MultilineSelectionItem {
+            id: NEXT_RESULTS_ID.to_string(),
+            title: i18n::tr(language, "podcasts.categories.next_results"),
+            description: None,
+        });
+    }
+    items
+}
+
+fn first_gutenberg_result_id(
+    books: &[GutenbergBook],
+    has_previous: bool,
+    has_more: bool,
+) -> String {
+    if has_previous {
+        PREVIOUS_RESULTS_ID.to_string()
+    } else if let Some(book) = books.first() {
+        book.id.to_string()
+    } else if has_more {
+        NEXT_RESULTS_ID.to_string()
+    } else {
+        String::new()
     }
 }
 

@@ -1118,15 +1118,16 @@ async fn synthesize_segment_bytes(text: &str, config: &SynthesisConfig) -> Resul
     match config.engine {
         TtsEngine::Edge => {
             let request_id = Uuid::new_v4().simple().to_string();
-            download_audio_chunk(
+            download_audio_chunk_with_cancel(DownloadAudioChunkRequest {
                 text,
-                &config.voice,
-                &request_id,
-                config.rate,
-                config.pitch,
-                config.volume,
-                config.language,
-            )
+                voice: &config.voice,
+                request_id: &request_id,
+                tts_rate: config.rate,
+                tts_pitch: config.pitch,
+                tts_volume: config.volume,
+                language: config.language,
+                cancel: Some(config.cancel.as_ref()),
+            })
             .await
         }
         TtsEngine::Google => {
@@ -1246,6 +1247,9 @@ async fn synthesize_segment_to_wav(
     } else {
         decode_wav_to_pcm(&bytes)?
     };
+    if samples.is_empty() {
+        return Err("Segment decode failed: decoded audio contains no samples".to_string());
+    }
     let resampled = resample_pcm(
         &samples,
         src_rate,
@@ -2138,6 +2142,38 @@ fn is_edge_retry_forever_error(err: &str) -> bool {
     is_edge_connection_retry_error(err) || is_edge_forbidden_error(err)
 }
 
+fn is_edge_audiobook_transient_error(err: &str) -> bool {
+    let lower = err.to_ascii_lowercase();
+    is_edge_retry_forever_error(err)
+        || lower.contains("timeout")
+        || lower.contains("timed out")
+        || lower.contains("temporar")
+        || lower.contains("connection reset")
+        || lower.contains("connection refused")
+        || lower.contains("connection aborted")
+        || lower.contains("connection closed")
+        || lower.contains("failed to connect")
+        || lower.contains("forcibly closed")
+        || lower.contains("websocket")
+        || lower.contains("web socket")
+        || lower.contains("network")
+        || lower.contains("broken pipe")
+        || lower.contains("unexpected eof")
+        || lower.contains("closed without")
+        || lower.contains("too many requests")
+        || lower.contains("429")
+        || lower.contains("500 internal server error")
+        || lower.contains("502 bad gateway")
+        || lower.contains("503 service unavailable")
+        || lower.contains("504 gateway timeout")
+        || lower.contains("no audio sent")
+        || lower.contains("empty audio")
+        || lower.contains("empty payload")
+        || lower.contains("invalid audio")
+        || lower.contains("decode failed")
+        || lower.contains("segment decode failed")
+}
+
 fn edge_retry_delay_ms(err: &str, attempt: usize) -> u64 {
     let lower = err.to_ascii_lowercase();
     let base_ms = if is_edge_retry_forever_error(err) || lower.contains("timeout") {
@@ -2145,7 +2181,7 @@ fn edge_retry_delay_ms(err: &str, attempt: usize) -> u64 {
     } else {
         400
     };
-    ((attempt as u64) * (base_ms as u64)).min(2000)
+    (attempt as u64).saturating_mul(base_ms as u64).min(2000)
 }
 
 pub async fn download_audio_chunk(
@@ -2854,6 +2890,76 @@ async fn download_edge_chunk_ws_with_retry(
     Err(last_err)
 }
 
+async fn download_edge_audiobook_chunk_validated(
+    chunk: &TtsChunk,
+    options: &EdgeStreamOptions<'_>,
+    idx: usize,
+    max_retries: usize,
+    adaptive_lithuanian: bool,
+) -> Result<Vec<u8>, String> {
+    let sanitized_text = sanitize_edge_text(&chunk.text_to_read);
+    if !is_edge_text_usable(&sanitized_text) {
+        crate::log_debug(&format!(
+            "Edge audiobook: chunk {} contains no speakable text after sanitization",
+            idx
+        ));
+        return Err(i18n::tr(options.language, "app.tts_no_text"));
+    }
+
+    let mut validation_attempt = 1usize;
+    loop {
+        if options.cancel.load(Ordering::Relaxed) {
+            return Err(cancelled_message(options.language));
+        }
+
+        let download_result = if adaptive_lithuanian {
+            match download_edge_chunk_ws_adaptive_lt(chunk, options, idx, max_retries, 0).await {
+                Ok(mut audio) => {
+                    if is_lt_audio_suspicious(&chunk.text_to_read, audio.len())
+                        && let Ok(strict_audio) =
+                            download_edge_chunk_ws_strict_small_lt(chunk, options, idx, max_retries)
+                                .await
+                        && strict_audio.len() > audio.len()
+                    {
+                        audio = strict_audio;
+                    }
+                    Ok(audio)
+                }
+                Err(err) => Err(err),
+            }
+        } else {
+            download_edge_chunk_ws_with_retry(chunk, options, idx, max_retries).await
+        };
+
+        let err = match download_result {
+            Ok(audio) if audio.is_empty() => "Edge audiobook: empty audio payload".to_string(),
+            Ok(audio) => match decode_mp3_to_pcm(&audio) {
+                Ok((samples, _rate, _channels)) if !samples.is_empty() => return Ok(audio),
+                Ok((_samples, _rate, _channels)) => {
+                    "Edge audiobook: invalid audio with empty decoded samples".to_string()
+                }
+                Err(err) => format!("Edge audiobook: audio decode failed: {}", err),
+            },
+            Err(err) => err,
+        };
+        let retry_until_cancelled = is_edge_audiobook_transient_error(&err);
+        crate::log_debug(&format!(
+            "Edge audiobook: validated chunk failed chunk_index={} validation_attempt={} retry_until_cancelled={} error={}",
+            idx, validation_attempt, retry_until_cancelled, err
+        ));
+        if !retry_until_cancelled {
+            return Err(err);
+        }
+
+        tokio::time::sleep(Duration::from_millis(edge_retry_delay_ms(
+            &err,
+            validation_attempt,
+        )))
+        .await;
+        validation_attempt = validation_attempt.saturating_add(1);
+    }
+}
+
 fn normalize_spoken_label(value: &str) -> String {
     let value = value
         .trim()
@@ -3254,6 +3360,13 @@ fn filter_time_split_chunks(chunks: &[String], engine: TtsEngine) -> Vec<String>
             crate::log_debug(&format!("Time-split: skipping empty chunk index={}", idx));
             continue;
         }
+        if engine == TtsEngine::Edge && !is_edge_text_usable(&sanitize_edge_text(trimmed)) {
+            crate::log_debug(&format!(
+                "Time-split: skipping Edge chunk with no speakable text after sanitization index={}",
+                idx
+            ));
+            continue;
+        }
         let len_utf16 = utf16_len(chunk);
         let len_trim_utf16 = utf16_len(trimmed);
         let byte_len = chunk.len();
@@ -3270,9 +3383,9 @@ fn filter_time_split_chunks(chunks: &[String], engine: TtsEngine) -> Vec<String>
                 .into_iter()
                 .enumerate()
             {
-                if sub.trim().is_empty() {
+                if sub.trim().is_empty() || !is_edge_text_usable(&sanitize_edge_text(&sub)) {
                     crate::log_debug(&format!(
-                        "Time-split: skipping empty sub-chunk parent_index={} sub_index={}",
+                        "Time-split: skipping empty or non-speakable Edge sub-chunk parent_index={} sub_index={}",
                         idx, sub_idx
                     ));
                     continue;
@@ -3293,9 +3406,12 @@ fn filter_time_split_chunks(chunks: &[String], engine: TtsEngine) -> Vec<String>
                 idx, len_utf16, MAX_TTS_TEXT_LEN
             ));
             for (sub_idx, sub) in split_text_for_engine(chunk, engine).into_iter().enumerate() {
-                if sub.trim().is_empty() {
+                if sub.trim().is_empty()
+                    || (engine == TtsEngine::Edge
+                        && !is_edge_text_usable(&sanitize_edge_text(&sub)))
+                {
                     crate::log_debug(&format!(
-                        "Time-split: skipping empty sub-chunk parent_index={} sub_index={}",
+                        "Time-split: skipping empty or non-speakable sub-chunk parent_index={} sub_index={}",
                         idx, sub_idx
                     ));
                     continue;
@@ -3367,6 +3483,7 @@ fn run_split_audiobook_by_time_edge(
 
         const MAX_PARALLEL_CHUNKS: usize = 8;
         const CHUNK_RETRIES: usize = 6;
+        let is_lithuanian_voice = options.voice.to_ascii_lowercase().starts_with("lt-");
 
         let mut pending: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
         let mut next_to_write = 0usize;
@@ -3384,8 +3501,14 @@ fn run_split_audiobook_by_time_edge(
             .map(|(idx, chunk)| {
                 let opts = stream_options_ref;
                 async move {
-                    let res =
-                        download_edge_chunk_ws_with_retry(chunk, opts, idx, CHUNK_RETRIES).await;
+                    let res = download_edge_audiobook_chunk_validated(
+                        chunk,
+                        opts,
+                        idx,
+                        CHUNK_RETRIES,
+                        is_lithuanian_voice,
+                    )
+                    .await;
                     (idx, res)
                 }
             })
@@ -3398,59 +3521,23 @@ fn run_split_audiobook_by_time_edge(
             let audio = res?;
             pending.insert(idx, audio);
 
-        while let Some(data) = pending.remove(&next_to_write) {
-            if data.is_empty() {
-                crate::log_debug(&format!(
-                    "Edge WS: skipping empty audio payload after sanitization (chunk_index={}).",
-                    next_to_write
-                ));
-                current_global_progress = current_global_progress.saturating_add(1);
-                if options.progress_hwnd.0 != 0 {
-                    unsafe {
-                        if let Err(e) = PostMessageW(
-                            options.progress_hwnd,
-                            crate::WM_UPDATE_PROGRESS,
-                            WPARAM(current_global_progress),
-                            LPARAM(0),
-                        ) {
-                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
-                        }
-                    }
+            while let Some(data) = pending.remove(&next_to_write) {
+                if options.cancel.load(Ordering::Relaxed) {
+                    return Err(cancelled_message(options.language));
                 }
-                next_to_write = next_to_write.saturating_add(1);
-                continue;
-            }
-            if options.cancel.load(Ordering::Relaxed) {
-                return Err(cancelled_message(options.language));
-            }
 
-                let (samples, src_rate, src_channels) = match decode_mp3_to_pcm(&data) {
-                    Ok(v) => v,
-                    Err(err) => {
-                        crate::log_debug(&format!(
-                            "Edge WS: skipping undecodable audio chunk (chunk_index={}): {}",
-                            next_to_write, err
-                        ));
-                        current_global_progress = current_global_progress.saturating_add(1);
-                        if options.progress_hwnd.0 != 0 {
-                            unsafe {
-                                if let Err(e) = PostMessageW(
-                                    options.progress_hwnd,
-                                    crate::WM_UPDATE_PROGRESS,
-                                    WPARAM(current_global_progress),
-                                    LPARAM(0),
-                                ) {
-                                    crate::log_debug(&format!(
-                                        "Failed to post WM_UPDATE_PROGRESS: {}",
-                                        e
-                                    ));
-                                }
-                            }
-                        }
-                        next_to_write = next_to_write.saturating_add(1);
-                        continue;
-                    }
-                };
+                let (samples, src_rate, src_channels) = decode_mp3_to_pcm(&data).map_err(|err| {
+                    format!(
+                        "Edge audiobook: validated chunk {} could not be decoded during time-split writing: {}",
+                        next_to_write, err
+                    )
+                })?;
+                if samples.is_empty() {
+                    return Err(format!(
+                        "Edge audiobook: validated chunk {} contained no decoded samples during time-split writing",
+                        next_to_write
+                    ));
+                }
                 let chunk_duration = samples.len() as f64 / (src_rate as f64 * src_channels as f64);
 
                 if split_seconds > 0.0
@@ -3517,11 +3604,12 @@ fn run_split_audiobook_by_time_edge(
                             override_voice: None,
                             pause_ms: None,
                         };
-                        let announcement_audio = download_edge_chunk_ws_with_retry(
+                        let announcement_audio = download_edge_audiobook_chunk_validated(
                             &announcement_chunk,
                             &stream_options,
                             usize::MAX.saturating_sub(part_index as usize),
                             CHUNK_RETRIES,
+                            is_lithuanian_voice,
                         )
                         .await?;
                         if let Some(ref mut w) = wav_writer {
@@ -3589,6 +3677,14 @@ fn run_split_audiobook_by_time_edge(
                 }
                 next_to_write = next_to_write.saturating_add(1);
             }
+        }
+
+        if next_to_write != edge_chunks.len() {
+            return Err(format!(
+                "Edge audiobook time-split integrity check failed: produced {} chunks out of {}",
+                next_to_write,
+                edge_chunks.len()
+            ));
         }
 
         if let Some(mut writer) = part_writer.take()
@@ -3813,72 +3909,19 @@ async fn download_edge_chunks_ws_parallel_to_writer(
     let mut pending: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
     let mut next_to_write = start_index;
     let mut written_chunks = 0usize;
-    let mut skipped_empty_chunks = 0usize;
     let mut total_audio_bytes = 0usize;
 
     let mut stream = futures_util::stream::iter(chunks.iter().enumerate().skip(start_index))
         .map(|(idx, chunk)| async move {
-            let mut validate_attempt = 0usize;
-            loop {
-                if options.cancel.load(Ordering::Relaxed) {
-                    break (idx, Err("Cancelled".to_string()));
-                }
-
-                validate_attempt = validate_attempt.saturating_add(1);
-                let res = if is_lithuanian_voice {
-                    match download_edge_chunk_ws_adaptive_lt(chunk, options, idx, CHUNK_RETRIES, 0)
-                        .await
-                    {
-                        Ok(mut audio) => {
-                            if is_lt_audio_suspicious(&chunk.text_to_read, audio.len())
-                                && let Ok(strict_audio) = download_edge_chunk_ws_strict_small_lt(
-                                    chunk,
-                                    options,
-                                    idx,
-                                    CHUNK_RETRIES,
-                                )
-                                .await
-                                && strict_audio.len() > audio.len()
-                            {
-                                audio = strict_audio;
-                            }
-                            Ok(audio)
-                        }
-                        Err(err) => Err(err),
-                    }
-                } else {
-                    download_edge_chunk_ws_with_retry(chunk, options, idx, CHUNK_RETRIES).await
-                };
-
-                let audio = match res {
-                    Ok(audio) => audio,
-                    Err(err) => {
-                        crate::log_debug(&format!(
-                            "Edge WS: chunk {} fetch failed on validation attempt {}: {}. Retrying...",
-                            idx, validate_attempt, err
-                        ));
-                        continue;
-                    }
-                };
-
-                match decode_mp3_to_pcm(&audio) {
-                    Ok((samples, _rate, _channels)) if !samples.is_empty() => {
-                        break (idx, Ok(audio));
-                    }
-                    Ok((_samples, _rate, _channels)) => {
-                        crate::log_debug(&format!(
-                            "Edge WS: chunk {} invalid audio (empty decoded samples) on validation attempt {}. Retrying...",
-                            idx, validate_attempt
-                        ));
-                    }
-                    Err(err) => {
-                        crate::log_debug(&format!(
-                            "Edge WS: chunk {} invalid audio (decode error) on validation attempt {}: {}. Retrying...",
-                            idx, validate_attempt, err
-                        ));
-                    }
-                }
-            }
+            let result = download_edge_audiobook_chunk_validated(
+                chunk,
+                options,
+                idx,
+                CHUNK_RETRIES,
+                is_lithuanian_voice,
+            )
+            .await;
+            (idx, result)
         })
         .buffer_unordered(MAX_PARALLEL_CHUNKS);
 
@@ -3889,24 +3932,6 @@ async fn download_edge_chunks_ws_parallel_to_writer(
         let audio = res?;
         pending.insert(idx, audio);
         while let Some(data) = pending.remove(&next_to_write) {
-            if data.is_empty() {
-                skipped_empty_chunks = skipped_empty_chunks.saturating_add(1);
-                *current_global_progress += 1;
-                if options.progress_hwnd.0 != 0 {
-                    unsafe {
-                        if let Err(e) = PostMessageW(
-                            options.progress_hwnd,
-                            crate::WM_UPDATE_PROGRESS,
-                            WPARAM(*current_global_progress),
-                            LPARAM(0),
-                        ) {
-                            crate::log_debug(&format!("Failed to post WM_UPDATE_PROGRESS: {}", e));
-                        }
-                    }
-                }
-                next_to_write = next_to_write.saturating_add(1);
-                continue;
-            }
             writer.write_all(&data).map_err(|err| err.to_string())?;
             writer.flush().map_err(|err| err.to_string())?;
             written_chunks = written_chunks.saturating_add(1);
@@ -3931,9 +3956,15 @@ async fn download_edge_chunks_ws_parallel_to_writer(
 
     let expected_chunks = chunks.len().saturating_sub(start_index);
     crate::log_debug(&format!(
-        "Edge WS export summary: expected_chunks={} written_chunks={} skipped_empty_chunks={} total_audio_bytes={}",
-        expected_chunks, written_chunks, skipped_empty_chunks, total_audio_bytes
+        "Edge WS export summary: expected_chunks={} written_chunks={} total_audio_bytes={}",
+        expected_chunks, written_chunks, total_audio_bytes
     ));
+    if written_chunks != expected_chunks {
+        return Err(format!(
+            "Edge audiobook integrity check failed: produced {} chunks out of {}",
+            written_chunks, expected_chunks
+        ));
+    }
 
     Ok(chunks.len())
 }
@@ -9632,11 +9663,21 @@ pub(crate) fn run_tts_audiobook_part(
             if trimmed.is_empty() {
                 continue;
             }
+            if !is_edge_text_usable(&sanitize_edge_text(&normalized)) {
+                crate::log_debug(&format!(
+                    "Edge audiobook: ignoring chunk with no speakable text after sanitization: {:?}",
+                    preview_for_log(&normalized, 120)
+                ));
+                continue;
+            }
             if is_lithuanian_voice && normalized.len() > LT_EDGE_MAX_BYTES {
                 out.extend(
                     split_text_edge_with_limit(&normalized, LT_EDGE_MAX_BYTES)
                         .into_iter()
-                        .filter(|s| !s.trim().is_empty()),
+                        .filter(|text| {
+                            !text.trim().is_empty()
+                                && is_edge_text_usable(&sanitize_edge_text(text))
+                        }),
                 );
             } else {
                 out.push(normalized);
@@ -9645,18 +9686,18 @@ pub(crate) fn run_tts_audiobook_part(
         out
     };
 
+    if chunk_texts.is_empty() {
+        return Err(i18n::tr(options.language, "app.tts_no_text"));
+    }
+
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .map_err(|err| err.to_string())?;
 
-    rt.block_on(async {
+    let edge_render_result = rt.block_on(async {
         if options.cancel.load(Ordering::Relaxed) {
             return Err(cancelled_message(options.language));
-        }
-
-        if chunk_texts.is_empty() {
-            return Ok(());
         }
 
         let edge_chunks: Vec<TtsChunk> = chunk_texts
@@ -9708,7 +9749,7 @@ pub(crate) fn run_tts_audiobook_part(
                     let completed = current_global_progress.saturating_sub(base_progress);
                     next_index = (next_index + completed).min(edge_chunks.len());
                     let err_str = err.as_str();
-                    let retry_forever = is_edge_retry_forever_error(err_str);
+                    let retry_forever = is_edge_audiobook_transient_error(err_str);
                     crate::log_debug(&format!(
                         "Edge WS export failed (attempt {}/{}): {}",
                         attempt,
@@ -9736,7 +9777,22 @@ pub(crate) fn run_tts_audiobook_part(
             return Err(err);
         }
         Ok(())
-    })?;
+    });
+    if let Err(err) = edge_render_result {
+        if let Err(remove_err) = std::fs::remove_file(options.output)
+            && remove_err.kind() != std::io::ErrorKind::NotFound
+        {
+            crate::log_debug(&format!(
+                "Edge audiobook: failed to remove partial output {:?} after synthesis error: {}",
+                options.output, remove_err
+            ));
+        }
+        crate::log_debug(&format!(
+            "Edge audiobook: render aborted; partial output removed and no segment was omitted: {}",
+            err
+        ));
+        return Err(err);
+    }
 
     let extension = options
         .output
@@ -10248,6 +10304,7 @@ fn coalesce_google_audiobook_chunks(
         let batch_count = batches.len().max(1);
         let mut assigned_source_chunks = 0usize;
         for (batch_index, text_to_read) in batches.into_iter().enumerate() {
+            let batch_first_chunk_index = first_chunk_index.saturating_add(assigned_source_chunks);
             let cumulative_source_chunks =
                 (batch_index + 1).saturating_mul(source_chunk_count) / batch_count;
             let batch_source_chunks =
@@ -10257,7 +10314,7 @@ fn coalesce_google_audiobook_chunks(
             chunk.original_len = utf16_len(&text_to_read);
             chunk.text_to_read = text_to_read;
             units.push(MixedAudiobookUnit {
-                first_chunk_index,
+                first_chunk_index: batch_first_chunk_index,
                 source_chunk_count: batch_source_chunks,
                 chunk,
             });
@@ -10267,14 +10324,63 @@ fn coalesce_google_audiobook_chunks(
     units
 }
 
+const NON_GOOGLE_AUDIOBOOK_MAX_ATTEMPTS: usize = 5;
+
+fn audiobook_retry_delay(attempt: usize) -> Duration {
+    Duration::from_millis(250u64.saturating_mul(attempt.min(20) as u64))
+}
+
+fn is_permanent_google_audiobook_error(error: &str) -> bool {
+    let normalized = error.to_lowercase();
+    normalized.contains("selected google tts voice is not installed")
+        || normalized.contains("no google tts voice packages are installed")
+        || normalized.contains("google chrome and microsoft edge were not found")
+        || normalized.contains("invalid google tts voice path")
+        || normalized.contains("unknown google tts voice package")
+        || normalized.contains("google tts voice checksum mismatch")
+}
+
+fn should_retry_audiobook_segment(engine: TtsEngine, attempt: usize, error: &str) -> bool {
+    match engine {
+        TtsEngine::Google => !is_permanent_google_audiobook_error(error),
+        TtsEngine::Edge => {
+            is_edge_audiobook_transient_error(error) || attempt < NON_GOOGLE_AUDIOBOOK_MAX_ATTEMPTS
+        }
+        TtsEngine::Sapi5 | TtsEngine::Sapi4 => attempt < NON_GOOGLE_AUDIOBOOK_MAX_ATTEMPTS,
+    }
+}
+
+fn sleep_with_audiobook_cancellation(cancel: &Arc<AtomicBool>, duration: Duration) -> bool {
+    let mut remaining = duration;
+    while !remaining.is_zero() {
+        if cancel.load(Ordering::Relaxed) {
+            return false;
+        }
+        let step = remaining.min(Duration::from_millis(100));
+        std::thread::sleep(step);
+        remaining = remaining.saturating_sub(step);
+    }
+    !cancel.load(Ordering::Relaxed)
+}
+
+fn audiobook_segment_failed_message(
+    language: Language,
+    engine: &str,
+    chunk_idx: usize,
+    error: &str,
+) -> String {
+    i18n::tr(language, "audiobook.segment_failed")
+        .replace("{engine}", engine)
+        .replace("{chunk}", &(chunk_idx + 1).to_string())
+        .replace("{error}", error)
+}
+
 async fn synthesize_mixed_chunk_with_retry(
     chunk_idx: usize,
     chunk: &TtsChunk,
     synth: &SynthesisConfig,
     target: TargetAudio,
-) -> Option<PathBuf> {
-    const MIXED_SEGMENT_MAX_ATTEMPTS: usize = 5;
-
+) -> Result<Option<PathBuf>, String> {
     crate::log_debug(&format!(
         "Mixed audiobook synth: chunk={} engine={} voice={:?} rate={} pitch={} volume={} override={} text_preview={:?}",
         chunk_idx,
@@ -10299,13 +10405,18 @@ async fn synthesize_mixed_chunk_with_retry(
             Uuid::new_v4().simple()
         ));
         return match write_silence_wav(&path, ms, target.sample_rate, target.channels) {
-            Ok(()) => Some(path),
+            Ok(()) => Ok(Some(path)),
             Err(err) => {
                 crate::log_debug(&format!(
                     "Mixed audiobook: failed to create pause chunk={} duration_ms={}: {}",
                     chunk_idx, ms, err
                 ));
-                None
+                Err(audiobook_segment_failed_message(
+                    synth.language,
+                    "pause",
+                    chunk_idx,
+                    &err.to_string(),
+                ))
             }
         };
     }
@@ -10323,50 +10434,55 @@ async fn synthesize_mixed_chunk_with_retry(
             synth.voice,
             preview_for_log(&chunk.text_to_read, 120)
         ));
-        return None;
+        return Ok(None);
     }
 
-    let mut last_err: Option<String> = None;
-    for attempt in 1..=MIXED_SEGMENT_MAX_ATTEMPTS {
+    let engine_name = match synth.engine {
+        TtsEngine::Edge => "edge",
+        TtsEngine::Sapi5 => "sapi5",
+        TtsEngine::Sapi4 => "sapi4",
+        TtsEngine::Google => "google",
+    };
+    let mut attempt = 1usize;
+    loop {
+        if synth.cancel.load(Ordering::Relaxed) {
+            return Err(cancelled_message(synth.language));
+        }
         match synthesize_segment_to_wav(&chunk.text_to_read, synth, target).await {
-            Ok(wav_path) => return Some(wav_path),
+            Ok(wav_path) => return Ok(Some(wav_path)),
             Err(err) => {
+                let retry_delay = audiobook_retry_delay(attempt);
+                let retry_until_cancelled = synth.engine == TtsEngine::Google
+                    || (synth.engine == TtsEngine::Edge && is_edge_audiobook_transient_error(&err));
                 crate::log_debug(&format!(
-                    "Mixed audiobook: synth attempt {}/{} failed for chunk={} engine={} voice={:?}: {}",
-                    attempt,
-                    MIXED_SEGMENT_MAX_ATTEMPTS,
+                    "Mixed audiobook: synth failed chunk={} engine={} voice={:?} attempt={} retry_until_cancelled={} retry_delay_ms={} text_preview={:?} error={}",
                     chunk_idx,
-                    match synth.engine {
-                        TtsEngine::Edge => "edge",
-                        TtsEngine::Sapi5 => "sapi5",
-                        TtsEngine::Sapi4 => "sapi4",
-                        TtsEngine::Google => "google",
-                    },
+                    engine_name,
                     synth.voice,
+                    attempt,
+                    retry_until_cancelled,
+                    retry_delay.as_millis(),
+                    preview_for_log(&chunk.text_to_read, 120),
                     err
                 ));
-                last_err = Some(err);
-                if attempt < MIXED_SEGMENT_MAX_ATTEMPTS {
-                    tokio::time::sleep(Duration::from_millis(250 * attempt as u64)).await;
+                let should_retry = should_retry_audiobook_segment(synth.engine, attempt, &err);
+                if !should_retry {
+                    crate::log_debug(&format!(
+                        "Mixed audiobook: aborting render because chunk={} engine={} failed after attempt={}; no segment will be omitted",
+                        chunk_idx, engine_name, attempt
+                    ));
+                    return Err(audiobook_segment_failed_message(
+                        synth.language,
+                        engine_name,
+                        chunk_idx,
+                        &err,
+                    ));
                 }
+                tokio::time::sleep(retry_delay).await;
+                attempt = attempt.saturating_add(1);
             }
         }
     }
-
-    crate::log_debug(&format!(
-        "Mixed audiobook: dropping chunk after retries chunk={} engine={} voice={:?} text_preview={:?} last_error={}",
-        chunk_idx,
-        match synth.engine {
-            TtsEngine::Edge => "edge",
-            TtsEngine::Sapi5 => "sapi5",
-            TtsEngine::Sapi4 => "sapi4",
-            TtsEngine::Google => "google",
-        },
-        synth.voice,
-        preview_for_log(&chunk.text_to_read, 120),
-        last_err.unwrap_or_else(|| "unknown error".to_string())
-    ));
-    None
 }
 
 const GOOGLE_AUDIOBOOK_MAX_WORKERS: usize = 8;
@@ -10407,11 +10523,14 @@ struct GoogleAudiobookTask {
     volume: i32,
 }
 
+type GoogleAudiobookSynthesisResult = Result<Option<PathBuf>, String>;
+type OrderedGoogleAudiobookResult = Option<GoogleAudiobookSynthesisResult>;
+
 struct GoogleAudiobookTaskResult {
     order: usize,
     first_chunk_index: usize,
     source_chunk_count: usize,
-    wav_path: Option<PathBuf>,
+    synthesis_result: GoogleAudiobookSynthesisResult,
     elapsed_ms: u128,
 }
 
@@ -10421,9 +10540,8 @@ fn synthesize_google_audiobook_task(
     task: &GoogleAudiobookTask,
     target: TargetAudio,
     cancel: &Arc<AtomicBool>,
-) -> Option<PathBuf> {
-    const MAX_ATTEMPTS: usize = 5;
-
+    language: Language,
+) -> GoogleAudiobookSynthesisResult {
     if let Some(ms) = task.chunk.pause_ms {
         let path = std::env::temp_dir().join(format!(
             "sonarpad_google_pause_{}_{}_{}.wav",
@@ -10432,13 +10550,18 @@ fn synthesize_google_audiobook_task(
             Uuid::new_v4().simple()
         ));
         return match write_silence_wav(&path, ms, target.sample_rate, target.channels) {
-            Ok(()) => Some(path),
+            Ok(()) => Ok(Some(path)),
             Err(err) => {
                 crate::log_debug(&format!(
                     "Google audiobook worker {}: failed to create pause first_chunk={} duration_ms={}: {}",
                     worker_id, task.first_chunk_index, ms, err
                 ));
-                None
+                Err(audiobook_segment_failed_message(
+                    language,
+                    "pause",
+                    task.first_chunk_index,
+                    &err.to_string(),
+                ))
             }
         };
     }
@@ -10450,22 +10573,21 @@ fn synthesize_google_audiobook_task(
             task.first_chunk_index,
             preview_for_log(&task.chunk.text_to_read, 120)
         ));
-        return None;
+        return Ok(None);
     }
 
-    let mut last_error = None;
-    for attempt in 1..=MAX_ATTEMPTS {
+    let mut attempt = 1usize;
+    loop {
         if cancel.load(Ordering::Relaxed) {
-            return None;
+            return Err(cancelled_message(language));
         }
         crate::log_debug(&format!(
-            "Google audiobook worker {}: synth start order={} first_chunk={} source_chunks={} attempt={}/{} text_chars={} voice={:?} rate={} pitch={} volume={}",
+            "Google audiobook worker {}: synth start order={} first_chunk={} source_chunks={} attempt={} retry_limit=unlimited text_chars={} voice={:?} rate={} pitch={} volume={}",
             worker_id,
             task.order,
             task.first_chunk_index,
             task.source_chunk_count,
             attempt,
-            MAX_ATTEMPTS,
             task.chunk.text_to_read.chars().count(),
             task.voice.as_str(),
             task.rate,
@@ -10505,35 +10627,46 @@ fn synthesize_google_audiobook_task(
                     synth_started.elapsed().as_millis(),
                     path
                 ));
-                return Some(path);
+                return Ok(Some(path));
             }
             Err(err) => {
                 crate::log_debug(&format!(
-                    "Google audiobook worker {}: synth failed order={} first_chunk={} attempt={}/{} elapsed_ms={} error={}",
+                    "Google audiobook worker {}: synth failed order={} first_chunk={} attempt={} retry_limit=unlimited elapsed_ms={} error={}",
                     worker_id,
                     task.order,
                     task.first_chunk_index,
                     attempt,
-                    MAX_ATTEMPTS,
                     synth_started.elapsed().as_millis(),
                     err
                 ));
-                last_error = Some(err);
-                if attempt < MAX_ATTEMPTS && !cancel.load(Ordering::Relaxed) {
-                    std::thread::sleep(Duration::from_millis(250 * attempt as u64));
+                if !should_retry_audiobook_segment(TtsEngine::Google, attempt, &err) {
+                    crate::log_debug(&format!(
+                        "Google audiobook worker {}: permanent synthesis error order={} first_chunk={}; the audiobook will stop and no unit will be omitted: {}",
+                        worker_id, task.order, task.first_chunk_index, err
+                    ));
+                    return Err(audiobook_segment_failed_message(
+                        language,
+                        "google",
+                        task.first_chunk_index,
+                        &err,
+                    ));
                 }
+                let retry_delay = audiobook_retry_delay(attempt);
+                crate::log_debug(&format!(
+                    "Google audiobook worker {}: unit order={} first_chunk={} will be retried; retry_delay_ms={} text_preview={:?}",
+                    worker_id,
+                    task.order,
+                    task.first_chunk_index,
+                    retry_delay.as_millis(),
+                    preview_for_log(&task.chunk.text_to_read, 120)
+                ));
+                if !sleep_with_audiobook_cancellation(cancel, retry_delay) {
+                    return Err(cancelled_message(language));
+                }
+                attempt = attempt.saturating_add(1);
             }
         }
     }
-
-    crate::log_debug(&format!(
-        "Google audiobook worker {}: dropping unit order={} first_chunk={} after retries last_error={}",
-        worker_id,
-        task.order,
-        task.first_chunk_index,
-        last_error.unwrap_or_else(|| "unknown error".to_string())
-    ));
-    None
 }
 
 fn render_google_audiobook_units_parallel(
@@ -10598,8 +10731,25 @@ fn render_google_audiobook_units_parallel(
             let task_iter = task_iter.clone();
             let result_tx = result_tx.clone();
             let cancel = options.cancel.clone();
+            let language = options.language;
             let handle = std::thread::spawn(move || {
                 lower_current_audiobook_worker_priority("Google worker");
+                let startup_delay =
+                    Duration::from_millis((worker_offset as u64).saturating_mul(150));
+                if !startup_delay.is_zero() {
+                    crate::log_debug(&format!(
+                        "Google audiobook worker {}: staggered startup delay_ms={}",
+                        worker_id,
+                        startup_delay.as_millis()
+                    ));
+                    if !sleep_with_audiobook_cancellation(&cancel, startup_delay) {
+                        crate::log_debug(&format!(
+                            "Google audiobook worker {}: stopped during startup delay because the audiobook was cancelled",
+                            worker_id
+                        ));
+                        return;
+                    }
+                }
                 let mut session = crate::google_tts::GoogleTtsWorkerSession::new(worker_id);
                 loop {
                     if cancel.load(Ordering::Relaxed) {
@@ -10613,19 +10763,20 @@ fn render_google_audiobook_units_parallel(
                         break;
                     };
                     let started = Instant::now();
-                    let wav_path = synthesize_google_audiobook_task(
+                    let synthesis_result = synthesize_google_audiobook_task(
                         worker_id,
                         &mut session,
                         &task,
                         target,
                         &cancel,
+                        language,
                     );
                     if result_tx
                         .send(GoogleAudiobookTaskResult {
                             order: task.order,
                             first_chunk_index: task.first_chunk_index,
                             source_chunk_count: task.source_chunk_count,
-                            wav_path,
+                            synthesis_result,
                             elapsed_ms: started.elapsed().as_millis(),
                         })
                         .is_err()
@@ -10644,20 +10795,25 @@ fn render_google_audiobook_units_parallel(
         (result_rx, handles)
     };
 
-    let mut ordered_wavs: Vec<Option<PathBuf>> = vec![None; expected_results];
+    let mut ordered_results: Vec<OrderedGoogleAudiobookResult> = vec![None; expected_results];
     let mut received_results = 0usize;
     for result in result_rx {
         received_results = received_results.saturating_add(1);
+        let produced = matches!(&result.synthesis_result, Ok(Some(_)));
+        let failed = result.synthesis_result.is_err();
         crate::log_debug(&format!(
-            "Google audiobook parallel result: order={} first_chunk={} source_chunks={} elapsed_ms={} produced={}",
+            "Google audiobook parallel result: order={} first_chunk={} source_chunks={} elapsed_ms={} produced={} failed={}",
             result.order,
             result.first_chunk_index,
             result.source_chunk_count,
             result.elapsed_ms,
-            result.wav_path.is_some()
+            produced,
+            failed
         ));
-        if result.order < ordered_wavs.len() {
-            ordered_wavs[result.order] = result.wav_path;
+        if result.order < ordered_results.len() {
+            ordered_results[result.order] = Some(result.synthesis_result);
+        } else if let Ok(Some(path)) = result.synthesis_result {
+            crate::log_if_err!(std::fs::remove_file(path));
         }
         *current_global_progress =
             (*current_global_progress).saturating_add(result.source_chunk_count);
@@ -10684,23 +10840,50 @@ fn render_google_audiobook_units_parallel(
         }
     }
 
-    if options.cancel.load(Ordering::Relaxed) {
-        for path in ordered_wavs.into_iter().flatten() {
-            crate::log_if_err!(std::fs::remove_file(path));
+    let cleanup_ordered_results = |results: &mut [OrderedGoogleAudiobookResult]| {
+        for result in results.iter_mut() {
+            if let Some(Ok(Some(path))) = result.take() {
+                crate::log_if_err!(std::fs::remove_file(path));
+            }
         }
+    };
+
+    if options.cancel.load(Ordering::Relaxed) {
+        cleanup_ordered_results(&mut ordered_results);
         return Err(cancelled_message(options.language));
     }
-    if received_results != expected_results {
-        for path in ordered_wavs.into_iter().flatten() {
-            crate::log_if_err!(std::fs::remove_file(path));
-        }
-        return Err(format!(
-            "Google audiobook workers stopped early: received {} of {} results.",
-            received_results, expected_results
+    if received_results != expected_results || ordered_results.iter().any(Option::is_none) {
+        let missing_ordered_results = ordered_results
+            .iter()
+            .filter(|entry| entry.is_none())
+            .count();
+        cleanup_ordered_results(&mut ordered_results);
+        crate::log_debug(&format!(
+            "Google audiobook workers stopped early: received_results={} expected_results={} missing_ordered_results={}",
+            received_results, expected_results, missing_ordered_results
+        ));
+        return Err(i18n::tr(
+            options.language,
+            "audiobook.google_workers_stopped_early",
         ));
     }
+    if let Some(error) = ordered_results.iter().find_map(|entry| match entry {
+        Some(Err(error)) => Some(error.clone()),
+        _ => None,
+    }) {
+        cleanup_ordered_results(&mut ordered_results);
+        crate::log_debug(&format!(
+            "Google audiobook render aborted because a synthesis unit failed; no unit was omitted: {}",
+            error
+        ));
+        return Err(error);
+    }
 
-    temp_wavs.extend(ordered_wavs.into_iter().flatten());
+    for result in ordered_results {
+        if let Some(Ok(Some(path))) = result {
+            temp_wavs.push(path);
+        }
+    }
     Ok(())
 }
 
@@ -10789,8 +10972,27 @@ pub(crate) fn render_mixed_audiobook_part(
                 join_all(futures).await
             });
 
-            for (_idx, wav) in results {
-                if let Some(wav_path) = wav {
+            if let Some((failed_idx, error)) = results
+                .iter()
+                .find_map(|(idx, result)| result.as_ref().err().map(|error| (*idx, error.clone())))
+            {
+                crate::log_debug(&format!(
+                    "Mixed audiobook render aborted at chunk={} because synthesis failed; no chunk was omitted: {}",
+                    failed_idx, error
+                ));
+                for (_, result) in results {
+                    if let Ok(Some(path)) = result {
+                        crate::log_if_err!(std::fs::remove_file(path));
+                    }
+                }
+                for path in temp_wavs.drain(..) {
+                    crate::log_if_err!(std::fs::remove_file(path));
+                }
+                return Err(error);
+            }
+
+            for (_idx, wav_result) in results {
+                if let Ok(Some(wav_path)) = wav_result {
                     temp_wavs.push(wav_path);
                 }
                 *current_global_progress += 1;
@@ -10851,14 +11053,15 @@ pub(crate) fn render_mixed_audiobook_part(
                     cancel: options.cancel.clone(),
                 };
                 let unit_started = Instant::now();
-                let wav = rt.block_on(synthesize_mixed_chunk_with_retry(
+                let wav_result = rt.block_on(synthesize_mixed_chunk_with_retry(
                     unit.first_chunk_index,
                     chunk,
                     &synth,
                     target,
                 ));
+                let produced = matches!(&wav_result, Ok(Some(_)));
                 crate::log_debug(&format!(
-                    "Mixed audiobook unit complete: first_chunk={} source_chunks={} engine={} text_chars={} elapsed_ms={} produced={}",
+                    "Mixed audiobook unit complete: first_chunk={} source_chunks={} engine={} text_chars={} elapsed_ms={} produced={} failed={}",
                     unit.first_chunk_index,
                     unit.source_chunk_count,
                     match engine {
@@ -10869,10 +11072,22 @@ pub(crate) fn render_mixed_audiobook_part(
                     },
                     chunk.text_to_read.chars().count(),
                     unit_started.elapsed().as_millis(),
-                    wav.is_some()
+                    produced,
+                    wav_result.is_err()
                 ));
-                if let Some(wav_path) = wav {
-                    temp_wavs.push(wav_path);
+                match wav_result {
+                    Ok(Some(wav_path)) => temp_wavs.push(wav_path),
+                    Ok(None) => {}
+                    Err(error) => {
+                        crate::log_debug(&format!(
+                            "Mixed audiobook render aborted at first_chunk={} because synthesis failed; no chunk was omitted: {}",
+                            unit.first_chunk_index, error
+                        ));
+                        for path in temp_wavs.drain(..) {
+                            crate::log_if_err!(std::fs::remove_file(path));
+                        }
+                        return Err(error);
+                    }
                 }
                 *current_global_progress =
                     (*current_global_progress).saturating_add(unit.source_chunk_count);
@@ -10893,7 +11108,7 @@ pub(crate) fn render_mixed_audiobook_part(
     }
 
     if temp_wavs.is_empty() {
-        return Err("No valid audio segments were produced.".to_string());
+        return Err(i18n::tr(options.language, "audiobook.no_valid_segments"));
     }
     crate::log_debug(&format!(
         "Mixed audiobook synthesis phase complete: wav_segments={} elapsed_ms={}",
@@ -11235,6 +11450,152 @@ mod google_audiobook_optimization_tests {
         assert!(units[0].chunk.text_to_read.contains('\n'));
         assert!(units[0].chunk.text_to_read.ends_with('!'));
         assert_eq!(units[0].source_chunk_count, chunks.len());
+    }
+
+    #[test]
+    fn audiobook_retry_policy_never_drops_transient_google_failures() {
+        let transient = "Impossibile accedere al file. Il file è utilizzato da un altro processo. (os error 32)";
+        assert!(should_retry_audiobook_segment(
+            TtsEngine::Google,
+            1,
+            transient
+        ));
+        assert!(should_retry_audiobook_segment(
+            TtsEngine::Google,
+            500,
+            transient
+        ));
+        assert!(should_retry_audiobook_segment(
+            TtsEngine::Google,
+            500,
+            "Google TTS produced no audio."
+        ));
+        assert!(should_retry_audiobook_segment(
+            TtsEngine::Edge,
+            NON_GOOGLE_AUDIOBOOK_MAX_ATTEMPTS - 1,
+            "temporary failure"
+        ));
+        assert!(should_retry_audiobook_segment(
+            TtsEngine::Edge,
+            500,
+            "temporary WebSocket timeout"
+        ));
+        assert!(!should_retry_audiobook_segment(
+            TtsEngine::Edge,
+            NON_GOOGLE_AUDIOBOOK_MAX_ATTEMPTS,
+            "invalid voice configuration"
+        ));
+        assert!(!should_retry_audiobook_segment(
+            TtsEngine::Sapi5,
+            NON_GOOGLE_AUDIOBOOK_MAX_ATTEMPTS,
+            "temporary failure"
+        ));
+        assert!(!should_retry_audiobook_segment(
+            TtsEngine::Sapi4,
+            NON_GOOGLE_AUDIOBOOK_MAX_ATTEMPTS,
+            "temporary failure"
+        ));
+    }
+
+    #[test]
+    fn edge_audiobook_transient_failures_retry_until_user_cancellation() {
+        for error in [
+            "WebSocket timeout",
+            "429 Too Many Requests",
+            "503 Service Unavailable",
+            "connection reset by peer",
+            "connection refused",
+            "Edge WS: no audio sent",
+            "Edge audiobook: audio decode failed: invalid frame",
+        ] {
+            assert!(
+                is_edge_audiobook_transient_error(error),
+                "expected transient Edge audiobook error: {error}"
+            );
+            assert!(should_retry_audiobook_segment(TtsEngine::Edge, 500, error));
+        }
+        assert!(!is_edge_audiobook_transient_error(
+            "invalid voice configuration"
+        ));
+        assert!(!is_edge_audiobook_transient_error(
+            "invalid connection configuration"
+        ));
+    }
+
+    #[test]
+    fn edge_time_split_filters_only_chunks_without_speakable_text() {
+        let chunks = vec!["...?!".to_string(), "Testo da sintetizzare.".to_string()];
+        let filtered = filter_time_split_chunks(&chunks, TtsEngine::Edge);
+        assert_eq!(filtered, vec!["Testo da sintetizzare.".to_string()]);
+    }
+
+    #[test]
+    fn google_audiobook_permanent_configuration_errors_are_not_retried_forever() {
+        assert!(is_permanent_google_audiobook_error(
+            "The selected Google TTS voice is not installed."
+        ));
+        assert!(is_permanent_google_audiobook_error(
+            "Google Chrome and Microsoft Edge were not found."
+        ));
+        assert!(!is_permanent_google_audiobook_error(
+            "Impossibile accedere al file. Il file è utilizzato da un altro processo. (os error 32)"
+        ));
+        assert!(!is_permanent_google_audiobook_error(
+            "Google TTS produced no audio."
+        ));
+    }
+
+    #[test]
+    fn google_audiobook_retry_delay_grows_and_is_capped() {
+        assert_eq!(audiobook_retry_delay(1), Duration::from_millis(250));
+        assert_eq!(audiobook_retry_delay(5), Duration::from_millis(1_250));
+        assert_eq!(audiobook_retry_delay(20), Duration::from_secs(5));
+        assert_eq!(audiobook_retry_delay(100), Duration::from_secs(5));
+    }
+
+    #[test]
+    fn google_batches_keep_distinct_source_chunk_positions() {
+        let chunks = (0..45)
+            .map(|index| {
+                let text = format!(
+                    "Frase numero {index} sufficientemente lunga per verificare la suddivisione del testo."
+                );
+                TtsChunk {
+                    original_len: utf16_len(&text),
+                    text_to_read: text,
+                    override_voice: None,
+                    pause_ms: None,
+                }
+            })
+            .collect::<Vec<_>>();
+        let options = AudiobookCommonOptions {
+            voice: "google-test",
+            output: Path::new("test.wav"),
+            progress_hwnd: HWND(0),
+            cancel: Arc::new(AtomicBool::new(false)),
+            language: Language::Italian,
+            part_naming_mode: AudiobookPartNamingMode::TitleNumber,
+            part_announcement_mode: AudiobookPartAnnouncementMode::None,
+            audiobook_title: "",
+            audiobook_bitrate_kbps: 128,
+            rate: 0,
+            pitch: 0,
+            volume: 100,
+            sapi4_threads: None,
+        };
+        let config = MixedAudiobookConfig {
+            main_engine: TtsEngine::Google,
+        };
+
+        let units = coalesce_google_audiobook_chunks(&chunks, &options, &config);
+
+        assert!(units.len() > 1);
+        let mut expected_first_chunk = 0usize;
+        for unit in &units {
+            assert_eq!(unit.first_chunk_index, expected_first_chunk);
+            expected_first_chunk = expected_first_chunk.saturating_add(unit.source_chunk_count);
+        }
+        assert_eq!(expected_first_chunk, chunks.len());
     }
 
     #[test]

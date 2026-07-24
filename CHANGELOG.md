@@ -1,5 +1,27 @@
 # Changelog
 
+Version 0.8.4 – 2026-07-24
+
+EPUB document editing
+• Sonarpad can now not only open EPUB documents, but also edit them and save them again in EPUB format while preserving the original formatting, table of contents, footnotes, images, style sheets, metadata and internal links.
+• EPUB is available in “Save As” for documents opened from an EPUB. Saving updates only the changed text and keeps the book structure intact.
+
+Audiobook reliability
+• Fixed an intermittent problem where, after five failed Google TTS attempts, a synthesis unit was silently discarded and the final audiobook could be missing part of the text.
+• Google units are now retried until they succeed or the user cancels. Worker startup is staggered to reduce temporary Chrome and file conflicts, and Sonarpad now stops instead of saving an audiobook with a missing segment.
+• Edge audiobooks now retry temporary network, WebSocket, timeout, service-limit and invalid-audio responses until success or user cancellation, including mixed voices and time-based splitting. SAPI4 and SAPI5 retain adaptive finite recovery; if a segment still fails, Sonarpad stops without saving an incomplete audiobook.
+
+Digital library navigation
+• LibriVox, Internet Archive and Project Gutenberg search results now use page navigation like YouTube: “Go to previous results” appears at the top and “Go to next results” at the bottom.
+• Fixed LibriVox focus transitions: opening a book or chapter no longer sends NVDA focus to the main editor before the next list or player opens.
+• Added a LibriVox focus guard during searches and book loading: a localized loading dialog remains in the foreground while the request is running, preventing NVDA focus from escaping to Command Prompt, Windows Terminal or another application.
+
+YouTube playlist downloads
+• Added an accessible multi-selection command to YouTube playlists, allowing users to choose which videos to download without changing the existing “Save media” command for the currently playing item.
+• Selected items are downloaded one at a time using the format and quality chosen when opening the playlist, receive numbered file names that preserve playlist order, and are saved in a dedicated folder inside the configured Media folder.
+• The selection window includes Select all and Deselect all commands, announces the number of selected items, supports cancellation while keeping completed files, and reports any items that could not be downloaded.
+• Playlist entries are now native check boxes: screen readers announce each title, control role and checked state automatically, without adding selection words to the visible title or using forced speech.
+
 Version 0.8.3 – 2026-07-23
 
 Dark mode

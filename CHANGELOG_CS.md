@@ -1,5 +1,27 @@
 # Přehled změn
 
+Verze 0.8.4 – 2026-07-24
+
+Úpravy dokumentů EPUB
+• Sonarpad nyní dokumenty EPUB nejen otevírá, ale umožňuje je také upravovat a znovu ukládat ve formátu EPUB se zachováním původního formátování, obsahu, poznámek pod čarou, obrázků, stylů, metadat a interních odkazů.
+• Formát EPUB je v dialogu „Uložit jako“ dostupný u dokumentů otevřených ze souboru EPUB. Při ukládání se aktualizuje pouze změněný text a struktura knihy zůstává zachována.
+
+Spolehlivost audioknih
+• Opraven občasný problém, kdy byla po pěti neúspěšných pokusech Google TTS jednotka syntézy tiše zahozena a ve výsledné audioknize mohla chybět část textu.
+• Jednotky Google se nyní opakují až do úspěchu nebo do zrušení uživatelem. Spouštění procesů je časově rozloženo, aby se omezily dočasné konflikty s Chromem a soubory; Sonarpad také tvorbu ukončí místo uložení audioknihy s chybějícím segmentem.
+• Audioknihy Edge nyní při dočasných chybách sítě, WebSocketu, vypršení časového limitu, omezení služby nebo neplatném zvuku opakují pokus bez pevného limitu, dokud se nezdaří nebo je uživatel nezruší, včetně smíšených hlasů a dělení podle času. SAPI4 a SAPI5 si zachovávají adaptivní omezený počet pokusů; pokud se segment stále nedaří vytvořit, Sonarpad proces zastaví a neuloží neúplnou audioknihu.
+
+Navigace v digitálních knihovnách
+• Výsledky LibriVox, Internet Archive a Project Gutenberg nyní používají stránkovou navigaci jako YouTube: „Přejít na předchozí výsledky“ je na začátku seznamu a „Přejít na další výsledky“ na jeho konci.
+• Bylo opraveno předávání fokusu v LibriVox: při otevření knihy nebo kapitoly se fokus NVDA již nepřesune do hlavního editoru před otevřením dalšího seznamu nebo přehrávače.
+• Při vyhledávání a načítání knih LibriVox byla přidána ochrana fokusu: lokalizované okno načítání zůstává po celou dobu požadavku v popředí, takže fokus NVDA nepřeskočí do příkazového řádku, Windows Terminalu ani jiné aplikace.
+
+Stahování playlistů YouTube
+• Do playlistů YouTube byl přidán přístupný příkaz pro vícenásobný výběr, který umožňuje zvolit videa ke stažení, aniž by se změnil stávající příkaz „Uložit médium“ pro právě přehrávanou položku.
+• Vybrané položky se stahují postupně ve formátu a kvalitě zvolených při otevření playlistu, dostávají číslované názvy zachovávající původní pořadí a ukládají se do samostatné složky v nastavené složce Média.
+• Okno obsahuje příkazy „Vybrat vše“ a „Zrušit výběr“, oznamuje počet vybraných položek, umožňuje zrušení se zachováním již dokončených souborů a jasně vypíše položky, které se nepodařilo stáhnout.
+• Položky playlistu jsou nyní nativní zaškrtávací políčka: čtečky obrazovky automaticky oznamují název, typ ovládacího prvku a stav zaškrtnutí, bez přidávání slov do viditelného názvu a bez vynucených hlasových hlášení.
+
 Verze 0.8.3 – 2026-07-23
 
 Tmavý režim

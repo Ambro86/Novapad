@@ -1,5 +1,27 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.8.4 – 2026-07-24
+
+Chỉnh sửa tài liệu EPUB
+• Sonarpad giờ đây không chỉ mở được tài liệu EPUB mà còn có thể chỉnh sửa và lưu lại ở định dạng EPUB, đồng thời giữ nguyên định dạng ban đầu, mục lục, chú thích cuối trang, hình ảnh, bảng kiểu, siêu dữ liệu và các liên kết nội bộ.
+• Định dạng EPUB có trong hộp thoại “Lưu thành” đối với tài liệu được mở từ tệp EPUB. Khi lưu, chỉ phần văn bản đã thay đổi được cập nhật và cấu trúc của sách vẫn được giữ nguyên.
+
+Độ tin cậy của sách nói
+• Đã sửa lỗi không liên tục khiến một đơn vị tổng hợp bị âm thầm loại bỏ sau năm lần Google TTS thất bại, làm sách nói cuối cùng có thể thiếu một phần văn bản.
+• Các đơn vị Google giờ được thử lại cho đến khi thành công hoặc người dùng hủy. Việc khởi động các tiến trình được giãn cách để giảm xung đột tạm thời với Chrome và tệp; Sonarpad cũng dừng quá trình thay vì lưu một sách nói bị thiếu đoạn.
+• Sách nói Edge giờ sẽ thử lại không giới hạn cố định đối với các lỗi tạm thời về mạng, WebSocket, hết thời gian chờ, giới hạn dịch vụ và âm thanh không hợp lệ, cho đến khi thành công hoặc người dùng hủy, kể cả khi dùng giọng hỗn hợp và chia theo thời lượng. SAPI4 và SAPI5 vẫn dùng cơ chế thử lại thích ứng nhưng hữu hạn; nếu một đoạn tiếp tục thất bại, Sonarpad sẽ dừng mà không lưu sách nói không đầy đủ.
+
+Điều hướng thư viện số
+• Kết quả của LibriVox, Internet Archive và Project Gutenberg giờ dùng điều hướng theo trang giống YouTube: “Quay lại kết quả trước” nằm ở đầu danh sách và “Chuyển đến kết quả tiếp theo” nằm ở cuối.
+• Đã sửa việc chuyển tiêu điểm trong LibriVox: khi mở sách hoặc chương, tiêu điểm NVDA không còn chuyển về trình soạn thảo chính trước khi danh sách tiếp theo hoặc trình phát được mở.
+• Đã thêm cơ chế bảo vệ tiêu điểm trong khi tìm kiếm và tải sách LibriVox: cửa sổ tải đã bản địa hóa luôn ở phía trước trong suốt yêu cầu, ngăn tiêu điểm NVDA chuyển sang Command Prompt, Windows Terminal hoặc ứng dụng khác.
+
+Tải danh sách phát YouTube
+• Đã thêm lệnh chọn nhiều mục có khả năng truy cập cho danh sách phát YouTube, cho phép chọn video cần tải mà không thay đổi lệnh “Lưu phương tiện” hiện có của mục đang phát.
+• Các mục đã chọn được tải lần lượt bằng định dạng và chất lượng đã chọn khi mở danh sách phát, được đặt tên có số thứ tự giữ nguyên trật tự ban đầu và được lưu trong một thư mục riêng bên trong thư mục Phương tiện đã cấu hình.
+• Cửa sổ có các lệnh “Chọn tất cả” và “Bỏ chọn tất cả”, thông báo số mục đã chọn, cho phép hủy mà vẫn giữ các tệp đã hoàn tất và báo rõ các mục không thể tải xuống.
+• Các mục trong danh sách phát giờ là hộp kiểm gốc của Windows: trình đọc màn hình tự động thông báo tiêu đề, loại điều khiển và trạng thái đã chọn hoặc chưa chọn, không thêm từ vào tiêu đề hiển thị và không dùng thông báo giọng nói cưỡng bức.
+
 Phiên bản 0.8.3 – 2026-07-23
 
 Chế độ tối

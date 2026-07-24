@@ -179,7 +179,7 @@ fn start_recording_and_playback(
         StreamRecordingKind::Radio => {
             crate::launch_stream_url_in_mpv(parent, url, Some(title), None, None, None)
         }
-        StreamRecordingKind::Tv => crate::launch_tv_stream_in_mpv(
+        StreamRecordingKind::Tv => crate::launch_tv_stream_for_recording_in_mpv(
             parent,
             url,
             title,
@@ -214,10 +214,16 @@ fn start_recording_and_playback(
         ));
     }
     if kind == StreamRecordingKind::Tv && prefer_audio_description {
-        // La prima selezione può avvenire quando l'HLS non ha ancora pubblicato
-        // le tracce. Ora che il caricamento è completo, la ripetiamo prima di
-        // attivare stream-record, evitando cambi di traccia durante il file.
-        crate::select_raiplay_mpv_audio_track(parent);
+        // stream-record non deve partire mentre mpv sta ancora cambiando la
+        // rendition audio/video HLS: alcuni stream si fermano al primo segmento.
+        if let Err(error) = crate::stabilize_active_mpv_audiodescription_tracks_for_recording(
+            parent,
+            Duration::from_secs(6),
+        ) {
+            crate::stop_managed_mpv_playback(parent);
+            remove_recording_file(&output_path, "TV track stabilization failure");
+            return Err(error);
+        }
     }
 
     let activity = match create_activity(kind, title, &output_path, None, None) {
@@ -557,15 +563,18 @@ fn select_background_mpv_tracks(
     ipc_path: &Path,
     track_list: &serde_json::Value,
     prefer_audio_description: bool,
-) -> Result<(), String> {
+) -> Result<(Option<i64>, Option<i64>, bool), String> {
     let Some(tracks) = track_list.as_array() else {
         return Err("mpv ha restituito un elenco tracce non valido.".to_string());
     };
 
+    let audiodescription_id = prefer_audio_description
+        .then(|| crate::audiodescription_mpv_audio_track_id(track_list))
+        .flatten();
     let selected_video = tracks
         .iter()
         .find(|track| track_is_type(track, "video") && track_is_selected(track));
-    let video = selected_video.or_else(|| {
+    let fallback_video = selected_video.or_else(|| {
         tracks
             .iter()
             .filter(|track| track_is_type(track, "video"))
@@ -576,15 +585,12 @@ fn select_background_mpv_tracks(
                     .unwrap_or_default()
             })
     });
-    if let Some(video_id) = video.and_then(track_id) {
-        let command = serde_json::json!({
-            "command": ["set_property", "vid", video_id]
-        })
-        .to_string();
-        crate::send_mpv_ipc_command(ipc_path, &command)?;
-    }
-
-    let preferred_audio_id = if prefer_audio_description {
+    let preferred_video_id = audiodescription_id
+        .and_then(|audio_id| crate::preferred_tv_video_track_id(tracks, Some(audio_id)))
+        .or_else(|| fallback_video.and_then(track_id));
+    let preferred_audio_id = if let Some(audio_id) = audiodescription_id {
+        Some(audio_id)
+    } else if prefer_audio_description {
         crate::preferred_mpv_audio_track_id(track_list)
     } else {
         tracks
@@ -592,7 +598,7 @@ fn select_background_mpv_tracks(
             .find(|track| track_is_type(track, "audio") && track_is_selected(track))
             .and_then(track_id)
             .or_else(|| {
-                let video_program = video
+                let video_program = fallback_video
                     .and_then(|track| track.get("program-id"))
                     .and_then(serde_json::Value::as_i64);
                 tracks
@@ -613,6 +619,7 @@ fn select_background_mpv_tracks(
                     .and_then(track_id)
             })
     };
+
     if let Some(audio_id) = preferred_audio_id {
         let command = serde_json::json!({
             "command": ["set_property", "aid", audio_id]
@@ -620,7 +627,80 @@ fn select_background_mpv_tracks(
         .to_string();
         crate::send_mpv_ipc_command(ipc_path, &command)?;
     }
-    Ok(())
+    if let Some(video_id) = preferred_video_id {
+        let command = serde_json::json!({
+            "command": ["set_property", "vid", video_id]
+        })
+        .to_string();
+        crate::send_mpv_ipc_command(ipc_path, &command)?;
+    }
+
+    Ok((
+        preferred_audio_id,
+        preferred_video_id,
+        audiodescription_id.is_some(),
+    ))
+}
+
+fn wait_for_background_mpv_track_stability(
+    child: &mut Child,
+    ipc_path: &Path,
+    audio_id: Option<i64>,
+    video_id: Option<i64>,
+    timeout: Duration,
+) -> Result<(), String> {
+    let started = Instant::now();
+    let mut stable_since = None;
+    while started.elapsed() < timeout {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|error| format!("Impossibile verificare mpv: {error}"))?
+        {
+            return Err(format!(
+                "mpv si è chiuso durante la selezione delle tracce TV ({status})."
+            ));
+        }
+
+        let track_list = query_mpv_property_at_ipc(ipc_path, "track-list")?;
+        let selected = track_list.as_array().is_some_and(|tracks| {
+            let audio_ready = audio_id.is_none_or(|audio_id| {
+                tracks.iter().any(|track| {
+                    track_is_type(track, "audio")
+                        && track_id(track) == Some(audio_id)
+                        && track_is_selected(track)
+                })
+            });
+            let video_ready = video_id.is_none_or(|video_id| {
+                tracks.iter().any(|track| {
+                    track_is_type(track, "video")
+                        && track_id(track) == Some(video_id)
+                        && track_is_selected(track)
+                })
+            });
+            audio_ready && video_ready
+        });
+
+        if selected {
+            let since = stable_since.get_or_insert_with(Instant::now);
+            if since.elapsed() >= Duration::from_millis(750) {
+                crate::log_debug(&format!(
+                    "Scheduled TV recording tracks stabilized: audio_id={} video_id={}",
+                    audio_id
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "none".to_string()),
+                    video_id
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "none".to_string())
+                ));
+                return Ok(());
+            }
+        } else {
+            stable_since = None;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+
+    Err("Le tracce TV della registrazione programmata non si sono stabilizzate.".to_string())
 }
 
 fn remux_mpv_stream_recording(temp_path: &Path, output_path: &Path) -> Result<(), String> {
@@ -705,8 +785,19 @@ fn record_tv_for_duration_with_hidden_mpv(
         wait_for_background_mpv_ipc(&mut child, &ipc_path, Duration::from_secs(12))?;
         let track_list =
             wait_for_background_mpv_tracks(&mut child, &ipc_path, Duration::from_secs(20))?;
-        select_background_mpv_tracks(&ipc_path, &track_list, prefer_audio_description)?;
-        thread::sleep(Duration::from_millis(200));
+        let (audio_id, video_id, selected_audiodescription) =
+            select_background_mpv_tracks(&ipc_path, &track_list, prefer_audio_description)?;
+        if selected_audiodescription {
+            wait_for_background_mpv_track_stability(
+                &mut child,
+                &ipc_path,
+                audio_id,
+                video_id,
+                Duration::from_secs(6),
+            )?;
+        } else {
+            thread::sleep(Duration::from_millis(200));
+        }
         let record_command = serde_json::json!({
             "command": ["set_property", "stream-record", temp_path.to_string_lossy()]
         })

@@ -25,6 +25,7 @@ mod bookmarks;
 use bookmarks::*;
 mod tts_engine;
 use tts_engine::*;
+mod epub_editor;
 mod file_handler;
 mod mf_encoder;
 mod panic_guard;
@@ -118,10 +119,10 @@ use windows::Win32::UI::Controls::RichEdit::{
     SCF_SELECTION, TEXTRANGEW,
 };
 use windows::Win32::UI::Controls::{
-    BST_CHECKED, EM_GETMODIFY, EM_SETMODIFY, ICC_BAR_CLASSES, ICC_TAB_CLASSES,
-    INITCOMMONCONTROLSEX, InitCommonControlsEx, NMHDR, SB_SETTEXTW, STATUSCLASSNAMEW,
-    TCM_ADJUSTRECT, TCM_GETCURSEL, TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW, WC_STATIC,
-    WC_TABCONTROLW,
+    BST_CHECKED, EM_GETMODIFY, EM_SETMODIFY, ICC_BAR_CLASSES, ICC_LISTVIEW_CLASSES,
+    ICC_TAB_CLASSES, INITCOMMONCONTROLSEX, InitCommonControlsEx, NMHDR, SB_SETTEXTW,
+    STATUSCLASSNAMEW, TCM_ADJUSTRECT, TCM_GETCURSEL, TCN_SELCHANGE, WC_BUTTON, WC_COMBOBOXW,
+    WC_STATIC, WC_TABCONTROLW,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, IsWindowEnabled, SetActiveWindow, SetFocus, VK_APPS,
@@ -324,6 +325,14 @@ const EDITOR_TRANSLATE_LANGUAGES: [EditorTranslateLanguage; menu::IDM_EDIT_TRANS
         target: "pt",
     },
     EditorTranslateLanguage {
+        key: "pt_br",
+        target: "pt-BR",
+    },
+    EditorTranslateLanguage {
+        key: "de",
+        target: "de",
+    },
+    EditorTranslateLanguage {
         key: "cs",
         target: "cs",
     },
@@ -481,7 +490,7 @@ pub(crate) fn bring_window_to_foreground(hwnd: HWND) {
     }
 }
 
-fn bring_modal_window_to_foreground(hwnd: HWND) {
+pub(crate) fn bring_modal_window_to_foreground(hwnd: HWND) {
     unsafe {
         if !is_window_handle_valid(hwnd) {
             log_debug(&format!(
@@ -3278,6 +3287,41 @@ fn is_raiplay_audiodescription_track(language: Option<&str>, title: Option<&str>
             .unwrap_or(false)
 }
 
+fn mpv_track_is_audiodescription(track: &serde_json::Value) -> bool {
+    let is_audio = track
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .map(|value| value.eq_ignore_ascii_case("audio"))
+        .unwrap_or(false);
+    if !is_audio {
+        return false;
+    }
+
+    let language = track.get("lang").and_then(serde_json::Value::as_str);
+    let title = track
+        .get("title")
+        .and_then(serde_json::Value::as_str)
+        .or_else(|| {
+            track
+                .get("metadata")
+                .and_then(|metadata| metadata.get("comment"))
+                .and_then(serde_json::Value::as_str)
+        });
+    is_raiplay_audiodescription_track(language, title)
+        || track
+            .get("visual-impaired")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
+}
+
+pub(crate) fn audiodescription_mpv_audio_track_id(track_list: &serde_json::Value) -> Option<i64> {
+    track_list.as_array()?.iter().find_map(|track| {
+        mpv_track_is_audiodescription(track)
+            .then(|| track.get("id").and_then(serde_json::Value::as_i64))
+            .flatten()
+    })
+}
+
 pub(crate) fn preferred_mpv_audio_track_id(track_list: &serde_json::Value) -> Option<i64> {
     let tracks = track_list.as_array()?;
 
@@ -3299,15 +3343,13 @@ pub(crate) fn preferred_mpv_audio_track_id(track_list: &serde_json::Value) -> Op
         })
     };
 
-    find_track_id(&|language, title| is_raiplay_audiodescription_track(language, title)).or_else(
-        || {
-            find_track_id(&|language, _| {
-                language
-                    .map(|value| value.eq_ignore_ascii_case("ita"))
-                    .unwrap_or(false)
-            })
-        },
-    )
+    audiodescription_mpv_audio_track_id(track_list).or_else(|| {
+        find_track_id(&|language, _| {
+            language
+                .map(|value| value.eq_ignore_ascii_case("ita"))
+                .unwrap_or(false)
+        })
+    })
 }
 
 pub(crate) fn select_raiplay_mpv_audio_track(hwnd: HWND) {
@@ -4014,6 +4056,7 @@ pub(crate) fn launch_stream_url_in_mpv(
             allow_bookmark_resume: true,
             force_video: false,
             live_tv: false,
+            configure_tv_tracks_async: false,
         },
     )
 }
@@ -4038,6 +4081,34 @@ pub(crate) fn launch_tv_stream_in_mpv(
             allow_bookmark_resume: false,
             force_video: true,
             live_tv: true,
+            configure_tv_tracks_async: true,
+        },
+    )
+}
+
+pub(crate) fn launch_tv_stream_for_recording_in_mpv(
+    hwnd: HWND,
+    url: &str,
+    title: &str,
+    user_agent: &str,
+    prefer_audio_description: bool,
+) -> Result<(), String> {
+    launch_stream_url_in_mpv_with_options(
+        hwnd,
+        url,
+        StreamMpvOptions {
+            title: Some(title),
+            ytdlp_path: None,
+            ytdl_format: None,
+            ytdlp_credentials: None,
+            user_agent: Some(user_agent),
+            prefer_audio_description,
+            allow_bookmark_resume: false,
+            force_video: true,
+            live_tv: true,
+            // La registrazione configura e stabilizza le tracce in modo
+            // sincrono prima di attivare stream-record.
+            configure_tv_tracks_async: false,
         },
     )
 }
@@ -4063,6 +4134,7 @@ pub(crate) fn launch_video_stream_in_mpv(
             allow_bookmark_resume: false,
             force_video: true,
             live_tv: false,
+            configure_tv_tracks_async: true,
         },
     )
 }
@@ -4072,7 +4144,7 @@ fn is_mediaset_cdn_stream(url: &str) -> bool {
     lower.contains("mediaset.net") || lower.contains("mediaset.it") || lower.contains("msf.cdn")
 }
 
-fn preferred_tv_video_track_id(
+pub(crate) fn preferred_tv_video_track_id(
     tracks: &[serde_json::Value],
     preferred_audio_id: Option<i64>,
 ) -> Option<i64> {
@@ -4129,6 +4201,78 @@ fn preferred_tv_video_track_id(
         .or_else(|| video_tracks.first().copied())
         .and_then(|track| track.get("id"))
         .and_then(serde_json::Value::as_i64)
+}
+
+pub(crate) fn stabilize_active_mpv_audiodescription_tracks_for_recording(
+    hwnd: HWND,
+    timeout: std::time::Duration,
+) -> Result<bool, String> {
+    let track_list = query_managed_mpv_property_transient(hwnd, "track-list")?;
+    let Some(tracks) = track_list.as_array() else {
+        return Err("mpv ha restituito un elenco tracce TV non valido.".to_string());
+    };
+    let Some(audio_id) = audiodescription_mpv_audio_track_id(&track_list) else {
+        log_debug("TV recording track stabilization skipped: no audiodescription track available");
+        return Ok(false);
+    };
+    let video_id = preferred_tv_video_track_id(tracks, Some(audio_id));
+
+    let audio_command = format!(r#"{{"command":["set_property","aid",{}]}}"#, audio_id);
+    try_send_command_to_managed_mpv_transient(hwnd, &audio_command)?;
+    if let Some(video_id) = video_id {
+        let video_command = format!(r#"{{"command":["set_property","vid",{}]}}"#, video_id);
+        try_send_command_to_managed_mpv_transient(hwnd, &video_command)?;
+    }
+
+    let started = std::time::Instant::now();
+    let mut stable_since = None;
+    while started.elapsed() < timeout {
+        let current = query_managed_mpv_property_transient(hwnd, "track-list")?;
+        let selected = current.as_array().is_some_and(|tracks| {
+            let audio_ready = tracks.iter().any(|track| {
+                track.get("type").and_then(serde_json::Value::as_str) == Some("audio")
+                    && track.get("id").and_then(serde_json::Value::as_i64) == Some(audio_id)
+                    && track
+                        .get("selected")
+                        .and_then(serde_json::Value::as_bool)
+                        .unwrap_or(false)
+            });
+            let video_ready = video_id.is_none_or(|video_id| {
+                tracks.iter().any(|track| {
+                    track.get("type").and_then(serde_json::Value::as_str) == Some("video")
+                        && track.get("id").and_then(serde_json::Value::as_i64) == Some(video_id)
+                        && track
+                            .get("selected")
+                            .and_then(serde_json::Value::as_bool)
+                            .unwrap_or(false)
+                })
+            });
+            audio_ready && video_ready
+        });
+
+        if selected {
+            let since = stable_since.get_or_insert_with(std::time::Instant::now);
+            if since.elapsed() >= std::time::Duration::from_millis(750) {
+                log_debug(&format!(
+                    "TV recording tracks stabilized: audiodescription_id={audio_id} video_id={}",
+                    video_id
+                        .map(|value| value.to_string())
+                        .unwrap_or_else(|| "none".to_string())
+                ));
+                return Ok(true);
+            }
+        } else {
+            stable_since = None;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    Err(format!(
+        "Le tracce TV per la registrazione non si sono stabilizzate (audio={audio_id}, video={}).",
+        video_id
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "nessuno".to_string())
+    ))
 }
 
 fn configure_tv_tracks_after_load(
@@ -4298,6 +4442,7 @@ struct StreamMpvOptions<'a> {
     allow_bookmark_resume: bool,
     force_video: bool,
     live_tv: bool,
+    configure_tv_tracks_async: bool,
 }
 
 fn launch_stream_url_in_mpv_with_options(
@@ -4315,6 +4460,7 @@ fn launch_stream_url_in_mpv_with_options(
         allow_bookmark_resume,
         force_video,
         live_tv,
+        configure_tv_tracks_async,
     } = options;
     let mpv_exe = ensure_mpv_runtime_available(hwnd)?;
     let mpv_dir = mpv_exe
@@ -4490,7 +4636,7 @@ fn launch_stream_url_in_mpv_with_options(
                     mpv_generation, err
                 ));
             }
-            if force_video {
+            if force_video && configure_tv_tracks_async {
                 schedule_tv_track_configuration(
                     hwnd,
                     url,
@@ -4530,6 +4676,7 @@ pub(crate) fn launch_local_tv_recording_in_mpv(hwnd: HWND, path: &Path) -> Resul
             allow_bookmark_resume: false,
             force_video: true,
             live_tv: false,
+            configure_tv_tracks_async: true,
         },
     )
 }
@@ -9507,7 +9654,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
             WM_CREATE => {
                 let icc = INITCOMMONCONTROLSEX {
                     dwSize: size_of::<INITCOMMONCONTROLSEX>() as u32,
-                    dwICC: ICC_TAB_CLASSES | ICC_BAR_CLASSES,
+                    dwICC: ICC_TAB_CLASSES | ICC_BAR_CLASSES | ICC_LISTVIEW_CLASSES,
                 };
                 InitCommonControlsEx(&icc);
 
@@ -20237,10 +20384,12 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
 mod tests {
     use super::{
         COPYDATA_RESULT_DEFERRED_MODAL, COPYDATA_RESULT_HANDLED, SentenceNavigationDirection,
-        append_debug_log, audio_bookmark_position_and_snippet, clamp_tts_chunk_offset,
-        is_bad_executable_format_error, normalize_soft_line_breaks_for_translation,
-        preferred_mpv_audio_track_id, preferred_tv_video_track_id, relative_audiobook_bookmark,
-        sentence_navigation_target, sentence_start_offsets_utf16, should_defer_external_file_open,
+        append_debug_log, audio_bookmark_position_and_snippet, audiodescription_mpv_audio_track_id,
+        clamp_tts_chunk_offset, editor_translate_language_for_menu_id,
+        editor_translate_language_index_by_key, is_bad_executable_format_error,
+        normalize_soft_line_breaks_for_translation, preferred_mpv_audio_track_id,
+        preferred_tv_video_track_id, relative_audiobook_bookmark, sentence_navigation_target,
+        sentence_start_offsets_utf16, should_defer_external_file_open,
         should_focus_existing_window_after_copydata,
     };
     use crate::bookmarks::Bookmark;
@@ -20256,6 +20405,20 @@ mod tests {
         assert!(!is_bad_executable_format_error(
             &std::io::Error::from_raw_os_error(2)
         ));
+    }
+
+    #[test]
+    fn editor_translation_includes_german_and_brazilian_portuguese() {
+        for (key, target) in [("de", "de"), ("pt_br", "pt-BR")] {
+            let index = editor_translate_language_index_by_key(key)
+                .expect("translation language should be available");
+            let language = editor_translate_language_for_menu_id(
+                crate::menu::IDM_EDIT_TRANSLATE_TARGET_BASE + index,
+            )
+            .expect("translation menu id should resolve");
+            assert_eq!(language.key, key);
+            assert_eq!(language.target, target);
+        }
     }
 
     #[test]
@@ -20288,6 +20451,17 @@ mod tests {
             preferred_tv_video_track_id(tracks.as_array().unwrap(), audio_id),
             Some(3)
         );
+    }
+
+    #[test]
+    fn tv_audiodescription_detection_supports_generic_mpv_metadata() {
+        let tracks = serde_json::json!([
+            {"type": "audio", "id": 1, "lang": "ita"},
+            {"type": "audio", "id": 2, "metadata": {"comment": "Audiodescrizione"}},
+            {"type": "audio", "id": 3, "visual-impaired": true}
+        ]);
+
+        assert_eq!(audiodescription_mpv_audio_track_id(&tracks), Some(2));
     }
 
     #[test]
@@ -20809,6 +20983,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 prefer_mpv_playback: false,
                 route_map: None,
                 epub_index: Vec::new(),
+                epub_original_text: None,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -21057,6 +21232,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 prefer_mpv_playback: false,
                 route_map: None,
                 epub_index: loaded.epub_index,
+                epub_original_text: loaded.epub_original_text,
             };
             state.docs.push(doc);
             if large_file_no_wrap {
@@ -22062,7 +22238,8 @@ struct CustomFileDialogEventHandler {
     _encoding_label: String,
     _encodings: Vec<String>,
     _initial_encoding: TextEncoding,
-    _is_save_dialog: bool,
+    _txt_filter_index: u32,
+    _filter_default_extensions: Vec<Option<String>>,
 }
 
 impl IFileDialogEvents_Impl for CustomFileDialogEventHandler {
@@ -22096,15 +22273,15 @@ impl IFileDialogEvents_Impl for CustomFileDialogEventHandler {
             };
             let filter_index = pfd.GetFileTypeIndex()?;
             crate::log_debug(&format!("OnTypeChange: filter_index = {}", filter_index));
+            if let Some(extension) = self
+                ._filter_default_extensions
+                .get(filter_index.saturating_sub(1) as usize)
+            {
+                let extension_wide = to_wide(extension.as_deref().unwrap_or(""));
+                crate::log_if_err!(pfd.SetDefaultExtension(PCWSTR(extension_wide.as_ptr())));
+            }
             let pfdc: IFileDialogCustomize = pfd.cast()?;
-            // Show encoding only for TXT:
-            // - Open dialog: TXT is index 2
-            // - Save dialog: TXT is index 1
-            let is_txt = if self._is_save_dialog {
-                filter_index == 1
-            } else {
-                filter_index == 2
-            };
+            let is_txt = filter_index == self._txt_filter_index;
             if is_txt {
                 crate::log_debug("OnTypeChange: showing encoding combobox");
                 // Show the ComboBox (101)
@@ -22257,7 +22434,8 @@ pub(crate) fn open_file_dialog_with_encoding(
             _encoding_label: encoding_label,
             _encodings: encodings,
             _initial_encoding: TextEncoding::Utf8,
-            _is_save_dialog: false,
+            _txt_filter_index: 2,
+            _filter_default_extensions: Vec::new(),
         }
         .into();
         let cookie = pfd.Advise(&handler).ok()?;
@@ -22366,10 +22544,28 @@ pub(crate) fn open_subtitle_file_dialog(hwnd: HWND) -> Option<PathBuf> {
     Some(PathBuf::from(String::from_utf16_lossy(&buffer[..len])))
 }
 
+fn filter_pattern_contains_extension(pattern: &str, extension: &str) -> bool {
+    let wanted = extension.trim_start_matches('.');
+    pattern.split(';').any(|part| {
+        part.trim()
+            .strip_prefix("*.")
+            .is_some_and(|value| value.eq_ignore_ascii_case(wanted))
+    })
+}
+
+fn default_extension_from_filter_pattern(pattern: &str) -> Option<String> {
+    pattern.split(';').find_map(|part| {
+        let extension = part.trim().strip_prefix("*.")?;
+        (!extension.is_empty() && extension != "*").then(|| extension.to_string())
+    })
+}
+
 pub(crate) fn save_file_dialog_with_encoding(
     hwnd: HWND,
     suggested_name: Option<&str>,
     initial_encoding: TextEncoding,
+    allow_epub: bool,
+    preferred_extension: Option<&str>,
 ) -> Option<(PathBuf, TextEncoding)> {
     unsafe {
         let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
@@ -22378,25 +22574,64 @@ pub(crate) fn save_file_dialog_with_encoding(
 
         let filter_raw = i18n::tr(language, "dialog.save_filter");
         let parts: Vec<&str> = filter_raw.split("\\0").collect();
-        let mut spec = Vec::new();
-        let mut pattern_wides = Vec::new();
-        let mut name_wides = Vec::new();
-        for i in (0..parts.len().saturating_sub(1)).step_by(2) {
-            if parts[i].is_empty() {
+        let mut filter_pairs: Vec<(String, String)> = Vec::new();
+        for index in (0..parts.len().saturating_sub(1)).step_by(2) {
+            if parts[index].is_empty() {
                 break;
             }
-            name_wides.push(to_wide(parts[i]));
-            pattern_wides.push(to_wide(parts[i + 1]));
+            filter_pairs.push((parts[index].to_string(), parts[index + 1].to_string()));
         }
-        for i in 0..name_wides.len() {
-            spec.push(COMDLG_FILTERSPEC {
-                pszName: PCWSTR(name_wides[i].as_ptr()),
-                pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
-            });
+        if allow_epub
+            && !filter_pairs
+                .iter()
+                .any(|(_, pattern)| filter_pattern_contains_extension(pattern, "epub"))
+        {
+            let insertion_index = filter_pairs
+                .iter()
+                .position(|(_, pattern)| pattern.trim() == "*.*")
+                .unwrap_or(filter_pairs.len());
+            filter_pairs.insert(
+                insertion_index,
+                ("EPUB (*.epub)".to_string(), "*.epub".to_string()),
+            );
         }
-        pfd.SetFileTypes(&spec).ok()?;
-        pfd.SetFileTypeIndex(1).ok()?; // Default to TXT
-        pfd.SetDefaultExtension(w!("txt")).ok()?;
+
+        let wanted_extension = preferred_extension.unwrap_or("txt").trim_start_matches('.');
+        let preferred_filter_index = filter_pairs
+            .iter()
+            .position(|(_, pattern)| filter_pattern_contains_extension(pattern, wanted_extension))
+            .map(|index| index as u32 + 1)
+            .unwrap_or(1);
+        let txt_filter_index = filter_pairs
+            .iter()
+            .position(|(_, pattern)| filter_pattern_contains_extension(pattern, "txt"))
+            .map(|index| index as u32 + 1)
+            .unwrap_or(1);
+        let filter_default_extensions: Vec<Option<String>> = filter_pairs
+            .iter()
+            .map(|(_, pattern)| default_extension_from_filter_pattern(pattern))
+            .collect();
+
+        let name_wides: Vec<Vec<u16>> =
+            filter_pairs.iter().map(|(name, _)| to_wide(name)).collect();
+        let pattern_wides: Vec<Vec<u16>> = filter_pairs
+            .iter()
+            .map(|(_, pattern)| to_wide(pattern))
+            .collect();
+        let specs: Vec<COMDLG_FILTERSPEC> = name_wides
+            .iter()
+            .zip(pattern_wides.iter())
+            .map(|(name, pattern)| COMDLG_FILTERSPEC {
+                pszName: PCWSTR(name.as_ptr()),
+                pszSpec: PCWSTR(pattern.as_ptr()),
+            })
+            .collect();
+        pfd.SetFileTypes(&specs).ok()?;
+        pfd.SetFileTypeIndex(preferred_filter_index).ok()?;
+        let default_extension_wide = to_wide(wanted_extension);
+        pfd.SetDefaultExtension(PCWSTR(default_extension_wide.as_ptr()))
+            .ok()?;
+
         let route_document = with_state(hwnd, |state| {
             state
                 .docs
@@ -22414,16 +22649,17 @@ pub(crate) fn save_file_dialog_with_encoding(
                 .unwrap_or_else(settings::default_documents_save_folder)
         };
         crate::log_if_err!(std::fs::create_dir_all(&initial_dir));
-        let initial_dir_w = to_wide(&initial_dir);
+        let initial_dir_wide = to_wide(&initial_dir);
         if let Ok(shell_folder) =
-            SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(initial_dir_w.as_ptr()), None)
+            SHCreateItemFromParsingName::<_, _, IShellItem>(PCWSTR(initial_dir_wide.as_ptr()), None)
         {
-            let _unused = pfd.SetDefaultFolder(&shell_folder);
-            let _unused = pfd.SetFolder(&shell_folder);
+            let _set_default_folder_result = pfd.SetDefaultFolder(&shell_folder);
+            let _set_folder_result = pfd.SetFolder(&shell_folder);
         }
 
         if let Some(name) = suggested_name {
-            pfd.SetFileName(PCWSTR(to_wide(name).as_ptr())).ok()?;
+            let suggested_name_wide = to_wide(name);
+            pfd.SetFileName(PCWSTR(suggested_name_wide.as_ptr())).ok()?;
         }
 
         let pfdc: IFileDialogCustomize = pfd.cast().ok()?;
@@ -22436,12 +22672,11 @@ pub(crate) fn save_file_dialog_with_encoding(
             i18n::tr(language, "encoding.utf16be"),
         ];
 
-        // Use ComboBox with "Codifica: " prefix in each item for NVDA
         pfdc.AddComboBox(101).ok()?;
-
-        for (i, enc_name) in encodings.iter().enumerate() {
-            let item_text = format!("{} {}", encoding_label, enc_name);
-            pfdc.AddControlItem(101, i as u32, PCWSTR(to_wide(&item_text).as_ptr()))
+        for (index, encoding_name) in encodings.iter().enumerate() {
+            let item_text = format!("{} {}", encoding_label, encoding_name);
+            let item_text_wide = to_wide(&item_text);
+            pfdc.AddControlItem(101, index as u32, PCWSTR(item_text_wide.as_ptr()))
                 .ok()?;
         }
         pfdc.SetSelectedControlItem(101, encoding_to_index(initial_encoding))
@@ -22451,52 +22686,34 @@ pub(crate) fn save_file_dialog_with_encoding(
             _encoding_label: encoding_label,
             _encodings: encodings,
             _initial_encoding: initial_encoding,
-            _is_save_dialog: true,
+            _txt_filter_index: txt_filter_index,
+            _filter_default_extensions: filter_default_extensions,
         }
         .into();
         let cookie = pfd.Advise(&handler).ok()?;
-
-        // Trigger OnTypeChange to set initial visibility (filter index 1 = TXT for save dialog)
-        crate::log_if_err!(pfd.SetFileTypeIndex(1));
+        crate::log_if_err!(pfd.SetFileTypeIndex(preferred_filter_index));
 
         if pfd.Show(hwnd).is_ok() {
             let item = pfd.GetResult().ok()?;
             let path_ptr = item
                 .GetDisplayName(windows::Win32::UI::Shell::SIGDN_FILESYSPATH)
                 .ok()?;
-            let path_str = path_ptr.to_string().unwrap_or_default();
+            let path_string = path_ptr.to_string().unwrap_or_default();
             CoTaskMemFree(Some(path_ptr.0 as *const _));
 
-            let selected_encoding_idx = pfdc.GetSelectedControlItem(101).ok()?;
+            let selected_encoding_index = pfdc.GetSelectedControlItem(101).ok()?;
             let filter_index = pfd.GetFileTypeIndex().ok()?;
-
-            let mut path = PathBuf::from(path_str);
-            if path.extension().is_none() {
-                match filter_index {
-                    1 => {
-                        path.set_extension("txt");
-                    }
-                    2 => {
-                        path.set_extension("pdf");
-                    }
-                    3 => {
-                        path.set_extension("docx");
-                    }
-                    4 => {
-                        path.set_extension("xlsx");
-                    }
-                    5 => {
-                        path.set_extension("rtf");
-                    }
-                    7 => {
-                        path.set_extension("html");
-                    }
-                    _ => {}
-                }
+            let mut path = PathBuf::from(path_string);
+            if path.extension().is_none()
+                && let Some((_, pattern)) =
+                    filter_pairs.get(filter_index.saturating_sub(1) as usize)
+                && let Some(extension) = default_extension_from_filter_pattern(pattern)
+            {
+                path.set_extension(extension);
             }
 
             pfd.Unadvise(cookie).ok()?;
-            Some((path, index_to_encoding(selected_encoding_idx)))
+            Some((path, index_to_encoding(selected_encoding_index)))
         } else {
             pfd.Unadvise(cookie).ok()?;
             None

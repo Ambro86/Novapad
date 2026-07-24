@@ -1,5 +1,27 @@
 # Dziennik zmian
 
+Wersja 0.8.4 – 2026-07-24
+
+Edycja dokumentów EPUB
+• Sonarpad potrafi teraz nie tylko otwierać dokumenty EPUB, lecz także je edytować i ponownie zapisywać w formacie EPUB z zachowaniem oryginalnego formatowania, spisu treści, przypisów, obrazów, arkuszy stylów, metadanych i odsyłaczy wewnętrznych.
+• Format EPUB jest dostępny w oknie „Zapisz jako” dla dokumentów otwartych z pliku EPUB. Podczas zapisu aktualizowany jest wyłącznie zmieniony tekst, a struktura książki pozostaje nienaruszona.
+
+Niezawodność audiobooków
+• Naprawiono sporadyczny problem, przez który po pięciu nieudanych próbach Google TTS jednostka syntezy była po cichu pomijana, a w gotowym audiobooku mogło brakować fragmentu tekstu.
+• Jednostki Google są teraz ponawiane aż do powodzenia lub anulowania przez użytkownika. Uruchamianie procesów jest rozłożone w czasie, aby ograniczyć tymczasowe konflikty z Chrome i plikami; Sonarpad przerywa też tworzenie zamiast zapisywać audiobook z brakującym segmentem.
+• Audiobooki Edge ponawiają teraz bez stałego limitu tymczasowe błędy sieci, WebSocket, przekroczenia czasu, ograniczenia usługi i nieprawidłowego dźwięku, aż do powodzenia lub anulowania przez użytkownika, również przy głosach mieszanych i podziale według czasu. SAPI4 i SAPI5 zachowują adaptacyjne, ograniczone próby; jeśli segment nadal się nie powiedzie, Sonarpad przerywa proces bez zapisywania niekompletnego audiobooka.
+
+Nawigacja w bibliotekach cyfrowych
+• Wyniki LibriVox, Internet Archive i Project Gutenberg korzystają teraz z nawigacji stronami, tak jak YouTube: „Przejdź do poprzednich wyników” znajduje się na początku listy, a „Przejdź do następnych wyników” na końcu.
+• Poprawiono przełączanie fokusu w LibriVox: po otwarciu książki lub rozdziału fokus NVDA nie jest już przenoszony do głównego edytora przed otwarciem następnej listy lub odtwarzacza.
+• Dodano ochronę fokusu podczas wyszukiwania i wczytywania książek LibriVox: zlokalizowane okno ładowania pozostaje na pierwszym planie przez cały czas wykonywania żądania, dzięki czemu fokus NVDA nie przechodzi do Wiersza polecenia, Windows Terminal ani innej aplikacji.
+
+Pobieranie playlist YouTube
+• Do playlist YouTube dodano dostępne polecenie wielokrotnego wyboru, które pozwala wskazać filmy do pobrania bez zmiany dotychczasowego polecenia „Zapisz multimedia” dla aktualnie odtwarzanego elementu.
+• Wybrane elementy są pobierane kolejno w formacie i jakości wybranych podczas otwierania playlisty, otrzymują numerowane nazwy zachowujące pierwotną kolejność i są zapisywane w osobnym folderze wewnątrz skonfigurowanego folderu Multimedia.
+• Okno zawiera polecenia „Zaznacz wszystko” i „Odznacz wszystko”, ogłasza liczbę wybranych elementów, pozwala anulować z zachowaniem ukończonych plików i wyraźnie informuje o elementach, których nie udało się pobrać.
+• Elementy playlisty są teraz natywnymi polami wyboru: czytniki ekranu automatycznie ogłaszają tytuł, typ kontrolki i stan zaznaczenia, bez dodawania słów do widocznego tytułu i bez wymuszonych komunikatów głosowych.
+
 Wersja 0.8.3 – 2026-07-23
 
 Tryb ciemny

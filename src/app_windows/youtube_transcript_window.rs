@@ -20,8 +20,11 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL};
 use windows::Win32::UI::Controls::{
-    BST_CHECKED, EM_SCROLLCARET, EM_SETSEL, SetScrollInfo, ShowScrollBar, WC_BUTTON, WC_COMBOBOXW,
-    WC_LISTBOXW, WC_STATIC,
+    BST_CHECKED, EM_SCROLLCARET, EM_SETSEL, LIST_VIEW_ITEM_STATE_FLAGS, LVCF_WIDTH, LVCOLUMNW,
+    LVIF_TEXT, LVIS_FOCUSED, LVIS_SELECTED, LVIS_STATEIMAGEMASK, LVITEMW, LVM_ENSUREVISIBLE,
+    LVM_GETITEMCOUNT, LVM_GETITEMSTATE, LVM_INSERTCOLUMNW, LVM_INSERTITEMW,
+    LVM_SETEXTENDEDLISTVIEWSTYLE, LVM_SETITEMSTATE, LVN_ITEMCHANGED, NMLISTVIEW, SetScrollInfo,
+    ShowScrollBar, WC_BUTTON, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, GetFocus, GetKeyState, SetFocus, VK_BACK, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE,
@@ -42,11 +45,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY,
     TPM_RETURNCMD, TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
     WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_GETDLGCODE, WM_KEYDOWN, WM_LBUTTONDOWN,
-    WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_PAINT, WM_SETFOCUS, WM_SETFONT, WM_SIZE,
-    WM_TIMER, WM_VSCROLL, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_PAINT, WM_SETFOCUS, WM_SETFONT,
+    WM_SIZE, WM_TIMER, WM_VSCROLL, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
     WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
-use windows::core::{PCWSTR, w};
+use windows::core::{PCWSTR, PWSTR, w};
 
 use crate::accessibility::{
     EM_REPLACESEL, PlayerCommand, handle_player_keyboard, screen_reader_speak, to_wide,
@@ -83,8 +86,16 @@ const STREAM_ID_QUALITY: usize = 9318;
 const STREAM_TRACK_ID_COMBO: usize = 9321;
 const STREAM_TRACK_ID_OK: usize = 9322;
 const STREAM_TRACK_ID_CANCEL: usize = 9323;
+const PLAYLIST_DOWNLOAD_SELECT_ID_LIST: usize = 9341;
+const PLAYLIST_DOWNLOAD_SELECT_ID_ALL: usize = 9342;
+const PLAYLIST_DOWNLOAD_SELECT_ID_NONE: usize = 9343;
+const PLAYLIST_DOWNLOAD_SELECT_ID_DOWNLOAD: usize = 9344;
+const PLAYLIST_DOWNLOAD_SELECT_ID_CANCEL: usize = 9345;
+const PLAYLIST_DOWNLOAD_SELECT_ID_COUNT: usize = 9346;
+const PLAYLIST_DOWNLOAD_MAX_ATTEMPTS: usize = 3;
 const STREAM_DIALOG_CLASS_NAME: &str = "SonarpadStreamAudio";
 const STREAM_TRACK_DIALOG_CLASS_NAME: &str = "SonarpadStreamAudioTrack";
+const PLAYLIST_DOWNLOAD_SELECT_CLASS_NAME: &str = "SonarpadPlaylistDownloadSelect";
 const YOUTUBE_COMMENTS_DIALOG_CLASS_NAME: &str = "SonarpadYouTubeComments";
 const YOUTUBE_COMMENTS_VIEW_CLASS_NAME: &str = "SonarpadYouTubeCommentsView";
 const YOUTUBE_COMMENTS_INITIAL_PARENT_LIMIT: usize = 50;
@@ -1872,7 +1883,77 @@ fn is_youtube_channel_url(input: &str) -> bool {
 #[derive(Clone)]
 struct StreamCollectionEntry {
     label: String,
+    title: String,
     url: String,
+    position: usize,
+}
+
+#[derive(Clone, Copy)]
+struct PlaylistDownloadOptions {
+    format: StreamOutputFormat,
+    quality: StreamQualitySelection,
+}
+
+type PlaylistDownloadSelectionResult = Arc<Mutex<Option<Vec<usize>>>>;
+type PlaylistDownloadFailure = (String, String);
+
+struct StreamCollectionPageRequest<'a> {
+    parent: HWND,
+    language: Language,
+    ytdlp_path: &'a Path,
+    entries: &'a [StreamCollectionEntry],
+    has_previous: bool,
+    has_more: bool,
+    show_playlist_download_action: bool,
+    initial_selected_label: Option<&'a str>,
+}
+
+#[derive(Clone, Copy)]
+struct StreamSelectionResolveOptions<'a> {
+    initial_collection_page: Option<usize>,
+    initial_selected_label: Option<&'a str>,
+    initial_progress: Option<HWND>,
+    playlist_download_options: PlaylistDownloadOptions,
+}
+
+struct PlaylistFinalizeRequest<'a> {
+    parent: HWND,
+    progress: HWND,
+    downloaded_path: &'a Path,
+    target_dir: &'a Path,
+    entry: &'a StreamCollectionEntry,
+    position_width: usize,
+    options: PlaylistDownloadOptions,
+    language: Language,
+}
+
+struct PlaylistEntryDownloadRequest<'a> {
+    parent: HWND,
+    progress: HWND,
+    language: Language,
+    ytdlp_path: &'a Path,
+    entry: &'a StreamCollectionEntry,
+    cache_dir: &'a Path,
+    prefix: &'a str,
+    output_template: &'a Path,
+    dialog_data: &'a StreamDialogResult,
+    credentials: Option<&'a YtdlpAuthCredentials>,
+}
+
+struct PlaylistDownloadSelectionInit {
+    parent: HWND,
+    language: Language,
+    entries: Vec<StreamCollectionEntry>,
+    result: PlaylistDownloadSelectionResult,
+}
+
+struct PlaylistDownloadSelectionState {
+    parent: HWND,
+    language: Language,
+    list: HWND,
+    count_label: HWND,
+    entry_count: usize,
+    result: PlaylistDownloadSelectionResult,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -1916,6 +1997,7 @@ struct YoutubeCommentsDialogMode {
     right_arrow_accepts_selection: bool,
     left_arrow_closes: bool,
     escape_stops_active_player: bool,
+    suppress_parent_restore_on_action: bool,
 }
 
 #[derive(Clone, Copy, Default, Eq, PartialEq)]
@@ -2038,6 +2120,7 @@ struct ResolvedStreamSelection {
 const STREAM_SELECTION_PAGE_SIZE: usize = 20;
 const STREAM_SELECTION_LOAD_MORE_KEY: &str = "stream_audio.load_more_videos";
 const STREAM_SELECTION_PREVIOUS_KEY: &str = "stream_audio.previous_results";
+const STREAM_SELECTION_DOWNLOAD_PLAYLIST_KEY: &str = "stream_audio.playlist_download_action";
 const YOUTUBE_MPV_STREAM_FORMAT: &str = "best[height<=360][ext=mp4]/18/best[height<=480]/best";
 
 fn stream_entry_url(entry: &serde_json::Value) -> Option<String> {
@@ -2066,18 +2149,36 @@ fn stream_entry_url(entry: &serde_json::Value) -> Option<String> {
         })
 }
 
+fn stream_entry_title(entry: &serde_json::Value, language: Language) -> String {
+    entry
+        .get("title")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(plain_label)
+        .unwrap_or_else(|| i18n::tr(language, "app.untitled_base"))
+}
+
 fn collect_stream_collection_entries(
     entries: &[serde_json::Value],
     language: Language,
 ) -> Vec<StreamCollectionEntry> {
     let mut out = Vec::new();
-    for entry in entries.iter() {
+    for (index, entry) in entries.iter().enumerate() {
         let Some(video_url) = stream_entry_url(entry) else {
             continue;
         };
+        let position = entry
+            .get("playlist_index")
+            .and_then(|value| value.as_u64())
+            .map(|value| value as usize)
+            .filter(|value| *value > 0)
+            .unwrap_or(index + 1);
         out.push(StreamCollectionEntry {
             label: format_stream_entry_label(entry, language),
+            title: stream_entry_title(entry, language),
             url: video_url,
+            position,
         });
     }
     out
@@ -2137,6 +2238,61 @@ fn probe_youtube_collection_entries(
     Ok((out, has_more))
 }
 
+fn probe_youtube_playlist_all_entries(
+    ytdlp_path: &Path,
+    url: &str,
+    language: Language,
+) -> Result<(String, Vec<StreamCollectionEntry>), String> {
+    let target_url = normalize_youtube_playlist_url_from_input(url)
+        .ok_or_else(|| i18n::tr(language, "stream_audio.invalid_url"))?;
+    let extractor_args = youtube_flat_playlist_extractor_args(language);
+    crate::log_debug(&format!(
+        "yt-dlp full playlist probe extractor args: {}",
+        extractor_args
+    ));
+    let output = ytdlp_command(ytdlp_path)
+        .arg("--flat-playlist")
+        .arg("--dump-single-json")
+        .arg("--no-warnings")
+        .arg("--skip-download")
+        .arg("--extractor-args")
+        .arg(extractor_args)
+        .arg("--")
+        .arg(&target_url)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|err| err.to_string())?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if stderr.is_empty() {
+            i18n::tr(language, "stream_audio.no_output")
+        } else {
+            stderr
+        });
+    }
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).map_err(|err| err.to_string())?;
+    let playlist_title = json
+        .get("title")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(plain_label)
+        .unwrap_or_else(|| i18n::tr(language, "stream_audio.playlist_download_default_folder"));
+    let entries = json
+        .get("entries")
+        .and_then(|value| value.as_array())
+        .map(|values| collect_stream_collection_entries(values, language))
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|entry| {
+            !is_youtube_collection_url(&entry.url) && extract_video_id(&entry.url).is_some()
+        })
+        .collect();
+    Ok((playlist_title, entries))
+}
+
 fn probe_youtube_search_entries(
     ytdlp_path: &Path,
     query: &str,
@@ -2194,19 +2350,28 @@ fn probe_youtube_search_entries(
     Ok((collected, has_more))
 }
 
-fn choose_stream_collection_entry_page(
-    parent: HWND,
-    language: Language,
-    ytdlp_path: &Path,
-    entries: &[StreamCollectionEntry],
-    has_previous: bool,
-    has_more: bool,
-    initial_selected_label: Option<&str>,
-) -> Option<String> {
-    let mut labels =
-        Vec::with_capacity(entries.len() + usize::from(has_previous) + usize::from(has_more));
+fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>) -> Option<String> {
+    let StreamCollectionPageRequest {
+        parent,
+        language,
+        ytdlp_path,
+        entries,
+        has_previous,
+        has_more,
+        show_playlist_download_action,
+        initial_selected_label,
+    } = request;
+    let mut labels = Vec::with_capacity(
+        entries.len()
+            + usize::from(has_previous)
+            + usize::from(has_more)
+            + usize::from(show_playlist_download_action),
+    );
     if has_previous {
         labels.push(i18n::tr(language, STREAM_SELECTION_PREVIOUS_KEY));
+    }
+    if show_playlist_download_action {
+        labels.push(i18n::tr(language, STREAM_SELECTION_DOWNLOAD_PLAYLIST_KEY));
     }
     labels.extend(entries.iter().map(|entry| entry.label.clone()));
     if has_more {
@@ -2546,6 +2711,45 @@ pub(crate) fn select_multiline_items_with_search(
     initial_selected_id: Option<String>,
     search_options: MultilineSearchOptions,
 ) -> MultilineSelectionResult {
+    select_multiline_items_with_search_impl(
+        parent,
+        language,
+        title,
+        items,
+        initial_selected_id,
+        search_options,
+        false,
+    )
+}
+
+pub(crate) fn select_multiline_items_with_search_without_parent_restore_on_action(
+    parent: HWND,
+    language: Language,
+    title: String,
+    items: Vec<MultilineSelectionItem>,
+    initial_selected_id: Option<String>,
+    search_options: MultilineSearchOptions,
+) -> MultilineSelectionResult {
+    select_multiline_items_with_search_impl(
+        parent,
+        language,
+        title,
+        items,
+        initial_selected_id,
+        search_options,
+        true,
+    )
+}
+
+fn select_multiline_items_with_search_impl(
+    parent: HWND,
+    language: Language,
+    title: String,
+    items: Vec<MultilineSelectionItem>,
+    initial_selected_id: Option<String>,
+    search_options: MultilineSearchOptions,
+    suppress_parent_restore_on_action: bool,
+) -> MultilineSelectionResult {
     let comments = multiline_items_to_comments(items);
     let selection_result = Arc::new(Mutex::new(None));
     let search_result = Arc::new(Mutex::new(None));
@@ -2585,6 +2789,7 @@ pub(crate) fn select_multiline_items_with_search(
             right_arrow_accepts_selection: search_options.right_arrow_accepts_selection,
             left_arrow_closes: search_options.left_arrow_closes,
             escape_stops_active_player: search_options.escape_stops_active_player,
+            suppress_parent_restore_on_action,
         },
     );
     if let Some(value) = selection_result
@@ -2744,6 +2949,19 @@ fn open_youtube_comments_window_with_mode(
 
     let action_result = Arc::new(Mutex::new(YoutubeCommentsDialogAction::None));
     let is_flat_selection = mode.flat_selection.is_some();
+    let suppress_parent_restore_on_action = mode.suppress_parent_restore_on_action;
+    let flat_selection_result_for_restore = mode
+        .flat_selection
+        .as_ref()
+        .map(|selection| Arc::clone(&selection.result));
+    let flat_search_result_for_restore = mode
+        .flat_search
+        .as_ref()
+        .map(|search| Arc::clone(&search.result));
+    let flat_secondary_result_for_restore = mode
+        .flat_secondary_action
+        .as_ref()
+        .map(|secondary| Arc::clone(&secondary.result));
     let keep_parent_enabled_for_player = is_flat_selection
         && mode.escape_stops_active_player
         && crate::is_mpv_playback_active(parent);
@@ -3019,7 +3237,28 @@ fn open_youtube_comments_window_with_mode(
     unsafe {
         EnableWindow(parent, true);
     }
-    if crate::is_window_handle_valid(parent) {
+    let flat_action_accepted = flat_selection_result_for_restore
+        .as_ref()
+        .is_some_and(|result| {
+            result
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .is_some()
+        })
+        || flat_search_result_for_restore
+            .as_ref()
+            .is_some_and(|result| {
+                result
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner())
+                    .is_some()
+            })
+        || flat_secondary_result_for_restore
+            .as_ref()
+            .is_some_and(|result| *result.lock().unwrap_or_else(|error| error.into_inner()));
+    let suppress_parent_restore =
+        is_flat_selection && suppress_parent_restore_on_action && flat_action_accepted;
+    if crate::is_window_handle_valid(parent) && !suppress_parent_restore {
         crate::log_debug(&format!(
             "YT comments closing restore start parent={:?} focus_before_fg_restore={:?}",
             parent,
@@ -3028,13 +3267,20 @@ fn open_youtube_comments_window_with_mode(
         crate::set_foreground_window_safe(parent);
     }
     if is_flat_selection {
-        crate::log_debug(&format!(
-            "generic flat selection closed: restoring parent without stream-state access parent={:?}",
-            parent
-        ));
-        if crate::is_window_handle_valid(parent) {
-            crate::set_foreground_window_safe(parent);
-            crate::set_focus_safe(parent);
+        if suppress_parent_restore {
+            crate::log_debug(&format!(
+                "generic flat selection closed after action: parent restore suppressed parent={:?}",
+                parent
+            ));
+        } else {
+            crate::log_debug(&format!(
+                "generic flat selection closed: restoring parent without stream-state access parent={:?}",
+                parent
+            ));
+            if crate::is_window_handle_valid(parent) {
+                crate::set_foreground_window_safe(parent);
+                crate::set_focus_safe(parent);
+            }
         }
     } else {
         restore_stream_dialog_focus(parent);
@@ -3129,11 +3375,12 @@ fn youtube_comments_dialog_wndproc_inner(
             let (search_label, search_edit, search_button, secondary_button) =
                 if let Some(search) = init.flat_search.as_ref() {
                     let search_label = if search.show_edit {
+                        let search_label_text = i18n::tr(init.language, "find_in_files.term_label");
                         unsafe {
                             CreateWindowExW(
                                 Default::default(),
                                 WC_STATIC,
-                                PCWSTR(to_wide("Digita la stringa di ricerca").as_ptr()),
+                                PCWSTR(to_wide(&search_label_text).as_ptr()),
                                 WS_CHILD | WS_VISIBLE,
                                 10,
                                 40,
@@ -5282,10 +5529,14 @@ fn choose_youtube_collection_entry(
     language: Language,
     ytdlp_path: &Path,
     url: &str,
-    initial_page: Option<usize>,
-    initial_selected_label: Option<&str>,
-    initial_progress: Option<HWND>,
+    options: StreamSelectionResolveOptions<'_>,
 ) -> Result<Option<ResolvedStreamSelection>, String> {
+    let StreamSelectionResolveOptions {
+        initial_collection_page: initial_page,
+        initial_selected_label,
+        initial_progress,
+        playlist_download_options,
+    } = options;
     if !is_youtube_collection_url(url) {
         return Ok(Some(ResolvedStreamSelection {
             url: url.to_string(),
@@ -5379,15 +5630,17 @@ fn choose_youtube_collection_entry(
             };
         }
 
-        let Some(selected) = choose_stream_collection_entry_page(
+        let Some(selected) = choose_stream_collection_entry_page(StreamCollectionPageRequest {
             parent,
             language,
             ytdlp_path,
-            &entries,
-            page > 0,
+            entries: &entries,
+            has_previous: page > 0,
             has_more,
-            initial_selected_label.filter(|_| page == initial_page.unwrap_or(0)),
-        ) else {
+            show_playlist_download_action: normalize_youtube_playlist_url_from_input(url).is_some(),
+            initial_selected_label: initial_selected_label
+                .filter(|_| page == initial_page.unwrap_or(0)),
+        }) else {
             if page > 0 {
                 crate::log_debug(&format!(
                     "stream transition [collection_probe.cancel_previous]: current_page={} next_page={}",
@@ -5401,6 +5654,20 @@ fn choose_youtube_collection_entry(
             return Ok(None);
         };
         restore_stream_parent_after_selection(parent);
+        if selected == i18n::tr(language, STREAM_SELECTION_DOWNLOAD_PLAYLIST_KEY) {
+            crate::log_debug(&format!(
+                "stream transition [collection_probe.download_playlist]: page={} url={}",
+                page, url
+            ));
+            choose_and_download_youtube_playlist_items(
+                parent,
+                language,
+                ytdlp_path,
+                url,
+                playlist_download_options,
+            );
+            continue;
+        }
         if selected == i18n::tr(language, STREAM_SELECTION_LOAD_MORE_KEY) {
             crate::log_debug(&format!(
                 "stream transition [collection_probe.load_more]: current_page={} next_page={}",
@@ -5434,9 +5701,12 @@ fn choose_youtube_collection_entry(
                     language,
                     ytdlp_path,
                     &selected_url,
-                    None,
-                    None,
-                    None,
+                    StreamSelectionResolveOptions {
+                        initial_collection_page: None,
+                        initial_selected_label: None,
+                        initial_progress: None,
+                        playlist_download_options,
+                    },
                 )? {
                     Some(mut selection) => {
                         if selection.collection_url.is_some() || selection.collection_page.is_some()
@@ -5477,9 +5747,14 @@ fn choose_youtube_search_entry(
     language: Language,
     ytdlp_path: &Path,
     query: &str,
-    initial_selected_label: Option<&str>,
-    initial_progress: Option<HWND>,
+    options: StreamSelectionResolveOptions<'_>,
 ) -> Result<Option<ResolvedStreamSelection>, String> {
+    let StreamSelectionResolveOptions {
+        initial_selected_label,
+        initial_progress,
+        playlist_download_options,
+        ..
+    } = options;
     let mut page = 0usize;
     let mut shared_progress = initial_progress;
     loop {
@@ -5542,15 +5817,16 @@ fn choose_youtube_search_entry(
             };
         }
 
-        let Some(selected) = choose_stream_collection_entry_page(
+        let Some(selected) = choose_stream_collection_entry_page(StreamCollectionPageRequest {
             parent,
             language,
             ytdlp_path,
-            &entries,
-            page > 0,
+            entries: &entries,
+            has_previous: page > 0,
             has_more,
-            initial_selected_label.filter(|_| page == 0),
-        ) else {
+            show_playlist_download_action: false,
+            initial_selected_label: initial_selected_label.filter(|_| page == 0),
+        }) else {
             if page > 0 {
                 crate::log_debug(&format!(
                     "stream transition [search_probe.cancel_previous]: current_page={} next_page={}",
@@ -5587,9 +5863,12 @@ fn choose_youtube_search_entry(
                     language,
                     ytdlp_path,
                     &selected_url,
-                    None,
-                    None,
-                    None,
+                    StreamSelectionResolveOptions {
+                        initial_collection_page: None,
+                        initial_selected_label: None,
+                        initial_progress: None,
+                        playlist_download_options,
+                    },
                 )? {
                     Some(mut selection) => {
                         if selection.collection_url.is_some() || selection.collection_page.is_some()
@@ -5623,29 +5902,12 @@ fn resolve_stream_input_url(
     language: Language,
     ytdlp_path: &Path,
     input: &str,
-    initial_collection_page: Option<usize>,
-    initial_selected_label: Option<&str>,
-    initial_progress: Option<HWND>,
+    options: StreamSelectionResolveOptions<'_>,
 ) -> Result<Option<ResolvedStreamSelection>, String> {
     if looks_like_valid_stream_url(input) {
-        return choose_youtube_collection_entry(
-            parent,
-            language,
-            ytdlp_path,
-            input,
-            initial_collection_page,
-            initial_selected_label,
-            initial_progress,
-        );
+        return choose_youtube_collection_entry(parent, language, ytdlp_path, input, options);
     }
-    choose_youtube_search_entry(
-        parent,
-        language,
-        ytdlp_path,
-        input,
-        initial_selected_label,
-        initial_progress,
-    )
+    choose_youtube_search_entry(parent, language, ytdlp_path, input, options)
 }
 
 fn is_members_only_stream_error(err: &str) -> bool {
@@ -6162,6 +6424,536 @@ where
     crate::with_raw_mut_ptr_safe(ptr, f)
 }
 
+fn with_playlist_download_selection_state<F, R>(hwnd: HWND, f: F) -> Option<R>
+where
+    F: FnOnce(&mut PlaylistDownloadSelectionState) -> R,
+{
+    let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
+        as *mut PlaylistDownloadSelectionState;
+    crate::with_raw_mut_ptr_safe(ptr, f)
+}
+
+fn playlist_download_entry_is_checked(list: HWND, index: usize) -> bool {
+    let state = unsafe {
+        SendMessageW(
+            list,
+            LVM_GETITEMSTATE,
+            WPARAM(index),
+            LPARAM(LVIS_STATEIMAGEMASK.0 as isize),
+        )
+        .0 as u32
+    };
+    state & LVIS_STATEIMAGEMASK.0 == 2 << 12
+}
+
+fn playlist_download_set_entry_checked(list: HWND, index: usize, checked: bool) {
+    let mut item = LVITEMW {
+        state: LIST_VIEW_ITEM_STATE_FLAGS((if checked { 2 } else { 1 }) << 12),
+        stateMask: LVIS_STATEIMAGEMASK,
+        ..Default::default()
+    };
+    unsafe {
+        SendMessageW(
+            list,
+            LVM_SETITEMSTATE,
+            WPARAM(index),
+            LPARAM((&mut item as *mut LVITEMW) as isize),
+        );
+    }
+}
+
+fn playlist_download_selected_indices(list: HWND) -> Vec<usize> {
+    let item_count = unsafe { SendMessageW(list, LVM_GETITEMCOUNT, WPARAM(0), LPARAM(0)).0 };
+    if item_count <= 0 {
+        return Vec::new();
+    }
+    (0..item_count as usize)
+        .filter(|&index| playlist_download_entry_is_checked(list, index))
+        .collect()
+}
+
+fn playlist_download_insert_entry(list: HWND, index: usize, entry: &StreamCollectionEntry) {
+    let mut label = to_wide(&format!("{}. {}", entry.position, entry.label));
+    let mut item = LVITEMW {
+        mask: LVIF_TEXT,
+        iItem: index as i32,
+        pszText: PWSTR(label.as_mut_ptr()),
+        ..Default::default()
+    };
+    unsafe {
+        SendMessageW(
+            list,
+            LVM_INSERTITEMW,
+            WPARAM(0),
+            LPARAM((&mut item as *mut LVITEMW) as isize),
+        );
+    }
+    playlist_download_set_entry_checked(list, index, false);
+}
+
+fn playlist_download_focus_first_entry(list: HWND) {
+    let mut item = LVITEMW {
+        state: LIST_VIEW_ITEM_STATE_FLAGS(LVIS_SELECTED.0 | LVIS_FOCUSED.0),
+        stateMask: LIST_VIEW_ITEM_STATE_FLAGS(LVIS_SELECTED.0 | LVIS_FOCUSED.0),
+        ..Default::default()
+    };
+    unsafe {
+        SendMessageW(
+            list,
+            LVM_SETITEMSTATE,
+            WPARAM(0),
+            LPARAM((&mut item as *mut LVITEMW) as isize),
+        );
+        SendMessageW(list, LVM_ENSUREVISIBLE, WPARAM(0), LPARAM(0));
+    }
+}
+
+fn update_playlist_download_selection_count(state: &PlaylistDownloadSelectionState) {
+    let selected = playlist_download_selected_indices(state.list).len();
+    let selected_text = selected.to_string();
+    let total_text = state.entry_count.to_string();
+    let text = i18n::tr_f(
+        state.language,
+        "stream_audio.playlist_download_selected_count",
+        &[("selected", &selected_text), ("total", &total_text)],
+    );
+    unsafe {
+        let wide = to_wide(&text);
+        crate::log_if_err!(SetWindowTextW(state.count_label, PCWSTR(wide.as_ptr())));
+    }
+}
+
+unsafe extern "system" fn playlist_download_selection_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        crate::panic_guard::guard(
+            "playlist_download_selection_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || playlist_download_selection_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
+}
+
+fn playlist_download_selection_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr =
+                    (*create_struct).lpCreateParams as *mut PlaylistDownloadSelectionInit;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let init = Box::from_raw(init_ptr);
+                let hfont = HFONT(crate::get_stock_object_safe(DEFAULT_GUI_FONT).0);
+                let instructions = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(
+                        to_wide(&i18n::tr(
+                            init.language,
+                            "stream_audio.playlist_download_instructions",
+                        ))
+                        .as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    14,
+                    650,
+                    38,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let list = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("SysListView32"),
+                    PCWSTR::null(),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | WS_TABSTOP
+                        | WS_VSCROLL
+                        | WINDOW_STYLE(0x0001 | 0x0004 | 0x0008 | 0x4000),
+                    16,
+                    58,
+                    650,
+                    330,
+                    hwnd,
+                    HMENU(PLAYLIST_DOWNLOAD_SELECT_ID_LIST as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(
+                    list,
+                    LVM_SETEXTENDEDLISTVIEWSTYLE,
+                    WPARAM(0x0000_0004 | 0x0000_0020),
+                    LPARAM((0x0000_0004 | 0x0000_0020) as isize),
+                );
+                let mut column = LVCOLUMNW {
+                    mask: LVCF_WIDTH,
+                    cx: 620,
+                    ..Default::default()
+                };
+                SendMessageW(
+                    list,
+                    LVM_INSERTCOLUMNW,
+                    WPARAM(0),
+                    LPARAM((&mut column as *mut LVCOLUMNW) as isize),
+                );
+                let count_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    398,
+                    650,
+                    22,
+                    hwnd,
+                    HMENU(PLAYLIST_DOWNLOAD_SELECT_ID_COUNT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let select_all = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(
+                        to_wide(&i18n::tr(
+                            init.language,
+                            "stream_audio.playlist_download_select_all",
+                        ))
+                        .as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    16,
+                    430,
+                    130,
+                    30,
+                    hwnd,
+                    HMENU(PLAYLIST_DOWNLOAD_SELECT_ID_ALL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let select_none = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(
+                        to_wide(&i18n::tr(
+                            init.language,
+                            "stream_audio.playlist_download_select_none",
+                        ))
+                        .as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    152,
+                    430,
+                    130,
+                    30,
+                    hwnd,
+                    HMENU(PLAYLIST_DOWNLOAD_SELECT_ID_NONE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let download = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(
+                        to_wide(&i18n::tr(
+                            init.language,
+                            "stream_audio.playlist_download_button",
+                        ))
+                        .as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    470,
+                    430,
+                    94,
+                    30,
+                    hwnd,
+                    HMENU(PLAYLIST_DOWNLOAD_SELECT_ID_DOWNLOAD as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let cancel = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    572,
+                    430,
+                    94,
+                    30,
+                    hwnd,
+                    HMENU(PLAYLIST_DOWNLOAD_SELECT_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                for control in [
+                    instructions,
+                    list,
+                    count_label,
+                    select_all,
+                    select_none,
+                    download,
+                    cancel,
+                ] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
+                }
+                let has_entries = !init.entries.is_empty();
+                let state = Box::new(PlaylistDownloadSelectionState {
+                    parent: init.parent,
+                    language: init.language,
+                    list,
+                    count_label,
+                    entry_count: init.entries.len(),
+                    result: Arc::clone(&init.result),
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                for (index, entry) in init.entries.iter().enumerate() {
+                    playlist_download_insert_entry(list, index, entry);
+                }
+                if has_entries {
+                    playlist_download_focus_first_entry(list);
+                }
+                if with_playlist_download_selection_state(hwnd, |state| {
+                    update_playlist_download_selection_count(state);
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to initialize playlist download selection count");
+                }
+                SetFocus(list);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                if cmd_id == PLAYLIST_DOWNLOAD_SELECT_ID_ALL {
+                    if with_playlist_download_selection_state(hwnd, |state| {
+                        for index in 0..state.entry_count {
+                            playlist_download_set_entry_checked(state.list, index, true);
+                        }
+                        update_playlist_download_selection_count(state);
+                        SetFocus(state.list);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to select all playlist download entries");
+                    }
+                    return LRESULT(0);
+                }
+                if cmd_id == PLAYLIST_DOWNLOAD_SELECT_ID_NONE {
+                    if with_playlist_download_selection_state(hwnd, |state| {
+                        for index in 0..state.entry_count {
+                            playlist_download_set_entry_checked(state.list, index, false);
+                        }
+                        update_playlist_download_selection_count(state);
+                        SetFocus(state.list);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to clear playlist download selection");
+                    }
+                    return LRESULT(0);
+                }
+                if cmd_id == PLAYLIST_DOWNLOAD_SELECT_ID_DOWNLOAD || cmd_id == 1 {
+                    let accepted = with_playlist_download_selection_state(hwnd, |state| {
+                        let selected = playlist_download_selected_indices(state.list);
+                        if selected.is_empty() {
+                            show_error(
+                                hwnd,
+                                state.language,
+                                &i18n::tr(
+                                    state.language,
+                                    "stream_audio.playlist_download_none_selected",
+                                ),
+                            );
+                            SetFocus(state.list);
+                            return false;
+                        }
+                        *state.result.lock().unwrap_or_else(|err| err.into_inner()) =
+                            Some(selected);
+                        true
+                    })
+                    .unwrap_or(false);
+                    if accepted {
+                        crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                    }
+                    return LRESULT(0);
+                }
+                if cmd_id == PLAYLIST_DOWNLOAD_SELECT_ID_CANCEL || cmd_id == 2 {
+                    crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_NOTIFY => {
+                if lparam.0 != 0 {
+                    let change = &*(lparam.0 as *const NMLISTVIEW);
+                    if change.hdr.idFrom == PLAYLIST_DOWNLOAD_SELECT_ID_LIST
+                        && change.hdr.code == LVN_ITEMCHANGED
+                        && (change.uOldState ^ change.uNewState) & LVIS_STATEIMAGEMASK.0 != 0
+                    {
+                        if with_playlist_download_selection_state(hwnd, |state| {
+                            update_playlist_download_selection_count(state);
+                        })
+                        .is_none()
+                        {
+                            crate::log_debug(
+                                "Failed to update native playlist checkbox selection count",
+                            );
+                        }
+                        return LRESULT(0);
+                    }
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    crate::log_if_err!(PostMessageW(
+                        hwnd,
+                        WM_COMMAND,
+                        WPARAM(PLAYLIST_DOWNLOAD_SELECT_ID_CANCEL),
+                        LPARAM(0),
+                    ));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_CLOSE => {
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                LRESULT(0)
+            }
+            WM_DESTROY => {
+                if with_playlist_download_selection_state(hwnd, |state| {
+                    EnableWindow(state.parent, true);
+                    let accepted = state
+                        .result
+                        .lock()
+                        .unwrap_or_else(|err| err.into_inner())
+                        .is_some();
+                    if !accepted {
+                        SetForegroundWindow(state.parent);
+                    }
+                })
+                .is_none()
+                {
+                    crate::log_debug("Failed to access playlist download selection state");
+                }
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let ptr =
+                    GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut PlaylistDownloadSelectionState;
+                if !ptr.is_null() {
+                    SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+                    let _unused = Box::from_raw(ptr);
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
+    }
+}
+
+fn choose_playlist_download_entries(
+    parent: HWND,
+    language: Language,
+    entries: Vec<StreamCollectionEntry>,
+) -> Option<Vec<usize>> {
+    if entries.is_empty() {
+        return None;
+    }
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
+    let class_name = to_wide(PLAYLIST_DOWNLOAD_SELECT_CLASS_NAME);
+    let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
+            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
+        }),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(playlist_download_selection_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    unsafe {
+        RegisterClassW(&wc);
+    }
+    let result = Arc::new(Mutex::new(None));
+    let init = Box::new(PlaylistDownloadSelectionInit {
+        parent,
+        language,
+        entries,
+        result: Arc::clone(&result),
+    });
+    let title = to_wide(&i18n::tr(language, "stream_audio.playlist_download_title"));
+    let init_ptr = Box::into_raw(init);
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            700,
+            520,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(init_ptr.cast()),
+        )
+    };
+    if hwnd.0 == 0 {
+        unsafe {
+            let _unused_init = Box::from_raw(init_ptr);
+        }
+        return None;
+    }
+    unsafe {
+        EnableWindow(parent, false);
+    }
+    pin_stream_modal_window(hwnd);
+    let mut msg = MSG::default();
+    loop {
+        if !crate::is_window_handle_valid(hwnd) {
+            break;
+        }
+        let res = crate::get_message_w_safe(&mut msg, HWND(0), 0, 0);
+        if res.0 == 0 || res.0 == -1 {
+            break;
+        }
+        unsafe {
+            if IsDialogMessageW(hwnd, &msg).as_bool() {
+                continue;
+            }
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+    if crate::is_window_handle_valid(hwnd) {
+        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+    }
+    unsafe {
+        EnableWindow(parent, true);
+    }
+    {
+        let guard = result.lock().unwrap_or_else(|err| err.into_inner());
+        guard.clone()
+    }
+}
+
 unsafe extern "system" fn stream_dialog_wndproc(
     hwnd: HWND,
     msg: u32,
@@ -6577,7 +7369,9 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     close_progress_dialog(progress);
                     let entry = StreamCollectionEntry {
                         label: normalized_url.clone(),
+                        title: normalized_url.clone(),
                         url: normalized_url,
+                        position: 1,
                     };
                     show_youtube_comments_for_stream_entry(hwnd, language, &ytdlp_path, &entry);
                     if with_stream_dialog_state(hwnd, |state| {
@@ -7115,6 +7909,7 @@ fn convert_stream_audio_responsive(
     input: &Path,
     output: &Path,
     settings: crate::ffmpeg_export::ConvertAudioSettings,
+    cancel_as_empty_error: bool,
 ) -> Result<(), String> {
     let input = input.to_path_buf();
     let output = output.to_path_buf();
@@ -7168,9 +7963,93 @@ fn convert_stream_audio_responsive(
         report_progress(progress_dialog, pct);
     }
 
-    match worker.join() {
+    let was_cancelled = cancel.load(Ordering::Relaxed);
+    let result = match worker.join() {
         Ok(result) => result,
         Err(_) => Err("FFmpeg conversion worker terminated unexpectedly.".to_string()),
+    };
+    if was_cancelled && cancel_as_empty_error {
+        Err(String::new())
+    } else {
+        result
+    }
+}
+
+fn remux_stream_media_responsive(
+    parent: HWND,
+    progress_dialog: HWND,
+    input: &Path,
+    output: &Path,
+    language: Language,
+) -> Result<(), String> {
+    let input = input.to_path_buf();
+    let output = output.to_path_buf();
+    let worker_output = output.clone();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let worker_cancel = Arc::clone(&cancel);
+    let worker_progress = Arc::new(AtomicU32::new(0));
+    let worker_progress_for_thread = Arc::clone(&worker_progress);
+
+    let worker = std::thread::Builder::new()
+        .name("stream-media-remux".to_string())
+        .spawn(move || {
+            lower_current_stream_worker_priority("Stream FFmpeg remux");
+            let mut progress_cb = |pct: u32| {
+                worker_progress_for_thread.store((pct / 100).min(100), Ordering::Relaxed);
+            };
+            crate::ffmpeg_export::remux_media_file_to_mp4_with_preferred_audio_stream(
+                &input,
+                &worker_output,
+                None,
+                Some(worker_cancel),
+                Some(&mut progress_cb),
+            )
+        })
+        .map_err(|err| {
+            let error_text = err.to_string();
+            i18n::tr_f(
+                language,
+                "stream_audio.convert_failed",
+                &[("err", &error_text)],
+            )
+        })?;
+
+    let mut last_reported = u32::MAX;
+    let mut last_focus_keepalive = std::time::Instant::now();
+    while !worker.is_finished() {
+        if pump_messages_detect_stream_cancel(parent, progress_dialog) {
+            cancel.store(true, Ordering::Relaxed);
+        }
+        let pct = worker_progress.load(Ordering::Relaxed);
+        if pct != last_reported {
+            last_reported = pct;
+            report_progress(progress_dialog, pct);
+        }
+        if last_focus_keepalive.elapsed() >= std::time::Duration::from_millis(300) {
+            keep_stream_progress_focus(progress_dialog);
+            last_focus_keepalive = std::time::Instant::now();
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+
+    if pump_messages_detect_stream_cancel(parent, progress_dialog) {
+        cancel.store(true, Ordering::Relaxed);
+    }
+    let pct = worker_progress.load(Ordering::Relaxed);
+    if pct != last_reported {
+        report_progress(progress_dialog, pct);
+    }
+
+    let was_cancelled = cancel.load(Ordering::Relaxed);
+    let result = match worker.join() {
+        Ok(result) => result,
+        Err(_) => Err(i18n::tr(language, "stream_audio.no_output")),
+    };
+    if was_cancelled {
+        crate::log_if_err!(std::fs::remove_file(output));
+        Err(String::new())
+    } else {
+        result
     }
 }
 
@@ -8520,6 +9399,627 @@ fn stream_save_final_target_path(
     target
 }
 
+fn remove_stream_cache_files_for_prefix(cache_dir: &Path, prefix: &str) {
+    let Ok(entries) = std::fs::read_dir(cache_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let matches = path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .map(|name| name.starts_with(prefix))
+            .unwrap_or(false);
+        if matches && path.is_file() {
+            crate::log_if_err!(std::fs::remove_file(path));
+        }
+    }
+}
+
+fn fetch_playlist_download_entries_responsive(
+    parent: HWND,
+    language: Language,
+    ytdlp_path: &Path,
+    playlist_url: &str,
+) -> Result<(String, Vec<StreamCollectionEntry>), String> {
+    let progress = open_progress_dialog(
+        parent,
+        language,
+        "stream_audio.progress_title",
+        "stream_audio.playlist_download_loading",
+        false,
+    );
+    let ytdlp = ytdlp_path.to_path_buf();
+    let playlist_url = playlist_url.to_string();
+    let worker = std::thread::spawn(move || {
+        probe_youtube_playlist_all_entries(&ytdlp, &playlist_url, language)
+    });
+    let mut last_focus_keepalive = std::time::Instant::now();
+    while !worker.is_finished() {
+        ignore_bool(pump_messages_detect_stream_cancel(parent, progress));
+        if last_focus_keepalive.elapsed() > std::time::Duration::from_millis(300) {
+            keep_stream_progress_focus(progress);
+            last_focus_keepalive = std::time::Instant::now();
+        }
+        std::thread::sleep(std::time::Duration::from_millis(30));
+    }
+    let joined = worker.join();
+    close_progress_dialog(progress);
+    joined.map_err(|_| i18n::tr(language, "stream_audio.no_output"))?
+}
+
+fn playlist_download_target_folder(parent: HWND, playlist_title: &str) -> PathBuf {
+    let base = with_state(parent, |state| state.settings.media_save_folder.clone())
+        .filter(|value| !value.trim().is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(crate::settings::default_media_save_folder()));
+    let folder_name = crate::sanitize_filename(playlist_title);
+    if folder_name.trim().is_empty() {
+        base
+    } else {
+        base.join(folder_name)
+    }
+}
+
+fn playlist_download_file_base_name(
+    entry: &StreamCollectionEntry,
+    position_width: usize,
+    language: Language,
+) -> String {
+    let title = crate::sanitize_filename(&entry.title);
+    let title = if title.trim().is_empty() {
+        format!(
+            "{}_{}",
+            i18n::tr(language, "app.untitled_base"),
+            entry.position
+        )
+    } else {
+        title
+    };
+    format!(
+        "{position:0width$} - {title}",
+        position = entry.position,
+        width = position_width,
+    )
+}
+
+fn finalize_playlist_downloaded_file(
+    request: PlaylistFinalizeRequest<'_>,
+) -> Result<PathBuf, String> {
+    let PlaylistFinalizeRequest {
+        parent,
+        progress,
+        downloaded_path,
+        target_dir,
+        entry,
+        position_width,
+        options,
+        language,
+    } = request;
+    let downloaded_ext = downloaded_path
+        .extension()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("webm");
+    let base_name = playlist_download_file_base_name(entry, position_width, language);
+
+    let target = match options.format {
+        StreamOutputFormat::Auto => {
+            let target = unique_stream_named_path(target_dir, &base_name, downloaded_ext);
+            if let Err(err) = std::fs::copy(downloaded_path, &target) {
+                crate::log_if_err!(std::fs::remove_file(&target));
+                return Err(err.to_string());
+            }
+            target
+        }
+        StreamOutputFormat::Mp4 => {
+            let target = unique_stream_named_path(target_dir, &base_name, "mp4");
+            if downloaded_ext.eq_ignore_ascii_case("mp4") {
+                if let Err(err) = std::fs::copy(downloaded_path, &target) {
+                    crate::log_if_err!(std::fs::remove_file(&target));
+                    return Err(err.to_string());
+                }
+            } else {
+                report_progress_status(
+                    progress,
+                    &i18n::tr(language, "stream_audio.progress_converting"),
+                );
+                if let Err(err) = remux_stream_media_responsive(
+                    parent,
+                    progress,
+                    downloaded_path,
+                    &target,
+                    language,
+                ) {
+                    crate::log_if_err!(std::fs::remove_file(&target));
+                    return Err(err);
+                }
+            }
+            target
+        }
+        _ => {
+            let target_ext = options.format.extension().unwrap_or(downloaded_ext);
+            let target = unique_stream_named_path(target_dir, &base_name, target_ext);
+            let Some(convert_settings) = options.format.as_audio_convert_settings(options.quality)
+            else {
+                return Err(i18n::tr(language, "stream_audio.no_output"));
+            };
+            let same_extension = downloaded_ext.eq_ignore_ascii_case(target_ext);
+            let must_reencode_mp3 = matches!(
+                (options.format, options.quality),
+                (
+                    StreamOutputFormat::Mp3,
+                    StreamQualitySelection::BitrateKbps(_)
+                )
+            );
+            if same_extension && !must_reencode_mp3 {
+                if let Err(err) = std::fs::copy(downloaded_path, &target) {
+                    crate::log_if_err!(std::fs::remove_file(&target));
+                    return Err(err.to_string());
+                }
+            } else {
+                report_progress_status(
+                    progress,
+                    &i18n::tr(language, "stream_audio.progress_converting"),
+                );
+                if let Err(err) = convert_stream_audio_responsive(
+                    parent,
+                    progress,
+                    downloaded_path,
+                    &target,
+                    convert_settings,
+                    true,
+                ) {
+                    crate::log_if_err!(std::fs::remove_file(&target));
+                    return Err(err);
+                }
+            }
+            target
+        }
+    };
+
+    Ok(target)
+}
+
+fn summarize_playlist_download_failures(failures: &[PlaylistDownloadFailure]) -> String {
+    const MAX_REPORTED_FAILURES: usize = 10;
+    let mut lines: Vec<String> = failures
+        .iter()
+        .take(MAX_REPORTED_FAILURES)
+        .map(|(title, _)| format!("• {title}"))
+        .collect();
+    if failures.len() > MAX_REPORTED_FAILURES {
+        lines.push(format!("… +{}", failures.len() - MAX_REPORTED_FAILURES));
+    }
+    lines.join("\n")
+}
+
+fn find_completed_playlist_download_file(cache_dir: &Path, prefix: &str) -> Option<PathBuf> {
+    const ALLOWED_EXTENSIONS: &[&str] = &[
+        "mp3", "m4a", "aac", "opus", "ogg", "wav", "flac", "mp4", "webm", "mkv", "ts",
+    ];
+    let mut latest: Option<(std::time::SystemTime, PathBuf)> = None;
+    let directory = std::fs::read_dir(cache_dir).ok()?;
+    for entry in directory.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        let Some(suffix) = name
+            .strip_prefix(prefix)
+            .and_then(|value| value.strip_prefix('.'))
+        else {
+            continue;
+        };
+        // A completed yt-dlp output has exactly "prefix.extension". Names such as
+        // "prefix.f137.mp4" are separate video/audio fragments and must never be
+        // treated as the final media file.
+        if suffix.is_empty() || suffix.contains('.') {
+            continue;
+        }
+        let extension = suffix.to_ascii_lowercase();
+        if !ALLOWED_EXTENSIONS.contains(&extension.as_str()) {
+            continue;
+        }
+        let Ok(metadata) = std::fs::metadata(&path) else {
+            continue;
+        };
+        if metadata.len() == 0 {
+            continue;
+        }
+        let modified = metadata
+            .modified()
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        match &latest {
+            Some((latest_time, _)) if modified <= *latest_time => {}
+            _ => latest = Some((modified, path)),
+        }
+    }
+    latest.map(|(_, path)| path)
+}
+
+fn playlist_download_error_is_permanent(error: &str) -> bool {
+    if is_drm_not_supported_stream_error(error) || is_login_required_stream_error(error) {
+        return true;
+    }
+    let lower = error.to_ascii_lowercase();
+    [
+        "video unavailable",
+        "private video",
+        "this video has been removed",
+        "unsupported url",
+        "not available in your country",
+        "account has been terminated",
+        "members-only content",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
+}
+
+fn wait_before_playlist_download_retry(parent: HWND, progress: HWND) -> bool {
+    let started = std::time::Instant::now();
+    while started.elapsed() < std::time::Duration::from_millis(650) {
+        if pump_messages_detect_stream_cancel(parent, progress) {
+            return false;
+        }
+        keep_stream_progress_focus(progress);
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
+    true
+}
+
+fn download_playlist_entry_with_retries(
+    request: PlaylistEntryDownloadRequest<'_>,
+) -> Result<PathBuf, String> {
+    let PlaylistEntryDownloadRequest {
+        parent,
+        progress,
+        language,
+        ytdlp_path,
+        entry,
+        cache_dir,
+        prefix,
+        output_template,
+        dialog_data,
+        credentials,
+    } = request;
+    for attempt_number in 1..=PLAYLIST_DOWNLOAD_MAX_ATTEMPTS {
+        remove_stream_cache_files_for_prefix(cache_dir, prefix);
+        let result = run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
+            parent,
+            progress,
+            language,
+            ytdlp_path,
+            url: &entry.url,
+            cache_dir,
+            prefix,
+            output_template,
+            dialog_data,
+            selected_audio_format: None,
+            ytdlp_debug: ytdlp_debug_enabled(),
+            credentials,
+        });
+        let attempt = match result {
+            Ok(attempt) => attempt,
+            Err(message) if message.is_empty() => return Err(String::new()),
+            Err(message) => {
+                crate::log_debug(&format!(
+                    "YouTube playlist download process failed: position={} url={} attempt={}/{} error={}",
+                    entry.position,
+                    entry.url,
+                    attempt_number,
+                    PLAYLIST_DOWNLOAD_MAX_ATTEMPTS,
+                    truncate_debug_text(&message, 1500)
+                ));
+                if attempt_number == PLAYLIST_DOWNLOAD_MAX_ATTEMPTS
+                    || playlist_download_error_is_permanent(&message)
+                {
+                    return Err(message);
+                }
+                if !wait_before_playlist_download_retry(parent, progress) {
+                    return Err(String::new());
+                }
+                continue;
+            }
+        };
+        if let Some(path) = find_completed_playlist_download_file(cache_dir, prefix) {
+            return Ok(path);
+        }
+        let error = if attempt.stderr_capture.trim().is_empty() {
+            i18n::tr(language, "stream_audio.no_output")
+        } else {
+            attempt.stderr_capture.trim().to_string()
+        };
+        crate::log_debug(&format!(
+            "YouTube playlist download output missing: position={} url={} attempt={}/{} stalled={} error={}",
+            entry.position,
+            entry.url,
+            attempt_number,
+            PLAYLIST_DOWNLOAD_MAX_ATTEMPTS,
+            attempt.stalled,
+            truncate_debug_text(&error, 1500)
+        ));
+        if attempt_number == PLAYLIST_DOWNLOAD_MAX_ATTEMPTS
+            || playlist_download_error_is_permanent(&error)
+        {
+            return Err(error);
+        }
+        if !wait_before_playlist_download_retry(parent, progress) {
+            return Err(String::new());
+        }
+    }
+    Err(i18n::tr(language, "stream_audio.no_output"))
+}
+
+fn download_selected_youtube_playlist_entries(
+    parent: HWND,
+    language: Language,
+    ytdlp_path: &Path,
+    playlist_title: &str,
+    entries: &[StreamCollectionEntry],
+    options: PlaylistDownloadOptions,
+) {
+    if entries.is_empty() {
+        return;
+    }
+    let target_dir = playlist_download_target_folder(parent, playlist_title);
+    if let Err(err) = std::fs::create_dir_all(&target_dir) {
+        let error_text = err.to_string();
+        show_error(
+            parent,
+            language,
+            &i18n::tr_f(
+                language,
+                "stream_audio.playlist_download_folder_failed",
+                &[("err", &error_text)],
+            ),
+        );
+        return;
+    }
+    let cache_dir = settings_dir().join("podcast cache");
+    if let Err(err) = std::fs::create_dir_all(&cache_dir) {
+        let error_text = err.to_string();
+        show_error(
+            parent,
+            language,
+            &i18n::tr_f(
+                language,
+                "stream_audio.download_failed",
+                &[("err", &error_text)],
+            ),
+        );
+        return;
+    }
+    let progress = open_progress_dialog(
+        parent,
+        language,
+        "stream_audio.playlist_download_title",
+        "stream_audio.progress_downloading",
+        true,
+    );
+    let site_key = stream_auth_site_key("https://www.youtube.com/");
+    let credentials = site_key
+        .as_deref()
+        .and_then(|site| load_saved_stream_site_credentials(parent, site));
+    let width = entries
+        .iter()
+        .map(|entry| entry.position)
+        .max()
+        .unwrap_or(entries.len())
+        .to_string()
+        .len()
+        .max(2);
+    let total = entries.len();
+    let mut completed = 0usize;
+    let mut failures: Vec<PlaylistDownloadFailure> = Vec::new();
+    let mut cancelled = false;
+    let total_text = total.to_string();
+    for (selected_index, entry) in entries.iter().enumerate() {
+        let current_text = (selected_index + 1).to_string();
+        let status = i18n::tr_f(
+            language,
+            "stream_audio.playlist_download_progress",
+            &[
+                ("current", &current_text),
+                ("total", &total_text),
+                ("title", &entry.title),
+            ],
+        );
+        report_progress_status(progress, &status);
+        report_progress(progress, 0);
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_millis())
+            .unwrap_or(0);
+        let prefix = format!(
+            "playlist_save_{}_{}_{}",
+            std::process::id(),
+            stamp,
+            selected_index
+        );
+        let output_template = cache_dir.join(format!("{prefix}.%(ext)s"));
+        let dialog_data = StreamDialogResult {
+            url: entry.url.clone(),
+            format: options.format,
+            quality: options.quality,
+            direct_play: false,
+            reopen_collection_page: None,
+            reopen_selected_label: None,
+            previous_input: None,
+            previous_collection_page: None,
+            previous_selected_label: None,
+        };
+        let downloaded_path = match download_playlist_entry_with_retries(
+            PlaylistEntryDownloadRequest {
+                parent,
+                progress,
+                language,
+                ytdlp_path,
+                entry,
+                cache_dir: &cache_dir,
+                prefix: &prefix,
+                output_template: &output_template,
+                dialog_data: &dialog_data,
+                credentials: credentials.as_ref(),
+            },
+        ) {
+            Ok(path) => path,
+            Err(message) if message.is_empty() => {
+                cancelled = true;
+                remove_stream_cache_files_for_prefix(&cache_dir, &prefix);
+                break;
+            }
+            Err(message) => {
+                crate::log_debug(&format!(
+                    "YouTube playlist item failed permanently: position={} url={} title={} error={}",
+                    entry.position,
+                    entry.url,
+                    entry.title,
+                    truncate_debug_text(&message, 2000)
+                ));
+                failures.push((entry.title.clone(), message));
+                remove_stream_cache_files_for_prefix(&cache_dir, &prefix);
+                continue;
+            }
+        };
+        match finalize_playlist_downloaded_file(PlaylistFinalizeRequest {
+            parent,
+            progress,
+            downloaded_path: &downloaded_path,
+            target_dir: &target_dir,
+            entry,
+            position_width: width,
+            options,
+            language,
+        }) {
+            Ok(target) => {
+                completed += 1;
+                crate::log_debug(&format!(
+                    "YouTube playlist download complete: position={} url={} target={}",
+                    entry.position,
+                    entry.url,
+                    target.to_string_lossy()
+                ));
+            }
+            Err(error) => {
+                if error.is_empty() {
+                    cancelled = true;
+                } else {
+                    crate::log_debug(&format!(
+                        "YouTube playlist item finalization failed: position={} url={} title={} error={}",
+                        entry.position,
+                        entry.url,
+                        entry.title,
+                        truncate_debug_text(&error, 2000)
+                    ));
+                    failures.push((entry.title.clone(), error));
+                }
+            }
+        }
+        crate::log_if_err!(std::fs::remove_file(&downloaded_path));
+        remove_stream_cache_files_for_prefix(&cache_dir, &prefix);
+        if cancelled {
+            break;
+        }
+    }
+    if crate::is_window_handle_valid(progress) {
+        close_progress_dialog(progress);
+    }
+    let folder = target_dir.to_string_lossy().to_string();
+    let completed_text = completed.to_string();
+    if cancelled {
+        crate::show_info(
+            parent,
+            language,
+            &i18n::tr_f(
+                language,
+                "stream_audio.playlist_download_cancelled",
+                &[("completed", &completed_text), ("folder", &folder)],
+            ),
+        );
+    } else if failures.is_empty() {
+        crate::show_info(
+            parent,
+            language,
+            &i18n::tr_f(
+                language,
+                "stream_audio.playlist_download_complete",
+                &[("count", &completed_text), ("folder", &folder)],
+            ),
+        );
+    } else {
+        let errors = summarize_playlist_download_failures(&failures);
+        let failed_text = failures.len().to_string();
+        crate::show_info(
+            parent,
+            language,
+            &i18n::tr_f(
+                language,
+                "stream_audio.playlist_download_partial",
+                &[
+                    ("completed", &completed_text),
+                    ("failed", &failed_text),
+                    ("folder", &folder),
+                    ("errors", &errors),
+                ],
+            ),
+        );
+    }
+}
+
+fn choose_and_download_youtube_playlist_items(
+    parent: HWND,
+    language: Language,
+    ytdlp_path: &Path,
+    playlist_url: &str,
+    options: PlaylistDownloadOptions,
+) {
+    let (playlist_title, entries) = match fetch_playlist_download_entries_responsive(
+        parent,
+        language,
+        ytdlp_path,
+        playlist_url,
+    ) {
+        Ok(result) => result,
+        Err(error) => {
+            if !error.is_empty() {
+                show_error(
+                    parent,
+                    language,
+                    &i18n::tr_f(language, "stream_audio.download_failed", &[("err", &error)]),
+                );
+            }
+            return;
+        }
+    };
+    if entries.is_empty() {
+        show_error(
+            parent,
+            language,
+            &i18n::tr(language, "stream_audio.playlist_download_empty"),
+        );
+        return;
+    }
+    let Some(indices) = choose_playlist_download_entries(parent, language, entries.clone()) else {
+        return;
+    };
+    let selected: Vec<StreamCollectionEntry> = indices
+        .into_iter()
+        .filter_map(|index| entries.get(index).cloned())
+        .collect();
+    download_selected_youtube_playlist_entries(
+        parent,
+        language,
+        ytdlp_path,
+        &playlist_title,
+        &selected,
+        options,
+    );
+}
+
 pub(crate) fn download_active_streaming_audio_media(
     parent: HWND,
     active_url: &str,
@@ -8713,6 +10213,7 @@ pub(crate) fn download_active_streaming_audio_media(
                 &downloaded_path,
                 &target,
                 convert_settings,
+                false,
             ) {
                 Ok(()) => {
                     crate::log_if_err!(std::fs::remove_file(&downloaded_path));
@@ -8913,6 +10414,7 @@ pub(crate) fn download_active_streaming_audio_media_for_transcription(
             &downloaded_path,
             &converted_path,
             convert_settings,
+            false,
         ) {
             Ok(()) => {
                 crate::log_if_err!(std::fs::remove_file(&downloaded_path));
@@ -9029,9 +10531,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             language,
             &path,
             &input,
-            dialog_data.reopen_collection_page,
-            dialog_data.reopen_selected_label.as_deref(),
-            Some(bootstrap_progress),
+            StreamSelectionResolveOptions {
+                initial_collection_page: dialog_data.reopen_collection_page,
+                initial_selected_label: dialog_data.reopen_selected_label.as_deref(),
+                initial_progress: Some(bootstrap_progress),
+                playlist_download_options: PlaylistDownloadOptions {
+                    format: dialog_data.format,
+                    quality: dialog_data.quality,
+                },
+            },
         ) {
             Ok(Some(selection)) => selection,
             Ok(None) => {
@@ -9347,9 +10855,15 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                             language,
                             &ytdlp_path,
                             source_collection_url,
-                            collection_page,
-                            None,
-                            None,
+                            StreamSelectionResolveOptions {
+                                initial_collection_page: collection_page,
+                                initial_selected_label: None,
+                                initial_progress: None,
+                                playlist_download_options: PlaylistDownloadOptions {
+                                    format: dialog_data.format,
+                                    quality: dialog_data.quality,
+                                },
+                            },
                         ) {
                             Ok(Some(selection)) => selection,
                             Ok(None) => {
@@ -9833,6 +11347,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     &downloaded_path,
                     &converted_path,
                     convert_settings,
+                    false,
                 );
                 crate::log_debug(&format!(
                     "stream conversion result: success={} output_exists={} output={}",

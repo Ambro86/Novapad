@@ -123,6 +123,7 @@ enum FlatListValue {
 pub struct InterpreterContextAction {
     pub label: String,
     pub ctrl_c_shortcut: bool,
+    pub delete_shortcut: bool,
     pub enabled: ContextActionEnabled,
     pub handler: ContextActionHandler,
 }

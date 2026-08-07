@@ -130,6 +130,7 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
                 crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
             ),
             ctrl_c_shortcut: true,
+            delete_shortcut: false,
             enabled: Arc::new(move |selected_label: &str| {
                 display_items_for_enabled
                     .iter()
@@ -256,6 +257,7 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
                     crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
                 ),
                 ctrl_c_shortcut: true,
+                delete_shortcut: false,
                 enabled: Arc::new(move |selected_value: &str| {
                     item_by_id_for_enabled
                         .get(selected_value)
@@ -294,6 +296,7 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
                     crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
                 ),
                 ctrl_c_shortcut: true,
+                delete_shortcut: false,
                 enabled: Arc::new(move |selected_value: &str| {
                     item_by_id_for_enabled
                         .get(selected_value)
@@ -497,6 +500,7 @@ fn open_film_catalog(parent: HWND, language: Language, items: &[CatalogItem]) {
                     crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
                 ),
                 ctrl_c_shortcut: true,
+                delete_shortcut: false,
                 enabled: Arc::new(move |selected_label: &str| {
                     display_items_for_enabled
                         .iter()

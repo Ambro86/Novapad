@@ -1,5 +1,26 @@
 # Přehled změn
 
+Verze 0.8.5 – 2026-07-25
+
+Ukládání a export souborů EPUB
+• Opraveno „Uložit jako“ u dokumentů EPUB: při výběru TXT nebo jiného formátu se nyní použije zvolená přípona namísto zachování .epub.
+• Export EPUB do jiného formátu již nemění vazbu otevřeného dokumentu. Exportovaná kopie se vytvoří samostatně, zatímco „Uložit“ nadále aktualizuje původní EPUB otevřený z jeho složky.
+
+Rozhlasové nahrávky
+• Byla přidána klávesa Delete jako zkratka pro odstranění rozhlasových nahrávek. Sonarpad nyní před odstraněním nahrávky požádá o potvrzení.
+
+Dokumentace
+• Příručky byly přepracovány a doplněny o obsah pro snadnější orientaci.
+
+Katalog hlasů Google TTS
+• Katalog hlasů Google TTS ke stažení byl rozšířen ze 104 na 156 balíčků a z 53 na 81 jazykových variant.
+• Bylo přidáno 52 chybějících balíčků Chrome OS a Google Natural pro 28 jazyků s nejnovějšími ověřenými revizemi, adresami ke stažení, kontrolními součty SHA-256, velikostmi, závislostmi a interními identifikátory mluvčích z aktuálního kompatibilního katalogu. Litevština používá revizi r19 namísto starších balíčků r17.
+• Ve všech jazycích rozhraní byly doplněny lokalizované názvy ásámštiny, bodo, dógrí, konkánštiny, kašmírštiny, maithilštiny, manipurštiny, odijštiny, sanskrtu, santálštiny a sindhštiny a také název země Bosna a Hercegovina.
+
+Německé dialogy pro práci se soubory
+• Opraven problém německého překladu, kvůli kterému se nezobrazovaly dialogy Otevřít, Uložit jako, ukládání audioknih, stahování podcastů a další dialogy pro výběr souborů, přestože příkaz nabídky nebo klávesová zkratka byly správně provedeny.
+• Filtry souborových dialogů nyní podporují jak zapsané oddělovače \0, tak vložené znaky NUL a při chybně vytvořeném překladu použijí bezpečný náhradní filtr. Z protokolu byla také odstraněna neškodná falešná chyba zobrazovaná při otevření nabídky Soubor.
+
 Verze 0.8.4 – 2026-07-24
 
 Úpravy dokumentů EPUB

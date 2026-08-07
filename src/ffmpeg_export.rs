@@ -87,6 +87,26 @@ pub struct MixExportOptions {
     pub ducking: bool,
 }
 
+/// A synthesized audio-description cue ready for final mixing. `samples` are
+/// interleaved floating-point PCM in the declared format. Extended cues pause
+/// the source timeline and are inserted without consuming movie samples.
+#[derive(Clone)]
+pub struct AudioDescriptionMixCue {
+    pub start_sec: f64,
+    pub samples: Arc<[f32]>,
+    pub sample_rate: u32,
+    pub channels: u16,
+    pub extended_pause: bool,
+}
+
+#[derive(Clone)]
+pub struct AudioDescriptionExportOptions {
+    pub ducking_db: f32,
+    pub fade_ms: u32,
+    pub bitrate_kbps: u32,
+    pub cancel: Arc<AtomicBool>,
+}
+
 struct CueAudio {
     start_sample: u64,
     samples: Arc<[f32]>,
@@ -492,11 +512,12 @@ fn segment_format_from_path(path: &Path) -> Option<&'static str> {
         "opus" => Some("opus"),
         "flac" => Some("flac"),
         "wav" => Some("wav"),
+        "mkv" => Some("matroska"),
         _ => None,
     }
 }
 
-pub fn media_duration_secs(path: &Path) -> Option<u64> {
+pub fn media_duration_seconds(path: &Path) -> Option<f64> {
     let api = ffmpeg_api().ok()?;
     let input_c = CString::new(path.to_string_lossy().as_bytes()).ok()?;
     let mut in_ctx: *mut AVFormatContext = ptr::null_mut();
@@ -521,10 +542,14 @@ pub fn media_duration_secs(path: &Path) -> Option<u64> {
     let duration = unsafe { (*in_ctx).duration };
     crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
     if duration > 0 {
-        Some((duration as u64).div_ceil(1_000_000))
+        Some(duration as f64 / 1_000_000.0)
     } else {
         None
     }
+}
+
+pub fn media_duration_secs(path: &Path) -> Option<u64> {
+    media_duration_seconds(path).map(|duration| duration.ceil() as u64)
 }
 
 pub fn segment_media_file(
@@ -1726,6 +1751,410 @@ fn encode_mixed_audio_to_m4a(
     }
 
     Ok(())
+}
+
+#[derive(Clone)]
+struct PreparedAudioDescriptionCue {
+    start_sample: u64,
+    samples: Arc<[f32]>,
+    extended_pause: bool,
+}
+
+fn merge_audio_description_intervals(
+    mut intervals: Vec<(u64, u64)>,
+    merge_gap_frames: u64,
+) -> Vec<(u64, u64)> {
+    intervals.retain(|(start, end)| end > start);
+    intervals.sort_unstable_by_key(|(start, _)| *start);
+    let mut merged: Vec<(u64, u64)> = Vec::new();
+    for (start, end) in intervals {
+        if let Some(last) = merged.last_mut()
+            && start <= last.1.saturating_add(merge_gap_frames)
+        {
+            last.1 = last.1.max(end);
+        } else {
+            merged.push((start, end));
+        }
+    }
+    merged
+}
+
+fn audio_description_duck_gain(
+    frame: u64,
+    intervals: &[(u64, u64)],
+    cursor: &mut usize,
+    fade_frames: u64,
+    duck_gain: f32,
+) -> f32 {
+    while let Some((_, end)) = intervals.get(*cursor) {
+        if frame > end.saturating_add(fade_frames) {
+            *cursor = cursor.saturating_add(1);
+        } else {
+            break;
+        }
+    }
+    let Some((start, end)) = intervals.get(*cursor).copied() else {
+        return 1.0;
+    };
+    if fade_frames > 0 && frame < start {
+        let fade_start = start.saturating_sub(fade_frames);
+        if frame >= fade_start {
+            let position = (frame - fade_start) as f32 / fade_frames as f32;
+            return 1.0 + (duck_gain - 1.0) * position.clamp(0.0, 1.0);
+        }
+    }
+    if frame >= start && frame <= end {
+        return duck_gain;
+    }
+    if fade_frames > 0 && frame > end && frame <= end.saturating_add(fade_frames) {
+        let position = (frame - end) as f32 / fade_frames as f32;
+        return duck_gain + (1.0 - duck_gain) * position.clamp(0.0, 1.0);
+    }
+    1.0
+}
+
+fn mix_audio_description_sample(
+    original_sample: f32,
+    film_gain: f32,
+    narration_sample: f32,
+) -> f32 {
+    (original_sample * film_gain + narration_sample).clamp(-1.0, 1.0)
+}
+
+fn audio_description_temp_wav_path(output_path: &Path) -> PathBuf {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let parent = output_path.parent().unwrap_or_else(|| Path::new("."));
+    parent.join(format!(
+        ".sonarpad_audio_description_{}_{}.wav",
+        std::process::id(),
+        stamp
+    ))
+}
+
+/// Mix and export an audio-described MP3 without launching an external FFmpeg
+/// process. Source decoding and final libmp3lame encoding both use Sonarpad's
+/// dynamically loaded FFmpeg libraries. Pyannote is not involved here: its
+/// protected intervals have already been used by the exact TTS scheduler.
+pub fn export_audio_description_mp3(
+    input_path: &Path,
+    output_path: &Path,
+    cues: &[AudioDescriptionMixCue],
+    options: &AudioDescriptionExportOptions,
+    mut progress: Option<&mut dyn FnMut(u32)>,
+) -> Result<(), String> {
+    if cues.is_empty() {
+        return Err("Audio description: no synthesized cues to export".to_string());
+    }
+    if options.cancel.load(Ordering::Relaxed) {
+        return Err("cancelled".to_string());
+    }
+
+    let mut source = FfmpegSource::try_new(input_path, 0, None, None)?;
+    let sample_rate = source.sample_rate().max(1);
+    let channels = source.channels().max(1);
+    let channel_count = channels as usize;
+    let total_source_samples = source.total_duration().and_then(|duration| {
+        let value = duration.as_secs_f64() * sample_rate as f64 * channels as f64;
+        value.is_finite().then_some(value.max(1.0) as u64)
+    });
+
+    let mut prepared = Vec::with_capacity(cues.len());
+    for cue in cues {
+        if cue.samples.is_empty() || !cue.start_sec.is_finite() {
+            continue;
+        }
+        let converted = if cue.sample_rate == sample_rate && cue.channels == channels {
+            cue.samples.to_vec()
+        } else {
+            resample_pcm(
+                cue.samples.as_ref(),
+                cue.sample_rate.max(1),
+                cue.channels.max(1),
+                sample_rate,
+                channels,
+            )
+        };
+        if converted.is_empty() {
+            continue;
+        }
+        let start_frame = (cue.start_sec.max(0.0) * sample_rate as f64).round() as u64;
+        prepared.push(PreparedAudioDescriptionCue {
+            start_sample: start_frame.saturating_mul(channels as u64),
+            samples: Arc::from(converted),
+            extended_pause: cue.extended_pause,
+        });
+    }
+    prepared.sort_by_key(|cue| cue.start_sample);
+    if prepared.is_empty() {
+        return Err("Audio description: synthesized cues are empty or invalid".to_string());
+    }
+
+    let normal_cues: Vec<_> = prepared
+        .iter()
+        .filter(|cue| !cue.extended_pause)
+        .cloned()
+        .collect();
+    let pause_cues: Vec<_> = prepared
+        .iter()
+        .filter(|cue| cue.extended_pause)
+        .cloned()
+        .collect();
+    let duck_gain = 10_f32.powf(options.ducking_db.min(0.0) / 20.0);
+    let fade_frames = (sample_rate as u64)
+        .saturating_mul(options.fade_ms as u64)
+        .saturating_div(1000);
+    let duck_intervals = merge_audio_description_intervals(
+        normal_cues
+            .iter()
+            .map(|cue| {
+                let start_frame = cue.start_sample / channels as u64;
+                let cue_frames = (cue.samples.len() / channel_count).max(1) as u64;
+                (start_frame, start_frame.saturating_add(cue_frames))
+            })
+            .collect(),
+        fade_frames,
+    );
+
+    let temp_wav = audio_description_temp_wav_path(output_path);
+    let wav_spec = hound::WavSpec {
+        channels,
+        sample_rate,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mix_result = (|| -> Result<(), String> {
+        let mut writer = hound::WavWriter::create(&temp_wav, wav_spec)
+            .map_err(|error| format!("Audio description: create staging WAV failed: {error}"))?;
+        let mut pending: VecDeque<CueAudio> = normal_cues
+            .into_iter()
+            .map(|cue| CueAudio {
+                start_sample: cue.start_sample,
+                samples: cue.samples,
+            })
+            .collect();
+        let mut active: Vec<ActiveCue> = Vec::new();
+        let mut pending_pauses: VecDeque<PreparedAudioDescriptionCue> = pause_cues.into();
+        let mut active_pause: Option<ActiveCue> = None;
+        let mut source_sample_index = 0_u64;
+        let mut duck_cursor = 0_usize;
+        let mut current_film_gain = 1.0_f32;
+        let mut last_reported = 0_u32;
+
+        loop {
+            if options.cancel.load(Ordering::Relaxed) {
+                return Err("cancelled".to_string());
+            }
+
+            if active_pause.is_none()
+                && let Some(next_pause) = pending_pauses.front()
+                && source_sample_index >= next_pause.start_sample
+                && let Some(next_pause) = pending_pauses.pop_front()
+            {
+                active_pause = Some(ActiveCue {
+                    samples: next_pause.samples,
+                    read_offset: 0,
+                });
+            }
+
+            if let Some(pause) = active_pause.as_mut() {
+                if pause.read_offset < pause.samples.len() {
+                    let value = pause.samples[pause.read_offset].clamp(-1.0, 1.0);
+                    pause.read_offset += 1;
+                    writer
+                        .write_sample((value * i16::MAX as f32).round() as i16)
+                        .map_err(|error| {
+                            format!("Audio description: staging WAV write failed: {error}")
+                        })?;
+                    continue;
+                }
+                active_pause = None;
+                continue;
+            }
+
+            let Some(original_sample) = source.next() else {
+                if let Some(next_pause) = pending_pauses.front()
+                    && next_pause.start_sample <= source_sample_index
+                {
+                    continue;
+                }
+                break;
+            };
+
+            while let Some(front) = pending.front() {
+                if source_sample_index >= front.start_sample {
+                    if let Some(cue) = pending.pop_front() {
+                        active.push(ActiveCue {
+                            samples: cue.samples,
+                            read_offset: 0,
+                        });
+                    }
+                } else {
+                    break;
+                }
+            }
+            let mut narration_sample = 0.0_f32;
+            active.retain_mut(|cue| {
+                if cue.read_offset < cue.samples.len() {
+                    narration_sample += cue.samples[cue.read_offset];
+                    cue.read_offset += 1;
+                    true
+                } else {
+                    false
+                }
+            });
+
+            if source_sample_index.is_multiple_of(channels as u64) {
+                let frame = source_sample_index / channels as u64;
+                current_film_gain = audio_description_duck_gain(
+                    frame,
+                    &duck_intervals,
+                    &mut duck_cursor,
+                    fade_frames,
+                    duck_gain,
+                );
+            }
+            let mixed =
+                mix_audio_description_sample(original_sample, current_film_gain, narration_sample);
+            writer
+                .write_sample((mixed * i16::MAX as f32).round() as i16)
+                .map_err(|error| format!("Audio description: staging WAV write failed: {error}"))?;
+            source_sample_index = source_sample_index.saturating_add(1);
+
+            if let Some(total) = total_source_samples {
+                let pct = ((source_sample_index.saturating_mul(94)) / total).min(94) as u32;
+                if pct > last_reported {
+                    last_reported = pct;
+                    if let Some(callback) = progress.as_deref_mut() {
+                        callback(pct);
+                    }
+                }
+            }
+        }
+        writer
+            .finalize()
+            .map_err(|error| format!("Audio description: finalize staging WAV failed: {error}"))?;
+        Ok(())
+    })();
+
+    if let Err(error) = mix_result {
+        if let Err(cleanup_error) = fs::remove_file(&temp_wav) {
+            crate::log_debug(&format!(
+                "Audio description: temporary WAV cleanup failed: {cleanup_error}"
+            ));
+        }
+        return Err(error);
+    }
+
+    if let Some(callback) = progress.as_mut() {
+        callback(95);
+    }
+    let convert_settings = ConvertAudioSettings {
+        format: ConvertAudioFormat::Mp3,
+        quality: ConvertAudioQuality::BitrateKbps(options.bitrate_kbps.clamp(64, 320)),
+    };
+    let encode_result = {
+        let mut encode_progress = |pct: u32| {
+            if let Some(callback) = progress.as_mut() {
+                callback(95 + pct.saturating_mul(5) / 10_000);
+            }
+        };
+        convert_audio_file(
+            &temp_wav,
+            output_path,
+            &convert_settings,
+            Some(options.cancel.clone()),
+            Some(&mut encode_progress),
+        )
+    };
+    if let Err(error) = fs::remove_file(&temp_wav) {
+        log_debug(&format!(
+            "Audio description: unable to remove staging WAV {}: {}",
+            temp_wav.display(),
+            error
+        ));
+    }
+    encode_result?;
+    if let Some(callback) = progress.as_mut() {
+        callback(100);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod audio_description_export_tests {
+    use super::{
+        audio_description_duck_gain, merge_audio_description_intervals,
+        mix_audio_description_sample,
+    };
+
+    #[test]
+    fn merges_touching_duck_intervals() {
+        assert_eq!(
+            merge_audio_description_intervals(vec![(20, 30), (5, 10), (10, 15)], 0),
+            vec![(5, 15), (20, 30)]
+        );
+    }
+
+    #[test]
+    fn merges_intervals_separated_by_less_than_one_fade() {
+        assert_eq!(
+            merge_audio_description_intervals(vec![(10, 20), (28, 40)], 10),
+            vec![(10, 40)]
+        );
+    }
+
+    #[test]
+    fn omni_port_in_place_mix_preserves_length_and_changes_only_target_ranges() {
+        let original = vec![0.5_f32; 300];
+        let original_snapshot = original.clone();
+        let intervals = vec![(100_u64, 200_u64)];
+        let mut cursor = 0_usize;
+        let mixed: Vec<f32> = original
+            .iter()
+            .enumerate()
+            .map(|(frame, sample)| {
+                let gain =
+                    audio_description_duck_gain(frame as u64, &intervals, &mut cursor, 25, 0.2);
+                let narration = if (140..160).contains(&frame) {
+                    0.25
+                } else {
+                    0.0
+                };
+                mix_audio_description_sample(*sample, gain, narration)
+            })
+            .collect();
+
+        assert_eq!(mixed.len(), original.len());
+        assert_eq!(original, original_snapshot);
+        assert!((mixed[25] - original[25]).abs() < 0.001);
+        assert!(mixed[120] < original[120] - 0.3);
+        assert!((mixed[150] - 0.35).abs() < 0.001);
+        assert!((mixed[250] - original[250]).abs() < 0.001);
+    }
+
+    #[test]
+    fn duck_gain_uses_linear_fades() {
+        let intervals = vec![(100, 200)];
+        let mut cursor = 0;
+        assert!(
+            (audio_description_duck_gain(50, &intervals, &mut cursor, 25, 0.2) - 1.0).abs() < 0.001
+        );
+        assert!(
+            (audio_description_duck_gain(100, &intervals, &mut cursor, 25, 0.2) - 0.2).abs()
+                < 0.001
+        );
+        assert!(
+            (audio_description_duck_gain(200, &intervals, &mut cursor, 25, 0.2) - 0.2).abs()
+                < 0.001
+        );
+        assert!(
+            (audio_description_duck_gain(225, &intervals, &mut cursor, 25, 0.2) - 1.0).abs()
+                < 0.001
+        );
+    }
 }
 
 const AVERROR_EOF_FALLBACK: i32 =

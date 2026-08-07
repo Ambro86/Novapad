@@ -1,4 +1,6 @@
 pub mod about_window;
+pub mod audio_description_project_window;
+pub mod audio_description_window;
 pub mod audiobook_window;
 pub mod batch_audiobooks_window;
 pub mod bdciechi_window;
@@ -18,6 +20,7 @@ pub mod help_window;
 pub mod internet_archive_window;
 pub mod interpreter_select_window;
 pub mod italiaonline_window;
+pub mod la7_play_window;
 pub mod librivox_window;
 pub mod locale_display_names;
 pub mod marker_select_window;

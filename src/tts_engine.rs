@@ -10887,6 +10887,15 @@ fn render_google_audiobook_units_parallel(
     Ok(())
 }
 
+const MIXED_EDGE_PARALLELISM: usize = 8;
+
+fn mixed_edge_batch_parallelism(engine: TtsEngine) -> usize {
+    match engine {
+        TtsEngine::Edge => MIXED_EDGE_PARALLELISM,
+        TtsEngine::Google | TtsEngine::Sapi5 | TtsEngine::Sapi4 => 1,
+    }
+}
+
 pub(crate) fn render_mixed_audiobook_part(
     chunks: &[TtsChunk],
     current_global_progress: &mut usize,
@@ -10937,16 +10946,16 @@ pub(crate) fn render_mixed_audiobook_part(
     });
 
     if edge_only {
-        const MIXED_EDGE_PARALLELISM: usize = 8;
+        let edge_parallelism = mixed_edge_batch_parallelism(TtsEngine::Edge);
         crate::log_debug(&format!(
             "Mixed audiobook: edge-only mode, parallel synthesis enabled with concurrency={}",
-            MIXED_EDGE_PARALLELISM
+            edge_parallelism
         ));
-        for batch_start in (0..chunks.len()).step_by(MIXED_EDGE_PARALLELISM) {
+        for batch_start in (0..chunks.len()).step_by(edge_parallelism) {
             if options.cancel.load(Ordering::Relaxed) {
                 return Err(cancelled_message(options.language));
             }
-            let batch_end = std::cmp::min(batch_start + MIXED_EDGE_PARALLELISM, chunks.len());
+            let batch_end = std::cmp::min(batch_start + edge_parallelism, chunks.len());
             let batch = &chunks[batch_start..batch_end];
             let results = rt.block_on(async {
                 let futures = batch.iter().enumerate().map(|(offset, chunk)| {
@@ -11606,5 +11615,59 @@ mod google_audiobook_optimization_tests {
         assert_eq!(google_audiobook_worker_limit_for_cores(12), 6);
         assert_eq!(google_audiobook_worker_limit_for_cores(16), 7);
         assert_eq!(google_audiobook_worker_limit_for_cores(24), 8);
+    }
+}
+
+#[cfg(test)]
+mod omni_audio_description_tts_port_tests {
+    use super::{
+        MIXED_EDGE_PARALLELISM, is_edge_audiobook_transient_error, mixed_edge_batch_parallelism,
+        should_retry_audiobook_segment,
+    };
+    use crate::settings::TtsEngine;
+
+    #[test]
+    fn omni_port_edge_no_audio_is_retryable_without_attempt_cap() {
+        assert!(is_edge_audiobook_transient_error("Edge WS: no audio sent"));
+        assert!(should_retry_audiobook_segment(
+            TtsEngine::Edge,
+            500,
+            "Edge WS: no audio sent",
+        ));
+    }
+
+    #[test]
+    fn omni_port_edge_invalid_parameter_is_not_retried_after_limit() {
+        assert!(!is_edge_audiobook_transient_error(
+            "invalid voice parameter"
+        ));
+        assert!(!should_retry_audiobook_segment(
+            TtsEngine::Edge,
+            500,
+            "invalid voice parameter",
+        ));
+    }
+
+    #[test]
+    fn omni_port_edge_empty_or_decode_failure_is_retryable() {
+        for error in [
+            "Edge TTS produced empty audio payload",
+            "Edge audiobook: audio decode failed: invalid frame",
+        ] {
+            assert!(is_edge_audiobook_transient_error(error), "{error}");
+            assert!(should_retry_audiobook_segment(TtsEngine::Edge, 500, error));
+        }
+    }
+
+    #[test]
+    fn omni_port_edge_parallelism_is_bounded_to_eight() {
+        assert_eq!(mixed_edge_batch_parallelism(TtsEngine::Edge), 8);
+        assert_eq!(MIXED_EDGE_PARALLELISM, 8);
+    }
+
+    #[test]
+    fn omni_port_local_sapi_engines_do_not_use_edge_parallel_batches() {
+        assert_eq!(mixed_edge_batch_parallelism(TtsEngine::Sapi5), 1);
+        assert_eq!(mixed_edge_batch_parallelism(TtsEngine::Sapi4), 1);
     }
 }

@@ -27,8 +27,9 @@ use windows::Win32::UI::Controls::{
     ShowScrollBar, WC_BUTTON, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    EnableWindow, GetFocus, GetKeyState, SetFocus, VK_BACK, VK_CONTROL, VK_DOWN, VK_END, VK_ESCAPE,
-    VK_HOME, VK_LEFT, VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_TAB, VK_UP,
+    EnableWindow, GetFocus, GetKeyState, IsWindowEnabled, SetFocus, VK_BACK, VK_CONTROL, VK_DELETE,
+    VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_LEFT, VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_TAB,
+    VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING,
@@ -284,8 +285,46 @@ fn ytdlp_command(path: &Path) -> Command {
 
 #[cfg(test)]
 mod ytdlp_command_tests {
-    use super::ytdlp_command;
+    use super::{
+        StreamDialogResult, StreamOutputFormat, StreamQualitySelection,
+        configure_ytdlp_stream_download_command, is_youtube_stream_url, unique_stream_media_path,
+        ytdlp_command,
+    };
     use std::path::Path;
+
+    fn dialog(format: StreamOutputFormat) -> StreamDialogResult {
+        StreamDialogResult {
+            url: String::new(),
+            format,
+            quality: StreamQualitySelection::Original,
+            direct_play: true,
+            reopen_collection_page: None,
+            reopen_selected_label: None,
+            previous_input: None,
+            previous_collection_page: None,
+            previous_selected_label: None,
+        }
+    }
+
+    fn configured_selector(prefer_video: bool) -> Option<String> {
+        let mut command = ytdlp_command(Path::new("yt-dlp.exe"));
+        configure_ytdlp_stream_download_command(
+            &mut command,
+            "https://www.youtube.com/watch?v=test",
+            Path::new("output.%(ext)s"),
+            &dialog(StreamOutputFormat::Auto),
+            None,
+            prefer_video,
+            None,
+        );
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        args.windows(2)
+            .find(|pair| pair.first().map(String::as_str) == Some("-f"))
+            .and_then(|pair| pair.get(1).cloned())
+    }
 
     #[test]
     fn forces_utf8_for_captured_ytdlp_output() {
@@ -296,6 +335,56 @@ mod ytdlp_command_tests {
             .collect::<Vec<_>>();
 
         assert_eq!(&args[..2], ["--encoding", "utf-8"]);
+    }
+
+    #[test]
+    fn omni_port_automatic_video_save_requests_a_muxed_audio_video_stream() {
+        assert_eq!(
+            configured_selector(true).as_deref(),
+            Some("best[height<=720][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]")
+        );
+    }
+
+    #[test]
+    fn omni_port_automatic_audio_workflow_remains_audio_only() {
+        assert_eq!(
+            configured_selector(false).as_deref(),
+            Some("bestaudio/best")
+        );
+    }
+
+    #[test]
+    fn omni_port_audio_description_shortcut_accepts_only_youtube_urls() {
+        assert!(is_youtube_stream_url(
+            "https://www.youtube.com/watch?v=example"
+        ));
+        assert!(is_youtube_stream_url("https://youtu.be/example"));
+        assert!(!is_youtube_stream_url("https://example.com/video.webm"));
+    }
+
+    #[test]
+    fn omni_port_audio_description_download_does_not_overwrite_media_files() {
+        let folder = std::env::temp_dir().join(format!(
+            "sonarpad_audio_description_target_test_{}",
+            std::process::id()
+        ));
+        assert!(std::fs::create_dir_all(&folder).is_ok());
+        let existing = folder.join("Video.webm");
+        assert!(std::fs::write(&existing, b"test").is_ok());
+        assert_eq!(
+            unique_stream_media_path(&folder, "Video", "webm"),
+            folder.join("Video (2).webm")
+        );
+        if let Err(error) = std::fs::remove_file(existing) {
+            crate::log_debug(&format!(
+                "YouTube transcript test cleanup file failed: {error}"
+            ));
+        }
+        if let Err(error) = std::fs::remove_dir(folder) {
+            crate::log_debug(&format!(
+                "YouTube transcript test cleanup folder failed: {error}"
+            ));
+        }
     }
 }
 
@@ -2387,6 +2476,7 @@ fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>)
                 "Add to favorites",
             ),
             ctrl_c_shortcut: false,
+            delete_shortcut: false,
             enabled: {
                 let favorite_candidates = Arc::clone(&favorite_candidates);
                 Arc::new(move |selected: &str| {
@@ -2412,6 +2502,7 @@ fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>)
         crate::app_windows::interpreter_select_window::InterpreterContextAction {
             label: format!("{} (Ctrl+C)", i18n::tr(language, "stream_audio.copy_link")),
             ctrl_c_shortcut: true,
+            delete_shortcut: false,
             enabled: {
                 let favorite_candidates = Arc::clone(&favorite_candidates);
                 Arc::new(move |selected: &str| {
@@ -2438,6 +2529,7 @@ fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>)
         crate::app_windows::interpreter_select_window::InterpreterContextAction {
             label: tr_or(language, "stream_audio.view_comments", "View comments"),
             ctrl_c_shortcut: false,
+            delete_shortcut: false,
             enabled: {
                 let favorite_candidates = Arc::clone(&favorite_candidates);
                 Arc::new(move |selected: &str| {
@@ -2660,6 +2752,19 @@ pub(crate) fn restore_active_player_return_list(parent: HWND) -> bool {
         || !crate::is_window_handle_valid(dialog)
     {
         return false;
+    }
+
+    let foreground = unsafe { GetForegroundWindow() };
+    let dialog_enabled = unsafe { IsWindowEnabled(dialog).as_bool() };
+    if !dialog_enabled || (foreground.0 != 0 && foreground != dialog && foreground != parent) {
+        // Keep reporting the return list as handled so delayed editor-focus
+        // requests remain suppressed, but never steal focus from an owned
+        // confirmation box or from another application.
+        crate::log_debug(&format!(
+            "Active player return list restore deferred dialog={:?} parent={:?} foreground={:?} dialog_enabled={}",
+            dialog, parent, foreground, dialog_enabled
+        ));
+        return true;
     }
 
     crate::log_debug(&format!(
@@ -3078,6 +3183,15 @@ fn open_youtube_comments_window_with_mode(
                 })
                 .unwrap_or(false);
                 if ctrl_c_handled {
+                    continue;
+                }
+                let delete_requested = with_youtube_comments_state(hwnd, |state| {
+                    msg.wParam.0 as u32 == VK_DELETE.0 as u32
+                        && state.flat_list_mode
+                        && (focus == state.accessibility_proxy || focus == state.view)
+                })
+                .unwrap_or(false);
+                if delete_requested && trigger_youtube_comments_delete_shortcut(hwnd) {
                     continue;
                 }
                 let tab_to_list_handled = with_youtube_comments_state(hwnd, |state| {
@@ -3621,7 +3735,17 @@ fn youtube_comments_dialog_wndproc_inner(
             LRESULT(0)
         }
         WM_YT_REFOCUS_FLAT_LIST => {
-            focus_youtube_flat_list(hwnd);
+            let foreground = unsafe { GetForegroundWindow() };
+            let parent = with_youtube_comments_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+            let dialog_enabled = unsafe { IsWindowEnabled(hwnd).as_bool() };
+            if dialog_enabled && (foreground.0 == 0 || foreground == hwnd || foreground == parent) {
+                focus_youtube_flat_list(hwnd);
+            } else {
+                crate::log_debug(&format!(
+                    "YT comments refocus skipped hwnd={:?} parent={:?} foreground={:?} dialog_enabled={}",
+                    hwnd, parent, foreground, dialog_enabled
+                ));
+            }
             LRESULT(0)
         }
         WM_SETFOCUS => {
@@ -4563,6 +4687,25 @@ fn trigger_youtube_comments_context_action(hwnd: HWND) -> bool {
             .flat_context_actions
             .iter()
             .find(|action| action.ctrl_c_shortcut && (action.enabled)(&selected_id))
+            .cloned()
+            .map(|action| (action, selected_id))
+    })
+    .flatten();
+    let Some((action, selected_id)) = action else {
+        return false;
+    };
+    (action.handler)(selected_id);
+    restore_youtube_comments_dialog_focus(hwnd);
+    true
+}
+
+fn trigger_youtube_comments_delete_shortcut(hwnd: HWND) -> bool {
+    let action = with_youtube_comments_state(hwnd, |state| {
+        let selected_id = selected_youtube_comment_id(state)?;
+        state
+            .flat_context_actions
+            .iter()
+            .find(|action| action.delete_shortcut && (action.enabled)(&selected_id))
             .cloned()
             .map(|action| (action, selected_id))
     })
@@ -6059,7 +6202,7 @@ fn looks_like_valid_stream_url(input: &str) -> bool {
         || (host_lc.starts_with('[') && host_lc.ends_with(']'))
 }
 
-fn is_youtube_stream_url(input: &str) -> bool {
+pub(crate) fn is_youtube_stream_url(input: &str) -> bool {
     let Some(normalized) = normalize_youtube_input_for_download(input) else {
         return false;
     };
@@ -6090,6 +6233,16 @@ fn active_stream_save_context_for_url(url: &str) -> Option<StreamSaveContext> {
         .lock()
         .unwrap_or_else(|err| err.into_inner());
     guard.as_ref().filter(|context| context.url == url).cloned()
+}
+
+pub(crate) fn can_create_audio_description_from_active_youtube(active_url: &str) -> bool {
+    is_youtube_stream_url(active_url)
+}
+
+pub(crate) fn can_create_audio_description_from_active_stream(active_url: &str) -> bool {
+    !is_youtube_stream_url(active_url)
+        && active_stream_save_context_for_url(active_url)
+            .is_some_and(|context| context.prefer_video)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -6155,6 +6308,7 @@ struct YtdlpDownloadRequest<'a> {
     output_template: &'a Path,
     dialog_data: &'a StreamDialogResult,
     selected_audio_format: Option<&'a str>,
+    prefer_video: bool,
     ytdlp_debug: bool,
     credentials: Option<&'a YtdlpAuthCredentials>,
 }
@@ -6165,6 +6319,7 @@ struct StreamSaveContext {
     title: Option<String>,
     dialog_data: StreamDialogResult,
     selected_audio_format: Option<String>,
+    prefer_video: bool,
     ytdlp_path: PathBuf,
     credentials: Option<YtdlpAuthCredentials>,
 }
@@ -8227,6 +8382,7 @@ fn configure_ytdlp_stream_download_command(
     output_template: &Path,
     dialog_data: &StreamDialogResult,
     selected_audio_format: Option<&str>,
+    prefer_video: bool,
     credentials: Option<&YtdlpAuthCredentials>,
 ) {
     cmd.arg("--no-playlist")
@@ -8249,15 +8405,15 @@ fn configure_ytdlp_stream_download_command(
     }
 
     if let Some(format_id) = selected_audio_format {
-        match dialog_data.format {
-            StreamOutputFormat::Mp4 => {
+        match (dialog_data.format, prefer_video) {
+            (StreamOutputFormat::Mp4, _) => {
                 cmd.arg("--merge-output-format").arg("mp4");
                 cmd.arg("-f").arg(format!(
                     "bestvideo[ext=mp4]+{id}/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
                     id = format_id
                 ));
             }
-            StreamOutputFormat::Auto => {
+            (StreamOutputFormat::Auto, true) => {
                 cmd.arg("-f").arg(format!(
                     "bestvideo[ext=webm]+{id}/bestvideo+{id}/best",
                     id = format_id
@@ -8286,7 +8442,16 @@ fn configure_ytdlp_stream_download_command(
                 cmd.arg("-f").arg(mp4_profile);
             }
             StreamOutputFormat::Auto => {
-                cmd.arg("-f").arg("bestaudio/best");
+                if prefer_video {
+                    // Prefer a single already-muxed stream. This guarantees that
+                    // the saved WebM/MP4 contains both images and sound without
+                    // requiring an external ffmpeg.exe for yt-dlp merging.
+                    cmd.arg("-f").arg(
+                        "best[height<=720][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]",
+                    );
+                } else {
+                    cmd.arg("-f").arg("bestaudio/best");
+                }
             }
             StreamOutputFormat::Mp3
                 if matches!(dialog_data.quality, StreamQualitySelection::Original) =>
@@ -8374,6 +8539,7 @@ fn run_ytdlp_stream_download_attempt(
         req.output_template,
         req.dialog_data,
         req.selected_audio_format,
+        req.prefer_video,
         req.credentials,
     );
     if req.ytdlp_debug {
@@ -8391,10 +8557,11 @@ fn run_ytdlp_stream_download_attempt(
             |f| f.to_string(),
         );
         crate::log_debug(&format!(
-            "yt-dlp stream start: url={} output_template={} format={} auth={}",
+            "yt-dlp stream start: url={} output_template={} format={} prefer_video={} auth={}",
             req.url,
             req.output_template.to_string_lossy(),
             format_for_log,
+            req.prefer_video,
             req.credentials.is_some()
         ));
     }
@@ -9379,6 +9546,20 @@ fn suggested_stream_save_name(context: &StreamSaveContext) -> String {
         .unwrap_or_else(|| "stream_media".to_string())
 }
 
+pub(crate) fn unique_stream_media_path(folder: &Path, base_name: &str, extension: &str) -> PathBuf {
+    let first = folder.join(format!("{base_name}.{extension}"));
+    if !first.exists() {
+        return first;
+    }
+    for index in 2..=9_999 {
+        let candidate = folder.join(format!("{base_name} ({index}).{extension}"));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    folder.join(format!("{base_name}_{}.{}", std::process::id(), extension))
+}
+
 fn stream_save_target_ext(format: StreamOutputFormat) -> &'static str {
     format.extension().unwrap_or("webm")
 }
@@ -9699,6 +9880,7 @@ fn download_playlist_entry_with_retries(
             output_template,
             dialog_data,
             selected_audio_format: None,
+            prefer_video: matches!(dialog_data.format, StreamOutputFormat::Mp4),
             ytdlp_debug: ytdlp_debug_enabled(),
             credentials,
         });
@@ -10076,6 +10258,7 @@ pub(crate) fn download_active_streaming_audio_media(
         output_template: &output_template,
         dialog_data: &context.dialog_data,
         selected_audio_format: context.selected_audio_format.as_deref(),
+        prefer_video: context.prefer_video,
         ytdlp_debug: ytdlp_debug_enabled(),
         credentials: active_credentials.as_ref(),
     }) {
@@ -10143,6 +10326,7 @@ pub(crate) fn download_active_streaming_audio_media(
                 output_template: &output_template,
                 dialog_data: &context.dialog_data,
                 selected_audio_format: context.selected_audio_format.as_deref(),
+                prefer_video: context.prefer_video,
                 ytdlp_debug: ytdlp_debug_enabled(),
                 credentials: active_credentials.as_ref(),
             }) {
@@ -10237,6 +10421,288 @@ pub(crate) fn download_active_streaming_audio_media(
     true
 }
 
+pub(crate) fn download_active_streaming_video_for_audio_description(
+    parent: HWND,
+    active_url: &str,
+    language: Language,
+) -> bool {
+    let Some(context) =
+        active_stream_save_context_for_url(active_url).filter(|context| context.prefer_video)
+    else {
+        return false;
+    };
+    download_stream_context_for_audio_description(
+        parent,
+        context,
+        language,
+        "stream_audio_description",
+    )
+}
+
+fn download_stream_context_for_audio_description(
+    parent: HWND,
+    context: StreamSaveContext,
+    language: Language,
+    prefix_label: &str,
+) -> bool {
+    let target_dir = crate::with_state(parent, |state| state.settings.media_save_folder.clone())
+        .map(|folder| folder.trim().to_string())
+        .filter(|folder| !folder.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(crate::settings::default_media_save_folder()));
+    if let Err(err) = std::fs::create_dir_all(&target_dir) {
+        show_error(
+            parent,
+            language,
+            &i18n::tr_f(
+                language,
+                "stream_audio.download_failed",
+                &[("err", &err.to_string())],
+            ),
+        );
+        return true;
+    }
+
+    let cache_dir = settings_dir().join("podcast cache");
+    if let Err(err) = std::fs::create_dir_all(&cache_dir) {
+        show_error(
+            parent,
+            language,
+            &i18n::tr_f(
+                language,
+                "stream_audio.download_failed",
+                &[("err", &err.to_string())],
+            ),
+        );
+        return true;
+    }
+
+    let mut download_options = context.dialog_data.clone();
+    download_options.format = StreamOutputFormat::Auto;
+    download_options.quality = StreamQualitySelection::Original;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    let prefix = format!("{prefix_label}_{}_{}", std::process::id(), stamp);
+    let output_template = cache_dir.join(format!("{prefix}.%(ext)s"));
+    let mut progress = open_progress_dialog(
+        parent,
+        language,
+        "stream_audio.progress_title",
+        "stream_audio.progress_downloading",
+        true,
+    );
+    report_progress_status(
+        progress,
+        &i18n::tr(language, "stream_audio.progress_downloading"),
+    );
+
+    let mut active_credentials = context.credentials.clone();
+    let mut attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
+        parent,
+        progress,
+        language,
+        ytdlp_path: &context.ytdlp_path,
+        url: &context.url,
+        cache_dir: &cache_dir,
+        prefix: &prefix,
+        output_template: &output_template,
+        dialog_data: &download_options,
+        selected_audio_format: None,
+        prefer_video: true,
+        ytdlp_debug: ytdlp_debug_enabled(),
+        credentials: active_credentials.as_ref(),
+    }) {
+        Ok(attempt) => attempt,
+        Err(message) => {
+            if !message.is_empty() {
+                close_progress_dialog(progress);
+                show_error(parent, language, &message);
+            }
+            return true;
+        }
+    };
+
+    let mut downloaded_path = attempt.primary_path.take();
+    if downloaded_path.is_none() {
+        let err = if attempt.stderr_capture.trim().is_empty() {
+            "yt-dlp failed".to_string()
+        } else {
+            attempt.stderr_capture.trim().to_string()
+        };
+        if is_login_required_stream_error(&err) {
+            close_progress_dialog(progress);
+            let site_key = stream_auth_site_key(&context.url);
+            let saved_credentials_failed = active_credentials.is_some();
+            let saved_username = active_credentials
+                .as_ref()
+                .map(|credentials| credentials.username.clone())
+                .unwrap_or_default();
+            if let Some(site) = site_key.as_deref()
+                && saved_credentials_failed
+            {
+                clear_stream_site_credentials(parent, site);
+            }
+            let Some(prompted) = prompt_ytdlp_credentials(
+                parent,
+                language,
+                &saved_username,
+                site_key.is_some(),
+                saved_credentials_failed,
+            ) else {
+                return true;
+            };
+            if let Some(site) = site_key.as_ref() {
+                if prompted.save_credentials {
+                    save_stream_site_credentials(parent, site, &prompted.credentials);
+                } else {
+                    clear_stream_site_credentials(parent, site);
+                }
+            }
+            active_credentials = Some(prompted.credentials);
+            progress = open_progress_dialog(
+                parent,
+                language,
+                "stream_audio.progress_title",
+                "stream_audio.progress_downloading",
+                true,
+            );
+            attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
+                parent,
+                progress,
+                language,
+                ytdlp_path: &context.ytdlp_path,
+                url: &context.url,
+                cache_dir: &cache_dir,
+                prefix: &prefix,
+                output_template: &output_template,
+                dialog_data: &download_options,
+                selected_audio_format: None,
+                prefer_video: true,
+                ytdlp_debug: ytdlp_debug_enabled(),
+                credentials: active_credentials.as_ref(),
+            }) {
+                Ok(attempt) => attempt,
+                Err(message) => {
+                    if !message.is_empty() {
+                        close_progress_dialog(progress);
+                        show_error(parent, language, &message);
+                    }
+                    return true;
+                }
+            };
+            downloaded_path = attempt.primary_path.take();
+        } else {
+            close_progress_dialog(progress);
+            show_error(
+                parent,
+                language,
+                &i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]),
+            );
+            return true;
+        }
+    }
+
+    let Some(downloaded_path) = downloaded_path else {
+        close_progress_dialog(progress);
+        show_error(
+            parent,
+            language,
+            &i18n::tr(language, "stream_audio.no_output"),
+        );
+        return true;
+    };
+    let extension = downloaded_path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .filter(|extension| !extension.trim().is_empty())
+        .unwrap_or("webm");
+    let target_path = unique_stream_media_path(
+        &target_dir,
+        &suggested_stream_save_name(&context),
+        extension,
+    );
+    let copy_result = std::fs::copy(&downloaded_path, &target_path)
+        .map(|_| ())
+        .map_err(|err| err.to_string());
+    crate::log_if_err!(std::fs::remove_file(&downloaded_path));
+    remove_stream_cache_files_for_prefix(&cache_dir, &prefix);
+    close_progress_dialog(progress);
+    if let Err(err) = copy_result {
+        show_error(
+            parent,
+            language,
+            &i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]),
+        );
+        return true;
+    }
+
+    crate::app_windows::audio_description_window::open_with_input(parent, target_path);
+    true
+}
+
+pub(crate) fn download_active_youtube_for_audio_description(
+    parent: HWND,
+    active_url: &str,
+    language: Language,
+) -> bool {
+    let Some(normalized_url) = normalize_youtube_input_for_download(active_url) else {
+        return false;
+    };
+    if !is_youtube_stream_url(&normalized_url) {
+        return false;
+    }
+    let context = if let Some(context) = active_stream_save_context_for_url(active_url)
+        .or_else(|| active_stream_save_context_for_url(&normalized_url))
+    {
+        context
+    } else {
+        let labels_data = labels(language);
+        let ytdlp_path = match ensure_ytdlp_available(parent, language, &labels_data, None) {
+            Ok(Some(path)) => path,
+            Ok(None) => return true,
+            Err(err) => {
+                show_error(
+                    parent,
+                    language,
+                    &i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)]),
+                );
+                return true;
+            }
+        };
+        let credentials = stream_auth_site_key(&normalized_url)
+            .as_deref()
+            .and_then(|site| load_saved_stream_site_credentials(parent, site));
+        StreamSaveContext {
+            url: normalized_url.clone(),
+            title: probe_stream_media_title(&ytdlp_path, &normalized_url),
+            dialog_data: StreamDialogResult {
+                url: normalized_url,
+                format: StreamOutputFormat::Auto,
+                quality: StreamQualitySelection::Original,
+                direct_play: true,
+                reopen_collection_page: None,
+                reopen_selected_label: None,
+                previous_input: None,
+                previous_collection_page: None,
+                previous_selected_label: None,
+            },
+            selected_audio_format: None,
+            prefer_video: true,
+            ytdlp_path,
+            credentials,
+        }
+    };
+
+    download_stream_context_for_audio_description(
+        parent,
+        context,
+        language,
+        "youtube_audio_description",
+    )
+}
+
 pub(crate) fn download_active_streaming_audio_media_for_transcription(
     parent: HWND,
     active_url: &str,
@@ -10285,6 +10751,7 @@ pub(crate) fn download_active_streaming_audio_media_for_transcription(
         output_template: &output_template,
         dialog_data: &context.dialog_data,
         selected_audio_format: context.selected_audio_format.as_deref(),
+        prefer_video: false,
         ytdlp_debug: ytdlp_debug_enabled(),
         credentials: active_credentials.as_ref(),
     }) {
@@ -10358,6 +10825,7 @@ pub(crate) fn download_active_streaming_audio_media_for_transcription(
             output_template: &output_template,
             dialog_data: &context.dialog_data,
             selected_audio_format: context.selected_audio_format.as_deref(),
+            prefer_video: false,
             ytdlp_debug: ytdlp_debug_enabled(),
             credentials: active_credentials.as_ref(),
         }) {
@@ -10762,24 +11230,27 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         };
         reclaim_stream_modal_parent_foreground(parent, "play_streaming_audio.before_mpv_title");
         if is_youtube && let Err(err) = probe_youtube_stream_playable(&ytdlp_path, &url) {
-            if is_members_only_stream_error(&err) {
-                show_error(parent, language, &members_only_stream_message(language));
-                if collection_url.is_some() || collection_page.is_some() {
-                    set_pending_stream_reopen_context(Some(crate::YouTubeReturnContext {
-                        input: collection_url.clone().or_else(|| Some(input.clone())),
-                        collection_page,
-                        selected_label,
-                        previous_input,
-                        previous_collection_page,
-                        previous_selected_label,
-                    }));
-                    play_streaming_audio_from_url(parent);
-                } else {
-                    post_focus_editor(parent);
-                }
-                return;
-            }
             crate::log_debug(&format!("YouTube stream preflight failed: {}", err));
+            let message = if is_members_only_stream_error(&err) {
+                members_only_stream_message(language)
+            } else {
+                i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)])
+            };
+            show_error(parent, language, &message);
+            if collection_url.is_some() || collection_page.is_some() {
+                set_pending_stream_reopen_context(Some(crate::YouTubeReturnContext {
+                    input: collection_url.clone().or_else(|| Some(input.clone())),
+                    collection_page,
+                    selected_label,
+                    previous_input,
+                    previous_collection_page,
+                    previous_selected_label,
+                }));
+                play_streaming_audio_from_url(parent);
+            } else {
+                post_focus_editor(parent);
+            }
+            return;
         }
         let stream_title = probe_stream_media_title(&ytdlp_path, &url);
         let ytdl_format = if is_youtube {
@@ -10803,9 +11274,11 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     title: stream_title.clone(),
                     dialog_data: dialog_data.clone(),
                     selected_audio_format: selected_audio_format.clone(),
+                    prefer_video: is_youtube || crate::is_local_mpv_video_mode_active(parent),
                     ytdlp_path: ytdlp_path.clone(),
                     credentials: active_credentials.clone(),
                 });
+                crate::menu::update_playback_menu(parent, true);
                 if should_reopen_selection {
                     update_youtube_return_context_from_selection(
                         parent,
@@ -10980,6 +11453,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             output_template: &output_template,
             dialog_data: &dialog_data,
             selected_audio_format: selected_audio_format.as_deref(),
+            prefer_video: false,
             ytdlp_debug,
             credentials: forced_credentials.as_ref().or(saved_credentials.as_ref()),
         }) {
@@ -11051,6 +11525,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                     output_template: &auth_output_template,
                     dialog_data: &dialog_data,
                     selected_audio_format: selected_audio_format.as_deref(),
+                    prefer_video: false,
                     ytdlp_debug,
                     credentials: Some(&prompted.credentials),
                 }) {

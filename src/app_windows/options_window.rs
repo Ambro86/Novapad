@@ -244,6 +244,7 @@ const DEFAULT_SAVE_FOLDER_MEDIA: u32 = 1;
 const DEFAULT_SAVE_FOLDER_DOCUMENTS: u32 = 2;
 const DEFAULT_SAVE_FOLDER_RADIO: u32 = 3;
 const DEFAULT_SAVE_FOLDER_TV: u32 = 4;
+const DEFAULT_SAVE_FOLDER_AUDIO_DESCRIPTION: u32 = 5;
 
 struct GeminiModelsPayload {
     result: Result<Vec<String>, String>,
@@ -589,6 +590,10 @@ fn find_fixed_shortcut_conflict_label(
         (
             ShortcutBinding::new(true, true, false, 'M' as u16),
             labels.edit_strip_markdown,
+        ),
+        (
+            ShortcutBinding::new(true, true, false, 'I' as u16),
+            labels.menu_create_audio_description,
         ),
         (
             ShortcutBinding::new(true, true, false, 'H' as u16),
@@ -1153,6 +1158,7 @@ struct OptionsDialogState {
     content_heights: [i32; OPTIONS_TAB_COUNT as usize],
     default_save_folder_selection: u32,
     default_save_folder_audiobook: String,
+    default_save_folder_audio_description: String,
     default_save_folder_media: String,
     default_save_folder_documents: String,
     default_save_folder_radio: String,
@@ -1252,6 +1258,7 @@ struct OptionsLabels {
     label_audio_skip: String,
     label_default_save_folder_kind: String,
     option_default_save_folder_audiobooks: String,
+    option_default_save_folder_audio_descriptions: String,
     option_default_save_folder_media: String,
     option_default_save_folder_documents: String,
     option_default_save_folder_radio: String,
@@ -1516,6 +1523,17 @@ fn options_labels(language: Language) -> OptionsLabels {
             let value = i18n::tr(language, "options.choice.default_save_folder.audiobooks");
             if value == "options.choice.default_save_folder.audiobooks" {
                 "Audiobooks".to_string()
+            } else {
+                value
+            }
+        },
+        option_default_save_folder_audio_descriptions: {
+            let value = i18n::tr(
+                language,
+                "options.choice.default_save_folder.audio_descriptions",
+            );
+            if value == "options.choice.default_save_folder.audio_descriptions" {
+                "Audio descriptions".to_string()
             } else {
                 value
             }
@@ -6678,6 +6696,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     content_heights: [0; OPTIONS_TAB_COUNT as usize],
                     default_save_folder_selection: 0,
                     default_save_folder_audiobook: String::new(),
+                    default_save_folder_audio_description: String::new(),
                     default_save_folder_media: String::new(),
                     default_save_folder_documents: String::new(),
                     default_save_folder_radio: String::new(),
@@ -6808,15 +6827,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                         LRESULT(0)
                     }
                     OPTIONS_ID_GEMINI_GET_KEY => {
-                        let url = to_wide("https://aistudio.google.com/app/apikey");
-                        ShellExecuteW(
-                            HWND(0),
-                            w!("open"),
-                            PCWSTR(url.as_ptr()),
-                            PCWSTR::null(),
-                            PCWSTR::null(),
-                            SW_SHOWNORMAL,
-                        );
+                        open_gemini_api_key_page();
                         LRESULT(0)
                     }
                     OPTIONS_ID_GEMINI_REFRESH_MODELS => {
@@ -9094,6 +9105,8 @@ fn initialize_options_dialog(hwnd: HWND) {
         if with_options_state(hwnd, |state| {
             state.default_save_folder_selection = DEFAULT_SAVE_FOLDER_AUDIOBOOK;
             state.default_save_folder_audiobook = settings.audiobook_save_folder.clone();
+            state.default_save_folder_audio_description =
+                settings.audio_description_save_folder.clone();
             state.default_save_folder_media = settings.media_save_folder.clone();
             state.default_save_folder_documents = settings.documents_save_folder.clone();
             state.default_save_folder_radio = settings.radio_save_folder.clone();
@@ -9113,6 +9126,10 @@ fn initialize_options_dialog(hwnd: HWND) {
             (
                 DEFAULT_SAVE_FOLDER_AUDIOBOOK,
                 labels.option_default_save_folder_audiobooks.clone(),
+            ),
+            (
+                DEFAULT_SAVE_FOLDER_AUDIO_DESCRIPTION,
+                labels.option_default_save_folder_audio_descriptions.clone(),
             ),
             (
                 DEFAULT_SAVE_FOLDER_MEDIA,
@@ -12684,16 +12701,20 @@ fn apply_options_dialog(hwnd: HWND) {
             settings.audiobook_split_text = text;
         }
         persist_default_save_folder_edit(hwnd);
-        if let Some((audiobook, media, documents, radio, tv)) = with_options_state(hwnd, |state| {
-            (
-                state.default_save_folder_audiobook.clone(),
-                state.default_save_folder_media.clone(),
-                state.default_save_folder_documents.clone(),
-                state.default_save_folder_radio.clone(),
-                state.default_save_folder_tv.clone(),
-            )
-        }) {
+        if let Some((audiobook, audio_description, media, documents, radio, tv)) =
+            with_options_state(hwnd, |state| {
+                (
+                    state.default_save_folder_audiobook.clone(),
+                    state.default_save_folder_audio_description.clone(),
+                    state.default_save_folder_media.clone(),
+                    state.default_save_folder_documents.clone(),
+                    state.default_save_folder_radio.clone(),
+                    state.default_save_folder_tv.clone(),
+                )
+            })
+        {
             settings.audiobook_save_folder = audiobook.trim().to_string();
+            settings.audio_description_save_folder = audio_description.trim().to_string();
             settings.media_save_folder = media.trim().to_string();
             settings.documents_save_folder = documents.trim().to_string();
             settings.radio_save_folder = radio.trim().to_string();
@@ -14865,7 +14886,7 @@ fn ensure_sapi_voices_loaded(hwnd: HWND, _language: Language) {
     });
 }
 
-fn fetch_voice_list() -> Result<Vec<VoiceInfo>, String> {
+pub(crate) fn fetch_voice_list() -> Result<Vec<VoiceInfo>, String> {
     let url = format!(
         "{}?trustedclienttoken={}",
         VOICE_LIST_URL, TRUSTED_CLIENT_TOKEN
@@ -14970,6 +14991,7 @@ fn persist_default_save_folder_edit(hwnd: HWND) {
             String::new()
         };
     let _updated = with_options_state(hwnd, |state| match state.default_save_folder_selection {
+        DEFAULT_SAVE_FOLDER_AUDIO_DESCRIPTION => state.default_save_folder_audio_description = text,
         DEFAULT_SAVE_FOLDER_MEDIA => state.default_save_folder_media = text,
         DEFAULT_SAVE_FOLDER_DOCUMENTS => state.default_save_folder_documents = text,
         DEFAULT_SAVE_FOLDER_RADIO => state.default_save_folder_radio = text,
@@ -14981,6 +15003,9 @@ fn persist_default_save_folder_edit(hwnd: HWND) {
 fn refresh_default_save_folder_edit(hwnd: HWND) {
     let data = with_options_state(hwnd, |state| {
         let text = match state.default_save_folder_selection {
+            DEFAULT_SAVE_FOLDER_AUDIO_DESCRIPTION => {
+                state.default_save_folder_audio_description.clone()
+            }
             DEFAULT_SAVE_FOLDER_MEDIA => state.default_save_folder_media.clone(),
             DEFAULT_SAVE_FOLDER_DOCUMENTS => state.default_save_folder_documents.clone(),
             DEFAULT_SAVE_FOLDER_RADIO => state.default_save_folder_radio.clone(),
@@ -15112,6 +15137,67 @@ fn search_for_interpreter(hwnd: HWND) {
     }
 }
 
+pub(crate) fn open_gemini_api_key_page() {
+    unsafe {
+        let url = to_wide("https://aistudio.google.com/app/apikey");
+        ShellExecuteW(
+            HWND(0),
+            w!("open"),
+            PCWSTR(url.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        );
+    }
+}
+
+pub(crate) fn fetch_gemini_models_for_key(api_key: &str) -> Result<Vec<String>, String> {
+    let api_key = api_key.trim();
+    if api_key.is_empty() {
+        return Err("Gemini API key is empty".to_string());
+    }
+    let url = "https://generativelanguage.googleapis.com/v1beta/models";
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .get(url)
+        .header("x-goog-api-key", api_key)
+        .send()
+        .map_err(|error| error.to_string())?;
+    let status = response.status();
+    let value = response
+        .json::<serde_json::Value>()
+        .map_err(|error| error.to_string())?;
+    if !status.is_success() {
+        return Err(gemini_api_error(status.as_u16(), &value));
+    }
+
+    let mut models = Vec::new();
+    if let Some(list) = value["models"].as_array() {
+        for model in list {
+            let supports_generate_content = model["supportedGenerationMethods"]
+                .as_array()
+                .is_some_and(|methods| {
+                    methods
+                        .iter()
+                        .any(|method| method.as_str() == Some("generateContent"))
+                });
+            if supports_generate_content && let Some(name) = model["name"].as_str() {
+                let clean_name = name.replace("models/", "");
+                if clean_name.starts_with("gemini") {
+                    models.push(clean_name);
+                }
+            }
+        }
+    }
+    models.sort();
+    models.dedup();
+    if models.is_empty() {
+        Err("No compatible Gemini models found".to_string())
+    } else {
+        Ok(models)
+    }
+}
+
 pub fn refresh_gemini_models(hwnd: HWND) {
     let state = match with_options_state(hwnd, |s| {
         (
@@ -15143,63 +15229,9 @@ pub fn refresh_gemini_models(hwnd: HWND) {
     crate::enable_window_safe(btn_refresh, false);
 
     thread::spawn(move || {
-        let url = "https://generativelanguage.googleapis.com/v1beta/models";
-        let client = reqwest::blocking::Client::new();
-        let result = client
-            .get(url)
-            .header("x-goog-api-key", api_key)
-            .send()
-            .map_err(|err| err.to_string())
-            .and_then(|res| {
-                let status = res.status();
-                let value = res
-                    .json::<serde_json::Value>()
-                    .map_err(|err| err.to_string())?;
-                if status.is_success() {
-                    Ok(value)
-                } else {
-                    Err(gemini_api_error(status.as_u16(), &value))
-                }
-            });
-
-        let payload = match result {
-            Ok(resp) => {
-                let mut models: Vec<String> = Vec::new();
-                if let Some(list) = resp["models"].as_array() {
-                    for m in list {
-                        let supports_generate_content = m["supportedGenerationMethods"]
-                            .as_array()
-                            .is_some_and(|methods| {
-                                methods
-                                    .iter()
-                                    .any(|method| method.as_str() == Some("generateContent"))
-                            });
-                        if supports_generate_content && let Some(name) = m["name"].as_str() {
-                            let clean_name = name.replace("models/", "");
-                            if clean_name.starts_with("gemini") {
-                                models.push(clean_name);
-                            }
-                        }
-                    }
-                }
-                if models.is_empty() {
-                    GeminiModelsPayload {
-                        result: Err("No compatible Gemini models found".to_string()),
-                        language,
-                    }
-                } else {
-                    models.sort();
-                    models.dedup();
-                    GeminiModelsPayload {
-                        result: Ok(models),
-                        language,
-                    }
-                }
-            }
-            Err(e) => GeminiModelsPayload {
-                result: Err(e.to_string()),
-                language,
-            },
+        let payload = GeminiModelsPayload {
+            result: fetch_gemini_models_for_key(&api_key),
+            language,
         };
 
         let queue = GEMINI_MODELS_PAYLOADS.get_or_init(|| Mutex::new(VecDeque::new()));

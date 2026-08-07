@@ -99,7 +99,9 @@ pub fn handle_player_keyboard(msg: &MSG, skip_seconds: u32) -> PlayerCommand {
             vk if ctrl_down && !alt_down && !shift_down && vk == 'T' as u32 => {
                 PlayerCommand::GoToTime
             }
-            vk if ctrl_down && vk == 'I' as u32 => PlayerCommand::AnnounceTime,
+            vk if ctrl_down && !alt_down && !shift_down && vk == 'I' as u32 => {
+                PlayerCommand::AnnounceTime
+            }
             vk if vk == VK_SPACE.0 as u32 => PlayerCommand::TogglePause,
             vk if !ctrl_down && !alt_down && !shift_down && vk == VK_HOME.0 as u32 => {
                 PlayerCommand::SeekToStart

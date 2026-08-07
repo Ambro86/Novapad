@@ -48,6 +48,12 @@ the ability to **create audiobooks directly from text using Microsoft voices (Ed
   - Seek forward/backward using arrow keys
   - Play/Pause with the Space bar
   - Volume up/down using arrow keys
+- **Audio-description creation**
+  - Dialogue analysis with Pyannote and description generation with Gemini
+  - Narration through Sonarpad's existing Edge, Google or SAPI voices
+  - Ducking, extended pauses and MP3 export through the bundled Rust FFmpeg libraries
+  - Optional editable project containing only descriptions actually present in the MP3
+  - Text editing and re-export without repeating Gemini analysis
 - **Audio Transcription (Whisper / faster-whisper)**
   - Transcribe the currently playing audio/media
   - Optional timestamped transcript output

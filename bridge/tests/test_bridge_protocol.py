@@ -1,0 +1,153 @@
+from __future__ import annotations
+
+import io
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+import audio_description_bridge as bridge
+
+
+class BridgeProtocolTests(unittest.TestCase):
+    def test_quota_switch_returns_new_model_without_ending_worker(self):
+        emitted = []
+        reply = json.dumps({"action": "switch", "model": "gemini-3.5-flash"}) + "\n"
+        with mock.patch.object(bridge.sys, "stdin", io.StringIO(reply)), mock.patch.object(
+            bridge, "_emit", side_effect=lambda prefix, value: emitted.append((prefix, value))
+        ):
+            decision = bridge._quota_decision_handler(
+                "gemini-3.5-flash-lite", RuntimeError("RESOURCE_EXHAUSTED")
+            )
+        self.assertEqual(decision, "gemini-3.5-flash")
+        self.assertEqual(emitted[0][0], "QUOTA")
+        self.assertEqual(emitted[0][1]["model"], "gemini-3.5-flash-lite")
+
+    def test_quota_wait_keeps_same_request_pending(self):
+        reply = json.dumps({"action": "wait"}) + "\n"
+        with mock.patch.object(bridge.sys, "stdin", io.StringIO(reply)), mock.patch.object(
+            bridge, "_emit"
+        ):
+            self.assertIsNone(
+                bridge._quota_decision_handler("gemini-test", RuntimeError("quota"))
+            )
+
+    def test_quota_stop_or_closed_input_cancels_request(self):
+        for input_text in (json.dumps({"action": "stop"}) + "\n", ""):
+            with self.subTest(input_text=input_text), mock.patch.object(
+                bridge.sys, "stdin", io.StringIO(input_text)
+            ), mock.patch.object(bridge, "_emit"):
+                self.assertFalse(
+                    bridge._quota_decision_handler("gemini-test", RuntimeError("quota"))
+                )
+
+    def test_character_glossary_setting_is_forwarded_both_ways(self):
+        for enabled in (True, False):
+            captured = {}
+            with self.subTest(enabled=enabled), mock.patch.object(
+                bridge.config_model,
+                "configure",
+                side_effect=lambda values: captured.update(values),
+            ), mock.patch.object(bridge.audio_describer, "reset_gemini_client"), mock.patch.object(
+                bridge.gemini_helpers, "set_quota_decision_handler"
+            ):
+                bridge._configure_omni(
+                    {
+                        "language": "it",
+                        "gemini_api_key": "test-key",
+                        "gemini_model": "gemini-test",
+                        "verbosity": "detailed",
+                        "allow_extended_pauses": True,
+                        "recognize_characters": enabled,
+                    }
+                )
+            self.assertIs(captured["enable_character_glossary"], enabled)
+
+    def test_normalise_descriptions_filters_invalid_rows_and_sorts(self):
+        normalized = bridge._normalise_descriptions(
+            [
+                (9, 10, "Seconda"),
+                (2, 1, "Fine corretta"),
+                (3, 4, ""),
+                ("bad", 5, "Ignora"),
+                (1, 2, "Prima"),
+            ]
+        )
+        self.assertEqual([item["text"] for item in normalized], ["Prima", "Fine corretta", "Seconda"])
+        self.assertEqual(normalized[1]["start_sec"], normalized[1]["end_sec"])
+
+    def test_validate_request_accepts_host_prepared_media_and_rejects_bad_timeline(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "film.mkv"
+            wav = root / "audio.wav"
+            chunk1 = root / "chunk1.mp4"
+            chunk2 = root / "chunk2.mp4"
+            for path in (media, wav, chunk1, chunk2):
+                path.write_bytes(b"x")
+            request = {
+                "input_path": str(media),
+                "duration_sec": 360.0,
+                "audio_wav_path": str(wav),
+                "gemini_api_key": "key",
+                "verbosity": "detailed",
+                "chunks": [
+                    {"path": str(chunk1), "start_sec": 0.0, "end_sec": 180.0},
+                    {"path": str(chunk2), "start_sec": 180.0, "end_sec": 360.0},
+                ],
+            }
+            bridge._validate_request(request)
+            request["chunks"][1]["start_sec"] = 190.0
+            with self.assertRaisesRegex(ValueError, "timeline"):
+                bridge._validate_request(request)
+
+
+    def test_gemini_status_uses_stable_localizable_stage_ids(self):
+        emitted = []
+        with mock.patch.object(
+            bridge, "_emit", side_effect=lambda prefix, value: emitted.append((prefix, value))
+        ):
+            bridge._gemini_status("Chunk 2/5: asking Gemini for descriptions…")
+        status = next(value for prefix, value in emitted if prefix == "STATUS")
+        self.assertEqual(status["stage"], "gemini_chunk")
+        self.assertEqual(json.loads(status["message"]), {"current": 2, "total": 5})
+
+    def test_non_chunk_gemini_status_hides_english_worker_text(self):
+        emitted = []
+        with mock.patch.object(
+            bridge, "_emit", side_effect=lambda prefix, value: emitted.append((prefix, value))
+        ):
+            bridge._gemini_status("Uploading video to Gemini...")
+        status = next(value for prefix, value in emitted if prefix == "STATUS")
+        self.assertEqual(status, {"stage": "gemini_uploading", "message": ""})
+
+    def test_gemini_status_categorizes_worker_messages_without_forwarding_english(self):
+        cases = {
+            "Uploading video to Gemini...": "gemini_uploading",
+            "Waiting for Gemini — watching scenes...": "gemini_waiting",
+            "Contacting Gemini API (model: gemini-test)...": "gemini_contacting",
+            "Gemini response received. Parsing...": "gemini_response",
+            "Invalid JSON from AI — asking Gemini to reformat it correctly...": "gemini_repair",
+            "Transient error; retrying request attempt 2...": "gemini_retry",
+        }
+        for message, expected_stage in cases.items():
+            emitted = []
+            with mock.patch.object(
+                bridge, "_emit", side_effect=lambda prefix, value: emitted.append((prefix, value))
+            ):
+                bridge._gemini_status(message)
+            status = next(value for prefix, value in emitted if prefix == "STATUS")
+            self.assertEqual(status, {"stage": expected_stage, "message": ""})
+
+    def test_windows_build_script_passes_python_selector_explicitly(self):
+        script = (Path(__file__).resolve().parents[1] / "build_audio_description_bridge.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("@launcherArgs", script)
+        self.assertIn("& $Python $pythonSelector -m pip", script)
+        self.assertIn("& $Python $pythonSelector -m PyInstaller", script)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,3022 @@
+use crate::ffmpeg_export::{
+    AudioDescriptionExportOptions, AudioDescriptionMixCue, export_audio_description_mp3,
+};
+use crate::settings::{
+    AudiobookPartAnnouncementMode, AudiobookPartNamingMode, Language, TtsEngine,
+};
+use crate::tools::audio_description_bridge::{
+    AudioDescriptionBridgeCallbacks, AudioDescriptionBridgeRequest, AudioDescriptionPreparedChunk,
+    AudioDescriptionQuotaDecision, BridgeCharacter, BridgeInterval, run_audio_description_bridge,
+};
+use crate::tts_engine::{
+    AudiobookCommonOptions, MixedAudiobookConfig, TtsChunk, render_mixed_audiobook_part,
+};
+use rodio::Source;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+use windows::Win32::Foundation::HWND;
+
+const MAX_SHIFT_SEC: f64 = 5.0;
+const MIN_EXTENDED_ANCHOR_SEC: f64 = 1.0;
+const EDGE_TRAILING_MIN_REMOVE_MS: u64 = 60;
+const EDGE_TRAILING_KEEP_MS: u64 = 30;
+const EDGE_TRAILING_SEEK_MS: u64 = 5;
+const EDGE_TRAILING_WINDOW_MS: u64 = 60;
+const PYANNOTE_SAMPLE_RATE: u32 = 16_000;
+const GEMINI_CHUNK_SECONDS: u32 = 180;
+const GEMINI_MAX_CHUNK_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const AUDIO_DESCRIPTION_DUCKING_DB: f32 = -15.0;
+const AUDIO_DESCRIPTION_FADE_MS: u32 = 150;
+const AUDIO_DESCRIPTION_BITRATE_KBPS: u32 = 192;
+const MAX_CHARACTER_DESCRIPTION_CHARS: usize = 2_000;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AudioDescriptionVerbosity {
+    Brief,
+    Standard,
+    Detailed,
+}
+
+impl AudioDescriptionVerbosity {
+    pub fn as_bridge_value(self) -> &'static str {
+        match self {
+            Self::Brief => "short",
+            Self::Standard => "standard",
+            Self::Detailed => "detailed",
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct AudioDescriptionJob {
+    pub input_path: PathBuf,
+    pub output_path: PathBuf,
+    pub language_code: String,
+    pub tts_language: Language,
+    pub verbosity: AudioDescriptionVerbosity,
+    pub allow_extended_pauses: bool,
+    pub recognize_characters: bool,
+    pub character_catalog: Option<AudioDescriptionCharacterCatalogContext>,
+    pub save_project: bool,
+    pub tts_engine: TtsEngine,
+    pub tts_voice: String,
+    pub tts_rate: i32,
+    pub tts_pitch: i32,
+    pub tts_volume: i32,
+    pub gemini_api_key: String,
+    pub gemini_model: String,
+    pub audiobook_bitrate_kbps: u32,
+}
+
+#[derive(Clone, Debug)]
+pub struct AudioDescriptionCharacterCatalogContext {
+    pub name: String,
+    pub path: PathBuf,
+    pub characters: Vec<BridgeCharacter>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AudioDescriptionCharacterCatalogSummary {
+    pub name: String,
+    pub path: PathBuf,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct AudioDescriptionCharacterCatalogFile {
+    format: String,
+    version: u32,
+    name: String,
+    created_at_utc: String,
+    updated_at_utc: String,
+    #[serde(default)]
+    characters: Vec<BridgeCharacter>,
+}
+
+fn normalized_catalog_character(character: &BridgeCharacter) -> Option<BridgeCharacter> {
+    let name = character
+        .name
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let description = character
+        .description
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if name.is_empty() || description.is_empty() {
+        return None;
+    }
+    Some(BridgeCharacter {
+        id: character.id.trim().to_string(),
+        name,
+        description,
+    })
+}
+
+fn catalog_name_tokens(name: &str) -> Vec<String> {
+    name.split_whitespace()
+        .map(|token| {
+            token
+                .chars()
+                .filter(|character| character.is_alphanumeric())
+                .flat_map(char::to_lowercase)
+                .collect::<String>()
+        })
+        .filter(|token| !token.is_empty())
+        .collect()
+}
+
+fn find_catalog_identity(
+    characters: &[BridgeCharacter],
+    candidate: &BridgeCharacter,
+) -> Option<usize> {
+    let candidate_id = candidate.id.trim().to_lowercase();
+    if !candidate_id.is_empty() {
+        let mut matches = characters
+            .iter()
+            .enumerate()
+            .filter(|(_, character)| character.id.trim().eq_ignore_ascii_case(&candidate.id))
+            .map(|(index, _)| index);
+        if let Some(first) = matches.next()
+            && matches.next().is_none()
+        {
+            return Some(first);
+        }
+    }
+
+    let mut name_matches = characters
+        .iter()
+        .enumerate()
+        .filter(|(_, character)| character.name.trim().eq_ignore_ascii_case(&candidate.name))
+        .map(|(index, _)| index);
+    if let Some(first) = name_matches.next()
+        && name_matches.next().is_none()
+    {
+        return Some(first);
+    }
+
+    let candidate_tokens = catalog_name_tokens(&candidate.name);
+    if candidate_id.is_empty() || candidate_tokens.len() != 1 || candidate_tokens[0].len() < 3 {
+        return None;
+    }
+    let candidate_token = &candidate_tokens[0];
+    let id_prefix = format!("{candidate_id}_");
+    let alias_matches = characters
+        .iter()
+        .enumerate()
+        .filter(|(_, character)| {
+            character.id.to_lowercase().starts_with(&id_prefix)
+                && catalog_name_tokens(&character.name).contains(candidate_token)
+        })
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    match alias_matches.as_slice() {
+        [index] => Some(*index),
+        _ => None,
+    }
+}
+
+fn catalog_description_tokens(text: &str) -> Vec<String> {
+    text.split(|character: char| !character.is_alphanumeric())
+        .map(|token| token.to_lowercase())
+        .filter(|token| !token.is_empty())
+        .fold(Vec::<String>::new(), |mut tokens, token| {
+            if !tokens.contains(&token) {
+                tokens.push(token);
+            }
+            tokens
+        })
+}
+
+fn catalog_description_coverage(candidate: &str, established: &str) -> f32 {
+    let candidate_tokens = catalog_description_tokens(candidate);
+    if candidate_tokens.is_empty() {
+        return 1.0;
+    }
+    let established_tokens = catalog_description_tokens(established);
+    if established_tokens.is_empty() {
+        return 0.0;
+    }
+    let shared = candidate_tokens
+        .iter()
+        .filter(|token| established_tokens.contains(token))
+        .count();
+    shared as f32 / candidate_tokens.len() as f32
+}
+
+fn catalog_description_sentences(text: &str) -> Vec<String> {
+    text.split_inclusive(['.', '!', '?'])
+        .map(str::trim)
+        .filter(|sentence| !sentence.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn merge_catalog_description(existing: &str, observed: &str) -> String {
+    let existing = existing.trim();
+    let observed = observed.trim();
+    if existing.is_empty() {
+        return observed.to_string();
+    }
+    if observed.is_empty() {
+        return existing.to_string();
+    }
+
+    let mut merged = existing.to_string();
+    for sentence in catalog_description_sentences(observed) {
+        let words = catalog_description_tokens(&sentence);
+        if words.len() <= 2 {
+            continue;
+        }
+
+        // The saved catalog is authoritative. Gemini often restates the same
+        // biography with different punctuation, apostrophes, or one corrupted
+        // word (for example "Padre di Dio" instead of "Padre di Flo"). If most
+        // of the candidate sentence is already represented by the established
+        // description, treat it as a paraphrase/corruption rather than new data.
+        if catalog_description_coverage(&sentence, &merged) >= 0.65 {
+            continue;
+        }
+
+        let separator = if matches!(merged.chars().last(), Some('.' | '!' | '?')) {
+            " "
+        } else {
+            ". "
+        };
+        let candidate = format!("{merged}{separator}{sentence}");
+        if candidate.chars().count() > MAX_CHARACTER_DESCRIPTION_CHARS {
+            break;
+        }
+        merged = candidate;
+    }
+    merged
+}
+
+fn merge_catalog_characters(
+    established: &[BridgeCharacter],
+    detected: &[BridgeCharacter],
+) -> Vec<BridgeCharacter> {
+    let mut merged = Vec::<BridgeCharacter>::new();
+    for character in established {
+        let Some(candidate) = normalized_catalog_character(character) else {
+            continue;
+        };
+        if let Some(index) = find_catalog_identity(&merged, &candidate) {
+            let description =
+                merge_catalog_description(&merged[index].description, &candidate.description);
+            merged[index].description = description;
+            if merged[index].id.is_empty() && !candidate.id.is_empty() {
+                merged[index].id = candidate.id;
+            }
+        } else {
+            merged.push(candidate);
+        }
+    }
+
+    let authoritative_count = merged.len();
+    for character in detected {
+        let Some(candidate) = normalized_catalog_character(character) else {
+            continue;
+        };
+        if let Some(index) = find_catalog_identity(&merged, &candidate) {
+            let description =
+                merge_catalog_description(&merged[index].description, &candidate.description);
+            merged[index].description = description;
+            if index >= authoritative_count
+                && merged[index].id.is_empty()
+                && !candidate.id.is_empty()
+            {
+                merged[index].id = candidate.id;
+            }
+        } else {
+            merged.push(candidate);
+        }
+    }
+    merged
+}
+
+fn normalize_catalog_characters(characters: &[BridgeCharacter]) -> Vec<BridgeCharacter> {
+    merge_catalog_characters(&[], characters)
+}
+
+pub fn audio_description_character_catalog_dir(save_folder: &str) -> PathBuf {
+    PathBuf::from(save_folder).join("Catalogs")
+}
+
+fn safe_catalog_file_stem(name: &str) -> String {
+    let mut result = String::new();
+    for character in name.trim().chars() {
+        if matches!(
+            character,
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'
+        ) || character.is_control()
+        {
+            result.push('_');
+        } else {
+            result.push(character);
+        }
+    }
+    let result = result
+        .trim()
+        .trim_end_matches(['.', ' '])
+        .trim()
+        .to_string();
+    if result.is_empty() {
+        "characters".to_string()
+    } else {
+        result.chars().take(120).collect()
+    }
+}
+
+pub fn audio_description_character_catalog_path(save_folder: &str, name: &str) -> PathBuf {
+    audio_description_character_catalog_dir(save_folder)
+        .join(format!("{}.json", safe_catalog_file_stem(name)))
+}
+
+pub fn list_audio_description_character_catalogs(
+    save_folder: &str,
+) -> Vec<AudioDescriptionCharacterCatalogSummary> {
+    let directory = audio_description_character_catalog_dir(save_folder);
+    let Ok(entries) = fs::read_dir(directory) else {
+        return Vec::new();
+    };
+    let mut catalogs = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file()
+            || !path
+                .extension()
+                .and_then(|value| value.to_str())
+                .is_some_and(|value| value.eq_ignore_ascii_case("json"))
+        {
+            continue;
+        }
+        let name = load_audio_description_character_catalog(&path)
+            .map(|catalog| catalog.name)
+            .unwrap_or_else(|_| {
+                path.file_stem()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or("Catalog")
+                    .to_string()
+            });
+        catalogs.push(AudioDescriptionCharacterCatalogSummary { name, path });
+    }
+    catalogs.sort_by_key(|catalog| catalog.name.to_lowercase());
+    catalogs
+}
+
+fn load_audio_description_character_catalog(
+    path: &Path,
+) -> Result<AudioDescriptionCharacterCatalogFile, String> {
+    let raw = fs::read_to_string(path)
+        .map_err(|error| format!("Audio description: could not read character catalog: {error}"))?;
+    let mut catalog: AudioDescriptionCharacterCatalogFile = serde_json::from_str(&raw)
+        .map_err(|error| format!("Audio description: invalid character catalog: {error}"))?;
+    if catalog.format != "sonarpad-character-catalog" || catalog.version == 0 {
+        return Err("Audio description: unsupported character catalog format".to_string());
+    }
+    catalog.name = catalog.name.trim().to_string();
+    catalog.characters = normalize_catalog_characters(&catalog.characters);
+    Ok(catalog)
+}
+
+pub fn load_audio_description_character_catalog_context(
+    name: String,
+    path: PathBuf,
+) -> Result<AudioDescriptionCharacterCatalogContext, String> {
+    if !path.exists() {
+        return Ok(AudioDescriptionCharacterCatalogContext {
+            name,
+            path,
+            characters: Vec::new(),
+        });
+    }
+    let catalog = load_audio_description_character_catalog(&path)?;
+    Ok(AudioDescriptionCharacterCatalogContext {
+        name: if catalog.name.is_empty() {
+            name
+        } else {
+            catalog.name
+        },
+        path,
+        characters: catalog.characters,
+    })
+}
+
+fn save_audio_description_character_catalog(
+    context: &AudioDescriptionCharacterCatalogContext,
+    characters: &[BridgeCharacter],
+) -> Result<(), String> {
+    let characters = merge_catalog_characters(&context.characters, characters);
+    let parent = context.path.parent().unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent).map_err(|error| {
+        format!("Audio description: could not create character catalog folder: {error}")
+    })?;
+    let existing_created = load_audio_description_character_catalog(&context.path)
+        .ok()
+        .map(|catalog| catalog.created_at_utc)
+        .filter(|value| !value.trim().is_empty());
+    let now = chrono::Utc::now().to_rfc3339();
+    let catalog = AudioDescriptionCharacterCatalogFile {
+        format: "sonarpad-character-catalog".to_string(),
+        version: 1,
+        name: context.name.trim().to_string(),
+        created_at_utc: existing_created.unwrap_or_else(|| now.clone()),
+        updated_at_utc: now,
+        characters,
+    };
+    let temporary = temporary_sibling_path(&context.path, "new");
+    let raw = serde_json::to_vec_pretty(&catalog).map_err(|error| {
+        format!("Audio description: character catalog serialization failed: {error}")
+    })?;
+    fs::write(&temporary, raw)
+        .map_err(|error| format!("Audio description: character catalog write failed: {error}"))?;
+    if context.path.exists() {
+        fs::remove_file(&context.path).map_err(|error| {
+            crate::log_if_err!(
+                fs::remove_file(&temporary),
+                "Audio description cleanup operation failed"
+            );
+            format!("Audio description: character catalog replacement failed: {error}")
+        })?;
+    }
+    fs::rename(&temporary, &context.path).map_err(|error| {
+        crate::log_if_err!(
+            fs::remove_file(&temporary),
+            "Audio description cleanup operation failed"
+        );
+        format!("Audio description: character catalog commit failed: {error}")
+    })
+}
+
+pub type AudioDescriptionStatusCallback = Box<dyn FnMut(&str, &str) + Send>;
+pub type AudioDescriptionProgressCallback = Box<dyn FnMut(u32) + Send>;
+pub type AudioDescriptionQuotaCallback =
+    Box<dyn FnMut(&str, &str) -> AudioDescriptionQuotaDecision + Send>;
+
+pub struct AudioDescriptionCallbacks {
+    pub status: Option<AudioDescriptionStatusCallback>,
+    pub progress: Option<AudioDescriptionProgressCallback>,
+    pub quota: Option<AudioDescriptionQuotaCallback>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AudioDescriptionOutcome {
+    pub output_path: PathBuf,
+    pub project_path: Option<PathBuf>,
+    pub project_warning: Option<String>,
+    pub character_catalog_path: Option<PathBuf>,
+    pub character_catalog_warning: Option<String>,
+    pub generated_descriptions: usize,
+    pub normal_descriptions: usize,
+    pub extended_pauses: usize,
+    pub dropped_after_tts: usize,
+}
+
+#[derive(Clone)]
+struct SynthesizedDescription {
+    original_index: usize,
+    text: String,
+    desired_start_sec: f64,
+    samples: Arc<[f32]>,
+    sample_rate: u32,
+    channels: u16,
+}
+
+#[derive(Clone)]
+struct ScheduledDescription {
+    original_index: usize,
+    text: String,
+    desired_start_sec: f64,
+    start_sec: f64,
+    samples: Arc<[f32]>,
+    sample_rate: u32,
+    channels: u16,
+    extended_pause: bool,
+}
+
+#[derive(Clone, Debug)]
+struct DroppedDescription {
+    original_index: usize,
+    text: String,
+    desired_start_sec: f64,
+    tts_duration_sec: f64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AudioDescriptionProjectInterval {
+    pub start_sec: f64,
+    pub end_sec: f64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AudioDescriptionProjectDescription {
+    pub id: usize,
+    pub text: String,
+    pub original_text: String,
+    #[serde(default)]
+    pub rendered_text: String,
+    pub modified: bool,
+    pub gemini_start_sec: f64,
+    pub source_start_sec: f64,
+    pub output_start_sec: f64,
+    pub output_end_sec: f64,
+    pub tts_duration_sec: f64,
+    pub extended_pause: bool,
+    pub extended_pause_duration_sec: f64,
+    pub duck_start_sec: Option<f64>,
+    pub duck_end_sec: Option<f64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AudioDescriptionProjectExcluded {
+    pub id: usize,
+    pub text: String,
+    pub gemini_start_sec: f64,
+    pub tts_duration_sec: f64,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AudioDescriptionProject {
+    pub format: String,
+    pub version: u32,
+    pub created_at_utc: String,
+    pub updated_at_utc: String,
+    pub source_path: PathBuf,
+    pub output_mp3_path: PathBuf,
+    pub source_duration_sec: f64,
+    pub output_duration_sec: f64,
+    pub language: Language,
+    pub language_code: String,
+    pub verbosity: String,
+    pub allow_extended_pauses: bool,
+    #[serde(default = "default_true")]
+    pub recognize_characters: bool,
+    pub gemini_model: String,
+    pub tts_engine: TtsEngine,
+    pub tts_voice: String,
+    pub tts_rate: i32,
+    pub tts_pitch: i32,
+    pub tts_volume: i32,
+    pub bitrate_kbps: u32,
+    pub ducking_db: f32,
+    pub fade_ms: u32,
+    pub protected_intervals: Vec<AudioDescriptionProjectInterval>,
+    pub descriptions: Vec<AudioDescriptionProjectDescription>,
+    pub excluded_descriptions: Vec<AudioDescriptionProjectExcluded>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AudioDescriptionProjectEditOutcome {
+    pub project: AudioDescriptionProject,
+}
+
+#[derive(Debug)]
+pub struct AudioDescriptionProjectPreviewAudio {
+    path: PathBuf,
+    cache_dir: PathBuf,
+    duration_sec: f64,
+}
+
+impl AudioDescriptionProjectPreviewAudio {
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn duration_sec(&self) -> f64 {
+        self.duration_sec
+    }
+}
+
+impl Drop for AudioDescriptionProjectPreviewAudio {
+    fn drop(&mut self) {
+        crate::log_if_err!(
+            fs::remove_dir_all(&self.cache_dir),
+            "Audio description cleanup operation failed"
+        );
+    }
+}
+
+#[derive(Debug)]
+pub enum AudioDescriptionProjectEditError {
+    Cancelled,
+    TooLong {
+        available_sec: f64,
+        synthesized_sec: f64,
+    },
+    Other(String),
+}
+
+impl std::fmt::Display for AudioDescriptionProjectEditError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Cancelled => formatter.write_str("cancelled"),
+            Self::TooLong {
+                available_sec,
+                synthesized_sec,
+            } => write!(
+                formatter,
+                "Audio description: synthesized description is too long ({synthesized_sec:.3}s; available {available_sec:.3}s)"
+            ),
+            Self::Other(message) => formatter.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for AudioDescriptionProjectEditError {}
+
+fn default_true() -> bool {
+    true
+}
+
+fn notify_status(callbacks: &mut AudioDescriptionCallbacks, stage: &str, message: &str) {
+    if let Some(callback) = callbacks.status.as_mut() {
+        callback(stage, message);
+    }
+}
+
+fn notify_progress(callbacks: &mut AudioDescriptionCallbacks, progress: u32) {
+    if let Some(callback) = callbacks.progress.as_mut() {
+        callback(progress.min(100));
+    }
+}
+
+pub fn language_code(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "it",
+        Language::English => "en",
+        Language::German => "de",
+        Language::Spanish => "es",
+        Language::Portuguese => "pt",
+        Language::PortugueseBrazilian => "pt-BR",
+        Language::Swedish => "sv",
+        Language::Vietnamese => "vi",
+        Language::Czech => "cs",
+        Language::Polish => "pl",
+        Language::French => "fr",
+        Language::Serbian => "sr",
+        Language::Ukrainian => "uk",
+        Language::Lithuanian => "lt",
+        Language::Russian => "ru",
+        Language::Chinese => "zh",
+        Language::Hindi => "hi",
+    }
+}
+
+fn temporary_job_dir() -> Result<PathBuf, String> {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let dir = crate::settings::settings_dir()
+        .join("audio_description_cache")
+        .join(format!("{}_{}", std::process::id(), stamp));
+    fs::create_dir_all(&dir)
+        .map_err(|error| format!("Audio description: create cache failed: {error}"))?;
+    Ok(dir)
+}
+
+fn write_pyannote_wav(
+    input_path: &Path,
+    output_path: &Path,
+    cancel: &Arc<AtomicBool>,
+) -> Result<(), String> {
+    let mut source = crate::ffmpeg_source::FfmpegSource::try_new(input_path, 0, None, None)
+        .map_err(|error| format!("Audio description: FFmpeg audio decode failed: {error}"))?;
+    let input_rate = source.sample_rate().max(1);
+    let input_channels = source.channels().max(1) as usize;
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: PYANNOTE_SAMPLE_RATE,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut writer = hound::WavWriter::create(output_path, spec)
+        .map_err(|error| format!("Audio description: create Pyannote WAV failed: {error}"))?;
+    let output_step = input_rate as f64 / PYANNOTE_SAMPLE_RATE as f64;
+    let mut next_output_position = 0.0_f64;
+    let mut frame_index = 0_u64;
+    let mut channel_count = 0_usize;
+    let mut frame_sum = 0.0_f32;
+    let mut previous_mono: Option<f32> = None;
+    let mut written = 0_u64;
+
+    for sample in source.by_ref() {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("cancelled".to_string());
+        }
+        frame_sum += sample;
+        channel_count += 1;
+        if channel_count < input_channels {
+            continue;
+        }
+
+        let mono = (frame_sum / input_channels as f32).clamp(-1.0, 1.0);
+        let current_position = frame_index as f64;
+        if let Some(previous) = previous_mono {
+            let previous_position = current_position - 1.0;
+            while next_output_position <= current_position + f64::EPSILON {
+                if next_output_position >= previous_position {
+                    let fraction = (next_output_position - previous_position).clamp(0.0, 1.0);
+                    let interpolated = previous + (mono - previous) * fraction as f32;
+                    let pcm = (interpolated * i16::MAX as f32)
+                        .round()
+                        .clamp(i16::MIN as f32, i16::MAX as f32)
+                        as i16;
+                    writer.write_sample(pcm).map_err(|error| {
+                        format!("Audio description: write Pyannote WAV failed: {error}")
+                    })?;
+                    written = written.saturating_add(1);
+                }
+                next_output_position += output_step;
+            }
+        } else {
+            let pcm = (mono * i16::MAX as f32)
+                .round()
+                .clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+            writer.write_sample(pcm).map_err(|error| {
+                format!("Audio description: write Pyannote WAV failed: {error}")
+            })?;
+            written = written.saturating_add(1);
+            next_output_position = output_step;
+        }
+        previous_mono = Some(mono);
+        frame_index = frame_index.saturating_add(1);
+        channel_count = 0;
+        frame_sum = 0.0;
+    }
+
+    writer
+        .finalize()
+        .map_err(|error| format!("Audio description: finalize Pyannote WAV failed: {error}"))?;
+    if written == 0 {
+        crate::log_if_err!(
+            fs::remove_file(output_path),
+            "Audio description cleanup operation failed"
+        );
+        return Err("Audio description: decoded soundtrack is empty".to_string());
+    }
+    Ok(())
+}
+
+fn prepare_gemini_chunks(
+    input_path: &Path,
+    duration_sec: f64,
+    cache_dir: &Path,
+    cancel: &Arc<AtomicBool>,
+) -> Result<Vec<AudioDescriptionPreparedChunk>, String> {
+    if duration_sec <= GEMINI_CHUNK_SECONDS as f64 {
+        let file_size = fs::metadata(input_path)
+            .map_err(|error| format!("Audio description: read media metadata failed: {error}"))?
+            .len();
+        if file_size == 0 || file_size >= GEMINI_MAX_CHUNK_BYTES {
+            return Err(format!(
+                "Audio description: Gemini input has unsupported size: {}",
+                input_path.display()
+            ));
+        }
+        return Ok(vec![AudioDescriptionPreparedChunk {
+            path: input_path.to_string_lossy().to_string(),
+            start_sec: 0.0,
+            end_sec: duration_sec,
+        }]);
+    }
+
+    let output_pattern = cache_dir.join("gemini_chunk_%04d.mkv");
+    crate::ffmpeg_export::segment_media_file(
+        input_path,
+        &output_pattern,
+        GEMINI_CHUNK_SECONDS,
+        1,
+        None,
+    )
+    .map_err(|error| format!("Audio description: FFmpeg chunk preparation failed: {error}"))?;
+    if cancel.load(Ordering::Relaxed) {
+        return Err("cancelled".to_string());
+    }
+
+    let mut paths = fs::read_dir(cache_dir)
+        .map_err(|error| format!("Audio description: read chunk folder failed: {error}"))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("gemini_chunk_") && name.ends_with(".mkv"))
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
+    if paths.is_empty() {
+        return Err("Audio description: FFmpeg produced no Gemini chunks".to_string());
+    }
+
+    let mut chunks = Vec::with_capacity(paths.len());
+    let mut cursor = 0.0_f64;
+    let path_count = paths.len();
+    for (index, path) in paths.into_iter().enumerate() {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("cancelled".to_string());
+        }
+        let file_size = fs::metadata(&path)
+            .map_err(|error| format!("Audio description: read chunk metadata failed: {error}"))?
+            .len();
+        if file_size == 0 || file_size >= GEMINI_MAX_CHUNK_BYTES {
+            return Err(format!(
+                "Audio description: Gemini chunk has unsupported size: {}",
+                path.display()
+            ));
+        }
+        let measured = crate::ffmpeg_export::media_duration_seconds(&path)
+            .unwrap_or(GEMINI_CHUNK_SECONDS as f64)
+            .max(0.001);
+        let start_sec = cursor;
+        let end_sec = if index + 1 == path_count {
+            duration_sec
+        } else {
+            (start_sec + measured).min(duration_sec)
+        };
+        if end_sec <= start_sec {
+            return Err("Audio description: invalid Gemini chunk timeline".to_string());
+        }
+        chunks.push(AudioDescriptionPreparedChunk {
+            path: path.to_string_lossy().to_string(),
+            start_sec,
+            end_sec,
+        });
+        if index + 1 < path_count {
+            cursor = end_sec;
+        }
+    }
+    Ok(chunks)
+}
+
+fn read_wav_as_f32(path: &Path) -> Result<(Vec<f32>, u32, u16), String> {
+    let reader = hound::WavReader::open(path)
+        .map_err(|error| format!("Audio description: open synthesized WAV failed: {error}"))?;
+    let spec = reader.spec();
+    let sample_rate = spec.sample_rate.max(1);
+    let channels = spec.channels.max(1);
+    let mut samples = Vec::new();
+    match spec.sample_format {
+        hound::SampleFormat::Float => {
+            for sample in reader.into_samples::<f32>() {
+                samples.push(
+                    sample
+                        .map_err(|error| format!("Audio description: WAV sample failed: {error}"))?
+                        .clamp(-1.0, 1.0),
+                );
+            }
+        }
+        hound::SampleFormat::Int if spec.bits_per_sample <= 16 => {
+            let reader = hound::WavReader::open(path).map_err(|error| {
+                format!("Audio description: reopen synthesized WAV failed: {error}")
+            })?;
+            for sample in reader.into_samples::<i16>() {
+                samples.push(
+                    sample
+                        .map_err(|error| format!("Audio description: WAV sample failed: {error}"))?
+                        as f32
+                        / 32768.0,
+                );
+            }
+        }
+        hound::SampleFormat::Int => {
+            let reader = hound::WavReader::open(path).map_err(|error| {
+                format!("Audio description: reopen synthesized WAV failed: {error}")
+            })?;
+            let denominator = ((1_i64 << (spec.bits_per_sample - 1)) - 1).max(1) as f32;
+            for sample in reader.into_samples::<i32>() {
+                samples.push(
+                    sample
+                        .map_err(|error| format!("Audio description: WAV sample failed: {error}"))?
+                        as f32
+                        / denominator,
+                );
+            }
+        }
+    }
+    if samples.is_empty() {
+        return Err("Audio description: synthesized audio is empty".to_string());
+    }
+    Ok((samples, sample_rate, channels))
+}
+
+fn rms_dbfs(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return -120.0;
+    }
+    let sum = samples
+        .iter()
+        .map(|sample| {
+            let value = *sample as f64;
+            value * value
+        })
+        .sum::<f64>();
+    let rms = (sum / samples.len() as f64).sqrt();
+    if rms <= 1.0e-9 {
+        -120.0
+    } else {
+        (20.0 * rms.log10()) as f32
+    }
+}
+
+/// Reproduces Omni's Edge cleanup rule on decoded PCM: threshold is the louder
+/// of -55 dBFS and average-35 dB, scan in 5 ms steps using a 60 ms window,
+/// preserve 30 ms after the last non-silent window, and trim only at least 60 ms.
+fn trim_edge_trailing_silence(samples: &mut Vec<f32>, sample_rate: u32, channels: u16) -> usize {
+    if samples.is_empty() {
+        return 0;
+    }
+    let channels = channels.max(1) as usize;
+    let frames = samples.len() / channels;
+    let minimum_input_frames = ((sample_rate as u64 * 100) / 1000).max(1) as usize;
+    if frames < minimum_input_frames {
+        return 0;
+    }
+
+    let threshold_db = (-55.0_f32).max(rms_dbfs(samples) - 35.0);
+    let seek_frames = ((sample_rate as u64 * EDGE_TRAILING_SEEK_MS) / 1000).max(1) as usize;
+    let window_frames = ((sample_rate as u64 * EDGE_TRAILING_WINDOW_MS) / 1000).max(1) as usize;
+    if frames < window_frames {
+        return 0;
+    }
+    let keep_frames = ((sample_rate as u64 * EDGE_TRAILING_KEEP_MS) / 1000) as usize;
+    let minimum_remove_frames =
+        ((sample_rate as u64 * EDGE_TRAILING_MIN_REMOVE_MS) / 1000).max(1) as usize;
+
+    // Match pydub.detect_nonsilent(min_silence_len=60, seek_step=5):
+    // collect every silent 60 ms window, merge overlapping windows, then take
+    // the end of the final non-silent range and retain another 30 ms.
+    let last_slice_start = frames.saturating_sub(window_frames);
+    let mut slice_starts: Vec<usize> = (0..=last_slice_start).step_by(seek_frames).collect();
+    if slice_starts.last().copied() != Some(last_slice_start) {
+        slice_starts.push(last_slice_start);
+    }
+    let mut silent_starts = Vec::new();
+    for start in slice_starts {
+        let end = start.saturating_add(window_frames).min(frames);
+        let start_sample = start.saturating_mul(channels);
+        let end_sample = end.saturating_mul(channels).min(samples.len());
+        if rms_dbfs(&samples[start_sample..end_sample]) <= threshold_db {
+            silent_starts.push(start);
+        }
+    }
+    let Some(mut previous) = silent_starts.first().copied() else {
+        return 0;
+    };
+    let mut current_start = previous;
+    let mut silent_ranges = Vec::new();
+    for start in silent_starts.into_iter().skip(1) {
+        let continuous = start == previous.saturating_add(seek_frames);
+        let has_gap = start > previous.saturating_add(window_frames);
+        if !continuous && has_gap {
+            silent_ranges.push((
+                current_start,
+                previous.saturating_add(window_frames).min(frames),
+            ));
+            current_start = start;
+        }
+        previous = start;
+    }
+    silent_ranges.push((
+        current_start,
+        previous.saturating_add(window_frames).min(frames),
+    ));
+
+    if silent_ranges.len() == 1 && silent_ranges[0] == (0, frames) {
+        return 0;
+    }
+    let mut previous_silence_end = 0_usize;
+    let mut last_nonsilent_end = None;
+    for (silence_start, silence_end) in &silent_ranges {
+        if *silence_start > previous_silence_end {
+            last_nonsilent_end = Some(*silence_start);
+        }
+        previous_silence_end = previous_silence_end.max(*silence_end);
+    }
+    if previous_silence_end < frames {
+        last_nonsilent_end = Some(frames);
+    }
+    let Some(last_active_frame) = last_nonsilent_end else {
+        return 0;
+    };
+
+    let keep_until = last_active_frame.saturating_add(keep_frames).min(frames);
+    let removable_frames = frames.saturating_sub(keep_until);
+    if removable_frames < minimum_remove_frames {
+        return 0;
+    }
+    let old_len = samples.len();
+    samples.truncate(keep_until.saturating_mul(channels));
+    old_len.saturating_sub(samples.len())
+}
+
+fn synthesize_description(
+    text: &str,
+    index: usize,
+    job: &AudioDescriptionJob,
+    cache_dir: &Path,
+    cancel: Arc<AtomicBool>,
+) -> Result<(Arc<[f32]>, u32, u16), String> {
+    let output = cache_dir.join(format!("description_{index:05}.wav"));
+    let chunk = TtsChunk {
+        text_to_read: text.to_string(),
+        original_len: text.len(),
+        override_voice: None,
+        pause_ms: None,
+    };
+    let options = AudiobookCommonOptions {
+        voice: &job.tts_voice,
+        output: &output,
+        progress_hwnd: HWND(0),
+        cancel: cancel.clone(),
+        language: job.tts_language,
+        part_naming_mode: AudiobookPartNamingMode::TitleNumber,
+        part_announcement_mode: AudiobookPartAnnouncementMode::None,
+        audiobook_title: "",
+        audiobook_bitrate_kbps: job.audiobook_bitrate_kbps,
+        rate: job.tts_rate,
+        pitch: job.tts_pitch,
+        volume: job.tts_volume,
+        sapi4_threads: None,
+    };
+    let config = MixedAudiobookConfig {
+        main_engine: job.tts_engine,
+    };
+    let mut progress = 0_usize;
+    if let Err(error) =
+        render_mixed_audiobook_part(&[chunk], &mut progress, &output, &options, &config)
+    {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("cancelled".to_string());
+        }
+        return Err(error);
+    }
+    if !output.is_file() {
+        return Err(format!(
+            "Audio description: TTS did not create {}",
+            output.display()
+        ));
+    }
+    let (mut samples, sample_rate, channels) = read_wav_as_f32(&output)?;
+    if job.tts_engine == TtsEngine::Edge {
+        let removed = trim_edge_trailing_silence(&mut samples, sample_rate, channels);
+        if removed > 0 {
+            crate::log_debug(&format!(
+                "Audio description: removed {} trailing Edge PCM samples from cue {}",
+                removed, index
+            ));
+        }
+    }
+    crate::log_if_err!(
+        fs::remove_file(&output),
+        "Audio description cleanup operation failed"
+    );
+    if samples.is_empty() {
+        return Err(format!(
+            "Audio description: TTS cue {} became empty after validation",
+            index
+        ));
+    }
+    Ok((Arc::from(samples), sample_rate, channels))
+}
+
+fn normalize_intervals(intervals: &[BridgeInterval], duration_sec: f64) -> Vec<(f64, f64)> {
+    let mut values: Vec<(f64, f64)> = intervals
+        .iter()
+        .filter_map(|interval| {
+            let start = interval.start_sec.max(0.0).min(duration_sec);
+            let end = interval.end_sec.max(start).min(duration_sec);
+            (end > start).then_some((start, end))
+        })
+        .collect();
+    values.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let mut merged: Vec<(f64, f64)> = Vec::new();
+    for (start, end) in values {
+        if let Some(last) = merged.last_mut()
+            && start <= last.1
+        {
+            last.1 = last.1.max(end);
+        } else {
+            merged.push((start, end));
+        }
+    }
+    merged
+}
+
+fn speech_free_intervals(protected: &[(f64, f64)], duration_sec: f64) -> Vec<(f64, f64)> {
+    let mut free = Vec::new();
+    let mut cursor = 0.0_f64;
+    for (start, end) in protected {
+        if *start > cursor {
+            free.push((cursor, *start));
+        }
+        cursor = cursor.max(*end);
+    }
+    if duration_sec > cursor {
+        free.push((cursor, duration_sec));
+    }
+    free
+}
+
+fn choose_slot(
+    free: &[(f64, f64)],
+    desired_start: f64,
+    required_duration: f64,
+    earliest_start: f64,
+) -> Option<f64> {
+    free.iter()
+        .filter_map(|(gap_start, gap_end)| {
+            let lower = gap_start.max(earliest_start);
+            let upper = gap_end - required_duration;
+            if upper < lower {
+                return None;
+            }
+            let start = desired_start.clamp(lower, upper);
+            let distance = (start - desired_start).abs();
+            (distance <= MAX_SHIFT_SEC).then_some((distance, start))
+        })
+        .min_by(|left, right| left.0.total_cmp(&right.0))
+        .map(|(_, start)| start)
+}
+
+fn choose_pause_anchor(
+    free: &[(f64, f64)],
+    desired_start: f64,
+    earliest_start: f64,
+) -> Option<f64> {
+    free.iter()
+        .filter_map(|(gap_start, gap_end)| {
+            let lower = gap_start.max(earliest_start);
+            let upper = gap_end - MIN_EXTENDED_ANCHOR_SEC;
+            if upper < lower {
+                return None;
+            }
+            let start = desired_start.clamp(lower, upper);
+            let distance = (start - desired_start).abs();
+            (distance <= MAX_SHIFT_SEC).then_some((distance, start))
+        })
+        .min_by(|left, right| left.0.total_cmp(&right.0))
+        .map(|(_, start)| start)
+}
+
+fn schedule_synthesized_descriptions(
+    descriptions: &[SynthesizedDescription],
+    protected_intervals: &[BridgeInterval],
+    duration_sec: f64,
+    allow_extended_pauses: bool,
+) -> (Vec<ScheduledDescription>, Vec<DroppedDescription>) {
+    let protected = normalize_intervals(protected_intervals, duration_sec);
+    let free = speech_free_intervals(&protected, duration_sec);
+    let mut sorted = descriptions.to_vec();
+    sorted.sort_by(|left, right| left.desired_start_sec.total_cmp(&right.desired_start_sec));
+    let mut scheduled = Vec::new();
+    let mut dropped = Vec::new();
+    let mut earliest = 0.0_f64;
+
+    for description in sorted {
+        let frames = description.samples.len() / description.channels.max(1) as usize;
+        let required = frames as f64 / description.sample_rate.max(1) as f64;
+        if let Some(start) = choose_slot(
+            &free,
+            description.desired_start_sec,
+            required.max(0.001),
+            earliest,
+        ) {
+            scheduled.push(ScheduledDescription {
+                original_index: description.original_index,
+                text: description.text,
+                desired_start_sec: description.desired_start_sec,
+                start_sec: start,
+                samples: description.samples,
+                sample_rate: description.sample_rate,
+                channels: description.channels,
+                extended_pause: false,
+            });
+            earliest = start + required + 0.001;
+            continue;
+        }
+        if allow_extended_pauses
+            && let Some(anchor) =
+                choose_pause_anchor(&free, description.desired_start_sec, earliest)
+        {
+            scheduled.push(ScheduledDescription {
+                original_index: description.original_index,
+                text: description.text,
+                desired_start_sec: description.desired_start_sec,
+                start_sec: anchor,
+                samples: description.samples,
+                sample_rate: description.sample_rate,
+                channels: description.channels,
+                extended_pause: true,
+            });
+            earliest = anchor + MIN_EXTENDED_ANCHOR_SEC + 0.001;
+        } else {
+            dropped.push(DroppedDescription {
+                original_index: description.original_index,
+                text: description.text,
+                desired_start_sec: description.desired_start_sec,
+                tts_duration_sec: required,
+            });
+        }
+    }
+    (scheduled, dropped)
+}
+
+pub fn audio_description_project_path(output_path: &Path) -> PathBuf {
+    let mut path = output_path.to_path_buf();
+    path.set_extension("sonarpad-ad.json");
+    path
+}
+
+fn scheduled_duration_sec(description: &ScheduledDescription) -> f64 {
+    let frames = description.samples.len() / description.channels.max(1) as usize;
+    frames as f64 / description.sample_rate.max(1) as f64
+}
+
+fn build_audio_description_project(
+    job: &AudioDescriptionJob,
+    source_duration_sec: f64,
+    output_duration_sec: f64,
+    protected_intervals: &[BridgeInterval],
+    scheduled: &[ScheduledDescription],
+    dropped: &[DroppedDescription],
+) -> AudioDescriptionProject {
+    let now = chrono::Utc::now().to_rfc3339();
+    let mut output_offset_sec = 0.0_f64;
+    let mut descriptions = Vec::with_capacity(scheduled.len());
+    for description in scheduled {
+        let tts_duration_sec = scheduled_duration_sec(description);
+        let output_start_sec = description.start_sec + output_offset_sec;
+        let output_end_sec = output_start_sec + tts_duration_sec;
+        let (duck_start_sec, duck_end_sec, extended_pause_duration_sec) =
+            if description.extended_pause {
+                output_offset_sec += tts_duration_sec;
+                (None, None, tts_duration_sec)
+            } else {
+                (
+                    Some((output_start_sec - 0.150).max(0.0)),
+                    Some(output_end_sec + 0.150),
+                    0.0,
+                )
+            };
+        descriptions.push(AudioDescriptionProjectDescription {
+            id: description.original_index,
+            text: description.text.clone(),
+            original_text: description.text.clone(),
+            rendered_text: description.text.clone(),
+            modified: false,
+            gemini_start_sec: description.desired_start_sec,
+            source_start_sec: description.start_sec,
+            output_start_sec,
+            output_end_sec,
+            tts_duration_sec,
+            extended_pause: description.extended_pause,
+            extended_pause_duration_sec,
+            duck_start_sec,
+            duck_end_sec,
+        });
+    }
+    let excluded_descriptions = dropped
+        .iter()
+        .map(|description| AudioDescriptionProjectExcluded {
+            id: description.original_index,
+            text: description.text.clone(),
+            gemini_start_sec: description.desired_start_sec,
+            tts_duration_sec: description.tts_duration_sec,
+            reason: "no_safe_slot_after_real_tts_duration".to_string(),
+        })
+        .collect();
+    AudioDescriptionProject {
+        format: "sonarpad-audio-description-project".to_string(),
+        version: 1,
+        created_at_utc: now.clone(),
+        updated_at_utc: now,
+        source_path: job.input_path.clone(),
+        output_mp3_path: job.output_path.clone(),
+        source_duration_sec,
+        output_duration_sec,
+        language: job.tts_language,
+        language_code: job.language_code.clone(),
+        verbosity: job.verbosity.as_bridge_value().to_string(),
+        allow_extended_pauses: job.allow_extended_pauses,
+        recognize_characters: job.recognize_characters,
+        gemini_model: job.gemini_model.clone(),
+        tts_engine: job.tts_engine,
+        tts_voice: job.tts_voice.clone(),
+        tts_rate: job.tts_rate,
+        tts_pitch: job.tts_pitch,
+        tts_volume: job.tts_volume,
+        bitrate_kbps: AUDIO_DESCRIPTION_BITRATE_KBPS,
+        ducking_db: AUDIO_DESCRIPTION_DUCKING_DB,
+        fade_ms: AUDIO_DESCRIPTION_FADE_MS,
+        protected_intervals: protected_intervals
+            .iter()
+            .map(|interval| AudioDescriptionProjectInterval {
+                start_sec: interval.start_sec,
+                end_sec: interval.end_sec,
+            })
+            .collect(),
+        descriptions,
+        excluded_descriptions,
+    }
+}
+
+fn temporary_sibling_path(path: &Path, label: &str) -> PathBuf {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("audio_description");
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+    let file_name = if extension.is_empty() {
+        format!(".{stem}.{label}.{}.{}", std::process::id(), stamp)
+    } else {
+        format!(
+            ".{stem}.{label}.{}.{}.{}",
+            std::process::id(),
+            stamp,
+            extension
+        )
+    };
+    parent.join(file_name)
+}
+
+fn commit_audio_description_pair(
+    temporary_mp3: &Path,
+    final_mp3: &Path,
+    temporary_project: &Path,
+    final_project: &Path,
+) -> Result<(), String> {
+    let mp3_backup = temporary_sibling_path(final_mp3, "backup");
+    let project_backup = temporary_sibling_path(final_project, "backup");
+    let had_mp3 = final_mp3.exists();
+    let had_project = final_project.exists();
+
+    if had_mp3 {
+        fs::rename(final_mp3, &mp3_backup)
+            .map_err(|error| format!("Audio description: backup old MP3 failed: {error}"))?;
+    }
+    if had_project && let Err(error) = fs::rename(final_project, &project_backup) {
+        if had_mp3 {
+            crate::log_if_err!(
+                fs::rename(&mp3_backup, final_mp3),
+                "Audio description cleanup operation failed"
+            );
+        }
+        return Err(format!(
+            "Audio description: backup old project failed: {error}"
+        ));
+    }
+
+    if let Err(error) = fs::rename(temporary_mp3, final_mp3) {
+        if had_project {
+            crate::log_if_err!(
+                fs::rename(&project_backup, final_project),
+                "Audio description cleanup operation failed"
+            );
+        }
+        if had_mp3 {
+            crate::log_if_err!(
+                fs::rename(&mp3_backup, final_mp3),
+                "Audio description cleanup operation failed"
+            );
+        }
+        return Err(format!("Audio description: finalize MP3 failed: {error}"));
+    }
+    if let Err(error) = fs::rename(temporary_project, final_project) {
+        crate::log_if_err!(
+            fs::remove_file(final_mp3),
+            "Audio description cleanup operation failed"
+        );
+        if had_mp3 {
+            crate::log_if_err!(
+                fs::rename(&mp3_backup, final_mp3),
+                "Audio description cleanup operation failed"
+            );
+        }
+        if had_project {
+            crate::log_if_err!(
+                fs::rename(&project_backup, final_project),
+                "Audio description cleanup operation failed"
+            );
+        }
+        return Err(format!(
+            "Audio description: finalize project failed: {error}"
+        ));
+    }
+
+    if had_mp3 {
+        crate::log_if_err!(
+            fs::remove_file(mp3_backup),
+            "Audio description cleanup operation failed"
+        );
+    }
+    if had_project {
+        crate::log_if_err!(
+            fs::remove_file(project_backup),
+            "Audio description cleanup operation failed"
+        );
+    }
+    Ok(())
+}
+
+pub fn load_audio_description_project(path: &Path) -> Result<AudioDescriptionProject, String> {
+    let raw = fs::read(path)
+        .map_err(|error| format!("Audio description: read project failed: {error}"))?;
+    let mut project: AudioDescriptionProject = serde_json::from_slice(&raw)
+        .map_err(|error| format!("Audio description: invalid project JSON: {error}"))?;
+    if project.format != "sonarpad-audio-description-project" || project.version != 1 {
+        return Err("Audio description: unsupported project format or version".to_string());
+    }
+    if project.descriptions.is_empty() {
+        return Err("Audio description: project contains no inserted descriptions".to_string());
+    }
+    for description in &mut project.descriptions {
+        if description.rendered_text.is_empty() {
+            description.rendered_text = description.text.clone();
+        }
+    }
+    Ok(project)
+}
+
+pub fn save_audio_description_project(
+    path: &Path,
+    project: &AudioDescriptionProject,
+) -> Result<(), String> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Audio description: create project folder failed: {error}"))?;
+    }
+    let temp_path = path.with_extension("sonarpad-ad.json.tmp");
+    let bytes = serde_json::to_vec_pretty(project)
+        .map_err(|error| format!("Audio description: serialize project failed: {error}"))?;
+    fs::write(&temp_path, bytes)
+        .map_err(|error| format!("Audio description: write temporary project failed: {error}"))?;
+    if path.exists() {
+        fs::remove_file(path)
+            .map_err(|error| format!("Audio description: replace old project failed: {error}"))?;
+    }
+    fs::rename(&temp_path, path)
+        .map_err(|error| format!("Audio description: finalize project failed: {error}"))?;
+    Ok(())
+}
+
+fn audio_description_job_from_project(project: &AudioDescriptionProject) -> AudioDescriptionJob {
+    AudioDescriptionJob {
+        input_path: project.source_path.clone(),
+        output_path: project.output_mp3_path.clone(),
+        language_code: project.language_code.clone(),
+        tts_language: project.language,
+        verbosity: verbosity_from_project(&project.verbosity),
+        allow_extended_pauses: project.allow_extended_pauses,
+        recognize_characters: project.recognize_characters,
+        character_catalog: None,
+        save_project: true,
+        tts_engine: project.tts_engine,
+        tts_voice: project.tts_voice.clone(),
+        tts_rate: project.tts_rate,
+        tts_pitch: project.tts_pitch,
+        tts_volume: project.tts_volume,
+        gemini_api_key: String::new(),
+        gemini_model: project.gemini_model.clone(),
+        audiobook_bitrate_kbps: project.bitrate_kbps,
+    }
+}
+
+pub fn audio_description_project_edit_available_duration(
+    project: &AudioDescriptionProject,
+    index: usize,
+) -> Result<Option<f64>, String> {
+    let description = project.descriptions.get(index).ok_or_else(|| {
+        "Audio description: selected project description does not exist".to_string()
+    })?;
+    if description.extended_pause {
+        return Ok(None);
+    }
+
+    let protected: Vec<BridgeInterval> = project
+        .protected_intervals
+        .iter()
+        .map(|interval| BridgeInterval {
+            start_sec: interval.start_sec,
+            end_sec: interval.end_sec,
+        })
+        .collect();
+    let normalized = normalize_intervals(&protected, project.source_duration_sec);
+    let free = speech_free_intervals(&normalized, project.source_duration_sec);
+    let start = description.source_start_sec.max(0.0);
+    let Some((_, gap_end)) = free
+        .iter()
+        .find(|(gap_start, gap_end)| start + 0.001 >= *gap_start && start <= *gap_end + 0.001)
+    else {
+        return Ok(Some(0.0));
+    };
+    let next_description_start = project
+        .descriptions
+        .iter()
+        .enumerate()
+        .filter(|(candidate_index, candidate)| {
+            *candidate_index != index && candidate.source_start_sec > start + 0.001
+        })
+        .map(|(_, candidate)| candidate.source_start_sec)
+        .min_by(f64::total_cmp);
+    let available_end = next_description_start
+        .map(|next_start| gap_end.min(next_start))
+        .unwrap_or(*gap_end);
+    Ok(Some((available_end - start).max(0.0)))
+}
+
+fn validate_audio_description_project_edit_duration(
+    available_duration_sec: Option<f64>,
+    synthesized_duration_sec: f64,
+) -> Result<(), AudioDescriptionProjectEditError> {
+    if let Some(available_sec) = available_duration_sec
+        && synthesized_duration_sec > available_sec + 0.010
+    {
+        return Err(AudioDescriptionProjectEditError::TooLong {
+            available_sec,
+            synthesized_sec: synthesized_duration_sec,
+        });
+    }
+    Ok(())
+}
+
+fn write_audio_description_preview_wav(
+    output: &Path,
+    samples: &[f32],
+    sample_rate: u32,
+    channels: u16,
+) -> Result<(), String> {
+    let spec = hound::WavSpec {
+        channels: channels.max(1),
+        sample_rate: sample_rate.max(1),
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut writer = hound::WavWriter::create(output, spec)
+        .map_err(|error| format!("Audio description: create preview WAV failed: {error}"))?;
+    for sample in samples {
+        writer
+            .write_sample(sample.clamp(-1.0, 1.0))
+            .map_err(|error| format!("Audio description: write preview WAV failed: {error}"))?;
+    }
+    writer
+        .finalize()
+        .map_err(|error| format!("Audio description: finalize preview WAV failed: {error}"))
+}
+
+pub fn synthesize_audio_description_project_preview(
+    project: &AudioDescriptionProject,
+    index: usize,
+    text: &str,
+    cancel: Arc<AtomicBool>,
+) -> Result<AudioDescriptionProjectPreviewAudio, String> {
+    let normalized_text = text.trim();
+    if normalized_text.is_empty() {
+        return Err("Audio description: description text cannot be empty".to_string());
+    }
+    let current = project.descriptions.get(index).ok_or_else(|| {
+        "Audio description: selected project description does not exist".to_string()
+    })?;
+    if project.tts_voice.trim().is_empty() {
+        return Err("Audio description: project has no synthesis voice".to_string());
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return Err("cancelled".to_string());
+    }
+
+    let job = audio_description_job_from_project(project);
+    let cache_dir = temporary_job_dir()?;
+    let synthesis_result = synthesize_description(
+        normalized_text,
+        current.id,
+        &job,
+        &cache_dir,
+        cancel.clone(),
+    );
+    let (samples, sample_rate, channels) = match synthesis_result {
+        Ok(values) => values,
+        Err(error) => {
+            crate::log_if_err!(
+                fs::remove_dir_all(&cache_dir),
+                "Audio description cleanup operation failed"
+            );
+            return Err(error);
+        }
+    };
+    if cancel.load(Ordering::Relaxed) {
+        crate::log_if_err!(
+            fs::remove_dir_all(&cache_dir),
+            "Audio description cleanup operation failed"
+        );
+        return Err("cancelled".to_string());
+    }
+    let frames = samples.len() / channels.max(1) as usize;
+    let duration_sec = frames as f64 / sample_rate.max(1) as f64;
+    let path = cache_dir.join("modified_description_preview.wav");
+    if let Err(error) =
+        write_audio_description_preview_wav(&path, samples.as_ref(), sample_rate, channels)
+    {
+        crate::log_if_err!(
+            fs::remove_dir_all(&cache_dir),
+            "Audio description cleanup operation failed"
+        );
+        return Err(error);
+    }
+    Ok(AudioDescriptionProjectPreviewAudio {
+        path,
+        cache_dir,
+        duration_sec,
+    })
+}
+
+pub fn apply_audio_description_project_edit(
+    project_path: &Path,
+    project: &AudioDescriptionProject,
+    index: usize,
+    text: &str,
+    cancel: Arc<AtomicBool>,
+) -> Result<AudioDescriptionProjectEditOutcome, AudioDescriptionProjectEditError> {
+    let normalized_text = text.trim();
+    if normalized_text.is_empty() {
+        return Err(AudioDescriptionProjectEditError::Other(
+            "Audio description: description text cannot be empty".to_string(),
+        ));
+    }
+    let current = project.descriptions.get(index).ok_or_else(|| {
+        AudioDescriptionProjectEditError::Other(
+            "Audio description: selected project description does not exist".to_string(),
+        )
+    })?;
+    let available_duration_sec = audio_description_project_edit_available_duration(project, index)
+        .map_err(AudioDescriptionProjectEditError::Other)?;
+    if current.text == normalized_text {
+        return Ok(AudioDescriptionProjectEditOutcome {
+            project: project.clone(),
+        });
+    }
+    if project.tts_voice.trim().is_empty() {
+        return Err(AudioDescriptionProjectEditError::Other(
+            "Audio description: project has no synthesis voice".to_string(),
+        ));
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return Err(AudioDescriptionProjectEditError::Cancelled);
+    }
+
+    let job = audio_description_job_from_project(project);
+    let cache_dir = temporary_job_dir().map_err(AudioDescriptionProjectEditError::Other)?;
+    let synthesis_result = synthesize_description(
+        normalized_text,
+        current.id,
+        &job,
+        &cache_dir,
+        cancel.clone(),
+    );
+    crate::log_if_err!(
+        fs::remove_dir_all(&cache_dir),
+        "Audio description cleanup operation failed"
+    );
+    let (samples, sample_rate, channels) = synthesis_result.map_err(|error| {
+        if error == "cancelled" || cancel.load(Ordering::Relaxed) {
+            AudioDescriptionProjectEditError::Cancelled
+        } else {
+            AudioDescriptionProjectEditError::Other(error)
+        }
+    })?;
+    if cancel.load(Ordering::Relaxed) {
+        return Err(AudioDescriptionProjectEditError::Cancelled);
+    }
+    let frames = samples.len() / channels.max(1) as usize;
+    let synthesized_duration_sec = frames as f64 / sample_rate.max(1) as f64;
+    validate_audio_description_project_edit_duration(
+        available_duration_sec,
+        synthesized_duration_sec,
+    )?;
+
+    let mut updated = project.clone();
+    let description = updated.descriptions.get_mut(index).ok_or_else(|| {
+        AudioDescriptionProjectEditError::Other(
+            "Audio description: selected project description does not exist".to_string(),
+        )
+    })?;
+    description.text = normalized_text.to_string();
+    description.modified = description.text != description.original_text;
+    updated.updated_at_utc = chrono::Utc::now().to_rfc3339();
+    save_audio_description_project(project_path, &updated)
+        .map_err(AudioDescriptionProjectEditError::Other)?;
+    Ok(AudioDescriptionProjectEditOutcome { project: updated })
+}
+
+pub fn delete_audio_description_project_description(
+    project_path: &Path,
+    project: &AudioDescriptionProject,
+    index: usize,
+) -> Result<AudioDescriptionProject, String> {
+    if project.descriptions.len() <= 1 {
+        return Err(
+            "Audio description: the only project description cannot be deleted".to_string(),
+        );
+    }
+    if index >= project.descriptions.len() {
+        return Err("Audio description: selected project description does not exist".to_string());
+    }
+    let mut updated = project.clone();
+    updated.descriptions.remove(index);
+    updated.updated_at_utc = chrono::Utc::now().to_rfc3339();
+    save_audio_description_project(project_path, &updated)?;
+    Ok(updated)
+}
+
+fn validate_job(job: &AudioDescriptionJob) -> Result<(), String> {
+    if !job.input_path.is_file() {
+        return Err(format!(
+            "Audio description: input file not found: {}",
+            job.input_path.display()
+        ));
+    }
+    if job.output_path.as_os_str().is_empty() {
+        return Err("Audio description: output path is empty".to_string());
+    }
+    if job.gemini_api_key.trim().is_empty() {
+        return Err("Audio description: Gemini API key is not configured".to_string());
+    }
+    if job.tts_voice.trim().is_empty() {
+        return Err("Audio description: no synthesis voice is selected".to_string());
+    }
+    Ok(())
+}
+
+fn verbosity_from_project(value: &str) -> AudioDescriptionVerbosity {
+    match value {
+        "short" => AudioDescriptionVerbosity::Brief,
+        "standard" => AudioDescriptionVerbosity::Standard,
+        _ => AudioDescriptionVerbosity::Detailed,
+    }
+}
+
+pub fn reexport_audio_description_project(
+    project_path: &Path,
+    project: &AudioDescriptionProject,
+    cancel: Arc<AtomicBool>,
+    mut callbacks: AudioDescriptionCallbacks,
+) -> Result<AudioDescriptionOutcome, String> {
+    if !project.source_path.is_file() {
+        return Err(format!(
+            "Audio description: source file not found: {}",
+            project.source_path.display()
+        ));
+    }
+    if project.descriptions.is_empty() {
+        return Err("Audio description: project contains no descriptions to export".to_string());
+    }
+    if project.tts_voice.trim().is_empty() {
+        return Err("Audio description: project has no synthesis voice".to_string());
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return Err("cancelled".to_string());
+    }
+
+    let job = audio_description_job_from_project(project);
+    if let Some(parent) = job.output_path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Audio description: create output folder failed: {error}"))?;
+    }
+
+    notify_status(
+        &mut callbacks,
+        "tts_edit",
+        "Synthesizing the edited project descriptions with Sonarpad...",
+    );
+    notify_progress(&mut callbacks, 0);
+    let cache_dir = temporary_job_dir()?;
+    let synthesis_result = (|| -> Result<Vec<SynthesizedDescription>, String> {
+        let mut synthesized = Vec::with_capacity(project.descriptions.len());
+        for (index, description) in project.descriptions.iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err("cancelled".to_string());
+            }
+            let (samples, sample_rate, channels) =
+                synthesize_description(&description.text, index, &job, &cache_dir, cancel.clone())?;
+            synthesized.push(SynthesizedDescription {
+                original_index: description.id,
+                text: description.text.clone(),
+                desired_start_sec: description.source_start_sec,
+                samples,
+                sample_rate,
+                channels,
+            });
+            notify_progress(
+                &mut callbacks,
+                ((index + 1) as u32).saturating_mul(60) / project.descriptions.len().max(1) as u32,
+            );
+        }
+        Ok(synthesized)
+    })();
+    crate::log_if_err!(
+        fs::remove_dir_all(&cache_dir),
+        "Audio description cleanup operation failed"
+    );
+    let synthesized = synthesis_result?;
+
+    let protected_intervals: Vec<BridgeInterval> = project
+        .protected_intervals
+        .iter()
+        .map(|interval| BridgeInterval {
+            start_sec: interval.start_sec,
+            end_sec: interval.end_sec,
+        })
+        .collect();
+    notify_status(
+        &mut callbacks,
+        "schedule_edit",
+        "Checking edited descriptions against the saved Pyannote intervals...",
+    );
+    let (scheduled, dropped_descriptions) = schedule_synthesized_descriptions(
+        &synthesized,
+        &protected_intervals,
+        project.source_duration_sec,
+        project.allow_extended_pauses,
+    );
+    if scheduled.is_empty() {
+        return Err("Audio description: no edited description can be placed safely".to_string());
+    }
+
+    let mix_cues: Vec<AudioDescriptionMixCue> = scheduled
+        .iter()
+        .map(|description| AudioDescriptionMixCue {
+            start_sec: description.start_sec,
+            samples: description.samples.clone(),
+            sample_rate: description.sample_rate,
+            channels: description.channels,
+            extended_pause: description.extended_pause,
+        })
+        .collect();
+    let export_target = temporary_sibling_path(&project.output_mp3_path, "edited");
+    let export_options = AudioDescriptionExportOptions {
+        ducking_db: project.ducking_db,
+        fade_ms: project.fade_ms,
+        bitrate_kbps: project.bitrate_kbps,
+        cancel: cancel.clone(),
+    };
+    notify_status(
+        &mut callbacks,
+        "export_edit",
+        "Exporting the edited MP3 with Sonarpad's Rust FFmpeg libraries...",
+    );
+    let mut export_progress = |pct: u32| {
+        notify_progress(&mut callbacks, 65 + pct.saturating_mul(35) / 100);
+    };
+    if let Err(error) = export_audio_description_mp3(
+        &project.source_path,
+        &export_target,
+        &mix_cues,
+        &export_options,
+        Some(&mut export_progress),
+    ) {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        return Err(error);
+    }
+    let output_metadata = fs::metadata(&export_target)
+        .map_err(|error| format!("Audio description: edited MP3 validation failed: {error}"))?;
+    if output_metadata.len() == 0 {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        return Err("Audio description: edited MP3 is empty".to_string());
+    }
+
+    let calculated_output_duration = project.source_duration_sec
+        + scheduled
+            .iter()
+            .filter(|description| description.extended_pause)
+            .map(scheduled_duration_sec)
+            .sum::<f64>();
+    let output_duration_sec = crate::ffmpeg_export::media_duration_seconds(&export_target)
+        .unwrap_or(calculated_output_duration);
+    let mut updated = build_audio_description_project(
+        &job,
+        project.source_duration_sec,
+        output_duration_sec,
+        &protected_intervals,
+        &scheduled,
+        &dropped_descriptions,
+    );
+    updated.created_at_utc = project.created_at_utc.clone();
+    updated.updated_at_utc = chrono::Utc::now().to_rfc3339();
+    for description in &mut updated.descriptions {
+        if let Some(previous) = project
+            .descriptions
+            .iter()
+            .find(|candidate| candidate.id == description.id)
+        {
+            description.original_text = previous.original_text.clone();
+            description.modified = description.text != description.original_text;
+            description.gemini_start_sec = previous.gemini_start_sec;
+        }
+    }
+    let scheduled_ids = scheduled
+        .iter()
+        .map(|description| description.original_index)
+        .collect::<std::collections::HashSet<_>>();
+    let mut excluded = project.excluded_descriptions.clone();
+    excluded.retain(|description| !scheduled_ids.contains(&description.id));
+    for description in &dropped_descriptions {
+        excluded.retain(|candidate| candidate.id != description.original_index);
+        excluded.push(AudioDescriptionProjectExcluded {
+            id: description.original_index,
+            text: description.text.clone(),
+            gemini_start_sec: description.desired_start_sec,
+            tts_duration_sec: description.tts_duration_sec,
+            reason: "dropped_after_project_edit_real_tts_duration".to_string(),
+        });
+    }
+    excluded.sort_by_key(|description| description.id);
+    updated.excluded_descriptions = excluded;
+
+    let temporary_project = temporary_sibling_path(project_path, "edited");
+    if let Err(error) = save_audio_description_project(&temporary_project, &updated) {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        return Err(error);
+    }
+    if let Err(error) = commit_audio_description_pair(
+        &export_target,
+        &project.output_mp3_path,
+        &temporary_project,
+        project_path,
+    ) {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        crate::log_if_err!(
+            fs::remove_file(&temporary_project),
+            "Audio description cleanup operation failed"
+        );
+        return Err(error);
+    }
+
+    let normal_descriptions = scheduled
+        .iter()
+        .filter(|description| !description.extended_pause)
+        .count();
+    let extended_pauses = scheduled
+        .iter()
+        .filter(|description| description.extended_pause)
+        .count();
+    notify_progress(&mut callbacks, 100);
+    notify_status(
+        &mut callbacks,
+        "complete_edit",
+        "Edited audio-description MP3 export complete.",
+    );
+    Ok(AudioDescriptionOutcome {
+        output_path: project.output_mp3_path.clone(),
+        project_path: Some(project_path.to_path_buf()),
+        project_warning: None,
+        character_catalog_path: None,
+        character_catalog_warning: None,
+        generated_descriptions: project.descriptions.len(),
+        normal_descriptions,
+        extended_pauses,
+        dropped_after_tts: dropped_descriptions.len(),
+    })
+}
+
+pub fn create_audio_description(
+    job: &AudioDescriptionJob,
+    cancel: Arc<AtomicBool>,
+    mut callbacks: AudioDescriptionCallbacks,
+) -> Result<AudioDescriptionOutcome, String> {
+    validate_job(job)?;
+    if cancel.load(Ordering::Relaxed) {
+        return Err("cancelled".to_string());
+    }
+    if let Some(parent) = job.output_path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Audio description: create output folder failed: {error}"))?;
+    }
+
+    notify_status(
+        &mut callbacks,
+        "analysis_prepare",
+        "Preparing media with Sonarpad FFmpeg libraries...",
+    );
+    notify_progress(&mut callbacks, 0);
+
+    let analysis_cache_dir = temporary_job_dir()?;
+    let preparation_result =
+        (|| -> Result<(f64, Option<PathBuf>, Vec<AudioDescriptionPreparedChunk>), String> {
+            let duration_sec = crate::ffmpeg_export::media_duration_seconds(&job.input_path)
+                .ok_or_else(|| {
+                    "Audio description: FFmpeg could not read media duration".to_string()
+                })?;
+            if duration_sec <= 0.0 {
+                return Err("Audio description: selected media is empty".to_string());
+            }
+            let has_video =
+                crate::ffmpeg_source::has_real_video_stream(&job.input_path).map_err(|error| {
+                    format!("Audio description: FFmpeg video inspection failed: {error}")
+                })?;
+            if !has_video {
+                return Err(
+                    "Audio description: selected file has no usable video stream".to_string(),
+                );
+            }
+            let audio_streams =
+                crate::ffmpeg_source::list_audio_streams(&job.input_path).map_err(|error| {
+                    format!("Audio description: FFmpeg stream inspection failed: {error}")
+                })?;
+            let audio_wav_path = if audio_streams.is_empty() {
+                None
+            } else {
+                notify_status(
+                    &mut callbacks,
+                    "pyannote_prepare",
+                    "Decoding mono 16 kHz audio with Sonarpad FFmpeg libraries...",
+                );
+                let path = analysis_cache_dir.join("pyannote_input.wav");
+                write_pyannote_wav(&job.input_path, &path, &cancel)?;
+                Some(path)
+            };
+            notify_progress(&mut callbacks, 5);
+            notify_status(
+                &mut callbacks,
+                "chunk_prepare",
+                "Creating 180-second Gemini chunks with Sonarpad FFmpeg libraries...",
+            );
+            let chunks =
+                prepare_gemini_chunks(&job.input_path, duration_sec, &analysis_cache_dir, &cancel)?;
+            notify_progress(&mut callbacks, 10);
+            Ok((duration_sec, audio_wav_path, chunks))
+        })();
+    let (duration_sec, audio_wav_path, chunks) = match preparation_result {
+        Ok(value) => value,
+        Err(error) => {
+            crate::log_if_err!(
+                fs::remove_dir_all(&analysis_cache_dir),
+                "Audio description cleanup operation failed"
+            );
+            return Err(error);
+        }
+    };
+
+    let bridge_request = AudioDescriptionBridgeRequest {
+        input_path: job.input_path.to_string_lossy().to_string(),
+        audio_wav_path: audio_wav_path
+            .as_ref()
+            .map(|path| path.to_string_lossy().to_string()),
+        duration_sec,
+        chunks,
+        language: job.language_code.clone(),
+        verbosity: job.verbosity.as_bridge_value().to_string(),
+        allow_extended_pauses: job.allow_extended_pauses,
+        recognize_characters: job.recognize_characters,
+        initial_character_glossary: job
+            .character_catalog
+            .as_ref()
+            .map(|catalog| catalog.characters.clone())
+            .unwrap_or_default(),
+        gemini_api_key: job.gemini_api_key.clone(),
+        gemini_model: job.gemini_model.clone(),
+    };
+    let callback_state = Arc::new(std::sync::Mutex::new(callbacks));
+    let download_state = callback_state.clone();
+    let progress_state = callback_state.clone();
+    let status_state = callback_state.clone();
+    let quota_state = callback_state.clone();
+    let analysis_result = run_audio_description_bridge(
+        &bridge_request,
+        cancel.clone(),
+        AudioDescriptionBridgeCallbacks {
+            download: Some(Box::new(move |pct| {
+                if let Ok(mut callbacks) = download_state.lock() {
+                    notify_status(
+                        &mut callbacks,
+                        "download",
+                        "Downloading the audio-description analysis module...",
+                    );
+                    notify_progress(&mut callbacks, (pct.max(0) as u32).saturating_mul(10) / 100);
+                }
+            })),
+            progress: Some(Box::new(move |pct| {
+                if let Ok(mut callbacks) = progress_state.lock() {
+                    notify_progress(
+                        &mut callbacks,
+                        10 + (pct.max(0) as u32).saturating_mul(45) / 100,
+                    );
+                }
+            })),
+            status: Some(Box::new(move |stage, message| {
+                if let Ok(mut callbacks) = status_state.lock() {
+                    notify_status(&mut callbacks, stage, message);
+                }
+            })),
+            quota: Some(Box::new(move |model, error| {
+                let Ok(mut callbacks) = quota_state.lock() else {
+                    return AudioDescriptionQuotaDecision::Stop;
+                };
+                callbacks
+                    .quota
+                    .as_mut()
+                    .map(|callback| callback(model, error))
+                    .unwrap_or(AudioDescriptionQuotaDecision::Wait)
+            })),
+        },
+    );
+    crate::log_if_err!(
+        fs::remove_dir_all(&analysis_cache_dir),
+        "Audio description cleanup operation failed"
+    );
+    let analysis = analysis_result?;
+    let mut callbacks = Arc::try_unwrap(callback_state)
+        .map_err(|_| "Audio description: callback state still in use".to_string())?
+        .into_inner()
+        .map_err(|_| "Audio description: callback state poisoned".to_string())?;
+    let mut effective_job = job.clone();
+    if !analysis.gemini_model.trim().is_empty() {
+        effective_job.gemini_model = analysis.gemini_model.trim().to_string();
+    }
+
+    if analysis.descriptions.is_empty() {
+        return Err("Audio description: Gemini returned no descriptions".to_string());
+    }
+    notify_status(
+        &mut callbacks,
+        "tts",
+        "Synthesizing descriptions with the selected Sonarpad voice...",
+    );
+    let cache_dir = temporary_job_dir()?;
+    let synthesis_result = (|| -> Result<Vec<SynthesizedDescription>, String> {
+        let mut synthesized = Vec::with_capacity(analysis.descriptions.len());
+        for (index, description) in analysis.descriptions.iter().enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err("cancelled".to_string());
+            }
+            let (samples, sample_rate, channels) =
+                synthesize_description(&description.text, index, job, &cache_dir, cancel.clone())?;
+            synthesized.push(SynthesizedDescription {
+                original_index: index,
+                text: description.text.clone(),
+                desired_start_sec: description.start_sec,
+                samples,
+                sample_rate,
+                channels,
+            });
+            let pct = 55
+                + (((index + 1) as u32).saturating_mul(25)
+                    / analysis.descriptions.len().max(1) as u32);
+            notify_progress(&mut callbacks, pct);
+        }
+        Ok(synthesized)
+    })();
+    crate::log_if_err!(
+        fs::remove_dir_all(&cache_dir),
+        "Audio description cleanup operation failed"
+    );
+    let synthesized = synthesis_result?;
+
+    notify_status(
+        &mut callbacks,
+        "schedule",
+        "Checking the real TTS duration against Pyannote silences...",
+    );
+    let (scheduled, dropped_descriptions) = schedule_synthesized_descriptions(
+        &synthesized,
+        &analysis.protected_intervals,
+        analysis.duration_sec,
+        job.allow_extended_pauses,
+    );
+    let dropped_after_tts = dropped_descriptions.len();
+    if scheduled.is_empty() {
+        return Err(
+            "Audio description: no synthesized description can be placed safely between dialogue"
+                .to_string(),
+        );
+    }
+    let normal_descriptions = scheduled
+        .iter()
+        .filter(|description| !description.extended_pause)
+        .count();
+    let extended_pauses = scheduled
+        .iter()
+        .filter(|description| description.extended_pause)
+        .count();
+    let mix_cues: Vec<AudioDescriptionMixCue> = scheduled
+        .iter()
+        .map(|description| AudioDescriptionMixCue {
+            start_sec: description.start_sec,
+            samples: description.samples.clone(),
+            sample_rate: description.sample_rate,
+            channels: description.channels,
+            extended_pause: description.extended_pause,
+        })
+        .collect();
+
+    notify_status(
+        &mut callbacks,
+        "export",
+        "Applying ducking and exporting MP3 with Sonarpad's Rust FFmpeg libraries...",
+    );
+    let export_options = AudioDescriptionExportOptions {
+        // Ducking is a Sonarpad export policy, not a worker setting.
+        ducking_db: AUDIO_DESCRIPTION_DUCKING_DB,
+        fade_ms: AUDIO_DESCRIPTION_FADE_MS,
+        bitrate_kbps: AUDIO_DESCRIPTION_BITRATE_KBPS,
+        cancel: cancel.clone(),
+    };
+    let export_target = if job.save_project {
+        temporary_sibling_path(&job.output_path, "new")
+    } else {
+        job.output_path.clone()
+    };
+    let mut export_progress = |pct: u32| {
+        notify_progress(&mut callbacks, 80 + pct.saturating_mul(20) / 100);
+    };
+    let export_result = export_audio_description_mp3(
+        &job.input_path,
+        &export_target,
+        &mix_cues,
+        &export_options,
+        Some(&mut export_progress),
+    );
+    if let Err(error) = export_result {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        return Err(error);
+    }
+    let output_metadata = fs::metadata(&export_target)
+        .map_err(|error| format!("Audio description: exported MP3 validation failed: {error}"))?;
+    if output_metadata.len() == 0 {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        return Err("Audio description: exported MP3 is empty".to_string());
+    }
+
+    let mut project_path = None;
+    let project_warning = None;
+    if job.save_project {
+        notify_status(
+            &mut callbacks,
+            "project",
+            "Saving the descriptions actually inserted in the exported MP3...",
+        );
+        let path = audio_description_project_path(&job.output_path);
+        let temporary_project = temporary_sibling_path(&path, "new");
+        let calculated_output_duration = analysis.duration_sec
+            + scheduled
+                .iter()
+                .filter(|description| description.extended_pause)
+                .map(scheduled_duration_sec)
+                .sum::<f64>();
+        let output_duration_sec = crate::ffmpeg_export::media_duration_seconds(&export_target)
+            .unwrap_or(calculated_output_duration);
+        let project = build_audio_description_project(
+            &effective_job,
+            analysis.duration_sec,
+            output_duration_sec,
+            &analysis.protected_intervals,
+            &scheduled,
+            &dropped_descriptions,
+        );
+        if let Err(error) = save_audio_description_project(&temporary_project, &project) {
+            crate::log_if_err!(
+                fs::remove_file(&export_target),
+                "Audio description cleanup operation failed"
+            );
+            return Err(error);
+        }
+        if let Err(error) = commit_audio_description_pair(
+            &export_target,
+            &job.output_path,
+            &temporary_project,
+            &path,
+        ) {
+            crate::log_if_err!(
+                fs::remove_file(&export_target),
+                "Audio description cleanup operation failed"
+            );
+            crate::log_if_err!(
+                fs::remove_file(&temporary_project),
+                "Audio description cleanup operation failed"
+            );
+            return Err(error);
+        }
+        project_path = Some(path);
+    }
+
+    let (character_catalog_path, character_catalog_warning) =
+        if let Some(catalog) = job.character_catalog.as_ref() {
+            match save_audio_description_character_catalog(catalog, &analysis.character_glossary) {
+                Ok(()) => (Some(catalog.path.clone()), None),
+                Err(error) => (None, Some(error)),
+            }
+        } else {
+            (None, None)
+        };
+
+    notify_progress(&mut callbacks, 100);
+    notify_status(
+        &mut callbacks,
+        "complete",
+        "Audio-description MP3 export complete.",
+    );
+    Ok(AudioDescriptionOutcome {
+        output_path: job.output_path.clone(),
+        project_path,
+        project_warning,
+        character_catalog_path,
+        character_catalog_warning,
+        generated_descriptions: analysis.descriptions.len(),
+        normal_descriptions,
+        extended_pauses,
+        dropped_after_tts,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        AudioDescriptionCharacterCatalogContext, AudioDescriptionJob,
+        AudioDescriptionProjectEditError, AudioDescriptionVerbosity, ScheduledDescription,
+        SynthesizedDescription, audio_description_character_catalog_dir,
+        audio_description_character_catalog_path,
+        audio_description_project_edit_available_duration, audio_description_project_path,
+        build_audio_description_project, choose_slot, delete_audio_description_project_description,
+        load_audio_description_character_catalog_context, load_audio_description_project,
+        merge_catalog_characters, merge_catalog_description, normalize_catalog_characters,
+        save_audio_description_character_catalog, save_audio_description_project,
+        schedule_synthesized_descriptions, scheduled_duration_sec, trim_edge_trailing_silence,
+        validate_audio_description_project_edit_duration,
+    };
+    use crate::settings::{Language, TtsEngine};
+    use crate::tools::audio_description_bridge::{BridgeCharacter, BridgeInterval};
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn project_path_keeps_the_audio_name_and_adds_project_suffix() {
+        assert_eq!(
+            audio_description_project_path(PathBuf::from("movie.mp3").as_path()),
+            PathBuf::from("movie.sonarpad-ad.json")
+        );
+    }
+
+    #[test]
+    fn project_timeline_includes_prior_extended_pauses() {
+        let job = AudioDescriptionJob {
+            input_path: PathBuf::from("movie.mkv"),
+            output_path: PathBuf::from("movie.mp3"),
+            language_code: "it".to_string(),
+            tts_language: Language::Italian,
+            verbosity: AudioDescriptionVerbosity::Detailed,
+            allow_extended_pauses: true,
+            recognize_characters: true,
+            character_catalog: None,
+            save_project: true,
+            tts_engine: TtsEngine::Edge,
+            tts_voice: "it-IT-ElsaNeural".to_string(),
+            tts_rate: 0,
+            tts_pitch: 0,
+            tts_volume: 100,
+            gemini_api_key: String::new(),
+            gemini_model: "gemini".to_string(),
+            audiobook_bitrate_kbps: 192,
+        };
+        let scheduled = vec![
+            ScheduledDescription {
+                original_index: 0,
+                text: "Prima".to_string(),
+                desired_start_sec: 2.0,
+                start_sec: 2.0,
+                samples: Arc::from(vec![0.1_f32; 30]),
+                sample_rate: 10,
+                channels: 1,
+                extended_pause: true,
+            },
+            ScheduledDescription {
+                original_index: 1,
+                text: "Seconda".to_string(),
+                desired_start_sec: 4.0,
+                start_sec: 4.0,
+                samples: Arc::from(vec![0.1_f32; 10]),
+                sample_rate: 10,
+                channels: 1,
+                extended_pause: false,
+            },
+        ];
+        let project = build_audio_description_project(&job, 10.0, 13.0, &[], &scheduled, &[]);
+        assert!((project.descriptions[0].output_start_sec - 2.0).abs() < 0.001);
+        assert!((project.descriptions[0].output_end_sec - 5.0).abs() < 0.001);
+        assert!((project.descriptions[1].output_start_sec - 7.0).abs() < 0.001);
+        assert!((project.descriptions[1].output_end_sec - 8.0).abs() < 0.001);
+        assert!(project.recognize_characters);
+
+        let mut legacy_json = serde_json::to_value(&project).expect("serialize project");
+        legacy_json
+            .as_object_mut()
+            .expect("project object")
+            .remove("recognize_characters");
+        let legacy_project: super::AudioDescriptionProject =
+            serde_json::from_value(legacy_json).expect("deserialize legacy project");
+        assert!(legacy_project.recognize_characters);
+    }
+
+    #[test]
+    fn exact_scheduler_moves_description_into_nearby_silence() {
+        let free = vec![(0.0, 3.0), (5.0, 10.0)];
+        assert_eq!(choose_slot(&free, 4.0, 2.0, 0.0), Some(5.0));
+    }
+
+    #[test]
+    fn extended_mode_preserves_unfittable_description_as_pause() {
+        let descriptions = vec![SynthesizedDescription {
+            original_index: 0,
+            text: "A description".to_string(),
+            desired_start_sec: 3.0,
+            samples: Arc::from(vec![0.2_f32; 4 * 44_100]),
+            sample_rate: 44_100,
+            channels: 1,
+        }];
+        let protected = vec![BridgeInterval {
+            start_sec: 1.0,
+            end_sec: 9.0,
+        }];
+        let (scheduled, dropped) =
+            schedule_synthesized_descriptions(&descriptions, &protected, 10.0, true);
+        assert!(dropped.is_empty());
+        assert_eq!(scheduled.len(), 1);
+        assert!(scheduled[0].extended_pause);
+    }
+
+    #[test]
+    fn edge_trim_keeps_short_tail_but_removes_long_silence() {
+        let rate = 1_000;
+        let mut samples = vec![0.5_f32; 500];
+        samples.extend(vec![0.0_f32; 300]);
+        let removed = trim_edge_trailing_silence(&mut samples, rate, 1);
+        assert!(removed >= 200);
+        assert!(samples.len() >= 500);
+        assert!(samples.len() <= 550);
+    }
+
+    #[test]
+    fn edge_trim_does_not_delete_an_all_silent_cue() {
+        let mut samples = vec![0.0_f32; 500];
+        let removed = trim_edge_trailing_silence(&mut samples, 1_000, 1);
+        assert_eq!(removed, 0);
+        assert_eq!(samples.len(), 500);
+    }
+
+    #[test]
+    fn omni_port_tts_trailing_silence_removed_without_cutting_speech() {
+        let rate = 1_000;
+        let mut samples = vec![0.45_f32; 500];
+        samples.extend(vec![0.0_f32; 300]);
+        let removed = trim_edge_trailing_silence(&mut samples, rate, 1);
+        assert!(removed >= 200);
+        assert!(
+            samples[..500]
+                .iter()
+                .all(|sample| (*sample - 0.45).abs() < f32::EPSILON)
+        );
+        assert!((500..=550).contains(&samples.len()));
+    }
+
+    #[test]
+    fn omni_port_short_tts_tail_is_preserved() {
+        let rate = 1_000;
+        let mut samples = vec![0.4_f32; 500];
+        samples.extend(vec![0.0_f32; 40]);
+        let original_len = samples.len();
+        let removed = trim_edge_trailing_silence(&mut samples, rate, 1);
+        assert_eq!(removed, 0);
+        assert_eq!(samples.len(), original_len);
+    }
+
+    #[test]
+    fn omni_port_json_project_round_trip_preserves_inserted_timeline() {
+        let job = AudioDescriptionJob {
+            input_path: PathBuf::from("film.mkv"),
+            output_path: PathBuf::from("film-audiodescritto.mp3"),
+            language_code: "it".to_string(),
+            tts_language: Language::Italian,
+            verbosity: AudioDescriptionVerbosity::Detailed,
+            allow_extended_pauses: true,
+            recognize_characters: true,
+            character_catalog: None,
+            save_project: true,
+            tts_engine: TtsEngine::Edge,
+            tts_voice: "it-IT-ElsaNeural".to_string(),
+            tts_rate: 0,
+            tts_pitch: 0,
+            tts_volume: 100,
+            gemini_api_key: String::new(),
+            gemini_model: "gemini-3.5-flash-lite".to_string(),
+            audiobook_bitrate_kbps: 192,
+        };
+        let scheduled = vec![ScheduledDescription {
+            original_index: 0,
+            text: "Apre la porta.".to_string(),
+            desired_start_sec: 2.0,
+            start_sec: 2.5,
+            samples: Arc::from(vec![0.2_f32; 20]),
+            sample_rate: 10,
+            channels: 1,
+            extended_pause: false,
+        }];
+        let project = build_audio_description_project(
+            &job,
+            10.0,
+            10.0,
+            &[BridgeInterval {
+                start_sec: 5.0,
+                end_sec: 8.0,
+            }],
+            &scheduled,
+            &[],
+        );
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("sonarpad_ad_roundtrip_{stamp}.json"));
+        save_audio_description_project(&path, &project).expect("save project");
+        let loaded = load_audio_description_project(&path).expect("load project");
+        crate::log_if_err!(
+            std::fs::remove_file(path),
+            "Audio description cleanup operation failed"
+        );
+        assert_eq!(loaded.descriptions.len(), 1);
+        assert_eq!(loaded.descriptions[0].text, "Apre la porta.");
+        assert!((loaded.descriptions[0].output_start_sec - 2.5).abs() < 0.001);
+        assert_eq!(loaded.protected_intervals.len(), 1);
+        assert_eq!(loaded.gemini_model, "gemini-3.5-flash-lite");
+    }
+
+    #[test]
+    fn omni_port_legacy_project_defaults_character_recognition_to_true() {
+        let job = AudioDescriptionJob {
+            input_path: PathBuf::from("film.mkv"),
+            output_path: PathBuf::from("film.mp3"),
+            language_code: "it".to_string(),
+            tts_language: Language::Italian,
+            verbosity: AudioDescriptionVerbosity::Detailed,
+            allow_extended_pauses: true,
+            recognize_characters: true,
+            character_catalog: None,
+            save_project: true,
+            tts_engine: TtsEngine::Edge,
+            tts_voice: "voice".to_string(),
+            tts_rate: 0,
+            tts_pitch: 0,
+            tts_volume: 100,
+            gemini_api_key: String::new(),
+            gemini_model: "gemini".to_string(),
+            audiobook_bitrate_kbps: 192,
+        };
+        let project = build_audio_description_project(&job, 1.0, 1.0, &[], &[], &[]);
+        let mut value = serde_json::to_value(project).expect("serialize");
+        value
+            .as_object_mut()
+            .expect("object")
+            .remove("recognize_characters");
+        let loaded: super::AudioDescriptionProject =
+            serde_json::from_value(value).expect("legacy project");
+        assert!(loaded.recognize_characters);
+    }
+
+    #[test]
+    fn omni_port_extended_pause_lengthens_output_timeline() {
+        let descriptions = vec![SynthesizedDescription {
+            original_index: 0,
+            text: "Descrizione lunga".to_string(),
+            desired_start_sec: 2.0,
+            samples: Arc::from(vec![0.2_f32; 16_000]),
+            sample_rate: 8_000,
+            channels: 1,
+        }];
+        let protected = vec![
+            BridgeInterval {
+                start_sec: 0.0,
+                end_sec: 2.0,
+            },
+            BridgeInterval {
+                start_sec: 3.0,
+                end_sec: 5.0,
+            },
+        ];
+        let (scheduled, dropped) =
+            schedule_synthesized_descriptions(&descriptions, &protected, 5.0, true);
+        assert!(dropped.is_empty());
+        assert_eq!(scheduled.len(), 1);
+        assert!(scheduled[0].extended_pause);
+        let final_duration = 5.0 + scheduled.iter().map(scheduled_duration_sec).sum::<f64>();
+        assert!((final_duration - 7.0).abs() < 0.001);
+    }
+    #[test]
+    fn omni_port_character_catalog_is_stored_below_audiodescriptions() {
+        let directory = audio_description_character_catalog_dir("C:/Sonarpad/Audiodescriptions");
+        assert!(directory.ends_with(PathBuf::from("Audiodescriptions").join("Catalogs")));
+        let path = audio_description_character_catalog_path(
+            "C:/Sonarpad/Audiodescriptions",
+            "Serie: prova",
+        );
+        assert!(
+            path.ends_with(
+                PathBuf::from("Audiodescriptions")
+                    .join("Catalogs")
+                    .join("Serie_ prova.json")
+            )
+        );
+    }
+
+    #[test]
+    fn omni_port_character_catalog_reuses_prior_episode_and_merges_new_characters() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("sonarpad-character-catalog-{stamp}"));
+        let path = root.join("Catalogs").join("Serie.json");
+        let context = AudioDescriptionCharacterCatalogContext {
+            name: "Serie".to_string(),
+            path: path.clone(),
+            characters: Vec::new(),
+        };
+        save_audio_description_character_catalog(
+            &context,
+            &[
+                BridgeCharacter {
+                    id: "c1".to_string(),
+                    name: "Anna".to_string(),
+                    description: "Donna dai capelli scuri".to_string(),
+                },
+                BridgeCharacter {
+                    id: "c2".to_string(),
+                    name: "Marco".to_string(),
+                    description: "Uomo con barba corta".to_string(),
+                },
+            ],
+        )
+        .expect("save first episode catalog");
+
+        let loaded =
+            load_audio_description_character_catalog_context("Serie".to_string(), path.clone())
+                .expect("load catalog for second episode");
+        assert_eq!(loaded.characters.len(), 2);
+        let mut second_episode = loaded.characters.clone();
+        second_episode.push(BridgeCharacter {
+            id: "c1".to_string(),
+            name: "Anna".to_string(),
+            description: "Donna dai capelli scuri, occhi verdi e cappotto rosso".to_string(),
+        });
+        second_episode.push(BridgeCharacter {
+            id: "c3".to_string(),
+            name: "Luca".to_string(),
+            description: "Ragazzo alto con capelli ricci".to_string(),
+        });
+        save_audio_description_character_catalog(&loaded, &second_episode)
+            .expect("save second episode catalog");
+
+        let updated = load_audio_description_character_catalog_context("Serie".to_string(), path)
+            .expect("reload updated catalog");
+        assert_eq!(updated.characters.len(), 3);
+        let anna = updated
+            .characters
+            .iter()
+            .find(|character| character.name == "Anna")
+            .expect("Anna remains in catalog");
+        assert!(anna.description.contains("occhi verdi"));
+        assert_eq!(anna.id, "c1");
+        assert!(
+            updated
+                .characters
+                .iter()
+                .any(|character| character.name == "Marco")
+        );
+        assert!(
+            updated
+                .characters
+                .iter()
+                .any(|character| character.name == "Luca")
+        );
+        crate::log_if_err!(
+            std::fs::remove_dir_all(root),
+            "Audio description cleanup operation failed"
+        );
+    }
+
+    #[test]
+    fn character_catalog_single_entry_normalization_does_not_index_empty_alias_matches() {
+        let characters = vec![BridgeCharacter {
+            id: "flo".to_string(),
+            name: "Flo".to_string(),
+            description: "Protagonista della serie.".to_string(),
+        }];
+
+        let normalized = normalize_catalog_characters(&characters);
+        assert_eq!(normalized.len(), 1);
+        assert_eq!(normalized[0].id, "flo");
+        assert_eq!(normalized[0].name, "Flo");
+    }
+
+    #[test]
+    fn character_catalog_preserves_authoritative_id_against_shortened_duplicate() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("sonarpad-character-id-{stamp}"));
+        let path = root.join("Catalogs").join("Serie.json");
+        let authoritative_description = format!(
+            "{}{}",
+            "Madre di Flo, Franz e Jack e moglie di Ernest. ",
+            "Descrizione fisica stabile molto dettagliata. ".repeat(8)
+        );
+        let context = AudioDescriptionCharacterCatalogContext {
+            name: "Serie".to_string(),
+            path: path.clone(),
+            characters: vec![BridgeCharacter {
+                id: "anna_robinson".to_string(),
+                name: "Anna Robinson".to_string(),
+                description: authoritative_description.clone(),
+            }],
+        };
+        save_audio_description_character_catalog(
+            &context,
+            &[BridgeCharacter {
+                id: "anna".to_string(),
+                name: "Anna".to_string(),
+                description: "Indossa un abito azzurro chiaro con colletto alto.".to_string(),
+            }],
+        )
+        .expect("save catalog with shortened Gemini alias");
+
+        let loaded = load_audio_description_character_catalog_context("Serie".to_string(), path)
+            .expect("reload authoritative catalog");
+        assert_eq!(loaded.characters.len(), 1);
+        assert_eq!(loaded.characters[0].id, "anna_robinson");
+        assert_eq!(loaded.characters[0].name, "Anna Robinson");
+        assert!(
+            loaded.characters[0]
+                .description
+                .starts_with(&authoritative_description)
+        );
+        assert!(loaded.characters[0].description.contains("abito azzurro"));
+        assert!(loaded.characters[0].description.chars().count() > 240);
+        crate::log_if_err!(
+            std::fs::remove_dir_all(root),
+            "Audio description cleanup operation failed"
+        );
+    }
+
+    #[test]
+    fn character_catalog_rejects_repeated_and_corrupted_biography_sentences() {
+        let existing = "Padre di Flo, Anna è sua moglie. Uomo adulto sui quarant’anni, medico, alto e robusto, con capelli castano scuro corti, folta barba e baffi scuri.";
+        let observed = "Padre di Dio, Anna è sua moglie. Uomo adulto sui quarant'anni, medico, alto e robusto, con capelli castano scuro corti, folta barba e baffi scuri. Padre di Flo, medico robusto con barba e baffi scuri.";
+        assert_eq!(merge_catalog_description(existing, observed), existing);
+    }
+
+    #[test]
+    fn character_catalog_appends_only_genuinely_new_visual_sentence() {
+        let existing = "Madre di Flo, Franz e Jack e moglie di Ernest. Donna adulta con capelli castano-ramati raccolti ordinatamente dietro la testa.";
+        let observed = "Madre di Flo, Franz e Jack e moglie di Ernest. Indossa un abito azzurro chiaro con colletto alto volantato.";
+        let merged = merge_catalog_description(existing, observed);
+        assert!(merged.starts_with(existing));
+        assert!(merged.contains("abito azzurro"));
+        assert_eq!(merged.matches("Madre di Flo").count(), 1);
+    }
+
+    #[test]
+    fn character_catalog_does_not_merge_ambiguous_first_name_only() {
+        let established = vec![
+            BridgeCharacter {
+                id: "eric_capretto".to_string(),
+                name: "Capretto Eric".to_string(),
+                description: "Capretto giovane.".to_string(),
+            },
+            BridgeCharacter {
+                id: "eric_beths".to_string(),
+                name: "Eric Beths".to_string(),
+                description: "Naufrago adulto.".to_string(),
+            },
+        ];
+        let detected = vec![BridgeCharacter {
+            id: "eric".to_string(),
+            name: "Eric".to_string(),
+            description: "Figura vista nel filmato.".to_string(),
+        }];
+        let merged = merge_catalog_characters(&established, &detected);
+        assert_eq!(merged.len(), 3);
+        assert!(
+            merged
+                .iter()
+                .any(|character| character.id == "eric_capretto")
+        );
+        assert!(merged.iter().any(|character| character.id == "eric_beths"));
+        assert!(merged.iter().any(|character| character.id == "eric"));
+    }
+
+    #[test]
+    fn omni_port_project_edit_checks_the_exact_remaining_silence() {
+        let job = AudioDescriptionJob {
+            input_path: PathBuf::from("film.mkv"),
+            output_path: PathBuf::from("film.mp3"),
+            language_code: "it".to_string(),
+            tts_language: Language::Italian,
+            verbosity: AudioDescriptionVerbosity::Detailed,
+            allow_extended_pauses: true,
+            recognize_characters: true,
+            character_catalog: None,
+            save_project: true,
+            tts_engine: TtsEngine::Edge,
+            tts_voice: "it-IT-ElsaNeural".to_string(),
+            tts_rate: 0,
+            tts_pitch: 0,
+            tts_volume: 100,
+            gemini_api_key: String::new(),
+            gemini_model: "gemini-3.5-flash-lite".to_string(),
+            audiobook_bitrate_kbps: 192,
+        };
+        let scheduled = vec![
+            ScheduledDescription {
+                original_index: 0,
+                text: "Prima".to_string(),
+                desired_start_sec: 2.0,
+                start_sec: 2.0,
+                samples: Arc::from(vec![0.2_f32; 20]),
+                sample_rate: 10,
+                channels: 1,
+                extended_pause: false,
+            },
+            ScheduledDescription {
+                original_index: 1,
+                text: "Seconda".to_string(),
+                desired_start_sec: 7.0,
+                start_sec: 7.0,
+                samples: Arc::from(vec![0.2_f32; 10]),
+                sample_rate: 10,
+                channels: 1,
+                extended_pause: false,
+            },
+        ];
+        let project = build_audio_description_project(
+            &job,
+            12.0,
+            12.0,
+            &[
+                BridgeInterval {
+                    start_sec: 0.0,
+                    end_sec: 1.0,
+                },
+                BridgeInterval {
+                    start_sec: 10.0,
+                    end_sec: 12.0,
+                },
+            ],
+            &scheduled,
+            &[],
+        );
+        let available = audio_description_project_edit_available_duration(&project, 0)
+            .expect("available duration");
+        assert_eq!(available, Some(5.0));
+        assert!(validate_audio_description_project_edit_duration(available, 4.9).is_ok());
+        assert!(matches!(
+            validate_audio_description_project_edit_duration(available, 5.2),
+            Err(AudioDescriptionProjectEditError::TooLong { .. })
+        ));
+    }
+
+    #[test]
+    fn omni_port_extended_pause_edit_has_no_fixed_duration_limit() {
+        let job = AudioDescriptionJob {
+            input_path: PathBuf::from("film.mkv"),
+            output_path: PathBuf::from("film.mp3"),
+            language_code: "it".to_string(),
+            tts_language: Language::Italian,
+            verbosity: AudioDescriptionVerbosity::Detailed,
+            allow_extended_pauses: true,
+            recognize_characters: true,
+            character_catalog: None,
+            save_project: true,
+            tts_engine: TtsEngine::Edge,
+            tts_voice: "it-IT-ElsaNeural".to_string(),
+            tts_rate: 0,
+            tts_pitch: 0,
+            tts_volume: 100,
+            gemini_api_key: String::new(),
+            gemini_model: "gemini-3.5-flash-lite".to_string(),
+            audiobook_bitrate_kbps: 192,
+        };
+        let scheduled = vec![ScheduledDescription {
+            original_index: 0,
+            text: "Pausa".to_string(),
+            desired_start_sec: 2.0,
+            start_sec: 2.0,
+            samples: Arc::from(vec![0.2_f32; 20]),
+            sample_rate: 10,
+            channels: 1,
+            extended_pause: true,
+        }];
+        let project = build_audio_description_project(&job, 5.0, 7.0, &[], &scheduled, &[]);
+        let available = audio_description_project_edit_available_duration(&project, 0)
+            .expect("available duration");
+        assert_eq!(available, None);
+        assert!(validate_audio_description_project_edit_duration(available, 120.0).is_ok());
+    }
+
+    #[test]
+    fn omni_port_deleting_a_description_saves_the_project_immediately() {
+        let job = AudioDescriptionJob {
+            input_path: PathBuf::from("film.mkv"),
+            output_path: PathBuf::from("film.mp3"),
+            language_code: "it".to_string(),
+            tts_language: Language::Italian,
+            verbosity: AudioDescriptionVerbosity::Detailed,
+            allow_extended_pauses: true,
+            recognize_characters: true,
+            character_catalog: None,
+            save_project: true,
+            tts_engine: TtsEngine::Edge,
+            tts_voice: "it-IT-ElsaNeural".to_string(),
+            tts_rate: 0,
+            tts_pitch: 0,
+            tts_volume: 100,
+            gemini_api_key: String::new(),
+            gemini_model: "gemini-3.5-flash-lite".to_string(),
+            audiobook_bitrate_kbps: 192,
+        };
+        let scheduled = vec![
+            ScheduledDescription {
+                original_index: 0,
+                text: "Prima".to_string(),
+                desired_start_sec: 1.0,
+                start_sec: 1.0,
+                samples: Arc::from(vec![0.2_f32; 10]),
+                sample_rate: 10,
+                channels: 1,
+                extended_pause: false,
+            },
+            ScheduledDescription {
+                original_index: 1,
+                text: "Seconda".to_string(),
+                desired_start_sec: 3.0,
+                start_sec: 3.0,
+                samples: Arc::from(vec![0.2_f32; 10]),
+                sample_rate: 10,
+                channels: 1,
+                extended_pause: false,
+            },
+        ];
+        let project = build_audio_description_project(&job, 5.0, 5.0, &[], &scheduled, &[]);
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("sonarpad_ad_delete_{stamp}.json"));
+        save_audio_description_project(&path, &project).expect("initial save");
+        let updated = delete_audio_description_project_description(&path, &project, 0)
+            .expect("delete description");
+        assert_eq!(updated.descriptions.len(), 1);
+        assert_eq!(updated.descriptions[0].text, "Seconda");
+        let reloaded = load_audio_description_project(&path).expect("reload saved project");
+        assert_eq!(reloaded.descriptions.len(), 1);
+        assert_eq!(reloaded.descriptions[0].text, "Seconda");
+        crate::log_if_err!(
+            std::fs::remove_file(path),
+            "Audio description cleanup operation failed"
+        );
+    }
+}

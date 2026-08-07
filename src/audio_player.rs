@@ -1249,10 +1249,11 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
             path: PathBuf,
             resume_seconds: Option<u64>,
         },
-        StartRaiPlayInMpv {
+        StartRemoteInMpv {
             url: String,
             podcast_title: Option<String>,
             title: Option<String>,
+            origin: crate::RaiAudioOrigin,
             resume_seconds: Option<u64>,
         },
         RestartFromPosition {
@@ -1405,23 +1406,34 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
             }
             let path = doc.path.clone()?;
             let current_url = path.to_string_lossy().into_owned();
-            let should_resume_raiplay_in_mpv = doc.prefer_mpv_playback
+            let active_url_matches = state
+                .active_podcast_episode_url
+                .as_ref()
+                .is_some_and(|url| url == &current_url);
+            let last_url_matches = state
+                .last_stopped_mpv_url
+                .as_ref()
+                .is_some_and(|url| url == &current_url);
+            let should_resume_remote_in_mpv = doc.prefer_mpv_playback
                 && crate::is_direct_stream_url_path(&path)
                 && state.raiplay_live_audio_variants.is_empty()
-                && (state.active_podcast_episode_from_rai == crate::RaiAudioOrigin::RaiPlay
-                    || state
-                        .active_podcast_episode_url
-                        .as_ref()
-                        .is_some_and(|url| url == &current_url)
-                    || state
-                        .last_stopped_mpv_url
-                        .as_ref()
-                        .is_some_and(|url| url == &current_url));
-            if should_resume_raiplay_in_mpv {
-                return Some(ToggleAction::StartRaiPlayInMpv {
+                && (active_url_matches || last_url_matches);
+            if should_resume_remote_in_mpv {
+                let origin = if active_url_matches {
+                    state.active_podcast_episode_from_rai
+                } else {
+                    state.last_stopped_mpv_origin
+                };
+                return Some(ToggleAction::StartRemoteInMpv {
                     url: current_url.clone(),
                     podcast_title: state.active_podcast_title.clone(),
-                    title: state.active_podcast_episode_title.clone(),
+                    title: Some(
+                        state
+                            .active_podcast_episode_title
+                            .clone()
+                            .unwrap_or_else(|| doc.title.clone()),
+                    ),
+                    origin,
                     resume_seconds: state
                         .last_stopped_mpv_url
                         .as_ref()
@@ -1462,22 +1474,43 @@ pub fn toggle_audiobook_pause(hwnd: HWND) {
                         start_audiobook_playback(hwnd, &path);
                     }
                 }
-                ToggleAction::StartRaiPlayInMpv {
+                ToggleAction::StartRemoteInMpv {
                     url,
                     podcast_title,
                     title,
+                    origin,
                     resume_seconds,
                 } => {
-                    if let Err(err) = crate::launch_raiplay_in_mpv_with_resume(
-                        hwnd,
-                        &url,
-                        podcast_title.as_deref(),
-                        title.as_deref(),
-                        crate::RaiAudioOrigin::RaiPlay,
-                        resume_seconds,
-                    ) {
+                    let result = match origin {
+                        crate::RaiAudioOrigin::RaiPlay | crate::RaiAudioOrigin::La7Play => {
+                            crate::launch_raiplay_in_mpv_with_resume(
+                                hwnd,
+                                &url,
+                                podcast_title.as_deref(),
+                                title.as_deref(),
+                                origin,
+                                resume_seconds,
+                            )
+                        }
+                        _ if crate::app_windows::youtube_transcript_window::is_youtube_stream_url(
+                            &url,
+                        ) => crate::app_windows::youtube_transcript_window::play_youtube_video_in_mpv(
+                            hwnd,
+                            &url,
+                            title.as_deref().unwrap_or("YouTube"),
+                        ),
+                        _ => crate::launch_stream_url_in_mpv(
+                            hwnd,
+                            &url,
+                            title.as_deref(),
+                            None,
+                            None,
+                            None,
+                        ),
+                    };
+                    if let Err(err) = result {
                         crate::log_debug(&format!(
-                            "Audio player: failed to relaunch RaiPlay in mpv: {}",
+                            "Audio player: failed to relaunch remote stream in mpv: {}",
                             err
                         ));
                         crate::accessibility::screen_reader_speak(&err);

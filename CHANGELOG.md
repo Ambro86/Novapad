@@ -1,5 +1,47 @@
 # Changelog
 
+Version 0.8.5 – 2026-07-25
+
+Audio-description creation
+• The playback menu now offers “Create audio description with AI” for video links opened through Stream audio from URL, reusing the active yt-dlp save context and storing the downloaded video in the configured Media folder.
+• RaiPlay and La7 Play on-demand videos now expose the same command. Sonarpad reuses their existing MP4 exporter, saves automatically to the Media folder and opens the audio-description window only after a successful export. Live RaiPlay and La7 streams remain excluded.
+• The Create audio description with AI window now remembers language, detail level, engine, voice and all three checkboxes. These preferences are separate from Sonarpad’s general reading voice and are saved immediately after each change.
+• Added “Create audio description with AI” under Tools > Multimedia, using Pyannote to protect dialogue, Gemini to generate descriptions, and Sonarpad's existing TTS engines for narration.
+• Sonarpad performs ducking, extended pauses and MP3 encoding through its Rust FFmpeg libraries, without external ffmpeg.exe or ffprobe.exe files.
+• The optional “Save project for future editing” check box is off by default. Its JSON is written only after a successful MP3 and contains only descriptions actually inserted, with final output times and excluded candidates stored separately.
+• The new project editor can change description text and re-export without calling Gemini again. The JSON is updated only after the new MP3 succeeds.
+• Audio-description MP3 files and their optional JSON projects now default to `Documents\Sonarpad\Audiodescriptions`. The Audio settings tab includes an “Audio descriptions” entry in the default-folder selector, so the user can change this location consistently with Audiobooks, Media and recordings.
+• “Enable extended pauses” is selected by default and can be turned off to prevent the movie from being interrupted when a description does not fit in a silence.
+• “Try to recognize characters and use their names” is selected by default. Turning it off disables the character glossary and cross-chunk named-character continuity, so Gemini uses generic references.
+• The window now includes the Gemini API key, a link to obtain it, model-list refresh and a separate audio-description model preference defaulting to `gemini-3.5-flash-lite`. The key is shared with AI and transcription, while this model selection does not alter other Gemini features.
+• When Gemini reports a genuinely exhausted quota, Sonarpad now lets the user try another model, keep waiting, or stop. The worker remains on the current chunk and preserves completed work; the replacement model is used for later chunks and recorded in the final project.
+• Completed localization of the entire audio-description module in all 17 interface languages. Gemini prompts now explicitly constrain both narration text and character-glossary descriptions to the selected language; the worker validates and selectively corrects both, while progress messages use stable identifiers translated by Sonarpad.
+• While generation is running, file, model, voice and all other configuration controls are hidden: NVDA encounters only the progress bar, current status and Cancel button.
+• After the completion message, pressing OK opens the MP3 in Sonarpad's internal player. Escape stops the player and returns to the Create audio description with AI window.
+• Worker states for upload, waiting, Gemini submission, response parsing, JSON repair and retries are now translated by Sonarpad and no longer expose English messages.
+• Fixed the worker PowerShell script: the `-3.14` selector is passed explicitly to pip and PyInstaller, preventing the `py` interactive console from opening accidentally.
+• The dedicated suite now contains 128 tests: 105 Python tests and 23 Rust tests, including coverage for all 17 prompt languages, glossary-language correction, complete interface localization and translated dynamic progress states.
+
+
+EPUB saving and export
+• Fixed Save As for EPUB documents: selecting TXT or another format now applies the selected extension instead of retaining .epub.
+• Exporting an EPUB to another format no longer changes the open document association. The exported copy is created separately, while Save continues to update the original EPUB opened from its folder.
+
+Radio recordings
+• Added the Delete key shortcut for deleting radio recordings. Sonarpad now asks for confirmation before deleting a recording.
+
+Documentation
+• The guides have been reorganized and now include an index for easier consultation.
+
+Google TTS voice catalog
+• Expanded the downloadable Google TTS catalog from 104 to 156 packages and from 53 to 81 language variants.
+• Added the 52 missing Chrome OS and Google Natural packages for 28 languages, using the newest verified revisions, download addresses, SHA-256 checksums, sizes, dependencies and internal speaker identifiers from the current compatible catalog. Lithuanian is included as revision r19 instead of the older r17 packages.
+• Added localized language names for Assamese, Bodo, Dogri, Konkani, Kashmiri, Maithili, Manipuri, Odia, Sanskrit, Santali and Sindhi, together with the Bosnia and Herzegovina country label, in every Sonarpad interface language.
+
+German file dialogs
+• Fixed a German localization problem that prevented Open, Save As, audiobook saving, podcast downloads and other file-selection dialogs from appearing, even though the menu command or keyboard shortcut was correctly executed.
+• File-dialog filters now support both escaped \0 separators and embedded NUL characters, with a safe fallback for malformed translations. A harmless false error produced when opening the File menu has also been removed from the log.
+
 Version 0.8.4 – 2026-07-24
 
 EPUB document editing

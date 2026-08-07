@@ -1,5 +1,26 @@
 # Changelog
 
+Versão 0.8.5 – 2026-07-25
+
+Salvamento e exportação de EPUB
+• Corrigido “Salvar como” em documentos EPUB: ao escolher TXT ou outro formato, a extensão selecionada agora é aplicada em vez de manter .epub.
+• A exportação de um EPUB para outro formato não altera mais a associação do documento aberto. A cópia é criada separadamente, enquanto “Salvar” continua atualizando o EPUB original aberto em sua pasta.
+
+Gravações de rádio
+• Foi adicionado o atalho da tecla Delete para excluir gravações de rádio. O Sonarpad agora pede confirmação antes de excluir uma gravação.
+
+Documentação
+• Os guias foram reformulados e agora incluem um índice para facilitar a consulta.
+
+Catálogo de vozes Google TTS
+• O catálogo de vozes Google TTS para download foi ampliado de 104 para 156 pacotes e de 53 para 81 variantes de idioma.
+• Foram adicionados os 52 pacotes Chrome OS e Google Natural que faltavam para 28 idiomas, com as revisões verificadas mais recentes, endereços de download, somas SHA-256, tamanhos, dependências e identificadores internos dos falantes do catálogo compatível atual. O lituano usa a revisão r19 em vez dos antigos pacotes r17.
+• Foram adicionados em todos os idiomas da interface os nomes localizados de assamês, bodo, dogri, concani, caxemira, maithili, manipuri, odia, sânscrito, santali e sindi, além do nome do país Bósnia e Herzegovina.
+
+Janelas de arquivos em alemão
+• Foi corrigido um problema da tradução alemã que impedia a exibição de Abrir, Salvar como, salvamento de audiolivros, downloads de podcasts e outras janelas de seleção de arquivos, embora o comando do menu ou o atalho fosse executado corretamente.
+• Os filtros das janelas de arquivos agora aceitam tanto separadores \0 escritos como sequência quanto caracteres NUL incorporados, usando um filtro seguro quando uma tradução está malformada. Também foi removido do registro um falso erro inofensivo exibido ao abrir o menu Arquivo.
+
 Versão 0.8.4 – 2026-07-24
 
 Edição de documentos EPUB

@@ -610,6 +610,18 @@ pub(crate) fn av_codecpar_sample_rate_safe(codecpar: *const AVCodecParameters) -
     unsafe { (*codecpar).sample_rate }
 }
 
+pub(crate) fn av_codecpar_width_safe(codecpar: *const AVCodecParameters) -> i32 {
+    unsafe { (*codecpar).width }
+}
+
+pub(crate) fn av_codecpar_height_safe(codecpar: *const AVCodecParameters) -> i32 {
+    unsafe { (*codecpar).height }
+}
+
+pub(crate) fn av_stream_disposition_safe(stream: *const AVStream) -> i32 {
+    unsafe { (*stream).disposition }
+}
+
 pub(crate) fn av_packet_stream_index_safe(pkt: *const AVPacket) -> i32 {
     unsafe { (*pkt).stream_index }
 }
@@ -770,6 +782,76 @@ fn dict_get_string(api: &FfmpegApi, dict: *mut AVDictionary, key: &str) -> Optio
     }
 }
 
+/// Return whether the media contains a real video stream rather than only an attached cover.
+pub fn has_real_video_stream(path: &Path) -> Result<bool, String> {
+    const AV_DISPOSITION_ATTACHED_PIC_I32: i32 = 0x0400;
+
+    let api = ffmpeg_api()?;
+    init_ffmpeg_once(api);
+    let path_c = CString::new(path.to_string_lossy().as_bytes())
+        .map_err(|_| "FFmpeg: invalid path".to_string())?;
+    let mut fmt_ctx: *mut AVFormatContext = ptr::null_mut();
+    let open_ret = crate::ffmpeg_source::avformat_open_input_safe(
+        api,
+        &mut fmt_ctx,
+        path_c.as_ptr(),
+        ptr::null_mut(),
+        ptr::null_mut(),
+    );
+    if open_ret < 0 || fmt_ctx.is_null() {
+        return Err(format!(
+            "FFmpeg: input open failed: {}",
+            ffmpeg_err(api, open_ret)
+        ));
+    }
+    let info_ret =
+        crate::ffmpeg_source::avformat_find_stream_info_safe(api, fmt_ctx, ptr::null_mut());
+    if info_ret < 0 {
+        crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
+        return Err(format!(
+            "FFmpeg: stream info failed: {}",
+            ffmpeg_err(api, info_ret)
+        ));
+    }
+
+    let nb_streams = crate::ffmpeg_source::av_format_context_nb_streams_safe(fmt_ctx);
+    let streams_ptr = crate::ffmpeg_source::av_format_context_streams_safe(fmt_ctx);
+    let mut found = false;
+    if !streams_ptr.is_null() {
+        for index in 0..nb_streams {
+            let stream = unsafe { *streams_ptr.add(index as usize) };
+            if stream.is_null() {
+                continue;
+            }
+            let codecpar = crate::ffmpeg_source::av_stream_codecpar_safe(stream);
+            if codecpar.is_null()
+                || crate::ffmpeg_source::av_codecpar_codec_type_safe(codecpar)
+                    != AVMediaType_AVMEDIA_TYPE_VIDEO
+            {
+                continue;
+            }
+            let disposition = crate::ffmpeg_source::av_stream_disposition_safe(stream);
+            let width = crate::ffmpeg_source::av_codecpar_width_safe(codecpar);
+            let height = crate::ffmpeg_source::av_codecpar_height_safe(codecpar);
+            let codec_id = crate::ffmpeg_source::av_codecpar_codec_id_safe(codecpar);
+            let attached_picture = disposition & AV_DISPOSITION_ATTACHED_PIC_I32 != 0;
+            log_debug(&format!(
+                "FFmpeg: video stream probe index={index} codec_id={codec_id:?} width={width} height={height} disposition=0x{disposition:08x} attached_picture={attached_picture}"
+            ));
+            // Some valid WebM/Matroska streams expose dimensions only after the
+            // decoder opens. A non-attached video stream is sufficient here;
+            // the later chunking stage will report a precise decoding error if
+            // the stream is actually unusable.
+            if !attached_picture {
+                found = true;
+                break;
+            }
+        }
+    }
+    crate::ffmpeg_source::avformat_close_input_safe(api, &mut fmt_ctx);
+    Ok(found)
+}
+
 /// List all audio streams in a media file.
 pub fn list_audio_streams(path: &Path) -> Result<Vec<AudioStreamInfo>, String> {
     let api = ffmpeg_api()?;
@@ -918,6 +1000,26 @@ impl FfmpegSource {
         pts_clock: Option<Arc<AtomicI64>>,
         preferred_stream_index: Option<i32>,
     ) -> Result<Self, String> {
+        Self::try_new_at(
+            path,
+            start_seconds as f64,
+            pts_clock,
+            preferred_stream_index,
+        )
+    }
+
+    /// Create a new FFmpeg audio source at a precise fractional-second position.
+    pub fn try_new_at(
+        path: &Path,
+        start_seconds: f64,
+        pts_clock: Option<Arc<AtomicI64>>,
+        preferred_stream_index: Option<i32>,
+    ) -> Result<Self, String> {
+        let start_seconds = if start_seconds.is_finite() {
+            start_seconds.max(0.0)
+        } else {
+            0.0
+        };
         let api = ffmpeg_api()?;
         init_ffmpeg_once(api);
 
@@ -1116,7 +1218,7 @@ impl FfmpegSource {
         } else {
             time_base.den as i64
         };
-        let start_pts_us = (start_seconds as i64).saturating_mul(1_000_000);
+        let start_pts_us = (start_seconds * 1_000_000.0).round() as i64;
         let stream_start_raw = unsafe { (*stream).start_time };
         let stream_start_us = if stream_start_raw != AV_NOPTS_VALUE_I64 {
             (stream_start_raw as i128)
@@ -1166,9 +1268,9 @@ impl FfmpegSource {
             sent_eof: false,
         };
 
-        if start_seconds > 0 {
+        if start_seconds > 0.0 {
             log_debug(&format!("FFmpeg: seeking to {}s", start_seconds));
-            match source.try_seek(Duration::from_secs(start_seconds)) {
+            match source.try_seek(Duration::from_secs_f64(start_seconds)) {
                 Ok(()) => log_debug(&format!("FFmpeg: seek to {}s succeeded", start_seconds)),
                 Err(err) => log_debug(&format!("FFmpeg: initial seek failed: {}", err)),
             }

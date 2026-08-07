@@ -14,7 +14,9 @@ use windows::Win32::Foundation::{CloseHandle, HWND};
 use windows::Win32::System::Threading::{
     GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
 };
-use windows::Win32::UI::WindowsAndMessaging::{MB_ICONWARNING, MB_OK};
+use windows::Win32::UI::WindowsAndMessaging::{
+    IDYES, MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_YESNO,
+};
 use windows::core::PCWSTR;
 
 use crate::accessibility::to_wide;
@@ -1256,30 +1258,54 @@ pub(crate) fn open_recordings(
             .collect::<Vec<_>>();
 
         let delete_label = translated(language, "radio.delete_recording", "Elimina registrazione");
+        let delete_confirmation = match kind {
+            StreamRecordingKind::Radio => translated(
+                language,
+                "radio.confirm_delete_recording",
+                "Eliminare la registrazione radio selezionata?",
+            ),
+            StreamRecordingKind::Tv => crate::i18n::tr_tv("tv.confirm_delete_recording"),
+        };
+        let delete_confirmation_title = crate::settings::confirm_title(language);
         let recording_deleted = Arc::new(AtomicBool::new(false));
         let recording_deleted_handler = Arc::clone(&recording_deleted);
         let delete_action = InterpreterContextAction {
             label: delete_label,
             ctrl_c_shortcut: false,
+            delete_shortcut: true,
             enabled: Arc::new(|id| Path::new(id).is_file()),
-            handler: Arc::new(move |id| match fs::remove_file(&id) {
-                Ok(()) => {
-                    recording_deleted_handler.store(true, Ordering::SeqCst);
-                    crate::log_debug(&format!(
-                        "Recording deleted; refreshing list immediately: {id}"
-                    ));
-                    let dialog = crate::get_foreground_window_safe();
-                    if dialog.0 != 0 && crate::is_window_handle_valid(dialog) {
-                        crate::log_if_err!(crate::post_message_w_safe(
-                            dialog,
-                            windows::Win32::UI::WindowsAndMessaging::WM_CLOSE,
-                            windows::Win32::Foundation::WPARAM(0),
-                            windows::Win32::Foundation::LPARAM(0),
-                        ));
-                    }
+            handler: Arc::new(move |id| {
+                let dialog = crate::get_foreground_window_safe();
+                let confirmation_wide = to_wide(&delete_confirmation);
+                let title_wide = to_wide(&delete_confirmation_title);
+                let response = crate::message_box_modal(
+                    dialog,
+                    PCWSTR(confirmation_wide.as_ptr()),
+                    PCWSTR(title_wide.as_ptr()),
+                    MB_YESNO | MB_ICONQUESTION,
+                );
+                if response != IDYES {
+                    return;
                 }
-                Err(err) => {
-                    crate::log_debug(&format!("Recording delete failed for {id}: {err}"));
+
+                match fs::remove_file(&id) {
+                    Ok(()) => {
+                        recording_deleted_handler.store(true, Ordering::SeqCst);
+                        crate::log_debug(&format!(
+                            "Recording deleted after confirmation; refreshing list immediately: {id}"
+                        ));
+                        if dialog.0 != 0 && crate::is_window_handle_valid(dialog) {
+                            crate::log_if_err!(crate::post_message_w_safe(
+                                dialog,
+                                windows::Win32::UI::WindowsAndMessaging::WM_CLOSE,
+                                windows::Win32::Foundation::WPARAM(0),
+                                windows::Win32::Foundation::LPARAM(0),
+                            ));
+                        }
+                    }
+                    Err(err) => {
+                        crate::log_debug(&format!("Recording delete failed for {id}: {err}"));
+                    }
                 }
             }),
         };

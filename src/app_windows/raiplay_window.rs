@@ -140,6 +140,7 @@ fn browse_page(
                     crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
                 ),
                 ctrl_c_shortcut: true,
+                delete_shortcut: false,
                 enabled: Arc::new(move |selected_id: &str| {
                     context_items_for_enabled
                         .iter()

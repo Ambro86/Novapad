@@ -1,5 +1,26 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.8.5 – 2026-07-25
+
+Lưu và xuất EPUB
+• Đã sửa lệnh “Lưu thành” cho tài liệu EPUB: khi chọn TXT hoặc định dạng khác, phần mở rộng đã chọn giờ được áp dụng thay vì vẫn giữ .epub.
+• Việc xuất EPUB sang định dạng khác không còn thay đổi liên kết của tài liệu đang mở. Bản sao được tạo riêng, còn “Lưu” tiếp tục cập nhật tệp EPUB gốc đã mở từ thư mục của nó.
+
+Bản ghi radio
+• Đã thêm phím Delete làm phím tắt để xóa các bản ghi radio. Sonarpad hiện yêu cầu xác nhận trước khi xóa một bản ghi.
+
+Tài liệu hướng dẫn
+• Các hướng dẫn đã được biên soạn lại và bổ sung mục lục để việc tra cứu thuận tiện hơn.
+
+Danh mục giọng Google TTS
+• Danh mục Google TTS có thể tải xuống được mở rộng từ 104 lên 156 gói và từ 53 lên 81 biến thể ngôn ngữ.
+• Đã thêm 52 gói Chrome OS và Google Natural còn thiếu cho 28 ngôn ngữ, dùng các bản sửa đổi mới nhất đã được xác minh, địa chỉ tải xuống, mã kiểm SHA-256, kích thước, phần phụ thuộc và mã định danh người nói nội bộ từ danh mục tương thích hiện tại. Tiếng Litva dùng bản sửa đổi r19 thay cho các gói r17 cũ.
+• Đã thêm tên bản địa hóa của tiếng Assam, Bodo, Dogri, Konkani, Kashmir, Maithili, Manipuri, Odia, Phạn, Santali và Sindhi, cùng tên quốc gia Bosnia và Herzegovina, trong mọi ngôn ngữ giao diện.
+
+Hộp thoại tệp bằng tiếng Đức
+• Đã sửa lỗi trong bản dịch tiếng Đức khiến các hộp thoại Mở, Lưu thành, lưu sách nói, tải podcast và các hộp thoại chọn tệp khác không xuất hiện, mặc dù lệnh menu hoặc phím tắt đã được thực thi đúng.
+• Bộ lọc của hộp thoại tệp giờ hỗ trợ cả dấu phân cách \0 được viết dưới dạng chuỗi và ký tự NUL nhúng, đồng thời dùng bộ lọc dự phòng an toàn nếu bản dịch bị sai định dạng. Một lỗi giả vô hại xuất hiện trong nhật ký khi mở menu Tệp cũng đã được loại bỏ.
+
 Phiên bản 0.8.4 – 2026-07-24
 
 Chỉnh sửa tài liệu EPUB

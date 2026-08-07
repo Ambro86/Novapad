@@ -1,7 +1,9 @@
+pub mod audio_description_bridge;
 pub mod bdciechi;
 pub mod dictation;
 pub mod faster_whisper_bridge;
 pub mod italiaonline;
+pub mod la7_play;
 pub mod rai_audiodescrizioni;
 pub mod raiplay;
 pub mod raiplaysound;

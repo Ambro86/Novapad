@@ -1,5 +1,26 @@
 # Journal des modifications
 
+Version 0.8.5 – 2026-07-25
+
+Enregistrement et exportation des EPUB
+• Correction de « Enregistrer sous » pour les documents EPUB : lorsque TXT ou un autre format est choisi, l’extension sélectionnée est désormais appliquée au lieu de conserver .epub.
+• L’exportation d’un EPUB vers un autre format ne modifie plus l’association du document ouvert. La copie est créée séparément, tandis que « Enregistrer » continue de mettre à jour l’EPUB original ouvert depuis son dossier.
+
+Enregistrements radio
+• Ajout de la touche Suppr comme raccourci pour supprimer les enregistrements radio. Sonarpad demande désormais une confirmation avant de supprimer un enregistrement.
+
+Documentation
+• Les guides ont été remaniés et comportent désormais un sommaire afin d’en faciliter la consultation.
+
+Catalogue des voix Google TTS
+• Le catalogue téléchargeable Google TTS passe de 104 à 156 paquets et de 53 à 81 variantes linguistiques.
+• Les 52 paquets Chrome OS et Google Natural manquants pour 28 langues ont été ajoutés avec les révisions vérifiées les plus récentes, les adresses de téléchargement, les sommes SHA-256, les tailles, les dépendances et les identifiants internes des locuteurs du catalogue compatible actuel. Le lituanien utilise la révision r19 au lieu des anciens paquets r17.
+• Les noms localisés de l’assamais, du bodo, du dogri, du konkani, du cachemiri, du maithili, du manipuri, de l’odia, du sanskrit, du santali et du sindhi, ainsi que le nom du pays Bosnie-Herzégovine, ont été ajoutés dans toutes les langues de l’interface.
+
+Boîtes de dialogue de fichiers en allemand
+• Correction d’un problème de la traduction allemande qui empêchait l’affichage d’Ouvrir, Enregistrer sous, de l’enregistrement des livres audio, du téléchargement des podcasts et d’autres boîtes de sélection de fichiers, bien que la commande de menu ou le raccourci soit correctement exécuté.
+• Les filtres des boîtes de dialogue acceptent désormais aussi bien les séparateurs \0 écrits sous forme de séquence que les caractères NUL intégrés, avec un filtre de secours sûr si une traduction est incorrecte. Une fausse erreur sans conséquence affichée dans le journal à l’ouverture du menu Fichier a également été supprimée.
+
 Version 0.8.4 – 2026-07-24
 
 Modification des documents EPUB

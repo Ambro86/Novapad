@@ -1,5 +1,26 @@
 # Änderungsprotokoll
 
+Version 0.8.5 – 2026-07-25
+
+Speichern und Exportieren von EPUB-Dateien
+• „Speichern unter“ für EPUB-Dokumente wurde korrigiert: Bei Auswahl von TXT oder einem anderen Format wird nun die gewählte Dateiendung verwendet, statt .epub beizubehalten.
+• Beim Exportieren eines EPUB-Dokuments in ein anderes Format bleibt das geöffnete Dokument weiterhin mit der ursprünglichen EPUB-Datei verknüpft. Die exportierte Kopie wird separat erstellt, während „Speichern“ weiterhin das aus seinem Ordner geöffnete Original-EPUB aktualisiert.
+
+Radioaufnahmen
+• Die Entf-Taste kann jetzt zum Löschen von Radioaufnahmen verwendet werden. Sonarpad fragt nun vor dem Löschen einer Aufnahme nach einer Bestätigung.
+
+Dokumentation
+• Die Anleitungen wurden überarbeitet und mit einem Inhaltsverzeichnis versehen, damit sie leichter nachgeschlagen werden können.
+
+Google-TTS-Stimmenkatalog
+• Der herunterladbare Google-TTS-Katalog wurde von 104 auf 156 Pakete und von 53 auf 81 Sprachvarianten erweitert.
+• Für 28 Sprachen wurden 52 fehlende Chrome-OS- und Google-Natural-Pakete mit den neuesten geprüften Revisionen, Downloadadressen, SHA-256-Prüfsummen, Größen, Abhängigkeiten und internen Sprecherkennungen des aktuellen kompatiblen Katalogs ergänzt. Litauisch wird in Revision r19 statt mit den älteren r17-Paketen angeboten.
+• In allen Oberflächensprachen wurden lokalisierte Namen für Assamesisch, Bodo, Dogri, Konkani, Kaschmirisch, Maithili, Manipuri, Odia, Sanskrit, Santali und Sindhi sowie die Länderbezeichnung Bosnien und Herzegowina ergänzt.
+
+Dateidialoge in deutscher Sprache
+• Ein Problem der deutschen Übersetzung wurde behoben, durch das „Öffnen“, „Speichern unter“, das Speichern von Hörbüchern, Podcast-Downloads und weitere Dateiauswahldialoge nicht erschienen, obwohl der Menübefehl oder die Tastenkombination korrekt ausgeführt wurde.
+• Die Filter der Dateidialoge unterstützen jetzt sowohl ausgeschriebene \0-Trennzeichen als auch eingebettete NUL-Zeichen und verwenden bei einer fehlerhaften Übersetzung einen sicheren Ersatzfilter. Außerdem wurde eine harmlose falsche Fehlermeldung beim Öffnen des Menüs „Datei“ aus dem Protokoll entfernt.
+
 Version 0.8.4 – 2026-07-24
 
 Bearbeiten von EPUB-Dokumenten

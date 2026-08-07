@@ -1,5 +1,26 @@
 # Changelog
 
+Versión 0.8.5 – 2026-07-25
+
+Guardado y exportación de EPUB
+• Se ha corregido «Guardar como» en los documentos EPUB: al elegir TXT u otro formato, ahora se aplica la extensión seleccionada en lugar de conservar .epub.
+• Exportar un EPUB a otro formato ya no cambia la asociación del documento abierto. La copia se crea por separado, mientras que «Guardar» continúa actualizando el EPUB original abierto desde su carpeta.
+
+Grabaciones de radio
+• Se añadió la tecla Supr como atajo para eliminar grabaciones de radio. Sonarpad ahora solicita confirmación antes de eliminar una grabación.
+
+Documentación
+• Las guías se han reformulado e incluyen ahora un índice para facilitar su consulta.
+
+Catálogo de voces de Google TTS
+• El catálogo descargable de Google TTS se amplió de 104 a 156 paquetes y de 53 a 81 variantes lingüísticas.
+• Se añadieron los 52 paquetes de Chrome OS y Google Natural que faltaban para 28 idiomas, con las revisiones verificadas más recientes, direcciones de descarga, sumas SHA-256, tamaños, dependencias e identificadores internos de los hablantes del catálogo compatible actual. El lituano utiliza la revisión r19 en lugar de los antiguos paquetes r17.
+• Se añadieron en todos los idiomas de la interfaz los nombres localizados de asamés, bodo, dogri, konkani, cachemir, maithili, manipuri, odia, sánscrito, santali y sindhi, junto con el nombre del país Bosnia y Herzegovina.
+
+Cuadros de archivo en alemán
+• Se corrigió un problema de la traducción alemana que impedía que aparecieran Abrir, Guardar como, el guardado de audiolibros, las descargas de pódcast y otros cuadros de selección de archivos, aunque el comando de menú o el atajo se ejecutaran correctamente.
+• Los filtros de los cuadros de archivo admiten ahora tanto separadores \0 escritos como secuencia como caracteres NUL incrustados, y utilizan un filtro seguro si una traducción está mal formada. También se eliminó del registro un falso error inofensivo que aparecía al abrir el menú Archivo.
+
 Versión 0.8.4 – 2026-07-24
 
 Edición de documentos EPUB

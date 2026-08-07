@@ -14,7 +14,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  SONARPAD_RELEASE_TAG: v0.8.4
+  SONARPAD_RELEASE_TAG: v0.8.5
   SONARPAD_ROUTE_CLIENT_TOKEN: ${{ secrets.SONARPAD_ROUTE_CLIENT_TOKEN }}
 
 jobs:
@@ -39,6 +39,19 @@ jobs:
 
     - name: Rust Cache
       uses: swatinem/rust-cache@v2
+
+    - name: Set up Python for audio-description tests
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.14"
+        cache: "pip"
+        cache-dependency-path: bridge/requirements-test.txt
+
+    - name: Install audio-description test dependencies
+      run: python -m pip install -r bridge/requirements-test.txt
+
+    - name: Audio-description Python tests
+      run: python bridge/run_audio_description_tests.py
 
     # --- INIZIO BLOCCO VCPKG (FIXED) ---
     - name: Set VCPKG_ROOT Environment

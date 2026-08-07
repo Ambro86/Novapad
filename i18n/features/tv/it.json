@@ -7,6 +7,7 @@
   "tv.regions_summary": "{regions} regioni, {channels}",
   "tv.recordings": "Registrazioni TV",
   "tv.recordings_description": "Apri le registrazioni dei canali TV",
+  "tv.confirm_delete_recording": "Eliminare la registrazione TV selezionata?",
   "tv.now_playing": "{channel}. Ora in onda: {program}",
   "tv.loading_channels": "Caricamento canali TV",
   "tv.loading_programs": "Caricamento ora in onda",

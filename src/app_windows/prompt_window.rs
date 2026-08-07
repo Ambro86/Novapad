@@ -29,17 +29,17 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL,
-    CBS_DROPDOWNLIST, CreateWindowExW, DefWindowProcW, DispatchMessageW, ES_AUTOHSCROLL,
-    ES_AUTOVSCROLL, ES_MULTILINE, ES_PASSWORD, ES_READONLY, GWLP_USERDATA, GetClientRect,
-    GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
-    IDC_ARROW, IsDialogMessageW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION, MB_OKCANCEL,
-    MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW,
-    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, ShowWindow, TranslateMessage,
-    WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_CAPTION,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU,
-    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
+    CB_SETCURSEL, CBS_DROPDOWNLIST, CreateWindowExW, DefWindowProcW, DispatchMessageW,
+    ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_PASSWORD, ES_READONLY, GWLP_USERDATA,
+    GetClientRect, GetMessageW, GetParent, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
+    HMENU, IDC_ARROW, IsDialogMessageW, IsWindow, KillTimer, LoadCursorW, MB_ICONQUESTION,
+    MB_OKCANCEL, MESSAGEBOX_STYLE, MSG, MessageBoxW, PostMessageW, RegisterClassW, SW_HIDE,
+    SW_SHOW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, ShowWindow,
+    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_SYSKEYDOWN,
+    WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SIZEBOX, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::PCWSTR;
 
@@ -411,6 +411,115 @@ pub fn prompt_user_with_options(
     }
 }
 
+pub fn prompt_user_choice(
+    parent: HWND,
+    title: &str,
+    body: &str,
+    choices: &[String],
+    preferred: &str,
+    language: Language,
+) -> Option<String> {
+    if choices.is_empty() {
+        return None;
+    }
+
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide("SonarpadChoicePrompt");
+
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| {
+            let wc = WNDCLASSW {
+                hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(
+                    LoadCursorW(None, IDC_ARROW).unwrap_or_default().0,
+                ),
+                hInstance: hinstance,
+                lpszClassName: PCWSTR(class_name.as_ptr()),
+                lpfnWndProc: Some(choice_prompt_wndproc),
+                ..Default::default()
+            };
+            RegisterClassW(&wc);
+        });
+
+        let selected_index = choices
+            .iter()
+            .position(|choice| choice.eq_ignore_ascii_case(preferred))
+            .unwrap_or(0);
+        let mut data = ChoicePromptData {
+            body: body.to_string(),
+            choices: choices.to_vec(),
+            selected_index,
+            confirmed: false,
+            language,
+        };
+
+        let hwnd = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(to_wide(title).as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            200,
+            200,
+            430,
+            220,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(&mut data as *mut _ as *const std::ffi::c_void),
+        );
+
+        if hwnd.0 == 0 {
+            return None;
+        }
+
+        EnableWindow(parent, false);
+
+        let mut msg = MSG::default();
+        while IsWindow(hwnd).as_bool() && GetMessageW(&mut msg, HWND(0), 0, 0).into() {
+            if crate::app_windows::calendar_window::handle_reminder_alert_message(&msg) {
+                continue;
+            }
+            if msg.message == WM_KEYDOWN && msg.wParam.0 as u32 == VK_TAB.0 as u32 {
+                SendMessageW(hwnd, WM_KEYDOWN, msg.wParam, msg.lParam);
+                continue;
+            }
+            if !IsDialogMessageW(hwnd, &msg).as_bool() {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        }
+
+        EnableWindow(parent, true);
+        if parent.0 != 0 {
+            let mut class_buf = [0u16; 64];
+            let class_len = crate::get_class_name_w_safe(parent, &mut class_buf);
+            let parent_class = if class_len > 0 {
+                String::from_utf16_lossy(&class_buf[..class_len as usize])
+            } else {
+                String::new()
+            };
+            if parent_class == "SonarpadWin32" {
+                crate::bring_window_to_foreground(parent);
+                crate::log_if_err!(crate::post_message_w_safe(
+                    parent,
+                    crate::WM_FOCUS_EDITOR,
+                    WPARAM(0),
+                    LPARAM(0)
+                ));
+            } else {
+                crate::set_foreground_window_safe(parent);
+                crate::set_focus_safe(parent);
+            }
+        }
+
+        if data.confirmed {
+            data.choices.get(data.selected_index).cloned()
+        } else {
+            None
+        }
+    }
+}
+
 pub fn prompt_credentials(
     parent: HWND,
     title: &str,
@@ -670,6 +779,14 @@ struct SimplePromptData {
     masked: bool,
 }
 
+struct ChoicePromptData {
+    body: String,
+    choices: Vec<String>,
+    selected_index: usize,
+    confirmed: bool,
+    language: Language,
+}
+
 struct CredentialsPromptData {
     body: String,
     username: String,
@@ -885,6 +1002,203 @@ fn simple_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                 let order = [edit, ok, cancel];
                 let mut idx = order.iter().position(|&h| h == current_focus).unwrap_or(0);
 
+                if shift_down {
+                    idx = if idx == 0 { order.len() - 1 } else { idx - 1 };
+                } else {
+                    idx = (idx + 1) % order.len();
+                }
+                crate::set_focus_safe(order[idx]);
+                return LRESULT(0);
+            }
+            if key == VK_RETURN.0 as u32 {
+                crate::send_message_w_safe(hwnd, WM_COMMAND, WPARAM(1), LPARAM(0));
+                return LRESULT(0);
+            }
+            if key == VK_ESCAPE.0 as u32 {
+                crate::send_message_w_safe(hwnd, WM_COMMAND, WPARAM(2), LPARAM(0));
+                return LRESULT(0);
+            }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
+        }
+        WM_CLOSE => {
+            crate::log_if_err!(crate::destroy_window_safe(hwnd));
+            LRESULT(0)
+        }
+        _ => crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
+    }
+}
+
+unsafe extern "system" fn choice_prompt_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        crate::panic_guard::guard(
+            "choice_prompt_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || choice_prompt_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
+}
+
+fn choice_prompt_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    const IDC_CHOICE: isize = 101;
+    match msg {
+        WM_CREATE => {
+            let create_struct =
+                lparam.0 as *const windows::Win32::UI::WindowsAndMessaging::CREATESTRUCTW;
+            let data_ptr = unsafe { (*create_struct).lpCreateParams as *mut ChoicePromptData };
+            crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, data_ptr as isize);
+            let Some((body_text, choices, selected_index, language)) =
+                crate::with_raw_mut_ptr_safe(data_ptr, |data| {
+                    (
+                        data.body.clone(),
+                        data.choices.clone(),
+                        data.selected_index,
+                        data.language,
+                    )
+                })
+            else {
+                crate::log_debug("Choice prompt create params pointer unavailable");
+                return LRESULT(0);
+            };
+
+            let hfont = HFONT(
+                crate::get_stock_object_safe(windows::Win32::Graphics::Gdi::DEFAULT_GUI_FONT).0,
+            );
+            let label = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&body_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
+                    20,
+                    380,
+                    55,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            let combo = unsafe {
+                CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    20,
+                    82,
+                    380,
+                    220,
+                    hwnd,
+                    HMENU(IDC_CHOICE),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            for choice in &choices {
+                unsafe {
+                    SendMessageW(
+                        combo,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(choice).as_ptr() as isize),
+                    );
+                }
+            }
+            unsafe {
+                SendMessageW(
+                    combo,
+                    CB_SETCURSEL,
+                    WPARAM(selected_index.min(choices.len().saturating_sub(1))),
+                    LPARAM(0),
+                );
+            }
+            let ok = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "options.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    215,
+                    132,
+                    80,
+                    28,
+                    hwnd,
+                    HMENU(1),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+            let cancel = unsafe {
+                CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "options.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    305,
+                    132,
+                    95,
+                    28,
+                    hwnd,
+                    HMENU(2),
+                    HINSTANCE(0),
+                    None,
+                )
+            };
+
+            if hfont.0 != 0 {
+                unsafe {
+                    for control in [label, combo, ok, cancel] {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
+                }
+            }
+            crate::set_focus_safe(combo);
+            LRESULT(0)
+        }
+        WM_COMMAND => {
+            let id = wparam.0 & 0xffff;
+            if id == 1 {
+                let ptr =
+                    crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut ChoicePromptData;
+                if !ptr.is_null() {
+                    let combo = crate::get_dlg_item_safe(hwnd, IDC_CHOICE as i32);
+                    let selected =
+                        unsafe { SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+                    if selected >= 0
+                        && crate::with_raw_mut_ptr_safe(ptr, |data| {
+                            data.selected_index = selected as usize;
+                            data.confirmed = true;
+                        })
+                        .is_none()
+                    {
+                        crate::log_debug(
+                            "Choice prompt: state pointer unavailable while confirming selection",
+                        );
+                    }
+                }
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
+            } else if id == 2 {
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
+            }
+            LRESULT(0)
+        }
+        WM_KEYDOWN => {
+            let key = wparam.0 as u32;
+            if key == VK_TAB.0 as u32 {
+                let shift_down =
+                    (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                let current_focus = crate::get_focus_safe();
+                let combo = crate::get_dlg_item_safe(hwnd, IDC_CHOICE as i32);
+                let ok = crate::get_dlg_item_safe(hwnd, 1);
+                let cancel = crate::get_dlg_item_safe(hwnd, 2);
+                let order = [combo, ok, cancel];
+                let mut idx = order.iter().position(|&h| h == current_focus).unwrap_or(0);
                 if shift_down {
                     idx = if idx == 0 { order.len() - 1 } else { idx - 1 };
                 } else {

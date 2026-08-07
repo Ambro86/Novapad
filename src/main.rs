@@ -2,9 +2,10 @@
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(let_underscore_drop)]
-#![windows_subsystem = "windows"]
+#![cfg_attr(not(test), windows_subsystem = "windows")]
 
 mod accessibility;
+mod audio_description;
 mod com_guard;
 mod curl_client;
 mod embedded_deps;
@@ -224,13 +225,13 @@ fn update_epub_index_menu_item(hwnd: HWND, view_menu: HMENU) {
 }
 
 fn update_route_image_menu_item(hwnd: HWND, file_menu: HMENU) {
+    delete_menu_best_effort(
+        file_menu,
+        IDM_FILE_SAVE_IMAGE as u32,
+        MF_BYCOMMAND,
+        "Delete route image menu item",
+    );
     unsafe {
-        crate::log_if_err!(DeleteMenu(
-            file_menu,
-            IDM_FILE_SAVE_IMAGE as u32,
-            MF_BYCOMMAND,
-        ));
-
         if !editor_manager::current_document_has_route_map(hwnd) {
             return;
         }
@@ -406,6 +407,7 @@ const COPYDATA_OPEN_FILE: usize = 1;
 const COPYDATA_CALENDAR_REMINDER: usize = 2;
 const COPYDATA_RESULT_HANDLED: isize = 1;
 const COPYDATA_RESULT_DEFERRED_MODAL: isize = 2;
+const COPYDATA_RESULT_OPEN_NEW_WINDOW: isize = 3;
 const VOICE_PANEL_ID_ENGINE: usize = 21001;
 const VOICE_PANEL_ID_LANGUAGE: usize = 21012;
 const VOICE_PANEL_ID_VOICE: usize = 21002;
@@ -759,7 +761,17 @@ fn should_defer_external_file_open(main_window_enabled: bool) -> bool {
 }
 
 fn should_focus_existing_window_after_copydata(result: isize) -> bool {
-    result != COPYDATA_RESULT_DEFERRED_MODAL
+    result != COPYDATA_RESULT_DEFERRED_MODAL && result != COPYDATA_RESULT_OPEN_NEW_WINDOW
+}
+
+fn should_open_new_window_after_copydata(result: isize) -> bool {
+    result == COPYDATA_RESULT_OPEN_NEW_WINDOW
+}
+
+fn should_route_external_file_open_to_new_window(hwnd: HWND) -> bool {
+    let audio_description_window =
+        with_state(hwnd, |state| state.audio_description_window).unwrap_or(HWND(0));
+    app_windows::audio_description_window::blocks_parent_focus(hwnd, audio_description_window)
 }
 
 fn reactivate_modal_child_while_main_disabled(hwnd: HWND) -> bool {
@@ -1390,6 +1402,7 @@ struct PodcastEpisodeSaveResult {
     language: Language,
     target_path: PathBuf,
     error: Option<String>,
+    open_audio_description: bool,
 }
 
 struct PodcastEpisodePlayReady {
@@ -1542,6 +1555,7 @@ pub(crate) enum RaiAudioOrigin {
     Recenti,
     Tutte,
     RaiPlay,
+    La7Play,
     RaiPlaySound,
 }
 
@@ -2289,8 +2303,18 @@ pub(crate) fn clear_active_youtube_return_context(hwnd: HWND) {
 }
 
 pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
-    let (url, media_url, podcast_title, title, cache_path, language, is_raiplay_on_demand) = {
+    let (
+        url,
+        media_url,
+        podcast_title,
+        title,
+        cache_path,
+        language,
+        rai_origin,
+        uses_video_save_dialog,
+    ) = {
         with_state(hwnd, |state| {
+            let rai_origin = state.active_podcast_episode_from_rai;
             (
                 state.active_podcast_episode_url.clone(),
                 state.active_podcast_episode_media_url.clone(),
@@ -2298,13 +2322,29 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
                 state.active_podcast_episode_title.clone(),
                 state.active_podcast_episode_cache.clone(),
                 state.settings.language,
-                state.active_podcast_episode_from_rai == RaiAudioOrigin::RaiPlay
-                    && state.raiplay_live_audio_variants.is_empty(),
+                rai_origin,
+                matches!(
+                    rai_origin,
+                    RaiAudioOrigin::RaiPlay | RaiAudioOrigin::La7Play
+                ) && state.raiplay_live_audio_variants.is_empty(),
             )
         })
-        .unwrap_or((None, None, None, None, None, Language::default(), false))
+        .unwrap_or((
+            None,
+            None,
+            None,
+            None,
+            None,
+            Language::default(),
+            RaiAudioOrigin::None,
+            false,
+        ))
     };
-    if let Some(active_url) = url.as_deref()
+    // I contenuti RaiPlay e La Sette Play devono passare dal selettore MP3/MP4.
+    // Un HLS La7, altrimenti, verrebbe intercettato come streaming audio generico
+    // e proporrebbe soltanto il salvataggio audio.
+    if !uses_video_save_dialog
+        && let Some(active_url) = url.as_deref()
         && app_windows::youtube_transcript_window::download_active_streaming_audio_media(
             hwnd, active_url, language,
         )
@@ -2313,16 +2353,18 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
     }
     let fallback_cache_path =
         current_playback_media_path(hwnd).filter(|path| is_local_cached_media_path(path));
-    if is_raiplay_on_demand {
-        download_podcast_episode_with_progress(
+    if uses_video_save_dialog {
+        download_podcast_episode_with_progress(PodcastProgressDownloadRequest {
             hwnd,
             url,
             media_url,
             podcast_title,
             title,
-            cache_path.or(fallback_cache_path),
+            cache_path: cache_path.or(fallback_cache_path),
             language,
-        );
+            rai_origin,
+            open_audio_description: false,
+        });
         return;
     }
     download_podcast_episode(
@@ -2335,13 +2377,66 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
     );
 }
 
+fn download_active_rai_la7_for_audio_description(hwnd: HWND) -> bool {
+    let (url, media_url, podcast_title, title, cache_path, language, rai_origin, is_live) =
+        with_state(hwnd, |state| {
+            (
+                state.active_podcast_episode_url.clone(),
+                state.active_podcast_episode_media_url.clone(),
+                state.active_podcast_title.clone(),
+                state.active_podcast_episode_title.clone(),
+                state.active_podcast_episode_cache.clone(),
+                state.settings.language,
+                state.active_podcast_episode_from_rai,
+                state.active_mpv_is_live_tv || !state.raiplay_live_audio_variants.is_empty(),
+            )
+        })
+        .unwrap_or((
+            None,
+            None,
+            None,
+            None,
+            None,
+            Language::default(),
+            RaiAudioOrigin::None,
+            false,
+        ));
+
+    if is_live
+        || !matches!(
+            rai_origin,
+            RaiAudioOrigin::RaiPlay | RaiAudioOrigin::La7Play
+        )
+    {
+        return false;
+    }
+
+    pause_active_playback_for_audio_description(hwnd);
+    log_debug(&format!(
+        "Audio description shortcut: saving {:?} video with existing media exporter",
+        rai_origin
+    ));
+    download_podcast_episode_with_progress(PodcastProgressDownloadRequest {
+        hwnd,
+        url,
+        media_url,
+        podcast_title,
+        title,
+        cache_path,
+        language,
+        rai_origin,
+        open_audio_description: true,
+    });
+    true
+}
+
 enum RaiPlaySaveMode {
     Mp3,
     Mp4,
     Mp4Described,
 }
 
-fn download_podcast_episode_with_progress(
+struct PodcastProgressDownloadRequest {
     hwnd: HWND,
     url: Option<String>,
     media_url: Option<String>,
@@ -2349,7 +2444,22 @@ fn download_podcast_episode_with_progress(
     title: Option<String>,
     cache_path: Option<PathBuf>,
     language: Language,
-) {
+    rai_origin: RaiAudioOrigin,
+    open_audio_description: bool,
+}
+
+fn download_podcast_episode_with_progress(request: PodcastProgressDownloadRequest) {
+    let PodcastProgressDownloadRequest {
+        hwnd,
+        url,
+        media_url,
+        podcast_title,
+        title,
+        cache_path,
+        language,
+        rai_origin,
+        open_audio_description,
+    } = request;
     let suggested_name =
         suggested_podcast_episode_filename(podcast_title.as_deref(), title.as_deref())
             .or_else(|| {
@@ -2374,21 +2484,50 @@ fn download_podcast_episode_with_progress(
                 crate::tools::raiplay::PlaybackTarget::Download(_) => None,
             })
     });
-    let Some(save_mode) =
-        choose_raiplay_episode_save_mode(hwnd, language, described_audio_url.is_some())
-    else {
-        return;
+    let save_mode = if open_audio_description {
+        RaiPlaySaveMode::Mp4
+    } else {
+        let Some(save_mode) =
+            choose_rai_episode_save_mode(hwnd, language, rai_origin, described_audio_url.is_some())
+        else {
+            return;
+        };
+        save_mode
     };
     let ext = match save_mode {
         RaiPlaySaveMode::Mp3 => "mp3",
         RaiPlaySaveMode::Mp4 | RaiPlaySaveMode::Mp4Described => "mp4",
     };
-    let suggested_full = format!("{}.{}", suggested_name, ext);
-    let target = save_podcast_episode_dialog(hwnd, language, &suggested_full);
-    let Some(target) = target else {
-        return;
+    let target = if open_audio_description {
+        let target_dir = with_state(hwnd, |state| state.settings.media_save_folder.clone())
+            .map(|folder| folder.trim().to_string())
+            .filter(|folder| !folder.is_empty())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(settings::default_media_save_folder()));
+        if let Err(err) = std::fs::create_dir_all(&target_dir) {
+            show_error(
+                hwnd,
+                language,
+                &i18n::tr_f(
+                    language,
+                    "stream_audio.download_failed",
+                    &[("err", &err.to_string())],
+                ),
+            );
+            return;
+        }
+        app_windows::youtube_transcript_window::unique_stream_media_path(
+            &target_dir,
+            &suggested_name,
+            ext,
+        )
+    } else {
+        let suggested_full = format!("{}.{}", suggested_name, ext);
+        let Some(target) = save_podcast_episode_dialog(hwnd, language, &suggested_full) else {
+            return;
+        };
+        replace_path_extension(target, ext)
     };
-    let target = replace_path_extension(target, ext);
     let stream_source_url = match save_mode {
         RaiPlaySaveMode::Mp3 => described_audio_url.clone().or_else(|| url.clone()),
         RaiPlaySaveMode::Mp4 | RaiPlaySaveMode::Mp4Described => media_url.or(url.clone()),
@@ -2398,6 +2537,14 @@ fn download_podcast_episode_with_progress(
         .filter(|value| value.starts_with("http://") || value.starts_with("https://"))
         .map(ToOwned::to_owned)
     else {
+        if open_audio_description {
+            show_error(
+                hwnd,
+                language,
+                &i18n::tr(language, "stream_audio.no_output"),
+            );
+            return;
+        }
         download_podcast_episode(hwnd, url, podcast_title, title, cache_path, language);
         return;
     };
@@ -2481,6 +2628,7 @@ fn download_podcast_episode_with_progress(
                         language,
                         target_path: target,
                         error: None,
+                        open_audio_description,
                     },
                 )
             }
@@ -2490,6 +2638,7 @@ fn download_podcast_episode_with_progress(
                     language,
                     target_path: target.clone(),
                     error: Some(format!("stream export failed: {err}")),
+                    open_audio_description,
                 },
             ),
         }
@@ -2526,6 +2675,7 @@ pub(crate) fn post_media_save_result(
             language,
             target_path,
             error,
+            open_audio_description: false,
         },
     );
 }
@@ -3162,8 +3312,19 @@ fn taskkill_mpv_process(process_id: u32, context: &str) {
 
 fn invalidate_managed_mpv_session(hwnd: HWND) {
     let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
-    let active_url = with_state(hwnd, |state| state.active_podcast_episode_url.clone()).flatten();
+    let (active_url, active_origin) = with_state(hwnd, |state| {
+        (
+            state.active_podcast_episode_url.clone(),
+            state.active_podcast_episode_from_rai,
+        )
+    })
+    .unwrap_or((None, RaiAudioOrigin::None));
     if with_state(hwnd, |state| {
+        state.last_stopped_mpv_origin = if active_url.is_some() {
+            active_origin
+        } else {
+            RaiAudioOrigin::None
+        };
         state.last_stopped_mpv_url = active_url;
     })
     .is_none()
@@ -3411,6 +3572,10 @@ pub(crate) fn is_mpv_playback_active(hwnd: HWND) -> bool {
     with_state(hwnd, |state| state.active_mpv_session.is_some()).unwrap_or(false)
 }
 
+pub(crate) fn is_local_mpv_video_mode_active(hwnd: HWND) -> bool {
+    with_state(hwnd, |state| state.local_mpv_video_mode_active).unwrap_or(false)
+}
+
 fn active_local_mpv_media(hwnd: HWND) -> Option<(PathBuf, u32)> {
     with_state(hwnd, |state| {
         let session = state.active_mpv_session.as_ref()?;
@@ -3655,7 +3820,13 @@ pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
     clear_active_audiobook_bookmark(hwnd);
     set_local_mpv_video_mode(hwnd, false);
     let session = with_state(hwnd, |state| state.active_mpv_session.clone()).flatten();
-    let active_url = with_state(hwnd, |state| state.active_podcast_episode_url.clone()).flatten();
+    let (active_url, active_origin) = with_state(hwnd, |state| {
+        (
+            state.active_podcast_episode_url.clone(),
+            state.active_podcast_episode_from_rai,
+        )
+    })
+    .unwrap_or((None, RaiAudioOrigin::None));
     log_debug(&format!(
         "stop_managed_mpv_playback: foreground_before={:?} focus_before={:?} has_session={}",
         unsafe { GetForegroundWindow() },
@@ -3671,6 +3842,11 @@ pub(crate) fn stop_managed_mpv_playback(hwnd: HWND) {
     if with_state(hwnd, |state| {
         state.last_stopped_mpv_url = active_url.clone();
         state.last_stopped_mpv_position_secs = resume_position_secs;
+        state.last_stopped_mpv_origin = if active_url.is_some() {
+            active_origin
+        } else {
+            RaiAudioOrigin::None
+        };
     })
     .is_none()
     {
@@ -3885,6 +4061,7 @@ pub(crate) fn launch_raiplay_in_mpv_with_resume(
                 state.selected_audio_track = None;
                 state.last_stopped_mpv_url = None;
                 state.last_stopped_mpv_position_secs = None;
+                state.last_stopped_mpv_origin = RaiAudioOrigin::None;
             })
             .is_none()
             {
@@ -4615,6 +4792,7 @@ fn launch_stream_url_in_mpv_with_options(
                 state.selected_audio_track = None;
                 state.last_stopped_mpv_url = None;
                 state.last_stopped_mpv_position_secs = None;
+                state.last_stopped_mpv_origin = RaiAudioOrigin::None;
             })
             .is_none()
             {
@@ -4789,6 +4967,7 @@ pub(crate) fn launch_local_video_in_mpv(hwnd: HWND, path: &Path) -> Result<(), S
                 state.selected_audio_track = None;
                 state.last_stopped_mpv_url = None;
                 state.last_stopped_mpv_position_secs = None;
+                state.last_stopped_mpv_origin = RaiAudioOrigin::None;
             })
             .is_none()
             {
@@ -5286,6 +5465,7 @@ pub(crate) fn download_podcast_episode(
                         language,
                         target_path: target.clone(),
                         error: Some(err),
+                        open_audio_description: false,
                     },
                 );
                 return;
@@ -5308,6 +5488,7 @@ pub(crate) fn download_podcast_episode(
                             language,
                             target_path: target.clone(),
                             error: Some(err),
+                            open_audio_description: false,
                         },
                     );
                     return;
@@ -5333,6 +5514,7 @@ pub(crate) fn download_podcast_episode(
                             language,
                             target_path: target,
                             error: None,
+                            open_audio_description: false,
                         },
                     );
                 }
@@ -5345,6 +5527,7 @@ pub(crate) fn download_podcast_episode(
                             language,
                             target_path: target.clone(),
                             error: Some(error),
+                            open_audio_description: false,
                         },
                     );
                 }
@@ -5361,6 +5544,7 @@ pub(crate) fn download_podcast_episode(
                     language,
                     target_path: target.clone(),
                     error: Some(err),
+                    open_audio_description: false,
                 },
             );
             return;
@@ -5376,6 +5560,7 @@ pub(crate) fn download_podcast_episode(
                         language,
                         target_path: target.clone(),
                         error: Some(err),
+                        open_audio_description: false,
                     },
                 );
                 return;
@@ -5396,6 +5581,7 @@ pub(crate) fn download_podcast_episode(
                             language,
                             target_path: target.clone(),
                             error: Some(err),
+                            open_audio_description: false,
                         },
                     );
                     return;
@@ -5414,6 +5600,7 @@ pub(crate) fn download_podcast_episode(
                     language,
                     target_path: target,
                     error: None,
+                    open_audio_description: false,
                 },
             );
         } else {
@@ -5428,6 +5615,7 @@ pub(crate) fn download_podcast_episode(
                     language,
                     target_path: target,
                     error: Some(err),
+                    open_audio_description: false,
                 },
             );
         }
@@ -5501,37 +5689,52 @@ fn replace_path_extension(mut path: PathBuf, desired_ext: &str) -> PathBuf {
     path
 }
 
-fn choose_raiplay_episode_save_mode(
+fn choose_rai_episode_save_mode(
     hwnd: HWND,
     language: Language,
+    rai_origin: RaiAudioOrigin,
     has_described_audio: bool,
 ) -> Option<RaiPlaySaveMode> {
-    let (title, label) = match language {
-        Language::Italian => ("Formato salvataggio RaiPlay", "Seleziona il formato"),
-        _ => ("RaiPlay Save Format", "Select format"),
+    let (title, label) = if rai_origin == RaiAudioOrigin::La7Play {
+        (
+            crate::i18n::tr_la7_play("la7.save_format_title"),
+            crate::i18n::tr_la7_play("la7.save_format_label"),
+        )
+    } else {
+        match language {
+            Language::Italian => (
+                "Formato salvataggio RaiPlay".to_string(),
+                "Seleziona il formato".to_string(),
+            ),
+            _ => (
+                "RaiPlay Save Format".to_string(),
+                "Select format".to_string(),
+            ),
+        }
     };
-    let mut options = match language {
-        Language::Italian => vec!["MP3".to_string(), "MP4".to_string()],
-        _ => vec!["MP3".to_string(), "MP4".to_string()],
+    let mut options = if rai_origin == RaiAudioOrigin::La7Play {
+        vec![
+            crate::i18n::tr_la7_play("la7.save_mp3"),
+            crate::i18n::tr_la7_play("la7.save_mp4"),
+        ]
+    } else {
+        vec!["MP3".to_string(), "MP4".to_string()]
     };
-    if has_described_audio {
+    if has_described_audio && rai_origin == RaiAudioOrigin::RaiPlay {
         options.push(match language {
             Language::Italian => "MP4 con audiodescrizione".to_string(),
             _ => "MP4 with described audio".to_string(),
         });
     }
     let selected = app_windows::youtube_transcript_window::choose_combo_option_dialog(
-        hwnd,
-        language,
-        title.to_string(),
-        label.to_string(),
-        options,
-        0,
+        hwnd, language, title, label, options, 0,
     )?;
     match selected {
         0 => Some(RaiPlaySaveMode::Mp3),
         1 => Some(RaiPlaySaveMode::Mp4),
-        2 if has_described_audio => Some(RaiPlaySaveMode::Mp4Described),
+        2 if has_described_audio && rai_origin == RaiAudioOrigin::RaiPlay => {
+            Some(RaiPlaySaveMode::Mp4Described)
+        }
         _ => None,
     }
 }
@@ -5598,24 +5801,21 @@ pub(crate) fn save_podcast_episode_dialog(
     unsafe {
         let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
 
-        let filter_raw = i18n::tr(language, "podcasts.download_filter");
-        let parts: Vec<&str> = filter_raw.split("\\0").collect();
-        let mut spec = Vec::new();
-        let mut pattern_wides = Vec::new();
-        let mut name_wides = Vec::new();
-        for i in (0..parts.len().saturating_sub(1)).step_by(2) {
-            if parts[i].is_empty() {
-                break;
-            }
-            name_wides.push(to_wide(parts[i]));
-            pattern_wides.push(to_wide(parts[i + 1]));
-        }
-        for i in 0..name_wides.len() {
-            spec.push(COMDLG_FILTERSPEC {
-                pszName: PCWSTR(name_wides[i].as_ptr()),
-                pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
-            });
-        }
+        let filter_pairs = i18n::dialog_filter_pairs(language, "podcasts.download_filter");
+        let name_wides: Vec<Vec<u16>> =
+            filter_pairs.iter().map(|(name, _)| to_wide(name)).collect();
+        let pattern_wides: Vec<Vec<u16>> = filter_pairs
+            .iter()
+            .map(|(_, pattern)| to_wide(pattern))
+            .collect();
+        let spec: Vec<COMDLG_FILTERSPEC> = name_wides
+            .iter()
+            .zip(pattern_wides.iter())
+            .map(|(name, pattern)| COMDLG_FILTERSPEC {
+                pszName: PCWSTR(name.as_ptr()),
+                pszSpec: PCWSTR(pattern.as_ptr()),
+            })
+            .collect();
         pfd.SetFileTypes(&spec).ok()?;
         pfd.SetFileTypeIndex(1).ok()?;
 
@@ -6265,6 +6465,152 @@ pub(crate) fn current_local_playback_media_path(hwnd: HWND) -> Option<PathBuf> {
         return None;
     }
     Some(path)
+}
+
+pub(crate) fn finish_audio_description_after_output_preview(
+    hwnd: HWND,
+    source_player_path: Option<&Path>,
+) {
+    log_debug(&format!(
+        "Audio description: finishing output preview workflow source_player_path={}",
+        source_player_path
+            .map(|path| path.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    ));
+
+    if is_mpv_playback_active(hwnd) {
+        stop_managed_mpv_playback(hwnd);
+    }
+
+    let source_index = source_player_path.and_then(|source_path| {
+        with_state(hwnd, |state| {
+            state.docs.iter().position(|doc| {
+                matches!(doc.format, FileFormat::Audiobook)
+                    && doc.path.as_deref() == Some(source_path)
+            })
+        })
+        .flatten()
+    });
+
+    if let Some(index) = source_index {
+        log_debug(&format!(
+            "Audio description: closing source player document at index {index}"
+        ));
+        if !editor_manager::close_document_at(hwnd, index) {
+            log_debug("Audio description: failed to close source player document");
+        }
+    }
+
+    clear_active_podcast_chapters(hwnd);
+    clear_active_youtube_return_context(hwnd);
+
+    // The audio-description window is still inside WM_DESTROY when this helper runs.
+    // Do not hand focus back synchronously: Windows/NVDA can otherwise keep a stale
+    // modal/accessibility state even though the edit control already owns focus.
+    let _enabled = enable_window_safe(hwnd, true);
+    send_message_w_safe(hwnd, WM_CANCELMODE, WPARAM(0), LPARAM(0));
+    if with_state(hwnd, |state| {
+        state.alt_menu_suppressed = false;
+        state.alt_menu_used_with_key = false;
+        state.local_mpv_alt_menu_pending = false;
+    })
+    .is_none()
+    {
+        log_debug("Audio description: app state unavailable while resetting Alt/menu state");
+    }
+    unsafe {
+        crate::log_if_err!(DrawMenuBar(hwnd));
+    }
+    log_debug("Audio description: scheduling deferred editor focus after preview cleanup");
+    crate::log_if_err!(post_message_w_safe(
+        hwnd,
+        WM_FOCUS_EDITOR,
+        WPARAM(0),
+        LPARAM(0)
+    ));
+}
+
+fn pause_active_playback_for_audio_description(hwnd: HWND) {
+    if is_mpv_playback_active(hwnd) {
+        match try_send_command_to_managed_mpv(hwnd, r#"{"command":["set_property","pause",true]}"#)
+        {
+            Ok(()) => {
+                log_debug("Audio description shortcut: paused active mpv playback");
+                stop_mpv_subtitle_speech(hwnd, "audio_description_start");
+                sync_mpv_sleep_prevention(hwnd);
+            }
+            Err(err) => {
+                log_debug(&format!(
+                    "Audio description shortcut: failed to pause active mpv playback: {}",
+                    err
+                ));
+            }
+        }
+        return;
+    }
+
+    if crate::audio_player::pause_audiobook_if_playing(hwnd) {
+        log_debug("Audio description shortcut: paused active BASS playback");
+    }
+}
+
+fn open_audio_description_from_current_context(hwnd: HWND) {
+    if let Some(path) = current_local_playback_media_path(hwnd)
+        .filter(|path| file_handler::is_video_path(path.as_path()))
+    {
+        log_debug(&format!(
+            "Audio description shortcut: opening local video {}",
+            path.display()
+        ));
+        pause_active_playback_for_audio_description(hwnd);
+        app_windows::audio_description_window::open_with_input(hwnd, path);
+        return;
+    }
+
+    if download_active_rai_la7_for_audio_description(hwnd) {
+        return;
+    }
+
+    let (active_url, language) = with_state(hwnd, |state| {
+        (
+            state.active_podcast_episode_url.clone(),
+            state.settings.language,
+        )
+    })
+    .unwrap_or((None, Language::default()));
+
+    if let Some(active_url) = active_url.as_deref()
+        && app_windows::youtube_transcript_window::can_create_audio_description_from_active_stream(
+            active_url,
+        )
+    {
+        log_debug("Audio description shortcut: downloading active yt-dlp video stream");
+        pause_active_playback_for_audio_description(hwnd);
+        app_windows::youtube_transcript_window::download_active_streaming_video_for_audio_description(
+            hwnd,
+            active_url,
+            language,
+        );
+        return;
+    }
+
+    if let Some(active_url) = active_url.filter(|url| {
+        app_windows::youtube_transcript_window::can_create_audio_description_from_active_youtube(
+            url,
+        )
+    }) {
+        log_debug("Audio description shortcut: downloading active YouTube video");
+        pause_active_playback_for_audio_description(hwnd);
+        app_windows::youtube_transcript_window::download_active_youtube_for_audio_description(
+            hwnd,
+            &active_url,
+            language,
+        );
+        return;
+    }
+
+    log_debug("Audio description shortcut: opening empty window");
+    app_windows::audio_description_window::open(hwnd);
 }
 
 pub(crate) fn restore_transcription_progress_focus_for_current_document(hwnd: HWND) -> bool {
@@ -8020,6 +8366,12 @@ fn has_secondary_window_open(hwnd: HWND) -> bool {
                 || state.transcription_progress_window.0 != 0
                 || state.batch_audiobooks_window.0 != 0
                 || state.convert_audio_window.0 != 0
+                || app_windows::audio_description_window::blocks_parent_focus(
+                    hwnd,
+                    state.audio_description_window,
+                )
+                || (state.audio_description_project_window.0 != 0
+                    && unsafe { IsWindowVisible(state.audio_description_project_window).as_bool() })
                 || state.media_split_window.0 != 0
                 || state.radio_window.0 != 0
                 || state.podcasts_window.0 != 0
@@ -8073,6 +8425,12 @@ fn should_force_editor_focus_on_foreground(hwnd: HWND) -> bool {
                 && state.bdciechi_window.0 == 0
                 && state.replace_progress_window.0 == 0
                 && state.radio_window.0 == 0
+                && !app_windows::audio_description_window::blocks_parent_focus(
+                    hwnd,
+                    state.audio_description_window,
+                )
+                && (state.audio_description_project_window.0 == 0
+                    || !IsWindowVisible(state.audio_description_project_window).as_bool())
                 && !audiobook_progress_in_foreground
                 && !is_reader_mode
         })
@@ -8238,6 +8596,8 @@ pub(crate) struct AppState {
     transcription_progress_window: HWND,
     batch_audiobooks_window: HWND,
     convert_audio_window: HWND,
+    audio_description_window: HWND,
+    audio_description_project_window: HWND,
     media_split_window: HWND,
     radio_window: HWND,
     podcasts_window: HWND,
@@ -8305,6 +8665,7 @@ pub(crate) struct AppState {
     active_mpv_status: Option<MpvPlaybackStatus>,
     last_stopped_mpv_url: Option<String>,
     last_stopped_mpv_position_secs: Option<u64>,
+    last_stopped_mpv_origin: RaiAudioOrigin,
     active_youtube_return_context: YouTubeReturnContext,
     last_italiaonline_query: Option<crate::tools::italiaonline::SearchQuery>,
     last_italiaonline_result_id: Option<String>,
@@ -8313,6 +8674,10 @@ pub(crate) struct AppState {
     raiplay_navigation_stack: Vec<(String, Option<String>)>,
     last_raiplay_page_path: Option<String>,
     last_raiplay_item_id: Option<String>,
+    la7_play_navigation_stack: Vec<(String, Option<String>)>,
+    last_la7_play_page_path: Option<String>,
+    last_la7_play_item_id: Option<String>,
+    last_la7_play_search_query: String,
     raiplaysound_navigation_stack: Vec<(String, Option<String>)>,
     last_raiplaysound_page_path: Option<String>,
     last_raiplaysound_item_id: Option<String>,
@@ -8457,12 +8822,13 @@ fn main() -> windows::core::Result<()> {
         std::process::exit(0);
     }
     let show_update_completed = args.iter().any(|arg| arg == "--after-update-completed");
+    let force_new_window = args.iter().any(|arg| arg == "--new-window");
     let mut calendar_reminder_id = None;
     let mut filtered_args = Vec::with_capacity(args.len());
     let mut index = 0usize;
     while index < args.len() {
         let argument = &args[index];
-        if argument == "--after-update-completed" {
+        if argument == "--after-update-completed" || argument == "--new-window" {
             index += 1;
             continue;
         }
@@ -8499,6 +8865,7 @@ fn main() -> windows::core::Result<()> {
         &filtered_args,
         show_update_completed,
         calendar_reminder_id.as_deref(),
+        force_new_window,
     ) {
         sentry_integration::capture_fatal_windows_error("run_app", &e);
         sentry_integration::flush(2);
@@ -8537,6 +8904,7 @@ fn run_app(
     args: &[String],
     show_update_completed: bool,
     calendar_reminder_id: Option<&str>,
+    force_new_window: bool,
 ) -> windows::core::Result<()> {
     unsafe {
         crate::log_if_err!(LoadLibraryW(w!("Msftedit.dll")));
@@ -8596,7 +8964,10 @@ fn run_app(
                 return Ok(());
             }
         }
-        if !extra_paths.is_empty() && settings.open_behavior == OpenBehavior::NewTab {
+        if !force_new_window
+            && !extra_paths.is_empty()
+            && settings.open_behavior == OpenBehavior::NewTab
+        {
             let existing = FindWindowW(class_name, PCWSTR::null());
             if existing.0 != 0 {
                 // Send paths to existing window via WM_COPYDATA
@@ -8620,6 +8991,12 @@ fn run_app(
                     WPARAM(0),
                     LPARAM(&mut cds as *mut _ as isize),
                 );
+                if should_open_new_window_after_copydata(copydata_result.0) {
+                    log_debug(
+                        "Existing Sonarpad instance spawned a separate window for Explorer file(s); sender will exit",
+                    );
+                    return Ok(());
+                }
                 if should_focus_existing_window_after_copydata(copydata_result.0) {
                     bring_window_to_foreground(existing);
                 } else {
@@ -9205,7 +9582,13 @@ fn run_app(
                         || state.go_to_time_dialog.0 != 0
                         || state.podcasts_add_dialog.0 != 0
                         || state.podcasts_categories_dialog.0 != 0
-                        || state.podcasts_description_dialog.0 != 0;
+                        || state.podcasts_description_dialog.0 != 0
+                        || app_windows::audio_description_window::blocks_parent_focus(
+                            hwnd,
+                            state.audio_description_window,
+                        )
+                        || (state.audio_description_project_window.0 != 0
+                            && IsWindowVisible(state.audio_description_project_window).as_bool());
 
                     // Exclude voice panel controls from player keyboard handling
                     let is_voice_panel_control = is_focus_in_voice_panel(hwnd);
@@ -9245,6 +9628,10 @@ fn run_app(
                             let youtube_return_context =
                                 state.active_youtube_return_context.clone();
                             let stopped_url = state.active_podcast_episode_url.clone();
+                            let stopped_audio_path = state
+                                .active_audiobook
+                                .as_ref()
+                                .map(|player| player.path.clone());
                             let is_mpv = state.active_mpv_session.is_some();
                             if is_stop {
                                 // close_current_document() already stops audiobook playback
@@ -9259,12 +9646,21 @@ fn run_app(
                                 } else {
                                     editor_manager::close_current_document(hwnd);
                                 }
+                                if app_windows::audio_description_window::restore_after_player_stop(
+                                    hwnd,
+                                    stopped_audio_path.as_deref(),
+                                ) {
+                                    handled = true;
+                                    return;
+                                }
                                 if from_rai == RaiAudioOrigin::Recenti {
                                     app_windows::rai_audiodescrizioni_window::open(hwnd);
                                 } else if from_rai == RaiAudioOrigin::Tutte {
                                     app_windows::rai_audiodescrizioni_window::open_grouped(hwnd);
                                 } else if from_rai == RaiAudioOrigin::RaiPlay {
                                     app_windows::raiplay_window::reopen_last(hwnd);
+                                } else if from_rai == RaiAudioOrigin::La7Play {
+                                    app_windows::la7_play_window::reopen_last(hwnd);
                                 } else if from_rai == RaiAudioOrigin::RaiPlaySound {
                                     app_windows::raiplaysound_window::reopen_last(hwnd);
                                 } else if youtube_return_context.input.is_some() {
@@ -9517,6 +9913,42 @@ fn run_app(
                 }
                 if state.convert_audio_window.0 != 0
                     && handle_accessibility(state.convert_audio_window, &msg)
+                {
+                    handled = true;
+                    return;
+                }
+                // The project editor can be opened from the creation window, so route
+                // keyboard and dialog messages to the topmost editor first.
+                if state.audio_description_project_window.0 != 0
+                    && IsWindowVisible(state.audio_description_project_window).as_bool()
+                    && app_windows::audio_description_project_window::handle_navigation(
+                        state.audio_description_project_window,
+                        &msg,
+                    )
+                {
+                    handled = true;
+                    return;
+                }
+                if state.audio_description_project_window.0 != 0
+                    && IsWindowVisible(state.audio_description_project_window).as_bool()
+                    && handle_accessibility(state.audio_description_project_window, &msg)
+                {
+                    handled = true;
+                    return;
+                }
+                if state.audio_description_window.0 != 0
+                    && IsWindowVisible(state.audio_description_window).as_bool()
+                    && app_windows::audio_description_window::handle_navigation(
+                        state.audio_description_window,
+                        &msg,
+                    )
+                {
+                    handled = true;
+                    return;
+                }
+                if state.audio_description_window.0 != 0
+                    && IsWindowVisible(state.audio_description_window).as_bool()
+                    && handle_accessibility(state.audio_description_window, &msg)
                 {
                     handled = true;
                     return;
@@ -10102,6 +10534,8 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     transcription_progress_window: HWND(0),
                     batch_audiobooks_window: HWND(0),
                     convert_audio_window: HWND(0),
+                    audio_description_window: HWND(0),
+                    audio_description_project_window: HWND(0),
                     media_split_window: HWND(0),
                     radio_window: HWND(0),
 
@@ -10162,6 +10596,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     active_mpv_status: None,
                     last_stopped_mpv_url: None,
                     last_stopped_mpv_position_secs: None,
+                    last_stopped_mpv_origin: RaiAudioOrigin::None,
                     active_youtube_return_context: YouTubeReturnContext::default(),
                     last_italiaonline_query: None,
                     last_italiaonline_result_id: None,
@@ -10170,6 +10605,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     raiplay_navigation_stack: Vec::new(),
                     last_raiplay_page_path: None,
                     last_raiplay_item_id: None,
+                    la7_play_navigation_stack: Vec::new(),
+                    last_la7_play_page_path: None,
+                    last_la7_play_item_id: None,
+                    last_la7_play_search_query: String::new(),
                     raiplaysound_navigation_stack: Vec::new(),
                     last_raiplaysound_page_path: None,
                     last_raiplaysound_item_id: None,
@@ -10468,6 +10907,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 if restore_transcription_progress_focus_for_current_document(hwnd) {
                     return LRESULT(0);
                 }
+                if app_windows::audio_description_window::restore_on_parent_activation(hwnd) {
+                    return LRESULT(0);
+                }
                 force_active_editor_focus(hwnd);
                 log_mpv_focus_snapshot(hwnd, "mpv_wm_setfocus.after");
                 LRESULT(0)
@@ -10493,6 +10935,12 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         return LRESULT(0);
                     }
                     if restore_transcription_progress_focus_for_current_document(hwnd) {
+                        return LRESULT(0);
+                    }
+                    if app_windows::audio_description_window::restore_on_parent_activation(hwnd) {
+                        log_debug(
+                            "WM_ACTIVATE redirected to the audio-description window after owner reactivation",
+                        );
                         return LRESULT(0);
                     }
                     if with_state(hwnd, |state| state.local_mpv_video_mode_active).unwrap_or(false)
@@ -10619,6 +11067,13 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         ));
                         log_foreground_snapshot(&format!(
                             "focus_timer.after_modal_popup.{}",
+                            wparam.0
+                        ));
+                        return LRESULT(0);
+                    }
+                    if app_windows::audio_description_window::restore_on_parent_activation(hwnd) {
+                        log_debug(&format!(
+                            "focus timer {} suppressed because the audio-description window is active",
                             wparam.0
                         ));
                         return LRESULT(0);
@@ -10838,6 +11293,14 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         PCWSTR(body_w.as_ptr()),
                         PCWSTR(title_w.as_ptr()),
                         MB_OK | MB_ICONERROR,
+                    );
+                    return LRESULT(0);
+                }
+
+                if payload.open_audio_description {
+                    app_windows::audio_description_window::open_with_input(
+                        hwnd,
+                        payload.target_path,
                     );
                     return LRESULT(0);
                 }
@@ -12316,6 +12779,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         }
                         LRESULT(0)
                     }
+                    IDM_PLAYBACK_CREATE_AUDIO_DESCRIPTION => {
+                        open_audio_description_from_current_context(hwnd);
+                        LRESULT(0)
+                    }
                     IDM_PLAYBACK_TRANSCRIBE_CURRENT => {
                         start_whisper_transcription(hwnd);
                         LRESULT(0)
@@ -12690,6 +13157,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         app_windows::youtube_transcript_window::play_streaming_audio_from_url(hwnd);
                         LRESULT(0)
                     }
+                    IDM_TOOLS_CREATE_AUDIO_DESCRIPTION => {
+                        log_debug("Menu: Create audio description");
+                        open_audio_description_from_current_context(hwnd);
+                        LRESULT(0)
+                    }
                     IDM_TOOLS_RADIO => {
                         log_debug("Menu: Radio");
                         app_windows::radio_window::open(hwnd);
@@ -12728,6 +13200,11 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     IDM_TOOLS_RAIPLAY => {
                         log_debug("Menu: RaiPlay");
                         app_windows::raiplay_window::open(hwnd);
+                        LRESULT(0)
+                    }
+                    IDM_TOOLS_LA7_PLAY => {
+                        log_debug("Menu: La Sette Play");
+                        app_windows::la7_play_window::open(hwnd);
                         LRESULT(0)
                     }
                     IDM_TOOLS_TV => {
@@ -12888,6 +13365,17 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                             .filter(|path_str| !path_str.is_empty())
                             .map(PathBuf::from)
                             .collect();
+                        if should_route_external_file_open_to_new_window(hwnd) {
+                            if spawn_new_window_with_paths(&paths) {
+                                log_debug(
+                                    "WM_COPYDATA open spawned a separate Sonarpad window because the audio-description window is active",
+                                );
+                                return LRESULT(COPYDATA_RESULT_OPEN_NEW_WINDOW);
+                            }
+                            log_debug(
+                                "WM_COPYDATA could not spawn a separate Sonarpad window; falling back to opening the file in the current instance",
+                            );
+                        }
                         if defer_copydata_paths_for_pending_blocking_modal(hwnd, &paths) {
                             log_debug(
                                 "WM_COPYDATA open deferred while blocking modal dialog is pending",
@@ -13865,6 +14353,7 @@ fn set_voice_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool) {
     }
     clear_voice_labels_if_hidden(hwnd);
     editor_manager::layout_children(hwnd);
+    sync_voice_panel_visibility_for_current_document(hwnd);
 }
 
 fn toggle_favorites_panel(hwnd: HWND) {
@@ -13912,9 +14401,146 @@ fn set_favorites_panel_visible_internal(hwnd: HWND, visible: bool, persist: bool
     }
     clear_voice_labels_if_hidden(hwnd);
     editor_manager::layout_children(hwnd);
+    sync_voice_panel_visibility_for_current_document(hwnd);
+}
+
+pub(crate) fn sync_voice_panel_visibility_for_current_document(hwnd: HWND) {
+    unsafe {
+        let data = with_state(hwnd, |state| {
+            let is_audiobook = state
+                .docs
+                .get(state.current)
+                .map(|doc| matches!(doc.format, FileFormat::Audiobook))
+                .unwrap_or(false);
+            (
+                is_audiobook,
+                state.voice_panel_visible,
+                state.voice_favorites_visible,
+                state.settings.tts_engine,
+                state.settings.tts_only_multilingual,
+                state.settings.tts_manual_tuning,
+                state.voice_label_engine,
+                state.voice_combo_engine,
+                state.voice_label_language,
+                state.voice_combo_language,
+                state.voice_label_voice,
+                state.voice_combo_voice,
+                state.voice_button_insert_tag,
+                state.voice_button_manage_google_voices,
+                state.voice_button_insert_pause,
+                state.voice_label_speed,
+                state.voice_combo_speed,
+                state.voice_edit_speed,
+                state.voice_label_pitch,
+                state.voice_combo_pitch,
+                state.voice_edit_pitch,
+                state.voice_label_volume,
+                state.voice_combo_volume,
+                state.voice_edit_volume,
+                state.voice_checkbox_multilingual,
+                state.voice_label_favorites,
+                state.voice_combo_favorites,
+            )
+        });
+        let Some((
+            is_audiobook,
+            voice_requested,
+            favorites_requested,
+            tts_engine,
+            tts_only_multilingual,
+            manual_tuning,
+            label_engine,
+            combo_engine,
+            label_language,
+            combo_language,
+            label_voice,
+            combo_voice,
+            button_insert_tag,
+            button_manage_google_voices,
+            button_insert_pause,
+            label_speed,
+            combo_speed,
+            edit_speed,
+            label_pitch,
+            combo_pitch,
+            edit_pitch,
+            label_volume,
+            combo_volume,
+            edit_volume,
+            checkbox_multilingual,
+            label_favorites,
+            combo_favorites,
+        )) = data
+        else {
+            return;
+        };
+
+        let voice_visible = voice_requested && !is_audiobook;
+        let favorites_visible = favorites_requested && !is_audiobook;
+        let show = |control: HWND, visible: bool| {
+            if control.0 != 0 {
+                ShowWindow(control, if visible { SW_SHOW } else { SW_HIDE });
+            }
+        };
+
+        for control in [
+            label_engine,
+            combo_engine,
+            label_voice,
+            combo_voice,
+            button_insert_tag,
+            button_insert_pause,
+            label_speed,
+            label_pitch,
+            label_volume,
+        ] {
+            show(control, voice_visible);
+        }
+        let is_edge = matches!(tts_engine, TtsEngine::Edge);
+        let is_google = matches!(tts_engine, TtsEngine::Google);
+        show(
+            label_language,
+            voice_visible && is_edge && !tts_only_multilingual,
+        );
+        show(
+            combo_language,
+            voice_visible && is_edge && !tts_only_multilingual,
+        );
+        show(checkbox_multilingual, voice_visible && is_edge);
+        show(button_manage_google_voices, voice_visible && is_google);
+        show(combo_speed, voice_visible && !manual_tuning);
+        show(combo_pitch, voice_visible && !manual_tuning);
+        show(combo_volume, voice_visible && !manual_tuning);
+        show(edit_speed, voice_visible && manual_tuning);
+        show(edit_pitch, voice_visible && manual_tuning);
+        show(edit_volume, voice_visible && manual_tuning);
+        show(label_favorites, favorites_visible);
+        show(combo_favorites, favorites_visible);
+
+        if is_audiobook {
+            log_debug("Voice panels suppressed for audiobook/player document");
+            return;
+        }
+        if voice_visible || favorites_visible {
+            refresh_voice_panel(hwnd);
+        }
+    }
 }
 
 pub(crate) fn refresh_voice_panel(hwnd: HWND) {
+    let current_is_audiobook = with_state(hwnd, |state| {
+        state
+            .docs
+            .get(state.current)
+            .map(|doc| matches!(doc.format, FileFormat::Audiobook))
+            .unwrap_or(false)
+    })
+    .unwrap_or(false);
+    if current_is_audiobook {
+        sync_voice_panel_visibility_for_current_document(hwnd);
+        return;
+    }
+
     unsafe {
         let (
             voice_visible,
@@ -19022,6 +19648,10 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
         state.active_audiobook.is_some() || state.active_mpv_session.is_some()
     })
     .unwrap_or(false);
+    if key == 'I' as u16 && ctrl_down && shift_down && !alt_down {
+        dispatch_shortcut_command(hwnd, IDM_TOOLS_CREATE_AUDIO_DESCRIPTION);
+        return true;
+    }
     if key == 'B' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_BDCIECHI);
         return true;
@@ -19045,6 +19675,14 @@ fn handle_custom_shortcuts(hwnd: HWND, msg: &MSG) -> bool {
     if key == 'P' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_RAIPLAY);
         return true;
+    }
+    if key == 'L' as u16 && ctrl_down && !shift_down && !alt_down {
+        let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+        if language == Language::Italian {
+            dispatch_shortcut_command(hwnd, IDM_TOOLS_LA7_PLAY);
+            return true;
+        }
+        return false;
     }
     if key == 'V' as u16 && !ctrl_down && shift_down && alt_down {
         dispatch_shortcut_command(hwnd, IDM_TOOLS_TV);
@@ -19276,6 +19914,11 @@ fn create_accelerators() -> HACCEL {
                 fVirt: virt_shift,
                 key: 'M' as u16,
                 cmd: IDM_EDIT_STRIP_MARKDOWN as u16,
+            },
+            ACCEL {
+                fVirt: virt_shift,
+                key: 'I' as u16,
+                cmd: IDM_TOOLS_CREATE_AUDIO_DESCRIPTION as u16,
             },
             ACCEL {
                 fVirt: virt_shift,
@@ -20373,29 +21016,59 @@ pub(crate) fn clear_recent_files(hwnd: HWND) {
     save_recent_files(&[]);
 }
 
-fn spawn_new_window_with_path(path: &Path) -> bool {
+fn spawn_new_window_with_paths(paths: &[PathBuf]) -> bool {
+    if paths.is_empty() {
+        return false;
+    }
     let Ok(exe) = std::env::current_exe() else {
         return false;
     };
-    std::process::Command::new(exe).arg(path).spawn().is_ok()
+    let mut command = std::process::Command::new(exe);
+    command.arg("--new-window");
+    command.args(paths);
+    command.spawn().is_ok()
+}
+
+fn spawn_new_window_with_path(path: &Path) -> bool {
+    spawn_new_window_with_paths(&[path.to_path_buf()])
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        COPYDATA_RESULT_DEFERRED_MODAL, COPYDATA_RESULT_HANDLED, SentenceNavigationDirection,
-        append_debug_log, audio_bookmark_position_and_snippet, audiodescription_mpv_audio_track_id,
+        COPYDATA_RESULT_DEFERRED_MODAL, COPYDATA_RESULT_HANDLED, COPYDATA_RESULT_OPEN_NEW_WINDOW,
+        SentenceNavigationDirection, append_debug_log, apply_selected_save_filter_extension,
+        audio_bookmark_position_and_snippet, audiodescription_mpv_audio_track_id,
         clamp_tts_chunk_offset, editor_translate_language_for_menu_id,
         editor_translate_language_index_by_key, is_bad_executable_format_error,
         normalize_soft_line_breaks_for_translation, preferred_mpv_audio_track_id,
         preferred_tv_video_track_id, relative_audiobook_bookmark, sentence_navigation_target,
         sentence_start_offsets_utf16, should_defer_external_file_open,
-        should_focus_existing_window_after_copydata,
+        should_focus_existing_window_after_copydata, should_open_new_window_after_copydata,
     };
     use crate::bookmarks::Bookmark;
     use std::collections::HashSet;
+    use std::path::PathBuf;
     use std::sync::{Arc, Barrier};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn save_dialog_replaces_stale_epub_extension_with_selected_txt_filter() {
+        let mut path = PathBuf::from("book.epub");
+        apply_selected_save_filter_extension(&mut path, "*.txt");
+        assert_eq!(path, PathBuf::from("book.txt"));
+    }
+
+    #[test]
+    fn save_dialog_preserves_matching_or_all_files_extensions() {
+        let mut epub_path = PathBuf::from("book.epub");
+        apply_selected_save_filter_extension(&mut epub_path, "*.epub");
+        assert_eq!(epub_path, PathBuf::from("book.epub"));
+
+        let mut custom_path = PathBuf::from("book.custom");
+        apply_selected_save_filter_extension(&mut custom_path, "*.*");
+        assert_eq!(custom_path, PathBuf::from("book.custom"));
+    }
 
     #[test]
     fn mpv_runtime_repair_only_matches_bad_executable_format() {
@@ -20546,6 +21219,16 @@ mod tests {
     fn sender_focuses_existing_window_after_immediate_open() {
         assert!(should_focus_existing_window_after_copydata(
             COPYDATA_RESULT_HANDLED,
+        ));
+    }
+
+    #[test]
+    fn sender_opens_separate_window_when_audio_description_window_requests_it() {
+        assert!(should_open_new_window_after_copydata(
+            COPYDATA_RESULT_OPEN_NEW_WINDOW,
+        ));
+        assert!(!should_focus_existing_window_after_copydata(
+            COPYDATA_RESULT_OPEN_NEW_WINDOW,
         ));
     }
 
@@ -21784,24 +22467,21 @@ pub(crate) fn save_audio_dialog(
         }
         let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
 
-        let filter_raw = i18n::tr(language, "dialog.save_audio_filter");
-        let parts: Vec<&str> = filter_raw.split("\\0").collect();
-        let mut spec = Vec::new();
-        let mut pattern_wides = Vec::new();
-        let mut name_wides = Vec::new();
-        for i in (0..parts.len().saturating_sub(1)).step_by(2) {
-            if parts[i].is_empty() {
-                break;
-            }
-            name_wides.push(to_wide(parts[i]));
-            pattern_wides.push(to_wide(parts[i + 1]));
-        }
-        for i in 0..name_wides.len() {
-            spec.push(COMDLG_FILTERSPEC {
-                pszName: PCWSTR(name_wides[i].as_ptr()),
-                pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
-            });
-        }
+        let filter_pairs = i18n::dialog_filter_pairs(language, "dialog.save_audio_filter");
+        let name_wides: Vec<Vec<u16>> =
+            filter_pairs.iter().map(|(name, _)| to_wide(name)).collect();
+        let pattern_wides: Vec<Vec<u16>> = filter_pairs
+            .iter()
+            .map(|(_, pattern)| to_wide(pattern))
+            .collect();
+        let spec: Vec<COMDLG_FILTERSPEC> = name_wides
+            .iter()
+            .zip(pattern_wides.iter())
+            .map(|(name, pattern)| COMDLG_FILTERSPEC {
+                pszName: PCWSTR(name.as_ptr()),
+                pszSpec: PCWSTR(pattern.as_ptr()),
+            })
+            .collect();
         pfd.SetFileTypes(&spec).ok()?;
         pfd.SetFileTypeIndex(1).ok()?;
         pfd.SetDefaultExtension(w!("mp3")).ok()?;
@@ -22383,24 +23063,21 @@ pub(crate) fn open_file_dialog_with_encoding(
             }
         };
 
-        let filter_raw = i18n::tr(language, "dialog.open_filter");
-        let parts: Vec<&str> = filter_raw.split("\\0").collect();
-        let mut spec = Vec::new();
-        let mut pattern_wides = Vec::new();
-        let mut name_wides = Vec::new();
-        for i in (0..parts.len().saturating_sub(1)).step_by(2) {
-            if parts[i].is_empty() {
-                break;
-            }
-            name_wides.push(to_wide(parts[i]));
-            pattern_wides.push(to_wide(parts[i + 1]));
-        }
-        for i in 0..name_wides.len() {
-            spec.push(COMDLG_FILTERSPEC {
-                pszName: PCWSTR(name_wides[i].as_ptr()),
-                pszSpec: PCWSTR(pattern_wides[i].as_ptr()),
-            });
-        }
+        let filter_pairs = i18n::dialog_filter_pairs(language, "dialog.open_filter");
+        let name_wides: Vec<Vec<u16>> =
+            filter_pairs.iter().map(|(name, _)| to_wide(name)).collect();
+        let pattern_wides: Vec<Vec<u16>> = filter_pairs
+            .iter()
+            .map(|(_, pattern)| to_wide(pattern))
+            .collect();
+        let spec: Vec<COMDLG_FILTERSPEC> = name_wides
+            .iter()
+            .zip(pattern_wides.iter())
+            .map(|(name, pattern)| COMDLG_FILTERSPEC {
+                pszName: PCWSTR(name.as_ptr()),
+                pszSpec: PCWSTR(pattern.as_ptr()),
+            })
+            .collect();
         pfd.SetFileTypes(&spec).ok()?;
         pfd.SetFileTypeIndex(1).ok()?; // Default to "All supported formats"
         let mut options = pfd.GetOptions().ok()?;
@@ -22560,6 +23237,25 @@ fn default_extension_from_filter_pattern(pattern: &str) -> Option<String> {
     })
 }
 
+fn apply_selected_save_filter_extension(path: &mut PathBuf, pattern: &str) {
+    if pattern
+        .split(';')
+        .any(|part| part.trim() == "*.*" || part.trim() == "*")
+    {
+        return;
+    }
+
+    let Some(default_extension) = default_extension_from_filter_pattern(pattern) else {
+        return;
+    };
+    let current_extension = path.extension().and_then(|value| value.to_str());
+    if current_extension
+        .is_none_or(|extension| !filter_pattern_contains_extension(pattern, extension))
+    {
+        path.set_extension(default_extension);
+    }
+}
+
 pub(crate) fn save_file_dialog_with_encoding(
     hwnd: HWND,
     suggested_name: Option<&str>,
@@ -22572,15 +23268,7 @@ pub(crate) fn save_file_dialog_with_encoding(
 
         let pfd: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL).ok()?;
 
-        let filter_raw = i18n::tr(language, "dialog.save_filter");
-        let parts: Vec<&str> = filter_raw.split("\\0").collect();
-        let mut filter_pairs: Vec<(String, String)> = Vec::new();
-        for index in (0..parts.len().saturating_sub(1)).step_by(2) {
-            if parts[index].is_empty() {
-                break;
-            }
-            filter_pairs.push((parts[index].to_string(), parts[index + 1].to_string()));
-        }
+        let mut filter_pairs = i18n::dialog_filter_pairs(language, "dialog.save_filter");
         if allow_epub
             && !filter_pairs
                 .iter()
@@ -22704,12 +23392,8 @@ pub(crate) fn save_file_dialog_with_encoding(
             let selected_encoding_index = pfdc.GetSelectedControlItem(101).ok()?;
             let filter_index = pfd.GetFileTypeIndex().ok()?;
             let mut path = PathBuf::from(path_string);
-            if path.extension().is_none()
-                && let Some((_, pattern)) =
-                    filter_pairs.get(filter_index.saturating_sub(1) as usize)
-                && let Some(extension) = default_extension_from_filter_pattern(pattern)
-            {
-                path.set_extension(extension);
+            if let Some((_, pattern)) = filter_pairs.get(filter_index.saturating_sub(1) as usize) {
+                apply_selected_save_filter_extension(&mut path, pattern);
             }
 
             pfd.Unadvise(cookie).ok()?;

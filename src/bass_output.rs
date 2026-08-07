@@ -291,6 +291,27 @@ impl BassOutput {
         paused: bool,
         stream_index: Option<i32>,
     ) -> Result<Arc<Self>, String> {
+        Self::start_with_ffmpeg_at(
+            path,
+            start_seconds as f64,
+            speed,
+            pitch,
+            volume,
+            paused,
+            stream_index,
+        )
+    }
+
+    /// Start FFmpeg-backed playback at a precise fractional-second position.
+    pub fn start_with_ffmpeg_at(
+        path: &Path,
+        start_seconds: f64,
+        speed: f32,
+        pitch: f32,
+        volume: f32,
+        paused: bool,
+        stream_index: Option<i32>,
+    ) -> Result<Arc<Self>, String> {
         init_bass_once()?;
         let api = bass_api()?;
         let fx_api = bass_fx_api().ok();
@@ -362,7 +383,7 @@ impl BassOutput {
             api,
             handle: Mutex::new(handle),
             _ffmpeg_stream: Some(ffmpeg_stream),
-            start_offset_secs: start_seconds as f64,
+            start_offset_secs: start_seconds,
         }))
     }
 

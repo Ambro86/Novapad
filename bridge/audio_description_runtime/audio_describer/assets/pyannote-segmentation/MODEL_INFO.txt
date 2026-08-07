@@ -1,0 +1,16 @@
+pyannote Community-1 voice segmentation (ONNX)
+================================================
+
+Source: https://huggingface.co/pyannote/speaker-diarization-community-1
+Bundled source revision: 3533c8cf8e369892e6b79ff1bf80f7b0286a54ee
+Original segmentation file: segmentation/pytorch_model.bin
+Distributed file: model.onnx
+SHA-256: 6575e57e9375c114545391ffecda0096060df55ae544d40472cdf412d115d35d
+License: CC BY 4.0
+
+The segmentation weights were exported from PyTorch to ONNX. Omni Describer
+uses only voice activity and does not perform speaker identification,
+embedding, clustering, or diarization. Inference is fully local and requires
+no account, token, telemetry, or first-run model download.
+
+Omni Describer is not affiliated with or endorsed by pyannote.

@@ -47,6 +47,12 @@ la **trascrizione audio con Whisper/faster-whisper** e la **registrazione podcas
   - Avanzamento e riavvolgimento con i tasti freccia
   - Play/Pausa con la barra spaziatrice
   - Volume su/giù con i tasti freccia
+- **Creazione di audiodescrizioni**
+  - Analisi dei dialoghi con Pyannote e generazione delle descrizioni con Gemini
+  - Sintesi con le voci Edge, Google o SAPI già disponibili in Sonarpad
+  - Ducking, pause estese ed esportazione MP3 tramite le librerie FFmpeg Rust incluse
+  - Salvataggio opzionale di un progetto modificabile contenente solo le descrizioni realmente presenti nell’MP3
+  - Modifica e riesportazione senza ripetere l’analisi Gemini
 - **Trascrizione audio (Whisper / faster-whisper)**
   - Trascrizione dell'audio/media attualmente in riproduzione
   - Timestamp opzionali nell'output

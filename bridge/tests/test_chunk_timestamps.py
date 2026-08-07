@@ -1,0 +1,518 @@
+import unittest
+from unittest import mock
+from types import SimpleNamespace
+
+from audio_describer.core import gemini_helpers
+from audio_describer.core.audio_describer import (
+    _TransientGeminiFileProcessingError,
+    _description_belongs_to_gaps,
+    _effective_chunk_duration,
+    _extract_upload_chunk,
+    _find_large_chunk_gaps,
+    _build_unified_prompts,
+    _normalize_chunk_timestamps,
+    _post_process_mmss_timestamps,
+    _requires_per_chunk_upload,
+    _should_use_per_chunk_uploads,
+    _suppress_repeated_leading_character_names,
+    _format_character_continuity,
+    _format_recent_description_context,
+    _generate_blocked_chunk_by_minutes,
+    _items_for_minute,
+    _update_character_continuity,
+    _upload_and_wait_for_active,
+)
+
+
+class ChunkTimestampTests(unittest.TestCase):
+    def test_repeated_character_name_filter_is_generic_and_context_safe(self):
+        glossary = [
+            {"name": "Janet"},
+            {"name": "Mark"},
+            {"name": "Bruce Nolan"},
+        ]
+        descriptions = [
+            (0.0, 2.0, "Janet apre la porta."),
+            (3.0, 5.0, "Janet entra nella stanza."),
+            (6.0, 8.0, "Janet guarda fuori dalla finestra."),
+            (9.0, 11.0, "Janet e Mark scendono le scale."),
+            (12.0, 14.0, "Mark accende la luce."),
+            (15.0, 17.0, "La bambina osserva Janet."),
+            (18.0, 20.0, "Janet si ritrae."),
+            (21.0, 23.0, "Bruce Nolan prende la collana."),
+            (24.0, 26.0, "Bruce Nolan la lancia via."),
+            (60.0, 62.0, "Bruce Nolan torna alla porta."),
+        ]
+
+        result = _suppress_repeated_leading_character_names(
+            descriptions, glossary
+        )
+
+        self.assertEqual([item[2] for item in result], [
+            "Janet apre la porta.",
+            "Entra nella stanza.",
+            "Guarda fuori dalla finestra.",
+            "Janet e Mark scendono le scale.",
+            "Mark accende la luce.",
+            "La bambina osserva Janet.",
+            "Janet si ritrae.",
+            "Bruce Nolan prende la collana.",
+            "La lancia via.",
+            "Bruce Nolan torna alla porta.",
+        ])
+
+    def test_minute_fallback_assigns_slot_by_midpoint_and_resets_timeline(self):
+        slots = [
+            {"id": "first", "start": 58.0, "end": 62.0, "max_words": 8},
+            {"id": "second", "start": 75.0, "end": 80.0, "max_words": 10},
+        ]
+
+        result = _items_for_minute(slots, 60.0, 120.0, 60.0)
+
+        self.assertEqual([item["id"] for item in result], ["first", "second"])
+        self.assertEqual((result[0]["start"], result[0]["end"]), (0.0, 2.0))
+        self.assertEqual((result[1]["start"], result[1]["end"]), (15.0, 20.0))
+
+    def test_blocked_chunk_keeps_successful_minutes_and_skips_blocked_one(self):
+        responses = [object(), gemini_helpers.ContentBlockedError(
+            "blocked", reason="PROHIBITED_CONTENT"
+        ), object()]
+        parsed = [
+            ([('00:10', '00:12', 'Prima scena.')], []),
+            ([('00:05', '00:07', 'Terza scena.')], []),
+        ]
+        settings = {
+            "application_language": "it",
+            "enable_character_glossary": False,
+            "gemini_description_verbosity": "standard",
+        }
+        statuses = []
+
+        with (
+            mock.patch(
+                "audio_describer.core.audio_describer.config_model.get_setting",
+                side_effect=lambda key: settings.get(key),
+            ),
+            mock.patch(
+                "audio_describer.core.audio_describer._prepare_video_for_gemini",
+                side_effect=[("part1", None), ("part2", None), ("part3", None)],
+            ),
+            mock.patch(
+                "audio_describer.core.audio_describer.gemini.generate_content_with_retry",
+                side_effect=responses,
+            ) as generate,
+            mock.patch(
+                "audio_describer.core.audio_describer.gemini.process_gemini_response",
+                return_value=("{}", True),
+            ),
+            mock.patch(
+                "audio_describer.core.audio_describer._parse_with_optional_json_repair",
+                side_effect=parsed,
+            ),
+            mock.patch(
+                "audio_describer.core.audio_describer._correct_description_language",
+                side_effect=lambda _client, _model, descriptions, _status: (
+                    descriptions, None
+                ),
+            ),
+            mock.patch(
+                "audio_describer.core.audio_describer.gemini.build_generation_config",
+                return_value=object(),
+            ),
+            mock.patch(
+                "audio_describer.core.audio_describer.gemini.save_raw_ai_output"
+            ),
+            mock.patch(
+                "audio_describer.core.audio_describer.gemini.log_token_usage",
+                return_value=None,
+            ),
+            mock.patch("audio_describer.core.audio_describer.os.unlink"),
+        ):
+            descriptions, glossary, usage = _generate_blocked_chunk_by_minutes(
+                client=object(),
+                model_name="gemini-test",
+                video_path="movie.mp4",
+                prepared_chunk_path="prepared_chunk.mp4",
+                chunk_start=0.0,
+                chunk_end=180.0,
+                chunk_number=8,
+                total_chunks=28,
+                clipped_windows=[],
+                intensive_slots=[],
+                extended_anchors=[],
+                intensive_mode=False,
+                extended_mode=False,
+                user_prompt="",
+                character_continuity={},
+                prior_descriptions=[],
+                status_update_callback=statuses.append,
+            )
+
+        self.assertEqual(descriptions, [
+            (10.0, 12.0, "Prima scena."),
+            (125.0, 127.0, "Terza scena."),
+        ])
+        self.assertEqual(glossary, [])
+        self.assertEqual(usage, [])
+        self.assertEqual(generate.call_count, 3)
+        self.assertTrue(all(
+            call.kwargs["prohibited_content_max_attempts"] == 1
+            for call in generate.call_args_list
+        ))
+        self.assertTrue(any("original audio" in status for status in statuses))
+
+    def test_out_of_order_gemini_entries_keep_their_scene_timestamps(self):
+        raw = [
+            ("01:31.500", "01:35.997", "Jasmine con la tigre."),
+            ("01:04.259", "01:05.666", "Una lanterna oscilla."),
+            ("01:07.567", "01:11.000", "Jafar percorre il corridoio."),
+            (
+                "01:11.000",
+                "01:15.200",
+                "Jafar mostra l'anello scintillante.",
+            ),
+        ]
+
+        corrected = _post_process_mmss_timestamps(raw)
+
+        self.assertEqual(
+            [item[2] for item in corrected],
+            [
+                "Una lanterna oscilla.",
+                "Jafar percorre il corridoio.",
+                "Jafar mostra l'anello scintillante.",
+                "Jasmine con la tigre.",
+            ],
+        )
+        ring = corrected[2]
+        self.assertAlmostEqual(ring[0], 71.0)
+        self.assertAlmostEqual(ring[1], 75.2)
+
+    def test_code_13_file_processing_retries_until_upload_succeeds(self):
+        client = object()
+        success = object()
+        failures = [
+            _TransientGeminiFileProcessingError(
+                "Code 13", SimpleNamespace(name=f"files/failed-{index}")
+            )
+            for index in range(2)
+        ]
+        statuses = []
+
+        with (
+            mock.patch(
+                "audio_describer.core.audio_describer._upload_and_wait_for_active_once",
+                side_effect=[*failures, success],
+            ) as upload_once,
+            mock.patch(
+                "audio_describer.core.audio_describer._cleanup_uploaded_file"
+            ) as cleanup,
+            mock.patch("audio_describer.core.audio_describer.time.sleep") as sleep,
+        ):
+            result = _upload_and_wait_for_active(
+                client, "chunk.mp4", statuses.append
+            )
+
+        self.assertIs(result, success)
+        self.assertEqual(upload_once.call_count, 3)
+        self.assertEqual(cleanup.call_count, 2)
+        self.assertEqual(sleep.call_count, 2)
+        self.assertIn("retry 2", statuses[-1].lower())
+
+    def test_character_continuity_keeps_only_named_characters(self):
+        known = {}
+        _update_character_continuity(known, [
+            {"id": "stanley", "name": "Stanley", "description": "Uomo magro."},
+            {"id": "stranger", "name": None, "description": "Uomo alto."},
+        ])
+
+        self.assertEqual(list(known), ["id:stanley"])
+        self.assertIn("Stanley", _format_character_continuity(known))
+        self.assertNotIn("Uomo alto", _format_character_continuity(known))
+
+    def test_character_continuity_deduplicates_and_keeps_best_description(self):
+        known = {}
+        _update_character_continuity(known, [
+            {"name": "Stanley", "description": "Capelli castani e abito grigio."},
+        ])
+        _update_character_continuity(known, [
+            {"name": " stanley ", "description": "Uomo."},
+        ])
+
+        self.assertEqual(len(known), 1)
+        self.assertEqual(
+            known["name:stanley"]["description"], "Capelli castani e abito grigio."
+        )
+
+    def test_character_continuity_is_injected_into_next_chunk_prompt(self):
+        settings = {
+            "application_language": "it",
+            "enable_character_glossary": True,
+            "gemini_description_verbosity": "standard",
+        }
+        continuity = (
+            '[{"name":"Stanley","description":"Uomo magro con capelli castani."}]'
+        )
+        with mock.patch(
+            "audio_describer.core.audio_describer.config_model.get_setting",
+            side_effect=lambda key: settings.get(key),
+        ):
+            _system, prompt = _build_unified_prompts(
+                "", "gemini-test", character_continuity_text=continuity
+            )
+
+        self.assertIn("ESTABLISHED CHARACTER CONTINUITY", prompt)
+        self.assertIn("Stanley", prompt)
+        self.assertIn("may be reused without being spoken again", prompt)
+        self.assertIn("when uncertain, use a generic label", prompt)
+
+    def test_intensive_prompt_forbids_borrowing_actions_from_other_times(self):
+        settings = {
+            "application_language": "it",
+            "enable_character_glossary": True,
+            "gemini_description_verbosity": "detailed",
+        }
+        with mock.patch(
+            "audio_describer.core.audio_describer.config_model.get_setting",
+            side_effect=lambda key: settings.get(key),
+        ):
+            system, prompt = _build_unified_prompts(
+                "",
+                "gemini-test",
+                intensive_slots_text="S0001=79.000-82.000 (max 6 words)",
+                intensive_mode=True,
+            )
+
+        self.assertIn("GROUND EVERY DESCRIPTION IN ITS EXACT TIME RANGE", system)
+        self.assertIn("Never borrow, move, or repeat an action", system)
+        self.assertIn("inspect only the frames inside that slot", prompt)
+        self.assertIn("never pull an action from a preceding or following scene", prompt)
+        self.assertIn("describe their current visible state or setting", prompt)
+
+    def test_recent_descriptions_preserve_subject_flow_across_chunk_boundary(self):
+        recent = _format_recent_description_context([
+            (170.0, 174.0, "Bruce Nolan raccoglie una collanina."),
+            (176.0, 179.0, "Bruce Nolan la stringe nel pugno."),
+        ], 180.0)
+        settings = {
+            "application_language": "it",
+            "enable_character_glossary": False,
+            "gemini_description_verbosity": "standard",
+        }
+        with mock.patch(
+            "audio_describer.core.audio_describer.config_model.get_setting",
+            side_effect=lambda key: settings.get(key),
+        ):
+            _system, prompt = _build_unified_prompts(
+                "", "gemini-test", recent_descriptions_text=recent
+            )
+
+        self.assertIn("RECENT DESCRIPTIONS IMMEDIATELY BEFORE THIS CLIP", prompt)
+        self.assertIn("Bruce Nolan la stringe", prompt)
+        self.assertIn("repeating that subject's name", prompt)
+
+    def test_physical_chunk_preparation_is_delegated_to_sonarpad_rust(self):
+        with self.assertRaises(gemini_helpers.GeminiAPIError) as raised:
+            _extract_upload_chunk("movie.mp4", 180, 360, 2)
+        self.assertIn("Sonarpad's Rust FFmpeg backend", str(raised.exception))
+
+    def test_files_at_gemini_two_gib_limit_use_per_chunk_uploads(self):
+        with mock.patch(
+            "audio_describer.core.audio_describer.os.path.getsize",
+            return_value=2 * 1024 * 1024 * 1024,
+        ):
+            self.assertTrue(_requires_per_chunk_upload("large.mp4"))
+
+        with mock.patch(
+            "audio_describer.core.audio_describer.os.path.getsize",
+            return_value=2 * 1024 * 1024 * 1024 - 1,
+        ):
+            self.assertFalse(_requires_per_chunk_upload("small-enough.mp4"))
+
+    def test_multi_chunk_video_uses_physical_upload_chunks(self):
+        with mock.patch(
+            "audio_describer.core.audio_describer.os.path.getsize",
+            return_value=100 * 1024 * 1024,
+        ):
+            self.assertTrue(_should_use_per_chunk_uploads("movie.mp4", 2))
+            self.assertFalse(_should_use_per_chunk_uploads("short.mp4", 1))
+
+    def test_single_chunk_over_media_limit_keeps_safety_fallback(self):
+        with mock.patch(
+            "audio_describer.core.audio_describer.os.path.getsize",
+            return_value=2 * 1024 * 1024 * 1024,
+        ):
+            self.assertTrue(_should_use_per_chunk_uploads("huge.mp4", 1))
+
+    def test_all_long_chunks_are_capped_to_three_minutes(self):
+        self.assertEqual(_effective_chunk_duration(600), 180.0)
+        self.assertEqual(_effective_chunk_duration(180), 180.0)
+        self.assertEqual(_effective_chunk_duration(120), 120.0)
+
+    def test_late_first_relative_timestamp_gets_chunk_offset(self):
+        # This is the case the old first-timestamp heuristic could misclassify:
+        # the first event is late in a 600-second chunk.
+        result = _normalize_chunk_timestamps(
+            [(500.0, 503.0, "late event"), (550.0, 552.0, "later event")],
+            chunk_start=600.0,
+            chunk_end=1200.0,
+            chunk_number=2,
+        )
+        self.assertEqual(result[0][:2], (1100.0, 1103.0))
+        self.assertEqual(result[1][:2], (1150.0, 1152.0))
+
+    def test_absolute_timestamps_are_not_shifted(self):
+        result = _normalize_chunk_timestamps(
+            [(720.0, 723.0, "absolute event"), (900.0, 902.0, "another")],
+            chunk_start=600.0,
+            chunk_end=1200.0,
+            chunk_number=2,
+        )
+        self.assertEqual(result[0][:2], (720.0, 723.0))
+
+    def test_extracted_clip_forces_local_timestamps_even_when_ambiguous(self):
+        result = _normalize_chunk_timestamps(
+            [(36.0, 39.0, "scene in extracted clip")],
+            chunk_start=180.0,
+            chunk_end=360.0,
+            chunk_number=2,
+            force_mode="relative",
+        )
+        self.assertEqual(result, [(216.0, 219.0, "scene in extracted clip")])
+
+    def test_out_of_range_timestamp_is_rejected(self):
+        result = _normalize_chunk_timestamps(
+            [(620.0, 622.0, "valid"), (1800.0, 1802.0, "invalid")],
+            chunk_start=600.0,
+            chunk_end=1200.0,
+            chunk_number=2,
+        )
+        self.assertEqual(result, [(620.0, 622.0, "valid")])
+
+    def test_small_boundary_drift_is_clamped(self):
+        result = _normalize_chunk_timestamps(
+            [(599.5, 602.0, "boundary")],
+            chunk_start=600.0,
+            chunk_end=1200.0,
+            chunk_number=2,
+        )
+        self.assertEqual(result, [(600.0, 602.0, "boundary")])
+
+    def test_large_uncovered_chunk_tail_is_detected(self):
+        descriptions = [
+            (4.5, 10.0, "inizio"),
+            (382.0, 388.0, "ultima descrizione"),
+        ]
+
+        self.assertEqual(
+            _find_large_chunk_gaps(descriptions, 0.0, 600.0),
+            [(10.0, 382.0), (388.0, 600.0)],
+        )
+
+    def test_completely_empty_chunk_is_recovered(self):
+        self.assertEqual(
+            _find_large_chunk_gaps([], 600.0, 1200.0),
+            [(600.0, 1200.0)],
+        )
+
+    def test_short_gaps_are_not_recovered(self):
+        descriptions = [
+            (4.0, 10.0, "uno"),
+            (80.0, 85.0, "due"),
+            (160.0, 170.0, "tre"),
+        ]
+
+        self.assertEqual(_find_large_chunk_gaps(descriptions, 0.0, 200.0), [])
+
+    def test_recovery_result_must_belong_to_requested_gap(self):
+        gaps = [(388.0, 600.0)]
+        self.assertTrue(
+            _description_belongs_to_gaps((450.0, 455.0, "recuperata"), gaps)
+        )
+        self.assertFalse(
+            _description_belongs_to_gaps((704.0, 708.0, "fuori intervallo"), gaps)
+        )
+
+    def test_intensive_prompt_requires_every_numbered_slot(self):
+        settings = {
+            "application_language": "it",
+            "enable_character_glossary": False,
+            "gemini_description_verbosity": "standard",
+        }
+        with mock.patch(
+            "audio_describer.core.audio_describer.config_model.get_setting",
+            side_effect=lambda key: settings.get(key),
+        ):
+            system, prompt = _build_unified_prompts(
+                "", "gemini-test", "0.000-10.000",
+                "S0001=0.000-4.000 (max 8 words), "
+                "S0002=6.000-10.000 (max 8 words)",
+            )
+
+        self.assertIn("FILL EVERY USABLE SILENCE", system)
+        self.assertIn("at least one", prompt)
+        self.assertIn("may add further entries inside a slot", prompt)
+        self.assertNotIn("exactly one", prompt)
+        self.assertIn("S0002=6.000-10.000", prompt)
+        self.assertIn("NEVER REPEAT AN ACTION", system)
+        self.assertIn("does not permit repeating or paraphrasing", prompt)
+        self.assertIn("AVOID REPETITIVE SUBJECT LABELS", system)
+        self.assertIn("Do not introduce a name", system)
+
+    def test_intensive_prompt_with_no_slots_forbids_invented_timestamps(self):
+        settings = {
+            "application_language": "it",
+            "enable_character_glossary": False,
+            "gemini_description_verbosity": "standard",
+        }
+        with mock.patch(
+            "audio_describer.core.audio_describer.config_model.get_setting",
+            side_effect=lambda key: settings.get(key),
+        ):
+            _system, prompt = _build_unified_prompts(
+                "", "gemini-test", "", "", intensive_mode=True
+            )
+        self.assertIn("empty `audio_descriptions` array", prompt)
+
+    def test_intensive_short_gap_anchors_do_not_require_media_pauses(self):
+        settings = {
+            "application_language": "it",
+            "enable_character_glossary": False,
+            "gemini_description_verbosity": "standard",
+        }
+        with mock.patch(
+            "audio_describer.core.audio_describer.config_model.get_setting",
+            side_effect=lambda key: settings.get(key),
+        ):
+            _system, prompt = _build_unified_prompts(
+                "", "gemini-test", intensive_mode=True,
+                extended_anchors_text="E0001=4.000-5.200",
+            )
+
+        self.assertIn("OPTIONAL INTENSIVE SHORT-GAP", prompt)
+        self.assertIn("not mandatory", prompt)
+        self.assertIn("will NOT be paused", prompt)
+        self.assertIn("cannot fit naturally", prompt)
+
+    def test_extended_mode_allows_pause_only_as_short_gap_fallback(self):
+        settings = {
+            "application_language": "it",
+            "enable_character_glossary": False,
+            "gemini_description_verbosity": "standard",
+        }
+        with mock.patch(
+            "audio_describer.core.audio_describer.config_model.get_setting",
+            side_effect=lambda key: settings.get(key),
+        ):
+            _system, prompt = _build_unified_prompts(
+                "", "gemini-test", intensive_mode=True,
+                extended_mode=True,
+                extended_anchors_text="E0001=4.000-5.200",
+            )
+
+        self.assertIn("OPTIONAL INTENSIVE SHORT-GAP", prompt)
+        self.assertIn("may pause", prompt)
+        self.assertIn("only if", prompt)
+
+if __name__ == "__main__":
+    unittest.main()

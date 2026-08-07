@@ -3992,6 +3992,7 @@ pub fn select_tab(hwnd: HWND, index: usize) {
         update_window_title(hwnd);
         crate::menu::update_playback_menu(hwnd, is_audiobook);
         layout_children(hwnd);
+        crate::sync_voice_panel_visibility_for_current_document(hwnd);
         crate::update_main_status_bar(hwnd);
         crate::restore_transcription_progress_focus_for_current_document(hwnd);
     }
@@ -4101,6 +4102,11 @@ pub fn layout_children(hwnd: HWND) {
                 state.hwnd_tab,
                 state.hwnd_status,
                 state.docs.iter().map(|d| d.hwnd_edit).collect::<Vec<_>>(),
+                state
+                    .docs
+                    .get(state.current)
+                    .map(|doc| matches!(doc.format, FileFormat::Audiobook))
+                    .unwrap_or(false),
                 state.voice_panel_visible,
                 state.voice_favorites_visible,
                 state.settings.tts_engine,
@@ -4137,6 +4143,7 @@ pub fn layout_children(hwnd: HWND) {
             hwnd_tab,
             hwnd_status,
             edit_handles,
+            current_is_audiobook,
             voice_panel_visible,
             favorites_visible,
             tts_engine,
@@ -4197,6 +4204,8 @@ pub fn layout_children(hwnd: HWND) {
             LPARAM(&mut tab_rc as *mut _ as isize),
         );
 
+        let voice_panel_visible = voice_panel_visible && !current_is_audiobook;
+        let favorites_visible = favorites_visible && !current_is_audiobook;
         let mut panel_height = 0;
         let panel_visible = voice_panel_visible || favorites_visible;
         if panel_visible {
@@ -4540,6 +4549,10 @@ pub fn create_edit(
     }
 }
 
+fn should_export_epub_copy(source_is_epub: bool, force_dialog: bool, target_is_epub: bool) -> bool {
+    source_is_epub && force_dialog && !target_is_epub
+}
+
 pub fn save_current_document(hwnd: HWND) -> bool {
     save_document_at(hwnd, get_current_index(hwnd), false)
 }
@@ -4670,6 +4683,8 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
             }
 
             let is_epub = crate::file_handler::is_epub_path(&path);
+            let exporting_epub_copy =
+                should_export_epub_copy(source_is_epub, force_dialog, is_epub);
             let is_pdf = crate::file_handler::is_pdf_path(&path);
             let is_docx = crate::file_handler::is_docx_path(&path);
             let is_doc = path
@@ -4798,17 +4813,21 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                     crate::show_error(hwnd, language, &message);
                     return None;
                 }
-                state.docs[index].format = FileFormat::Pdf;
+                if !exporting_epub_copy {
+                    state.docs[index].format = FileFormat::Pdf;
+                }
             } else if is_docx || is_doc {
                 if let Err(message) = crate::file_handler::write_docx_text(&path, &text, language) {
                     crate::show_error(hwnd, language, &message);
                     return None;
                 }
-                state.docs[index].format = if is_docx {
-                    FileFormat::Docx
-                } else {
-                    FileFormat::Doc
-                };
+                if !exporting_epub_copy {
+                    state.docs[index].format = if is_docx {
+                        FileFormat::Docx
+                    } else {
+                        FileFormat::Doc
+                    };
+                }
             } else if is_rtf {
                 if let Err(message) =
                     crate::audio_utils::write_rtf_text(&path, state.docs[index].hwnd_edit)
@@ -4816,10 +4835,14 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                     crate::show_error(hwnd, language, &message);
                     return None;
                 }
-                state.docs[index].format = FileFormat::Doc; // Doc handles RTF as well
+                if !exporting_epub_copy {
+                    state.docs[index].format = FileFormat::Doc; // Doc handles RTF as well
+                }
             } else {
                 let encoding = if let Some(enc) = user_selected_encoding {
-                    state.docs[index].current_save_text_encoding = Some(enc);
+                    if !exporting_epub_copy {
+                        state.docs[index].current_save_text_encoding = Some(enc);
+                    }
                     enc
                 } else {
                     state.docs[index]
@@ -4836,7 +4859,17 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                     );
                     return None;
                 }
-                state.docs[index].format = FileFormat::Text(encoding);
+                if !exporting_epub_copy {
+                    state.docs[index].format = FileFormat::Text(encoding);
+                }
+            }
+
+            if exporting_epub_copy {
+                crate::log_debug(&format!(
+                    "EPUB export: wrote '{}' without changing the source document association",
+                    path.display()
+                ));
+                return Some(path);
             }
 
             if !is_epub {
@@ -5246,6 +5279,14 @@ pub fn get_tab(hwnd: HWND) -> HWND {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn epub_cross_format_save_as_is_an_export_copy() {
+        assert!(should_export_epub_copy(true, true, false));
+        assert!(!should_export_epub_copy(true, false, false));
+        assert!(!should_export_epub_copy(true, true, true));
+        assert!(!should_export_epub_copy(false, true, false));
+    }
 
     #[test]
     fn test_clean_end_of_line_hyphens() {

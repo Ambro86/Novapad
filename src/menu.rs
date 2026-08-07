@@ -94,6 +94,7 @@ pub const IDM_PLAYBACK_TRANSCRIBE_CURRENT_FOLDER: usize = 8028;
 pub const IDM_PLAYBACK_TRANSCRIBE_CANCEL: usize = 8030;
 pub const IDM_PLAYBACK_SPLIT_PARTS: usize = 8031;
 pub const IDM_PLAYBACK_SPLIT_TIME: usize = 8032;
+pub const IDM_PLAYBACK_CREATE_AUDIO_DESCRIPTION: usize = 8033;
 pub const IDM_PLAYBACK_ADD_SUBTITLES: usize = 8019;
 pub const IDM_PLAYBACK_REMOVE_SUBTITLES: usize = 8020;
 pub const IDM_PLAYBACK_CHAPTER_PREV: usize = 8012;
@@ -167,6 +168,8 @@ pub const IDM_TOOLS_TRECCANI: usize = 5022;
 pub const IDM_TOOLS_GUTENBERG: usize = 5023;
 pub const IDM_TOOLS_INTERNET_ARCHIVE: usize = 5024;
 pub const IDM_TOOLS_LIBRIVOX: usize = 5025;
+pub const IDM_TOOLS_LA7_PLAY: usize = 5026;
+pub const IDM_TOOLS_CREATE_AUDIO_DESCRIPTION: usize = 5027;
 pub const IDM_HELP_GUIDE: usize = 7001;
 pub const IDM_HELP_ABOUT: usize = 7002;
 pub const IDM_HELP_CHECK_UPDATES: usize = 7003;
@@ -208,6 +211,7 @@ pub struct MenuLabels {
     pub menu_treccani: String,
     pub menu_import_youtube: String,
     pub menu_stream_audio: String,
+    pub menu_create_audio_description: String,
     pub menu_bdciechi: String,
     pub menu_rai_audiodescrizioni: String,
     pub menu_raiplay: String,
@@ -342,6 +346,10 @@ pub fn menu_labels(language: Language) -> MenuLabels {
         },
         menu_import_youtube: i18n::tr(language, "menu.import_youtube"),
         menu_stream_audio: i18n::tr(language, "menu.stream_audio"),
+        menu_create_audio_description: format!(
+            "{}\tCtrl+Shift+I",
+            i18n::tr(language, "menu.create_audio_description")
+        ),
         menu_bdciechi: if language == Language::Italian {
             i18n::tr(language, "excluded_from_testing.bdciechi.menu_label")
         } else {
@@ -630,6 +638,37 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 && !state.raiplay_live_audio_variants.is_empty()
         })
         .unwrap_or(false);
+        let stream_video_audio_description_available = if mpv_playback_active {
+            with_state(hwnd, |state| state.active_podcast_episode_url.clone())
+                .flatten()
+                .as_deref()
+                .is_some_and(|url| {
+                    crate::app_windows::youtube_transcript_window::can_create_audio_description_from_active_stream(
+                        url,
+                    ) || crate::app_windows::youtube_transcript_window::can_create_audio_description_from_active_youtube(
+                        url,
+                    )
+                })
+        } else {
+            false
+        };
+        let local_video_audio_description_available = mpv_playback_active
+            && crate::current_local_playback_media_path(hwnd)
+                .as_deref()
+                .is_some_and(crate::file_handler::is_video_path);
+        let rai_la7_audio_description_available = !live_tv_playback
+            && with_state(hwnd, |state| {
+                matches!(
+                    state.active_podcast_episode_from_rai,
+                    crate::RaiAudioOrigin::RaiPlay | crate::RaiAudioOrigin::La7Play
+                ) && state.raiplay_live_audio_variants.is_empty()
+                    && (state.active_podcast_episode_media_url.is_some()
+                        || state.active_podcast_episode_url.is_some())
+            })
+            .unwrap_or(false);
+        let audio_description_available = stream_video_audio_description_available
+            || local_video_audio_description_available
+            || rai_la7_audio_description_available;
         if show {
             if existing.0 != 0 {
                 remove_playback_menu(hmenu, existing);
@@ -685,6 +724,10 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                 i18n::tr(language, "playback.download_episode")
             );
             let transcribe_current = i18n::tr(language, "playback.transcribe_current");
+            let create_audio_description = format!(
+                "{}\tCtrl+Shift+I",
+                i18n::tr(language, "menu.create_audio_description").replace('&', "")
+            );
             let split_media = i18n::tr(language, "playback.split_media");
             let split_media_parts = i18n::tr(language, "playback.split_media.parts");
             let split_media_time = i18n::tr(language, "playback.split_media.time");
@@ -784,6 +827,14 @@ pub fn update_playback_menu(hwnd: HWND, show: bool) {
                     MF_STRING,
                     IDM_PLAYBACK_DOWNLOAD_EPISODE,
                     &download_episode,
+                );
+            }
+            if audio_description_available {
+                append_menu_string(
+                    playback_menu,
+                    MF_STRING,
+                    IDM_PLAYBACK_CREATE_AUDIO_DESCRIPTION,
+                    &create_audio_description,
                 );
             }
             if !hls_m3u8_playback {
@@ -1666,6 +1717,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 IDM_TOOLS_STREAM_AUDIO,
                 &labels.menu_stream_audio,
             );
+            append_menu_string(
+                multimedia_menu,
+                MF_STRING,
+                IDM_TOOLS_CREATE_AUDIO_DESCRIPTION,
+                &labels.menu_create_audio_description,
+            );
             if language == Language::Italian {
                 append_menu_string(
                     multimedia_menu,
@@ -1678,6 +1735,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                     MF_STRING,
                     IDM_TOOLS_RAIPLAY,
                     &labels.menu_raiplay,
+                );
+                append_menu_string(
+                    multimedia_menu,
+                    MF_STRING,
+                    IDM_TOOLS_LA7_PLAY,
+                    &crate::i18n::tr_la7_play("la7.menu"),
                 );
                 append_menu_string(
                     multimedia_menu,
@@ -1812,6 +1875,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                 IDM_TOOLS_STREAM_AUDIO,
                 &labels.menu_stream_audio,
             );
+            append_menu_string(
+                tools_menu,
+                MF_STRING,
+                IDM_TOOLS_CREATE_AUDIO_DESCRIPTION,
+                &labels.menu_create_audio_description,
+            );
             if language == Language::Italian {
                 append_menu_string(
                     tools_menu,
@@ -1824,6 +1893,12 @@ pub fn create_menus(hwnd: HWND, language: Language) -> (HMENU, HMENU) {
                     MF_STRING,
                     IDM_TOOLS_RAIPLAY,
                     &labels.menu_raiplay,
+                );
+                append_menu_string(
+                    tools_menu,
+                    MF_STRING,
+                    IDM_TOOLS_LA7_PLAY,
+                    &crate::i18n::tr_la7_play("la7.menu"),
                 );
                 append_menu_string(
                     tools_menu,
@@ -2185,6 +2260,7 @@ mod tests {
                 menu_podcasts,
                 menu_import_youtube,
                 menu_stream_audio,
+                menu_create_audio_description,
                 menu_rai_audiodescrizioni,
                 menu_raiplay,
                 menu_raiplaysound,
@@ -2215,6 +2291,7 @@ mod tests {
                 menu_treccani,
                 menu_import_youtube,
                 menu_stream_audio,
+                menu_create_audio_description,
                 menu_rai_audiodescrizioni,
                 menu_raiplay,
                 menu_raiplaysound,

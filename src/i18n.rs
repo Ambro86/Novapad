@@ -21,6 +21,7 @@ const ZH_JSON: &str = include_str!("../i18n/zh.json");
 const HI_JSON: &str = include_str!("../i18n/hi.json");
 const TRECCANI_IT_JSON: &str = include_str!("../i18n/features/treccani_it.json");
 const TV_IT_JSON: &str = include_str!("../i18n/features/tv/it.json");
+const LA7_PLAY_IT_JSON: &str = include_str!("../i18n/features/la7_play/it.json");
 
 fn load_map(raw: &str) -> HashMap<String, String> {
     let mut map: HashMap<String, String> = serde_json::from_str(raw).unwrap_or_default();
@@ -226,6 +227,66 @@ pub fn tr(language: Language, key: &str) -> String {
         .unwrap_or_else(|| key.to_string())
 }
 
+fn split_dialog_filter_fields(raw: &str) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut chars = raw.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\0' {
+            fields.push(std::mem::take(&mut current));
+            continue;
+        }
+
+        if ch == '\\' {
+            let mut slash_count = 1usize;
+            while chars.peek() == Some(&'\\') {
+                let _slash = chars.next();
+                slash_count += 1;
+            }
+            if chars.peek() == Some(&'0') {
+                let _zero = chars.next();
+                fields.push(std::mem::take(&mut current));
+                continue;
+            }
+            current.extend(std::iter::repeat_n('\\', slash_count));
+            continue;
+        }
+
+        current.push(ch);
+    }
+    fields.push(current);
+    fields
+}
+
+pub(crate) fn parse_dialog_filter_pairs(raw: &str) -> Vec<(String, String)> {
+    let fields = split_dialog_filter_fields(raw);
+    let mut pairs = Vec::new();
+    let mut fields = fields.into_iter();
+
+    while let (Some(name), Some(pattern)) = (fields.next(), fields.next()) {
+        if name.is_empty() || pattern.is_empty() {
+            break;
+        }
+        pairs.push((name, pattern));
+    }
+
+    pairs
+}
+
+pub(crate) fn dialog_filter_pairs(language: Language, key: &str) -> Vec<(String, String)> {
+    let raw = tr(language, key);
+    let pairs = parse_dialog_filter_pairs(&raw);
+    if !pairs.is_empty() {
+        return pairs;
+    }
+
+    crate::log_debug(&format!(
+        "Invalid localized file-dialog filter for key={key}; using all-files fallback"
+    ));
+    vec![(tr(language, "dialog.all_files"), "*.*".to_string())]
+}
+
 pub fn tr_treccani(key: &str) -> String {
     static TRECCANI_IT: OnceLock<HashMap<String, String>> = OnceLock::new();
     TRECCANI_IT
@@ -256,6 +317,67 @@ pub fn tr_tv_f(key: &str, args: &[(&str, &str)]) -> String {
     replace_named_args(tr_tv(key), args)
 }
 
+pub fn tr_la7_play(key: &str) -> String {
+    static LA7_PLAY_IT: OnceLock<HashMap<String, String>> = OnceLock::new();
+    LA7_PLAY_IT
+        .get_or_init(|| load_map(LA7_PLAY_IT_JSON))
+        .get(key)
+        .cloned()
+        .unwrap_or_else(|| key.to_string())
+}
+
+pub fn tr_la7_play_f(key: &str, args: &[(&str, &str)]) -> String {
+    replace_named_args(tr_la7_play(key), args)
+}
+
 pub fn tr_f(language: Language, key: &str, args: &[(&str, &str)]) -> String {
     replace_named_args(tr(language, key), args)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_dialog_filter_pairs;
+
+    #[test]
+    fn dialog_filters_accept_literal_backslash_zero_separators() {
+        assert_eq!(
+            parse_dialog_filter_pairs(r"Text (*.txt)\0*.txt\0All files (*.*)\0*.*\0\0"),
+            vec![
+                ("Text (*.txt)".to_string(), "*.txt".to_string()),
+                ("All files (*.*)".to_string(), "*.*".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn dialog_filters_accept_embedded_nul_separators() {
+        assert_eq!(
+            parse_dialog_filter_pairs("Text (*.txt)\0*.txt\0All files (*.*)\0*.*\0\0"),
+            vec![
+                ("Text (*.txt)".to_string(), "*.txt".to_string()),
+                ("All files (*.*)".to_string(), "*.*".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn dialog_filters_accept_overescaped_separators() {
+        assert_eq!(
+            parse_dialog_filter_pairs(
+                r"Text (*.txt)\\\\\0*.txt\\\\\0All files (*.*)\\\\\0*.*\\\\\0\\\\\0"
+            ),
+            vec![
+                ("Text (*.txt)".to_string(), "*.txt".to_string()),
+                ("All files (*.*)".to_string(), "*.*".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn dialog_filters_ignore_incomplete_trailing_pair() {
+        assert_eq!(
+            parse_dialog_filter_pairs(r"Text (*.txt)\0*.txt\0Incomplete"),
+            vec![("Text (*.txt)".to_string(), "*.txt".to_string())]
+        );
+    }
 }

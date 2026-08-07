@@ -1,0 +1,23 @@
+pyannote speaker-diarization-community-1
+========================================
+
+This distribution includes the voice-segmentation neural-network weights from
+the pyannote speaker-diarization-community-1 model, converted from PyTorch to
+ONNX for local CPU inference.
+
+Creator: pyannote
+Source: https://huggingface.co/pyannote/speaker-diarization-community-1
+Bundled revision: 3533c8cf8e369892e6b79ff1bf80f7b0286a54ee
+Changes to model files: the segmentation weights were exported to ONNX. Speaker
+embedding, PLDA, clustering, and diarization assets are not distributed.
+
+The model is licensed under the Creative Commons Attribution 4.0 International
+license (CC BY 4.0):
+
+https://creativecommons.org/licenses/by/4.0/
+https://creativecommons.org/licenses/by/4.0/legalcode
+
+The CC BY 4.0 license permits sharing and adaptation provided that appropriate
+credit is given, a link to the license is supplied, and changes are indicated.
+The model is provided without warranties. Omni Describer is not affiliated with
+or endorsed by pyannote.

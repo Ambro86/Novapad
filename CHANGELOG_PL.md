@@ -1,5 +1,26 @@
 # Dziennik zmian
 
+Wersja 0.8.5 – 2026-07-25
+
+Zapisywanie i eksport plików EPUB
+• Poprawiono polecenie „Zapisz jako” dla dokumentów EPUB: po wybraniu TXT lub innego formatu stosowane jest teraz wybrane rozszerzenie zamiast pozostawiania .epub.
+• Eksport EPUB do innego formatu nie zmienia już powiązania otwartego dokumentu. Kopia jest tworzona osobno, a polecenie „Zapisz” nadal aktualizuje oryginalny EPUB otwarty z jego folderu.
+
+Nagrania radiowe
+• Dodano skrót klawisza Delete do usuwania nagrań radiowych. Sonarpad prosi teraz o potwierdzenie przed usunięciem nagrania.
+
+Dokumentacja
+• Przewodniki zostały przeorganizowane i wyposażone w spis treści, aby ułatwić korzystanie z nich.
+
+Katalog głosów Google TTS
+• Katalog głosów Google TTS do pobrania rozszerzono ze 104 do 156 pakietów oraz z 53 do 81 wariantów językowych.
+• Dodano 52 brakujące pakiety Chrome OS i Google Natural dla 28 języków, korzystając z najnowszych zweryfikowanych rewizji, adresów pobierania, sum SHA-256, rozmiarów, zależności i wewnętrznych identyfikatorów mówców z bieżącego zgodnego katalogu. Dla języka litewskiego używana jest rewizja r19 zamiast starszych pakietów r17.
+• We wszystkich językach interfejsu dodano zlokalizowane nazwy języków: asamskiego, bodo, dogri, konkani, kaszmirskiego, maithili, manipuri, odia, sanskrytu, santali i sindhi, a także nazwę kraju Bośnia i Hercegowina.
+
+Niemieckie okna wyboru plików
+• Naprawiono problem niemieckiego tłumaczenia, przez który okna Otwórz, Zapisz jako, zapisywania audiobooków, pobierania podcastów i inne okna wyboru plików nie pojawiały się, mimo że polecenie menu lub skrót klawiaturowy były wykonywane prawidłowo.
+• Filtry okien plików obsługują teraz zarówno zapisane sekwencje rozdzielające \0, jak i osadzone znaki NUL, a w przypadku błędnego tłumaczenia używają bezpiecznego filtra zastępczego. Z dziennika usunięto również nieszkodliwy fałszywy błąd pojawiający się przy otwieraniu menu Plik.
+
 Wersja 0.8.4 – 2026-07-24
 
 Edycja dokumentów EPUB

@@ -1,5 +1,26 @@
 # Changelog
 
+Versão 0.8.5 – 2026-07-25
+
+Gravação e exportação de EPUB
+• Corrigido «Guardar como» nos documentos EPUB: ao escolher TXT ou outro formato, é agora aplicada a extensão selecionada em vez de se manter .epub.
+• A exportação de um EPUB para outro formato já não altera a associação do documento aberto. A cópia é criada separadamente, enquanto «Guardar» continua a atualizar o EPUB original aberto a partir da respetiva pasta.
+
+Gravações de rádio
+• Foi adicionado o atalho da tecla Delete para eliminar gravações de rádio. O Sonarpad pede agora confirmação antes de eliminar uma gravação.
+
+Documentação
+• Os guias foram reformulados e passam a incluir um índice para facilitar a consulta.
+
+Catálogo de vozes Google TTS
+• O catálogo descarregável de vozes Google TTS foi ampliado de 104 para 156 pacotes e de 53 para 81 variantes linguísticas.
+• Foram adicionados os 52 pacotes Chrome OS e Google Natural em falta para 28 idiomas, com as revisões verificadas mais recentes, endereços de transferência, somas SHA-256, tamanhos, dependências e identificadores internos dos locutores do catálogo compatível atual. O lituano usa a revisão r19 em vez dos antigos pacotes r17.
+• Foram adicionados em todos os idiomas da interface os nomes localizados de assamês, bodo, dogri, concani, caxemira, maithili, manipuri, odia, sânscrito, santali e sindi, bem como o nome do país Bósnia e Herzegovina.
+
+Janelas de ficheiros em alemão
+• Foi corrigido um problema da tradução alemã que impedia a apresentação de Abrir, Guardar como, gravação de audiolivros, transferências de podcasts e outras janelas de seleção de ficheiros, apesar de o comando de menu ou o atalho ser executado corretamente.
+• Os filtros das janelas de ficheiros aceitam agora tanto separadores \0 escritos como sequência como caracteres NUL incorporados, usando um filtro seguro quando uma tradução está malformada. Foi também removido do registo um falso erro inofensivo apresentado ao abrir o menu Ficheiro.
+
 Versão 0.8.4 – 2026-07-24
 
 Edição de documentos EPUB

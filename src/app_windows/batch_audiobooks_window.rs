@@ -1874,8 +1874,16 @@ fn is_window_valid(hwnd: HWND, label: &str) -> bool {
 }
 
 fn open_files_dialog(hwnd: HWND, language: Language) -> Option<Vec<PathBuf>> {
-    let filter_raw = i18n::tr(language, "dialog.open_filter");
-    let filter = to_wide(&filter_raw.replace("\\0", "\0"));
+    let filter_pairs = i18n::dialog_filter_pairs(language, "dialog.open_filter");
+    let mut filter_raw = String::new();
+    for (name, pattern) in filter_pairs {
+        filter_raw.push_str(&name);
+        filter_raw.push('\0');
+        filter_raw.push_str(&pattern);
+        filter_raw.push('\0');
+    }
+    filter_raw.push('\0');
+    let filter = to_wide(&filter_raw);
     let mut buffer = vec![0u16; 4096];
     let mut ofn = OPENFILENAMEW {
         lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,

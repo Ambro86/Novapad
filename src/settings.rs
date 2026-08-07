@@ -35,6 +35,7 @@ pub const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 pub const VOICE_LIST_URL: &str =
     "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list";
 pub const DEFAULT_GEMINI_MODEL: &str = "gemini-3.5-flash";
+pub const DEFAULT_AUDIO_DESCRIPTION_GEMINI_MODEL: &str = "gemini-3.5-flash-lite";
 
 static RAI_LUCE_CODE_CACHE: OnceLock<RwLock<Option<String>>> = OnceLock::new();
 static RAI_LUCE_EXPLICIT_CLEAR_PENDING: AtomicBool = AtomicBool::new(false);
@@ -132,7 +133,7 @@ pub enum OpenBehavior {
     NewWindow,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum Language {
     #[serde(rename = "it")]
     #[default]
@@ -182,7 +183,7 @@ pub enum ModifiedMarkerPosition {
     Unknown,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum TtsEngine {
     #[serde(rename = "edge")]
     #[default]
@@ -808,6 +809,8 @@ pub struct AppSettings {
     pub tv_save_folder: String,
     #[serde(default = "default_audiobook_save_folder")]
     pub audiobook_save_folder: String,
+    #[serde(default = "default_audio_description_save_folder")]
+    pub audio_description_save_folder: String,
     #[serde(default = "default_media_save_folder")]
     pub media_save_folder: String,
     #[serde(default = "default_documents_save_folder")]
@@ -841,6 +844,26 @@ pub struct AppSettings {
     pub gemini_api_key: String,
     #[serde(default = "default_gemini_model")]
     pub gemini_model: String,
+    #[serde(default = "default_audio_description_gemini_model")]
+    pub audio_description_gemini_model: String,
+    #[serde(default)]
+    pub audio_description_language: Option<Language>,
+    #[serde(default)]
+    pub audio_description_tts_engine: TtsEngine,
+    #[serde(default)]
+    pub audio_description_tts_voice: String,
+    #[serde(default = "default_audio_description_verbosity")]
+    pub audio_description_verbosity: u8,
+    #[serde(default = "default_true")]
+    pub audio_description_extended_pauses: bool,
+    #[serde(default = "default_true")]
+    pub audio_description_recognize_characters: bool,
+    #[serde(default)]
+    pub audio_description_keep_character_catalog: bool,
+    #[serde(default)]
+    pub audio_description_character_catalog: String,
+    #[serde(default)]
+    pub audio_description_save_project: bool,
     pub youtube_include_timestamps: bool,
     #[serde(default = "default_stream_audio_output_format")]
     pub stream_audio_default_format: String,
@@ -1191,6 +1214,14 @@ fn default_gemini_model() -> String {
     DEFAULT_GEMINI_MODEL.to_string()
 }
 
+fn default_audio_description_gemini_model() -> String {
+    DEFAULT_AUDIO_DESCRIPTION_GEMINI_MODEL.to_string()
+}
+
+fn default_audio_description_verbosity() -> u8 {
+    2
+}
+
 fn default_dictionary_lookup_language() -> String {
     "auto".to_string()
 }
@@ -1285,6 +1316,7 @@ impl Default for AppSettings {
             radio_save_folder: default_radio_save_folder(),
             tv_save_folder: default_tv_save_folder(),
             audiobook_save_folder: default_audiobook_save_folder(),
+            audio_description_save_folder: default_audio_description_save_folder(),
             media_save_folder: default_media_save_folder(),
             documents_save_folder: default_documents_save_folder(),
             podcast_include_video: false,
@@ -1304,6 +1336,16 @@ impl Default for AppSettings {
             podcast_search_provider: PodcastSearchProvider::Itunes,
             gemini_api_key: String::new(),
             gemini_model: default_gemini_model(),
+            audio_description_gemini_model: default_audio_description_gemini_model(),
+            audio_description_language: None,
+            audio_description_tts_engine: TtsEngine::Edge,
+            audio_description_tts_voice: String::new(),
+            audio_description_verbosity: default_audio_description_verbosity(),
+            audio_description_extended_pauses: true,
+            audio_description_recognize_characters: true,
+            audio_description_keep_character_catalog: false,
+            audio_description_character_catalog: String::new(),
+            audio_description_save_project: false,
             youtube_include_timestamps: true,
             stream_audio_default_format: default_stream_audio_output_format(),
             stream_favorites: Vec::new(),
@@ -1830,6 +1872,12 @@ pub fn default_audiobook_save_folder() -> String {
     base.to_string_lossy().to_string()
 }
 
+pub fn default_audio_description_save_folder() -> String {
+    let mut base = sonarpad_documents_root();
+    base.push("Audiodescriptions");
+    base.to_string_lossy().to_string()
+}
+
 pub fn default_media_save_folder() -> String {
     let mut base = sonarpad_documents_root();
     base.push("Media");
@@ -2294,6 +2342,11 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.audiobook_save_folder.trim().is_empty() {
         settings.audiobook_save_folder = default_audiobook_save_folder();
     }
+    settings.audio_description_save_folder =
+        settings.audio_description_save_folder.trim().to_string();
+    if settings.audio_description_save_folder.is_empty() {
+        settings.audio_description_save_folder = default_audio_description_save_folder();
+    }
     settings.media_save_folder = settings.media_save_folder.trim().to_string();
     if settings.media_save_folder.is_empty() {
         settings.media_save_folder = default_media_save_folder();
@@ -2477,6 +2530,20 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.gemini_model.is_empty() {
         settings.gemini_model = default_gemini_model();
     }
+    settings.audio_description_gemini_model =
+        settings.audio_description_gemini_model.trim().to_string();
+    if settings.audio_description_gemini_model.is_empty() {
+        settings.audio_description_gemini_model = default_audio_description_gemini_model();
+    }
+    settings.audio_description_tts_voice = settings.audio_description_tts_voice.trim().to_string();
+    settings.audio_description_character_catalog = settings
+        .audio_description_character_catalog
+        .trim()
+        .to_string();
+    if !settings.audio_description_recognize_characters {
+        settings.audio_description_keep_character_catalog = false;
+    }
+    settings.audio_description_verbosity = settings.audio_description_verbosity.min(2);
     settings.stream_audio_default_format = settings.stream_audio_default_format.trim().to_string();
     if settings.stream_audio_default_format.is_empty() {
         settings.stream_audio_default_format = default_stream_audio_output_format();
@@ -3698,4 +3765,70 @@ pub fn sort_podcast_sources(settings: &mut AppSettings, order: SortOrder) {
             .unwrap_or(0)
             .cmp(&b.last_updated.unwrap_or(0)),
     });
+}
+
+#[cfg(test)]
+mod audio_description_save_folder_tests {
+    use std::path::PathBuf;
+
+    use super::{AppSettings, default_audio_description_save_folder, normalize_settings};
+
+    #[test]
+    fn omni_port_audio_description_default_folder_is_under_sonarpad_documents() {
+        let path = PathBuf::from(default_audio_description_save_folder());
+        assert!(path.ends_with(PathBuf::from("Sonarpad").join("Audiodescriptions")));
+    }
+
+    #[test]
+    fn omni_port_empty_audio_description_folder_is_restored_to_default() {
+        let settings = normalize_settings(AppSettings {
+            audio_description_save_folder: "   ".to_string(),
+            ..Default::default()
+        });
+        assert_eq!(
+            settings.audio_description_save_folder,
+            default_audio_description_save_folder()
+        );
+    }
+
+    #[test]
+    fn omni_port_audio_description_preferences_have_legacy_compatible_defaults() {
+        let settings = AppSettings::default();
+        assert!(settings.audio_description_language.is_none());
+        assert!(matches!(
+            settings.audio_description_tts_engine,
+            super::TtsEngine::Edge
+        ));
+        assert!(settings.audio_description_tts_voice.is_empty());
+        assert_eq!(settings.audio_description_verbosity, 2);
+        assert!(settings.audio_description_extended_pauses);
+        assert!(settings.audio_description_recognize_characters);
+        assert!(!settings.audio_description_keep_character_catalog);
+        assert!(settings.audio_description_character_catalog.is_empty());
+        assert!(!settings.audio_description_save_project);
+    }
+
+    #[test]
+    fn omni_port_audio_description_preferences_are_normalized() {
+        let settings = normalize_settings(AppSettings {
+            audio_description_tts_voice: "  it-IT-IsabellaNeural  ".to_string(),
+            audio_description_character_catalog: "  My Series  ".to_string(),
+            audio_description_verbosity: 9,
+            ..Default::default()
+        });
+        assert_eq!(settings.audio_description_tts_voice, "it-IT-IsabellaNeural");
+        assert_eq!(settings.audio_description_character_catalog, "My Series");
+        assert_eq!(settings.audio_description_verbosity, 2);
+    }
+    #[test]
+    fn omni_port_character_catalog_is_disabled_when_character_recognition_is_off() {
+        let settings = normalize_settings(AppSettings {
+            audio_description_recognize_characters: false,
+            audio_description_keep_character_catalog: true,
+            audio_description_character_catalog: "Series".to_string(),
+            ..Default::default()
+        });
+        assert!(!settings.audio_description_keep_character_catalog);
+        assert_eq!(settings.audio_description_character_catalog, "Series");
+    }
 }

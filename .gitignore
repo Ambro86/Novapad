@@ -57,3 +57,11 @@ rustnotepad_source_*/
 
 # Local documentation workspace
 docs/
+ 
+# Local audio-description development artifacts 
+AUDIO_DESCRIPTION_VALIDATION_V*.md 
+Service/ 
+bridge/build/ 
+bridge/dist/ 
+*.BAC 
+*.bac

@@ -31,7 +31,11 @@ class AudioDescriptionBridgeDeliveryTests(unittest.TestCase):
         start = BRIDGE.index("fn bridge_install_path() -> PathBuf")
         end = BRIDGE.index("\n}", start) + 2
         install_fn = BRIDGE[start:end]
-        self.assertIn('crate::settings::settings_dir().join("tools").join(BRIDGE_CACHE_FILE_NAME)', install_fn)
+        install_fn_compact = "".join(install_fn.split())
+        self.assertIn(
+            'crate::settings::settings_dir().join("tools").join(BRIDGE_CACHE_FILE_NAME)',
+            install_fn_compact,
+        )
 
     def test_debug_build_can_still_use_local_unversioned_bridge(self):
         self.assertIn("#[cfg(debug_assertions)]", BRIDGE)

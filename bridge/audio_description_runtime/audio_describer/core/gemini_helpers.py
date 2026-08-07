@@ -77,7 +77,15 @@ if google_spec:
 else:
     app_logger.warning("Could not find spec for the 'google' namespace package.")
 
-genai_spec = importlib.util.find_spec("google.genai")
+try:
+    genai_spec = importlib.util.find_spec("google.genai")
+except (ImportError, ModuleNotFoundError, AttributeError, ValueError):
+    # find_spec("google.genai") raises ModuleNotFoundError when the parent
+    # namespace package "google" is not installed.  The Gemini SDK is an
+    # optional/lazy dependency here, so absence must be reported as an
+    # unavailable SDK rather than aborting module import (notably in clean CI).
+    genai_spec = None
+
 if genai_spec:
     app_logger.debug(f"Found 'google.genai' spec before import attempt. Origin: {genai_spec.origin}")
 else:

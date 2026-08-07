@@ -101,7 +101,8 @@ class YouTubeAudioDescriptionShortcutTests(unittest.TestCase):
     def test_live_raiplay_and_la7_are_not_offered(self):
         self.assertIn("state.active_mpv_is_live_tv", MAIN)
         self.assertIn("!state.raiplay_live_audio_variants.is_empty()", MAIN)
-        self.assertIn("if is_live || !matches!", MAIN)
+        main_compact = "".join(MAIN.split())
+        self.assertIn("ifis_live||!matches!", main_compact)
         self.assertIn("!live_tv_playback", MENU)
         self.assertIn("state.raiplay_live_audio_variants.is_empty()", MENU)
 

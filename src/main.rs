@@ -407,7 +407,6 @@ const COPYDATA_OPEN_FILE: usize = 1;
 const COPYDATA_CALENDAR_REMINDER: usize = 2;
 const COPYDATA_RESULT_HANDLED: isize = 1;
 const COPYDATA_RESULT_DEFERRED_MODAL: isize = 2;
-const COPYDATA_RESULT_OPEN_NEW_WINDOW: isize = 3;
 const VOICE_PANEL_ID_ENGINE: usize = 21001;
 const VOICE_PANEL_ID_LANGUAGE: usize = 21012;
 const VOICE_PANEL_ID_VOICE: usize = 21002;
@@ -761,17 +760,7 @@ fn should_defer_external_file_open(main_window_enabled: bool) -> bool {
 }
 
 fn should_focus_existing_window_after_copydata(result: isize) -> bool {
-    result != COPYDATA_RESULT_DEFERRED_MODAL && result != COPYDATA_RESULT_OPEN_NEW_WINDOW
-}
-
-fn should_open_new_window_after_copydata(result: isize) -> bool {
-    result == COPYDATA_RESULT_OPEN_NEW_WINDOW
-}
-
-fn should_route_external_file_open_to_new_window(hwnd: HWND) -> bool {
-    let audio_description_window =
-        with_state(hwnd, |state| state.audio_description_window).unwrap_or(HWND(0));
-    app_windows::audio_description_window::blocks_parent_focus(hwnd, audio_description_window)
+    result != COPYDATA_RESULT_DEFERRED_MODAL
 }
 
 fn reactivate_modal_child_while_main_disabled(hwnd: HWND) -> bool {
@@ -8991,12 +8980,6 @@ fn run_app(
                     WPARAM(0),
                     LPARAM(&mut cds as *mut _ as isize),
                 );
-                if should_open_new_window_after_copydata(copydata_result.0) {
-                    log_debug(
-                        "Existing Sonarpad instance spawned a separate window for Explorer file(s); sender will exit",
-                    );
-                    return Ok(());
-                }
                 if should_focus_existing_window_after_copydata(copydata_result.0) {
                     bring_window_to_foreground(existing);
                 } else {
@@ -13324,7 +13307,18 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_CLOSE => {
-                try_close_app(hwnd);
+                let audio_description_window =
+                    with_state(hwnd, |state| state.audio_description_window).unwrap_or(HWND(0));
+                if audio_description_window.0 != 0
+                    && is_window_handle_valid(audio_description_window)
+                {
+                    log_debug(
+                        "Main window close requested while independent audio-description window is open; closing current document instead",
+                    );
+                    editor_manager::close_current_document(hwnd);
+                } else {
+                    try_close_app(hwnd);
+                }
                 LRESULT(0)
             }
             WM_DESTROY => {
@@ -13365,17 +13359,6 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                             .filter(|path_str| !path_str.is_empty())
                             .map(PathBuf::from)
                             .collect();
-                        if should_route_external_file_open_to_new_window(hwnd) {
-                            if spawn_new_window_with_paths(&paths) {
-                                log_debug(
-                                    "WM_COPYDATA open spawned a separate Sonarpad window because the audio-description window is active",
-                                );
-                                return LRESULT(COPYDATA_RESULT_OPEN_NEW_WINDOW);
-                            }
-                            log_debug(
-                                "WM_COPYDATA could not spawn a separate Sonarpad window; falling back to opening the file in the current instance",
-                            );
-                        }
                         if defer_copydata_paths_for_pending_blocking_modal(hwnd, &paths) {
                             log_debug(
                                 "WM_COPYDATA open deferred while blocking modal dialog is pending",
@@ -21036,15 +21019,15 @@ fn spawn_new_window_with_path(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        COPYDATA_RESULT_DEFERRED_MODAL, COPYDATA_RESULT_HANDLED, COPYDATA_RESULT_OPEN_NEW_WINDOW,
-        SentenceNavigationDirection, append_debug_log, apply_selected_save_filter_extension,
+        COPYDATA_RESULT_DEFERRED_MODAL, COPYDATA_RESULT_HANDLED, SentenceNavigationDirection,
+        append_debug_log, apply_selected_save_filter_extension,
         audio_bookmark_position_and_snippet, audiodescription_mpv_audio_track_id,
         clamp_tts_chunk_offset, editor_translate_language_for_menu_id,
         editor_translate_language_index_by_key, is_bad_executable_format_error,
         normalize_soft_line_breaks_for_translation, preferred_mpv_audio_track_id,
         preferred_tv_video_track_id, relative_audiobook_bookmark, sentence_navigation_target,
         sentence_start_offsets_utf16, should_defer_external_file_open,
-        should_focus_existing_window_after_copydata, should_open_new_window_after_copydata,
+        should_focus_existing_window_after_copydata,
     };
     use crate::bookmarks::Bookmark;
     use std::collections::HashSet;
@@ -21219,16 +21202,6 @@ mod tests {
     fn sender_focuses_existing_window_after_immediate_open() {
         assert!(should_focus_existing_window_after_copydata(
             COPYDATA_RESULT_HANDLED,
-        ));
-    }
-
-    #[test]
-    fn sender_opens_separate_window_when_audio_description_window_requests_it() {
-        assert!(should_open_new_window_after_copydata(
-            COPYDATA_RESULT_OPEN_NEW_WINDOW,
-        ));
-        assert!(!should_focus_existing_window_after_copydata(
-            COPYDATA_RESULT_OPEN_NEW_WINDOW,
         ));
     }
 

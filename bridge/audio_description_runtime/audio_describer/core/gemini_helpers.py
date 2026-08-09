@@ -573,6 +573,23 @@ def _single_exception_is_retryable(exc: BaseException) -> bool:
     return any(keyword in error_str for keyword in _RETRYABLE_ERROR_KEYWORDS)
 
 
+def is_prepaid_credits_depleted_error(exc: BaseException) -> bool:
+    """Return True only for Gemini's permanent prepaid-billing depletion error.
+
+    This is deliberately narrower than generic HTTP 429 / RESOURCE_EXHAUSTED
+    handling. Other quota/rate-limit responses remain retryable or eligible for
+    the existing model-switch decision flow.
+    """
+    seen = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if "prepayment credits are depleted" in str(current).casefold():
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
 def is_retryable_transient_error(exc: BaseException) -> bool:
     """True if *exc* (or any cause/context in its chain) is a transient network/API error.
 
@@ -631,6 +648,12 @@ def run_with_retry(operation, *, status_callback=None, operation_label=None):
                 )
             return operation()
         except Exception as e:
+            if is_prepaid_credits_depleted_error(e):
+                app_logger.error(
+                    "Permanent Gemini billing error on %s attempt %d: %s",
+                    label, attempt, e,
+                )
+                raise
             if not is_retryable_transient_error(e):
                 raise
 
@@ -721,6 +744,12 @@ def generate_content_with_retry(client, model, contents, config, status_callback
                 client, current_model, contents, config, status_callback
             )
         except Exception as exc:
+            if is_prepaid_credits_depleted_error(exc):
+                app_logger.error(
+                    "Permanent Gemini prepaid-billing error on model %s: %s",
+                    current_model, exc,
+                )
+                raise
             if not is_retryable_transient_error(exc):
                 raise
 

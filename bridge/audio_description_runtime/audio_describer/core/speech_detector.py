@@ -184,6 +184,193 @@ def _choose_pause_anchor(free_intervals, desired_start, earliest_start=0.0,
     return min(candidates)[1] if candidates else None
 
 
+def _subtract_reserved_intervals(free_intervals, reserved_intervals):
+    """Remove already scheduled narration spans from speech-free intervals."""
+    reserved = merge_intervals(reserved_intervals or [])
+    available = []
+    for free_start, free_end in free_intervals or []:
+        cursor = free_start
+        for block_start, block_end in reserved:
+            if block_end <= cursor or block_start >= free_end:
+                continue
+            if block_start > cursor:
+                available.append((cursor, min(block_start, free_end)))
+            cursor = max(cursor, block_end)
+            if cursor >= free_end:
+                break
+        if cursor < free_end:
+            available.append((cursor, free_end))
+    return [(start, end) for start, end in available if end > start]
+
+
+def _slot_for_description(description, required_slots):
+    start, end, _text = description
+    midpoint = (float(start) + float(end)) / 2.0
+    for slot in required_slots or []:
+        if float(slot["start"]) <= midpoint <= float(slot["end"]):
+            return slot
+    return None
+
+
+def _align_descriptions_prioritizing_slots(
+    descriptions, protected_intervals, duration_sec, required_slots,
+    max_shift_sec=DEFAULT_MAX_SHIFT_SEC, allow_extended_pauses=False,
+    min_anchor_sec=DEFAULT_EXTENDED_ANCHOR_SEC,
+):
+    """Place mandatory-slot descriptions before optional narration.
+
+    Intensive generation can return useful optional descriptions in addition to
+    the mandatory silence slots. A chronological greedy scheduler lets an
+    optional cue consume room that a later mandatory cue needs. This scheduler
+    reserves one fitting cue per mandatory slot first, then fills the remaining
+    speech-free space with optional cues.
+    """
+    protected = merge_intervals(protected_intervals, duration_sec=duration_sec)
+    free = speech_free_intervals(protected, duration_sec)
+    source = list(descriptions or [])
+    used = set()
+    reserved = []
+    aligned = []
+    dropped = 0
+    extended = 0
+    mandatory_scheduled = 0
+    mandatory_missing = 0
+    mandatory_clamped = 0
+
+    for slot in required_slots or []:
+        slot_start = float(slot["start"])
+        slot_end = float(slot["end"])
+        slot_center = (slot_start + slot_end) / 2.0
+        candidates = []
+        for index, item in enumerate(source):
+            if index in used or _slot_for_description(item, [slot]) is None:
+                continue
+            required = estimate_spoken_duration(item[2])
+            midpoint = (float(item[0]) + float(item[1])) / 2.0
+            candidates.append((
+                required > (slot_end - slot_start) + 1e-6,
+                abs(midpoint - slot_center),
+                required,
+                index,
+                item,
+            ))
+        candidates.sort(key=lambda candidate: candidate[:4])
+
+        placed = False
+        for _too_long, _distance, required, index, item in candidates:
+            available = _subtract_reserved_intervals(free, reserved)
+            slot_free = [
+                (max(start, slot_start), min(end, slot_end))
+                for start, end in available
+                if min(end, slot_end) > max(start, slot_start)
+            ]
+            desired_start = max(slot_start, float(item[0]))
+            # A mandatory cue has already been grounded to this exact silence
+            # slot by the intensive-coverage pass.  The pre-TTS duration is
+            # only an estimate (2 words/sec), so it must never be allowed to
+            # delete the required cue before the exact synthesized duration is
+            # known in Rust.  Fit the provisional window inside the slot and
+            # allow movement anywhere within that same grounded slot.
+            max_available = max(
+                (end - start for start, end in slot_free), default=0.0
+            )
+            if max_available <= 0.0:
+                continue
+            planning_duration = min(required, max_available)
+            chosen = _choose_slot(
+                slot_free, desired_start, planning_duration, earliest_start=0.0,
+                max_shift_sec=max(max_shift_sec, slot_end - slot_start),
+            )
+            if chosen is None:
+                continue
+            if planning_duration + 1e-6 < required:
+                mandatory_clamped += 1
+                app_logger.info(
+                    "Mandatory description for slot %s needs %.3fs by estimate; "
+                    "keeping it in the %.3fs available slot for exact TTS scheduling.",
+                    slot.get("id") or "?", required, planning_duration,
+                )
+            aligned.append((chosen, chosen + planning_duration, item[2]))
+            reserved.append((chosen, chosen + planning_duration))
+            used.add(index)
+            mandatory_scheduled += 1
+            placed = True
+            break
+
+        if not placed:
+            mandatory_missing += 1
+
+    for index, item in sorted(
+        enumerate(source), key=lambda pair: (float(pair[1][0]), pair[0])
+    ):
+        if index in used:
+            continue
+        desired_start = max(0.0, float(item[0]))
+        required = estimate_spoken_duration(item[2])
+        available = _subtract_reserved_intervals(free, reserved)
+        chosen = _choose_slot(
+            available, desired_start, required, earliest_start=0.0,
+            max_shift_sec=max_shift_sec,
+        )
+        if chosen is not None:
+            aligned.append((chosen, chosen + required, item[2]))
+            reserved.append((chosen, chosen + required))
+            used.add(index)
+            continue
+
+        if allow_extended_pauses:
+            anchor = _choose_pause_anchor(
+                available, desired_start, earliest_start=0.0,
+                min_anchor_sec=min_anchor_sec, max_shift_sec=max_shift_sec,
+            )
+            if anchor is not None:
+                aligned.append((anchor, anchor + min_anchor_sec, item[2]))
+                reserved.append((anchor, anchor + min_anchor_sec))
+                used.add(index)
+                extended += 1
+                continue
+
+        dropped += 1
+        app_logger.warning(
+            "Dropping optional description at %.3fs after mandatory-slot reservation: "
+            "no dialogue-free slot of %.3fs nearby.",
+            desired_start, required,
+        )
+
+    aligned.sort(key=lambda item: (item[0], item[1]))
+    app_logger.info(
+        "Priority dialogue alignment audit: input=%d kept=%d mandatory=%d/%d "
+        "mandatory_missing=%d mandatory_clamped=%d optional_dropped=%d "
+        "extended=%d protected_intervals=%d.",
+        len(source), len(aligned), mandatory_scheduled, len(required_slots or []),
+        mandatory_missing, mandatory_clamped, dropped, extended, len(protected),
+    )
+    return aligned, dropped, extended
+
+
+def align_descriptions_prioritizing_slots(
+    descriptions, protected_intervals, duration_sec, required_slots,
+    max_shift_sec=DEFAULT_MAX_SHIFT_SEC,
+):
+    aligned, dropped, _extended = _align_descriptions_prioritizing_slots(
+        descriptions, protected_intervals, duration_sec, required_slots,
+        max_shift_sec=max_shift_sec, allow_extended_pauses=False,
+    )
+    return aligned, dropped
+
+
+def align_descriptions_with_extended_pauses_prioritizing_slots(
+    descriptions, protected_intervals, duration_sec, required_slots,
+    max_shift_sec=DEFAULT_MAX_SHIFT_SEC,
+    min_anchor_sec=DEFAULT_EXTENDED_ANCHOR_SEC,
+):
+    return _align_descriptions_prioritizing_slots(
+        descriptions, protected_intervals, duration_sec, required_slots,
+        max_shift_sec=max_shift_sec, allow_extended_pauses=True,
+        min_anchor_sec=min_anchor_sec,
+    )
+
+
 def align_descriptions_with_extended_pauses(
     descriptions, protected_intervals, duration_sec,
     max_shift_sec=DEFAULT_MAX_SHIFT_SEC,

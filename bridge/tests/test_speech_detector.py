@@ -9,6 +9,7 @@ from audio_describer.core import speech_detector
 from audio_describer.core.speech_detector import (
     DialogueDetectionError,
     align_descriptions,
+    align_descriptions_prioritizing_slots,
     align_descriptions_with_extended_pauses,
     detect_dialogue_intervals,
     intensive_description_slots,
@@ -190,6 +191,48 @@ class SpeechDetectorIntervalTests(unittest.TestCase):
         )
         self.assertEqual(aligned, [])
         self.assertEqual(dropped, 1)
+
+    def test_priority_alignment_reserves_mandatory_slot_before_optional_cue(self):
+        descriptions = [
+            (2.0, 3.0, "uno due tre quattro cinque sei sette otto nove dieci"),
+            (5.0, 6.0, "azione visiva importante dentro lo slot obbligatorio ora"),
+        ]
+        required_slots = [{"id": "S1", "start": 5.0, "end": 10.0}]
+        aligned, dropped = align_descriptions_prioritizing_slots(
+            descriptions, [], 10.0, required_slots
+        )
+        self.assertEqual(dropped, 0)
+        self.assertEqual(len(aligned), 2)
+        mandatory = next(item for item in aligned if "obbligatorio" in item[2])
+        self.assertGreaterEqual(mandatory[0], 5.0)
+        self.assertLessEqual(mandatory[1], 10.0)
+
+    def test_priority_alignment_keeps_mandatory_when_estimate_exceeds_slot(self):
+        descriptions = [
+            (5.0, 8.0, "uno due tre quattro cinque sei sette otto nove dieci undici dodici"),
+        ]
+        required_slots = [{"id": "S1", "start": 5.0, "end": 8.0}]
+        aligned, dropped = align_descriptions_prioritizing_slots(
+            descriptions, [], 10.0, required_slots
+        )
+        self.assertEqual(dropped, 0)
+        self.assertEqual(len(aligned), 1)
+        self.assertGreaterEqual(aligned[0][0], 5.0)
+        self.assertLessEqual(aligned[0][1], 8.0)
+        self.assertEqual(aligned[0][2], descriptions[0][2])
+
+    def test_priority_alignment_can_reposition_mandatory_anywhere_inside_its_slot(self):
+        descriptions = [
+            (14.5, 15.0, "uno due tre quattro cinque sei sette otto nove dieci"),
+        ]
+        required_slots = [{"id": "S1", "start": 5.0, "end": 15.0}]
+        aligned, dropped = align_descriptions_prioritizing_slots(
+            descriptions, [], 20.0, required_slots
+        )
+        self.assertEqual(dropped, 0)
+        self.assertEqual(len(aligned), 1)
+        self.assertGreaterEqual(aligned[0][0], 5.0)
+        self.assertLessEqual(aligned[0][1], 15.0)
 
     def test_description_is_dropped_without_nearby_room(self):
         aligned, dropped = align_descriptions(

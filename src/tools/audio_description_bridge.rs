@@ -63,6 +63,12 @@ pub struct BridgeInterval {
 pub struct BridgeDescription {
     pub start_sec: f64,
     pub text: String,
+    #[serde(default)]
+    pub mandatory: bool,
+    #[serde(default)]
+    pub slot_start_sec: Option<f64>,
+    #[serde(default)]
+    pub slot_end_sec: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

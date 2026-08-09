@@ -245,8 +245,9 @@ def _gemini_status(message: str) -> None:
         _status("gemini_processing", "")
 
 
-def _normalise_descriptions(descriptions) -> list[dict]:
+def _normalise_descriptions(descriptions, mandatory_slots=None) -> list[dict]:
     result: list[dict] = []
+    mandatory_slots = list(mandatory_slots or [])
     for item in descriptions or []:
         if not isinstance(item, (list, tuple)) or len(item) < 3:
             continue
@@ -259,6 +260,34 @@ def _normalise_descriptions(descriptions) -> list[dict]:
         if not text:
             continue
         result.append({"start_sec": start, "end_sec": end, "text": text})
+
+    # Mark exactly one representative description per mandatory slot. Extra
+    # descriptions in the same silence remain optional so downstream exact-TTS
+    # scheduling can distinguish the required cue from additional narration.
+    claimed_rows = set()
+    for slot in mandatory_slots:
+        slot_start = float(slot["start"])
+        slot_end = float(slot["end"])
+        slot_center = (slot_start + slot_end) / 2.0
+        candidates = []
+        for index, row in enumerate(result):
+            if index in claimed_rows:
+                continue
+            midpoint = (row["start_sec"] + row["end_sec"]) / 2.0
+            if slot_start <= midpoint <= slot_end:
+                word_count = len(re.findall(r"\w+", row["text"], flags=re.UNICODE))
+                candidates.append((word_count, abs(midpoint - slot_center), index))
+        if not candidates:
+            continue
+        _words, _distance, index = min(candidates)
+        claimed_rows.add(index)
+        result[index].update({
+            "mandatory": True,
+            "slot_id": str(slot.get("id") or ""),
+            "slot_start_sec": slot_start,
+            "slot_end_sec": slot_end,
+        })
+
     result.sort(key=lambda row: (row["start_sec"], row["end_sec"]))
     return result
 
@@ -319,19 +348,48 @@ def run(request: dict) -> dict:
     descriptions = audio_describer._remove_consecutive_duplicates(  # noqa: SLF001
         descriptions, _gemini_status
     )
+    try:
+        intensive_min_silence = float(
+            config_model.get_setting("intensive_min_silence_seconds") or 3.0
+        )
+    except (TypeError, ValueError):
+        intensive_min_silence = 3.0
+    mandatory_slots = []
+    for index, chunk in enumerate(prepared_chunks, 1):
+        mandatory_slots.extend(
+            speech_detector.intensive_description_slots(
+                dialogue_intervals,
+                duration,
+                intensive_min_silence,
+                float(chunk["start_sec"]),
+                float(chunk["end_sec"]),
+                id_suffix=f"C{index:04d}",
+            )
+        )
+
     if bool(request.get("allow_extended_pauses", True)):
         aligned, dropped, short_gap_candidates = (
-            speech_detector.align_descriptions_with_extended_pauses(
-                descriptions, dialogue_intervals, duration
+            speech_detector.align_descriptions_with_extended_pauses_prioritizing_slots(
+                descriptions, dialogue_intervals, duration, mandatory_slots
             )
         )
     else:
-        aligned, dropped = speech_detector.align_descriptions(
-            descriptions, dialogue_intervals, duration
+        aligned, dropped = speech_detector.align_descriptions_prioritizing_slots(
+            descriptions, dialogue_intervals, duration, mandatory_slots
         )
         short_gap_candidates = 0
 
-    normalized = _normalise_descriptions(aligned)
+    final_missing_slots = speech_detector.uncovered_intensive_slots(
+        aligned, mandatory_slots
+    )
+    app_logger.info(
+        "Final post-alignment intensive coverage audit: slots=%d covered=%d missing=%d ids=%s.",
+        len(mandatory_slots),
+        len(mandatory_slots) - len(final_missing_slots),
+        len(final_missing_slots),
+        ",".join(slot["id"] for slot in final_missing_slots) or "none",
+    )
+    normalized = _normalise_descriptions(aligned, mandatory_slots)
     model = str(request.get("gemini_model") or "gemini-3.5-flash-lite").strip()
     protected = [
         {"start_sec": float(start), "end_sec": float(end)}

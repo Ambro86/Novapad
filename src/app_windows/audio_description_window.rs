@@ -211,6 +211,12 @@ fn is_hidden_for_output_player(parent: HWND, window: HWND) -> bool {
 pub(crate) fn blocks_parent_focus(parent: HWND, window: HWND) -> bool {
     window.0 != 0
         && crate::is_window_handle_valid(window)
+        && unsafe {
+            GetWindowLongPtrW(
+                window,
+                windows::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
+            ) == parent.0
+        }
         && !is_hidden_for_output_player(parent, window)
 }
 
@@ -417,10 +423,12 @@ fn open_window(parent: HWND) -> HWND {
     let title = to_wide(&labels(language).title);
     let hwnd = unsafe {
         CreateWindowExW(
-            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            WS_EX_CONTROLPARENT
+                | WS_EX_DLGMODALFRAME
+                | windows::Win32::UI::WindowsAndMessaging::WS_EX_APPWINDOW,
             PCWSTR(class_name.as_ptr()),
             PCWSTR(title.as_ptr()),
-            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            WS_CAPTION | WS_SYSMENU,
             120,
             90,
             700,
@@ -431,8 +439,27 @@ fn open_window(parent: HWND) -> HWND {
             None,
         )
     };
-    if hwnd.0 != 0 && with_state(parent, |state| state.audio_description_window = hwnd).is_none() {
-        crate::log_debug("Audio description: parent state unavailable while registering window");
+    if hwnd.0 != 0 {
+        // The parent hwnd was supplied during WM_CREATE only so this window could load
+        // Sonarpad settings and keep its existing callbacks. Detach the Win32 owner before
+        // showing it: the audio-description UI then has its own taskbar/Alt+Tab lifetime
+        // and the main Sonarpad window remains independently usable.
+        let _previous_owner = unsafe {
+            SetWindowLongPtrW(
+                hwnd,
+                windows::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
+                0,
+            )
+        };
+        unsafe {
+            ShowWindow(hwnd, SW_SHOW);
+            SetForegroundWindow(hwnd);
+        }
+        if with_state(parent, |state| state.audio_description_window = hwnd).is_none() {
+            crate::log_debug(
+                "Audio description: parent state unavailable while registering window",
+            );
+        }
     }
     hwnd
 }
@@ -2346,7 +2373,12 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                 &labels.character_catalog_warning.replace("{error}", warning),
                             );
                         }
+                        // Keep this secondary window disabled while the completion MessageBox is
+                        // active. Otherwise Windows can restore focus to one of our controls after
+                        // sleep/resume even though the blocking completion dialog is still open.
+                        EnableWindow(hwnd, false);
                         show_info(state.parent, state.language, &message);
+                        EnableWindow(hwnd, true);
                         open_result_in_player(hwnd, state.parent, outcome.output_path.clone());
                     }
                     Err(error) if error == "cancelled" => {
@@ -2396,7 +2428,14 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                         as *mut WindowState;
                 if !pointer.is_null() {
-                    SetFocus((*pointer).input);
+                    let state = &*pointer;
+                    if state.running {
+                        SetFocus(state.cancel_button);
+                    } else if state.return_to_editor_after_player {
+                        SetFocus(state.close_button);
+                    } else {
+                        SetFocus(state.input);
+                    }
                 }
                 LRESULT(0)
             }
@@ -2451,6 +2490,19 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             parent,
                             source_player_path.as_deref(),
                         );
+                    } else if crate::is_window_handle_valid(parent) {
+                        // Hand focus back only after this secondary window is being destroyed.
+                        // WM_FOCUS_EDITOR uses Sonarpad's normal editor focus/accessibility path.
+                        SetForegroundWindow(parent);
+                        crate::log_debug(
+                            "Audio description: scheduling editor focus after window close",
+                        );
+                        crate::log_if_err!(PostMessageW(
+                            parent,
+                            crate::WM_FOCUS_EDITOR,
+                            WPARAM(0),
+                            LPARAM(0),
+                        ));
                     }
                 }
                 LRESULT(0)

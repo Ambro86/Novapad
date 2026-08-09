@@ -482,6 +482,9 @@ struct SynthesizedDescription {
     original_index: usize,
     text: String,
     desired_start_sec: f64,
+    mandatory: bool,
+    slot_start_sec: Option<f64>,
+    slot_end_sec: Option<f64>,
     samples: Arc<[f32]>,
     sample_rate: u32,
     channels: u16,
@@ -1165,6 +1168,59 @@ fn choose_pause_anchor(
         .map(|(_, start)| start)
 }
 
+fn subtract_reserved_intervals(free: &[(f64, f64)], reserved: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    let mut blocks = reserved.to_vec();
+    blocks.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let mut merged: Vec<(f64, f64)> = Vec::new();
+    for (start, end) in blocks {
+        if let Some(last) = merged.last_mut()
+            && start <= last.1
+        {
+            last.1 = last.1.max(end);
+        } else if end > start {
+            merged.push((start, end));
+        }
+    }
+
+    let mut available = Vec::new();
+    for (free_start, free_end) in free {
+        let mut cursor = *free_start;
+        for (block_start, block_end) in &merged {
+            if *block_end <= cursor || *block_start >= *free_end {
+                continue;
+            }
+            if *block_start > cursor {
+                available.push((cursor, (*block_start).min(*free_end)));
+            }
+            cursor = cursor.max(*block_end);
+            if cursor >= *free_end {
+                break;
+            }
+        }
+        if cursor < *free_end {
+            available.push((cursor, *free_end));
+        }
+    }
+    available
+}
+
+fn restrict_to_mandatory_slot(
+    free: &[(f64, f64)],
+    description: &SynthesizedDescription,
+) -> Vec<(f64, f64)> {
+    let (Some(slot_start), Some(slot_end)) = (description.slot_start_sec, description.slot_end_sec)
+    else {
+        return free.to_vec();
+    };
+    free.iter()
+        .filter_map(|(start, end)| {
+            let clipped_start = (*start).max(slot_start);
+            let clipped_end = (*end).min(slot_end);
+            (clipped_end > clipped_start).then_some((clipped_start, clipped_end))
+        })
+        .collect()
+}
+
 fn schedule_synthesized_descriptions(
     descriptions: &[SynthesizedDescription],
     protected_intervals: &[BridgeInterval],
@@ -1173,21 +1229,42 @@ fn schedule_synthesized_descriptions(
 ) -> (Vec<ScheduledDescription>, Vec<DroppedDescription>) {
     let protected = normalize_intervals(protected_intervals, duration_sec);
     let free = speech_free_intervals(&protected, duration_sec);
-    let mut sorted = descriptions.to_vec();
-    sorted.sort_by(|left, right| left.desired_start_sec.total_cmp(&right.desired_start_sec));
+    let mut mandatory: Vec<SynthesizedDescription> = descriptions
+        .iter()
+        .filter(|description| description.mandatory)
+        .cloned()
+        .collect();
+    let mut optional: Vec<SynthesizedDescription> = descriptions
+        .iter()
+        .filter(|description| !description.mandatory)
+        .cloned()
+        .collect();
+    mandatory.sort_by(|left, right| left.desired_start_sec.total_cmp(&right.desired_start_sec));
+    optional.sort_by(|left, right| left.desired_start_sec.total_cmp(&right.desired_start_sec));
+
+    let mut ordered = mandatory;
+    ordered.extend(optional);
     let mut scheduled = Vec::new();
     let mut dropped = Vec::new();
-    let mut earliest = 0.0_f64;
+    let mut reserved: Vec<(f64, f64)> = Vec::new();
 
-    for description in sorted {
+    for description in ordered {
         let frames = description.samples.len() / description.channels.max(1) as usize;
         let required = frames as f64 / description.sample_rate.max(1) as f64;
+        let available = subtract_reserved_intervals(&free, &reserved);
+        let candidates = if description.mandatory {
+            restrict_to_mandatory_slot(&available, &description)
+        } else {
+            available
+        };
+
         if let Some(start) = choose_slot(
-            &free,
+            &candidates,
             description.desired_start_sec,
             required.max(0.001),
-            earliest,
+            0.0,
         ) {
+            reserved.push((start, start + required.max(0.001)));
             scheduled.push(ScheduledDescription {
                 original_index: description.original_index,
                 text: description.text,
@@ -1198,13 +1275,13 @@ fn schedule_synthesized_descriptions(
                 channels: description.channels,
                 extended_pause: false,
             });
-            earliest = start + required + 0.001;
             continue;
         }
         if allow_extended_pauses
             && let Some(anchor) =
-                choose_pause_anchor(&free, description.desired_start_sec, earliest)
+                choose_pause_anchor(&candidates, description.desired_start_sec, 0.0)
         {
+            reserved.push((anchor, anchor + MIN_EXTENDED_ANCHOR_SEC));
             scheduled.push(ScheduledDescription {
                 original_index: description.original_index,
                 text: description.text,
@@ -1215,7 +1292,6 @@ fn schedule_synthesized_descriptions(
                 channels: description.channels,
                 extended_pause: true,
             });
-            earliest = anchor + MIN_EXTENDED_ANCHOR_SEC + 0.001;
         } else {
             dropped.push(DroppedDescription {
                 original_index: description.original_index,
@@ -1225,6 +1301,7 @@ fn schedule_synthesized_descriptions(
             });
         }
     }
+    scheduled.sort_by(|left, right| left.start_sec.total_cmp(&right.start_sec));
     (scheduled, dropped)
 }
 
@@ -1819,6 +1896,9 @@ pub fn reexport_audio_description_project(
                 original_index: description.id,
                 text: description.text.clone(),
                 desired_start_sec: description.source_start_sec,
+                mandatory: false,
+                slot_start_sec: None,
+                slot_end_sec: None,
                 samples,
                 sample_rate,
                 channels,
@@ -2185,6 +2265,9 @@ pub fn create_audio_description(
                 original_index: index,
                 text: description.text.clone(),
                 desired_start_sec: description.start_sec,
+                mandatory: description.mandatory,
+                slot_start_sec: description.slot_start_sec,
+                slot_end_sec: description.slot_end_sec,
                 samples,
                 sample_rate,
                 channels,
@@ -2460,11 +2543,49 @@ mod tests {
     }
 
     #[test]
+    fn exact_scheduler_reserves_mandatory_slot_before_optional_description() {
+        let descriptions = vec![
+            SynthesizedDescription {
+                original_index: 0,
+                text: "Optional".to_string(),
+                desired_start_sec: 2.0,
+                mandatory: false,
+                slot_start_sec: None,
+                slot_end_sec: None,
+                samples: Arc::from(vec![0.2_f32; 60]),
+                sample_rate: 10,
+                channels: 1,
+            },
+            SynthesizedDescription {
+                original_index: 1,
+                text: "Mandatory".to_string(),
+                desired_start_sec: 5.0,
+                mandatory: true,
+                slot_start_sec: Some(5.0),
+                slot_end_sec: Some(8.0),
+                samples: Arc::from(vec![0.2_f32; 30]),
+                sample_rate: 10,
+                channels: 1,
+            },
+        ];
+        let (scheduled, dropped) =
+            schedule_synthesized_descriptions(&descriptions, &[], 10.0, false);
+        assert_eq!(scheduled.len(), 1);
+        assert_eq!(scheduled[0].original_index, 1);
+        assert!((scheduled[0].start_sec - 5.0).abs() < 0.001);
+        assert_eq!(dropped.len(), 1);
+        assert_eq!(dropped[0].original_index, 0);
+    }
+
+    #[test]
     fn extended_mode_preserves_unfittable_description_as_pause() {
         let descriptions = vec![SynthesizedDescription {
             original_index: 0,
             text: "A description".to_string(),
             desired_start_sec: 3.0,
+            mandatory: false,
+            slot_start_sec: None,
+            slot_end_sec: None,
             samples: Arc::from(vec![0.2_f32; 4 * 44_100]),
             sample_rate: 44_100,
             channels: 1,
@@ -2623,6 +2744,9 @@ mod tests {
             original_index: 0,
             text: "Descrizione lunga".to_string(),
             desired_start_sec: 2.0,
+            mandatory: false,
+            slot_start_sec: None,
+            slot_end_sec: None,
             samples: Arc::from(vec![0.2_f32; 16_000]),
             sample_rate: 8_000,
             channels: 1,

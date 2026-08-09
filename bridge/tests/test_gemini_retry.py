@@ -42,6 +42,57 @@ class GeminiRetryTests(unittest.TestCase):
         self.assertEqual(operation.call_count, 1)
         sleep_mock.assert_not_called()
 
+    def test_prepaid_credits_depleted_stops_generic_retry_immediately(self):
+        error = RuntimeError(
+            "429 RESOURCE_EXHAUSTED: Your prepayment credits are depleted. "
+            "Please go to AI Studio to manage your project and billing."
+        )
+        operation = mock.Mock(side_effect=error)
+
+        with mock.patch.object(gemini_helpers.time, "sleep") as sleep_mock:
+            with self.assertRaises(RuntimeError) as raised:
+                gemini_helpers.run_with_retry(
+                    operation, operation_label="video upload"
+                )
+
+        self.assertIs(raised.exception, error)
+        self.assertEqual(operation.call_count, 1)
+        sleep_mock.assert_not_called()
+
+    def test_prepaid_credits_depleted_does_not_offer_model_switch(self):
+        error = RuntimeError(
+            "429 RESOURCE_EXHAUSTED: Your prepayment credits are depleted."
+        )
+        client = mock.Mock()
+        client.models.generate_content.side_effect = error
+        decision_handler = mock.Mock(return_value="gemini-new")
+        gemini_helpers.set_quota_decision_handler(decision_handler)
+
+        with mock.patch.object(
+            gemini_helpers.config_model, "get_setting", return_value=""
+        ), mock.patch.object(gemini_helpers.time, "sleep") as sleep_mock:
+            with self.assertRaises(RuntimeError) as raised:
+                gemini_helpers.generate_content_with_retry(
+                    client, "gemini-old", [], object()
+                )
+
+        self.assertIs(raised.exception, error)
+        self.assertEqual(client.models.generate_content.call_count, 1)
+        decision_handler.assert_not_called()
+        client.models.get.assert_not_called()
+        sleep_mock.assert_not_called()
+
+    def test_prepaid_credits_detection_follows_exception_chain(self):
+        inner = RuntimeError(
+            "429 RESOURCE_EXHAUSTED: Your prepayment credits are depleted."
+        )
+        outer = RuntimeError("upload wrapper failed")
+        outer.__cause__ = inner
+
+        self.assertTrue(
+            gemini_helpers.is_prepaid_credits_depleted_error(outer)
+        )
+
     def test_gemini_504_deadline_exceeded_retries_same_request(self):
         deadline = RuntimeError(
             "504 DEADLINE_EXCEEDED: Deadline expired before operation could complete."

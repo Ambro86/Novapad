@@ -48,25 +48,19 @@ class AudioDescriptionProjectWindowAccessibilityTests(unittest.TestCase):
         self.assertIn("!IsWindowVisible(state.audio_description_project_window).as_bool()", MAIN)
         self.assertIn("audio_description_window::blocks_parent_focus", MAIN)
 
-    def test_explorer_open_uses_separate_main_window_while_creation_window_is_active(self):
-        self.assertIn("COPYDATA_RESULT_OPEN_NEW_WINDOW", MAIN)
-        self.assertIn("fn should_route_external_file_open_to_new_window", MAIN)
+    def test_explorer_open_is_deferred_while_creation_window_is_active(self):
+        self.assertIn("COPYDATA_RESULT_DEFERRED_MODAL", MAIN)
+        self.assertIn("fn defer_copydata_paths_while_main_window_disabled", MAIN)
         self.assertIn(
-            "audio_description_window::blocks_parent_focus(hwnd, audio_description_window)",
+            "if defer_copydata_paths_while_main_window_disabled(hwnd, &paths)",
             MAIN,
         )
-        self.assertIn("fn spawn_new_window_with_paths(paths: &[PathBuf])", MAIN)
-        self.assertIn('command.arg("--new-window")', MAIN)
-        self.assertIn("command.args(paths)", MAIN)
-        self.assertIn("if spawn_new_window_with_paths(&paths)", MAIN)
+        self.assertIn("return LRESULT(COPYDATA_RESULT_DEFERRED_MODAL);", MAIN)
+        self.assertIn("fn process_deferred_modal_copydata_paths_if_ready", MAIN)
+        self.assertIn("open_copydata_paths(hwnd, pending_paths);", MAIN)
+        self.assertIn("should_focus_existing_window_after_copydata(copydata_result.0)", MAIN)
         self.assertIn(
-            "WM_COPYDATA open spawned a separate Sonarpad window",
-            MAIN,
-        )
-        self.assertIn('let force_new_window = args.iter().any(|arg| arg == "--new-window")', MAIN)
-        self.assertIn("if !force_new_window", MAIN)
-        self.assertIn(
-            "Existing Sonarpad instance spawned a separate window for Explorer file(s); sender will exit",
+            "Existing Sonarpad instance deferred the file open because a modal dialog is active",
             MAIN,
         )
 

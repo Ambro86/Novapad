@@ -1,5 +1,14 @@
 # Nhật ký thay đổi
 
+Chưa phát hành – 2026-08-10
+
+Định dạng sách điện tử
+• Đã thêm nhập Kindle không DRM ở MOBI, AZW và AZW3, gồm luồng không nén, PalmDOC, HUFF/CDIC và các biến thể MOBI 6/KF8/AZW3. Văn bản, chương và tiêu đề có trong chỉ mục Sonarpad.
+• Đã thêm DAISY 2.02 (NCC + SMIL + XHTML) và DAISY 3 (OPF + NCX + DTBook) từ .daisy/ZIP, ấn phẩm đã giải nén và tệp DAISY mở trực tiếp. Sách chỉ có âm thanh dùng nhãn điều hướng làm văn bản.
+• Sách nói DAISY giờ dùng trình phát nội bộ hiện có của Sonarpad: khi mở sách sẽ hiện mục lục DAISY, Enter phát chương đã chọn, Space tạm dừng/tiếp tục và Escape đóng trình phát rồi quay lại mục lục DAISY. Các giới hạn SMIL clipBegin/clipEnd được tôn trọng và một chương có thể tự động tiếp tục qua nhiều tệp âm thanh.
+• Kindle và DAISY được nhập thành văn bản có thể sửa mà không ghi đè e-book nguồn; Lưu dùng Lưu thành/xuất. Kindle có DRM bị từ chối rõ ràng.
+• MOBI/AZW/AZW3 và DAISY được thêm vào hộp thoại Mở ở cả 17 ngôn ngữ và liên kết Windows. Kiểm thử bao phủ không nén/PalmDOC/HUFF-CDIC, CDIC đệ quy, MOBI 6/8, DRM, DAISY 2.02/3 đóng gói/giải nén và NCX/SMIL/DTBook trực tiếp.
+
 Phiên bản 0.8.5 – 2026-07-25
 
 Lưu và xuất EPUB

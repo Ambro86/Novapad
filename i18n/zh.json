@@ -294,7 +294,7 @@
   "dialog.export_diagnostics_title": "导出诊断信息",
   "dialog.no": "否",
   "dialog.ocr_title": "PDF 光学字符识别 (OCR)",
-  "dialog.open_filter": "所有支持的格式 (*.txt;*.md;*.pdf;*.epub;*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav;*.doc;*.docx;*.odt;*.xls;*.xlsx;*.rtf;*.htm;*.html;*.ppt;*.pptx;*.odp;*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh)\\0*.txt;*.md;*.pdf;*.epub;*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav;*.doc;*.docx;*.odt;*.xls;*.xlsx;*.rtf;*.htm;*.html;*.ppt;*.pptx;*.odp;*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh\\0TXT (*.txt)\\0*.txt\\0Markdown (*.md)\\0*.md\\0PDF (*.pdf)\\0*.pdf\\0EPUB (*.epub)\\0*.epub\\0音频/视频 (*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav)\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Word (*.doc;*.docx;*.odt)\\0*.doc;*.docx;*.odt\\0Excel (*.xls;*.xlsx)\\0*.xls;*.xlsx\\0RTF (*.rtf)\\0*.rtf\\0HTML (*.htm;*.html)\\0*.htm;*.html\\0PowerPoint (*.ppt;*.pptx;*.odp)\\0*.ppt;*.pptx;*.odp\\0编程文件 (*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh)\\0*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh\\0所有文件 (*.*)\\0*.*\\0\\0",
+  "dialog.open_filter": "所有支持的格式 (*.txt;*.md;*.pdf;*.epub;*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav;*.doc;*.docx;*.odt;*.xls;*.xlsx;*.rtf;*.htm;*.html;*.ppt;*.pptx;*.odp;*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh;*.mobi;*.azw;*.azw3;*.daisy;*.opf;*.ncx;*.smil;*.xml;*.zip)\\0*.txt;*.md;*.pdf;*.epub;*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav;*.doc;*.docx;*.odt;*.xls;*.xlsx;*.rtf;*.htm;*.html;*.ppt;*.pptx;*.odp;*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh;*.mobi;*.azw;*.azw3;*.daisy;*.opf;*.ncx;*.smil;*.xml;*.zip\\0TXT (*.txt)\\0*.txt\\0Markdown (*.md)\\0*.md\\0PDF (*.pdf)\\0*.pdf\\0EPUB (*.epub)\\0*.epub\\0Kindle 电子书 (*.mobi;*.azw;*.azw3)\\0*.mobi;*.azw;*.azw3\\0DAISY 图书 (*.daisy;*.opf;*.ncx;*.smil;*.xml;*.zip)\\0*.daisy;*.opf;*.ncx;*.smil;*.xml;*.zip\\0音频/视频 (*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav)\\0*.mp3;*.m4a;*.mp4;*.aac;*.mkv;*.avi;*.mov;*.m4v;*.webm;*.mpg;*.mpeg;*.ts;*.m2ts;*.mts;*.wmv;*.asf;*.flv;*.vob;*.3gp;*.flac;*.ogg;*.opus;*.wma;*.aiff;*.m4b;*.wav\\0Word (*.doc;*.docx;*.odt)\\0*.doc;*.docx;*.odt\\0Excel (*.xls;*.xlsx)\\0*.xls;*.xlsx\\0RTF (*.rtf)\\0*.rtf\\0HTML (*.htm;*.html)\\0*.htm;*.html\\0PowerPoint (*.ppt;*.pptx;*.odp)\\0*.ppt;*.pptx;*.odp\\0编程文件 (*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh)\\0*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh\\0所有文件 (*.*)\\0*.*\\0\\0",
   "dialog.open_subtitles_title": "选择字幕",
   "dialog.pdf_no_text_ocr": "无法提取文本。是否要运行OCR识别文本？",
   "dialog.save_audio_filter": "MP3 (*.mp3)\\0*.mp3\\0M4B 有声书 (*.m4b)\\0*.m4b\\0所有文件 (*.*)\\0*.*\\0\\0",
@@ -2049,5 +2049,10 @@
   "audio_description.character_catalog.name_prompt": "要如何命名角色目录？",
   "audio_description.character_catalog.name_error": "请输入角色目录名称。",
   "audio_description.character_catalog.saved": "角色目录已保存到：\r\n{path}",
-  "audio_description.character_catalog.warning": "音频描述已创建，但无法保存角色目录：\r\n{error}"
+  "audio_description.character_catalog.warning": "音频描述已创建，但无法保存角色目录：\r\n{error}",
+  "daisy_index.title": "DAISY 目录",
+  "daisy_index.hint": "选择章节或部分，然后按 Enter 播放。",
+  "daisy_index.no_audio": "此 DAISY 图书没有可播放的同步音频。文本仍会在编辑器中保持打开。",
+  "daisy_index.chapter_no_audio": "所选 DAISY 部分没有可播放的音频。",
+  "daisy_index.finished": "DAISY 章节结束。"
 }

@@ -1,5 +1,14 @@
 # Changelog
 
+Não lançado – 2026-08-10
+
+Formatos de livros eletrónicos
+• Adicionada importação Kindle sem DRM em MOBI, AZW e AZW3, incluindo fluxos sem compressão, PalmDOC e HUFF/CDIC e variantes MOBI 6/KF8/AZW3. Texto, capítulos e títulos ficam disponíveis no índice do Sonarpad.
+• Adicionado DAISY 2.02 (NCC + SMIL + XHTML) e DAISY 3 (OPF + NCX + DTBook), a partir de .daisy/ZIP, publicações extraídas e ficheiros DAISY abertos diretamente. Livros apenas com áudio usam as etiquetas de navegação como texto.
+• Os audiolivros DAISY usam agora o leitor interno já existente do Sonarpad: ao abrir surge o índice DAISY, Enter reproduz o capítulo escolhido, Espaço pausa/retoma e Escape fecha o leitor e regressa ao índice DAISY. Os limites SMIL clipBegin/clipEnd são respeitados e um capítulo pode continuar automaticamente por vários ficheiros de áudio.
+• Kindle e DAISY são importados como texto editável sem substituir o e-book original; Guardar usa Guardar como/exportar. Kindle com DRM é rejeitado explicitamente.
+• MOBI/AZW/AZW3 e DAISY foram adicionados à janela Abrir nas 17 línguas e às associações do Windows. Os testes cobrem sem compressão/PalmDOC/HUFF-CDIC, CDIC recursivo, MOBI 6/8, DRM, DAISY 2.02/3 empacotado/extraído e entradas diretas NCX/SMIL/DTBook.
+
 Versão 0.8.5 – 2026-07-25
 
 Gravação e exportação de EPUB

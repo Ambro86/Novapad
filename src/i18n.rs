@@ -336,7 +336,8 @@ pub fn tr_f(language: Language, key: &str, args: &[(&str, &str)]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_dialog_filter_pairs;
+    use super::{dialog_filter_pairs, parse_dialog_filter_pairs};
+    use crate::settings::Language;
 
     #[test]
     fn dialog_filters_accept_literal_backslash_zero_separators() {
@@ -371,6 +372,39 @@ mod tests {
                 ("All files (*.*)".to_string(), "*.*".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn open_filter_lists_kindle_and_daisy_in_every_interface_language() {
+        let languages = [
+            Language::Italian,
+            Language::English,
+            Language::German,
+            Language::Spanish,
+            Language::Portuguese,
+            Language::PortugueseBrazilian,
+            Language::Swedish,
+            Language::Vietnamese,
+            Language::Czech,
+            Language::Polish,
+            Language::French,
+            Language::Serbian,
+            Language::Ukrainian,
+            Language::Lithuanian,
+            Language::Russian,
+            Language::Chinese,
+            Language::Hindi,
+        ];
+        for language in languages {
+            let pairs = dialog_filter_pairs(language, "dialog.open_filter");
+            assert_eq!(pairs.get(1).map(|pair| pair.1.as_str()), Some("*.txt"));
+            assert!(pairs.iter().any(|pair| pair.1 == "*.mobi;*.azw;*.azw3"));
+            assert!(
+                pairs
+                    .iter()
+                    .any(|pair| pair.1 == "*.daisy;*.opf;*.ncx;*.smil;*.xml;*.zip")
+            );
+        }
     }
 
     #[test]

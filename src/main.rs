@@ -26,6 +26,8 @@ mod bookmarks;
 use bookmarks::*;
 mod tts_engine;
 use tts_engine::*;
+mod daisy_player;
+mod ebook_formats;
 mod epub_editor;
 mod file_handler;
 mod mf_encoder;
@@ -763,22 +765,107 @@ fn should_focus_existing_window_after_copydata(result: isize) -> bool {
     result != COPYDATA_RESULT_DEFERRED_MODAL
 }
 
+fn tracked_progress_modal_while_main_disabled(hwnd: HWND) -> HWND {
+    with_state(hwnd, |state| {
+        [
+            state.podcast_save_window,
+            state.update_progress_window,
+            state.replace_progress_window,
+            state.editor_translation_progress_window,
+        ]
+        .into_iter()
+        .find(|candidate| {
+            candidate.0 != 0
+                && is_window_handle_valid(*candidate)
+                && unsafe { IsWindowVisible(*candidate).as_bool() }
+        })
+        .unwrap_or(HWND(0))
+    })
+    .unwrap_or(HWND(0))
+}
+
 fn reactivate_modal_child_while_main_disabled(hwnd: HWND) -> bool {
     if unsafe { IsWindowEnabled(hwnd).as_bool() } {
         return false;
     }
 
     let popup = unsafe { GetLastActivePopup(hwnd) };
-    if popup.0 == 0 || popup == hwnd || !is_window_handle_valid(popup) {
-        log_debug("Main window is disabled, but no valid modal popup was found");
-        return false;
+    if popup.0 != 0 && popup != hwnd && is_window_handle_valid(popup) {
+        log_debug(&format!(
+            "Reactivating modal popup while main window is disabled: popup={popup:?}"
+        ));
+        bring_modal_window_to_foreground(popup);
+        return true;
+    }
+
+    // GetLastActivePopup(main) can temporarily return the disabled main window when
+    // the embedded MPV menu is activated while a progress dialog owns the focus.
+    // Fall back to progress dialogs tracked in AppState, and preserve any nested
+    // popup (for example the cancel-confirmation message box) owned by that dialog.
+    let tracked = tracked_progress_modal_while_main_disabled(hwnd);
+    if tracked.0 != 0 {
+        let nested = unsafe { GetLastActivePopup(tracked) };
+        let target = if nested.0 != 0 && nested != tracked && is_window_handle_valid(nested) {
+            nested
+        } else {
+            tracked
+        };
+        log_debug(&format!(
+            "Main window disabled: restoring tracked progress modal target={target:?} tracked={tracked:?}"
+        ));
+        bring_modal_window_to_foreground(target);
+        return true;
+    }
+
+    log_debug("Main window is disabled, but no valid modal popup was found");
+    false
+}
+
+pub(crate) fn recover_main_window_after_audio_description(hwnd: HWND, stage: &str) {
+    if hwnd.0 == 0 || !is_window_handle_valid(hwnd) {
+        log_debug(&format!(
+            "Audio description: cannot recover main window at {stage}; invalid parent={hwnd:?}"
+        ));
+        return;
+    }
+    if unsafe { IsWindowEnabled(hwnd).as_bool() } {
+        return;
+    }
+
+    let popup = unsafe { GetLastActivePopup(hwnd) };
+    if popup.0 != 0 && popup != hwnd && is_window_handle_valid(popup) {
+        log_debug(&format!(
+            "Audio description: main still disabled at {stage}, preserving valid modal popup={popup:?}"
+        ));
+        bring_modal_window_to_foreground(popup);
+        return;
+    }
+
+    let tracked_progress = tracked_progress_modal_while_main_disabled(hwnd);
+    if tracked_progress.0 != 0 {
+        log_debug(&format!(
+            "Audio description: main still disabled at {stage}, preserving tracked progress modal={tracked_progress:?}"
+        ));
+        bring_modal_window_to_foreground(tracked_progress);
+        return;
+    }
+
+    if has_pending_blocking_modal(hwnd) {
+        log_debug(&format!(
+            "Audio description: main still disabled at {stage}, preserving tracked blocking modal"
+        ));
+        reactivate_pending_blocking_modal(hwnd);
+        return;
     }
 
     log_debug(&format!(
-        "Reactivating modal popup while main window is disabled: popup={popup:?}"
+        "Audio description: recovering stale disabled main window at {stage}"
     ));
-    bring_modal_window_to_foreground(popup);
-    true
+    enable_window_safe(hwnd, true);
+    send_message_w_safe(hwnd, WM_CANCELMODE, WPARAM(0), LPARAM(0));
+    unsafe {
+        crate::log_if_err!(DrawMenuBar(hwnd));
+    }
 }
 
 fn defer_copydata_paths_while_main_window_disabled(hwnd: HWND, paths: &[PathBuf]) -> bool {
@@ -905,8 +992,13 @@ pub(crate) fn show_blocking_modal_message_box(
     let pending_paths = take_deferred_copydata_paths_for_blocking_modal(hwnd);
     if !pending_paths.is_empty() {
         open_copydata_paths(hwnd, pending_paths);
-    } else {
+    } else if unsafe { IsWindowEnabled(hwnd).as_bool() } {
         restore_editor_focus(hwnd);
+    } else {
+        log_debug(
+            "Blocking modal closed while its owner is still disabled; deferring editor focus restoration",
+        );
+        reactivate_modal_child_while_main_disabled(hwnd);
     }
     watchdog::exit_modal_dialog();
     result
@@ -6496,8 +6588,7 @@ pub(crate) fn finish_audio_description_after_output_preview(
     // The audio-description window is still inside WM_DESTROY when this helper runs.
     // Do not hand focus back synchronously: Windows/NVDA can otherwise keep a stale
     // modal/accessibility state even though the edit control already owns focus.
-    let _enabled = enable_window_safe(hwnd, true);
-    send_message_w_safe(hwnd, WM_CANCELMODE, WPARAM(0), LPARAM(0));
+    recover_main_window_after_audio_description(hwnd, "output_preview_cleanup");
     if with_state(hwnd, |state| {
         state.alt_menu_suppressed = false;
         state.alt_menu_used_with_key = false;
@@ -7996,6 +8087,9 @@ fn toggle_voice_dictation(hwnd: HWND) {
 }
 
 pub(crate) fn handle_player_command(hwnd: HWND, command: PlayerCommand) {
+    if daisy_player::handle_player_command(hwnd, &command) {
+        return;
+    }
     if should_route_player_command_to_mpv(hwnd) {
         let language = { with_state(hwnd, |state| state.settings.language) }.unwrap_or_default();
         let result = match command {
@@ -9193,17 +9287,20 @@ fn run_app(
                         (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
                     let ctrl_down =
                         (crate::get_key_state_safe(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+                    let main_window_enabled = IsWindowEnabled(hwnd).as_bool();
                     let should_show_menu = with_state(hwnd, |state| {
                         state.local_mpv_alt_menu_pending = false;
                         alt_down
+                            && main_window_enabled
                             && state.local_mpv_video_mode_active
                             && state.local_mpv_hidden_menu.0 != 0
                     })
                     .unwrap_or(false);
                     log_debug(&format!(
-                        "local_mpv_alt_down: alt_down={} should_show_menu={} video_mode={} attached_menu={:?} hidden_menu={:?}",
+                        "local_mpv_alt_down: alt_down={} should_show_menu={} main_enabled={} video_mode={} attached_menu={:?} hidden_menu={:?}",
                         alt_down,
                         should_show_menu,
+                        main_window_enabled,
                         with_state(hwnd, |state| state.local_mpv_video_mode_active)
                             .unwrap_or(false),
                         crate::get_menu_safe(hwnd),
@@ -9217,10 +9314,17 @@ fn run_app(
                             state.alt_menu_suppressed = true;
                             state.alt_menu_used_with_key = shift_down || ctrl_down;
                         });
-                        log_debug(&format!(
-                            "shortcut probe: suppress Alt menu activation shift_down={} ctrl_down={}",
-                            shift_down, ctrl_down
-                        ));
+                        if !main_window_enabled {
+                            log_debug(
+                                "shortcut probe: suppress Alt menu while a modal progress window disables the main window",
+                            );
+                            reactivate_modal_child_while_main_disabled(hwnd);
+                        } else {
+                            log_debug(&format!(
+                                "shortcut probe: suppress Alt menu activation shift_down={} ctrl_down={}",
+                                shift_down, ctrl_down
+                            ));
+                        }
                         continue;
                     }
                 }
@@ -9628,6 +9732,13 @@ fn run_app(
                                     schedule_mpv_esc_focus_debug_snapshots(hwnd);
                                 } else {
                                     editor_manager::close_current_document(hwnd);
+                                }
+                                if daisy_player::restore_index_after_stop(
+                                    hwnd,
+                                    stopped_audio_path.as_deref(),
+                                ) {
+                                    handled = true;
+                                    return;
                                 }
                                 if app_windows::audio_description_window::restore_after_player_stop(
                                     hwnd,
@@ -12931,6 +13042,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         LRESULT(0)
                     }
                     IDM_VIEW_SHOW_EPUB_INDEX => {
+                        if editor_manager::current_daisy_document_path(hwnd).is_some() {
+                            daisy_player::open_index_for_current_document(hwnd);
+                            return LRESULT(0);
+                        }
                         let language =
                             with_state(hwnd, |state| state.settings.language).unwrap_or_default();
                         let index = editor_manager::current_epub_index(hwnd);
@@ -20410,6 +20525,11 @@ pub(crate) fn save_automatic_bookmark_for_document(hwnd: HWND, doc_index: usize)
     if !automatic_enabled || hwnd_edit.0 == 0 {
         return false;
     }
+    if matches!(format, FileFormat::Audiobook)
+        && daisy_player::is_active_audio_document_path(path.as_deref())
+    {
+        return false;
+    }
 
     let (storage_key, persist_to_disk) =
         runtime_bookmark_storage_key(path.as_deref(), hwnd_edit, &title, format);
@@ -21486,6 +21606,9 @@ fn switch_audio_playlist_relative(hwnd: HWND, delta: i32) -> bool {
 }
 
 fn handle_audio_playlist_timer(hwnd: HWND) {
+    if daisy_player::handle_playback_timer(hwnd) {
+        return;
+    }
     let (is_paused, should_advance, current_seconds, elapsed_since_start, total_seconds) = {
         with_state(hwnd, |state| {
             let player = state.active_audiobook.as_ref()?;
@@ -21858,7 +21981,8 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
             .unwrap_or(false);
 
         let title = path.file_name().and_then(|s| s.to_str()).unwrap_or("File");
-        let has_epub_index = !loaded.epub_index.is_empty();
+        let is_daisy = matches!(loaded.format, FileFormat::Daisy);
+        let has_epub_index = !loaded.epub_index.is_empty() && !is_daisy;
         let (hwnd_edit, new_index) = with_state(hwnd, |state| {
             let use_word_wrap = state.settings.word_wrap && !large_file_no_wrap;
             let hwnd_edit = editor_manager::create_edit(
@@ -21951,6 +22075,9 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 }
                 state.pending_find_in_files = None;
             });
+        }
+        if is_daisy {
+            daisy_player::open_index_for_document(hwnd, &path);
         }
     }
 }

@@ -35,6 +35,8 @@ the ability to **create audiobooks directly from text using Microsoft voices (Ed
   - Microsoft Word (DOCX)
   - Spreadsheets (Excel / ODS via `calamine`)
   - EPUB e-books
+  - Kindle e-books (MOBI/AZW/AZW3, DRM-free)
+  - DAISY 2.02/3 Digital Talking Books (NCC/SMIL, OPF/NCX/DTBook), including synchronized audio playback in Sonarpad’s internal player with chapter navigation and SMIL clip boundaries
 - **Text-to-Speech (TTS) & Audiobook Creation**
   - Read documents aloud using Microsoft voices (Edge Neural) and SAPI5 (including OneCore)
   - Create MP3 audiobooks directly from text

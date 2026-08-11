@@ -34,6 +34,8 @@ la **trascrizione audio con Whisper/faster-whisper** e la **registrazione podcas
   - Documenti Microsoft Word (DOCX)
   - Fogli di calcolo (Excel / ODS tramite `calamine`)
   - E-book EPUB
+  - E-book Kindle (MOBI/AZW/AZW3 senza DRM)
+  - Digital Talking Book DAISY 2.02/3 (NCC/SMIL, OPF/NCX/DTBook), compresa la riproduzione audio sincronizzata nel player interno di Sonarpad con navigazione per capitoli e limiti SMIL
 - **Text-to-Speech (TTS) e creazione di audiolibri**
   - Lettura vocale dei documenti tramite le voci Microsoft (Edge Neural) e SAPI5 (incluse OneCore)
   - Creazione di audiolibri in formato MP3 direttamente dal testo

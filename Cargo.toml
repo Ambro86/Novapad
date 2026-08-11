@@ -3,14 +3,14 @@ name = "sonarpad"
 version = "0.8.5"
 edition = "2024"
 authors = ["Ambrogio Riili"]
-description = "A modern Notepad with PDF, DOCX, XLS and EPUB support and TTS capabilities."
+description = "A modern Notepad with PDF, DOCX, XLS, EPUB, Kindle and DAISY support and TTS capabilities."
 
 [package.metadata.packager]
 product_name = "Sonarpad"
 identifier = "com.ambrogioriili.sonarpad"
 authors = ["Ambrogio Riili"]
 publisher = "Ambrogio Riili"
-description = "A modern Notepad with PDF, DOCX, XLS and EPUB support and TTS capabilities."
+description = "A modern Notepad with PDF, DOCX, XLS, EPUB, Kindle and DAISY support and TTS capabilities."
 formats = ["nsis", "wix"]
 
 [[package.metadata.packager.file_associations]]
@@ -32,6 +32,16 @@ name = "Sonarpad OpenDocument Text"
 extensions = ["epub"]
 description = "Sonarpad EPUB Document"
 name = "Sonarpad EPUB Document"
+
+[[package.metadata.packager.file_associations]]
+extensions = ["mobi", "azw", "azw3"]
+description = "Sonarpad Kindle eBook"
+name = "Sonarpad Kindle eBook"
+
+[[package.metadata.packager.file_associations]]
+extensions = ["daisy", "opf", "ncx", "smil"]
+description = "Sonarpad DAISY Digital Talking Book"
+name = "Sonarpad DAISY Digital Talking Book"
 
 [[package.metadata.packager.file_associations]]
 extensions = ["pdf"]
@@ -215,6 +225,7 @@ cpal = "0.17"
 url = "2.5"
 uuid = { version = "1.19", features = ["v4"] }
 epub = "2.1"
+ebook-rs = { version = "=0.14.1", default-features = false, features = ["serde"] }
 zip = "0.6"
 feed-rs = "2.3"
 scraper = "0.25"

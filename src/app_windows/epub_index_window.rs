@@ -35,6 +35,8 @@ struct EpubIndexInit {
     parent: HWND,
     entries: Vec<EpubIndexEntry>,
     language: Language,
+    hint_key: &'static str,
+    initial_target: Option<i32>,
     result: Arc<Mutex<Option<i32>>>,
 }
 
@@ -48,6 +50,40 @@ pub fn select_epub_index_entry(
     parent: HWND,
     entries: &[EpubIndexEntry],
     language: Language,
+) -> Option<i32> {
+    select_index_entry(
+        parent,
+        entries,
+        language,
+        "epub_index.title",
+        "epub_index.hint",
+        None,
+    )
+}
+
+pub fn select_daisy_index_entry(
+    parent: HWND,
+    entries: &[EpubIndexEntry],
+    language: Language,
+    initial_target: Option<i32>,
+) -> Option<i32> {
+    select_index_entry(
+        parent,
+        entries,
+        language,
+        "daisy_index.title",
+        "daisy_index.hint",
+        initial_target,
+    )
+}
+
+fn select_index_entry(
+    parent: HWND,
+    entries: &[EpubIndexEntry],
+    language: Language,
+    title_key: &'static str,
+    hint_key: &'static str,
+    initial_target: Option<i32>,
 ) -> Option<i32> {
     if entries.is_empty() {
         return None;
@@ -72,9 +108,11 @@ pub fn select_epub_index_entry(
         parent,
         entries: entries.to_vec(),
         language,
+        hint_key,
+        initial_target,
         result: result.clone(),
     });
-    let title = to_wide(&i18n::tr(language, "epub_index.title"));
+    let title = to_wide(&i18n::tr(language, title_key));
     let hwnd = unsafe {
         CreateWindowExW(
             WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
@@ -173,7 +211,7 @@ fn epub_index_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
                 let hint = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
-                    PCWSTR(to_wide(&i18n::tr(init.language, "epub_index.hint")).as_ptr()),
+                    PCWSTR(to_wide(&i18n::tr(init.language, init.hint_key)).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
                     14,
@@ -235,21 +273,29 @@ fn epub_index_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM
 
                 let mut targets = Vec::new();
                 let mut first_item = HTREEITEM(0);
+                let mut initial_item = HTREEITEM(0);
                 insert_epub_index_entries(
                     tree,
                     HTREEITEM(0),
                     &init.entries,
                     &mut targets,
                     &mut first_item,
+                    init.initial_target,
+                    &mut initial_item,
                 );
-                if first_item.0 != 0 {
+                let selected_item = if initial_item.0 != 0 {
+                    initial_item
+                } else {
+                    first_item
+                };
+                if selected_item.0 != 0 {
                     SendMessageW(
                         tree,
                         TVM_SELECTITEM,
                         WPARAM(TVGN_CARET as usize),
-                        LPARAM(first_item.0),
+                        LPARAM(selected_item.0),
                     );
-                    SendMessageW(tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(first_item.0));
+                    SendMessageW(tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(selected_item.0));
                 }
 
                 for control in [hint, tree, ok, cancel] {
@@ -314,6 +360,8 @@ fn insert_epub_index_entries(
     entries: &[EpubIndexEntry],
     targets: &mut Vec<i32>,
     first_item: &mut HTREEITEM,
+    initial_target: Option<i32>,
+    initial_item: &mut HTREEITEM,
 ) {
     for entry in entries {
         let target_index = targets.len();
@@ -322,8 +370,22 @@ fn insert_epub_index_entries(
         if first_item.0 == 0 && item.0 != 0 {
             *first_item = item;
         }
+        if initial_item.0 == 0
+            && item.0 != 0
+            && initial_target.is_some_and(|target| target == entry.target_utf16)
+        {
+            *initial_item = item;
+        }
         if item.0 != 0 && !entry.children.is_empty() {
-            insert_epub_index_entries(tree, item, &entry.children, targets, first_item);
+            insert_epub_index_entries(
+                tree,
+                item,
+                &entry.children,
+                targets,
+                first_item,
+                initial_target,
+                initial_item,
+            );
         }
     }
 }

@@ -294,7 +294,7 @@
   "dialog.export_diagnostics_title": "Exportovat diagnostiku",
   "dialog.no": "Ne",
   "dialog.ocr_title": "PDF OCR",
-  "dialog.open_filter": "Všechny podporované formáty (*.txt;*.md;*.pdf;*.epub;*.mp3;*.m4a;*.mp4;*.aac;*.doc;*.docx;*.odt;*.xls;*.xlsx;*.rtf;*.htm;*.html;*.ppt;*.pptx;*.odp;*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh)\\0*.txt;*.md;*.pdf;*.epub;*.mp3;*.m4a;*.mp4;*.aac;*.doc;*.docx;*.odt;*.xls;*.xlsx;*.rtf;*.htm;*.html;*.ppt;*.pptx;*.odp;*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh\\0TXT (*.txt)\\0*.txt\\0Markdown (*.md)\\0*.md\\0PDF (*.pdf)\\0*.pdf\\0EPUB (*.epub)\\0*.epub\\0Audio (*.mp3;*.m4a;*.mp4;*.aac)\\0*.mp3;*.m4a;*.mp4;*.aac\\0Word (*.doc;*.docx;*.odt)\\0*.doc;*.docx;*.odt\\0Excel (*.xls;*.xlsx)\\0*.xls;*.xlsx\\0RTF (*.rtf)\\0*.rtf\\0HTML (*.htm;*.html)\\0*.htm;*.html\\0PowerPoint (*.ppt;*.pptx;*.odp)\\0*.ppt;*.pptx;*.odp\\0Programovací soubory (*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh)\\0*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh\\0Všechny soubory (*.*)\\0*.*\\0\\0",
+  "dialog.open_filter": "Všechny podporované formáty (*.txt;*.md;*.pdf;*.epub;*.mp3;*.m4a;*.mp4;*.aac;*.doc;*.docx;*.odt;*.xls;*.xlsx;*.rtf;*.htm;*.html;*.ppt;*.pptx;*.odp;*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh;*.mobi;*.azw;*.azw3;*.daisy;*.opf;*.ncx;*.smil;*.xml;*.zip)\\0*.txt;*.md;*.pdf;*.epub;*.mp3;*.m4a;*.mp4;*.aac;*.doc;*.docx;*.odt;*.xls;*.xlsx;*.rtf;*.htm;*.html;*.ppt;*.pptx;*.odp;*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh;*.mobi;*.azw;*.azw3;*.daisy;*.opf;*.ncx;*.smil;*.xml;*.zip\\0TXT (*.txt)\\0*.txt\\0Markdown (*.md)\\0*.md\\0PDF (*.pdf)\\0*.pdf\\0EPUB (*.epub)\\0*.epub\\0Knihy Kindle (*.mobi;*.azw;*.azw3)\\0*.mobi;*.azw;*.azw3\\0Knihy DAISY (*.daisy;*.opf;*.ncx;*.smil;*.xml;*.zip)\\0*.daisy;*.opf;*.ncx;*.smil;*.xml;*.zip\\0Audio (*.mp3;*.m4a;*.mp4;*.aac)\\0*.mp3;*.m4a;*.mp4;*.aac\\0Word (*.doc;*.docx;*.odt)\\0*.doc;*.docx;*.odt\\0Excel (*.xls;*.xlsx)\\0*.xls;*.xlsx\\0RTF (*.rtf)\\0*.rtf\\0HTML (*.htm;*.html)\\0*.htm;*.html\\0PowerPoint (*.ppt;*.pptx;*.odp)\\0*.ppt;*.pptx;*.odp\\0Programovací soubory (*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh)\\0*.py;*.java;*.js;*.rb;*.pl;*.php;*.lua;*.ps1;*.sh\\0Všechny soubory (*.*)\\0*.*\\0\\0",
   "dialog.open_subtitles_title": "Vybrat titulky",
   "dialog.pdf_no_text_ocr": "Žádný extrahovatelný text. Chcete provést OCR pro rozpoznání textu?",
   "dialog.save_audio_filter": "Zvukové soubory (*.mp3;*.m4a;*.aac;*.ogg;*.opus;*.wav;*.flac)\\0*.mp3;*.m4a;*.aac;*.ogg;*.opus;*.wav;*.flac\\0Všechny soubory (*.*)\\0*.*\\0\\0",
@@ -2049,5 +2049,10 @@
   "audio_description.character_catalog.name_prompt": "Jak se má katalog postav jmenovat?",
   "audio_description.character_catalog.name_error": "Zadejte název katalogu postav.",
   "audio_description.character_catalog.saved": "Katalog postav byl uložen do:\r\n{path}",
-  "audio_description.character_catalog.warning": "Audiopopis byl vytvořen, ale katalog postav se nepodařilo uložit:\r\n{error}"
+  "audio_description.character_catalog.warning": "Audiopopis byl vytvořen, ale katalog postav se nepodařilo uložit:\r\n{error}",
+  "daisy_index.title": "Obsah DAISY",
+  "daisy_index.hint": "Vyberte kapitolu nebo oddíl a stisknutím Enter jej přehrajte.",
+  "daisy_index.no_audio": "Tato kniha DAISY neobsahuje přehrávatelný synchronizovaný zvuk. Text zůstane otevřený v editoru.",
+  "daisy_index.chapter_no_audio": "Vybraný oddíl DAISY neobsahuje přehrávatelný zvuk.",
+  "daisy_index.finished": "Konec kapitoly DAISY."
 }

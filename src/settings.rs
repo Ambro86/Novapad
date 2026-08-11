@@ -110,6 +110,8 @@ pub enum FileFormat {
     Pdf,
     Spreadsheet,
     Epub,
+    KindleEbook,
+    Daisy,
     Html,
     Ppt,
     Pptx,

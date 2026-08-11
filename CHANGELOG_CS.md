@@ -1,5 +1,14 @@
 # Přehled změn
 
+Nevydáno – 2026-08-10
+
+Formáty e-knih
+• Přidán import Kindle knih bez DRM ve formátech MOBI, AZW a AZW3, včetně nekomprimovaných, PalmDOC a HUFF/CDIC textových proudů a variant MOBI 6/KF8/AZW3. Text, kapitoly a nadpisy jsou dostupné v indexu dokumentu Sonarpad.
+• Přidán import DAISY 2.02 (NCC + SMIL + XHTML) a DAISY 3 (OPF + NCX + DTBook) z balíčků .daisy/ZIP, rozbalených publikací i přímo otevřených souborů DAISY. U knih pouze se zvukem se použijí navigační popisky.
+• Audioknihy DAISY nyní používají stávající interní přehrávač Sonarpadu: po otevření se zobrazí obsah DAISY, Enter přehraje vybranou kapitolu, Mezerník pozastaví/pokračuje a Escape zavře přehrávač a vrátí se do obsahu DAISY. Hranice SMIL clipBegin/clipEnd jsou respektovány a kapitola může automaticky pokračovat přes více zvukových souborů.
+• Kindle a DAISY se importují jako upravitelný text bez přepsání zdrojového e-booku; Uložit používá Uložit jako/export. Kindle s DRM jsou výslovně odmítnuty.
+• MOBI/AZW/AZW3 a DAISY byly přidány do dialogu Otevřít ve všech 17 jazycích a do asociací Windows. Testy pokrývají nekomprimované/PalmDOC/HUFF-CDIC, rekurzivní CDIC, MOBI 6/8, DRM a balené/rozbalené DAISY 2.02/3 i přímé NCX/SMIL/DTBook.
+
 Verze 0.8.5 – 2026-07-25
 
 Ukládání a export souborů EPUB

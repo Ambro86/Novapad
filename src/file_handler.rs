@@ -507,7 +507,7 @@ fn choose_ansi_decoding(
     cp1252_text.to_string()
 }
 
-fn decode_ansi_best_effort(bytes: &[u8], language: Language) -> String {
+pub(crate) fn decode_ansi_best_effort(bytes: &[u8], language: Language) -> String {
     let (cp1250_text, _, _) = WINDOWS_1250.decode(bytes);
     let cp1250_text = cp1250_text.into_owned();
     let (cp1252_text, _, _) = WINDOWS_1252.decode(bytes);
@@ -1544,7 +1544,7 @@ fn align_epub_target_to_title(
     best_match.map(|(offset, _)| offset).unwrap_or(raw_target)
 }
 
-fn byte_offset_to_editor_utf16(text: &str, byte_offset: usize) -> i32 {
+pub(crate) fn byte_offset_to_editor_utf16(text: &str, byte_offset: usize) -> i32 {
     let mut safe_offset = byte_offset.min(text.len());
     while safe_offset > 0 && !text.is_char_boundary(safe_offset) {
         safe_offset -= 1;
@@ -1556,11 +1556,11 @@ fn byte_offset_to_editor_utf16(text: &str, byte_offset: usize) -> i32 {
     prefix.encode_utf16().count().min(i32::MAX as usize) as i32
 }
 
-fn normalize_epub_index_label(label: &str) -> String {
+pub(crate) fn normalize_epub_index_label(label: &str) -> String {
     label.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn normalize_epub_internal_path(path: &str) -> String {
+pub(crate) fn normalize_epub_internal_path(path: &str) -> String {
     let mut parts: Vec<&str> = Vec::new();
     let replaced = path.replace('\\', "/");
     for part in replaced.split('/') {
@@ -1575,7 +1575,7 @@ fn normalize_epub_internal_path(path: &str) -> String {
     parts.join("/")
 }
 
-fn percent_decode_epub_component(value: &str) -> String {
+pub(crate) fn percent_decode_epub_component(value: &str) -> String {
     let bytes = value.as_bytes();
     let mut decoded = Vec::with_capacity(bytes.len());
     let mut index = 0;
@@ -1771,7 +1771,9 @@ fn html_to_text(html: &str) -> String {
         .replace(SONARPAD_EXPLICIT_BREAK_MARKER, "")
 }
 
-fn html_to_text_with_anchors(html: &str) -> (String, std::collections::HashMap<String, usize>) {
+pub(crate) fn html_to_text_with_anchors(
+    html: &str,
+) -> (String, std::collections::HashMap<String, usize>) {
     let mut out = String::new();
     let mut anchors = std::collections::HashMap::new();
     let mut inside = false;

@@ -1,5 +1,14 @@
 # Changelog
 
+Non rilasciato – 2026-08-10
+
+Formati e-book
+• Aggiunta l'importazione nativa degli e-book Kindle senza DRM nei formati `.mobi`, `.azw` e `.azw3`, comprese le varianti MOBI non compresse, PalmDOC, i flussi di testo HUFF/CDIC legacy e l'analisi KF8/AZW3. Testo e navigazione dei capitoli vengono importati nell'editor e nell'indice di Sonarpad.
+• Aggiunto il supporto DAISY 2.02 e DAISY 3 da libri impacchettati `.daisy`/ZIP e da risorse estratte `ncc.html`, SMIL, OPF, NCX e DTBook XML. Per i titoli DAISY solo audio vengono usate come testo le etichette della navigazione.
+• Gli audiolibri DAISY usano ora il player interno già esistente di Sonarpad: aprendo il libro compare l’indice DAISY, Invio riproduce il capitolo scelto, Spazio mette in pausa/riprende, gli spostamenti restano entro il capitolo ed Esc chiude il player e torna all’indice DAISY. Vengono rispettati i limiti SMIL clipBegin/clipEnd e un capitolo può proseguire automaticamente su più file audio.
+• I documenti Kindle e DAISY vengono importati come testo modificabile senza sovrascrivere il contenitore sorgente; Salva passa quindi a Salva con nome/esportazione. I Kindle protetti da DRM vengono rifiutati esplicitamente e gli ZIP non DAISY vengono rifiutati invece di essere aperti come testo binario.
+• Aggiornati i filtri della finestra Apri in tutte le 17 lingue dell'interfaccia e le associazioni file di Windows. Aggiunti test Rust di regressione per MOBI/AZW/AZW3, flussi non compressi/PalmDOC/HUFF-CDIC, frasi CDIC ricorsive, intestazioni MOBI 6/8, rifiuto DRM, DAISY 2.02/3 impacchettati ed estratti, ingresso diretto NCC/SMIL/NCX/DTBook, navigazione solo audio, riconoscimento ZIP e filtri Apri localizzati.
+
 Versione 0.8.5 – 2026-07-25
 
 Creazione di audiodescrizioni

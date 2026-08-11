@@ -720,6 +720,15 @@ fn start_audiobook_at_with_options(
     seconds: u64,
     options: AudiobookPlaybackOptions,
 ) {
+    start_audiobook_at_with_options_precise(hwnd, path, seconds as f64, options);
+}
+
+fn start_audiobook_at_with_options_precise(
+    hwnd: HWND,
+    path: PathBuf,
+    seconds: f64,
+    options: AudiobookPlaybackOptions,
+) {
     let hwnd_main = hwnd;
     let playback_generation = next_audiobook_playback_generation(hwnd_main, "start");
     std::thread::spawn(move || {
@@ -758,26 +767,26 @@ fn start_audiobook_at_with_options(
                 };
                 match export_mixed_media(&path_clone, &settings, &mix_opts) {
                     Ok(mixed_path) => {
-                        start_audiobook_at_with_options(
+                        start_audiobook_at_with_options_precise(
                             hwnd_main,
                             mixed_path,
                             seconds,
                             AudiobookPlaybackOptions {
                                 mix_export: false,
-                                subtitle_seek_target_secs: Some(seconds as f64),
+                                subtitle_seek_target_secs: Some(seconds),
                                 ..opts
                             },
                         );
                     }
                     Err(err) => {
                         log_debug(&format!("Subtitle: mix export failed: {}", err));
-                        start_audiobook_at_with_options(
+                        start_audiobook_at_with_options_precise(
                             hwnd_main,
                             path_clone,
                             seconds,
                             AudiobookPlaybackOptions {
                                 mix_export: false,
-                                subtitle_seek_target_secs: Some(seconds as f64),
+                                subtitle_seek_target_secs: Some(seconds),
                                 ..opts
                             },
                         );
@@ -859,7 +868,7 @@ fn start_audiobook_at_with_options(
         log_debug("Audio player: Opening with BASS...");
         let initial_volume = if options.muted { 0.0 } else { options.volume };
         let output = if force_ffmpeg_stream {
-            match BassOutput::start_with_ffmpeg(
+            match BassOutput::start_with_ffmpeg_at(
                 &final_path,
                 seconds,
                 effective_speed,
@@ -878,7 +887,7 @@ fn start_audiobook_at_with_options(
                         stream_err
                     ));
                     match decode_ffmpeg_to_wav(&final_path, options.audio_track) {
-                        Ok(wav_path) => match BassOutput::start(
+                        Ok(wav_path) => match BassOutput::start_at(
                             &wav_path,
                             seconds,
                             effective_speed,
@@ -909,7 +918,7 @@ fn start_audiobook_at_with_options(
                 }
             }
         } else {
-            match BassOutput::start(
+            match BassOutput::start_at(
                 &final_path,
                 seconds,
                 effective_speed,
@@ -922,7 +931,7 @@ fn start_audiobook_at_with_options(
                     log_debug(&format!("Audio player: BASS open failed: {}", err));
                     if prefer_precise_subtitle_backend {
                         match decode_ffmpeg_to_wav(&final_path, options.audio_track) {
-                            Ok(wav_path) => match BassOutput::start(
+                            Ok(wav_path) => match BassOutput::start_at(
                                 &wav_path,
                                 seconds,
                                 effective_speed,
@@ -954,7 +963,7 @@ fn start_audiobook_at_with_options(
                         }
                     } else {
                         // Try FFmpeg streaming first (instant playback)
-                        match BassOutput::start_with_ffmpeg(
+                        match BassOutput::start_with_ffmpeg_at(
                             &final_path,
                             seconds,
                             effective_speed,
@@ -983,7 +992,7 @@ fn start_audiobook_at_with_options(
                                 ));
                                 // Fallback to WAV decode (slower but reliable)
                                 match decode_ffmpeg_to_wav(&final_path, options.audio_track) {
-                                    Ok(wav_path) => match BassOutput::start(
+                                    Ok(wav_path) => match BassOutput::start_at(
                                         &wav_path,
                                         seconds,
                                         effective_speed,
@@ -1076,7 +1085,7 @@ fn start_audiobook_at_with_options(
             output,
             is_paused: effective_paused,
             start_instant: std::time::Instant::now(),
-            accumulated_seconds: seconds,
+            accumulated_seconds: seconds.max(0.0).floor() as u64,
             volume: options.volume,
             muted: options.muted,
             prev_volume: options.prev_volume,
@@ -2005,6 +2014,52 @@ pub fn start_audiobook_at(hwnd: HWND, path: &Path, seconds: u64) {
             },
         );
     }
+}
+
+pub fn start_audiobook_at_precise(hwnd: HWND, path: &Path, seconds: f64) {
+    if crate::is_mpv_playback_active(hwnd) {
+        crate::stop_managed_mpv_playback(hwnd);
+    }
+    let seconds = seconds.max(0.0);
+    crate::log_debug(&format!(
+        "Audio player: precise start for {} at {:.3}s",
+        path.display(),
+        seconds
+    ));
+    let (speed, pitch, volume, muted, prev_volume) = with_state(hwnd, |state| {
+        state.audio_unexpected_stop_retry_for = None;
+        if let Some(player) = &state.active_audiobook {
+            (
+                player.speed,
+                player.pitch,
+                player.volume,
+                player.muted,
+                player.prev_volume,
+            )
+        } else {
+            (1.0, 0.0, 1.0, false, 1.0)
+        }
+    })
+    .unwrap_or((1.0, 0.0, 1.0, false, 1.0));
+    let audio_track = with_state(hwnd, |state| state.selected_audio_track).flatten();
+    stop_audiobook_playback(hwnd);
+    start_audiobook_at_with_options_precise(
+        hwnd,
+        path.to_path_buf(),
+        seconds,
+        AudiobookPlaybackOptions {
+            speed,
+            pitch,
+            paused: false,
+            volume,
+            muted,
+            prev_volume,
+            mix_export: false,
+            audio_track,
+            force_ffmpeg_stream: false,
+            subtitle_seek_target_secs: None,
+        },
+    );
 }
 
 pub fn change_audiobook_volume(hwnd: HWND, delta: f32) {

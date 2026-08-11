@@ -1,5 +1,8 @@
 use crate::accessibility::{EM_GETSEL, EM_REPLACESEL, EM_SCROLLCARET, to_wide, to_wide_normalized};
 use crate::app_windows::route_service::RouteMapData;
+use crate::ebook_formats::{
+    is_daisy_path, is_kindle_path, read_daisy_document, read_kindle_document,
+};
 use crate::file_handler::decode_text_with_encoding;
 use crate::file_handler::*;
 use crate::settings::{
@@ -3347,6 +3350,38 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
     }
 }
 
+pub fn retarget_current_audiobook_document(hwnd: HWND, path: &Path, title: &str) -> bool {
+    let changed = with_state(hwnd, |state| {
+        let index = state.current;
+        let document = state.docs.get_mut(index)?;
+        if !matches!(document.format, FileFormat::Audiobook) {
+            return None;
+        }
+        document.path = Some(path.to_path_buf());
+        document.title = title.to_string();
+        document.dirty = false;
+        Some((state.hwnd_tab, index))
+    })
+    .flatten();
+    let Some((hwnd_tab, index)) = changed else {
+        return false;
+    };
+    update_tab_title(hwnd_tab, index, title, false);
+    update_window_title(hwnd);
+    true
+}
+
+pub fn current_daisy_document_path(hwnd: HWND) -> Option<PathBuf> {
+    with_state(hwnd, |state| {
+        state.docs.get(state.current).and_then(|document| {
+            matches!(document.format, FileFormat::Daisy)
+                .then(|| document.path.clone())
+                .flatten()
+        })
+    })
+    .flatten()
+}
+
 fn open_document_with_encoding_internal(
     hwnd: HWND,
     path: &Path,
@@ -3453,6 +3488,36 @@ fn load_document_content(
             epub_index: Vec::new(),
             epub_original_text: None,
         }));
+    }
+    if is_kindle_path(path) {
+        let document = read_kindle_document(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: document.text,
+            format: FileFormat::KindleEbook,
+            opened_text_encoding: None,
+            epub_index: document.index,
+            epub_original_text: None,
+        }));
+    }
+    if is_daisy_path(path) {
+        let document = read_daisy_document(path, language)?;
+        return Ok(Some(LoadedDocument {
+            content: document.text,
+            format: FileFormat::Daisy,
+            opened_text_encoding: None,
+            epub_index: document.index,
+            epub_original_text: None,
+        }));
+    }
+    if path
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("zip"))
+    {
+        return Err(crate::settings::error_open_file_message(
+            language,
+            "The ZIP archive is not a recognized DAISY Digital Talking Book.",
+        ));
     }
     if is_epub_path(path) {
         let document = read_epub_document(path, language)?;
@@ -3904,7 +3969,10 @@ pub fn current_document_has_epub_index(hwnd: HWND) -> bool {
             .docs
             .get(state.current)
             .map(|document| {
-                matches!(document.format, FileFormat::Epub) && !document.epub_index.is_empty()
+                matches!(
+                    document.format,
+                    FileFormat::Epub | FileFormat::KindleEbook | FileFormat::Daisy
+                ) && !document.epub_index.is_empty()
             })
             .unwrap_or(false)
     })
@@ -4615,6 +4683,8 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                     | FileFormat::Ppt
                     | FileFormat::Pptx
                     | FileFormat::Odp
+                    | FileFormat::KindleEbook
+                    | FileFormat::Daisy
             );
             let mut suggested_name = state.docs[index]
                 .path

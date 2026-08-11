@@ -1,5 +1,14 @@
 # Changelog
 
+Unreleased – 2026-08-10
+
+E-book formats
+• Added native import for DRM-free Kindle e-books in `.mobi`, `.azw` and `.azw3`, including uncompressed MOBI, PalmDOC, legacy HUFF/CDIC text streams and KF8/AZW3 parsing. Text and chapter navigation are imported into Sonarpad's editor/index.
+• Added DAISY 2.02 and DAISY 3 import from packaged `.daisy`/ZIP books and extracted `ncc.html`, SMIL, OPF, NCX and DTBook XML resources. Audio-only DAISY titles fall back to their textual navigation labels.
+• DAISY audio books now use Sonarpad's existing internal player: opening a book shows its DAISY table of contents, Enter plays the selected chapter, Space pauses/resumes, seeking stays within the chapter, and Escape closes the player and returns to the DAISY index. SMIL clipBegin/clipEnd boundaries are honored and chapters may continue automatically across multiple audio files.
+• Kindle and DAISY documents are imported as editable text without overwriting their source container; Save therefore uses Save As/export. DRM-protected Kindle books are rejected explicitly, and non-DAISY ZIP archives are rejected instead of being opened as binary text.
+• Updated Open-dialog filters in all 17 interface languages and Windows file associations. Added Rust regression tests for MOBI/AZW/AZW3, uncompressed/PalmDOC/HUFF-CDIC streams, recursive CDIC phrases, MOBI 6/8 headers, DRM rejection, packaged and extracted DAISY 2.02/3, direct NCC/SMIL/NCX/DTBook entry points, audio-only navigation, ZIP sniffing and localized Open filters.
+
 Version 0.8.5 – 2026-07-25
 
 Audio-description creation

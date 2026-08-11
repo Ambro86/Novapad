@@ -2378,6 +2378,10 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         // sleep/resume even though the blocking completion dialog is still open.
                         EnableWindow(hwnd, false);
                         show_info(state.parent, state.language, &message);
+                        crate::recover_main_window_after_audio_description(
+                            state.parent,
+                            "completion_message_closed",
+                        );
                         EnableWindow(hwnd, true);
                         open_result_in_player(hwnd, state.parent, outcome.output_path.clone());
                     }
@@ -2485,6 +2489,10 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             "Audio description: parent state unavailable during WM_DESTROY",
                         );
                     }
+                    crate::recover_main_window_after_audio_description(
+                        parent,
+                        "audio_description_window_destroy",
+                    );
                     if return_to_editor_after_player {
                         crate::finish_audio_description_after_output_preview(
                             parent,

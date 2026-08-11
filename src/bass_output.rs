@@ -181,6 +181,17 @@ impl BassOutput {
         volume: f32,
         paused: bool,
     ) -> Result<Arc<Self>, String> {
+        Self::start_at(path, start_seconds as f64, speed, pitch, volume, paused)
+    }
+
+    pub fn start_at(
+        path: &Path,
+        start_seconds: f64,
+        speed: f32,
+        pitch: f32,
+        volume: f32,
+        paused: bool,
+    ) -> Result<Arc<Self>, String> {
         init_bass_once()?;
         let api = bass_api()?;
         let fx_api = bass_fx_api().ok();
@@ -249,8 +260,8 @@ impl BassOutput {
             log_bass_error(api, "BASS_ChannelSetAttribute volume");
         }
 
-        if start_seconds > 0 {
-            let pos = bass_channel_seconds2bytes_safe(api, handle, start_seconds as f64);
+        if start_seconds > 0.0 {
+            let pos = bass_channel_seconds2bytes_safe(api, handle, start_seconds);
             let seek_ok = bass_channel_set_position_safe(api, handle, pos, BASS_POS_BYTE);
             if seek_ok == 0 {
                 log_bass_error(api, "BASS_ChannelSetPosition");
@@ -279,27 +290,6 @@ impl BassOutput {
             _ffmpeg_stream: None,
             start_offset_secs: 0.0,
         }))
-    }
-
-    /// Start playback using FFmpeg streaming (no intermediate WAV file)
-    pub fn start_with_ffmpeg(
-        path: &Path,
-        start_seconds: u64,
-        speed: f32,
-        pitch: f32,
-        volume: f32,
-        paused: bool,
-        stream_index: Option<i32>,
-    ) -> Result<Arc<Self>, String> {
-        Self::start_with_ffmpeg_at(
-            path,
-            start_seconds as f64,
-            speed,
-            pitch,
-            volume,
-            paused,
-            stream_index,
-        )
     }
 
     /// Start FFmpeg-backed playback at a precise fractional-second position.

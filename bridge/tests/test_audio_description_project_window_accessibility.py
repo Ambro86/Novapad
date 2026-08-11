@@ -282,8 +282,20 @@ class AudioDescriptionProjectWindowAccessibilityTests(unittest.TestCase):
         self.assertIn("editor_manager::close_document_at(hwnd, index)", cleanup)
         self.assertIn("clear_active_podcast_chapters(hwnd)", cleanup)
         self.assertIn("clear_active_youtube_return_context(hwnd)", cleanup)
-        self.assertIn("enable_window_safe(hwnd, true)", cleanup)
-        self.assertIn("WM_CANCELMODE", cleanup)
+        self.assertIn(
+            'recover_main_window_after_audio_description(hwnd, "output_preview_cleanup")',
+            cleanup,
+        )
+
+        recovery = MAIN[
+            MAIN.index("fn recover_main_window_after_audio_description"):
+            MAIN.index("fn defer_copydata_paths_while_main_window_disabled")
+        ]
+        self.assertIn("enable_window_safe(hwnd, true)", recovery)
+        self.assertIn("WM_CANCELMODE", recovery)
+        self.assertIn("GetLastActivePopup(hwnd)", recovery)
+        self.assertIn("tracked_progress_modal_while_main_disabled(hwnd)", recovery)
+        self.assertIn("has_pending_blocking_modal(hwnd)", recovery)
         self.assertIn("state.alt_menu_suppressed = false", cleanup)
         self.assertIn("state.alt_menu_used_with_key = false", cleanup)
         self.assertIn("DrawMenuBar(hwnd)", cleanup)

@@ -948,7 +948,11 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
                                   status_update_callback=None, dialogue_free_windows="",
                                   dialogue_intervals=None, prepared_chunks=None,
                                   total_duration_override=None,
-                                  initial_character_glossary=None):
+                                  initial_character_glossary=None,
+                                  resume_completed_chunks=0,
+                                  resume_descriptions=None,
+                                  resume_character_glossary=None,
+                                  checkpoint_callback=None):
     """Generate long-video descriptions in bounded analysis chunks.
 
     Multi-chunk videos use exact temporary clips for lower Gemini latency. A
@@ -1001,10 +1005,27 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
         num_chunks = len(normalized_chunks)
         use_per_chunk_uploads = True
         shared_file_obj = None
+        resume_completed_chunks = max(0, min(int(resume_completed_chunks or 0), num_chunks))
+        for item in resume_descriptions or []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                start = float(item.get("start_sec") or 0.0)
+                end = float(item.get("end_sec") or start)
+            except (TypeError, ValueError):
+                continue
+            text = str(item.get("text") or "").strip()
+            if text and end > start:
+                all_descriptions.append((start, end, text))
         app_logger.info(
             "Using %d physical chunk(s) prepared by Sonarpad's Rust FFmpeg backend.",
             num_chunks,
         )
+        if resume_completed_chunks:
+            app_logger.info(
+                "Resuming audio description from checkpoint: completed_chunks=%d/%d descriptions=%d.",
+                resume_completed_chunks, num_chunks, len(all_descriptions),
+            )
 
         _update_status(_("Processing video..."))
 
@@ -1013,11 +1034,16 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
             _update_character_continuity(
                 character_continuity, initial_character_glossary, max_characters=96
             )
+        if enable_glossary and resume_character_glossary:
+            _update_character_continuity(
+                character_continuity, resume_character_glossary, max_characters=96
+            )
+        if enable_glossary and character_continuity:
             seeded = list(character_continuity.values())
             character_glossary.extend(seeded)
             detected_character_glossary.extend(seeded)
             app_logger.info(
-                "Loaded %d established character(s) from the Sonarpad catalog.",
+                "Loaded %d established/resumed character(s) for continuity.",
                 len(seeded),
             )
         extended_mode = bool(
@@ -1032,6 +1058,12 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
         )
 
         for i, prepared_chunk in enumerate(normalized_chunks):
+            if i < resume_completed_chunks:
+                app_logger.info(
+                    "Chunk %d/%d restored from checkpoint; Gemini call skipped.",
+                    i + 1, num_chunks,
+                )
+                continue
             chunk_start = prepared_chunk["start"]
             chunk_end = prepared_chunk["end"]
             chunk_free_windows = dialogue_free_windows
@@ -1386,6 +1418,21 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
                     )
 
             _update_status(_("Chunk %d: parsed %d descriptions.") % (i + 1, len(normalized_chunk)))
+
+            if checkpoint_callback is not None:
+                try:
+                    checkpoint_callback(
+                        i + 1,
+                        num_chunks,
+                        list(all_descriptions),
+                        list(character_continuity.values()) if enable_glossary else [],
+                        str(config_model.get_setting("gemini_model_override") or model_name_to_use),
+                    )
+                except Exception as exc:
+                    app_logger.warning(
+                        "Chunk %d checkpoint callback failed; continuing job: %s",
+                        i + 1, exc,
+                    )
 
             if current_chunk_file_obj is not None:
                 _cleanup_uploaded_file(client, current_chunk_file_obj, _update_status)

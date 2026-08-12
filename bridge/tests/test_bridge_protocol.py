@@ -171,5 +171,35 @@ class BridgeProtocolTests(unittest.TestCase):
         self.assertIn("& $Python $pythonSelector -m PyInstaller", script)
 
 
+    def test_validate_request_accepts_resume_and_rejects_progress_past_chunk_count(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "film.mkv"
+            chunk1 = root / "chunk1.mkv"
+            chunk2 = root / "chunk2.mkv"
+            for path in (media, chunk1, chunk2):
+                path.write_bytes(b"x")
+            request = {
+                "input_path": str(media),
+                "duration_sec": 360.0,
+                "gemini_api_key": "key",
+                "verbosity": "detailed",
+                "chunks": [
+                    {"path": str(chunk1), "start_sec": 0.0, "end_sec": 180.0},
+                    {"path": str(chunk2), "start_sec": 180.0, "end_sec": 360.0},
+                ],
+                "resume": {
+                    "completed_chunks": 1,
+                    "descriptions": [
+                        {"start_sec": 10.0, "end_sec": 12.0, "text": "Scena."}
+                    ],
+                    "character_glossary": [],
+                },
+            }
+            bridge._validate_request(request)
+            request["resume"]["completed_chunks"] = 3
+            with self.assertRaisesRegex(ValueError, "completed_chunks"):
+                bridge._validate_request(request)
+
 if __name__ == "__main__":
     unittest.main()

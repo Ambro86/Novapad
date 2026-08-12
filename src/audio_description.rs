@@ -5,8 +5,10 @@ use crate::settings::{
     AudiobookPartAnnouncementMode, AudiobookPartNamingMode, Language, TtsEngine,
 };
 use crate::tools::audio_description_bridge::{
-    AudioDescriptionBridgeCallbacks, AudioDescriptionBridgeRequest, AudioDescriptionPreparedChunk,
-    AudioDescriptionQuotaDecision, BridgeCharacter, BridgeInterval, run_audio_description_bridge,
+    AudioDescriptionBridgeCallbacks, AudioDescriptionBridgeCheckpoint,
+    AudioDescriptionBridgeRequest, AudioDescriptionBridgeResume, AudioDescriptionPreparedChunk,
+    AudioDescriptionQuotaDecision, BridgeCharacter, BridgeDescription, BridgeInterval,
+    run_audio_description_bridge,
 };
 use crate::tts_engine::{
     AudiobookCommonOptions, MixedAudiobookConfig, TtsChunk, render_mixed_audiobook_part,
@@ -33,6 +35,8 @@ const AUDIO_DESCRIPTION_DUCKING_DB: f32 = -15.0;
 const AUDIO_DESCRIPTION_FADE_MS: u32 = 150;
 const AUDIO_DESCRIPTION_BITRATE_KBPS: u32 = 192;
 const MAX_CHARACTER_DESCRIPTION_CHARS: usize = 2_000;
+const AUDIO_DESCRIPTION_PARTIAL_FORMAT: &str = "sonarpad-audio-description-partial";
+const AUDIO_DESCRIPTION_PARTIAL_VERSION: u32 = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AudioDescriptionVerbosity {
@@ -47,6 +51,14 @@ impl AudioDescriptionVerbosity {
             Self::Brief => "short",
             Self::Standard => "standard",
             Self::Detailed => "detailed",
+        }
+    }
+
+    fn from_bridge_value(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "short" => Self::Brief,
+            "standard" => Self::Standard,
+            _ => Self::Detailed,
         }
     }
 }
@@ -70,6 +82,7 @@ pub struct AudioDescriptionJob {
     pub gemini_api_key: String,
     pub gemini_model: String,
     pub audiobook_bitrate_kbps: u32,
+    pub resume_checkpoint_path: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug)]
@@ -83,6 +96,61 @@ pub struct AudioDescriptionCharacterCatalogContext {
 pub struct AudioDescriptionCharacterCatalogSummary {
     pub name: String,
     pub path: PathBuf,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct AudioDescriptionPartialCatalog {
+    name: String,
+    path: PathBuf,
+    #[serde(default)]
+    characters: Vec<BridgeCharacter>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct AudioDescriptionPartialCheckpoint {
+    format: String,
+    version: u32,
+    source_path: PathBuf,
+    output_mp3_path: PathBuf,
+    source_file_size: u64,
+    source_duration_sec: f64,
+    language: Language,
+    language_code: String,
+    verbosity: String,
+    allow_extended_pauses: bool,
+    recognize_characters: bool,
+    save_project: bool,
+    tts_engine: TtsEngine,
+    tts_voice: String,
+    tts_rate: i32,
+    tts_pitch: i32,
+    tts_volume: i32,
+    gemini_model: String,
+    audiobook_bitrate_kbps: u32,
+    character_catalog: Option<AudioDescriptionPartialCatalog>,
+    completed_chunks: usize,
+    total_chunks: usize,
+    #[serde(default)]
+    descriptions: Vec<BridgeDescription>,
+    #[serde(default)]
+    character_glossary: Vec<BridgeCharacter>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AudioDescriptionResumeSettings {
+    pub checkpoint_path: PathBuf,
+    pub input_path: PathBuf,
+    pub output_path: PathBuf,
+    pub description_language: Language,
+    pub verbosity: AudioDescriptionVerbosity,
+    pub allow_extended_pauses: bool,
+    pub recognize_characters: bool,
+    pub save_project: bool,
+    pub tts_engine: TtsEngine,
+    pub tts_voice: String,
+    pub gemini_model: String,
+    pub completed_chunks: usize,
+    pub total_chunks: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -1339,6 +1407,165 @@ pub fn audio_description_project_path(output_path: &Path) -> PathBuf {
     path
 }
 
+pub fn audio_description_partial_checkpoint_path(output_path: &Path) -> PathBuf {
+    let mut path = output_path.to_path_buf();
+    path.set_extension("sonarpad-ad.partial.json");
+    path
+}
+
+fn load_audio_description_partial_checkpoint(
+    path: &Path,
+) -> Result<AudioDescriptionPartialCheckpoint, String> {
+    let raw = fs::read(path).map_err(|error| {
+        format!("Audio description: could not read partial checkpoint: {error}")
+    })?;
+    let checkpoint: AudioDescriptionPartialCheckpoint = serde_json::from_slice(&raw)
+        .map_err(|error| format!("Audio description: invalid partial checkpoint: {error}"))?;
+    if checkpoint.format != AUDIO_DESCRIPTION_PARTIAL_FORMAT
+        || checkpoint.version != AUDIO_DESCRIPTION_PARTIAL_VERSION
+    {
+        return Err("Audio description: unsupported partial checkpoint format".to_string());
+    }
+    if checkpoint.total_chunks == 0 || checkpoint.completed_chunks > checkpoint.total_chunks {
+        return Err("Audio description: invalid partial checkpoint progress".to_string());
+    }
+    let source_metadata = fs::metadata(&checkpoint.source_path).map_err(|error| {
+        format!("Audio description: source video saved in the checkpoint is unavailable: {error}")
+    })?;
+    if source_metadata.len() != checkpoint.source_file_size {
+        return Err(
+            "Audio description: source video no longer matches the interrupted job".to_string(),
+        );
+    }
+    Ok(checkpoint)
+}
+
+fn save_audio_description_partial_checkpoint(
+    path: &Path,
+    job: &AudioDescriptionJob,
+    source_duration_sec: f64,
+    checkpoint: &AudioDescriptionBridgeCheckpoint,
+) -> Result<(), String> {
+    let source_file_size = fs::metadata(&job.input_path)
+        .map_err(|error| format!("Audio description: source file metadata failed: {error}"))?
+        .len();
+    let character_catalog =
+        job.character_catalog
+            .as_ref()
+            .map(|catalog| AudioDescriptionPartialCatalog {
+                name: catalog.name.clone(),
+                path: catalog.path.clone(),
+                characters: catalog.characters.clone(),
+            });
+    let value = AudioDescriptionPartialCheckpoint {
+        format: AUDIO_DESCRIPTION_PARTIAL_FORMAT.to_string(),
+        version: AUDIO_DESCRIPTION_PARTIAL_VERSION,
+        source_path: job.input_path.clone(),
+        output_mp3_path: job.output_path.clone(),
+        source_file_size,
+        source_duration_sec,
+        language: job.tts_language,
+        language_code: job.language_code.clone(),
+        verbosity: job.verbosity.as_bridge_value().to_string(),
+        allow_extended_pauses: job.allow_extended_pauses,
+        recognize_characters: job.recognize_characters,
+        save_project: job.save_project,
+        tts_engine: job.tts_engine,
+        tts_voice: job.tts_voice.clone(),
+        tts_rate: job.tts_rate,
+        tts_pitch: job.tts_pitch,
+        tts_volume: job.tts_volume,
+        gemini_model: if checkpoint.gemini_model.trim().is_empty() {
+            job.gemini_model.clone()
+        } else {
+            checkpoint.gemini_model.trim().to_string()
+        },
+        audiobook_bitrate_kbps: job.audiobook_bitrate_kbps,
+        character_catalog,
+        completed_chunks: checkpoint.completed_chunks,
+        total_chunks: checkpoint.total_chunks,
+        descriptions: checkpoint.descriptions.clone(),
+        character_glossary: checkpoint.character_glossary.clone(),
+    };
+    let raw = serde_json::to_vec_pretty(&value)
+        .map_err(|error| format!("Audio description: checkpoint serialization failed: {error}"))?;
+    let temporary = temporary_sibling_path(path, "partial");
+    fs::write(&temporary, raw)
+        .map_err(|error| format!("Audio description: checkpoint write failed: {error}"))?;
+    if path.exists() {
+        fs::remove_file(path).map_err(|error| {
+            crate::log_if_err!(
+                fs::remove_file(&temporary),
+                "Audio description checkpoint cleanup failed"
+            );
+            format!("Audio description: checkpoint replacement failed: {error}")
+        })?;
+    }
+    fs::rename(&temporary, path).map_err(|error| {
+        crate::log_if_err!(
+            fs::remove_file(&temporary),
+            "Audio description checkpoint cleanup failed"
+        );
+        format!("Audio description: checkpoint commit failed: {error}")
+    })
+}
+
+pub fn load_audio_description_resume_settings(
+    checkpoint_path: &Path,
+) -> Result<AudioDescriptionResumeSettings, String> {
+    let checkpoint = load_audio_description_partial_checkpoint(checkpoint_path)?;
+    Ok(AudioDescriptionResumeSettings {
+        checkpoint_path: checkpoint_path.to_path_buf(),
+        input_path: checkpoint.source_path,
+        output_path: checkpoint.output_mp3_path,
+        description_language: checkpoint.language,
+        verbosity: AudioDescriptionVerbosity::from_bridge_value(&checkpoint.verbosity),
+        allow_extended_pauses: checkpoint.allow_extended_pauses,
+        recognize_characters: checkpoint.recognize_characters,
+        save_project: checkpoint.save_project,
+        tts_engine: checkpoint.tts_engine,
+        tts_voice: checkpoint.tts_voice,
+        gemini_model: checkpoint.gemini_model,
+        completed_chunks: checkpoint.completed_chunks,
+        total_chunks: checkpoint.total_chunks,
+    })
+}
+
+pub fn audio_description_job_from_checkpoint(
+    checkpoint_path: &Path,
+    gemini_api_key: String,
+) -> Result<AudioDescriptionJob, String> {
+    let checkpoint = load_audio_description_partial_checkpoint(checkpoint_path)?;
+    let character_catalog =
+        checkpoint
+            .character_catalog
+            .map(|catalog| AudioDescriptionCharacterCatalogContext {
+                name: catalog.name,
+                path: catalog.path,
+                characters: catalog.characters,
+            });
+    Ok(AudioDescriptionJob {
+        input_path: checkpoint.source_path,
+        output_path: checkpoint.output_mp3_path,
+        language_code: checkpoint.language_code,
+        tts_language: checkpoint.language,
+        verbosity: AudioDescriptionVerbosity::from_bridge_value(&checkpoint.verbosity),
+        allow_extended_pauses: checkpoint.allow_extended_pauses,
+        recognize_characters: checkpoint.recognize_characters,
+        character_catalog,
+        save_project: checkpoint.save_project,
+        tts_engine: checkpoint.tts_engine,
+        tts_voice: checkpoint.tts_voice,
+        tts_rate: checkpoint.tts_rate,
+        tts_pitch: checkpoint.tts_pitch,
+        tts_volume: checkpoint.tts_volume,
+        gemini_api_key,
+        gemini_model: checkpoint.gemini_model,
+        audiobook_bitrate_kbps: checkpoint.audiobook_bitrate_kbps,
+        resume_checkpoint_path: Some(checkpoint_path.to_path_buf()),
+    })
+}
+
 fn scheduled_duration_sec(description: &ScheduledDescription) -> f64 {
     let frames = description.samples.len() / description.channels.max(1) as usize;
     frames as f64 / description.sample_rate.max(1) as f64
@@ -1600,6 +1827,7 @@ fn audio_description_job_from_project(project: &AudioDescriptionProject) -> Audi
         gemini_api_key: String::new(),
         gemini_model: project.gemini_model.clone(),
         audiobook_bitrate_kbps: project.bitrate_kbps,
+        resume_checkpoint_path: None,
     }
 }
 
@@ -2395,6 +2623,11 @@ pub fn create_audio_description(
             .map_err(|error| format!("Audio description: create output folder failed: {error}"))?;
     }
 
+    let checkpoint_path = job
+        .resume_checkpoint_path
+        .clone()
+        .unwrap_or_else(|| audio_description_partial_checkpoint_path(&job.output_path));
+
     notify_status(
         &mut callbacks,
         "analysis_prepare",
@@ -2459,6 +2692,37 @@ pub fn create_audio_description(
         }
     };
 
+    let resume = if job.resume_checkpoint_path.is_some() {
+        let checkpoint = match load_audio_description_partial_checkpoint(&checkpoint_path) {
+            Ok(checkpoint) => checkpoint,
+            Err(error) => {
+                crate::log_if_err!(
+                    fs::remove_dir_all(&analysis_cache_dir),
+                    "Audio description cleanup operation failed"
+                );
+                return Err(error);
+            }
+        };
+        if checkpoint.total_chunks != chunks.len()
+            || (checkpoint.source_duration_sec - duration_sec).abs() > 0.5
+        {
+            crate::log_if_err!(
+                fs::remove_dir_all(&analysis_cache_dir),
+                "Audio description cleanup operation failed"
+            );
+            return Err(
+                "Audio description: interrupted checkpoint no longer matches the prepared video"
+                    .to_string(),
+            );
+        }
+        Some(AudioDescriptionBridgeResume {
+            completed_chunks: checkpoint.completed_chunks,
+            descriptions: checkpoint.descriptions,
+            character_glossary: checkpoint.character_glossary,
+        })
+    } else {
+        None
+    };
     let bridge_request = AudioDescriptionBridgeRequest {
         input_path: job.input_path.to_string_lossy().to_string(),
         audio_wav_path: audio_wav_path
@@ -2477,12 +2741,15 @@ pub fn create_audio_description(
             .unwrap_or_default(),
         gemini_api_key: job.gemini_api_key.clone(),
         gemini_model: job.gemini_model.clone(),
+        resume,
     };
     let callback_state = Arc::new(std::sync::Mutex::new(callbacks));
     let download_state = callback_state.clone();
     let progress_state = callback_state.clone();
     let status_state = callback_state.clone();
     let quota_state = callback_state.clone();
+    let checkpoint_job = job.clone();
+    let checkpoint_target = checkpoint_path.clone();
     let analysis_result = run_audio_description_bridge(
         &bridge_request,
         cancel.clone(),
@@ -2519,6 +2786,25 @@ pub fn create_audio_description(
                     .as_mut()
                     .map(|callback| callback(model, error))
                     .unwrap_or(AudioDescriptionQuotaDecision::Wait)
+            })),
+            checkpoint: Some(Box::new(move |checkpoint| {
+                if let Err(error) = save_audio_description_partial_checkpoint(
+                    &checkpoint_target,
+                    &checkpoint_job,
+                    duration_sec,
+                    checkpoint,
+                ) {
+                    crate::log_debug(&format!(
+                        "Audio description: partial checkpoint save failed: {error}"
+                    ));
+                } else {
+                    crate::log_debug(&format!(
+                        "Audio description: saved partial checkpoint after chunk {}/{} to {}",
+                        checkpoint.completed_chunks,
+                        checkpoint.total_chunks,
+                        checkpoint_target.display()
+                    ));
+                }
             })),
         },
     );
@@ -2726,6 +3012,12 @@ pub fn create_audio_description(
         "complete",
         "Audio-description MP3 export complete.",
     );
+    if checkpoint_path.exists() {
+        crate::log_if_err!(
+            fs::remove_file(&checkpoint_path),
+            "Audio description: remove completed partial checkpoint failed"
+        );
+    }
     Ok(AudioDescriptionOutcome {
         output_path: job.output_path.clone(),
         project_path,
@@ -2788,6 +3080,7 @@ mod tests {
             gemini_api_key: String::new(),
             gemini_model: "gemini".to_string(),
             audiobook_bitrate_kbps: 192,
+            resume_checkpoint_path: None,
         };
         let scheduled = vec![
             ScheduledDescription {
@@ -2958,6 +3251,7 @@ mod tests {
             gemini_api_key: String::new(),
             gemini_model: "gemini-3.5-flash-lite".to_string(),
             audiobook_bitrate_kbps: 192,
+            resume_checkpoint_path: None,
         };
         let scheduled = vec![ScheduledDescription {
             original_index: 0,
@@ -3018,6 +3312,7 @@ mod tests {
             gemini_api_key: String::new(),
             gemini_model: "gemini".to_string(),
             audiobook_bitrate_kbps: 192,
+            resume_checkpoint_path: None,
         };
         let project = build_audio_description_project(&job, 1.0, 1.0, &[], &[], &[]);
         let mut value = serde_json::to_value(project).expect("serialize");
@@ -3285,6 +3580,7 @@ mod tests {
             gemini_api_key: String::new(),
             gemini_model: "gemini-3.5-flash-lite".to_string(),
             audiobook_bitrate_kbps: 192,
+            resume_checkpoint_path: None,
         };
         let scheduled = vec![
             ScheduledDescription {
@@ -3355,6 +3651,7 @@ mod tests {
             gemini_api_key: String::new(),
             gemini_model: "gemini-3.5-flash-lite".to_string(),
             audiobook_bitrate_kbps: 192,
+            resume_checkpoint_path: None,
         };
         let scheduled = vec![ScheduledDescription {
             original_index: 0,
@@ -3393,6 +3690,7 @@ mod tests {
             gemini_api_key: String::new(),
             gemini_model: "gemini-3.5-flash-lite".to_string(),
             audiobook_bitrate_kbps: 192,
+            resume_checkpoint_path: None,
         };
         let scheduled = vec![
             ScheduledDescription {

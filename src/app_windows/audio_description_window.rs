@@ -31,9 +31,10 @@ use crate::accessibility::to_wide;
 use crate::audio_description::{
     AudioDescriptionCallbacks, AudioDescriptionCharacterCatalogContext,
     AudioDescriptionCharacterCatalogSummary, AudioDescriptionJob, AudioDescriptionOutcome,
-    AudioDescriptionVerbosity, audio_description_character_catalog_path, create_audio_description,
-    language_code, list_audio_description_character_catalogs,
-    load_audio_description_character_catalog_context,
+    AudioDescriptionResumeSettings, AudioDescriptionVerbosity,
+    audio_description_character_catalog_path, audio_description_job_from_checkpoint,
+    create_audio_description, language_code, list_audio_description_character_catalogs,
+    load_audio_description_character_catalog_context, load_audio_description_resume_settings,
 };
 use crate::i18n;
 use crate::settings::{
@@ -66,6 +67,7 @@ const ID_RECOGNIZE_CHARACTERS: usize = 9669;
 const ID_KEEP_CHARACTER_CATALOG: usize = 9670;
 const ID_CHARACTER_CATALOG: usize = 9671;
 const ID_CHARACTER_CATALOG_NAME: usize = 9672;
+const ID_CONTINUE_INTERRUPTED: usize = 9673;
 
 const WM_AD_PROGRESS: u32 = WM_APP + 188;
 const WM_AD_STATUS: u32 = WM_APP + 189;
@@ -75,6 +77,7 @@ const WM_AD_MODELS_LOADED: u32 = WM_APP + 192;
 const WM_AD_QUOTA: u32 = WM_APP + 193;
 const WM_AD_PLAYER_RETURN: u32 = WM_APP + 194;
 const WM_AD_SET_INPUT: u32 = WM_APP + 195;
+const WM_AD_SET_RESUME: u32 = WM_APP + 196;
 
 struct Labels {
     title: String,
@@ -109,6 +112,11 @@ struct Labels {
     engine: String,
     voice: String,
     start: String,
+    resume_start: String,
+    resume_model: String,
+    resume_title: String,
+    resume_open_title: String,
+    resume_invalid: String,
     cancel: String,
     close: String,
     ready: String,
@@ -145,6 +153,7 @@ struct WindowState {
     character_catalogs: Vec<AudioDescriptionCharacterCatalogSummary>,
     save_project_checkbox: HWND,
     gemini_api_key_edit: HWND,
+    gemini_model_label: HWND,
     gemini_model_combo: HWND,
     gemini_refresh_models_button: HWND,
     engine_combo: HWND,
@@ -162,6 +171,8 @@ struct WindowState {
     exhausted_gemini_models: Vec<String>,
     return_to_editor_after_player: bool,
     source_player_path: Option<PathBuf>,
+    resume_checkpoint_path: Option<PathBuf>,
+    resume_mode: bool,
 }
 
 struct QuotaPromptRequest {
@@ -356,6 +367,11 @@ fn labels(language: Language) -> Labels {
         engine: i18n::tr(language, "audio_description.engine"),
         voice: i18n::tr(language, "audio_description.voice"),
         start: i18n::tr(language, "audio_description.start"),
+        resume_start: i18n::tr(language, "audio_description.resume.start"),
+        resume_model: i18n::tr(language, "audio_description.resume.model"),
+        resume_title: i18n::tr(language, "audio_description.resume.title"),
+        resume_open_title: i18n::tr(language, "audio_description.resume.open_title"),
+        resume_invalid: i18n::tr(language, "audio_description.resume.invalid"),
         cancel: i18n::tr(language, "audio_description.cancel"),
         close: i18n::tr(language, "audio_description.close"),
         ready: i18n::tr(language, "audio_description.status.ready"),
@@ -403,6 +419,53 @@ pub fn open_with_input(parent: HWND, input_path: PathBuf) {
         return;
     }
     post_boxed_message(hwnd, WM_AD_SET_INPUT, WPARAM(0), Box::new(input_path));
+    unsafe {
+        ShowWindow(hwnd, SW_SHOW);
+        SetForegroundWindow(hwnd);
+    }
+}
+
+fn choose_resume_checkpoint(parent: HWND, language: Language) -> Option<PathBuf> {
+    let labels = labels(language);
+    let all_files = i18n::tr(language, "dialog.all_files");
+    let filter = to_wide(&format!(
+        "Sonarpad audio-description checkpoint (*.sonarpad-ad.partial.json)\0*.sonarpad-ad.partial.json\0{} (*.*)\0*.*\0\0",
+        all_files
+    ));
+    let title = to_wide(&labels.resume_open_title);
+    let mut buffer = [0_u16; 2048];
+    let mut dialog = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        hwndOwner: parent,
+        lpstrFile: PWSTR(buffer.as_mut_ptr()),
+        nMaxFile: buffer.len() as u32,
+        lpstrFilter: PCWSTR(filter.as_ptr()),
+        lpstrTitle: PCWSTR(title.as_ptr()),
+        Flags: OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST,
+        ..Default::default()
+    };
+    if !unsafe { GetOpenFileNameW(&mut dialog).as_bool() } {
+        return None;
+    }
+    let len = buffer.iter().position(|value| *value == 0)?;
+    Some(PathBuf::from(String::from_utf16_lossy(&buffer[..len])))
+}
+
+fn continue_interrupted_from_window(hwnd: HWND, state: &WindowState) {
+    let Some(checkpoint_path) = choose_resume_checkpoint(hwnd, state.language) else {
+        return;
+    };
+    let resume = match load_audio_description_resume_settings(&checkpoint_path) {
+        Ok(resume) => resume,
+        Err(error) => {
+            let message = labels(state.language)
+                .resume_invalid
+                .replace("{error}", &error);
+            show_error(state.parent, state.language, &message);
+            return;
+        }
+    };
+    post_boxed_message(hwnd, WM_AD_SET_RESUME, WPARAM(0), Box::new(resume));
     unsafe {
         ShowWindow(hwnd, SW_SHOW);
         SetForegroundWindow(hwnd);
@@ -1251,13 +1314,45 @@ fn set_controls_enabled(state: &WindowState, enabled: bool) {
             EnableWindow(*control, enabled);
             ShowWindow(*control, if enabled { SW_SHOW } else { SW_HIDE });
         }
-        ShowWindow(state.progress, SW_SHOW);
+        if enabled && state.resume_mode {
+            for control in &state.setup_controls {
+                ShowWindow(*control, SW_HIDE);
+            }
+            for control in [
+                state.gemini_model_label,
+                state.gemini_model_combo,
+                state.start_button,
+                state.close_button,
+            ] {
+                EnableWindow(control, true);
+                ShowWindow(control, SW_SHOW);
+            }
+        }
+        ShowWindow(
+            state.progress,
+            if enabled && state.resume_mode {
+                SW_HIDE
+            } else {
+                SW_SHOW
+            },
+        );
         ShowWindow(state.status, SW_SHOW);
-        ShowWindow(state.cancel_button, SW_SHOW);
+        ShowWindow(
+            state.cancel_button,
+            if enabled && state.resume_mode {
+                SW_HIDE
+            } else {
+                SW_SHOW
+            },
+        );
         EnableWindow(state.cancel_button, !enabled);
         if enabled {
-            update_character_catalog_visibility(state);
-            SetFocus(state.start_button);
+            if state.resume_mode {
+                SetFocus(state.gemini_model_combo);
+            } else {
+                update_character_catalog_visibility(state);
+                SetFocus(state.start_button);
+            }
         } else {
             SetFocus(state.cancel_button);
         }
@@ -1266,81 +1361,103 @@ fn set_controls_enabled(state: &WindowState, enabled: bool) {
 
 fn start_job(hwnd: HWND, state: &mut WindowState) {
     let labels = labels(state.language);
-    let input = PathBuf::from(get_text(state.input).trim());
-    if !input.is_file() {
-        show_error(state.parent, state.language, &labels.error_input);
-        return;
-    }
-    let mut output = PathBuf::from(get_text(state.output).trim());
-    if output.as_os_str().is_empty() {
-        output = default_output(state.parent, &input);
-        set_path(state.output, &output);
-    }
-    if output.as_os_str().is_empty() {
-        show_error(state.parent, state.language, &labels.error_output);
-        return;
-    }
-    if input == output {
-        show_error(state.parent, state.language, &labels.error_same_path);
-        return;
-    }
-    let voice_index =
-        unsafe { SendMessageW(state.voice_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
-    let Some(voice) = (voice_index >= 0)
-        .then(|| state.voices.get(voice_index as usize))
-        .flatten()
-        .map(|voice| voice.short_name.clone())
-    else {
-        show_error(state.parent, state.language, &labels.error_voice);
-        return;
-    };
-    let Some(settings) = with_state(state.parent, |app| app.settings.clone()) else {
-        return;
-    };
     let gemini_api_key = get_text(state.gemini_api_key_edit).trim().to_string();
     if gemini_api_key.is_empty() {
         show_error(state.parent, state.language, &labels.error_api_key);
         return;
     }
-    let gemini_model = get_text(state.gemini_model_combo).trim().to_string();
-    if gemini_model.is_empty() {
-        show_error(state.parent, state.language, &labels.error_model);
-        return;
-    }
-    persist_gemini_settings(state.parent, &gemini_api_key, &gemini_model);
 
-    let description_language = language_from_combo(state.language_combo);
-    let extended = checkbox_checked(state.extended_checkbox);
-    let recognize_characters = checkbox_checked(state.recognize_characters_checkbox);
-    let character_catalog = match prepare_character_catalog(hwnd, state, &labels) {
-        Ok(CharacterCatalogPreparation::Disabled) => None,
-        Ok(CharacterCatalogPreparation::Cancelled) => return,
-        Ok(CharacterCatalogPreparation::Ready(catalog)) => Some(catalog),
-        Err(error) => {
-            show_error(state.parent, state.language, &error);
+    let job = if let Some(checkpoint_path) = state.resume_checkpoint_path.as_ref() {
+        match audio_description_job_from_checkpoint(checkpoint_path, gemini_api_key.clone()) {
+            Ok(mut job) => {
+                let selected_model = get_text(state.gemini_model_combo).trim().to_string();
+                if selected_model.is_empty() {
+                    show_error(state.parent, state.language, &labels.error_model);
+                    return;
+                }
+                job.gemini_model = selected_model;
+                persist_gemini_settings(state.parent, &gemini_api_key, &job.gemini_model);
+                job
+            }
+            Err(error) => {
+                let message = labels.resume_invalid.replace("{error}", &error);
+                show_error(state.parent, state.language, &message);
+                return;
+            }
+        }
+    } else {
+        let input = PathBuf::from(get_text(state.input).trim());
+        if !input.is_file() {
+            show_error(state.parent, state.language, &labels.error_input);
             return;
         }
-    };
-    let save_project = checkbox_checked(state.save_project_checkbox);
-    persist_audio_description_preferences(state);
-    let job = AudioDescriptionJob {
-        input_path: input,
-        output_path: output,
-        language_code: language_code(description_language).to_string(),
-        tts_language: description_language,
-        verbosity: selected_verbosity(state.verbosity_combo),
-        allow_extended_pauses: extended,
-        recognize_characters,
-        character_catalog,
-        save_project,
-        tts_engine: engine_from_combo(state.engine_combo),
-        tts_voice: voice,
-        tts_rate: settings.tts_rate,
-        tts_pitch: settings.tts_pitch,
-        tts_volume: settings.tts_volume,
-        gemini_api_key,
-        gemini_model,
-        audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
+        let mut output = PathBuf::from(get_text(state.output).trim());
+        if output.as_os_str().is_empty() {
+            output = default_output(state.parent, &input);
+            set_path(state.output, &output);
+        }
+        if output.as_os_str().is_empty() {
+            show_error(state.parent, state.language, &labels.error_output);
+            return;
+        }
+        if input == output {
+            show_error(state.parent, state.language, &labels.error_same_path);
+            return;
+        }
+        let voice_index =
+            unsafe { SendMessageW(state.voice_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+        let Some(voice) = (voice_index >= 0)
+            .then(|| state.voices.get(voice_index as usize))
+            .flatten()
+            .map(|voice| voice.short_name.clone())
+        else {
+            show_error(state.parent, state.language, &labels.error_voice);
+            return;
+        };
+        let Some(settings) = with_state(state.parent, |app| app.settings.clone()) else {
+            return;
+        };
+        let gemini_model = get_text(state.gemini_model_combo).trim().to_string();
+        if gemini_model.is_empty() {
+            show_error(state.parent, state.language, &labels.error_model);
+            return;
+        }
+        persist_gemini_settings(state.parent, &gemini_api_key, &gemini_model);
+
+        let description_language = language_from_combo(state.language_combo);
+        let extended = checkbox_checked(state.extended_checkbox);
+        let recognize_characters = checkbox_checked(state.recognize_characters_checkbox);
+        let character_catalog = match prepare_character_catalog(hwnd, state, &labels) {
+            Ok(CharacterCatalogPreparation::Disabled) => None,
+            Ok(CharacterCatalogPreparation::Cancelled) => return,
+            Ok(CharacterCatalogPreparation::Ready(catalog)) => Some(catalog),
+            Err(error) => {
+                show_error(state.parent, state.language, &error);
+                return;
+            }
+        };
+        let save_project = checkbox_checked(state.save_project_checkbox);
+        persist_audio_description_preferences(state);
+        AudioDescriptionJob {
+            input_path: input,
+            output_path: output,
+            language_code: language_code(description_language).to_string(),
+            tts_language: description_language,
+            verbosity: selected_verbosity(state.verbosity_combo),
+            allow_extended_pauses: extended,
+            recognize_characters,
+            character_catalog,
+            save_project,
+            tts_engine: engine_from_combo(state.engine_combo),
+            tts_voice: voice,
+            tts_rate: settings.tts_rate,
+            tts_pitch: settings.tts_pitch,
+            tts_volume: settings.tts_volume,
+            gemini_api_key,
+            gemini_model,
+            audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
+            resume_checkpoint_path: None,
+        }
     };
     let cancel = Arc::new(AtomicBool::new(false));
     state.cancel = Some(cancel.clone());
@@ -1952,14 +2069,28 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     HINSTANCE(0),
                     None,
                 );
+                let continue_interrupted_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.resume_title).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    236,
+                    650,
+                    250,
+                    30,
+                    hwnd,
+                    HMENU(ID_CONTINUE_INTERRUPTED as isize),
+                    HINSTANCE(0),
+                    None,
+                );
                 let start_button = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
                     PCWSTR(to_wide(&labels.start).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                    250,
+                    496,
                     650,
-                    125,
+                    150,
                     30,
                     hwnd,
                     HMENU(ID_START as isize),
@@ -1972,7 +2103,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.cancel).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     390,
-                    650,
+                    690,
                     100,
                     30,
                     hwnd,
@@ -1987,7 +2118,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.close).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     510,
-                    650,
+                    690,
                     100,
                     30,
                     hwnd,
@@ -2030,6 +2161,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     cancel_button,
                     close_button,
                     modify_project_button,
+                    continue_interrupted_button,
                 ] {
                     if hfont.0 != 0 {
                         SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
@@ -2053,6 +2185,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     character_catalogs,
                     save_project_checkbox,
                     gemini_api_key_edit,
+                    gemini_model_label,
                     gemini_model_combo,
                     gemini_refresh_models_button,
                     engine_combo,
@@ -2092,6 +2225,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         engine_combo,
                         voice_combo,
                         modify_project_button,
+                        continue_interrupted_button,
                         start_button,
                         close_button,
                     ],
@@ -2102,6 +2236,8 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     exhausted_gemini_models: Vec::new(),
                     return_to_editor_after_player: false,
                     source_player_path: crate::current_playback_media_path(parent),
+                    resume_checkpoint_path: None,
+                    resume_mode: false,
                 });
                 let state_pointer = Box::into_raw(state);
                 SetWindowLongPtrW(
@@ -2211,6 +2347,9 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             state.parent,
                             hwnd,
                         );
+                    }
+                    ID_CONTINUE_INTERRUPTED if !state.running => {
+                        continue_interrupted_from_window(hwnd, state);
                     }
                     ID_START => start_job(hwnd, state),
                     ID_CANCEL => {
@@ -2511,6 +2650,12 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             "completion_message_closed",
                         );
                         EnableWindow(hwnd, true);
+                        state.resume_checkpoint_path = None;
+                        state.resume_mode = false;
+                        set_text(state.gemini_model_label, &labels.gemini_model);
+                        set_text(state.start_button, &labels.start);
+                        set_text(hwnd, &labels.title);
+                        set_controls_enabled(state, true);
                         open_result_in_player(hwnd, state.parent, outcome.output_path.clone());
                     }
                     Err(error) if error == "cancelled" => {
@@ -2536,6 +2681,97 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 }
                 LRESULT(0)
             }
+            WM_AD_SET_RESUME => {
+                let payload = lparam.0 as *mut AudioDescriptionResumeSettings;
+                if payload.is_null() {
+                    return LRESULT(0);
+                }
+                let resume = *Box::from_raw(payload);
+                let pointer =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut WindowState;
+                if !pointer.is_null() && !(*pointer).running {
+                    let state = &mut *pointer;
+                    state.resume_checkpoint_path = Some(resume.checkpoint_path);
+                    state.resume_mode = true;
+                    set_path(state.input, &resume.input_path);
+                    set_path(state.output, &resume.output_path);
+                    SendMessageW(
+                        state.language_combo,
+                        CB_SETCURSEL,
+                        WPARAM(language_combo_index(resume.description_language)),
+                        LPARAM(0),
+                    );
+                    let verbosity_index = match resume.verbosity {
+                        AudioDescriptionVerbosity::Brief => 0,
+                        AudioDescriptionVerbosity::Standard => 1,
+                        AudioDescriptionVerbosity::Detailed => 2,
+                    };
+                    SendMessageW(
+                        state.verbosity_combo,
+                        CB_SETCURSEL,
+                        WPARAM(verbosity_index),
+                        LPARAM(0),
+                    );
+                    SendMessageW(
+                        state.extended_checkbox,
+                        BM_SETCHECK,
+                        WPARAM(if resume.allow_extended_pauses {
+                            BST_CHECKED.0 as usize
+                        } else {
+                            0
+                        }),
+                        LPARAM(0),
+                    );
+                    SendMessageW(
+                        state.recognize_characters_checkbox,
+                        BM_SETCHECK,
+                        WPARAM(if resume.recognize_characters {
+                            BST_CHECKED.0 as usize
+                        } else {
+                            0
+                        }),
+                        LPARAM(0),
+                    );
+                    SendMessageW(
+                        state.save_project_checkbox,
+                        BM_SETCHECK,
+                        WPARAM(if resume.save_project {
+                            BST_CHECKED.0 as usize
+                        } else {
+                            0
+                        }),
+                        LPARAM(0),
+                    );
+                    SendMessageW(
+                        state.engine_combo,
+                        CB_SETCURSEL,
+                        WPARAM(engine_combo_index(resume.tts_engine)),
+                        LPARAM(0),
+                    );
+                    state.preferred_voice = resume.tts_voice;
+                    refill_gemini_model_combo(
+                        state.gemini_model_combo,
+                        combo_items(state.gemini_model_combo),
+                        &resume.gemini_model,
+                    );
+                    let current_labels = labels(state.language);
+                    set_text(state.gemini_model_label, &current_labels.resume_model);
+                    set_text(state.start_button, &current_labels.resume_start);
+                    set_text(hwnd, &current_labels.resume_title);
+                    set_text(
+                        state.status,
+                        &format!(
+                            "{} {}/{}",
+                            current_labels.resume_start,
+                            resume.completed_chunks,
+                            resume.total_chunks
+                        ),
+                    );
+                    set_controls_enabled(state, true);
+                }
+                LRESULT(0)
+            }
             WM_AD_SET_INPUT => {
                 let payload = lparam.0 as *mut PathBuf;
                 if payload.is_null() {
@@ -2546,13 +2782,21 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                         as *mut WindowState;
                 if !pointer.is_null() && !(*pointer).running {
+                    let state = &mut *pointer;
+                    state.resume_checkpoint_path = None;
+                    state.resume_mode = false;
+                    let current_labels = labels(state.language);
+                    set_text(state.gemini_model_label, &current_labels.gemini_model);
+                    set_text(state.start_button, &current_labels.start);
+                    set_text(hwnd, &current_labels.title);
+                    set_controls_enabled(state, true);
                     set_path((*pointer).input, &input_path);
                     set_path(
-                        (*pointer).output,
+                        state.output,
                         &default_output((*pointer).parent, &input_path),
                     );
-                    ensure_new_character_catalog_name(&*pointer);
-                    SetFocus((*pointer).input);
+                    ensure_new_character_catalog_name(state);
+                    SetFocus(state.input);
                 }
                 LRESULT(0)
             }
@@ -2566,6 +2810,8 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         SetFocus(state.cancel_button);
                     } else if state.return_to_editor_after_player {
                         SetFocus(state.close_button);
+                    } else if state.resume_mode {
+                        SetFocus(state.gemini_model_combo);
                     } else {
                         SetFocus(state.input);
                     }

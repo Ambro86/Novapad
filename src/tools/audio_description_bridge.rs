@@ -51,6 +51,15 @@ pub struct AudioDescriptionBridgeRequest {
     pub initial_character_glossary: Vec<BridgeCharacter>,
     pub gemini_api_key: String,
     pub gemini_model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resume: Option<AudioDescriptionBridgeResume>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AudioDescriptionBridgeResume {
+    pub completed_chunks: usize,
+    pub descriptions: Vec<BridgeDescription>,
+    pub character_glossary: Vec<BridgeCharacter>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -59,9 +68,11 @@ pub struct BridgeInterval {
     pub end_sec: f64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BridgeDescription {
     pub start_sec: f64,
+    #[serde(default)]
+    pub end_sec: f64,
     pub text: String,
     #[serde(default)]
     pub mandatory: bool,
@@ -113,6 +124,20 @@ struct BridgeQuota {
     error: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct AudioDescriptionBridgeCheckpoint {
+    #[serde(default)]
+    pub completed_chunks: usize,
+    #[serde(default)]
+    pub total_chunks: usize,
+    #[serde(default)]
+    pub descriptions: Vec<BridgeDescription>,
+    #[serde(default)]
+    pub character_glossary: Vec<BridgeCharacter>,
+    #[serde(default)]
+    pub gemini_model: String,
+}
+
 #[derive(Debug, Clone)]
 pub enum AudioDescriptionQuotaDecision {
     SwitchModel(String),
@@ -124,12 +149,15 @@ pub type AudioDescriptionBridgePercentCallback = Box<dyn FnMut(i32) + Send>;
 pub type AudioDescriptionBridgeStatusCallback = Box<dyn FnMut(&str, &str) + Send>;
 pub type AudioDescriptionBridgeQuotaCallback =
     Box<dyn FnMut(&str, &str) -> AudioDescriptionQuotaDecision + Send>;
+pub type AudioDescriptionBridgeCheckpointCallback =
+    Box<dyn FnMut(&AudioDescriptionBridgeCheckpoint) + Send>;
 
 pub struct AudioDescriptionBridgeCallbacks {
     pub download: Option<AudioDescriptionBridgePercentCallback>,
     pub progress: Option<AudioDescriptionBridgePercentCallback>,
     pub status: Option<AudioDescriptionBridgeStatusCallback>,
     pub quota: Option<AudioDescriptionBridgeQuotaCallback>,
+    pub checkpoint: Option<AudioDescriptionBridgeCheckpointCallback>,
 }
 
 fn bridge_install_path() -> PathBuf {
@@ -493,6 +521,18 @@ pub fn run_audio_description_bridge(
                             && let Some(callback) = callbacks.status.as_mut()
                         {
                             callback(&status.stage, &status.message);
+                        }
+                    } else if let Some(raw_checkpoint) = line.strip_prefix("CHECKPOINT:") {
+                        let checkpoint = serde_json::from_str::<AudioDescriptionBridgeCheckpoint>(
+                            raw_checkpoint,
+                        )
+                        .map_err(|error| {
+                            format!(
+                                "invalid checkpoint event from audio-description worker: {error}"
+                            )
+                        })?;
+                        if let Some(callback) = callbacks.checkpoint.as_mut() {
+                            callback(&checkpoint);
                         }
                     } else if let Some(raw_quota) = line.strip_prefix("QUOTA:") {
                         let quota =

@@ -18,6 +18,7 @@ from audio_describer.core.audio_describer import (
     _format_character_continuity,
     _format_recent_description_context,
     _generate_blocked_chunk_by_minutes,
+    generate_descriptions_chunked,
     _items_for_minute,
     _video_metadata_kwargs,
     _update_character_continuity,
@@ -529,6 +530,61 @@ class ChunkTimestampTests(unittest.TestCase):
         self.assertIn("OPTIONAL INTENSIVE SHORT-GAP", prompt)
         self.assertIn("may pause", prompt)
         self.assertIn("only if", prompt)
+
+    def test_completed_checkpoint_reuses_descriptions_without_new_gemini_chunk_calls(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            video = root / "movie.mkv"
+            chunk1 = root / "chunk1.mkv"
+            chunk2 = root / "chunk2.mkv"
+            for path in (video, chunk1, chunk2):
+                path.write_bytes(b"x")
+            settings = {
+                "enable_character_glossary": False,
+                "enable_extended_audio_description": False,
+                "description_coverage_mode": "standard",
+                "intensive_min_silence_seconds": 3.0,
+            }
+            resumed = [
+                {"start_sec": 10.0, "end_sec": 12.0, "text": "Prima."},
+                {"start_sec": 200.0, "end_sec": 202.0, "text": "Seconda."},
+            ]
+            with (
+                mock.patch(
+                    "audio_describer.core.audio_describer.config_model.get_setting",
+                    side_effect=lambda key: settings.get(key),
+                ),
+                mock.patch(
+                    "audio_describer.core.audio_describer.gemini.get_gemini_client",
+                    return_value=object(),
+                ),
+                mock.patch(
+                    "audio_describer.core.audio_describer.gemini.validate_model_for_generate_content",
+                    return_value="gemini-test",
+                ),
+                mock.patch(
+                    "audio_describer.core.audio_describer._prepare_video_for_gemini"
+                ) as prepare_video,
+            ):
+                descriptions, glossary, usage = generate_descriptions_chunked(
+                    str(video),
+                    180,
+                    prepared_chunks=[
+                        {"path": str(chunk1), "start_sec": 0.0, "end_sec": 180.0},
+                        {"path": str(chunk2), "start_sec": 180.0, "end_sec": 360.0},
+                    ],
+                    total_duration_override=360.0,
+                    resume_completed_chunks=2,
+                    resume_descriptions=resumed,
+                )
+
+            self.assertEqual([item[2] for item in descriptions], ["Prima.", "Seconda."])
+            self.assertEqual(glossary, [])
+            self.assertEqual(usage, [])
+            prepare_video.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()

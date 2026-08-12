@@ -65,6 +65,7 @@ const ID_GEMINI_REFRESH_MODELS: usize = 9668;
 const ID_RECOGNIZE_CHARACTERS: usize = 9669;
 const ID_KEEP_CHARACTER_CATALOG: usize = 9670;
 const ID_CHARACTER_CATALOG: usize = 9671;
+const ID_CHARACTER_CATALOG_NAME: usize = 9672;
 
 const WM_AD_PROGRESS: u32 = WM_APP + 188;
 const WM_AD_STATUS: u32 = WM_APP + 189;
@@ -79,7 +80,8 @@ struct Labels {
     title: String,
     input: String,
     output: String,
-    browse: String,
+    input_browse: String,
+    output_browse: String,
     language: String,
     verbosity: String,
     verbosity_brief: String,
@@ -89,8 +91,8 @@ struct Labels {
     recognize_characters: String,
     keep_character_catalog: String,
     character_catalog_choose: String,
-    character_catalog_name_title: String,
-    character_catalog_name_prompt: String,
+    character_catalog_selection_label: String,
+    character_catalog_new_name_label: String,
     character_catalog_name_error: String,
     save_project: String,
     modify_project: String,
@@ -136,7 +138,10 @@ struct WindowState {
     extended_checkbox: HWND,
     recognize_characters_checkbox: HWND,
     keep_character_catalog_checkbox: HWND,
+    character_catalog_label: HWND,
     character_catalog_combo: HWND,
+    character_catalog_name_label: HWND,
+    character_catalog_name_edit: HWND,
     character_catalogs: Vec<AudioDescriptionCharacterCatalogSummary>,
     save_project_checkbox: HWND,
     gemini_api_key_edit: HWND,
@@ -307,7 +312,8 @@ fn labels(language: Language) -> Labels {
         title: i18n::tr(language, "audio_description.title"),
         input: i18n::tr(language, "audio_description.input"),
         output: i18n::tr(language, "audio_description.output"),
-        browse: i18n::tr(language, "audio_description.browse"),
+        input_browse: i18n::tr(language, "audio_description.browse_input"),
+        output_browse: i18n::tr(language, "audio_description.browse_output"),
         language: i18n::tr(language, "audio_description.language"),
         verbosity: i18n::tr(language, "audio_description.verbosity"),
         verbosity_brief: i18n::tr(language, "audio_description.verbosity.brief"),
@@ -316,14 +322,17 @@ fn labels(language: Language) -> Labels {
         extended: i18n::tr(language, "audio_description.extended"),
         recognize_characters: i18n::tr(language, "audio_description.recognize_characters"),
         keep_character_catalog: i18n::tr(language, "audio_description.keep_character_catalog"),
-        character_catalog_choose: i18n::tr(language, "audio_description.character_catalog.choose"),
-        character_catalog_name_title: i18n::tr(
+        character_catalog_choose: i18n::tr(
             language,
-            "audio_description.character_catalog.name_title",
+            "audio_description.character_catalog.new_option",
         ),
-        character_catalog_name_prompt: i18n::tr(
+        character_catalog_selection_label: i18n::tr(
             language,
-            "audio_description.character_catalog.name_prompt",
+            "audio_description.character_catalog.selection_label",
+        ),
+        character_catalog_new_name_label: i18n::tr(
+            language,
+            "audio_description.character_catalog.new_name_label",
         ),
         character_catalog_name_error: i18n::tr(
             language,
@@ -432,7 +441,7 @@ fn open_window(parent: HWND) -> HWND {
             120,
             90,
             700,
-            760,
+            800,
             parent,
             HMENU(0),
             hinstance,
@@ -790,6 +799,38 @@ fn selected_character_catalog_name(state: &WindowState) -> String {
     }
 }
 
+fn suggested_character_catalog_name(input: &str) -> String {
+    Path::new(input)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .map(str::trim)
+        .filter(|stem| !stem.is_empty())
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn ensure_new_character_catalog_name(state: &WindowState) {
+    let selected = unsafe {
+        SendMessageW(
+            state.character_catalog_combo,
+            CB_GETCURSEL,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0
+    };
+    if selected == 0
+        && get_text(state.character_catalog_name_edit)
+            .trim()
+            .is_empty()
+    {
+        let suggested = suggested_character_catalog_name(&get_text(state.input));
+        if !suggested.is_empty() {
+            set_text(state.character_catalog_name_edit, &suggested);
+        }
+    }
+}
+
 fn refill_character_catalog_combo(state: &WindowState, preferred_name: &str) {
     let labels = labels(state.language);
     unsafe {
@@ -846,10 +887,37 @@ fn update_character_catalog_visibility(state: &WindowState) {
             recognize && !state.running,
         );
         ShowWindow(
+            state.character_catalog_label,
+            if keep { SW_SHOW } else { SW_HIDE },
+        );
+        ShowWindow(
             state.character_catalog_combo,
             if keep { SW_SHOW } else { SW_HIDE },
         );
         EnableWindow(state.character_catalog_combo, keep && !state.running);
+        let selected = SendMessageW(
+            state.character_catalog_combo,
+            CB_GETCURSEL,
+            WPARAM(0),
+            LPARAM(0),
+        )
+        .0;
+        let show_new_name = keep && selected == 0;
+        ShowWindow(
+            state.character_catalog_name_label,
+            if show_new_name { SW_SHOW } else { SW_HIDE },
+        );
+        ShowWindow(
+            state.character_catalog_name_edit,
+            if show_new_name { SW_SHOW } else { SW_HIDE },
+        );
+        EnableWindow(
+            state.character_catalog_name_edit,
+            show_new_name && !state.running,
+        );
+    }
+    if keep {
+        ensure_new_character_catalog_name(state);
     }
 }
 
@@ -860,7 +928,7 @@ enum CharacterCatalogPreparation {
 }
 
 fn prepare_character_catalog(
-    hwnd: HWND,
+    _hwnd: HWND,
     state: &mut WindowState,
     labels: &Labels,
 ) -> Result<CharacterCatalogPreparation, String> {
@@ -889,22 +957,15 @@ fn prepare_character_catalog(
         .map(CharacterCatalogPreparation::Ready);
     }
 
-    let Some(name) = crate::app_windows::prompt_window::prompt_user(
-        hwnd,
-        &labels.character_catalog_name_title,
-        &labels.character_catalog_name_prompt,
-        "",
-        state.language,
-    ) else {
-        return Ok(CharacterCatalogPreparation::Cancelled);
-    };
-    let name = name.trim();
+    let name_value = get_text(state.character_catalog_name_edit);
+    let name = name_value.trim();
     if name.is_empty() {
         show_error(
             state.parent,
             state.language,
             &labels.character_catalog_name_error,
         );
+        unsafe { SetFocus(state.character_catalog_name_edit) };
         return Ok(CharacterCatalogPreparation::Cancelled);
     }
     let save_folder = with_state(state.parent, |app| {
@@ -1401,7 +1462,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     TtsEngine::Edge,
                     String::new(),
                     2,
-                    true,
+                    false,
                     true,
                     false,
                     String::new(),
@@ -1430,7 +1491,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 let input_browse = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
-                    PCWSTR(to_wide(&labels.browse).as_ptr()),
+                    PCWSTR(to_wide(&labels.input_browse).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     544,
                     36,
@@ -1459,7 +1520,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 let output_browse = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
-                    PCWSTR(to_wide(&labels.browse).as_ptr()),
+                    PCWSTR(to_wide(&labels.output_browse).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     544,
                     88,
@@ -1608,10 +1669,27 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     LPARAM(0),
                 );
 
+                let catalog_controls_visible = recognize_characters && keep_character_catalog;
+                let character_catalog_label = create_label(
+                    hwnd,
+                    &labels.character_catalog_selection_label,
+                    16,
+                    268,
+                    190,
+                    hfont,
+                );
+                ShowWindow(
+                    character_catalog_label,
+                    if catalog_controls_visible {
+                        SW_SHOW
+                    } else {
+                        SW_HIDE
+                    },
+                );
                 let catalog_combo_style = WS_CHILD
                     | WS_TABSTOP
                     | WINDOW_STYLE(CBS_DROPDOWNLIST as u32)
-                    | if recognize_characters && keep_character_catalog {
+                    | if catalog_controls_visible {
                         WS_VISIBLE
                     } else {
                         WINDOW_STYLE(0)
@@ -1621,9 +1699,9 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     WC_COMBOBOXW,
                     PCWSTR::null(),
                     catalog_combo_style,
-                    16,
-                    268,
-                    633,
+                    210,
+                    264,
+                    439,
                     220,
                     hwnd,
                     HMENU(ID_CHARACTER_CATALOG as isize),
@@ -1649,6 +1727,45 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     WPARAM(selected_catalog_index),
                     LPARAM(0),
                 );
+                let character_catalog_name_label = create_label(
+                    hwnd,
+                    &labels.character_catalog_new_name_label,
+                    16,
+                    300,
+                    190,
+                    hfont,
+                );
+                let character_catalog_name_edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    210,
+                    296,
+                    439,
+                    24,
+                    hwnd,
+                    HMENU(ID_CHARACTER_CATALOG_NAME as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let show_new_catalog_name = catalog_controls_visible && selected_catalog_index == 0;
+                ShowWindow(
+                    character_catalog_name_label,
+                    if show_new_catalog_name {
+                        SW_SHOW
+                    } else {
+                        SW_HIDE
+                    },
+                );
+                ShowWindow(
+                    character_catalog_name_edit,
+                    if show_new_catalog_name {
+                        SW_SHOW
+                    } else {
+                        SW_HIDE
+                    },
+                );
 
                 let save_project_checkbox = CreateWindowExW(
                     Default::default(),
@@ -1656,7 +1773,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.save_project).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
                     16,
-                    304,
+                    332,
                     650,
                     24,
                     hwnd,
@@ -1676,7 +1793,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 );
 
                 let gemini_api_key_label =
-                    create_label(hwnd, &labels.gemini_api_key, 16, 342, 210, hfont);
+                    create_label(hwnd, &labels.gemini_api_key, 16, 370, 210, hfont);
                 let gemini_api_key_edit = CreateWindowExW(
                     WS_EX_CLIENTEDGE,
                     WC_EDIT,
@@ -1686,7 +1803,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         | WS_TABSTOP
                         | WINDOW_STYLE(ES_AUTOHSCROLL as u32 | ES_PASSWORD as u32),
                     16,
-                    362,
+                    390,
                     420,
                     24,
                     hwnd,
@@ -1700,7 +1817,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.gemini_get_key).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     446,
-                    360,
+                    388,
                     203,
                     28,
                     hwnd,
@@ -1710,14 +1827,14 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 );
 
                 let gemini_model_label =
-                    create_label(hwnd, &labels.gemini_model, 16, 398, 210, hfont);
+                    create_label(hwnd, &labels.gemini_model, 16, 426, 210, hfont);
                 let gemini_model_combo = CreateWindowExW(
                     WS_EX_CLIENTEDGE,
                     WC_COMBOBOXW,
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     16,
-                    418,
+                    446,
                     420,
                     220,
                     hwnd,
@@ -1736,7 +1853,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.gemini_refresh_models).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     446,
-                    416,
+                    444,
                     203,
                     28,
                     hwnd,
@@ -1745,14 +1862,14 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     None,
                 );
 
-                let engine_label = create_label(hwnd, &labels.engine, 16, 454, 200, hfont);
+                let engine_label = create_label(hwnd, &labels.engine, 16, 482, 200, hfont);
                 let engine_combo = CreateWindowExW(
                     Default::default(),
                     WC_COMBOBOXW,
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     16,
-                    474,
+                    502,
                     200,
                     150,
                     hwnd,
@@ -1775,14 +1892,14 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     LPARAM(0),
                 );
 
-                let voice_label = create_label(hwnd, &labels.voice, 236, 454, 200, hfont);
+                let voice_label = create_label(hwnd, &labels.voice, 236, 482, 200, hfont);
                 let voice_combo = CreateWindowExW(
                     Default::default(),
                     WC_COMBOBOXW,
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     236,
-                    474,
+                    502,
                     413,
                     220,
                     hwnd,
@@ -1798,7 +1915,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    518,
+                    546,
                     650,
                     20,
                     hwnd,
@@ -1813,7 +1930,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.ready).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    548,
+                    576,
                     650,
                     48,
                     hwnd,
@@ -1827,7 +1944,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.modify_project).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     16,
-                    622,
+                    650,
                     210,
                     30,
                     hwnd,
@@ -1841,7 +1958,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.start).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     250,
-                    622,
+                    650,
                     125,
                     30,
                     hwnd,
@@ -1855,7 +1972,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.cancel).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     390,
-                    622,
+                    650,
                     100,
                     30,
                     hwnd,
@@ -1870,7 +1987,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.close).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     510,
-                    622,
+                    650,
                     100,
                     30,
                     hwnd,
@@ -1897,7 +2014,10 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     extended_checkbox,
                     recognize_characters_checkbox,
                     keep_character_catalog_checkbox,
+                    character_catalog_label,
                     character_catalog_combo,
+                    character_catalog_name_label,
+                    character_catalog_name_edit,
                     save_project_checkbox,
                     gemini_api_key_edit,
                     gemini_get_key_button,
@@ -1926,7 +2046,10 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     extended_checkbox,
                     recognize_characters_checkbox,
                     keep_character_catalog_checkbox,
+                    character_catalog_label,
                     character_catalog_combo,
+                    character_catalog_name_label,
+                    character_catalog_name_edit,
                     character_catalogs,
                     save_project_checkbox,
                     gemini_api_key_edit,
@@ -1957,7 +2080,10 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         extended_checkbox,
                         recognize_characters_checkbox,
                         keep_character_catalog_checkbox,
+                        character_catalog_label,
                         character_catalog_combo,
+                        character_catalog_name_label,
+                        character_catalog_name_edit,
                         save_project_checkbox,
                         gemini_api_key_edit,
                         gemini_get_key_button,
@@ -2014,6 +2140,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         if let Some(path) = open_input_dialog(hwnd, state.language, &labels) {
                             set_path(state.input, &path);
                             set_path(state.output, &default_output(state.parent, &path));
+                            ensure_new_character_catalog_name(state);
                             SetForegroundWindow(hwnd);
                         }
                     }
@@ -2073,6 +2200,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         persist_audio_description_preferences(state);
                     }
                     ID_CHARACTER_CATALOG if notification == CBN_SELCHANGE && !state.running => {
+                        update_character_catalog_visibility(state);
                         persist_audio_description_preferences(state);
                     }
                     ID_EXTENDED | ID_SAVE_PROJECT if !state.running => {
@@ -2423,6 +2551,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         (*pointer).output,
                         &default_output((*pointer).parent, &input_path),
                     );
+                    ensure_new_character_catalog_name(&*pointer);
                     SetFocus((*pointer).input);
                 }
                 LRESULT(0)

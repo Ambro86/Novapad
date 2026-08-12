@@ -856,7 +856,7 @@ pub struct AppSettings {
     pub audio_description_tts_voice: String,
     #[serde(default = "default_audio_description_verbosity")]
     pub audio_description_verbosity: u8,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub audio_description_extended_pauses: bool,
     #[serde(default = "default_true")]
     pub audio_description_recognize_characters: bool,
@@ -1343,7 +1343,7 @@ impl Default for AppSettings {
             audio_description_tts_engine: TtsEngine::Edge,
             audio_description_tts_voice: String::new(),
             audio_description_verbosity: default_audio_description_verbosity(),
-            audio_description_extended_pauses: true,
+            audio_description_extended_pauses: false,
             audio_description_recognize_characters: true,
             audio_description_keep_character_catalog: false,
             audio_description_character_catalog: String::new(),
@@ -3803,7 +3803,7 @@ mod audio_description_save_folder_tests {
         ));
         assert!(settings.audio_description_tts_voice.is_empty());
         assert_eq!(settings.audio_description_verbosity, 2);
-        assert!(settings.audio_description_extended_pauses);
+        assert!(!settings.audio_description_extended_pauses);
         assert!(settings.audio_description_recognize_characters);
         assert!(!settings.audio_description_keep_character_catalog);
         assert!(settings.audio_description_character_catalog.is_empty());

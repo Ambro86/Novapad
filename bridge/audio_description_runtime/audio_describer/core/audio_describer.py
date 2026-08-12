@@ -38,6 +38,11 @@ _CHUNK_COVERAGE_GAP_SEC = 90.0
 # slice, so chunked generation never analyzes more than three minutes at once.
 _MAX_CHUNK_DURATION_SEC = 180.0
 _BLOCKED_CHUNK_FALLBACK_DURATION_SEC = 60.0
+# Ignore sub-half-second floating-point tails when a blocked chunk is split into
+# one-minute Gemini fallback ranges. Such tails cannot contain a useful speech-free
+# window and previously produced malformed videoMetadata offsets (for example
+# 180.06900000000041s).
+_BLOCKED_CHUNK_FALLBACK_MIN_DURATION_SEC = 0.5
 _REPEATED_SUBJECT_NAME_MAX_GAP_SEC = 20.0
 _LANGUAGE_DETECTION_MIN_CONFIDENCE = 0.75
 _LANGUAGE_NAMES = {
@@ -314,6 +319,20 @@ def _upload_and_wait_for_active(client, video_path, status_callback=None):
             time.sleep(_UPLOAD_POLL_INTERVAL_SEC)
 
 
+def _format_gemini_duration_seconds(value):
+    """Serialize a non-negative second offset with at most nanosecond precision."""
+    seconds = float(value)
+    if not math.isfinite(seconds) or seconds < 0.0:
+        raise GeminiAPIError(_("Gemini video time offset is invalid."))
+
+    # Protobuf Duration accepts at most nine fractional digits. Formatting the
+    # binary float first also removes artifacts such as 180.06900000000041.
+    text = f"{seconds:.9f}".rstrip("0").rstrip(".")
+    if "." not in text:
+        text += ".0"
+    return f"{text}s"
+
+
 def _video_metadata_kwargs(start_offset_sec=None, end_offset_sec=None):
     """Build kwargs for types.VideoMetadata from settings / chunk offsets."""
     metadata_kwargs = {}
@@ -322,11 +341,17 @@ def _video_metadata_kwargs(start_offset_sec=None, end_offset_sec=None):
         metadata_kwargs["fps"] = target_fps
         app_logger.info(f"Setting Gemini videoMetadata fps={target_fps}")
     if start_offset_sec is not None:
-        metadata_kwargs["start_offset"] = f"{start_offset_sec}s"
-        app_logger.info(f"Setting Gemini videoMetadata start_offset={start_offset_sec}s")
+        start_offset = _format_gemini_duration_seconds(start_offset_sec)
+        metadata_kwargs["start_offset"] = start_offset
+        app_logger.info(
+            "Setting Gemini videoMetadata start_offset=%s", start_offset
+        )
     if end_offset_sec is not None:
-        metadata_kwargs["end_offset"] = f"{end_offset_sec}s"
-        app_logger.info(f"Setting Gemini videoMetadata end_offset={end_offset_sec}s")
+        end_offset = _format_gemini_duration_seconds(end_offset_sec)
+        metadata_kwargs["end_offset"] = end_offset
+        app_logger.info(
+            "Setting Gemini videoMetadata end_offset=%s", end_offset
+        )
     return metadata_kwargs
 
 
@@ -722,21 +747,33 @@ def _generate_blocked_chunk_by_minutes(
     recovered_descriptions = []
     recovered_glossary = []
     recovered_usage = []
-    minute_count = max(
-        1,
-        math.ceil(
-            (float(chunk_end) - float(chunk_start))
-            / _BLOCKED_CHUNK_FALLBACK_DURATION_SEC
-        ),
-    )
-
-    for minute_index in range(minute_count):
-        minute_start = chunk_start + (
-            minute_index * _BLOCKED_CHUNK_FALLBACK_DURATION_SEC
-        )
+    minute_ranges = []
+    minute_start = float(chunk_start)
+    chunk_end_value = float(chunk_end)
+    while minute_start < chunk_end_value:
         minute_end = min(
-            minute_start + _BLOCKED_CHUNK_FALLBACK_DURATION_SEC, chunk_end
+            minute_start + _BLOCKED_CHUNK_FALLBACK_DURATION_SEC,
+            chunk_end_value,
         )
+        minute_duration = minute_end - minute_start
+        if minute_duration < _BLOCKED_CHUNK_FALLBACK_MIN_DURATION_SEC:
+            app_logger.info(
+                "Blocked chunk %d: ignoring %.3fs fallback tail at %.3f-%.3fs.",
+                chunk_number, minute_duration, minute_start, minute_end,
+            )
+            break
+        minute_ranges.append((minute_start, minute_end))
+        minute_start = minute_end
+
+    minute_count = len(minute_ranges)
+    if minute_count == 0:
+        app_logger.info(
+            "Blocked chunk %d minute fallback has no usable range.",
+            chunk_number,
+        )
+        return recovered_descriptions, recovered_glossary, recovered_usage
+
+    for minute_index, (minute_start, minute_end) in enumerate(minute_ranges):
         minute_duration = minute_end - minute_start
         minute_label = minute_index + 1
         status_update_callback(

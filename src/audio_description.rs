@@ -633,6 +633,34 @@ impl std::fmt::Display for AudioDescriptionProjectEditError {
 
 impl std::error::Error for AudioDescriptionProjectEditError {}
 
+#[derive(Debug)]
+pub enum AudioDescriptionProjectVoiceError {
+    Cancelled,
+    DoesNotFit {
+        source_start_sec: f64,
+        synthesized_sec: f64,
+    },
+    Other(String),
+}
+
+impl std::fmt::Display for AudioDescriptionProjectVoiceError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Cancelled => formatter.write_str("cancelled"),
+            Self::DoesNotFit {
+                source_start_sec,
+                synthesized_sec,
+            } => write!(
+                formatter,
+                "Audio description: selected voice does not fit near {source_start_sec:.3}s ({synthesized_sec:.3}s)"
+            ),
+            Self::Other(message) => formatter.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for AudioDescriptionProjectVoiceError {}
+
 fn default_true() -> bool {
     true
 }
@@ -1798,6 +1826,270 @@ pub fn apply_audio_description_project_edit(
     save_audio_description_project(project_path, &updated)
         .map_err(AudioDescriptionProjectEditError::Other)?;
     Ok(AudioDescriptionProjectEditOutcome { project: updated })
+}
+
+pub fn change_audio_description_project_voice(
+    project_path: &Path,
+    project: &AudioDescriptionProject,
+    engine: TtsEngine,
+    voice: &str,
+    cancel: Arc<AtomicBool>,
+    mut callbacks: AudioDescriptionCallbacks,
+) -> Result<AudioDescriptionProject, AudioDescriptionProjectVoiceError> {
+    let voice = voice.trim();
+    if voice.is_empty() {
+        return Err(AudioDescriptionProjectVoiceError::Other(
+            "Audio description: no synthesis voice is selected".to_string(),
+        ));
+    }
+    if project.descriptions.is_empty() {
+        return Err(AudioDescriptionProjectVoiceError::Other(
+            "Audio description: project contains no descriptions".to_string(),
+        ));
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return Err(AudioDescriptionProjectVoiceError::Cancelled);
+    }
+
+    let mut job = audio_description_job_from_project(project);
+    job.tts_engine = engine;
+    job.tts_voice = voice.to_string();
+    notify_status(
+        &mut callbacks,
+        "voice_check",
+        "Checking all project descriptions with the selected voice...",
+    );
+    notify_progress(&mut callbacks, 0);
+
+    let cache_dir = temporary_job_dir().map_err(AudioDescriptionProjectVoiceError::Other)?;
+    let synthesis_result =
+        (|| -> Result<Vec<SynthesizedDescription>, AudioDescriptionProjectVoiceError> {
+            let mut synthesized = Vec::with_capacity(project.descriptions.len());
+            for (index, description) in project.descriptions.iter().enumerate() {
+                if cancel.load(Ordering::Relaxed) {
+                    return Err(AudioDescriptionProjectVoiceError::Cancelled);
+                }
+                let (samples, sample_rate, channels) = synthesize_description(
+                    &description.text,
+                    description.id,
+                    &job,
+                    &cache_dir,
+                    cancel.clone(),
+                )
+                .map_err(|error| {
+                    if error == "cancelled" || cancel.load(Ordering::Relaxed) {
+                        AudioDescriptionProjectVoiceError::Cancelled
+                    } else {
+                        AudioDescriptionProjectVoiceError::Other(error)
+                    }
+                })?;
+                synthesized.push(SynthesizedDescription {
+                    original_index: description.id,
+                    text: description.text.clone(),
+                    desired_start_sec: description.source_start_sec,
+                    mandatory: false,
+                    slot_start_sec: None,
+                    slot_end_sec: None,
+                    samples,
+                    sample_rate,
+                    channels,
+                });
+                notify_progress(
+                    &mut callbacks,
+                    ((index + 1) as u32).saturating_mul(90)
+                        / project.descriptions.len().max(1) as u32,
+                );
+            }
+            Ok(synthesized)
+        })();
+    crate::log_if_err!(
+        fs::remove_dir_all(&cache_dir),
+        "Audio description cleanup operation failed"
+    );
+    let synthesized = synthesis_result?;
+
+    if cancel.load(Ordering::Relaxed) {
+        return Err(AudioDescriptionProjectVoiceError::Cancelled);
+    }
+    let protected_intervals = project
+        .protected_intervals
+        .iter()
+        .map(|interval| BridgeInterval {
+            start_sec: interval.start_sec,
+            end_sec: interval.end_sec,
+        })
+        .collect::<Vec<_>>();
+    let (scheduled, dropped) = schedule_synthesized_descriptions(
+        &synthesized,
+        &protected_intervals,
+        project.source_duration_sec,
+        project.allow_extended_pauses,
+    );
+    if let Some(first) = dropped.first() {
+        let source_start_sec = project
+            .descriptions
+            .iter()
+            .find(|description| description.id == first.original_index)
+            .map(|description| description.source_start_sec)
+            .unwrap_or(first.desired_start_sec);
+        return Err(AudioDescriptionProjectVoiceError::DoesNotFit {
+            source_start_sec,
+            synthesized_sec: first.tts_duration_sec,
+        });
+    }
+    if cancel.load(Ordering::Relaxed) {
+        return Err(AudioDescriptionProjectVoiceError::Cancelled);
+    }
+    if !project.source_path.is_file() {
+        return Err(AudioDescriptionProjectVoiceError::Other(format!(
+            "Audio description: source file not found: {}",
+            project.source_path.display()
+        )));
+    }
+    if let Some(parent) = project.output_mp3_path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent).map_err(|error| {
+            AudioDescriptionProjectVoiceError::Other(format!(
+                "Audio description: create output folder failed: {error}"
+            ))
+        })?;
+    }
+
+    notify_status(
+        &mut callbacks,
+        "voice_export",
+        "Rebuilding the project MP3 with the verified voice...",
+    );
+    crate::log_debug(
+        "Audio description project voice: all descriptions fit; rebuilding MP3 from verified synthesized audio",
+    );
+    let mix_cues: Vec<AudioDescriptionMixCue> = scheduled
+        .iter()
+        .map(|description| AudioDescriptionMixCue {
+            start_sec: description.start_sec,
+            samples: description.samples.clone(),
+            sample_rate: description.sample_rate,
+            channels: description.channels,
+            extended_pause: description.extended_pause,
+        })
+        .collect();
+    let export_target = temporary_sibling_path(&project.output_mp3_path, "voice");
+    let export_options = AudioDescriptionExportOptions {
+        ducking_db: project.ducking_db,
+        fade_ms: project.fade_ms,
+        bitrate_kbps: project.bitrate_kbps,
+        cancel: cancel.clone(),
+    };
+    let mut export_progress = |pct: u32| {
+        notify_progress(&mut callbacks, 90 + pct.saturating_mul(10) / 100);
+    };
+    if let Err(error) = export_audio_description_mp3(
+        &project.source_path,
+        &export_target,
+        &mix_cues,
+        &export_options,
+        Some(&mut export_progress),
+    ) {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        return if error == "cancelled" || cancel.load(Ordering::Relaxed) {
+            Err(AudioDescriptionProjectVoiceError::Cancelled)
+        } else {
+            Err(AudioDescriptionProjectVoiceError::Other(error))
+        };
+    }
+    let output_metadata = fs::metadata(&export_target).map_err(|error| {
+        AudioDescriptionProjectVoiceError::Other(format!(
+            "Audio description: changed-voice MP3 validation failed: {error}"
+        ))
+    })?;
+    if output_metadata.len() == 0 {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        return Err(AudioDescriptionProjectVoiceError::Other(
+            "Audio description: changed-voice MP3 is empty".to_string(),
+        ));
+    }
+    if cancel.load(Ordering::Relaxed) {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        return Err(AudioDescriptionProjectVoiceError::Cancelled);
+    }
+
+    let calculated_output_duration = project.source_duration_sec
+        + scheduled
+            .iter()
+            .filter(|description| description.extended_pause)
+            .map(scheduled_duration_sec)
+            .sum::<f64>();
+    let output_duration_sec = crate::ffmpeg_export::media_duration_seconds(&export_target)
+        .unwrap_or(calculated_output_duration);
+    let mut updated = build_audio_description_project(
+        &job,
+        project.source_duration_sec,
+        output_duration_sec,
+        &protected_intervals,
+        &scheduled,
+        &[],
+    );
+    updated.created_at_utc = project.created_at_utc.clone();
+    updated.updated_at_utc = chrono::Utc::now().to_rfc3339();
+    updated.bitrate_kbps = project.bitrate_kbps;
+    updated.ducking_db = project.ducking_db;
+    updated.fade_ms = project.fade_ms;
+    for description in &mut updated.descriptions {
+        if let Some(previous) = project
+            .descriptions
+            .iter()
+            .find(|candidate| candidate.id == description.id)
+        {
+            description.original_text = previous.original_text.clone();
+            description.modified = description.text != description.original_text;
+            description.gemini_start_sec = previous.gemini_start_sec;
+        }
+    }
+    let scheduled_ids = scheduled
+        .iter()
+        .map(|description| description.original_index)
+        .collect::<std::collections::HashSet<_>>();
+    let mut excluded = project.excluded_descriptions.clone();
+    excluded.retain(|description| !scheduled_ids.contains(&description.id));
+    updated.excluded_descriptions = excluded;
+
+    let temporary_project = temporary_sibling_path(project_path, "voice");
+    if let Err(error) = save_audio_description_project(&temporary_project, &updated) {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        return Err(AudioDescriptionProjectVoiceError::Other(error));
+    }
+    if let Err(error) = commit_audio_description_pair(
+        &export_target,
+        &project.output_mp3_path,
+        &temporary_project,
+        project_path,
+    ) {
+        crate::log_if_err!(
+            fs::remove_file(&export_target),
+            "Audio description cleanup operation failed"
+        );
+        crate::log_if_err!(
+            fs::remove_file(&temporary_project),
+            "Audio description cleanup operation failed"
+        );
+        return Err(AudioDescriptionProjectVoiceError::Other(error));
+    }
+
+    notify_progress(&mut callbacks, 100);
+    Ok(updated)
 }
 
 pub fn delete_audio_description_project_description(

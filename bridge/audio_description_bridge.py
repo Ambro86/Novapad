@@ -35,7 +35,11 @@ if str(RUNTIME_DIR) not in sys.path:
 from audio_describer.core import audio_describer, speech_detector  # noqa: E402
 from audio_describer.core import gemini_helpers  # noqa: E402
 from audio_describer.models import config_model  # noqa: E402
-from audio_describer.utils.logger import app_logger, get_log_file_path  # noqa: E402
+from audio_describer.utils.logger import (  # noqa: E402
+    app_logger,
+    get_log_file_path,
+    reset_log_file,
+)
 
 CHUNK_DURATION_SECONDS = 180
 
@@ -448,7 +452,12 @@ def main() -> int:
         return 2
 
     try:
-        result = run(_read_request(args.request))
+        request = _read_request(args.request)
+        if reset_log_file():
+            app_logger.info("Starting new audio-description job; previous bridge log cleared.")
+        else:
+            app_logger.warning("Could not clear the bridge log before the new audio-description job.")
+        result = run(request)
         _emit("RESULT", result)
         return 0
     except KeyboardInterrupt:

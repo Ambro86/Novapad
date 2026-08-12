@@ -19,6 +19,7 @@ from audio_describer.core.audio_describer import (
     _format_recent_description_context,
     _generate_blocked_chunk_by_minutes,
     _items_for_minute,
+    _video_metadata_kwargs,
     _update_character_continuity,
     _upload_and_wait_for_active,
 )
@@ -60,6 +61,16 @@ class ChunkTimestampTests(unittest.TestCase):
             "La lancia via.",
             "Bruce Nolan torna alla porta.",
         ])
+
+    def test_video_metadata_offsets_remove_float_artifacts(self):
+        with mock.patch(
+            "audio_describer.core.audio_describer.config_model.get_setting",
+            return_value=None,
+        ):
+            metadata = _video_metadata_kwargs(180.0, 180.06900000000041)
+
+        self.assertEqual(metadata["start_offset"], "180.0s")
+        self.assertEqual(metadata["end_offset"], "180.069s")
 
     def test_minute_fallback_assigns_slot_by_midpoint_and_resets_timeline(self):
         slots = [
@@ -134,7 +145,7 @@ class ChunkTimestampTests(unittest.TestCase):
                 video_path="movie.mp4",
                 prepared_chunk_path="prepared_chunk.mp4",
                 chunk_start=0.0,
-                chunk_end=180.0,
+                chunk_end=180.069,
                 chunk_number=8,
                 total_chunks=28,
                 clipped_windows=[],
@@ -155,6 +166,7 @@ class ChunkTimestampTests(unittest.TestCase):
         self.assertEqual(glossary, [])
         self.assertEqual(usage, [])
         self.assertEqual(generate.call_count, 3)
+        self.assertFalse(any("minute 4" in status for status in statuses))
         self.assertTrue(all(
             call.kwargs["prohibited_content_max_attempts"] == 1
             for call in generate.call_args_list

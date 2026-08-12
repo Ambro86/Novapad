@@ -93,6 +93,29 @@ class GeminiRetryTests(unittest.TestCase):
             gemini_helpers.is_prepaid_credits_depleted_error(outer)
         )
 
+    def test_gemini_invalid_argument_does_not_retry_transient_context(self):
+        transient_context = TimeoutError("temporary timeout")
+        invalid_argument = RuntimeError(
+            "400 INVALID_ARGUMENT: Invalid duration format, "
+            "failed to parse nano seconds"
+        )
+        invalid_argument.code = 400
+        invalid_argument.__context__ = transient_context
+        client = mock.Mock()
+        client.models.generate_content.side_effect = invalid_argument
+
+        with mock.patch.object(
+            gemini_helpers.config_model, "get_setting", return_value=""
+        ), mock.patch.object(gemini_helpers.time, "sleep") as sleep_mock:
+            with self.assertRaises(RuntimeError) as raised:
+                gemini_helpers.generate_content_with_retry(
+                    client, "gemini-test", [], object()
+                )
+
+        self.assertIs(raised.exception, invalid_argument)
+        self.assertEqual(client.models.generate_content.call_count, 1)
+        sleep_mock.assert_not_called()
+
     def test_gemini_504_deadline_exceeded_retries_same_request(self):
         deadline = RuntimeError(
             "504 DEADLINE_EXCEEDED: Deadline expired before operation could complete."

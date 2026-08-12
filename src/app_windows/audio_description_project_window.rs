@@ -10,22 +10,24 @@ use windows::Win32::UI::Controls::Dialogs::{
     OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::{
-    PBM_SETPOS, PBM_SETRANGE32, PROGRESS_CLASSW, WC_BUTTON, WC_EDIT, WC_LISTBOXW, WC_STATIC,
+    PBM_SETPOS, PBM_SETRANGE32, PROGRESS_CLASSW, WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_LISTBOXW,
+    WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, SetFocus, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_SPACE, VK_TAB,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, BS_DEFPUSHBUTTON, CREATESTRUCTW, CreatePopupMenu, CreateWindowExW, DefWindowProcW,
-    DestroyMenu, DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, GetCursorPos,
-    GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, IsWindowVisible, LB_ADDSTRING, LB_GETCURSEL,
-    LB_RESETCONTENT, LB_SETCURSEL, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY,
-    LoadCursorW, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO, MF_STRING,
-    MessageBoxW, PostMessageW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, TPM_NONOTIFY,
-    TPM_RETURNCMD, TrackPopupMenu, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
-    WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WNDCLASSW,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
-    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    AppendMenuW, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL,
+    CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CreatePopupMenu, CreateWindowExW,
+    DefWindowProcW, DestroyMenu, DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN,
+    GetCursorPos, GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, IsWindowVisible, LB_ADDSTRING,
+    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_SELCHANGE, LBS_HASSTRINGS,
+    LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MB_ICONERROR, MB_ICONINFORMATION,
+    MB_ICONQUESTION, MB_OK, MB_YESNO, MF_STRING, MessageBoxW, PostMessageW, SendMessageW,
+    SetForegroundWindow, SetWindowLongPtrW, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu,
+    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -34,13 +36,14 @@ use crate::audio_description::{
     AudioDescriptionCallbacks, AudioDescriptionOutcome, AudioDescriptionProject,
     AudioDescriptionProjectDescription, AudioDescriptionProjectEditError,
     AudioDescriptionProjectEditOutcome, AudioDescriptionProjectPreviewAudio,
-    apply_audio_description_project_edit, delete_audio_description_project_description,
+    AudioDescriptionProjectVoiceError, apply_audio_description_project_edit,
+    change_audio_description_project_voice, delete_audio_description_project_description,
     load_audio_description_project, reexport_audio_description_project,
     synthesize_audio_description_project_preview,
 };
 use crate::bass_output::BassOutput;
 use crate::i18n;
-use crate::settings::{Language, default_audio_description_save_folder};
+use crate::settings::{Language, TtsEngine, VoiceInfo, default_audio_description_save_folder};
 use crate::{show_error, with_state};
 
 const CLASS_NAME: &str = "SonarpadAudioDescriptionProject";
@@ -52,6 +55,9 @@ const ID_CANCEL: usize = 9675;
 const ID_CLOSE: usize = 9676;
 const ID_CONTEXT_PLAY: usize = 9677;
 const ID_CONTEXT_DELETE: usize = 9678;
+const ID_VOICE: usize = 9679;
+const ID_ENGINE: usize = 9680;
+const ID_CHANGE_VOICE: usize = 9681;
 
 const WM_PROJECT_PROGRESS: u32 = WM_APP + 192;
 const WM_PROJECT_STATUS: u32 = WM_APP + 193;
@@ -59,6 +65,8 @@ const WM_PROJECT_DONE: u32 = WM_APP + 194;
 const WM_PROJECT_APPLY_DONE: u32 = WM_APP + 195;
 const WM_PROJECT_PLAY_SELECTED: u32 = WM_APP + 196;
 const WM_PROJECT_DRAFT_PREVIEW_DONE: u32 = WM_APP + 197;
+const WM_PROJECT_VOICES_LOADED: u32 = WM_APP + 198;
+const WM_PROJECT_VOICE_DONE: u32 = WM_APP + 199;
 
 struct DraftPreviewPayload {
     generation: u64,
@@ -67,11 +75,24 @@ struct DraftPreviewPayload {
     result: Result<AudioDescriptionProjectPreviewAudio, String>,
 }
 
+struct VoiceLoadPayload {
+    engine: TtsEngine,
+    result: Result<Vec<VoiceInfo>, String>,
+}
+
+struct VoiceChangePayload {
+    requested_voice: String,
+    result: Result<AudioDescriptionProject, AudioDescriptionProjectVoiceError>,
+}
+
 struct Labels {
     title: String,
     open_title: String,
     descriptions: String,
     text: String,
+    engine: String,
+    voice: String,
+    change_voice: String,
     apply: String,
     export: String,
     cancel: String,
@@ -91,6 +112,13 @@ struct Labels {
     delete_confirm: String,
     delete_last_error: String,
     checking_duration: String,
+    loading_voices: String,
+    voice_checking: String,
+    voice_changed_title: String,
+    voice_changed: String,
+    voice_too_long: String,
+    voice_check_error: String,
+    edit_saved_title: String,
     edit_saved: String,
     apply_before_export: String,
 }
@@ -104,6 +132,10 @@ struct WindowState {
     list: HWND,
     edit: HWND,
     details: HWND,
+    engine_combo: HWND,
+    voice_combo: HWND,
+    change_voice_button: HWND,
+    voices: Vec<VoiceInfo>,
     progress: HWND,
     status: HWND,
     apply_button: HWND,
@@ -133,6 +165,9 @@ fn labels(language: Language) -> Labels {
         open_title: i18n::tr(language, "audio_description.project.open_title"),
         descriptions: i18n::tr(language, "audio_description.project.descriptions"),
         text: i18n::tr(language, "audio_description.project.text"),
+        engine: i18n::tr(language, "audio_description.engine"),
+        voice: i18n::tr(language, "audio_description.voice"),
+        change_voice: i18n::tr(language, "audio_description.project.change_voice"),
         apply: i18n::tr(language, "audio_description.project.apply"),
         export: i18n::tr(language, "audio_description.project.export"),
         cancel: i18n::tr(language, "audio_description.cancel"),
@@ -155,8 +190,170 @@ fn labels(language: Language) -> Labels {
             language,
             "audio_description.project.status.checking_duration",
         ),
+        loading_voices: i18n::tr(language, "audio_description.status.loading_voices"),
+        voice_checking: i18n::tr(language, "audio_description.project.voice_checking"),
+        voice_changed_title: i18n::tr(language, "audio_description.project.voice_changed_title"),
+        voice_changed: i18n::tr(language, "audio_description.project.voice_changed"),
+        voice_too_long: i18n::tr(language, "audio_description.project.voice_too_long"),
+        voice_check_error: i18n::tr(language, "audio_description.project.voice_check_error"),
+        edit_saved_title: i18n::tr(language, "audio_description.project.edit_saved_title"),
         edit_saved: i18n::tr(language, "audio_description.project.edit_saved"),
         apply_before_export: i18n::tr(language, "audio_description.project.apply_before_export"),
+    }
+}
+
+fn add_combo_item(combo: HWND, text: &str) {
+    let wide = to_wide(text);
+    unsafe {
+        SendMessageW(
+            combo,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
+}
+
+fn engine_from_combo(combo: HWND) -> TtsEngine {
+    match unsafe { SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 } {
+        1 => TtsEngine::Sapi5,
+        2 => TtsEngine::Sapi4,
+        3 => TtsEngine::Google,
+        _ => TtsEngine::Edge,
+    }
+}
+
+fn engine_combo_index(engine: TtsEngine) -> usize {
+    match engine {
+        TtsEngine::Edge => 0,
+        TtsEngine::Sapi5 => 1,
+        TtsEngine::Sapi4 => 2,
+        TtsEngine::Google => 3,
+    }
+}
+
+fn load_project_voices(hwnd: HWND, engine: TtsEngine) {
+    thread::spawn(move || {
+        let result = match engine {
+            TtsEngine::Edge => crate::app_windows::options_window::fetch_voice_list(),
+            TtsEngine::Sapi5 => crate::sapi5_engine::list_sapi_voices(),
+            TtsEngine::Sapi4 => Ok(crate::sapi4_engine::get_voices()),
+            TtsEngine::Google => Ok(crate::google_tts::installed_voices()),
+        };
+        post_boxed_message(
+            hwnd,
+            WM_PROJECT_VOICES_LOADED,
+            WPARAM(0),
+            Box::new(VoiceLoadPayload { engine, result }),
+        );
+    });
+}
+
+fn refill_project_voice_combo(
+    state: &mut WindowState,
+    engine: TtsEngine,
+    mut voices: Vec<VoiceInfo>,
+) {
+    let current = state.project.tts_voice.trim();
+    if engine == state.project.tts_engine
+        && !current.is_empty()
+        && !voices
+            .iter()
+            .any(|voice| voice.short_name.eq_ignore_ascii_case(current))
+    {
+        voices.insert(
+            0,
+            VoiceInfo {
+                short_name: current.to_string(),
+                locale: state.project.language_code.clone(),
+                is_multilingual: false,
+            },
+        );
+    }
+    state.voices = voices;
+    unsafe {
+        SendMessageW(state.voice_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    }
+    for voice in &state.voices {
+        let display = if voice.locale.trim().is_empty() {
+            voice.short_name.clone()
+        } else {
+            format!("{} ({})", voice.short_name, voice.locale)
+        };
+        add_combo_item(state.voice_combo, &display);
+    }
+    let language_code = state.project.language_code.to_ascii_lowercase();
+    let selected = if engine == state.project.tts_engine {
+        state
+            .voices
+            .iter()
+            .position(|voice| {
+                voice
+                    .short_name
+                    .eq_ignore_ascii_case(&state.project.tts_voice)
+            })
+            .or_else(|| {
+                state.voices.iter().position(|voice| {
+                    voice
+                        .locale
+                        .to_ascii_lowercase()
+                        .starts_with(&language_code)
+                })
+            })
+            .unwrap_or(0)
+    } else {
+        state
+            .voices
+            .iter()
+            .position(|voice| {
+                voice
+                    .locale
+                    .to_ascii_lowercase()
+                    .starts_with(&language_code)
+            })
+            .unwrap_or(0)
+    };
+    unsafe {
+        if state.voices.is_empty() {
+            EnableWindow(state.voice_combo, false);
+            EnableWindow(state.change_voice_button, false);
+        } else {
+            SendMessageW(state.voice_combo, CB_SETCURSEL, WPARAM(selected), LPARAM(0));
+            EnableWindow(state.voice_combo, !state.running);
+            EnableWindow(state.change_voice_button, !state.running);
+        }
+    }
+}
+
+fn restore_project_voice_selection(hwnd: HWND, state: &mut WindowState) {
+    let selected_engine = engine_from_combo(state.engine_combo);
+    unsafe {
+        SendMessageW(
+            state.engine_combo,
+            CB_SETCURSEL,
+            WPARAM(engine_combo_index(state.project.tts_engine)),
+            LPARAM(0),
+        );
+    }
+    if selected_engine != state.project.tts_engine {
+        state.voices.clear();
+        unsafe {
+            SendMessageW(state.voice_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+            EnableWindow(state.voice_combo, false);
+            EnableWindow(state.change_voice_button, false);
+        }
+        set_text(state.status, &labels(state.language).loading_voices);
+        load_project_voices(hwnd, state.project.tts_engine);
+        return;
+    }
+    if let Some(index) = state.voices.iter().position(|voice| {
+        voice
+            .short_name
+            .eq_ignore_ascii_case(&state.project.tts_voice)
+    }) {
+        unsafe {
+            SendMessageW(state.voice_combo, CB_SETCURSEL, WPARAM(index), LPARAM(0));
+        }
     }
 }
 
@@ -182,6 +379,30 @@ fn show_project_error(hwnd: HWND, language: Language, message: &str) {
             PCWSTR(text.as_ptr()),
             PCWSTR(title.as_ptr()),
             MB_OK | MB_ICONERROR,
+        );
+    }
+    crate::watchdog::exit_modal_dialog();
+    if crate::is_window_handle_valid(hwnd) && unsafe { IsWindowVisible(hwnd).as_bool() } {
+        unsafe {
+            SetForegroundWindow(hwnd);
+        }
+        focus_descriptions_list(hwnd);
+    }
+}
+
+fn show_project_info_with_title(hwnd: HWND, title: &str, message: &str) {
+    crate::log_debug(&format!(
+        "Audio description project information shown: {message}"
+    ));
+    let text = to_wide(message);
+    let title = to_wide(title);
+    crate::watchdog::enter_modal_dialog();
+    unsafe {
+        MessageBoxW(
+            hwnd,
+            PCWSTR(text.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            MB_OK | MB_ICONINFORMATION,
         );
     }
     crate::watchdog::exit_modal_dialog();
@@ -694,11 +915,15 @@ fn set_controls_enabled(state: &WindowState, enabled: bool) {
             state.list,
             state.edit,
             state.apply_button,
+            state.engine_combo,
             state.export_button,
             state.close_button,
         ] {
             EnableWindow(control, enabled);
         }
+        let voices_available = !state.voices.is_empty();
+        EnableWindow(state.voice_combo, enabled && voices_available);
+        EnableWindow(state.change_voice_button, enabled && voices_available);
         EnableWindow(state.cancel_button, !enabled);
     }
 }
@@ -786,7 +1011,7 @@ pub fn open(parent: HWND, owner: HWND, project_path: &Path) {
             140,
             80,
             820,
-            650,
+            700,
             owner,
             HMENU(0),
             hinstance,
@@ -853,6 +1078,70 @@ fn start_apply(hwnd: HWND, state: &mut WindowState) {
         let result =
             apply_audio_description_project_edit(&project_path, &project, index, &text, cancel);
         post_boxed_message(hwnd, WM_PROJECT_APPLY_DONE, WPARAM(0), Box::new(result));
+    });
+}
+
+fn start_voice_change(hwnd: HWND, state: &mut WindowState) {
+    let selected = unsafe { SendMessageW(state.voice_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    let Some(candidate) = (selected >= 0)
+        .then(|| state.voices.get(selected as usize))
+        .flatten()
+        .map(|voice| voice.short_name.clone())
+    else {
+        restore_project_voice_selection(hwnd, state);
+        return;
+    };
+    let candidate_engine = engine_from_combo(state.engine_combo);
+    if candidate_engine == state.project.tts_engine
+        && candidate.eq_ignore_ascii_case(&state.project.tts_voice)
+    {
+        return;
+    }
+
+    stop_preview(state);
+    let project_path = state.project_path.clone();
+    let project = state.project.clone();
+    let cancel = Arc::new(AtomicBool::new(false));
+    state.cancel = Some(cancel.clone());
+    state.running = true;
+    set_controls_enabled(state, false);
+    set_text(state.status, &labels(state.language).voice_checking);
+    unsafe { SendMessageW(state.progress, PBM_SETPOS, WPARAM(0), LPARAM(0)) };
+
+    thread::spawn(move || {
+        let progress_hwnd = hwnd;
+        let requested_voice = candidate.clone();
+        let result = change_audio_description_project_voice(
+            &project_path,
+            &project,
+            candidate_engine,
+            &candidate,
+            cancel,
+            AudioDescriptionCallbacks {
+                status: None,
+                progress: Some(Box::new(move |pct| unsafe {
+                    crate::log_if_err!(
+                        PostMessageW(
+                            progress_hwnd,
+                            WM_PROJECT_PROGRESS,
+                            WPARAM(pct as usize),
+                            LPARAM(0),
+                        ),
+                        "Audio description project: PostMessageW failed"
+                    );
+                })),
+                quota: None,
+            },
+        );
+        post_boxed_message(
+            hwnd,
+            WM_PROJECT_VOICE_DONE,
+            WPARAM(0),
+            Box::new(VoiceChangePayload {
+                requested_voice,
+                result,
+            }),
+        );
     });
 }
 
@@ -1015,13 +1304,113 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     HINSTANCE(0),
                     None,
                 );
+                let apply_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.apply).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    16,
+                    612,
+                    170,
+                    30,
+                    hwnd,
+                    HMENU(ID_APPLY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let engine_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.engine).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    482,
+                    224,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let engine_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    250,
+                    478,
+                    526,
+                    180,
+                    hwnd,
+                    HMENU(ID_ENGINE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                for key in [
+                    "options.engine.edge",
+                    "options.engine.sapi5",
+                    "options.engine.sapi4",
+                    "options.engine.google",
+                ] {
+                    add_combo_item(engine_combo, &i18n::tr(language, key));
+                }
+                SendMessageW(
+                    engine_combo,
+                    CB_SETCURSEL,
+                    WPARAM(engine_combo_index(project.tts_engine)),
+                    LPARAM(0),
+                );
+                let voice_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.voice).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    516,
+                    96,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let voice_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    120,
+                    512,
+                    462,
+                    220,
+                    hwnd,
+                    HMENU(ID_VOICE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                EnableWindow(voice_combo, false);
+                let change_voice_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.change_voice).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    592,
+                    512,
+                    184,
+                    30,
+                    hwnd,
+                    HMENU(ID_CHANGE_VOICE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                EnableWindow(change_voice_button, false);
                 let progress = CreateWindowExW(
                     Default::default(),
                     PROGRESS_CLASSW,
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    480,
+                    550,
                     760,
                     20,
                     hwnd,
@@ -1036,25 +1425,11 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.ready).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    506,
+                    576,
                     760,
                     28,
                     hwnd,
                     HMENU(0),
-                    HINSTANCE(0),
-                    None,
-                );
-                let apply_button = CreateWindowExW(
-                    Default::default(),
-                    WC_BUTTON,
-                    PCWSTR(to_wide(&labels.apply).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                    16,
-                    542,
-                    170,
-                    30,
-                    hwnd,
-                    HMENU(ID_APPLY as isize),
                     HINSTANCE(0),
                     None,
                 );
@@ -1064,7 +1439,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.export).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     330,
-                    542,
+                    612,
                     180,
                     30,
                     hwnd,
@@ -1078,7 +1453,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.cancel).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     520,
-                    542,
+                    612,
                     110,
                     30,
                     hwnd,
@@ -1093,7 +1468,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.close).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     640,
-                    542,
+                    612,
                     136,
                     30,
                     hwnd,
@@ -1107,8 +1482,13 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     text_label,
                     edit,
                     details,
-                    status,
                     apply_button,
+                    engine_label,
+                    engine_combo,
+                    voice_label,
+                    voice_combo,
+                    change_voice_button,
+                    status,
                     export_button,
                     cancel_button,
                     close_button,
@@ -1126,6 +1506,10 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     list,
                     edit,
                     details,
+                    engine_combo,
+                    voice_combo,
+                    change_voice_button,
+                    voices: Vec::new(),
                     progress,
                     status,
                     apply_button,
@@ -1139,11 +1523,14 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     preview_generation: Arc::new(AtomicU64::new(0)),
                 });
                 refill_list(&mut state, 0);
+                let project_engine = state.project.tts_engine;
                 SetWindowLongPtrW(
                     hwnd,
                     windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
                     Box::into_raw(state) as isize,
                 );
+                set_text(status, &labels.loading_voices);
+                load_project_voices(hwnd, project_engine);
                 SetFocus(list);
                 LRESULT(0)
             }
@@ -1179,6 +1566,15 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             }
                         }
                     }
+                    ID_ENGINE if notification == CBN_SELCHANGE && !state.running => {
+                        state.voices.clear();
+                        SendMessageW(state.voice_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+                        EnableWindow(state.voice_combo, false);
+                        EnableWindow(state.change_voice_button, false);
+                        set_text(state.status, &labels(state.language).loading_voices);
+                        load_project_voices(hwnd, engine_from_combo(state.engine_combo));
+                    }
+                    ID_CHANGE_VOICE if !state.running => start_voice_change(hwnd, state),
                     ID_APPLY if !state.running => start_apply(hwnd, state),
                     ID_EXPORT if !state.running => start_export(hwnd, state),
                     ID_CANCEL => {
@@ -1286,10 +1682,14 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         state.project = outcome.project;
                         refill_list(state, state.selected_index.unwrap_or(0));
                         SendMessageW(state.progress, PBM_SETPOS, WPARAM(100), LPARAM(0));
-                        let message = labels(state.language).edit_saved;
+                        let language_labels = labels(state.language);
+                        let message = language_labels.edit_saved;
                         set_text(state.status, &message);
-                        crate::accessibility::screen_reader_speak(&message);
-                        focus_descriptions_list(hwnd);
+                        show_project_info_with_title(
+                            hwnd,
+                            &language_labels.edit_saved_title,
+                            &message,
+                        );
                     }
                     Err(AudioDescriptionProjectEditError::Cancelled) => {
                         set_text(state.status, &labels(state.language).ready);
@@ -1311,6 +1711,95 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     Err(AudioDescriptionProjectEditError::Other(error)) => {
                         set_text(state.status, &error);
                         show_project_error(hwnd, state.language, &error);
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_PROJECT_VOICES_LOADED => {
+                let payload = lparam.0 as *mut VoiceLoadPayload;
+                if payload.is_null() {
+                    return LRESULT(0);
+                }
+                let payload = *Box::from_raw(payload);
+                let pointer =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut WindowState;
+                if pointer.is_null() {
+                    return LRESULT(0);
+                }
+                let state = &mut *pointer;
+                if payload.engine != engine_from_combo(state.engine_combo) {
+                    return LRESULT(0);
+                }
+                match payload.result {
+                    Ok(voices) => {
+                        refill_project_voice_combo(state, payload.engine, voices);
+                        if !state.running {
+                            set_text(state.status, &labels(state.language).ready);
+                        }
+                    }
+                    Err(error) => {
+                        set_text(state.status, &error);
+                        EnableWindow(state.voice_combo, false);
+                        EnableWindow(state.change_voice_button, false);
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_PROJECT_VOICE_DONE => {
+                let payload = lparam.0 as *mut VoiceChangePayload;
+                if payload.is_null() {
+                    return LRESULT(0);
+                }
+                let payload = *Box::from_raw(payload);
+                let pointer =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut WindowState;
+                if pointer.is_null() {
+                    return LRESULT(0);
+                }
+                let state = &mut *pointer;
+                state.running = false;
+                state.cancel = None;
+                set_controls_enabled(state, true);
+                match payload.result {
+                    Ok(project) => {
+                        state.project = project;
+                        restore_project_voice_selection(hwnd, state);
+                        SendMessageW(state.progress, PBM_SETPOS, WPARAM(100), LPARAM(0));
+                        let message = labels(state.language)
+                            .voice_changed
+                            .replace("{voice}", &payload.requested_voice);
+                        set_text(state.status, &message);
+                        show_project_info_with_title(
+                            hwnd,
+                            &labels(state.language).voice_changed_title,
+                            &message,
+                        );
+                    }
+                    Err(AudioDescriptionProjectVoiceError::Cancelled) => {
+                        restore_project_voice_selection(hwnd, state);
+                        set_text(state.status, &labels(state.language).ready);
+                    }
+                    Err(AudioDescriptionProjectVoiceError::DoesNotFit {
+                        source_start_sec,
+                        synthesized_sec,
+                    }) => {
+                        restore_project_voice_selection(hwnd, state);
+                        let message = labels(state.language)
+                            .voice_too_long
+                            .replace("{time}", &format_time(source_start_sec))
+                            .replace("{actual}", &format!("{synthesized_sec:.3}"));
+                        set_text(state.status, &message);
+                        show_project_error(hwnd, state.language, &message);
+                    }
+                    Err(AudioDescriptionProjectVoiceError::Other(error)) => {
+                        restore_project_voice_selection(hwnd, state);
+                        let message = labels(state.language)
+                            .voice_check_error
+                            .replace("{error}", &error);
+                        set_text(state.status, &message);
+                        show_project_error(hwnd, state.language, &message);
                     }
                 }
                 LRESULT(0)

@@ -590,24 +590,51 @@ def is_prepaid_credits_depleted_error(exc: BaseException) -> bool:
     return False
 
 
+def _single_exception_is_permanent_invalid_argument(exc: BaseException) -> bool:
+    """True for Gemini HTTP 400 INVALID_ARGUMENT request-validation failures."""
+    status_candidates = [
+        getattr(exc, "code", None),
+        getattr(exc, "status_code", None),
+        getattr(getattr(exc, "response", None), "status_code", None),
+    ]
+    structured_400 = False
+    for candidate in status_candidates:
+        try:
+            structured_400 = int(candidate) == 400
+        except (TypeError, ValueError):
+            continue
+        if structured_400:
+            break
+
+    message = str(exc).casefold()
+    return (
+        (structured_400 or re.search(r"(?<!\d)400(?!\d)", message) is not None)
+        and ("invalid_argument" in message or "invalid argument" in message)
+    )
+
+
 def is_retryable_transient_error(exc: BaseException) -> bool:
     """True if *exc* (or any cause/context in its chain) is a transient network/API error.
 
     Covers rate limits (429), every HTTP server error (5xx), and connection
-    failures such as Windows WinError 10060.
+    failures such as Windows WinError 10060. A concrete Gemini 400
+    INVALID_ARGUMENT always wins over incidental transient-looking exception
+    context because retrying the same malformed request cannot recover.
     """
+    chain = []
     seen = set()
     current: BaseException | None = exc
     while current is not None and id(current) not in seen:
         seen.add(id(current))
-        if _single_exception_is_retryable(current):
-            return True
-        # Prefer explicit cause; fall back to context (e.g. "during handling of")
+        chain.append(current)
         nxt = current.__cause__
         if nxt is None:
             nxt = current.__context__
         current = nxt
-    return False
+
+    if any(_single_exception_is_permanent_invalid_argument(item) for item in chain):
+        return False
+    return any(_single_exception_is_retryable(item) for item in chain)
 
 
 def is_quota_exhausted_error(exc: BaseException) -> bool:

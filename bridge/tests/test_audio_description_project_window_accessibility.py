@@ -317,5 +317,118 @@ class AudioDescriptionProjectWindowAccessibilityTests(unittest.TestCase):
         self.assertNotIn("bring_window_to_foreground(hwnd);", cleanup)
 
 
+
+    def test_creation_window_uses_specific_browse_labels_and_explicit_new_catalog_ui(self):
+        self.assertIn('audio_description.browse_input', WINDOW)
+        self.assertIn('audio_description.browse_output', WINDOW)
+        self.assertIn('labels.input_browse', WINDOW)
+        self.assertIn('labels.output_browse', WINDOW)
+        self.assertIn('audio_description.character_catalog.new_option', WINDOW)
+        self.assertIn('audio_description.character_catalog.selection_label', WINDOW)
+        self.assertIn('audio_description.character_catalog.new_name_label', WINDOW)
+        self.assertIn('character_catalog_name_edit', WINDOW)
+        self.assertIn('suggested_character_catalog_name', WINDOW)
+        prepare = WINDOW[
+            WINDOW.index('fn prepare_character_catalog'):
+            WINDOW.index('fn persist_audio_description_preferences')
+        ]
+        self.assertIn('get_text(state.character_catalog_name_edit)', prepare)
+        self.assertIn('SetFocus(state.character_catalog_name_edit)', prepare)
+        self.assertNotIn('prompt_user(', prepare)
+
+    def test_project_voice_change_reuses_real_scheduler_and_rebuilds_mp3_atomically(self):
+        self.assertIn('change_audio_description_project_voice', PROJECT)
+        self.assertIn('WM_PROJECT_VOICE_DONE', PROJECT)
+        self.assertIn('restore_project_voice_selection', PROJECT)
+        self.assertIn('show_project_info_with_title', PROJECT)
+        validation = AUDIO[
+            AUDIO.index('pub fn change_audio_description_project_voice'):
+            AUDIO.index('pub fn delete_audio_description_project_description')
+        ]
+        synth = validation.index('synthesize_description(')
+        schedule = validation.index('schedule_synthesized_descriptions(')
+        export = validation.index('export_audio_description_mp3(')
+        project_save = validation.index('save_audio_description_project(&temporary_project, &updated)')
+        commit = validation.index('commit_audio_description_pair(')
+        self.assertLess(synth, schedule)
+        self.assertLess(schedule, export)
+        self.assertLess(export, project_save)
+        self.assertLess(project_save, commit)
+        self.assertIn('if let Some(first) = dropped.first()', validation)
+        self.assertIn('AudioDescriptionProjectVoiceError::DoesNotFit', validation)
+        self.assertIn('job.tts_engine = engine;', validation)
+        self.assertIn('job.tts_voice = voice.to_string();', validation)
+        self.assertIn('let mix_cues: Vec<AudioDescriptionMixCue> = scheduled', validation)
+        self.assertIn('temporary_sibling_path(&project.output_mp3_path, "voice")', validation)
+        self.assertIn('build_audio_description_project(', validation)
+        self.assertIn('&scheduled,', validation)
+        self.assertIn('&[],', validation)
+        self.assertNotIn('save_audio_description_project(project_path, &updated)', validation)
+
+    def test_project_voice_change_reuses_verified_audio_without_second_synthesis_pass(self):
+        validation = AUDIO[
+            AUDIO.index('pub fn change_audio_description_project_voice'):
+            AUDIO.index('pub fn delete_audio_description_project_description')
+        ]
+        self.assertEqual(validation.count('synthesize_description('), 1)
+        schedule = validation.index('schedule_synthesized_descriptions(')
+        export = validation.index('export_audio_description_mp3(')
+        between = validation[schedule:export]
+        self.assertNotIn('synthesize_description(', between)
+        self.assertIn('samples: description.samples.clone()', between)
+
+    def test_project_voice_change_is_explicit_and_tab_order_is_accessible(self):
+        create = PROJECT[PROJECT.index('WM_CREATE =>'):PROJECT.index('WM_COMMAND =>')]
+        edit = create.index('let edit = CreateWindowExW(')
+        apply_button = create.index('let apply_button = CreateWindowExW(')
+        engine_combo = create.index('let engine_combo = CreateWindowExW(')
+        voice_combo = create.index('let voice_combo = CreateWindowExW(')
+        change_button = create.index('let change_voice_button = CreateWindowExW(')
+        self.assertLess(edit, apply_button)
+        self.assertLess(apply_button, engine_combo)
+        self.assertLess(engine_combo, voice_combo)
+        self.assertLess(voice_combo, change_button)
+        command = PROJECT[PROJECT.index('WM_COMMAND =>'):PROJECT.index('WM_CONTEXTMENU =>')]
+        self.assertIn('ID_CHANGE_VOICE if !state.running => start_voice_change(hwnd, state)', command)
+        self.assertNotIn('ID_VOICE if notification == CBN_SELCHANGE', command)
+        self.assertIn('ID_ENGINE if notification == CBN_SELCHANGE', command)
+
+    def test_project_engine_selection_only_reloads_voices_until_change_button_is_pressed(self):
+        command = PROJECT[PROJECT.index('WM_COMMAND =>'):PROJECT.index('WM_CONTEXTMENU =>')]
+        engine_branch = command[
+            command.index('ID_ENGINE if notification == CBN_SELCHANGE'):
+            command.index('ID_CHANGE_VOICE if !state.running')
+        ]
+        self.assertIn('load_project_voices(hwnd, engine_from_combo(state.engine_combo))', engine_branch)
+        self.assertNotIn('start_voice_change', engine_branch)
+        self.assertIn('EnableWindow(state.change_voice_button, false)', engine_branch)
+        self.assertIn('audio_description.project.change_voice', PROJECT)
+
+    def test_project_voice_loader_supports_all_creation_engines(self):
+        loader = PROJECT[
+            PROJECT.index('fn load_project_voices'):
+            PROJECT.index('fn refill_project_voice_combo')
+        ]
+        self.assertIn('TtsEngine::Edge', loader)
+        self.assertIn('TtsEngine::Sapi5', loader)
+        self.assertIn('TtsEngine::Sapi4', loader)
+        self.assertIn('TtsEngine::Google', loader)
+        create = PROJECT[PROJECT.index('WM_CREATE =>'):PROJECT.index('WM_COMMAND =>')]
+        self.assertIn('"options.engine.edge"', create)
+        self.assertIn('"options.engine.sapi5"', create)
+        self.assertIn('"options.engine.sapi4"', create)
+        self.assertIn('"options.engine.google"', create)
+        self.assertIn('let project_engine = state.project.tts_engine;', create)
+        self.assertIn('load_project_voices(hwnd, project_engine);', create)
+
+    def test_successful_apply_shows_modified_audio_description_dialog(self):
+        apply_done = PROJECT[
+            PROJECT.index('WM_PROJECT_APPLY_DONE =>'):
+            PROJECT.index('WM_PROJECT_VOICES_LOADED =>')
+        ]
+        self.assertIn('edit_saved_title', apply_done)
+        self.assertIn('show_project_info_with_title(', apply_done)
+        self.assertIn('audio_description.project.edit_saved_title', PROJECT)
+
 if __name__ == "__main__":
     unittest.main()

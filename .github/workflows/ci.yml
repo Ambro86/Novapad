@@ -177,8 +177,29 @@ jobs:
         }
         & $env:SENTRY_CLI upload-dif --org $env:SENTRY_ORG --project $env:SENTRY_PROJECT --wait $pdbs.FullName
 
-    - name: Package Application (NSIS)
-      run: cargo packager --release --formats nsis
+    - name: Package Application (NSIS) with Retry
+      shell: powershell
+      run: |
+        $maxAttempts = 5
+        $delaySeconds = 10
+
+        for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+          Write-Host "Packaging NSIS installer (Attempt $attempt/$maxAttempts)..."
+          & cargo packager --release --formats nsis
+          $exitCode = $LASTEXITCODE
+
+          if ($exitCode -eq 0) {
+            Write-Host "NSIS packaging completed successfully."
+            break
+          }
+
+          if ($attempt -eq $maxAttempts) {
+            throw "NSIS packaging failed after $maxAttempts attempts (last exit code: $exitCode)."
+          }
+
+          Write-Warning "NSIS packaging failed with exit code $exitCode. Retrying in $delaySeconds seconds..."
+          Start-Sleep -Seconds $delaySeconds
+        }
 
     - name: Generate WiX Artifacts
       run: cargo packager --release --formats wix || cmd /c "exit /b 0"

@@ -42,6 +42,7 @@ from audio_describer.utils.logger import (  # noqa: E402
 )
 
 CHUNK_DURATION_SECONDS = 180
+GEMINI_FRAME_RATE_FOR_AI = 0
 
 
 def _emit(prefix: str, value) -> None:
@@ -188,7 +189,7 @@ def _configure_omni(request: dict) -> None:
             "enable_extended_audio_description": bool(
                 request.get("allow_extended_pauses", True)
             ),
-            "frame_rate_for_ai": 0,
+            "frame_rate_for_ai": GEMINI_FRAME_RATE_FOR_AI,
             "enable_video_chunking": True,
             "video_chunk_duration_seconds": CHUNK_DURATION_SECONDS,
             "enable_character_glossary": bool(

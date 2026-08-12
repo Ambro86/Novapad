@@ -64,6 +64,28 @@ class BridgeProtocolTests(unittest.TestCase):
                 )
             self.assertIs(captured["enable_character_glossary"], enabled)
 
+    def test_audio_description_keeps_three_minute_chunks_and_default_frame_rate(self):
+        captured = {}
+        with mock.patch.object(
+            bridge.config_model,
+            "configure",
+            side_effect=lambda values: captured.update(values),
+        ), mock.patch.object(bridge.audio_describer, "reset_gemini_client"), mock.patch.object(
+            bridge.gemini_helpers, "set_quota_decision_handler"
+        ):
+            bridge._configure_omni(
+                {
+                    "language": "it",
+                    "gemini_api_key": "test-key",
+                    "gemini_model": "gemini-test",
+                    "verbosity": "detailed",
+                }
+            )
+
+        self.assertEqual(bridge.CHUNK_DURATION_SECONDS, 180)
+        self.assertEqual(captured["video_chunk_duration_seconds"], 180)
+        self.assertEqual(captured["frame_rate_for_ai"], 0)
+
     def test_normalise_descriptions_filters_invalid_rows_and_sorts(self):
         normalized = bridge._normalise_descriptions(
             [

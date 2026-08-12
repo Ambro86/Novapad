@@ -297,9 +297,13 @@ class ChunkTimestampTests(unittest.TestCase):
 
         self.assertIn("GROUND EVERY DESCRIPTION IN ITS EXACT TIME RANGE", system)
         self.assertIn("Never borrow, move, or repeat an action", system)
+        self.assertIn("Temporal grounding has absolute priority", system)
+        self.assertIn("static or mundane description", system)
+        self.assertIn("logo, title card", system)
         self.assertIn("inspect only the frames inside that slot", prompt)
         self.assertIn("never pull an action from a preceding or following scene", prompt)
-        self.assertIn("describe their current visible state or setting", prompt)
+        self.assertIn("including a logo or title card", prompt)
+        self.assertIn("Temporal correctness is more important", prompt)
 
     def test_recent_descriptions_preserve_subject_flow_across_chunk_boundary(self):
         recent = _format_recent_description_context([

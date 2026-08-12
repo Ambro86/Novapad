@@ -2763,10 +2763,15 @@ def _build_unified_prompts(user_prompt, model_name_to_use, dialogue_free_windows
     intensive_mode = bool(intensive_mode or intensive_slots_text)
     selection_directive = (
         "2.  **FILL EVERY USABLE SILENCE:** This is intensive mode. Produce at least one "
-        "description for every numbered mandatory slot supplied by the user. Do not omit a slot, "
-        "even if the view is static. You may add more descriptions inside the same slot when "
-        "distinct, useful visual changes occur and there is enough time. Keep entries chronological, "
-        "non-overlapping, and keep their combined words within the slot's word budget."
+        "description for every numbered mandatory slot supplied by the user. Temporal grounding "
+        "has absolute priority over choosing an interesting action. Do not omit a slot, even if "
+        "the view is static. If no action can be confirmed inside that exact slot, describe only "
+        "what is visibly present there: a logo, title card, setting, framing, stationary character "
+        "or object, or the current resulting state. A static or mundane description that is correct "
+        "for the slot is always preferable to an interesting action seen even a few seconds before "
+        "or after it. You may add more descriptions inside the same slot when distinct, useful visual "
+        "changes occur and there is enough time. Keep entries chronological, non-overlapping, and "
+        "keep their combined words within the slot's word budget."
         if intensive_mode else
         "2.  **BE SELECTIVE AND CONCISE (2 WORDS/SECOND RULE):** Describe only NEW and "
         "PLOT-CRITICAL visual information. A 3-second description can have a maximum of 6 words."
@@ -2854,7 +2859,10 @@ Your entire output MUST be a single JSON object with two top-level keys: "charac
                 "inspect only the frames inside that slot before choosing the text. Every character, "
                 "object, and action named in the entry must be visible inside that exact slot; never "
                 "pull an action from a preceding or following scene. If those frames are static, "
-                "describe their current visible state or setting.",
+                "describe their current visible state or setting, including a logo or title card when "
+                "that is what is actually visible. Temporal correctness is more important than visual "
+                "interest: a plain but correct description is always preferable to an action seen "
+                "outside the slot.",
             ])
         else:
             user_prompt_parts.append(

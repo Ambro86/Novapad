@@ -6,8 +6,8 @@ use std::thread;
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
 use windows::Win32::UI::Controls::Dialogs::{
-    GetOpenFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY, OFN_PATHMUSTEXIST,
-    OPENFILENAMEW,
+    GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY,
+    OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
 };
 use windows::Win32::UI::Controls::{
     PBM_SETPOS, PBM_SETRANGE32, PROGRESS_CLASSW, WC_BUTTON, WC_COMBOBOXW, WC_EDIT, WC_LISTBOXW,
@@ -58,6 +58,8 @@ const ID_CONTEXT_DELETE: usize = 9678;
 const ID_VOICE: usize = 9679;
 const ID_ENGINE: usize = 9680;
 const ID_CHANGE_VOICE: usize = 9681;
+const ID_EXPORT_SRT: usize = 9682;
+const ID_EXPORT_VTT: usize = 9683;
 
 const WM_PROJECT_PROGRESS: u32 = WM_APP + 192;
 const WM_PROJECT_STATUS: u32 = WM_APP + 193;
@@ -95,6 +97,11 @@ struct Labels {
     change_voice: String,
     apply: String,
     export: String,
+    export_srt: String,
+    export_vtt: String,
+    export_subtitle_title: String,
+    export_subtitle_success: String,
+    export_subtitle_error: String,
     cancel: String,
     close: String,
     ready: String,
@@ -140,6 +147,8 @@ struct WindowState {
     status: HWND,
     apply_button: HWND,
     export_button: HWND,
+    export_srt_button: HWND,
+    export_vtt_button: HWND,
     cancel_button: HWND,
     close_button: HWND,
     selected_index: Option<usize>,
@@ -170,6 +179,20 @@ fn labels(language: Language) -> Labels {
         change_voice: i18n::tr(language, "audio_description.project.change_voice"),
         apply: i18n::tr(language, "audio_description.project.apply"),
         export: i18n::tr(language, "audio_description.project.export"),
+        export_srt: i18n::tr(language, "audio_description.project.export_srt"),
+        export_vtt: i18n::tr(language, "audio_description.project.export_vtt"),
+        export_subtitle_title: i18n::tr(
+            language,
+            "audio_description.project.export_subtitle_title",
+        ),
+        export_subtitle_success: i18n::tr(
+            language,
+            "audio_description.project.export_subtitle_success",
+        ),
+        export_subtitle_error: i18n::tr(
+            language,
+            "audio_description.project.export_subtitle_error",
+        ),
         cancel: i18n::tr(language, "audio_description.cancel"),
         close: i18n::tr(language, "audio_description.close"),
         ready: i18n::tr(language, "audio_description.project.status.ready"),
@@ -917,6 +940,8 @@ fn set_controls_enabled(state: &WindowState, enabled: bool) {
             state.apply_button,
             state.engine_combo,
             state.export_button,
+            state.export_srt_button,
+            state.export_vtt_button,
             state.close_button,
         ] {
             EnableWindow(control, enabled);
@@ -1145,6 +1170,178 @@ fn start_voice_change(hwnd: HWND, state: &mut WindowState) {
     });
 }
 
+fn format_project_subtitle_timestamp(seconds: f64, millisecond_separator: char) -> String {
+    let safe_seconds = if seconds.is_finite() {
+        seconds.max(0.0)
+    } else {
+        0.0
+    };
+    let total_ms = (safe_seconds * 1000.0).round() as u64;
+    let hours = total_ms / 3_600_000;
+    let minutes = (total_ms / 60_000) % 60;
+    let secs = (total_ms / 1000) % 60;
+    let millis = total_ms % 1000;
+    format!("{hours:02}:{minutes:02}:{secs:02}{millisecond_separator}{millis:03}")
+}
+
+fn normalized_project_subtitle_text(text: &str) -> String {
+    text.replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .trim()
+        .to_string()
+}
+
+fn render_project_srt(project: &AudioDescriptionProject) -> String {
+    let mut output = String::new();
+    let mut cue_number = 1usize;
+    for description in &project.descriptions {
+        let text = normalized_project_subtitle_text(&description.text);
+        if text.is_empty() {
+            continue;
+        }
+        let start = description.output_start_sec.max(0.0);
+        let end = description.output_end_sec.max(start + 0.001);
+        output.push_str(&format!(
+            "{cue_number}\r\n{} --> {}\r\n{}\r\n\r\n",
+            format_project_subtitle_timestamp(start, ','),
+            format_project_subtitle_timestamp(end, ','),
+            text.replace('\n', "\r\n")
+        ));
+        cue_number += 1;
+    }
+    output
+}
+
+fn render_project_vtt(project: &AudioDescriptionProject) -> String {
+    let mut output = String::from("WEBVTT\r\n\r\n");
+    for description in &project.descriptions {
+        let text = normalized_project_subtitle_text(&description.text);
+        if text.is_empty() {
+            continue;
+        }
+        let start = description.output_start_sec.max(0.0);
+        let end = description.output_end_sec.max(start + 0.001);
+        output.push_str(&format!(
+            "{} --> {}\r\n{}\r\n\r\n",
+            format_project_subtitle_timestamp(start, '.'),
+            format_project_subtitle_timestamp(end, '.'),
+            text.replace('\n', "\r\n")
+        ));
+    }
+    output
+}
+
+fn choose_project_subtitle_output(
+    owner: HWND,
+    language: Language,
+    project: &AudioDescriptionProject,
+    extension: &str,
+) -> Option<PathBuf> {
+    unsafe {
+        let labels = labels(language);
+        let format_name = extension.to_ascii_uppercase();
+        let title = to_wide(
+            &labels
+                .export_subtitle_title
+                .replace("{format}", &format_name),
+        );
+        let all_files = i18n::tr(language, "dialog.all_files");
+        let format_label = if extension.eq_ignore_ascii_case("vtt") {
+            "WebVTT"
+        } else {
+            "SubRip"
+        };
+        let filter = to_wide(&format!(
+            "{format_label} (*.{extension})\0*.{extension}\0{all_files} (*.*)\0*.*\0\0"
+        ));
+        let extension_wide = to_wide(extension);
+        let stem = project
+            .output_mp3_path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .or_else(|| {
+                project
+                    .source_path
+                    .file_stem()
+                    .and_then(|value| value.to_str())
+            })
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or("audiodescrizione");
+        let mut initial = project.output_mp3_path.clone();
+        if let Some(parent) = initial.parent().map(Path::to_path_buf) {
+            initial = parent.join(format!("{stem}.{extension}"));
+        } else {
+            initial = PathBuf::from(format!("{stem}.{extension}"));
+        }
+        let initial_wide = to_wide(&initial.to_string_lossy());
+        let mut buffer = [0_u16; 2048];
+        let copy_len = initial_wide.len().min(buffer.len() - 1);
+        buffer[..copy_len].copy_from_slice(&initial_wide[..copy_len]);
+        let mut dialog = OPENFILENAMEW {
+            lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+            hwndOwner: owner,
+            lpstrFile: PWSTR(buffer.as_mut_ptr()),
+            nMaxFile: buffer.len() as u32,
+            lpstrFilter: PCWSTR(filter.as_ptr()),
+            lpstrTitle: PCWSTR(title.as_ptr()),
+            lpstrDefExt: PCWSTR(extension_wide.as_ptr()),
+            Flags: OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST,
+            ..Default::default()
+        };
+        if !GetSaveFileNameW(&mut dialog).as_bool() {
+            return None;
+        }
+        let len = buffer.iter().position(|value| *value == 0)?;
+        let mut path = PathBuf::from(String::from_utf16_lossy(&buffer[..len]));
+        if !path
+            .extension()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.eq_ignore_ascii_case(extension))
+        {
+            path.set_extension(extension);
+        }
+        Some(path)
+    }
+}
+
+fn export_project_subtitles(hwnd: HWND, state: &WindowState, extension: &str) {
+    if has_unapplied_edit(state) {
+        show_project_error(
+            hwnd,
+            state.language,
+            &labels(state.language).apply_before_export,
+        );
+        return;
+    }
+    let Some(path) =
+        choose_project_subtitle_output(hwnd, state.language, &state.project, extension)
+    else {
+        return;
+    };
+    let contents = if extension.eq_ignore_ascii_case("vtt") {
+        render_project_vtt(&state.project)
+    } else {
+        render_project_srt(&state.project)
+    };
+    let format_name = extension.to_ascii_uppercase();
+    match std::fs::write(&path, contents.as_bytes()) {
+        Ok(()) => {
+            let message = labels(state.language)
+                .export_subtitle_success
+                .replace("{format}", &format_name)
+                .replace("{path}", &path.to_string_lossy());
+            show_project_info(hwnd, state.language, &message);
+        }
+        Err(error) => {
+            let message = labels(state.language)
+                .export_subtitle_error
+                .replace("{format}", &format_name)
+                .replace("{error}", &error.to_string());
+            show_project_error(hwnd, state.language, &message);
+        }
+    }
+}
+
 fn start_export(hwnd: HWND, state: &mut WindowState) {
     if has_unapplied_edit(state) {
         show_error(
@@ -1311,7 +1508,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     16,
                     612,
-                    170,
+                    100,
                     30,
                     hwnd,
                     HMENU(ID_APPLY as isize),
@@ -1438,7 +1635,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     WC_BUTTON,
                     PCWSTR(to_wide(&labels.export).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
-                    330,
+                    126,
                     612,
                     180,
                     30,
@@ -1447,14 +1644,42 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     HINSTANCE(0),
                     None,
                 );
+                let export_srt_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.export_srt).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    316,
+                    612,
+                    110,
+                    30,
+                    hwnd,
+                    HMENU(ID_EXPORT_SRT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let export_vtt_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.export_vtt).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    436,
+                    612,
+                    110,
+                    30,
+                    hwnd,
+                    HMENU(ID_EXPORT_VTT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
                 let cancel_button = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
                     PCWSTR(to_wide(&labels.cancel).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                    520,
+                    556,
                     612,
-                    110,
+                    90,
                     30,
                     hwnd,
                     HMENU(ID_CANCEL as isize),
@@ -1467,9 +1692,9 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     WC_BUTTON,
                     PCWSTR(to_wide(&labels.close).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-                    640,
+                    656,
                     612,
-                    136,
+                    100,
                     30,
                     hwnd,
                     HMENU(ID_CLOSE as isize),
@@ -1490,6 +1715,8 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     change_voice_button,
                     status,
                     export_button,
+                    export_srt_button,
+                    export_vtt_button,
                     cancel_button,
                     close_button,
                 ] {
@@ -1514,6 +1741,8 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     status,
                     apply_button,
                     export_button,
+                    export_srt_button,
+                    export_vtt_button,
                     cancel_button,
                     close_button,
                     selected_index: None,
@@ -1577,6 +1806,8 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     ID_CHANGE_VOICE if !state.running => start_voice_change(hwnd, state),
                     ID_APPLY if !state.running => start_apply(hwnd, state),
                     ID_EXPORT if !state.running => start_export(hwnd, state),
+                    ID_EXPORT_SRT if !state.running => export_project_subtitles(hwnd, state, "srt"),
+                    ID_EXPORT_VTT if !state.running => export_project_subtitles(hwnd, state, "vtt"),
                     ID_CANCEL => {
                         if let Some(cancel) = state.cancel.as_ref() {
                             cancel.store(true, Ordering::Relaxed);

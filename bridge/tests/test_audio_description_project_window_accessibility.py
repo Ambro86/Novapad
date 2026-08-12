@@ -215,6 +215,25 @@ class AudioDescriptionProjectWindowAccessibilityTests(unittest.TestCase):
         self.assertNotIn("show_error(", helper)
         self.assertNotIn("show_blocking_modal_message_box", helper)
 
+
+    def test_project_exports_srt_and_vtt_after_mp3_with_final_timeline(self):
+        create = PROJECT[PROJECT.index("let export_button = CreateWindowExW"):PROJECT.index("let cancel_button = CreateWindowExW")]
+        self.assertLess(create.index("ID_EXPORT as isize"), create.index("ID_EXPORT_SRT as isize"))
+        self.assertLess(create.index("ID_EXPORT_SRT as isize"), create.index("ID_EXPORT_VTT as isize"))
+        self.assertIn("audio_description.project.export_srt", PROJECT)
+        self.assertIn("audio_description.project.export_vtt", PROJECT)
+        self.assertIn("fn render_project_srt", PROJECT)
+        self.assertIn("fn render_project_vtt", PROJECT)
+        self.assertIn("description.output_start_sec", PROJECT)
+        self.assertIn("description.output_end_sec", PROJECT)
+        self.assertIn('String::from("WEBVTT\\r\\n\\r\\n")', PROJECT)
+        self.assertIn("GetSaveFileNameW", PROJECT)
+        self.assertIn("OFN_OVERWRITEPROMPT", PROJECT)
+        command = PROJECT[PROJECT.index("WM_COMMAND =>"):PROJECT.index("WM_CONTEXTMENU =>")]
+        self.assertIn('ID_EXPORT_SRT if !state.running => export_project_subtitles(hwnd, state, "srt")', command)
+        self.assertIn('ID_EXPORT_VTT if !state.running => export_project_subtitles(hwnd, state, "vtt")', command)
+        self.assertIn("has_unapplied_edit(state)", PROJECT)
+
     def test_export_result_messages_return_to_project_description_list(self):
         done = PROJECT[
             PROJECT.index("WM_PROJECT_DONE =>"):

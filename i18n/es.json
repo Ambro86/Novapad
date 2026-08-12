@@ -2077,5 +2077,7 @@
   "daisy_index.hint": "Selecciona un capítulo o sección y pulsa Intro para reproducirlo.",
   "daisy_index.no_audio": "Este libro DAISY no contiene audio sincronizado reproducible. El texto permanece abierto en el editor.",
   "daisy_index.chapter_no_audio": "La sección DAISY seleccionada no contiene audio reproducible.",
-  "daisy_index.finished": "Fin del capítulo DAISY."
+  "daisy_index.finished": "Fin del capítulo DAISY.",
+  "audio_description.project.search": "Buscar descripciones:",
+  "audio_description.project.search_button": "Buscar"
 }

@@ -19,15 +19,16 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL,
     CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CreatePopupMenu, CreateWindowExW,
-    DefWindowProcW, DestroyMenu, DestroyWindow, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN,
-    GetCursorPos, GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES, IsWindowVisible, LB_ADDSTRING,
-    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_SELCHANGE, LBS_HASSTRINGS,
-    LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MB_ICONERROR, MB_ICONINFORMATION,
-    MB_ICONQUESTION, MB_OK, MB_YESNO, MF_STRING, MessageBoxW, PostMessageW, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu,
-    WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_KEYDOWN,
-    WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
-    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    DefWindowProcW, DestroyMenu, DestroyWindow, EN_CHANGE, ES_AUTOHSCROLL, ES_AUTOVSCROLL,
+    ES_MULTILINE, ES_WANTRETURN, GetCursorPos, GetWindowLongPtrW, HMENU, IDC_ARROW, IDYES,
+    IsWindowVisible, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_SELCHANGE,
+    LBS_HASSTRINGS, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY, LoadCursorW, MB_ICONERROR,
+    MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO, MF_STRING, MessageBoxW, PostMessageW,
+    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, TPM_NONOTIFY, TPM_RETURNCMD,
+    TrackPopupMenu, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE,
+    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -60,6 +61,8 @@ const ID_ENGINE: usize = 9680;
 const ID_CHANGE_VOICE: usize = 9681;
 const ID_EXPORT_SRT: usize = 9682;
 const ID_EXPORT_VTT: usize = 9683;
+const ID_SEARCH: usize = 9684;
+const ID_SEARCH_BUTTON: usize = 9685;
 
 const WM_PROJECT_PROGRESS: u32 = WM_APP + 192;
 const WM_PROJECT_STATUS: u32 = WM_APP + 193;
@@ -96,6 +99,8 @@ struct Labels {
     voice: String,
     change_voice: String,
     apply: String,
+    search: String,
+    search_button: String,
     export: String,
     export_srt: String,
     export_vtt: String,
@@ -146,6 +151,9 @@ struct WindowState {
     progress: HWND,
     status: HWND,
     apply_button: HWND,
+    search_edit: HWND,
+    search_button: HWND,
+    display_order: Vec<usize>,
     export_button: HWND,
     export_srt_button: HWND,
     export_vtt_button: HWND,
@@ -178,6 +186,8 @@ fn labels(language: Language) -> Labels {
         voice: i18n::tr(language, "audio_description.voice"),
         change_voice: i18n::tr(language, "audio_description.project.change_voice"),
         apply: i18n::tr(language, "audio_description.project.apply"),
+        search: i18n::tr(language, "audio_description.project.search"),
+        search_button: i18n::tr(language, "audio_description.project.search_button"),
         export: i18n::tr(language, "audio_description.project.export"),
         export_srt: i18n::tr(language, "audio_description.project.export_srt"),
         export_vtt: i18n::tr(language, "audio_description.project.export_vtt"),
@@ -470,12 +480,27 @@ pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessagi
     }
     let key = msg.wParam.0 as u32;
     let current = crate::get_focus_safe();
-    let list = unsafe {
+    let (list, search_edit) = unsafe {
         let pointer =
             GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                 as *mut WindowState;
-        (!pointer.is_null()).then_some((*pointer).list)
+        if pointer.is_null() {
+            (None, None)
+        } else {
+            (Some((*pointer).list), Some((*pointer).search_edit))
+        }
     };
+    if key == VK_RETURN.0 as u32 && search_edit == Some(current) {
+        unsafe {
+            let pointer =
+                GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                    as *mut WindowState;
+            if !pointer.is_null() && !(*pointer).running {
+                apply_description_search(&mut *pointer);
+            }
+        }
+        return true;
+    }
     if (key == VK_SPACE.0 as u32 || key == VK_RETURN.0 as u32) && list == Some(current) {
         crate::log_if_err!(
             crate::post_message_w_safe(hwnd, WM_PROJECT_PLAY_SELECTED, WPARAM(0), LPARAM(0),),
@@ -579,12 +604,32 @@ fn details_text(
     )
 }
 
-fn refill_list(state: &mut WindowState, select: usize) {
+fn description_search_order(project: &AudioDescriptionProject, query: &str) -> Vec<usize> {
+    let query = query.trim().to_lowercase();
+    if query.is_empty() {
+        return (0..project.descriptions.len()).collect();
+    }
+
+    let mut matching = Vec::new();
+    let mut remaining = Vec::new();
+    for (index, description) in project.descriptions.iter().enumerate() {
+        if description.text.to_lowercase().contains(&query) {
+            matching.push(index);
+        } else {
+            remaining.push(index);
+        }
+    }
+    matching.extend(remaining);
+    matching
+}
+
+fn refill_list(state: &mut WindowState, select_project_index: usize) {
     let labels = labels(state.language);
+    state.display_order = description_search_order(&state.project, &get_text(state.search_edit));
     unsafe {
         SendMessageW(state.list, LB_RESETCONTENT, WPARAM(0), LPARAM(0));
-        for index in 0..state.project.descriptions.len() {
-            let row = to_wide(&row_text(&state.project, index, &labels));
+        for project_index in &state.display_order {
+            let row = to_wide(&row_text(&state.project, *project_index, &labels));
             SendMessageW(
                 state.list,
                 LB_ADDSTRING,
@@ -592,20 +637,45 @@ fn refill_list(state: &mut WindowState, select: usize) {
                 LPARAM(row.as_ptr() as isize),
             );
         }
-        if !state.project.descriptions.is_empty() {
-            let index = select.min(state.project.descriptions.len() - 1);
-            SendMessageW(state.list, LB_SETCURSEL, WPARAM(index), LPARAM(0));
-            state.selected_index = Some(index);
-            set_text(state.edit, &state.project.descriptions[index].text);
+        if !state.display_order.is_empty() {
+            let list_index = state
+                .display_order
+                .iter()
+                .position(|index| *index == select_project_index)
+                .unwrap_or(0);
+            let project_index = state.display_order[list_index];
+            SendMessageW(state.list, LB_SETCURSEL, WPARAM(list_index), LPARAM(0));
+            state.selected_index = Some(project_index);
+            set_text(state.edit, &state.project.descriptions[project_index].text);
             set_text(
                 state.details,
-                &details_text(&state.project, index, state.language, &labels),
+                &details_text(&state.project, project_index, state.language, &labels),
             );
         } else {
             state.selected_index = None;
             set_text(state.edit, "");
             set_text(state.details, "");
         }
+    }
+}
+
+fn apply_description_search(state: &mut WindowState) {
+    let query = get_text(state.search_edit);
+    let query = query.trim().to_lowercase();
+    let current = state.selected_index.unwrap_or(0);
+    let target = if query.is_empty() {
+        current
+    } else {
+        state
+            .project
+            .descriptions
+            .iter()
+            .position(|description| description.text.to_lowercase().contains(&query))
+            .unwrap_or(current)
+    };
+    refill_list(state, target);
+    unsafe {
+        SetFocus(state.list);
     }
 }
 
@@ -938,6 +1008,8 @@ fn set_controls_enabled(state: &WindowState, enabled: bool) {
             state.list,
             state.edit,
             state.apply_button,
+            state.search_edit,
+            state.search_button,
             state.engine_combo,
             state.export_button,
             state.export_srt_button,
@@ -1036,7 +1108,7 @@ pub fn open(parent: HWND, owner: HWND, project_path: &Path) {
             140,
             80,
             820,
-            700,
+            760,
             owner,
             HMENU(0),
             hinstance,
@@ -1507,11 +1579,53 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.apply).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     16,
-                    612,
-                    100,
+                    482,
+                    120,
                     30,
                     hwnd,
                     HMENU(ID_APPLY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let search_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.search).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    150,
+                    486,
+                    150,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let search_edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_EDIT,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    300,
+                    482,
+                    346,
+                    26,
+                    hwnd,
+                    HMENU(ID_SEARCH as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let search_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.search_button).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    656,
+                    482,
+                    120,
+                    28,
+                    hwnd,
+                    HMENU(ID_SEARCH_BUTTON as isize),
                     HINSTANCE(0),
                     None,
                 );
@@ -1521,7 +1635,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.engine).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    482,
+                    526,
                     224,
                     20,
                     hwnd,
@@ -1535,7 +1649,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     250,
-                    478,
+                    522,
                     526,
                     180,
                     hwnd,
@@ -1563,7 +1677,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.voice).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    516,
+                    560,
                     96,
                     20,
                     hwnd,
@@ -1577,7 +1691,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     120,
-                    512,
+                    556,
                     462,
                     220,
                     hwnd,
@@ -1592,7 +1706,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.change_voice).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     592,
-                    512,
+                    556,
                     184,
                     30,
                     hwnd,
@@ -1607,7 +1721,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    550,
+                    594,
                     760,
                     20,
                     hwnd,
@@ -1622,7 +1736,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.ready).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    576,
+                    620,
                     760,
                     28,
                     hwnd,
@@ -1636,7 +1750,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.export).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     126,
-                    612,
+                    656,
                     180,
                     30,
                     hwnd,
@@ -1650,7 +1764,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.export_srt).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     316,
-                    612,
+                    656,
                     110,
                     30,
                     hwnd,
@@ -1664,7 +1778,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.export_vtt).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     436,
-                    612,
+                    656,
                     110,
                     30,
                     hwnd,
@@ -1678,7 +1792,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.cancel).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     556,
-                    612,
+                    656,
                     90,
                     30,
                     hwnd,
@@ -1693,7 +1807,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.close).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     656,
-                    612,
+                    656,
                     100,
                     30,
                     hwnd,
@@ -1708,6 +1822,9 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     edit,
                     details,
                     apply_button,
+                    search_label,
+                    search_edit,
+                    search_button,
                     engine_label,
                     engine_combo,
                     voice_label,
@@ -1740,6 +1857,9 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     progress,
                     status,
                     apply_button,
+                    search_edit,
+                    search_button,
+                    display_order: Vec::new(),
                     export_button,
                     export_srt_button,
                     export_vtt_button,
@@ -1779,7 +1899,12 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         let selected =
                             SendMessageW(state.list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
                         if selected >= 0 {
-                            let index = selected as usize;
+                            let list_index = selected as usize;
+                            let index = state
+                                .display_order
+                                .get(list_index)
+                                .copied()
+                                .unwrap_or(list_index);
                             state.selected_index = Some(index);
                             if let Some(description) = state.project.descriptions.get(index) {
                                 set_text(state.edit, &description.text);
@@ -1795,6 +1920,13 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             }
                         }
                     }
+                    ID_SEARCH if notification == EN_CHANGE && !state.running => {
+                        if get_text(state.search_edit).trim().is_empty() {
+                            let selected = state.selected_index.unwrap_or(0);
+                            refill_list(state, selected);
+                        }
+                    }
+                    ID_SEARCH_BUTTON if !state.running => apply_description_search(state),
                     ID_ENGINE if notification == CBN_SELCHANGE && !state.running => {
                         state.voices.clear();
                         SendMessageW(state.voice_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));

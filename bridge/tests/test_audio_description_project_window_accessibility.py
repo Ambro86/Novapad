@@ -216,6 +216,37 @@ class AudioDescriptionProjectWindowAccessibilityTests(unittest.TestCase):
         self.assertNotIn("show_blocking_modal_message_box", helper)
 
 
+    def test_project_search_is_after_apply_and_before_tts_engine_in_tab_order(self):
+        create = PROJECT[PROJECT.index("let apply_button = CreateWindowExW"):PROJECT.index("let voice_label = CreateWindowExW")]
+        self.assertLess(create.index("ID_APPLY as isize"), create.index("ID_SEARCH as isize"))
+        self.assertLess(create.index("ID_SEARCH as isize"), create.index("ID_SEARCH_BUTTON as isize"))
+        self.assertLess(create.index("ID_SEARCH_BUTTON as isize"), create.index("ID_ENGINE as isize"))
+        self.assertIn("audio_description.project.search", PROJECT)
+        self.assertIn("audio_description.project.search_button", PROJECT)
+
+    def test_project_search_prioritizes_matches_without_hiding_other_descriptions(self):
+        self.assertIn("fn description_search_order", PROJECT)
+        search = PROJECT[PROJECT.index("fn description_search_order"):PROJECT.index("fn selected_edit_text")]
+        self.assertIn("matching.push(index)", search)
+        self.assertIn("remaining.push(index)", search)
+        self.assertIn("matching.extend(remaining)", search)
+        self.assertIn("state.display_order", search)
+        command = PROJECT[PROJECT.index("WM_COMMAND =>"):PROJECT.index("WM_CONTEXTMENU =>")]
+        self.assertIn(".display_order", command)
+        self.assertIn("ID_SEARCH_BUTTON if !state.running => apply_description_search(state)", command)
+
+    def test_project_search_enter_focuses_list_and_empty_search_restores_original_order(self):
+        navigation = PROJECT[PROJECT.index("pub fn handle_navigation"):PROJECT.index("fn get_text")]
+        self.assertIn("search_edit == Some(current)", navigation)
+        self.assertIn("apply_description_search(&mut *pointer)", navigation)
+        search = PROJECT[PROJECT.index("fn description_search_order"):PROJECT.index("fn selected_edit_text")]
+        self.assertIn("if query.is_empty()", search)
+        self.assertIn("(0..project.descriptions.len()).collect()", search)
+        self.assertIn("SetFocus(state.list)", search)
+        command = PROJECT[PROJECT.index("WM_COMMAND =>"):PROJECT.index("WM_CONTEXTMENU =>")]
+        self.assertIn("ID_SEARCH if notification == EN_CHANGE", command)
+        self.assertIn("get_text(state.search_edit).trim().is_empty()", command)
+
     def test_project_exports_srt_and_vtt_after_mp3_with_final_timeline(self):
         create = PROJECT[PROJECT.index("let export_button = CreateWindowExW"):PROJECT.index("let cancel_button = CreateWindowExW")]
         self.assertLess(create.index("ID_EXPORT as isize"), create.index("ID_EXPORT_SRT as isize"))

@@ -78,6 +78,7 @@ const WM_AD_QUOTA: u32 = WM_APP + 193;
 const WM_AD_PLAYER_RETURN: u32 = WM_APP + 194;
 const WM_AD_SET_INPUT: u32 = WM_APP + 195;
 const WM_AD_SET_RESUME: u32 = WM_APP + 196;
+const WM_AD_RESET_NEW: u32 = WM_APP + 197;
 
 struct Labels {
     title: String,
@@ -410,13 +411,33 @@ pub fn handle_navigation(hwnd: HWND, msg: &windows::Win32::UI::WindowsAndMessagi
 }
 
 pub fn open(parent: HWND) {
-    open_window(parent);
-}
-
-pub fn open_with_input(parent: HWND, input_path: PathBuf) {
     let hwnd = open_window(parent);
     if hwnd.0 == 0 || !crate::is_window_handle_valid(hwnd) {
         return;
+    }
+    unsafe {
+        SendMessageW(hwnd, WM_AD_RESET_NEW, WPARAM(0), LPARAM(0));
+        ShowWindow(hwnd, SW_SHOW);
+        SetForegroundWindow(hwnd);
+    }
+}
+
+pub fn open_with_input(parent: HWND, input_path: PathBuf) {
+    if !input_path.is_file() || !crate::file_handler::is_video_path(input_path.as_path()) {
+        crate::log_debug(&format!(
+            "Audio description: refusing automatic non-video input {}; opening empty window",
+            input_path.display()
+        ));
+        open(parent);
+        return;
+    }
+
+    let hwnd = open_window(parent);
+    if hwnd.0 == 0 || !crate::is_window_handle_valid(hwnd) {
+        return;
+    }
+    unsafe {
+        SendMessageW(hwnd, WM_AD_RESET_NEW, WPARAM(0), LPARAM(0));
     }
     post_boxed_message(hwnd, WM_AD_SET_INPUT, WPARAM(0), Box::new(input_path));
     unsafe {
@@ -475,7 +496,6 @@ fn continue_interrupted_from_window(hwnd: HWND, state: &WindowState) {
 fn open_window(parent: HWND) -> HWND {
     let existing = with_state(parent, |state| state.audio_description_window).unwrap_or(HWND(0));
     if existing.0 != 0 && crate::is_window_handle_valid(existing) {
-        unsafe { SetForegroundWindow(existing) };
         return existing;
     }
     let language = with_state(parent, |state| state.settings.language).unwrap_or_default();
@@ -2681,6 +2701,38 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 }
                 LRESULT(0)
             }
+            WM_AD_RESET_NEW => {
+                let pointer =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut WindowState;
+                if !pointer.is_null() && !(*pointer).running {
+                    let state = &mut *pointer;
+                    clear_player_return_for_window(hwnd);
+                    state.return_to_editor_after_player = false;
+                    state.source_player_path = None;
+                    state.resume_checkpoint_path = None;
+                    state.resume_mode = false;
+                    state.cancel = None;
+                    state.exhausted_gemini_models.clear();
+
+                    let current_labels = labels(state.language);
+                    set_text(state.input, "");
+                    set_text(state.output, "");
+                    set_text(state.character_catalog_name_edit, "");
+                    set_text(state.gemini_model_label, &current_labels.gemini_model);
+                    set_text(state.start_button, &current_labels.start);
+                    set_text(hwnd, &current_labels.title);
+                    set_text(state.status, &current_labels.ready);
+                    SendMessageW(state.progress, PBM_SETPOS, WPARAM(0), LPARAM(0));
+                    set_controls_enabled(state, true);
+                    update_character_catalog_visibility(state);
+                    SetFocus(state.input);
+                    crate::log_debug(
+                        "Audio description: reset creation window for a fresh empty job",
+                    );
+                }
+                LRESULT(0)
+            }
             WM_AD_SET_RESUME => {
                 let payload = lparam.0 as *mut AudioDescriptionResumeSettings;
                 if payload.is_null() {
@@ -2783,6 +2835,9 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         as *mut WindowState;
                 if !pointer.is_null() && !(*pointer).running {
                     let state = &mut *pointer;
+                    clear_player_return_for_window(hwnd);
+                    state.return_to_editor_after_player = false;
+                    state.source_player_path = Some(input_path.clone());
                     state.resume_checkpoint_path = None;
                     state.resume_mode = false;
                     let current_labels = labels(state.language);

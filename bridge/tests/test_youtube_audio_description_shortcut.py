@@ -121,5 +121,39 @@ class YouTubeAudioDescriptionShortcutTests(unittest.TestCase):
         )
 
 
+    def test_audio_only_context_opens_a_fresh_empty_creation_window(self):
+        self.assertIn(
+            "filter(|path| file_handler::is_video_path(path.as_path()))",
+            MAIN,
+        )
+        self.assertIn(
+            'log_debug("Audio description shortcut: opening empty window");',
+            MAIN,
+        )
+        self.assertIn("SendMessageW(hwnd, WM_AD_RESET_NEW", WINDOW)
+        self.assertIn('set_text(state.input, "");', WINDOW)
+        self.assertIn('set_text(state.output, "");', WINDOW)
+
+    def test_reused_creation_window_clears_stale_player_and_project_state(self):
+        self.assertIn("clear_player_return_for_window(hwnd);", WINDOW)
+        self.assertIn("state.return_to_editor_after_player = false;", WINDOW)
+        self.assertIn("state.source_player_path = None;", WINDOW)
+        self.assertIn("state.resume_checkpoint_path = None;", WINDOW)
+        self.assertIn("state.resume_mode = false;", WINDOW)
+        self.assertIn('set_text(state.character_catalog_name_edit, "");', WINDOW)
+        self.assertGreaterEqual(WINDOW.count("ShowWindow(hwnd, SW_SHOW);"), 2)
+
+    def test_prefill_api_rejects_audio_and_other_non_video_paths(self):
+        self.assertIn(
+            "!input_path.is_file() || !crate::file_handler::is_video_path(input_path.as_path())",
+            WINDOW,
+        )
+        self.assertIn(
+            "refusing automatic non-video input",
+            WINDOW,
+        )
+        self.assertIn("state.source_player_path = Some(input_path.clone());", WINDOW)
+
+
 if __name__ == "__main__":
     unittest.main()

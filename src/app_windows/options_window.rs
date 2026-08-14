@@ -6,12 +6,13 @@ use crate::editor_manager::{
     insert_voice_tag_at_caret, update_window_title,
 };
 use crate::settings::{
-    AudiobookPartAnnouncementMode, AudiobookPartNamingMode, DEFAULT_VOICE_PROFILE_NAME, Language,
-    ListDateDisplayMode, ListTimeDisplayMode, ModifiedMarkerPosition, OpenBehavior,
-    PodcastDeleteConfirmMode, RssDeleteConfirmMode, RssPodcastUnreadLabelPosition, ShortcutBinding,
-    ShortcutSettings, SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, TtsTuning, VOICE_LIST_URL,
-    VoiceInfo, VoiceProfile, apply_voice_profile_to_settings_fields, confirm_title,
-    format_shortcut, save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
+    AudiobookPartAnnouncementMode, AudiobookPartNamingMode, DEFAULT_GEMINI_MODEL,
+    DEFAULT_VOICE_PROFILE_NAME, GEMINI_FLASH_LITE_LATEST_MODEL, Language, ListDateDisplayMode,
+    ListTimeDisplayMode, ModifiedMarkerPosition, OpenBehavior, PodcastDeleteConfirmMode,
+    RssDeleteConfirmMode, RssPodcastUnreadLabelPosition, ShortcutBinding, ShortcutSettings,
+    SubtitleReadMode, TRUSTED_CLIENT_TOKEN, TtsEngine, TtsTuning, VOICE_LIST_URL, VoiceInfo,
+    VoiceProfile, apply_voice_profile_to_settings_fields, confirm_title, format_shortcut,
+    save_settings_with_default_copy, sync_context_menu, sync_start_menu_shortcuts,
     tts_tuning_for_engine, voice_profile_from_settings_fields,
 };
 use crate::{
@@ -64,6 +65,25 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{PCWSTR, PWSTR, w};
 
 const WM_GEMINI_MODELS_LOADED: u32 = WM_APP + 50;
+const GEMINI_FLASH_LATEST_LABEL: &str = "Gemini Flash (latest)";
+const GEMINI_FLASH_LITE_LATEST_LABEL: &str = "Gemini Flash-Lite (latest)";
+
+fn gemini_model_display_label(model: &str) -> &str {
+    match model.trim() {
+        DEFAULT_GEMINI_MODEL => GEMINI_FLASH_LATEST_LABEL,
+        GEMINI_FLASH_LITE_LATEST_MODEL => GEMINI_FLASH_LITE_LATEST_LABEL,
+        other => other,
+    }
+}
+
+fn gemini_model_id_from_combo_text(text: &str) -> String {
+    match text.trim() {
+        GEMINI_FLASH_LATEST_LABEL => DEFAULT_GEMINI_MODEL.to_string(),
+        GEMINI_FLASH_LITE_LATEST_LABEL => GEMINI_FLASH_LITE_LATEST_MODEL.to_string(),
+        other => other.to_string(),
+    }
+}
+
 const OPTIONS_CLASS_NAME: &str = "SonarpadOptions";
 const OPTIONS_ID_LANG: usize = 6001;
 const OPTIONS_ID_MODIFIED_MARKER_POSITION: usize = 6023;
@@ -9622,17 +9642,20 @@ fn initialize_options_dialog(hwnd: HWND) {
 
             SendMessageW(combo_model, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
 
-            // Default model
-            SendMessageW(
-                combo_model,
-                CB_ADDSTRING,
-                WPARAM(0),
-                LPARAM(to_wide(crate::settings::DEFAULT_GEMINI_MODEL).as_ptr() as isize),
-            );
+            for model in [DEFAULT_GEMINI_MODEL, GEMINI_FLASH_LITE_LATEST_MODEL] {
+                SendMessageW(
+                    combo_model,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(to_wide(gemini_model_display_label(model)).as_ptr() as isize),
+                );
+            }
 
-            // If settings model is different, add it too
+            // Preserve an explicitly selected model loaded through "Refresh models".
+            // Fresh/default installations still see only the two rolling aliases above.
             if !settings.gemini_model.is_empty()
-                && settings.gemini_model != crate::settings::DEFAULT_GEMINI_MODEL
+                && settings.gemini_model != DEFAULT_GEMINI_MODEL
+                && settings.gemini_model != GEMINI_FLASH_LITE_LATEST_MODEL
             {
                 SendMessageW(
                     combo_model,
@@ -9642,24 +9665,24 @@ fn initialize_options_dialog(hwnd: HWND) {
                 );
             }
 
-            // Select current model
-            let mut text_wide = to_wide(&settings.gemini_model);
+            let selected_model = if settings.gemini_model.is_empty() {
+                DEFAULT_GEMINI_MODEL
+            } else {
+                settings.gemini_model.as_str()
+            };
+            let mut text_wide = to_wide(gemini_model_display_label(selected_model));
             let index = SendMessageW(
                 combo_model,
                 windows::Win32::UI::WindowsAndMessaging::CB_FINDSTRINGEXACT,
                 WPARAM(usize::MAX),
                 LPARAM(text_wide.as_mut_ptr() as isize),
             );
-            if index.0 >= 0 {
-                SendMessageW(
-                    combo_model,
-                    CB_SETCURSEL,
-                    WPARAM(index.0 as usize),
-                    LPARAM(0),
-                );
-            } else {
-                SendMessageW(combo_model, CB_SETCURSEL, WPARAM(0), LPARAM(0));
-            }
+            SendMessageW(
+                combo_model,
+                CB_SETCURSEL,
+                WPARAM(if index.0 >= 0 { index.0 as usize } else { 0 }),
+                LPARAM(0),
+            );
         }
         if let Some((combo_dictation_microphone, device_ids)) = with_options_state(hwnd, |state| {
             (
@@ -12944,9 +12967,9 @@ fn apply_options_dialog(hwnd: HWND) {
                 == BST_CHECKED.0;
         }
         settings.gemini_api_key = window_text(edit_gemini_api_key).trim().to_string();
-        let gemini_model = window_text(combo_gemini_model).trim().to_string();
+        let gemini_model = gemini_model_id_from_combo_text(&window_text(combo_gemini_model));
         settings.gemini_model = if gemini_model.is_empty() {
-            crate::settings::DEFAULT_GEMINI_MODEL.to_string()
+            DEFAULT_GEMINI_MODEL.to_string()
         } else {
             gemini_model
         };
@@ -15406,16 +15429,27 @@ fn handle_next_gemini_models_payload(hwnd: HWND) {
         let refresh_label = i18n::tr(payload.language, "options.gemini_refresh_models");
         match payload.result {
             Ok(models) => {
+                let selected_model = gemini_model_id_from_combo_text(&window_text(combo_model));
                 crate::send_message_w_safe(combo_model, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-                for model in models {
+
+                let mut selected_index = None;
+                for (index, model) in models.iter().enumerate() {
                     crate::send_message_w_safe(
                         combo_model,
                         CB_ADDSTRING,
                         WPARAM(0),
-                        LPARAM(to_wide(&model).as_ptr() as isize),
+                        LPARAM(to_wide(gemini_model_display_label(model)).as_ptr() as isize),
                     );
+                    if model == &selected_model {
+                        selected_index = Some(index);
+                    }
                 }
-                crate::send_message_w_safe(combo_model, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+                crate::send_message_w_safe(
+                    combo_model,
+                    CB_SETCURSEL,
+                    WPARAM(selected_index.unwrap_or(0)),
+                    LPARAM(0),
+                );
             }
             Err(error) => {
                 let err_msg = i18n::tr_f(

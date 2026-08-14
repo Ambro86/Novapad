@@ -34,8 +34,10 @@ pub const DRIVE_REMOVABLE: u32 = 2;
 pub const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 pub const VOICE_LIST_URL: &str =
     "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list";
-pub const DEFAULT_GEMINI_MODEL: &str = "gemini-3.5-flash";
+pub const DEFAULT_GEMINI_MODEL: &str = "gemini-flash-latest";
+pub const GEMINI_FLASH_LITE_LATEST_MODEL: &str = "gemini-flash-lite-latest";
 pub const DEFAULT_AUDIO_DESCRIPTION_GEMINI_MODEL: &str = "gemini-3.5-flash-lite";
+const LEGACY_DEFAULT_GEMINI_MODEL: &str = "gemini-3.5-flash";
 
 static RAI_LUCE_CODE_CACHE: OnceLock<RwLock<Option<String>>> = OnceLock::new();
 static RAI_LUCE_EXPLICIT_CLEAR_PENDING: AtomicBool = AtomicBool::new(false);
@@ -2529,7 +2531,7 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
         decrypt_gemini_api_key(&settings.gemini_api_key).unwrap_or(settings.gemini_api_key);
     settings.gemini_api_key = settings.gemini_api_key.trim().to_string();
     settings.gemini_model = settings.gemini_model.trim().to_string();
-    if settings.gemini_model.is_empty() {
+    if settings.gemini_model.is_empty() || settings.gemini_model == LEGACY_DEFAULT_GEMINI_MODEL {
         settings.gemini_model = default_gemini_model();
     }
     settings.audio_description_gemini_model =

@@ -721,10 +721,7 @@ impl TranslatorGemini {
         let body = json!({
             "contents": [{
                 "parts": [{"text": prompt}]
-            }],
-            "generationConfig": {
-                "temperature": 0.1,
-            }
+            }]
         });
 
         let api_key = HeaderValue::from_str(self.api_key.trim())

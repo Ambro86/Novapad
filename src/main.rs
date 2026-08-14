@@ -400,6 +400,14 @@ const STARTUP_UPDATE_CHANGELOG_TIMER_ID: usize = 0xD0F2;
 const STARTUP_UPDATE_CHANGELOG_INITIAL_DELAY_MS: u32 = 1000;
 const STARTUP_UPDATE_CHANGELOG_RETRY_INTERVAL_MS: u32 = 250;
 const GEMINI_TRANSLATION_FALLBACK_MODEL: &str = "gemini-2.5-flash";
+
+fn gemini_model_uses_compat_fallback(model: &str) -> bool {
+    let model = model.trim();
+    model.starts_with("gemini-3")
+        || model == crate::settings::DEFAULT_GEMINI_MODEL
+        || model == crate::settings::GEMINI_FLASH_LITE_LATEST_MODEL
+}
+
 const CHAPTER_ANNOUNCE_TIMER_ID: usize = 5;
 const SPELLCHECK_HIGHLIGHT_TIMER_ID: usize = 6;
 const AUDIO_PLAYLIST_TIMER_ID: usize = 7;
@@ -18223,7 +18231,7 @@ fn start_editor_translation_text(
                                     });
                                 }
                                 Err(err) => {
-                                    if settings.gemini_model.starts_with("gemini-3")
+                                    if gemini_model_uses_compat_fallback(&settings.gemini_model)
                                         && !cancel_token.load(Ordering::Relaxed)
                                     {
                                         log_debug(&format!(
@@ -18622,7 +18630,7 @@ fn start_editor_summary_text(
                             Err(translator::TranslatorError::PartialSummary {
                                 summary,
                                 error,
-                            }) if model.starts_with("gemini-3")
+                            }) if gemini_model_uses_compat_fallback(&model)
                                 && !cancel_token.load(Ordering::Relaxed) =>
                             {
                                 log_debug(&format!(
@@ -18685,7 +18693,7 @@ fn start_editor_summary_text(
                                 }
                             }
                             Err(err)
-                                if model.starts_with("gemini-3")
+                                if gemini_model_uses_compat_fallback(&model)
                                     && !cancel_token.load(Ordering::Relaxed) =>
                             {
                                 log_debug(&format!(

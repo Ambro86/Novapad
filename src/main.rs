@@ -1697,7 +1697,7 @@ fn log_path() -> Option<PathBuf> {
     Some(path)
 }
 
-const MAX_LOG_SIZE: u64 = 150 * 1024;
+const MAX_LOG_SIZE: u64 = 1024 * 1024;
 static LOG_WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 fn log_lock_path(log_path: &Path) -> Option<PathBuf> {
@@ -1705,7 +1705,12 @@ fn log_lock_path(log_path: &Path) -> Option<PathBuf> {
     Some(parent.join("Sonarpad.log.lock"))
 }
 
-fn truncate_log_if_needed(path: &Path) {
+fn rotated_log_path(log_path: &Path) -> Option<PathBuf> {
+    let parent = log_path.parent()?;
+    Some(parent.join("Sonarpad.log.1"))
+}
+
+fn rotate_log_if_needed(path: &Path) {
     static LOG_INIT: Once = Once::new();
     LOG_INIT.call_once(|| {
         let Some(lock_path) = log_lock_path(path) else {
@@ -1720,10 +1725,8 @@ fn truncate_log_if_needed(path: &Path) {
                 .open(&lock_path)
             {
                 Ok(mut file) => {
-                    if writeln!(file, "{}", std::process::id()).is_err() {
-                        return;
-                    }
                     lock_acquired = true;
+                    let _write_lock_pid_result = writeln!(file, "{}", std::process::id());
                     break;
                 }
                 Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
@@ -1734,45 +1737,44 @@ fn truncate_log_if_needed(path: &Path) {
                 }
             }
         }
-        if lock_acquired {
-            let needs_truncate = path.metadata().ok().map(|m| m.len() > MAX_LOG_SIZE) == Some(true);
-            if needs_truncate {
-                let mut truncated = false;
-                if let Ok(mut file) = std::fs::OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .truncate(true)
-                    .open(path)
-                {
-                    if writeln!(file, "[INFO] log truncated (exceeded 150 KB)").is_err() {
-                        return;
-                    } else {
-                        truncated = true;
-                    }
-                }
-                if !truncated {
-                    if std::fs::remove_file(path).is_err() {
-                        return;
-                    }
-                    if let Ok(mut file) = std::fs::OpenOptions::new()
-                        .create(true)
-                        .write(true)
-                        .truncate(true)
-                        .open(path)
-                        && writeln!(file, "[INFO] log truncated (exceeded 150 KB)").is_err()
-                    {
-                        return;
-                    }
+        if !lock_acquired {
+            return;
+        }
+
+        let needs_rotation = path.metadata().ok().map(|m| m.len() > MAX_LOG_SIZE) == Some(true);
+        if needs_rotation && let Some(rotated_path) = rotated_log_path(path) {
+            match std::fs::remove_file(&rotated_path) {
+                Ok(()) => {}
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(_) => {
+                    let _remove_lock_result = std::fs::remove_file(&lock_path);
+                    return;
                 }
             }
-            if std::fs::remove_file(&lock_path).is_err() {}
+            if std::fs::rename(path, &rotated_path).is_err() {
+                let _remove_lock_result = std::fs::remove_file(&lock_path);
+                return;
+            }
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(path)
+            {
+                let _write_rotation_marker_result = writeln!(
+                    file,
+                    "[INFO] log rotated (previous log saved as Sonarpad.log.1 after exceeding 1 MB)"
+                );
+            }
         }
+
+        let _remove_lock_result = std::fs::remove_file(&lock_path);
     });
 }
 
 pub(crate) fn log_debug(message: &str) {
     // Isolated SAPI5 workers are monitored by the parent diagnostic log.
-    // Avoid concurrent writes and log truncation races from many child processes.
+    // Avoid concurrent writes and log rotation races from many child processes.
     if std::env::var_os("SONARPAD_SAPI5_WORKER").is_some() {
         return;
     }
@@ -1796,7 +1798,7 @@ fn append_debug_log(path: &Path, message: &str) {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
     };
-    truncate_log_if_needed(path);
+    rotate_log_if_needed(path);
     if let Ok(mut log) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)

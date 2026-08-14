@@ -148,7 +148,8 @@ fn add_text_to_zip<W: Write + std::io::Seek>(
 ///
 /// Include:
 /// - version.txt: informazioni sulla versione e build
-/// - Sonarpad.log: file di log (sanitizzato)
+/// - Sonarpad.log: file di log corrente (sanitizzato)
+/// - Sonarpad.log.1: log precedente dopo la rotazione (se esiste, sanitizzato)
 /// - settings.json: configurazione (sanitizzata)
 /// - last_error.txt: ultimo errore fatale (se esiste)
 /// - sentry_last_event_id.txt: ultimo event ID Sentry (se esiste)
@@ -167,19 +168,23 @@ pub fn export_diagnostics_zip(dest_path: &Path) -> Result<(), String> {
     let log_path = settings_dir.join("Sonarpad.log");
     add_file_to_zip(&mut zip, &log_path, "Sonarpad.log", true)?;
 
-    // 3. settings.json - sanitizzato
+    // 3. Sonarpad.log.1 - log precedente dopo la rotazione, se esiste (sanitizzato)
+    let rotated_log_path = settings_dir.join("Sonarpad.log.1");
+    add_file_to_zip(&mut zip, &rotated_log_path, "Sonarpad.log.1", true)?;
+
+    // 4. settings.json - sanitizzato
     let settings_path = settings_dir.join("settings.json");
     add_file_to_zip(&mut zip, &settings_path, "settings.json", true)?;
 
-    // 4. last_error.txt - se esiste (sanitizzato)
+    // 5. last_error.txt - se esiste (sanitizzato)
     let last_error_path = settings_dir.join("last_error.txt");
     add_file_to_zip(&mut zip, &last_error_path, "last_error.txt", true)?;
 
-    // 5. sentry_last_event_id.txt - se esiste
+    // 6. sentry_last_event_id.txt - se esiste
     let sentry_id_path = settings_dir.join("sentry_last_event_id.txt");
     add_file_to_zip(&mut zip, &sentry_id_path, "sentry_last_event_id.txt", false)?;
 
-    // 6. last_hang.txt - se esiste (info su possibili freeze)
+    // 7. last_hang.txt - se esiste (info su possibili freeze)
     let last_hang_path = settings_dir.join("last_hang.txt");
     add_file_to_zip(&mut zip, &last_hang_path, "last_hang.txt", false)?;
 

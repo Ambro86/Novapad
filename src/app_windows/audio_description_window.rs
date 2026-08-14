@@ -248,6 +248,12 @@ pub(crate) fn blocks_parent_focus(parent: HWND, window: HWND) -> bool {
         && !is_hidden_for_output_player(parent, window)
 }
 
+pub(crate) fn blocks_main_window_close(parent: HWND, window: HWND) -> bool {
+    window.0 != 0
+        && crate::is_window_handle_valid(window)
+        && !is_hidden_for_output_player(parent, window)
+}
+
 pub(crate) fn restore_on_parent_activation(parent: HWND) -> bool {
     let window = with_state(parent, |state| state.audio_description_window).unwrap_or(HWND(0));
     if !blocks_parent_focus(parent, window) {

@@ -353,6 +353,20 @@ class AudioDescriptionProjectWindowAccessibilityTests(unittest.TestCase):
         self.assertIn("post_message_w_safe", cleanup)
         self.assertNotIn("focus_editor(hwnd);", cleanup)
 
+    def test_hidden_output_preview_window_does_not_block_main_alt_f4(self):
+        self.assertIn("pub(crate) fn blocks_main_window_close", WINDOW)
+        close_guard = WINDOW[
+            WINDOW.index("pub(crate) fn blocks_main_window_close"):
+            WINDOW.index("pub(crate) fn restore_on_parent_activation")
+        ]
+        self.assertIn("!is_hidden_for_output_player(parent, window)", close_guard)
+
+        main_close = MAIN[MAIN.index("WM_CLOSE =>") : MAIN.index("WM_DESTROY =>", MAIN.index("WM_CLOSE =>"))]
+        self.assertIn("audio_description_window::blocks_main_window_close", main_close)
+        self.assertIn("hidden for output preview; closing application", main_close)
+        self.assertIn("stale audio-description window handle", main_close)
+        self.assertIn("try_close_app(hwnd);", main_close)
+
     def test_output_preview_focus_is_deferred_until_audio_description_window_is_destroyed(self):
         destroyed = WINDOW[WINDOW.index("WM_DESTROY =>"):WINDOW.index("WM_NCDESTROY =>")]
         self.assertIn("audio_description_window = HWND(0)", destroyed)

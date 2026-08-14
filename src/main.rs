@@ -13446,14 +13446,37 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
             WM_CLOSE => {
                 let audio_description_window =
                     with_state(hwnd, |state| state.audio_description_window).unwrap_or(HWND(0));
-                if audio_description_window.0 != 0
-                    && is_window_handle_valid(audio_description_window)
-                {
+                if app_windows::audio_description_window::blocks_main_window_close(
+                    hwnd,
+                    audio_description_window,
+                ) {
                     log_debug(
                         "Main window close requested while independent audio-description window is open; closing current document instead",
                     );
                     editor_manager::close_current_document(hwnd);
                 } else {
+                    if audio_description_window.0 != 0 {
+                        if is_window_handle_valid(audio_description_window) {
+                            log_debug(
+                                "Main window close requested while audio-description window is hidden for output preview; closing application",
+                            );
+                        } else {
+                            if with_state(hwnd, |state| {
+                                if state.audio_description_window == audio_description_window {
+                                    state.audio_description_window = HWND(0);
+                                }
+                            })
+                            .is_none()
+                            {
+                                log_debug(
+                                    "Audio description: app state unavailable while clearing stale window handle during main close",
+                                );
+                            }
+                            log_debug(
+                                "Main window close found a stale audio-description window handle; cleared it and closing application",
+                            );
+                        }
+                    }
                     try_close_app(hwnd);
                 }
                 LRESULT(0)

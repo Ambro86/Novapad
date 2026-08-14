@@ -13,7 +13,6 @@ VERBOSITY_SHORT = "short"
 VERBOSITY_STANDARD = "standard"
 VERBOSITY_DETAILED = "detailed"
 DEFAULT_VERBOSITY = VERBOSITY_DETAILED
-LOG_FILE = "sonarpad_audio_description_bridge.log"
 LOG_LEVEL = "INFO"
 SUPPORTED_VIDEO_FORMATS = "*.mp4;*.avi;*.mkv;*.webm;*.mov;*.flv;*.wmv;*.mpeg;*.mpg;*.3gp;*.ogv;*.ts;*.m4v;*.divx"
 DEFAULT_YOUTUBE_RESOLUTION = "360p"

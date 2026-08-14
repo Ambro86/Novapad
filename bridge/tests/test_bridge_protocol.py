@@ -42,6 +42,31 @@ class BridgeProtocolTests(unittest.TestCase):
                     bridge._quota_decision_handler("gemini-test", RuntimeError("quota"))
                 )
 
+
+    def test_overload_wait_keeps_same_request_pending(self):
+        emitted = []
+        reply = json.dumps({"action": "wait"}) + "\n"
+        with mock.patch.object(bridge.sys, "stdin", io.StringIO(reply)), mock.patch.object(
+            bridge, "_emit", side_effect=lambda prefix, value: emitted.append((prefix, value))
+        ):
+            decision = bridge._overload_decision_handler(
+                "gemini-flash-lite-latest", RuntimeError("503 high demand")
+            )
+        self.assertTrue(decision)
+        self.assertEqual(emitted[0][0], "OVERLOAD")
+        self.assertEqual(emitted[0][1]["model"], "gemini-flash-lite-latest")
+
+    def test_overload_stop_or_closed_input_cancels_request(self):
+        for input_text in (json.dumps({"action": "stop"}) + "\n", ""):
+            with self.subTest(input_text=input_text), mock.patch.object(
+                bridge.sys, "stdin", io.StringIO(input_text)
+            ), mock.patch.object(bridge, "_emit"):
+                self.assertFalse(
+                    bridge._overload_decision_handler(
+                        "gemini-test", RuntimeError("503 high demand")
+                    )
+                )
+
     def test_character_glossary_setting_is_forwarded_both_ways(self):
         for enabled in (True, False):
             captured = {}
@@ -51,6 +76,8 @@ class BridgeProtocolTests(unittest.TestCase):
                 side_effect=lambda values: captured.update(values),
             ), mock.patch.object(bridge.audio_describer, "reset_gemini_client"), mock.patch.object(
                 bridge.gemini_helpers, "set_quota_decision_handler"
+            ), mock.patch.object(
+                bridge.gemini_helpers, "set_overload_decision_handler"
             ):
                 bridge._configure_omni(
                     {
@@ -72,6 +99,8 @@ class BridgeProtocolTests(unittest.TestCase):
             side_effect=lambda values: captured.update(values),
         ), mock.patch.object(bridge.audio_describer, "reset_gemini_client"), mock.patch.object(
             bridge.gemini_helpers, "set_quota_decision_handler"
+        ), mock.patch.object(
+            bridge.gemini_helpers, "set_overload_decision_handler"
         ):
             bridge._configure_omni(
                 {
@@ -161,6 +190,15 @@ class BridgeProtocolTests(unittest.TestCase):
                 bridge._gemini_status(message)
             status = next(value for prefix, value in emitted if prefix == "STATUS")
             self.assertEqual(status, {"stage": expected_stage, "message": ""})
+
+    def test_windows_host_handles_overload_separately_from_quota(self):
+        root = Path(__file__).resolve().parents[2]
+        bridge_source = (root / "src" / "tools" / "audio_description_bridge.rs").read_text(encoding="utf-8")
+        ui_source = (root / "src" / "app_windows" / "audio_description_window.rs").read_text(encoding="utf-8")
+        self.assertIn('line.strip_prefix("OVERLOAD:")', bridge_source)
+        self.assertIn("AudioDescriptionOverloadDecision::Wait", bridge_source)
+        self.assertIn("WM_AD_OVERLOAD", ui_source)
+        self.assertIn("MB_YESNO | MB_ICONQUESTION", ui_source)
 
     def test_windows_build_script_passes_python_selector_explicitly(self):
         script = (Path(__file__).resolve().parents[1] / "build_audio_description_bridge.ps1").read_text(

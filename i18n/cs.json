@@ -801,7 +801,7 @@
   "options.label.voice_profile": "Profil hlasu",
   "options.label.whisper_cuda": "Povolit CUDA (pro grafické karty Nvidia)",
   "options.label.whisper_include_timestamps": "Zahrnout časové značky do přepisu",
-  "options.label.whisper_keep_original_language": "Zachovat původní jazyk audia",
+  "options.label.whisper_audio_language": "Jazyk zvuku",
   "options.label.whisper_model": "Model Whisper:",
   "options.label.wikipedia_language": "Jazyk Wikipedie:",
   "options.label.word_wrap": "Zalamování řádků v editoru",
@@ -2079,5 +2079,7 @@
   "daisy_index.chapter_no_audio": "Vybraný oddíl DAISY neobsahuje přehrávatelný zvuk.",
   "daisy_index.finished": "Konec kapitoly DAISY.",
   "audio_description.project.search": "Hledat popisy:",
-  "audio_description.project.search_button": "Hledat"
+  "audio_description.project.search_button": "Hledat",
+  "audio_description.overload.title": "Gemini je dočasně přetížený",
+  "audio_description.overload.message": "Model {model} přijímá příliš mnoho požadavků a Gemini opakovaně vrátil 503 UNAVAILABLE. Chcete dále čekat?\n\nPokud zvolíte Ano, Sonarpad bude bez omezení opakovat pokus každých 5 sekund, dokud Gemini neodpoví nebo úlohu ručně nezrušíte. Již dokončená práce zůstane uložena.\n\nPodrobnosti: {error}"
 }

@@ -34,3 +34,6 @@ La richiesta può includere `initial_character_glossary`, una lista opzionale di
 ## Esclusione dei moduli di test Google
 
 Il file `audio_description_bridge.spec` raccoglie separatamente dati, librerie e moduli runtime di `google.genai`. I pacchetti `google.genai.tests`, `google.genai._test_api_client`, `pytest` e `_pytest` sono esclusi perché non servono al worker e causavano un avviso PyInstaller quando `pytest` non era installato.
+
+
+Quando Gemini restituisce ripetutamente 503 UNAVAILABLE per high demand, dopo tre errori consecutivi il worker emette `OVERLOAD` e attende una decisione su stdin: `{"action":"wait"}` oppure `{"action":"stop"}`. Con `wait`, la stessa richiesta continua a essere ritentata senza limite ogni 5 secondi fino al successo o all'annullamento manuale.

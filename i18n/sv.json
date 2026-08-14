@@ -801,7 +801,7 @@
   "options.label.voice_profile": "Röstprofil",
   "options.label.whisper_cuda": "Aktivera CUDA (för Nvidia GPU)",
   "options.label.whisper_include_timestamps": "Inkludera tidsstämplar i transkriptionen",
-  "options.label.whisper_keep_original_language": "Behåll originalspråket i ljudet",
+  "options.label.whisper_audio_language": "Ljudspråk",
   "options.label.whisper_model": "Whisper-modell:",
   "options.label.wikipedia_language": "Wikipedia-språk:",
   "options.label.word_wrap": "Radbrytning i redigeraren",
@@ -2079,5 +2079,7 @@
   "daisy_index.chapter_no_audio": "Det valda DAISY-avsnittet har inget spelbart ljud.",
   "daisy_index.finished": "Slut på DAISY-kapitlet.",
   "audio_description.project.search": "Sök beskrivningar:",
-  "audio_description.project.search_button": "Sök"
+  "audio_description.project.search_button": "Sök",
+  "audio_description.overload.title": "Gemini är tillfälligt överbelastat",
+  "audio_description.overload.message": "Modellen {model} får för många förfrågningar och Gemini har upprepade gånger returnerat 503 UNAVAILABLE. Vill du fortsätta vänta?\n\nOm du väljer Ja fortsätter Sonarpad att försöka utan gräns var 5:e sekund tills Gemini svarar eller du avbryter manuellt. Redan slutfört arbete förblir sparat.\n\nDetaljer: {error}"
 }

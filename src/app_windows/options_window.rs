@@ -121,7 +121,7 @@ const OPTIONS_ID_RAI_LUCE_CODE: usize = 6120;
 const OPTIONS_ID_PODCAST_DIRECTORY_COUNTRY: usize = 6122;
 const OPTIONS_ID_WHISPER_MODEL: usize = 6111;
 const OPTIONS_ID_WHISPER_CUDA: usize = 6112;
-const OPTIONS_ID_WHISPER_KEEP_ORIGINAL_LANGUAGE: usize = 6113;
+const OPTIONS_ID_WHISPER_AUDIO_LANGUAGE: usize = 6113;
 const OPTIONS_ID_WHISPER_INCLUDE_TIMESTAMPS: usize = 6114;
 const OPTIONS_ID_GEMINI_API_KEY: usize = 6146;
 const OPTIONS_ID_GEMINI_GET_KEY: usize = 6147;
@@ -1026,7 +1026,8 @@ struct OptionsDialogState {
     label_whisper_model: HWND,
     combo_whisper_model: HWND,
     checkbox_whisper_cuda: HWND,
-    checkbox_whisper_keep_original_language: HWND,
+    label_whisper_audio_language: HWND,
+    combo_whisper_audio_language: HWND,
     checkbox_whisper_include_timestamps: HWND,
     label_gemini_api_key: HWND,
     edit_gemini_api_key: HWND,
@@ -1300,7 +1301,7 @@ struct OptionsLabels {
     label_rai_luce_code: String,
     label_whisper_model: String,
     label_whisper_cuda: String,
-    label_whisper_keep_original_language: String,
+    label_whisper_audio_language: String,
     label_whisper_include_timestamps: String,
     label_gemini_api_key: String,
     button_gemini_get_key: String,
@@ -1680,10 +1681,7 @@ fn options_labels(language: Language) -> OptionsLabels {
         },
         label_whisper_model: i18n::tr(language, "options.label.whisper_model"),
         label_whisper_cuda: i18n::tr(language, "options.label.whisper_cuda"),
-        label_whisper_keep_original_language: i18n::tr(
-            language,
-            "options.label.whisper_keep_original_language",
-        ),
+        label_whisper_audio_language: i18n::tr(language, "options.label.whisper_audio_language"),
         label_whisper_include_timestamps: i18n::tr(
             language,
             "options.label.whisper_include_timestamps",
@@ -1813,6 +1811,96 @@ fn options_labels(language: Language) -> OptionsLabels {
         ok: i18n::tr(language, "options.ok"),
         cancel: i18n::tr(language, "options.cancel"),
         voices_empty: i18n::tr(language, "options.voices.empty"),
+    }
+}
+
+fn sonarpad_language_index(language: Language) -> usize {
+    match language {
+        Language::Italian => 0,
+        Language::English => 1,
+        Language::Spanish => 2,
+        Language::Portuguese => 3,
+        Language::PortugueseBrazilian => 4,
+        Language::Swedish => 5,
+        Language::Vietnamese => 6,
+        Language::Czech => 7,
+        Language::Polish => 8,
+        Language::French => 9,
+        Language::Serbian => 10,
+        Language::Ukrainian => 11,
+        Language::Lithuanian => 12,
+        Language::Russian => 13,
+        Language::Chinese => 14,
+        Language::Hindi => 15,
+        Language::German => 16,
+    }
+}
+
+fn sonarpad_language_from_index(index: isize) -> Option<Language> {
+    match index {
+        0 => Some(Language::Italian),
+        1 => Some(Language::English),
+        2 => Some(Language::Spanish),
+        3 => Some(Language::Portuguese),
+        4 => Some(Language::PortugueseBrazilian),
+        5 => Some(Language::Swedish),
+        6 => Some(Language::Vietnamese),
+        7 => Some(Language::Czech),
+        8 => Some(Language::Polish),
+        9 => Some(Language::French),
+        10 => Some(Language::Serbian),
+        11 => Some(Language::Ukrainian),
+        12 => Some(Language::Lithuanian),
+        13 => Some(Language::Russian),
+        14 => Some(Language::Chinese),
+        15 => Some(Language::Hindi),
+        16 => Some(Language::German),
+        _ => None,
+    }
+}
+
+fn sonarpad_language_code(language: Language) -> &'static str {
+    match language {
+        Language::Italian => "it",
+        Language::English => "en",
+        Language::German => "de",
+        Language::Spanish => "es",
+        Language::Portuguese => "pt",
+        Language::PortugueseBrazilian => "pt-BR",
+        Language::Swedish => "sv",
+        Language::Vietnamese => "vi",
+        Language::Czech => "cs",
+        Language::Polish => "pl",
+        Language::French => "fr",
+        Language::Serbian => "sr",
+        Language::Ukrainian => "uk",
+        Language::Lithuanian => "lt",
+        Language::Russian => "ru",
+        Language::Chinese => "zh",
+        Language::Hindi => "hi",
+    }
+}
+
+fn whisper_audio_language_from_code(code: &str) -> Option<Language> {
+    match code.trim() {
+        "it" => Some(Language::Italian),
+        "en" => Some(Language::English),
+        "de" => Some(Language::German),
+        "es" => Some(Language::Spanish),
+        "pt" => Some(Language::Portuguese),
+        "pt-BR" | "pt-br" => Some(Language::PortugueseBrazilian),
+        "sv" => Some(Language::Swedish),
+        "vi" => Some(Language::Vietnamese),
+        "cs" => Some(Language::Czech),
+        "pl" => Some(Language::Polish),
+        "fr" => Some(Language::French),
+        "sr" => Some(Language::Serbian),
+        "uk" => Some(Language::Ukrainian),
+        "lt" => Some(Language::Lithuanian),
+        "ru" => Some(Language::Russian),
+        "zh" => Some(Language::Chinese),
+        "hi" => Some(Language::Hindi),
+        _ => None,
     }
 }
 
@@ -5182,20 +5270,60 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     None,
                 );
                 y += 30;
-                let checkbox_whisper_keep_original_language = CreateWindowExW(
+                let label_whisper_audio_language = CreateWindowExW(
                     Default::default(),
-                    WC_BUTTON,
-                    PCWSTR(to_wide(&labels.label_whisper_keep_original_language).as_ptr()),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
-                    170,
+                    WC_STATIC,
+                    PCWSTR(to_wide(&labels.label_whisper_audio_language).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    20,
                     y,
-                    420,
+                    140,
                     20,
                     hwnd,
-                    HMENU(OPTIONS_ID_WHISPER_KEEP_ORIGINAL_LANGUAGE as isize),
+                    HMENU(0),
                     HINSTANCE(0),
                     None,
                 );
+                let combo_whisper_audio_language = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    170,
+                    y - 2,
+                    300,
+                    220,
+                    hwnd,
+                    HMENU(OPTIONS_ID_WHISPER_AUDIO_LANGUAGE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                for language_label in [
+                    labels.lang_it.as_str(),
+                    labels.lang_en.as_str(),
+                    labels.lang_es.as_str(),
+                    labels.lang_pt.as_str(),
+                    labels.lang_pt_br.as_str(),
+                    labels.lang_sv.as_str(),
+                    labels.lang_vi.as_str(),
+                    labels.lang_cs.as_str(),
+                    labels.lang_pl.as_str(),
+                    labels.lang_fr.as_str(),
+                    labels.lang_sr.as_str(),
+                    labels.lang_uk.as_str(),
+                    labels.lang_lt.as_str(),
+                    labels.lang_ru.as_str(),
+                    labels.lang_zh.as_str(),
+                    labels.lang_hi.as_str(),
+                    labels.lang_de.as_str(),
+                ] {
+                    SendMessageW(
+                        combo_whisper_audio_language,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(to_wide(language_label).as_ptr() as isize),
+                    );
+                }
                 y += 30;
                 let checkbox_whisper_include_timestamps = CreateWindowExW(
                     Default::default(),
@@ -6351,7 +6479,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     label_whisper_model,
                     combo_whisper_model,
                     checkbox_whisper_cuda,
-                    checkbox_whisper_keep_original_language,
+                    label_whisper_audio_language,
+                    combo_whisper_audio_language,
                     checkbox_whisper_include_timestamps,
                     label_gemini_api_key,
                     edit_gemini_api_key,
@@ -6564,7 +6693,8 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     label_whisper_model,
                     combo_whisper_model,
                     checkbox_whisper_cuda,
-                    checkbox_whisper_keep_original_language,
+                    label_whisper_audio_language,
+                    combo_whisper_audio_language,
                     checkbox_whisper_include_timestamps,
                     label_gemini_api_key,
                     edit_gemini_api_key,
@@ -7312,7 +7442,8 @@ fn initialize_options_dialog(hwnd: HWND) {
             _label_whisper_model,
             combo_whisper_model,
             _checkbox_whisper_cuda,
-            _checkbox_whisper_keep_original_language,
+            _label_whisper_audio_language,
+            combo_whisper_audio_language,
             _checkbox_whisper_include_timestamps,
             _label_gemini_api_key,
             _edit_gemini_api_key,
@@ -7464,7 +7595,8 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.label_whisper_model,
                 state.combo_whisper_model,
                 state.checkbox_whisper_cuda,
-                state.checkbox_whisper_keep_original_language,
+                state.label_whisper_audio_language,
+                state.combo_whisper_audio_language,
                 state.checkbox_whisper_include_timestamps,
                 state.label_gemini_api_key,
                 state.edit_gemini_api_key,
@@ -9457,20 +9589,15 @@ fn initialize_options_dialog(hwnd: HWND) {
                 LPARAM(0),
             );
         }
-        if let Some(checkbox_whisper_keep_original_language) =
-            with_options_state(hwnd, |state| state.checkbox_whisper_keep_original_language)
-        {
-            SendMessageW(
-                checkbox_whisper_keep_original_language,
-                BM_SETCHECK,
-                WPARAM(if settings.whisper_keep_original_language {
-                    BST_CHECKED.0 as usize
-                } else {
-                    0
-                }),
-                LPARAM(0),
-            );
-        }
+        let whisper_audio_language =
+            whisper_audio_language_from_code(&settings.whisper_audio_language)
+                .unwrap_or(settings.language);
+        SendMessageW(
+            combo_whisper_audio_language,
+            CB_SETCURSEL,
+            WPARAM(sonarpad_language_index(whisper_audio_language)),
+            LPARAM(0),
+        );
         if let Some(checkbox_whisper_include_timestamps) =
             with_options_state(hwnd, |state| state.checkbox_whisper_include_timestamps)
         {
@@ -12790,17 +12917,19 @@ fn apply_options_dialog(hwnd: HWND) {
                 SendMessageW(checkbox_whisper_cuda, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 as u32
                     == BST_CHECKED.0;
         }
-        if let Some(checkbox_whisper_keep_original_language) =
-            with_options_state(hwnd, |state| state.checkbox_whisper_keep_original_language)
+        if let Some(combo_whisper_audio_language) =
+            with_options_state(hwnd, |state| state.combo_whisper_audio_language)
         {
-            settings.whisper_keep_original_language = SendMessageW(
-                checkbox_whisper_keep_original_language,
-                BM_GETCHECK,
+            let selection = SendMessageW(
+                combo_whisper_audio_language,
+                CB_GETCURSEL,
                 WPARAM(0),
                 LPARAM(0),
             )
-            .0 as u32
-                == BST_CHECKED.0;
+            .0;
+            let selected_language =
+                sonarpad_language_from_index(selection).unwrap_or(settings.language);
+            settings.whisper_audio_language = sonarpad_language_code(selected_language).to_string();
         }
         if let Some(checkbox_whisper_include_timestamps) =
             with_options_state(hwnd, |state| state.checkbox_whisper_include_timestamps)
@@ -14192,10 +14321,13 @@ fn layout_ai_transcription_tab(state: &OptionsDialogState, scroll_offset: i32) -
         OPTIONS_COMBO_HEIGHT,
     );
     y = layout_checkbox("checkbox_whisper_cuda", state.checkbox_whisper_cuda, y);
-    y = layout_checkbox(
-        "checkbox_whisper_keep_original_language",
-        state.checkbox_whisper_keep_original_language,
+    y = layout_label_control(
+        "label_whisper_audio_language",
+        state.label_whisper_audio_language,
+        "combo_whisper_audio_language",
+        state.combo_whisper_audio_language,
         y,
+        OPTIONS_COMBO_HEIGHT,
     );
     y = layout_checkbox(
         "checkbox_whisper_include_timestamps",
@@ -14717,7 +14849,8 @@ fn set_active_tab(hwnd: HWND, index: i32) {
             state.label_whisper_model,
             state.combo_whisper_model,
             state.checkbox_whisper_cuda,
-            state.checkbox_whisper_keep_original_language,
+            state.label_whisper_audio_language,
+            state.combo_whisper_audio_language,
             state.checkbox_whisper_include_timestamps,
             state.label_dictation_microphone,
             state.combo_dictation_microphone,

@@ -31,6 +31,8 @@ _MODEL_ID_ALIASES = {
 }
 _VALIDATED_GENERATE_MODELS = set()
 _QUOTA_DECISION_HANDLER = None
+_OVERLOAD_DECISION_HANDLER = None
+OVERLOAD_PROMPT_AFTER_CONSECUTIVE_ERRORS = 3
 
 # Windows Winsock codes that are usually transient (timeout / reset / refused).
 _WIN_TRANSIENT_SOCKET_ERRORS = frozenset({
@@ -179,6 +181,16 @@ def set_quota_decision_handler(handler):
     """
     global _QUOTA_DECISION_HANDLER
     _QUOTA_DECISION_HANDLER = handler
+
+
+def set_overload_decision_handler(handler):
+    """Set the callback for repeated Gemini 503 high-demand errors.
+
+    The callback receives ``(current_model, exception)`` and returns True to
+    keep retrying indefinitely, or False to stop the current job.
+    """
+    global _OVERLOAD_DECISION_HANDLER
+    _OVERLOAD_DECISION_HANDLER = handler
 
 # --- Global Client Instance ---
 _GEMINI_CLIENT = None
@@ -637,6 +649,34 @@ def is_retryable_transient_error(exc: BaseException) -> bool:
     return any(_single_exception_is_retryable(item) for item in chain)
 
 
+def is_high_demand_unavailable_error(exc: BaseException) -> bool:
+    """Return True only for Gemini HTTP 503 high-demand/capacity responses."""
+    seen = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        message = str(current).casefold()
+        code = getattr(current, "code", None)
+        status_code = getattr(current, "status_code", None)
+        response_code = getattr(getattr(current, "response", None), "status_code", None)
+        structured_503 = any(
+            candidate == 503 or str(candidate) == "503"
+            for candidate in (code, status_code, response_code)
+            if candidate is not None
+        )
+        textual_503 = re.search(r"(?<!\d)503(?!\d)", message) is not None
+        high_demand = (
+            "high demand" in message
+            or "spikes in demand" in message
+            or "currently experiencing high demand" in message
+        )
+        unavailable = "unavailable" in message or "service unavailable" in message
+        if (structured_503 or textual_503) and high_demand and unavailable:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
 def is_quota_exhausted_error(exc: BaseException) -> bool:
     """Return True for Gemini 429/resource-exhausted quota responses."""
     seen = set()
@@ -757,6 +797,8 @@ def generate_content_with_retry(client, model, contents, config, status_callback
     configured_model = config_model.get_setting("gemini_model_override")
     current_model = normalize_model_id(configured_model or model)
     quota_prompted_models = set()
+    overload_failures = 0
+    overload_wait_forever = False
     attempt = 0
 
     while True:
@@ -792,6 +834,31 @@ def generate_content_with_retry(client, model, contents, config, status_callback
                     attempt,
                 )
                 raise
+
+            if is_high_demand_unavailable_error(exc):
+                overload_failures += 1
+                if (
+                    not overload_wait_forever
+                    and _OVERLOAD_DECISION_HANDLER is not None
+                    and overload_failures >= OVERLOAD_PROMPT_AFTER_CONSECUTIVE_ERRORS
+                ):
+                    app_logger.warning(
+                        "Gemini high-demand 503 persisted for %d consecutive attempt(s) "
+                        "on model %s; asking the user whether to keep waiting.",
+                        overload_failures, current_model,
+                    )
+                    if not _OVERLOAD_DECISION_HANDLER(current_model, exc):
+                        raise GeminiRetryCancelledError(
+                            _("Processing stopped by the user while Gemini is temporarily overloaded.")
+                        ) from exc
+                    overload_wait_forever = True
+                    app_logger.warning(
+                        "User chose to keep waiting for overloaded Gemini model %s; "
+                        "retrying indefinitely every %ds until success or cancellation.",
+                        current_model, RETRY_DELAY_SEC,
+                    )
+            else:
+                overload_failures = 0
 
             if (
                 is_quota_exhausted_error(exc)

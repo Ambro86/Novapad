@@ -19,11 +19,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_GETCOUNT, CB_GETCURSEL, CB_GETLBTEXT, CB_GETLBTEXTLEN, CB_RESETCONTENT, CB_SETCURSEL,
     CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CreateWindowExW, DefWindowProcW, DestroyWindow,
     ES_AUTOHSCROLL, ES_PASSWORD, GetWindowLongPtrW, HMENU, IDC_ARROW, IDNO, IDYES, IsWindowVisible,
-    LoadCursorW, MB_ICONQUESTION, MB_YESNOCANCEL, MessageBoxW, PostMessageW, SW_HIDE, SW_SHOW,
-    SendMessageW, SetForegroundWindow, SetWindowLongPtrW, ShowWindow, WINDOW_STYLE, WM_APP,
-    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
-    WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME,
-    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    LoadCursorW, MB_ICONQUESTION, MB_YESNO, MB_YESNOCANCEL, MessageBoxW, PostMessageW, SW_HIDE,
+    SW_SHOW, SendMessageW, SetForegroundWindow, SetWindowLongPtrW, ShowWindow, WINDOW_STYLE,
+    WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS,
+    WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
+    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -41,7 +41,9 @@ use crate::settings::{
     DEFAULT_AUDIO_DESCRIPTION_GEMINI_MODEL, Language, TtsEngine, VoiceInfo,
     default_audio_description_save_folder, save_settings,
 };
-use crate::tools::audio_description_bridge::AudioDescriptionQuotaDecision;
+use crate::tools::audio_description_bridge::{
+    AudioDescriptionOverloadDecision, AudioDescriptionQuotaDecision,
+};
 use crate::{show_error, show_info, with_state};
 
 const CLASS_NAME: &str = "SonarpadCreateAudioDescription";
@@ -79,6 +81,7 @@ const WM_AD_PLAYER_RETURN: u32 = WM_APP + 194;
 const WM_AD_SET_INPUT: u32 = WM_APP + 195;
 const WM_AD_SET_RESUME: u32 = WM_APP + 196;
 const WM_AD_RESET_NEW: u32 = WM_APP + 197;
+const WM_AD_OVERLOAD: u32 = WM_APP + 198;
 
 struct Labels {
     title: String,
@@ -110,6 +113,8 @@ struct Labels {
     quota_message: String,
     quota_model_prompt: String,
     quota_no_alternative_models: String,
+    overload_title: String,
+    overload_message: String,
     engine: String,
     voice: String,
     start: String,
@@ -180,6 +185,12 @@ struct QuotaPromptRequest {
     model: String,
     error: String,
     response: mpsc::SyncSender<AudioDescriptionQuotaDecision>,
+}
+
+struct OverloadPromptRequest {
+    model: String,
+    error: String,
+    response: mpsc::SyncSender<AudioDescriptionOverloadDecision>,
 }
 
 #[derive(Clone)]
@@ -365,6 +376,8 @@ fn labels(language: Language) -> Labels {
             language,
             "audio_description.quota.no_alternative_models",
         ),
+        overload_title: i18n::tr(language, "audio_description.overload.title"),
+        overload_message: i18n::tr(language, "audio_description.overload.message"),
         engine: i18n::tr(language, "audio_description.engine"),
         voice: i18n::tr(language, "audio_description.voice"),
         start: i18n::tr(language, "audio_description.start"),
@@ -1491,6 +1504,7 @@ fn start_job(hwnd: HWND, state: &mut WindowState) {
         let status_hwnd = hwnd;
         let progress_hwnd = hwnd;
         let quota_cancel = cancel.clone();
+        let overload_cancel = cancel.clone();
         let result = create_audio_description(
             &job,
             cancel,
@@ -1537,6 +1551,42 @@ fn start_job(hwnd: HWND, state: &mut WindowState) {
                             }
                             Err(mpsc::RecvTimeoutError::Disconnected) => {
                                 return AudioDescriptionQuotaDecision::Stop;
+                            }
+                        }
+                    }
+                })),
+                overload: Some(Box::new(move |model, error| {
+                    let (response, receiver) = mpsc::sync_channel(1);
+                    let payload = Box::new(OverloadPromptRequest {
+                        model: model.to_string(),
+                        error: error.to_string(),
+                        response,
+                    });
+                    let raw_payload = Box::into_raw(payload);
+                    let posted = unsafe {
+                        PostMessageW(
+                            hwnd,
+                            WM_AD_OVERLOAD,
+                            WPARAM(0),
+                            LPARAM(raw_payload as isize),
+                        )
+                    };
+                    if posted.is_err() {
+                        unsafe {
+                            let _released_payload = Box::from_raw(raw_payload);
+                        }
+                        return AudioDescriptionOverloadDecision::Stop;
+                    }
+                    loop {
+                        match receiver.recv_timeout(std::time::Duration::from_millis(100)) {
+                            Ok(decision) => return decision,
+                            Err(mpsc::RecvTimeoutError::Timeout) => {
+                                if overload_cancel.load(Ordering::Relaxed) {
+                                    return AudioDescriptionOverloadDecision::Stop;
+                                }
+                            }
+                            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                                return AudioDescriptionOverloadDecision::Stop;
                             }
                         }
                     }
@@ -2483,6 +2533,57 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     let localized = localized_status_text((*pointer).language, &stage, &message);
                     set_text((*pointer).status, &localized);
                 }
+                LRESULT(0)
+            }
+            WM_AD_OVERLOAD => {
+                let payload = lparam.0 as *mut OverloadPromptRequest;
+                if payload.is_null() {
+                    return LRESULT(0);
+                }
+                let request = *Box::from_raw(payload);
+                let pointer =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut WindowState;
+                if pointer.is_null() {
+                    crate::log_if_err!(
+                        request
+                            .response
+                            .send(AudioDescriptionOverloadDecision::Stop),
+                        "Audio description: overload response channel closed"
+                    );
+                    return LRESULT(0);
+                }
+                let state = &mut *pointer;
+                let labels = labels(state.language);
+                let message = labels
+                    .overload_message
+                    .replace("{model}", &request.model)
+                    .replace("{error}", &request.error);
+                crate::watchdog::enter_modal_dialog();
+                let choice = MessageBoxW(
+                    hwnd,
+                    PCWSTR(to_wide(&message).as_ptr()),
+                    PCWSTR(to_wide(&labels.overload_title).as_ptr()),
+                    MB_YESNO | MB_ICONQUESTION,
+                );
+                crate::watchdog::exit_modal_dialog();
+                let decision = if choice == IDYES {
+                    AudioDescriptionOverloadDecision::Wait
+                } else {
+                    AudioDescriptionOverloadDecision::Stop
+                };
+                crate::log_debug(&format!(
+                    "Audio description: Gemini overload user decision={}",
+                    if matches!(decision, AudioDescriptionOverloadDecision::Wait) {
+                        "wait_forever"
+                    } else {
+                        "stop"
+                    }
+                ));
+                crate::log_if_err!(
+                    request.response.send(decision),
+                    "Audio description: overload response channel closed"
+                );
                 LRESULT(0)
             }
             WM_AD_QUOTA => {

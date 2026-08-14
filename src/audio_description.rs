@@ -6,9 +6,9 @@ use crate::settings::{
 };
 use crate::tools::audio_description_bridge::{
     AudioDescriptionBridgeCallbacks, AudioDescriptionBridgeCheckpoint,
-    AudioDescriptionBridgeRequest, AudioDescriptionBridgeResume, AudioDescriptionPreparedChunk,
-    AudioDescriptionQuotaDecision, BridgeCharacter, BridgeDescription, BridgeInterval,
-    run_audio_description_bridge,
+    AudioDescriptionBridgeRequest, AudioDescriptionBridgeResume, AudioDescriptionOverloadDecision,
+    AudioDescriptionPreparedChunk, AudioDescriptionQuotaDecision, BridgeCharacter,
+    BridgeDescription, BridgeInterval, run_audio_description_bridge,
 };
 use crate::tts_engine::{
     AudiobookCommonOptions, MixedAudiobookConfig, TtsChunk, render_mixed_audiobook_part,
@@ -525,11 +525,14 @@ pub type AudioDescriptionStatusCallback = Box<dyn FnMut(&str, &str) + Send>;
 pub type AudioDescriptionProgressCallback = Box<dyn FnMut(u32) + Send>;
 pub type AudioDescriptionQuotaCallback =
     Box<dyn FnMut(&str, &str) -> AudioDescriptionQuotaDecision + Send>;
+pub type AudioDescriptionOverloadCallback =
+    Box<dyn FnMut(&str, &str) -> AudioDescriptionOverloadDecision + Send>;
 
 pub struct AudioDescriptionCallbacks {
     pub status: Option<AudioDescriptionStatusCallback>,
     pub progress: Option<AudioDescriptionProgressCallback>,
     pub quota: Option<AudioDescriptionQuotaCallback>,
+    pub overload: Option<AudioDescriptionOverloadCallback>,
 }
 
 #[derive(Clone, Debug)]
@@ -2748,6 +2751,7 @@ pub fn create_audio_description(
     let progress_state = callback_state.clone();
     let status_state = callback_state.clone();
     let quota_state = callback_state.clone();
+    let overload_state = callback_state.clone();
     let checkpoint_job = job.clone();
     let checkpoint_target = checkpoint_path.clone();
     let analysis_result = run_audio_description_bridge(
@@ -2786,6 +2790,16 @@ pub fn create_audio_description(
                     .as_mut()
                     .map(|callback| callback(model, error))
                     .unwrap_or(AudioDescriptionQuotaDecision::Wait)
+            })),
+            overload: Some(Box::new(move |model, error| {
+                let Ok(mut callbacks) = overload_state.lock() else {
+                    return AudioDescriptionOverloadDecision::Stop;
+                };
+                callbacks
+                    .overload
+                    .as_mut()
+                    .map(|callback| callback(model, error))
+                    .unwrap_or(AudioDescriptionOverloadDecision::Wait)
             })),
             checkpoint: Some(Box::new(move |checkpoint| {
                 if let Err(error) = save_audio_description_partial_checkpoint(

@@ -876,7 +876,7 @@ pub struct AppSettings {
     #[serde(default)]
     pub whisper_cuda_enabled: bool,
     #[serde(default)]
-    pub whisper_keep_original_language: bool,
+    pub whisper_audio_language: String,
     #[serde(default)]
     pub whisper_include_timestamps: bool,
     pub last_seen_changelog_version: String,
@@ -1353,7 +1353,7 @@ impl Default for AppSettings {
             stream_favorites: Vec::new(),
             whisper_model_profile: String::new(),
             whisper_cuda_enabled: false,
-            whisper_keep_original_language: false,
+            whisper_audio_language: String::new(),
             whisper_include_timestamps: false,
             last_seen_changelog_version: String::new(),
             favorite_voices: Vec::new(),

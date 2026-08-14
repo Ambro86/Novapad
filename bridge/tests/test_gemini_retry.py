@@ -13,6 +13,7 @@ class GeminiRetryTests(unittest.TestCase):
     def tearDown(self):
         self.lazy_import.stop()
         gemini_helpers.set_quota_decision_handler(None)
+        gemini_helpers.set_overload_decision_handler(None)
 
     def test_transient_failure_retries_beyond_thirty_with_fixed_delay(self):
         failures = [TimeoutError("temporary timeout") for _ in range(35)]
@@ -211,6 +212,64 @@ class GeminiRetryTests(unittest.TestCase):
 
         self.assertEqual(client.models.generate_content.call_count, 2)
         sleep_mock.assert_called_once_with(gemini_helpers.RETRY_DELAY_SEC)
+
+
+    def test_high_demand_503_detection_is_specific(self):
+        high_demand = RuntimeError(
+            "503 UNAVAILABLE. This model is currently experiencing high demand. "
+            "Spikes in demand are usually temporary. Please try again later."
+        )
+        generic = RuntimeError("503 UNAVAILABLE: backend maintenance")
+        self.assertTrue(gemini_helpers.is_high_demand_unavailable_error(high_demand))
+        self.assertFalse(gemini_helpers.is_high_demand_unavailable_error(generic))
+
+    def test_high_demand_prompts_after_three_errors_then_retries_indefinitely_without_reprompt(self):
+        error = RuntimeError(
+            "503 UNAVAILABLE. This model is currently experiencing high demand. "
+            "Spikes in demand are usually temporary. Please try again later."
+        )
+        client = mock.Mock()
+        client.models.generate_content.side_effect = [error] * 7 + ["ok"]
+        handler = mock.Mock(return_value=True)
+        gemini_helpers.set_overload_decision_handler(handler)
+
+        with mock.patch.object(
+            gemini_helpers.config_model, "get_setting", return_value=""
+        ), mock.patch.object(gemini_helpers.time, "sleep") as sleep_mock:
+            result = gemini_helpers.generate_content_with_retry(
+                client, "gemini-flash-lite-latest", [], object()
+            )
+
+        self.assertEqual(result, "ok")
+        self.assertEqual(client.models.generate_content.call_count, 8)
+        handler.assert_called_once()
+        self.assertEqual(sleep_mock.call_count, 7)
+        self.assertTrue(
+            all(call.args == (gemini_helpers.RETRY_DELAY_SEC,) for call in sleep_mock.call_args_list)
+        )
+
+    def test_high_demand_cancel_stops_after_third_error(self):
+        error = RuntimeError(
+            "503 UNAVAILABLE. This model is currently experiencing high demand. "
+            "Spikes in demand are usually temporary. Please try again later."
+        )
+        client = mock.Mock()
+        client.models.generate_content.side_effect = error
+        handler = mock.Mock(return_value=False)
+        gemini_helpers.set_overload_decision_handler(handler)
+
+        with mock.patch.object(
+            gemini_helpers.config_model, "get_setting", return_value=""
+        ), mock.patch.object(gemini_helpers.time, "sleep") as sleep_mock, self.assertRaises(
+            gemini_helpers.GeminiRetryCancelledError
+        ):
+            gemini_helpers.generate_content_with_retry(
+                client, "gemini-flash-lite-latest", [], object()
+            )
+
+        self.assertEqual(client.models.generate_content.call_count, 3)
+        handler.assert_called_once()
+        self.assertEqual(sleep_mock.call_count, 2)
 
     def test_quota_can_switch_model_without_losing_current_request(self):
         quota_error = RuntimeError("429 RESOURCE_EXHAUSTED: quota exceeded")

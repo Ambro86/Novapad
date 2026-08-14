@@ -801,7 +801,7 @@
   "options.label.voice_profile": "语音配置",
   "options.label.whisper_cuda": "启用 CUDA（用于 Nvidia 显卡）",
   "options.label.whisper_include_timestamps": "在转录中包含时间戳",
-  "options.label.whisper_keep_original_language": "保留音频原始语言",
+  "options.label.whisper_audio_language": "音频语言",
   "options.label.whisper_model": "Whisper 模型：",
   "options.label.wikipedia_language": "维基百科语言：",
   "options.label.word_wrap": "编辑器中的自动换行",
@@ -2079,5 +2079,7 @@
   "daisy_index.chapter_no_audio": "所选 DAISY 部分没有可播放的音频。",
   "daisy_index.finished": "DAISY 章节结束。",
   "audio_description.project.search": "搜索描述：",
-  "audio_description.project.search_button": "搜索"
+  "audio_description.project.search_button": "搜索",
+  "audio_description.overload.title": "Gemini 暂时过载",
+  "audio_description.overload.message": "模型 {model} 当前收到过多请求，Gemini 已多次返回 503 UNAVAILABLE。是否继续等待？\n\n如果选择“是”，Sonarpad 将每 5 秒无限重试，直到 Gemini 响应或你手动取消。已经完成的工作会保留。\n\n详细信息：{error}"
 }

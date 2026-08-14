@@ -801,7 +801,7 @@
   "options.label.voice_profile": "वॉइस प्रोफ़ाइल",
   "options.label.whisper_cuda": "CUDA सक्षम करें (Nvidia GPU के लिए)",
   "options.label.whisper_include_timestamps": "ट्रांसक्रिप्शन में टाइमस्टैम्प शामिल करें",
-  "options.label.whisper_keep_original_language": "मूल ऑडियो भाषा बनाए रखें",
+  "options.label.whisper_audio_language": "ऑडियो भाषा",
   "options.label.whisper_model": "Whisper मॉडल:",
   "options.label.wikipedia_language": "Wikipedia भाषा:",
   "options.label.word_wrap": "एडिटर में वर्ड रैप",
@@ -2079,5 +2079,7 @@
   "daisy_index.chapter_no_audio": "चुने गए DAISY अनुभाग में चलाने योग्य ऑडियो नहीं है।",
   "daisy_index.finished": "DAISY अध्याय समाप्त।",
   "audio_description.project.search": "विवरण खोजें:",
-  "audio_description.project.search_button": "खोजें"
+  "audio_description.project.search_button": "खोजें",
+  "audio_description.overload.title": "Gemini अस्थायी रूप से अधिक व्यस्त है",
+  "audio_description.overload.message": "मॉडल {model} पर बहुत अधिक अनुरोध आ रहे हैं और Gemini ने कई बार 503 UNAVAILABLE लौटाया है। क्या आप प्रतीक्षा जारी रखना चाहते हैं?\n\nयदि आप हाँ चुनते हैं, तो Sonarpad हर 5 सेकंड में बिना सीमा के पुनः प्रयास करता रहेगा, जब तक Gemini उत्तर न दे या आप मैन्युअल रूप से रद्द न करें। पूरा हो चुका काम सुरक्षित रहेगा।\n\nविवरण: {error}"
 }

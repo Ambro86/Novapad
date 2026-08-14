@@ -7066,6 +7066,29 @@ fn is_whisper_transcribable_audio_file(path: &Path) -> bool {
     )
 }
 
+fn whisper_audio_language_from_setting(code: &str, fallback: Language) -> Language {
+    match code.trim() {
+        "it" => Language::Italian,
+        "en" => Language::English,
+        "de" => Language::German,
+        "es" => Language::Spanish,
+        "pt" => Language::Portuguese,
+        "pt-BR" | "pt-br" => Language::PortugueseBrazilian,
+        "sv" => Language::Swedish,
+        "vi" => Language::Vietnamese,
+        "cs" => Language::Czech,
+        "pl" => Language::Polish,
+        "fr" => Language::French,
+        "sr" => Language::Serbian,
+        "uk" => Language::Ukrainian,
+        "lt" => Language::Lithuanian,
+        "ru" => Language::Russian,
+        "zh" => Language::Chinese,
+        "hi" => Language::Hindi,
+        _ => fallback,
+    }
+}
+
 fn collect_transcribable_audio_files_in_folder(folder: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     let read_dir = match std::fs::read_dir(folder) {
@@ -7097,8 +7120,8 @@ fn collect_transcribable_audio_files_in_folder(folder: &Path) -> Vec<PathBuf> {
 
 fn start_whisper_transcription(hwnd: HWND) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let whisper_keep_original_language =
-        with_state(hwnd, |state| state.settings.whisper_keep_original_language).unwrap_or(false);
+    let whisper_audio_language =
+        with_state(hwnd, |state| state.settings.whisper_audio_language.clone()).unwrap_or_default();
     let whisper_include_timestamps =
         with_state(hwnd, |state| state.settings.whisper_include_timestamps).unwrap_or(false);
     let whisper_cuda_enabled =
@@ -7221,11 +7244,10 @@ fn start_whisper_transcription(hwnd: HWND) {
                 LPARAM(0),
             );
             screen_reader_speak(&i18n::tr(language, "whisper.status.transcribing"));
-            let forced_language = if whisper_keep_original_language {
-                None
-            } else {
-                Some(language)
-            };
+            let forced_language = Some(whisper_audio_language_from_setting(
+                &whisper_audio_language,
+                language,
+            ));
             let mut download_progress_last = -1;
             let bridge_download_progress_callback: Box<dyn FnMut(i32) + Send> =
                 Box::new(move |pct| {
@@ -7364,8 +7386,8 @@ fn start_whisper_transcription(hwnd: HWND) {
 
 fn start_whisper_folder_transcription(hwnd: HWND) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let whisper_keep_original_language =
-        with_state(hwnd, |state| state.settings.whisper_keep_original_language).unwrap_or(false);
+    let whisper_audio_language =
+        with_state(hwnd, |state| state.settings.whisper_audio_language.clone()).unwrap_or_default();
     let whisper_include_timestamps =
         with_state(hwnd, |state| state.settings.whisper_include_timestamps).unwrap_or(false);
     let whisper_cuda_enabled =
@@ -7434,11 +7456,10 @@ fn start_whisper_folder_transcription(hwnd: HWND) {
     std::thread::spawn(move || {
         let result = (|| -> Result<WhisperTranscriptionResult, String> {
             let model = map_profile_to_bridge_model(whisper_profile);
-            let forced_language = if whisper_keep_original_language {
-                None
-            } else {
-                Some(language)
-            };
+            let forced_language = Some(whisper_audio_language_from_setting(
+                &whisper_audio_language,
+                language,
+            ));
             let total = files.len();
             let mut full_text = String::new();
 
@@ -7891,11 +7912,10 @@ fn toggle_voice_dictation(hwnd: HWND) {
                     .map(map_profile_to_bridge_model)
                     .unwrap_or(BridgeModel::Small),
                 state.settings.whisper_cuda_enabled,
-                if state.settings.whisper_keep_original_language {
-                    None
-                } else {
-                    Some(state.settings.language)
-                },
+                Some(whisper_audio_language_from_setting(
+                    &state.settings.whisper_audio_language,
+                    state.settings.language,
+                )),
                 cancel,
                 state.dictation_session_id,
             )

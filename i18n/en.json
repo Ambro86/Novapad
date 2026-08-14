@@ -801,7 +801,7 @@
   "options.label.voice_profile": "Voice profile",
   "options.label.whisper_cuda": "Enable CUDA (for Nvidia GPUs)",
   "options.label.whisper_include_timestamps": "Include timestamps in transcription",
-  "options.label.whisper_keep_original_language": "Keep original audio language",
+  "options.label.whisper_audio_language": "Audio language",
   "options.label.whisper_model": "Whisper model:",
   "options.label.wikipedia_language": "Wikipedia Language:",
   "options.label.word_wrap": "Word Wrap in Editor",
@@ -2079,5 +2079,7 @@
   "daisy_index.chapter_no_audio": "The selected DAISY section has no playable audio.",
   "daisy_index.finished": "End of DAISY chapter.",
   "audio_description.project.search": "Search descriptions:",
-  "audio_description.project.search_button": "Search"
+  "audio_description.project.search_button": "Search",
+  "audio_description.overload.title": "Gemini temporarily overloaded",
+  "audio_description.overload.message": "Model {model} is receiving too many requests and Gemini repeatedly returned 503 UNAVAILABLE. Do you want to keep waiting?\n\nIf you choose Yes, Sonarpad will keep retrying indefinitely every 5 seconds until Gemini responds or you cancel manually. Completed work remains saved.\n\nDetails: {error}"
 }

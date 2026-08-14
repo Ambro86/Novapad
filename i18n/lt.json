@@ -801,7 +801,7 @@
   "options.label.voice_profile": "Balso profilis",
   "options.label.whisper_cuda": "Įjungti CUDA (Nvidia vaizdo plokštėms)",
   "options.label.whisper_include_timestamps": "Įtraukti laiko žymes į transkripciją",
-  "options.label.whisper_keep_original_language": "Išlaikyti originalią garso kalbą",
+  "options.label.whisper_audio_language": "Garso kalba",
   "options.label.whisper_model": "Whisper modelis:",
   "options.label.wikipedia_language": "Vikipedijos kalba:",
   "options.label.word_wrap": "Žodžių perkelimas redaktoriuje",
@@ -2079,5 +2079,7 @@
   "daisy_index.chapter_no_audio": "Pasirinktoje DAISY dalyje nėra atkuriamo garso.",
   "daisy_index.finished": "DAISY skyriaus pabaiga.",
   "audio_description.project.search": "Ieškoti aprašų:",
-  "audio_description.project.search_button": "Ieškoti"
+  "audio_description.project.search_button": "Ieškoti",
+  "audio_description.overload.title": "Gemini laikinai perkrautas",
+  "audio_description.overload.message": "Modelis {model} gauna per daug užklausų ir Gemini kelis kartus grąžino 503 UNAVAILABLE. Ar norite toliau laukti?\n\nPasirinkus Taip, Sonarpad bandys iš naujo neribotai kas 5 sekundes, kol Gemini atsakys arba atšauksite rankiniu būdu. Jau atliktas darbas liks išsaugotas.\n\nIšsami informacija: {error}"
 }

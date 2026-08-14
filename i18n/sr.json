@@ -801,7 +801,7 @@
   "options.label.voice_profile": "Profil glasa",
   "options.label.whisper_cuda": "Omogući CUDA (za Nvidia GPU)",
   "options.label.whisper_include_timestamps": "Uključi vremenske oznake u transkripciju",
-  "options.label.whisper_keep_original_language": "Zadrži originalni jezik zvuka",
+  "options.label.whisper_audio_language": "Jezik zvuka",
   "options.label.whisper_model": "Whisper model:",
   "options.label.wikipedia_language": "Jezik za Vikipediju:",
   "options.label.word_wrap": "Prelamanje teksta u uređivaču",
@@ -2079,5 +2079,7 @@
   "daisy_index.chapter_no_audio": "Izabrani DAISY odeljak nema zvuk koji se može reprodukovati.",
   "daisy_index.finished": "Kraj DAISY poglavlja.",
   "audio_description.project.search": "Претражи описе:",
-  "audio_description.project.search_button": "Претражи"
+  "audio_description.project.search_button": "Претражи",
+  "audio_description.overload.title": "Gemini је привремено преоптерећен",
+  "audio_description.overload.message": "Модел {model} прима превише захтева и Gemini је више пута вратио 503 UNAVAILABLE. Желите ли да наставите да чекате?\n\nАко изаберете Да, Sonarpad ће покушавати неограничено на сваких 5 секунди док Gemini не одговори или ручно не откажете. Већ завршен рад остаје сачуван.\n\nДетаљи: {error}"
 }

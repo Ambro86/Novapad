@@ -801,7 +801,7 @@
   "options.label.voice_profile": "Hồ sơ giọng nói",
   "options.label.whisper_cuda": "Bật CUDA (cho GPU Nvidia)",
   "options.label.whisper_include_timestamps": "Bao gồm mốc thời gian trong bản phiên âm",
-  "options.label.whisper_keep_original_language": "Giữ ngôn ngữ gốc của âm thanh",
+  "options.label.whisper_audio_language": "Ngôn ngữ âm thanh",
   "options.label.whisper_model": "Mô hình Whisper:",
   "options.label.wikipedia_language": "Ngôn ngữ Wikipedia:",
   "options.label.word_wrap": "Tự động xuống dòng trong trình soạn thảo",
@@ -2079,5 +2079,7 @@
   "daisy_index.chapter_no_audio": "Phần DAISY đã chọn không có âm thanh có thể phát.",
   "daisy_index.finished": "Hết chương DAISY.",
   "audio_description.project.search": "Tìm mô tả:",
-  "audio_description.project.search_button": "Tìm"
+  "audio_description.project.search_button": "Tìm",
+  "audio_description.overload.title": "Gemini tạm thời quá tải",
+  "audio_description.overload.message": "Mô hình {model} đang nhận quá nhiều yêu cầu và Gemini đã nhiều lần trả về 503 UNAVAILABLE. Bạn có muốn tiếp tục chờ không?\n\nNếu chọn Có, Sonarpad sẽ tiếp tục thử lại không giới hạn sau mỗi 5 giây cho đến khi Gemini phản hồi hoặc bạn hủy thủ công. Công việc đã hoàn thành vẫn được lưu.\n\nChi tiết: {error}"
 }

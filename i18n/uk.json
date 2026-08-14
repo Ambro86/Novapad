@@ -801,7 +801,7 @@
   "options.label.voice_profile": "Профіль голосу",
   "options.label.whisper_cuda": "Увімкнути CUDA (для відеокарт Nvidia)",
   "options.label.whisper_include_timestamps": "Додати часові мітки до транскрипції",
-  "options.label.whisper_keep_original_language": "Зберегти оригінальну мову аудіо",
+  "options.label.whisper_audio_language": "Мова аудіо",
   "options.label.whisper_model": "Модель Whisper:",
   "options.label.wikipedia_language": "Мова Вікіпедії:",
   "options.label.word_wrap": "Перенесення слів",
@@ -2079,5 +2079,7 @@
   "daisy_index.chapter_no_audio": "Вибраний розділ DAISY не містить відтворюваного аудіо.",
   "daisy_index.finished": "Кінець розділу DAISY.",
   "audio_description.project.search": "Пошук описів:",
-  "audio_description.project.search_button": "Пошук"
+  "audio_description.project.search_button": "Пошук",
+  "audio_description.overload.title": "Gemini тимчасово перевантажений",
+  "audio_description.overload.message": "Модель {model} отримує забагато запитів, і Gemini кілька разів повернув 503 UNAVAILABLE. Продовжити очікування?\n\nЯкщо вибрати Так, Sonarpad повторюватиме запит без обмежень кожні 5 секунд, доки Gemini не відповість або ви не скасуєте вручну. Уже виконана робота залишиться збереженою.\n\nПодробиці: {error}"
 }

@@ -11,9 +11,10 @@ Stdout contains line-oriented events. Only these prefixes are protocol data:
     STATUS:{...json...}
     PROGRESS:<0-100>
     QUOTA:{...json...}
+    OVERLOAD:{...json...}
     RESULT:{...json...}
 
-All logging goes to stderr/a temporary log. The worker performs Pyannote ONNX
+All logging goes to stderr and is merged by the Rust host into Sonarpad's main log. The worker performs Pyannote ONNX
 speech segmentation and Gemini description generation. It never synthesizes,
 mixes, ducks or exports audio; those operations belong to Sonarpad's Rust TTS
 and FFmpeg DLL backends.
@@ -35,11 +36,7 @@ if str(RUNTIME_DIR) not in sys.path:
 from audio_describer.core import audio_describer, speech_detector  # noqa: E402
 from audio_describer.core import gemini_helpers  # noqa: E402
 from audio_describer.models import config_model  # noqa: E402
-from audio_describer.utils.logger import (  # noqa: E402
-    app_logger,
-    get_log_file_path,
-    reset_log_file,
-)
+from audio_describer.utils.logger import app_logger  # noqa: E402
 
 CHUNK_DURATION_SECONDS = 180
 GEMINI_FRAME_RATE_FOR_AI = 0
@@ -104,6 +101,32 @@ def _quota_decision_handler(current_model: str, exc: BaseException):
             model = str(reply.get("model") or "").strip()
             if model:
                 return model
+
+def _overload_decision_handler(current_model: str, exc: BaseException) -> bool:
+    """Ask the Rust host whether to keep retrying after repeated high-demand 503s."""
+    _emit(
+        "OVERLOAD",
+        {
+            "model": str(current_model or ""),
+            "error": str(exc),
+        },
+    )
+    while True:
+        line = sys.stdin.readline()
+        if not line:
+            return False
+        try:
+            reply = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(reply, dict):
+            continue
+        action = str(reply.get("action") or "").strip().lower()
+        if action == "stop":
+            return False
+        if action == "wait":
+            return True
+
 
 def _validate_request(request: dict) -> None:
     input_path = Path(str(request.get("input_path") or ""))
@@ -211,6 +234,7 @@ def _configure_omni(request: dict) -> None:
     )
     audio_describer.reset_gemini_client()
     gemini_helpers.set_quota_decision_handler(_quota_decision_handler)
+    gemini_helpers.set_overload_decision_handler(_overload_decision_handler)
 
 
 _CHUNK_RE = re.compile(r"(?:chunk|segment)\D*(\d+)\s*(?:of|/)\s*(\d+)", re.I)
@@ -463,7 +487,7 @@ def run(request: dict) -> dict:
         "gemini_model": str(
             config_model.get_setting("gemini_model_override") or model
         ),
-        "log_path": get_log_file_path(),
+        "log_path": "",
     }
 
 
@@ -484,6 +508,7 @@ def main() -> int:
             "expects_host_prepared_media": True,
             "contains_tts_or_playback": False,
             "interactive_quota_decisions": True,
+            "interactive_overload_decisions": True,
             "optional_character_glossary": True,
             "persistent_character_catalog_seed": True,
         }
@@ -496,10 +521,7 @@ def main() -> int:
 
     try:
         request = _read_request(args.request)
-        if reset_log_file():
-            app_logger.info("Starting new audio-description job; previous bridge log cleared.")
-        else:
-            app_logger.warning("Could not clear the bridge log before the new audio-description job.")
+        app_logger.info("Starting new audio-description job; logging is merged into Sonarpad log.txt.")
         result = run(request)
         _emit("RESULT", result)
         return 0
@@ -517,7 +539,7 @@ def main() -> int:
                 "ok": False,
                 "error": str(exc),
                 "error_type": type(exc).__name__,
-                "log_path": get_log_file_path(),
+                "log_path": "",
                 "traceback": traceback.format_exc(limit=12),
             },
         )

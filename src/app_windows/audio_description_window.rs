@@ -121,7 +121,6 @@ struct Labels {
     resume_start: String,
     resume_model: String,
     resume_title: String,
-    resume_open_title: String,
     resume_invalid: String,
     cancel: String,
     close: String,
@@ -390,7 +389,6 @@ fn labels(language: Language) -> Labels {
         resume_start: i18n::tr(language, "audio_description.resume.start"),
         resume_model: i18n::tr(language, "audio_description.resume.model"),
         resume_title: i18n::tr(language, "audio_description.resume.title"),
-        resume_open_title: i18n::tr(language, "audio_description.resume.open_title"),
         resume_invalid: i18n::tr(language, "audio_description.resume.invalid"),
         cancel: i18n::tr(language, "audio_description.cancel"),
         close: i18n::tr(language, "audio_description.close"),
@@ -465,34 +463,19 @@ pub fn open_with_input(parent: HWND, input_path: PathBuf) {
     }
 }
 
-fn choose_resume_checkpoint(parent: HWND, language: Language) -> Option<PathBuf> {
-    let labels = labels(language);
-    let all_files = i18n::tr(language, "dialog.all_files");
-    let filter = to_wide(&format!(
-        "Sonarpad audio-description checkpoint (*.sonarpad-ad.partial.json)\0*.sonarpad-ad.partial.json\0{} (*.*)\0*.*\0\0",
-        all_files
-    ));
-    let title = to_wide(&labels.resume_open_title);
-    let mut buffer = [0_u16; 2048];
-    let mut dialog = OPENFILENAMEW {
-        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
-        hwndOwner: parent,
-        lpstrFile: PWSTR(buffer.as_mut_ptr()),
-        nMaxFile: buffer.len() as u32,
-        lpstrFilter: PCWSTR(filter.as_ptr()),
-        lpstrTitle: PCWSTR(title.as_ptr()),
-        Flags: OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_PATHMUSTEXIST,
-        ..Default::default()
-    };
-    if !unsafe { GetOpenFileNameW(&mut dialog).as_bool() } {
-        return None;
-    }
-    let len = buffer.iter().position(|value| *value == 0)?;
-    Some(PathBuf::from(String::from_utf16_lossy(&buffer[..len])))
-}
-
 fn continue_interrupted_from_window(hwnd: HWND, state: &WindowState) {
-    let Some(checkpoint_path) = choose_resume_checkpoint(hwnd, state.language) else {
+    let Some(checkpoint_path) =
+        crate::app_windows::audio_description_resume_window::choose_resume_checkpoint(
+            hwnd,
+            state.parent,
+            state.language,
+        )
+    else {
+        crate::log_debug("Audio description: resume selector cancelled; closing creation window");
+        crate::log_if_err!(
+            crate::post_message_w_safe(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)),
+            "Audio description: PostMessageW failed while closing cancelled resume window"
+        );
         return;
     };
     let resume = match load_audio_description_resume_settings(&checkpoint_path) {
@@ -1443,6 +1426,10 @@ fn start_job(hwnd: HWND, state: &mut WindowState) {
             show_error(state.parent, state.language, &labels.error_same_path);
             return;
         }
+        crate::app_windows::audio_description_resume_window::remember_project_folder(
+            state.parent,
+            &output,
+        );
         let voice_index =
             unsafe { SendMessageW(state.voice_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
         let Some(voice) = (voice_index >= 0)

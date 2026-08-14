@@ -815,6 +815,8 @@ pub struct AppSettings {
     pub audiobook_save_folder: String,
     #[serde(default = "default_audio_description_save_folder")]
     pub audio_description_save_folder: String,
+    #[serde(default)]
+    pub audio_description_recent_project_folders: Vec<String>,
     #[serde(default = "default_media_save_folder")]
     pub media_save_folder: String,
     #[serde(default = "default_documents_save_folder")]
@@ -1321,6 +1323,7 @@ impl Default for AppSettings {
             tv_save_folder: default_tv_save_folder(),
             audiobook_save_folder: default_audiobook_save_folder(),
             audio_description_save_folder: default_audio_description_save_folder(),
+            audio_description_recent_project_folders: Vec::new(),
             media_save_folder: default_media_save_folder(),
             documents_save_folder: default_documents_save_folder(),
             podcast_include_video: false,
@@ -2351,6 +2354,23 @@ fn normalize_settings(mut settings: AppSettings) -> AppSettings {
     if settings.audio_description_save_folder.is_empty() {
         settings.audio_description_save_folder = default_audio_description_save_folder();
     }
+    let mut normalized_audio_description_recent_project_folders = Vec::new();
+    for folder in settings.audio_description_recent_project_folders.drain(..) {
+        let folder = folder.trim().to_string();
+        if folder.is_empty()
+            || normalized_audio_description_recent_project_folders
+                .iter()
+                .any(|known: &String| known.eq_ignore_ascii_case(&folder))
+        {
+            continue;
+        }
+        normalized_audio_description_recent_project_folders.push(folder);
+        if normalized_audio_description_recent_project_folders.len() >= 8 {
+            break;
+        }
+    }
+    settings.audio_description_recent_project_folders =
+        normalized_audio_description_recent_project_folders;
     settings.media_save_folder = settings.media_save_folder.trim().to_string();
     if settings.media_save_folder.is_empty() {
         settings.media_save_folder = default_media_save_folder();
@@ -3805,6 +3825,7 @@ mod audio_description_save_folder_tests {
         ));
         assert!(settings.audio_description_tts_voice.is_empty());
         assert_eq!(settings.audio_description_verbosity, 2);
+        assert!(settings.audio_description_recent_project_folders.is_empty());
         assert!(!settings.audio_description_extended_pauses);
         assert!(settings.audio_description_recognize_characters);
         assert!(!settings.audio_description_keep_character_catalog);

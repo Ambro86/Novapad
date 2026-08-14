@@ -1,5 +1,6 @@
 pub mod about_window;
 pub mod audio_description_project_window;
+pub mod audio_description_resume_window;
 pub mod audio_description_window;
 pub mod audiobook_window;
 pub mod batch_audiobooks_window;

@@ -45,6 +45,17 @@ _BLOCKED_CHUNK_FALLBACK_DURATION_SEC = 60.0
 _BLOCKED_CHUNK_FALLBACK_MIN_DURATION_SEC = 0.5
 _REPEATED_SUBJECT_NAME_MAX_GAP_SEC = 20.0
 _LANGUAGE_DETECTION_MIN_CONFIDENCE = 0.75
+_AUDIO_CONTEXT_ONLY_RULE = (
+    "The soundtrack and dialogue are context only. You may use spoken names, titles, "
+    "relationships, and other dialogue privately to identify or disambiguate visible "
+    "characters and understand the scene. Never put spoken content itself into "
+    "`description_text`: do not transcribe, quote, translate, paraphrase, summarize, "
+    "complete, echo, answer, or restate any spoken line, even partially. A spoken name "
+    "or title may be used only as an identity label when it is confidently linked to the "
+    "visible person. Do not narrate facts learned only from speech as though they were "
+    "visible. Never describe that someone talks, asks, answers, shouts, whispers, or says "
+    "something; describe only new visual information. "
+)
 _LANGUAGE_NAMES = {
     "ar": "Arabic",
     "cs": "Czech",
@@ -2090,7 +2101,7 @@ def _recover_large_chunk_gaps(
         "entry both with the existing descriptions and with every other entry you are about to return. "
         "For example, after describing someone placing a crown, do not describe that person placing "
         "or setting the crown again. Use only a genuinely new visible development or the resulting "
-        "state. " + recovery_subject_rule + "Do not describe speech itself. "
+        "state. " + recovery_subject_rule + _AUDIO_CONTEXT_ONLY_RULE +
         "Return only valid JSON with keys character_glossary (an empty array) "
         "and audio_descriptions. Each audio description must contain start_time_mmss, end_time_mmss "
         "and description_text, using the attached video's MM:SS timeline."
@@ -2582,6 +2593,7 @@ def _request_json_repair_from_gemini(
         "and close the document cleanly.\n"
         "- You may use the attached video to fill gaps or continue from the last good timestamp.\n"
         "- Prefer fewer valid entries over inventing broken structure.\n"
+        "- " + _AUDIO_CONTEXT_ONLY_RULE + "\n" +
         "- Do not wrap the answer in ``` fences."
     )
     user_prompt = (
@@ -2828,7 +2840,7 @@ def _build_unified_prompts(user_prompt, model_name_to_use, dialogue_free_windows
 1.  **DO NOT OVERLAP DIALOGUE:** The most critical rule. Never describe over spoken dialogue. Omit the visual information if there is no sufficiently long dialogue-free window.
 {selection_directive}
 {character_name_directive}
-4.  **Do not describe audible actions:** e.g., "a man talks". Describe new visual information.
+4.  **USE AUDIO ONLY AS PRIVATE CONTEXT — NEVER AS DESCRIPTION CONTENT:** {_AUDIO_CONTEXT_ONLY_RULE}
 5.  **NEVER REPEAT AN ACTION:** Before returning the timeline, compare every description with all
     earlier descriptions in this response. Do not narrate the same continuing action twice by using
     synonyms, character aliases, or extra details. For example, after describing someone placing a

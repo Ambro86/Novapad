@@ -279,6 +279,42 @@ class ChunkTimestampTests(unittest.TestCase):
         self.assertIn("may be reused without being spoken again", prompt)
         self.assertIn("when uncertain, use a generic label", prompt)
 
+    def test_prompt_uses_audio_for_identity_but_never_repeats_dialogue(self):
+        settings = {
+            "application_language": "it",
+            "enable_character_glossary": True,
+            "gemini_description_verbosity": "standard",
+        }
+        with mock.patch(
+            "audio_describer.core.audio_describer.config_model.get_setting",
+            side_effect=lambda key: settings.get(key),
+        ):
+            system, _prompt = _build_unified_prompts("", "gemini-test")
+
+        self.assertIn("USE AUDIO ONLY AS PRIVATE CONTEXT", system)
+        self.assertIn("spoken names, titles", system)
+        self.assertIn("identify or disambiguate visible characters", system)
+        self.assertIn("do not transcribe, quote, translate, paraphrase", system)
+        self.assertIn("complete, echo, answer, or restate any spoken line", system)
+        self.assertIn("identity label", system)
+        self.assertIn("facts learned only from speech", system)
+        self.assertIn("describe only new visual information", system)
+
+    def test_audio_context_rule_also_protects_recovery_and_json_repair(self):
+        from pathlib import Path
+        import audio_describer.core.audio_describer as audio_describer_module
+
+        source = Path(audio_describer_module.__file__).read_text(encoding="utf-8")
+        self.assertGreaterEqual(source.count("_AUDIO_CONTEXT_ONLY_RULE"), 4)
+        self.assertIn(
+            '"state. " + recovery_subject_rule + _AUDIO_CONTEXT_ONLY_RULE +',
+            source,
+        )
+        self.assertIn(
+            '"- " + _AUDIO_CONTEXT_ONLY_RULE + "\\n" +',
+            source,
+        )
+
     def test_intensive_prompt_forbids_borrowing_actions_from_other_times(self):
         settings = {
             "application_language": "it",

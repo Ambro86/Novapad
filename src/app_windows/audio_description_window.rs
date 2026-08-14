@@ -34,7 +34,7 @@ use crate::audio_description::{
     AudioDescriptionResumeSettings, AudioDescriptionVerbosity,
     audio_description_character_catalog_path, audio_description_job_from_checkpoint,
     create_audio_description, language_code, list_audio_description_character_catalogs,
-    load_audio_description_character_catalog_context, load_audio_description_resume_settings,
+    load_audio_description_character_catalog_context,
 };
 use crate::i18n;
 use crate::settings::{
@@ -82,6 +82,7 @@ const WM_AD_SET_INPUT: u32 = WM_APP + 195;
 const WM_AD_SET_RESUME: u32 = WM_APP + 196;
 const WM_AD_RESET_NEW: u32 = WM_APP + 197;
 const WM_AD_OVERLOAD: u32 = WM_APP + 198;
+const WM_AD_RESTORE_RUNNING_FOCUS: u32 = WM_APP + 199;
 
 struct Labels {
     title: String,
@@ -235,16 +236,46 @@ fn is_hidden_for_output_player(parent: HWND, window: HWND) -> bool {
         .is_some_and(|context| context.parent == parent.0 && context.window == window.0)
 }
 
+fn is_running_audio_description_window(window: HWND) -> bool {
+    if window.0 == 0 || !crate::is_window_handle_valid(window) {
+        return false;
+    }
+    unsafe {
+        let pointer = GetWindowLongPtrW(
+            window,
+            windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA,
+        ) as *const WindowState;
+        !pointer.is_null() && (*pointer).running
+    }
+}
+
 pub(crate) fn blocks_parent_focus(parent: HWND, window: HWND) -> bool {
-    window.0 != 0
-        && crate::is_window_handle_valid(window)
-        && unsafe {
-            GetWindowLongPtrW(
-                window,
-                windows::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
-            ) == parent.0
+    if window.0 == 0
+        || !crate::is_window_handle_valid(window)
+        || is_hidden_for_output_player(parent, window)
+    {
+        return false;
+    }
+
+    // The audio-description window is intentionally detached from the main Win32
+    // owner so it has its own taskbar/Alt+Tab lifetime. While a job is running,
+    // delayed editor-focus retries must not steal focus while the progress window
+    // (or another application) is in front. If the user explicitly activates the
+    // Sonarpad main window with Alt+Tab/click, GetForegroundWindow is the parent: in
+    // that case the editor must remain usable and the progress window must not be
+    // forced back to the foreground.
+    if is_running_audio_description_window(window) {
+        unsafe {
+            return windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow() != parent;
         }
-        && !is_hidden_for_output_player(parent, window)
+    }
+
+    unsafe {
+        GetWindowLongPtrW(
+            window,
+            windows::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
+        ) == parent.0
+    }
 }
 
 pub(crate) fn blocks_main_window_close(parent: HWND, window: HWND) -> bool {
@@ -463,12 +494,16 @@ pub fn open_with_input(parent: HWND, input_path: PathBuf) {
     }
 }
 
-fn continue_interrupted_from_window(hwnd: HWND, state: &WindowState) {
-    let Some(checkpoint_path) =
+fn continue_interrupted_from_window(hwnd: HWND, state: &mut WindowState) {
+    let available_models = combo_items(state.gemini_model_combo);
+    let current_model = get_text(state.gemini_model_combo).trim().to_string();
+    let Some(selection) =
         crate::app_windows::audio_description_resume_window::choose_resume_checkpoint(
             hwnd,
             state.parent,
             state.language,
+            available_models,
+            current_model,
         )
     else {
         crate::log_debug("Audio description: resume selector cancelled; closing creation window");
@@ -478,20 +513,30 @@ fn continue_interrupted_from_window(hwnd: HWND, state: &WindowState) {
         );
         return;
     };
-    let resume = match load_audio_description_resume_settings(&checkpoint_path) {
-        Ok(resume) => resume,
-        Err(error) => {
-            let message = labels(state.language)
-                .resume_invalid
-                .replace("{error}", &error);
-            show_error(state.parent, state.language, &message);
-            return;
-        }
-    };
-    post_boxed_message(hwnd, WM_AD_SET_RESUME, WPARAM(0), Box::new(resume));
-    unsafe {
-        ShowWindow(hwnd, SW_SHOW);
-        SetForegroundWindow(hwnd);
+
+    state.resume_checkpoint_path = Some(selection.checkpoint_path);
+    state.resume_mode = false;
+    refill_gemini_model_combo(
+        state.gemini_model_combo,
+        combo_items(state.gemini_model_combo),
+        &selection.gemini_model,
+    );
+    let current_labels = labels(state.language);
+    set_text(hwnd, &current_labels.resume_title);
+    crate::log_debug(&format!(
+        "Audio description: resume selector accepted project and model {}; starting immediately",
+        selection.gemini_model
+    ));
+    start_job(hwnd, state);
+    if state.running {
+        // The project/model selector runs its own modal message loop.  When that child
+        // is destroyed Windows can briefly reactivate the main Sonarpad editor before
+        // this WM_COMMAND returns.  Restore the running audio-description window on the
+        // next message-loop turn, after all selector activation messages have drained.
+        crate::log_if_err!(
+            crate::post_message_w_safe(hwnd, WM_AD_RESTORE_RUNNING_FOCUS, WPARAM(0), LPARAM(0),),
+            "Audio description: failed to schedule running-window focus after resume"
+        );
     }
 }
 
@@ -2941,6 +2986,21 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     );
                     ensure_new_character_catalog_name(state);
                     SetFocus(state.input);
+                }
+                LRESULT(0)
+            }
+            WM_AD_RESTORE_RUNNING_FOCUS => {
+                let pointer =
+                    GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
+                        as *mut WindowState;
+                if !pointer.is_null() && (*pointer).running {
+                    let state = &*pointer;
+                    ShowWindow(hwnd, SW_SHOW);
+                    SetForegroundWindow(hwnd);
+                    SetFocus(state.cancel_button);
+                    crate::log_debug(
+                        "Audio description: restored running resume window after selector close",
+                    );
                 }
                 LRESULT(0)
             }

@@ -75,24 +75,22 @@ class AudioDescriptionResumeTests(unittest.TestCase):
         cancelled_tail = window[cancelled_branch:cancelled_branch + 600]
         self.assertNotIn("remove_file", cancelled_tail)
 
-    def test_resume_dialog_only_exposes_model_choice_and_uses_selected_model(self):
+    def test_resume_selector_owns_model_choice_and_starts_immediately(self):
         window = (ROOT / "src" / "app_windows" / "audio_description_window.rs").read_text(
             encoding="utf-8"
         )
-        self.assertIn("state.resume_mode = true", window)
-        self.assertIn("state.gemini_model_label", window)
-        self.assertIn("state.gemini_model_combo", window)
-        self.assertIn("current_labels.resume_model", window)
-        self.assertIn("let selected_model = get_text(state.gemini_model_combo)", window)
-        self.assertIn("job.gemini_model = selected_model", window)
-        self.assertIn("state.start_button", window)
-        self.assertIn("state.close_button", window)
-        self.assertIn("SetFocus(state.gemini_model_combo)", window)
-        normalized_window = " ".join(window.split())
-        self.assertIn(
-            "if enabled && state.resume_mode { SW_HIDE } else { SW_SHOW }",
-            normalized_window,
-        )
+        selector = (
+            ROOT / "src" / "app_windows" / "audio_description_resume_window.rs"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"audio_description.resume.model"', selector)
+        self.assertIn("model_combo", selector)
+        resume_start = window.index("fn continue_interrupted_from_window")
+        resume_end = window.index("fn open_window", resume_start)
+        resume = window[resume_start:resume_end]
+        self.assertIn("selection.gemini_model", resume)
+        self.assertIn("start_job(hwnd, state);", resume)
+        self.assertNotIn("post_boxed_message(hwnd, WM_AD_SET_RESUME", resume)
+
 
     def test_resume_model_label_is_localized_in_all_windows_locales(self):
         i18n_dir = ROOT / "i18n"

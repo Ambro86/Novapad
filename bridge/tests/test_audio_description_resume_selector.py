@@ -60,6 +60,59 @@ class AudioDescriptionResumeSelectorTests(unittest.TestCase):
         self.assertIn("resume selector cancelled; closing creation window", resume)
         self.assertIn("post_message_w_safe(hwnd, WM_CLOSE", resume)
 
+    def test_selector_combines_project_and_model_before_single_continue(self):
+        selector = SELECTOR.read_text(encoding="utf-8")
+        window = WINDOW.read_text(encoding="utf-8")
+        self.assertIn("pub(crate) struct ResumeSelection", selector)
+        self.assertIn("pub gemini_model: String", selector)
+        self.assertIn('"audio_description.resume.model"', selector)
+        self.assertIn("model_combo", selector)
+        self.assertIn("CBN_SELCHANGE", selector)
+        start = window.index("fn continue_interrupted_from_window")
+        end = window.index("fn open_window", start)
+        resume = window[start:end]
+        self.assertIn("combo_items(state.gemini_model_combo)", resume)
+        self.assertIn("get_text(state.gemini_model_combo)", resume)
+        self.assertIn("selection.gemini_model", resume)
+        self.assertIn("start_job(hwnd, state);", resume)
+        self.assertNotIn("WM_AD_SET_RESUME", resume)
+
+    def test_running_progress_window_blocks_only_automatic_editor_focus(self):
+        window = WINDOW.read_text(encoding="utf-8")
+        start = window.index("fn is_running_audio_description_window")
+        end = window.index("pub(crate) fn blocks_main_window_close", start)
+        focus_guard = window[start:end]
+        self.assertIn("GWLP_USERDATA", focus_guard)
+        self.assertIn("(*pointer).running", focus_guard)
+        self.assertIn("if is_running_audio_description_window(window)", focus_guard)
+        self.assertIn("GetForegroundWindow() != parent", focus_guard)
+        self.assertNotIn("if is_running_audio_description_window(window) {\n        return true;", focus_guard)
+
+    def test_direct_resume_restores_progress_window_after_selector_closes(self):
+        window = WINDOW.read_text(encoding="utf-8")
+        start = window.index("fn continue_interrupted_from_window")
+        end = window.index("fn open_window", start)
+        resume = window[start:end]
+        self.assertIn("start_job(hwnd, state);", resume)
+        self.assertIn("WM_AD_RESTORE_RUNNING_FOCUS", resume)
+        self.assertIn("if state.running", resume)
+
+        handler = window.index("WM_AD_RESTORE_RUNNING_FOCUS =>")
+        focus = window[handler:handler + 900]
+        self.assertIn("ShowWindow(hwnd, SW_SHOW);", focus)
+        self.assertIn("SetForegroundWindow(hwnd);", focus)
+        self.assertIn("SetFocus(state.cancel_button);", focus)
+
+    def test_browse_keeps_selector_open_so_model_can_be_chosen(self):
+        selector = SELECTOR.read_text(encoding="utf-8")
+        command_start = selector.index("ID_BROWSE =>")
+        command_end = selector.index("ID_CANCEL =>", command_start)
+        browse = selector[command_start:command_end]
+        self.assertIn("append_candidate(state, candidate)", browse)
+        self.assertIn("SetFocus(state.model_combo)", browse)
+        self.assertNotIn("*result = Some", browse)
+        self.assertNotIn("DestroyWindow(hwnd)", browse)
+
     def test_resume_selector_labels_are_localized_in_all_windows_locales(self):
         locales = [
             "it", "en", "de", "es", "fr", "pt", "pt-BR", "cs", "pl",

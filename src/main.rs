@@ -836,6 +836,7 @@ pub(crate) fn recover_main_window_after_audio_description(hwnd: HWND, stage: &st
         ));
         return;
     }
+    sync_voice_panel_visibility_for_current_document(hwnd);
     if unsafe { IsWindowEnabled(hwnd).as_bool() } {
         return;
     }
@@ -14589,8 +14590,9 @@ pub(crate) fn sync_voice_panel_visibility_for_current_document(hwnd: HWND) {
                 .get(state.current)
                 .map(|doc| matches!(doc.format, FileFormat::Audiobook))
                 .unwrap_or(false);
+            let player_active = is_audiobook || state.active_mpv_session.is_some();
             (
-                is_audiobook,
+                player_active,
                 state.voice_panel_visible,
                 state.voice_favorites_visible,
                 state.settings.tts_engine,
@@ -14620,7 +14622,7 @@ pub(crate) fn sync_voice_panel_visibility_for_current_document(hwnd: HWND) {
             )
         });
         let Some((
-            is_audiobook,
+            player_active,
             voice_requested,
             favorites_requested,
             tts_engine,
@@ -14652,8 +14654,8 @@ pub(crate) fn sync_voice_panel_visibility_for_current_document(hwnd: HWND) {
             return;
         };
 
-        let voice_visible = voice_requested && !is_audiobook;
-        let favorites_visible = favorites_requested && !is_audiobook;
+        let voice_visible = voice_requested && !player_active;
+        let favorites_visible = favorites_requested && !player_active;
         let show = |control: HWND, visible: bool| {
             if control.0 != 0 {
                 ShowWindow(control, if visible { SW_SHOW } else { SW_HIDE });
@@ -14694,8 +14696,8 @@ pub(crate) fn sync_voice_panel_visibility_for_current_document(hwnd: HWND) {
         show(label_favorites, favorites_visible);
         show(combo_favorites, favorites_visible);
 
-        if is_audiobook {
-            log_debug("Voice panels suppressed for audiobook/player document");
+        if player_active {
+            log_debug("Voice panels suppressed while player playback is active");
             return;
         }
         if voice_visible || favorites_visible {
@@ -14705,15 +14707,16 @@ pub(crate) fn sync_voice_panel_visibility_for_current_document(hwnd: HWND) {
 }
 
 pub(crate) fn refresh_voice_panel(hwnd: HWND) {
-    let current_is_audiobook = with_state(hwnd, |state| {
+    let player_active = with_state(hwnd, |state| {
         state
             .docs
             .get(state.current)
             .map(|doc| matches!(doc.format, FileFormat::Audiobook))
             .unwrap_or(false)
+            || state.active_mpv_session.is_some()
     })
     .unwrap_or(false);
-    if current_is_audiobook {
+    if player_active {
         sync_voice_panel_visibility_for_current_document(hwnd);
         return;
     }
@@ -19490,6 +19493,9 @@ fn is_focus_in_voice_panel(hwnd: HWND) -> bool {
 }
 
 fn handle_voice_panel_tab(hwnd: HWND) -> bool {
+    if is_mpv_playback_active(hwnd) {
+        return false;
+    }
     unsafe {
         let (
             visible,

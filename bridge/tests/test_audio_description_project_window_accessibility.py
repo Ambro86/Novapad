@@ -317,6 +317,25 @@ class AudioDescriptionProjectWindowAccessibilityTests(unittest.TestCase):
         self.assertIn("state.audio_description_project_window", keyboard)
         self.assertIn("IsWindowVisible(state.audio_description_project_window)", keyboard)
 
+    def test_voice_panels_stay_hidden_while_mpv_player_is_active(self):
+        sync_start = MAIN.index("pub(crate) fn sync_voice_panel_visibility_for_current_document")
+        sync_end = MAIN.index("pub(crate) fn refresh_voice_panel", sync_start)
+        sync = MAIN[sync_start:sync_end]
+        self.assertIn("state.active_mpv_session.is_some()", sync)
+        self.assertIn("voice_requested && !player_active", sync)
+        self.assertIn("favorites_requested && !player_active", sync)
+
+        tab_start = MAIN.index("fn handle_voice_panel_tab")
+        tab_end = MAIN.index("fn is_modifier_vk", tab_start)
+        tab = MAIN[tab_start:tab_end]
+        self.assertIn("if is_mpv_playback_active(hwnd)", tab)
+        self.assertIn("return false;", tab)
+
+        recovery_start = MAIN.index("fn recover_main_window_after_audio_description")
+        recovery_end = MAIN.index("fn defer_copydata_paths_while_main_window_disabled", recovery_start)
+        recovery = MAIN[recovery_start:recovery_end]
+        self.assertIn("sync_voice_panel_visibility_for_current_document(hwnd);", recovery)
+
     def test_closing_after_output_preview_returns_to_normal_editor(self):
         destroyed = WINDOW[WINDOW.index("WM_DESTROY =>"):WINDOW.index("WM_NCDESTROY =>")]
         self.assertIn("return_to_editor_after_player", destroyed)

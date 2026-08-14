@@ -11,12 +11,13 @@ use windows::Win32::UI::Controls::Dialogs::{
 use windows::Win32::UI::Controls::{WC_BUTTON, WC_COMBOBOXW, WC_STATIC};
 use windows::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus, VK_ESCAPE};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL, CB_SETCURSEL, CBS_DROPDOWNLIST, CREATESTRUCTW,
-    CW_USEDEFAULT, CreateWindowExW, DestroyWindow, DispatchMessageW, GWLP_USERDATA,
-    GetWindowLongPtrW, HMENU, IDC_ARROW, IsDialogMessageW, LoadCursorW, MSG, SendMessageW,
-    SetForegroundWindow, SetWindowLongPtrW, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND,
-    WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    BS_DEFPUSHBUTTON, CB_ADDSTRING, CB_FINDSTRINGEXACT, CB_GETCURSEL, CB_GETLBTEXT,
+    CB_GETLBTEXTLEN, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT,
+    CreateWindowExW, DestroyWindow, DispatchMessageW, GWLP_USERDATA, GetWindowLongPtrW, HMENU,
+    IDC_ARROW, IsDialogMessageW, LoadCursorW, MSG, SendMessageW, SetForegroundWindow,
+    SetWindowLongPtrW, TranslateMessage, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_KEYDOWN,
+    WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE,
+    WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, PWSTR};
 
@@ -28,9 +29,10 @@ use crate::with_state;
 
 const CLASS_NAME: &str = "SonarpadAudioDescriptionResumeSelector";
 const ID_PROJECT: usize = 9681;
-const ID_CONTINUE: usize = 9682;
-const ID_BROWSE: usize = 9683;
-const ID_CANCEL: usize = 9684;
+const ID_MODEL: usize = 9682;
+const ID_CONTINUE: usize = 9683;
+const ID_BROWSE: usize = 9684;
+const ID_CANCEL: usize = 9685;
 const CHECKPOINT_SUFFIX: &str = ".sonarpad-ad.partial.json";
 const MAX_RECENT_FOLDERS: usize = 8;
 
@@ -38,22 +40,34 @@ const MAX_RECENT_FOLDERS: usize = 8;
 struct ResumeCandidate {
     path: PathBuf,
     label: String,
+    gemini_model: String,
     modified: SystemTime,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ResumeSelection {
+    pub checkpoint_path: PathBuf,
+    pub gemini_model: String,
 }
 
 struct ResumeSelectorInit {
     app_parent: HWND,
     language: Language,
     candidates: Vec<ResumeCandidate>,
-    result: Arc<Mutex<Option<PathBuf>>>,
+    available_models: Vec<String>,
+    selected_model: String,
+    result: Arc<Mutex<Option<ResumeSelection>>>,
 }
 
 struct ResumeSelectorState {
     app_parent: HWND,
     language: Language,
     combo: HWND,
+    model_combo: HWND,
+    continue_button: HWND,
     candidates: Vec<ResumeCandidate>,
-    result: Arc<Mutex<Option<PathBuf>>>,
+    available_models: Vec<String>,
+    result: Arc<Mutex<Option<ResumeSelection>>>,
 }
 
 fn candidate_project_name(path: &Path) -> String {
@@ -68,7 +82,7 @@ fn candidate_project_name(path: &Path) -> String {
     without_audio_description.replace('_', " ")
 }
 
-fn candidate_label(path: &Path) -> Option<String> {
+fn candidate_from_path(path: &Path, modified: SystemTime) -> Option<ResumeCandidate> {
     let resume = load_audio_description_resume_settings(path).ok()?;
     let name = candidate_project_name(path);
     let folder = path
@@ -77,10 +91,16 @@ fn candidate_label(path: &Path) -> Option<String> {
         .and_then(|value| value.to_str())
         .unwrap_or_default();
     let progress = format!("{}/{}", resume.completed_chunks, resume.total_chunks);
-    Some(if folder.is_empty() {
+    let label = if folder.is_empty() {
         format!("{name} — {progress}")
     } else {
         format!("{name} — {progress} — {folder}")
+    };
+    Some(ResumeCandidate {
+        path: path.to_path_buf(),
+        label,
+        gemini_model: resume.gemini_model,
+        modified,
     })
 }
 
@@ -140,24 +160,20 @@ fn discover_resume_candidates(app_parent: HWND) -> Vec<ResumeCandidate> {
             if seen.iter().any(|known| known.eq_ignore_ascii_case(&key)) {
                 continue;
             }
-            let Some(label) = candidate_label(&path) else {
+            let modified = entry
+                .metadata()
+                .ok()
+                .and_then(|metadata| metadata.modified().ok())
+                .unwrap_or(UNIX_EPOCH);
+            let Some(candidate) = candidate_from_path(&path, modified) else {
                 crate::log_debug(&format!(
                     "Audio description resume selector: ignoring invalid checkpoint {}",
                     path.display()
                 ));
                 continue;
             };
-            let modified = entry
-                .metadata()
-                .ok()
-                .and_then(|metadata| metadata.modified().ok())
-                .unwrap_or(UNIX_EPOCH);
             seen.push(key);
-            candidates.push(ResumeCandidate {
-                path,
-                label,
-                modified,
-            });
+            candidates.push(candidate);
         }
     }
 
@@ -229,11 +245,109 @@ fn browse_checkpoint(parent: HWND, language: Language) -> Option<PathBuf> {
     is_checkpoint_path(&path).then_some(path)
 }
 
+fn add_model_if_missing(models: &mut Vec<String>, model: &str) {
+    let model = model.trim();
+    if model.is_empty() || models.iter().any(|known| known.eq_ignore_ascii_case(model)) {
+        return;
+    }
+    models.push(model.to_string());
+}
+
+fn combo_selected_text(combo: HWND) -> String {
+    let index = unsafe { SendMessageW(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0 };
+    if index < 0 {
+        return String::new();
+    }
+    let len = unsafe { SendMessageW(combo, CB_GETLBTEXTLEN, WPARAM(index as usize), LPARAM(0)).0 };
+    if len <= 0 {
+        return String::new();
+    }
+    let mut buffer = vec![0_u16; len as usize + 1];
+    unsafe {
+        SendMessageW(
+            combo,
+            CB_GETLBTEXT,
+            WPARAM(index as usize),
+            LPARAM(buffer.as_mut_ptr() as isize),
+        );
+    }
+    String::from_utf16_lossy(&buffer[..len as usize])
+}
+
+fn select_combo_text(combo: HWND, text: &str) {
+    let text = text.trim();
+    if text.is_empty() {
+        return;
+    }
+    let wide = to_wide(text);
+    let index = unsafe {
+        SendMessageW(
+            combo,
+            CB_FINDSTRINGEXACT,
+            WPARAM(usize::MAX),
+            LPARAM(wide.as_ptr() as isize),
+        )
+        .0
+    };
+    if index >= 0 {
+        unsafe {
+            SendMessageW(combo, CB_SETCURSEL, WPARAM(index as usize), LPARAM(0));
+        }
+    }
+}
+
+fn append_candidate(state: &mut ResumeSelectorState, candidate: ResumeCandidate) {
+    let wide = to_wide(&candidate.label);
+    unsafe {
+        SendMessageW(
+            state.combo,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        );
+    }
+    add_model_if_missing(&mut state.available_models, &candidate.gemini_model);
+    if !candidate.gemini_model.trim().is_empty() {
+        let model_wide = to_wide(&candidate.gemini_model);
+        let found = unsafe {
+            SendMessageW(
+                state.model_combo,
+                CB_FINDSTRINGEXACT,
+                WPARAM(usize::MAX),
+                LPARAM(model_wide.as_ptr() as isize),
+            )
+            .0
+        };
+        if found < 0 {
+            unsafe {
+                SendMessageW(
+                    state.model_combo,
+                    CB_ADDSTRING,
+                    WPARAM(0),
+                    LPARAM(model_wide.as_ptr() as isize),
+                );
+            }
+        }
+    }
+    state.candidates.push(candidate);
+    let index = state.candidates.len() - 1;
+    unsafe {
+        SendMessageW(state.combo, CB_SETCURSEL, WPARAM(index), LPARAM(0));
+        EnableWindow(state.combo, true);
+        EnableWindow(state.model_combo, true);
+        EnableWindow(state.continue_button, true);
+    }
+    let model = state.candidates[index].gemini_model.clone();
+    select_combo_text(state.model_combo, &model);
+}
+
 pub(crate) fn choose_resume_checkpoint(
     parent: HWND,
     app_parent: HWND,
     language: Language,
-) -> Option<PathBuf> {
+    available_models: Vec<String>,
+    selected_model: String,
+) -> Option<ResumeSelection> {
     let candidates = discover_resume_candidates(app_parent);
     let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
     let class_name = to_wide(CLASS_NAME);
@@ -254,6 +368,8 @@ pub(crate) fn choose_resume_checkpoint(
         app_parent,
         language,
         candidates,
+        available_models,
+        selected_model,
         result: result.clone(),
     });
     let title = to_wide(&i18n::tr(language, "audio_description.resume.open_title"));
@@ -266,7 +382,7 @@ pub(crate) fn choose_resume_checkpoint(
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             650,
-            230,
+            300,
             parent,
             HMENU(0),
             hinstance,
@@ -274,11 +390,13 @@ pub(crate) fn choose_resume_checkpoint(
         )
     };
     if hwnd.0 == 0 {
-        let selected = browse_checkpoint(parent, language);
-        if let Some(path) = selected.as_ref() {
-            remember_project_folder(app_parent, path);
-        }
-        return selected;
+        let path = browse_checkpoint(parent, language)?;
+        remember_project_folder(app_parent, &path);
+        let resume = load_audio_description_resume_settings(&path).ok()?;
+        return Some(ResumeSelection {
+            checkpoint_path: path,
+            gemini_model: resume.gemini_model,
+        });
     }
 
     unsafe {
@@ -317,8 +435,8 @@ pub(crate) fn choose_resume_checkpoint(
         .lock()
         .unwrap_or_else(|error| error.into_inner())
         .clone();
-    if let Some(path) = selected.as_ref() {
-        remember_project_folder(app_parent, path);
+    if let Some(selection) = selected.as_ref() {
+        remember_project_folder(app_parent, &selection.checkpoint_path);
     }
     selected
 }
@@ -413,6 +531,61 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     SendMessageW(combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
                 }
 
+                let model_label_text = i18n::tr(init.language, "audio_description.resume.model");
+                let model_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&model_label_text).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    118,
+                    600,
+                    20,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let model_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    16,
+                    140,
+                    600,
+                    220,
+                    hwnd,
+                    HMENU(ID_MODEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let mut models = init.available_models.clone();
+                add_model_if_missing(&mut models, &init.selected_model);
+                for candidate in &init.candidates {
+                    add_model_if_missing(&mut models, &candidate.gemini_model);
+                }
+                models.sort_by_key(|model| model.to_ascii_lowercase());
+                for model in &models {
+                    let wide = to_wide(model);
+                    SendMessageW(
+                        model_combo,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(wide.as_ptr() as isize),
+                    );
+                }
+                let initial_model = init
+                    .candidates
+                    .first()
+                    .map(|candidate| candidate.gemini_model.as_str())
+                    .filter(|model| !model.trim().is_empty())
+                    .unwrap_or(&init.selected_model);
+                select_combo_text(model_combo, initial_model);
+                if combo_selected_text(model_combo).is_empty() && !models.is_empty() {
+                    SendMessageW(model_combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+                }
+
                 let continue_button = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -426,7 +599,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             0
                         }),
                     16,
-                    126,
+                    194,
                     180,
                     30,
                     hwnd,
@@ -447,7 +620,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             BS_DEFPUSHBUTTON as u32
                         }),
                     206,
-                    126,
+                    194,
                     250,
                     30,
                     hwnd,
@@ -461,7 +634,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&cancel_text).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     466,
-                    126,
+                    194,
                     150,
                     30,
                     hwnd,
@@ -474,6 +647,8 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     hint,
                     label,
                     combo,
+                    model_label,
+                    model_combo,
                     continue_button,
                     browse_button,
                     cancel_button,
@@ -481,13 +656,17 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
                 }
                 EnableWindow(combo, has_candidates);
+                EnableWindow(model_combo, has_candidates);
                 EnableWindow(continue_button, has_candidates);
 
                 let state = Box::new(ResumeSelectorState {
                     app_parent: init.app_parent,
                     language: init.language,
                     combo,
+                    model_combo,
+                    continue_button,
                     candidates: init.candidates,
+                    available_models: models,
                     result: init.result.clone(),
                 });
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
@@ -496,19 +675,34 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
             }
             WM_COMMAND => {
                 let id = wparam.0 & 0xffff;
+                let notification = (wparam.0 >> 16) as u32;
                 let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut ResumeSelectorState;
                 if pointer.is_null() {
                     return LRESULT(0);
                 }
                 let state = &mut *pointer;
                 match id {
-                    ID_CONTINUE => {
+                    ID_PROJECT if notification == CBN_SELCHANGE => {
                         let index = SendMessageW(state.combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
                         if index >= 0
                             && let Some(candidate) = state.candidates.get(index as usize)
+                            && !candidate.gemini_model.trim().is_empty()
+                        {
+                            select_combo_text(state.model_combo, &candidate.gemini_model);
+                        }
+                    }
+                    ID_CONTINUE => {
+                        let index = SendMessageW(state.combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+                        let model = combo_selected_text(state.model_combo);
+                        if index >= 0
+                            && !model.trim().is_empty()
+                            && let Some(candidate) = state.candidates.get(index as usize)
                         {
                             if let Ok(mut result) = state.result.lock() {
-                                *result = Some(candidate.path.clone());
+                                *result = Some(ResumeSelection {
+                                    checkpoint_path: candidate.path.clone(),
+                                    gemini_model: model,
+                                });
                             }
                             let _destroy_result = DestroyWindow(hwnd);
                         }
@@ -516,10 +710,22 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     ID_BROWSE => {
                         if let Some(path) = browse_checkpoint(hwnd, state.language) {
                             remember_project_folder(state.app_parent, &path);
-                            if let Ok(mut result) = state.result.lock() {
-                                *result = Some(path);
+                            let modified = std::fs::metadata(&path)
+                                .ok()
+                                .and_then(|metadata| metadata.modified().ok())
+                                .unwrap_or(UNIX_EPOCH);
+                            if let Some(candidate) = candidate_from_path(&path, modified) {
+                                append_candidate(state, candidate);
+                                SetFocus(state.model_combo);
+                            } else {
+                                let error = load_audio_description_resume_settings(&path)
+                                    .err()
+                                    .unwrap_or_else(|| "Invalid checkpoint".to_string());
+                                let message =
+                                    i18n::tr(state.language, "audio_description.resume.invalid")
+                                        .replace("{error}", &error);
+                                crate::show_error(state.app_parent, state.language, &message);
                             }
-                            let _destroy_result = DestroyWindow(hwnd);
                         }
                     }
                     ID_CANCEL => {

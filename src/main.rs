@@ -986,6 +986,48 @@ pub(crate) fn copydata_utf16_payload(
     Some(String::from_utf16_lossy(&slice[..len]))
 }
 
+fn show_blocking_modal_message_box_owned(
+    app_hwnd: HWND,
+    owner_hwnd: HWND,
+    kind: BlockingModalKind,
+    message: PCWSTR,
+    title: PCWSTR,
+    flags: MESSAGEBOX_STYLE,
+) -> MESSAGEBOX_RESULT {
+    watchdog::enter_modal_dialog();
+    set_blocking_modal_active(app_hwnd, Some(kind));
+
+    let disable_app = owner_hwnd != app_hwnd && unsafe { IsWindowEnabled(app_hwnd).as_bool() };
+    if disable_app {
+        unsafe {
+            EnableWindow(app_hwnd, false);
+        }
+    }
+
+    let result = unsafe { MessageBoxW(owner_hwnd, message, title, flags) };
+
+    if disable_app {
+        unsafe {
+            EnableWindow(app_hwnd, true);
+        }
+    }
+
+    set_blocking_modal_active(app_hwnd, None);
+    let pending_paths = take_deferred_copydata_paths_for_blocking_modal(app_hwnd);
+    if !pending_paths.is_empty() {
+        open_copydata_paths(app_hwnd, pending_paths);
+    } else if unsafe { IsWindowEnabled(app_hwnd).as_bool() } {
+        restore_editor_focus(app_hwnd);
+    } else {
+        log_debug(
+            "Blocking modal closed while its owner is still disabled; deferring editor focus restoration",
+        );
+        reactivate_modal_child_while_main_disabled(app_hwnd);
+    }
+    watchdog::exit_modal_dialog();
+    result
+}
+
 pub(crate) fn show_blocking_modal_message_box(
     hwnd: HWND,
     kind: BlockingModalKind,
@@ -993,23 +1035,7 @@ pub(crate) fn show_blocking_modal_message_box(
     title: PCWSTR,
     flags: MESSAGEBOX_STYLE,
 ) -> MESSAGEBOX_RESULT {
-    watchdog::enter_modal_dialog();
-    set_blocking_modal_active(hwnd, Some(kind));
-    let result = unsafe { MessageBoxW(hwnd, message, title, flags) };
-    set_blocking_modal_active(hwnd, None);
-    let pending_paths = take_deferred_copydata_paths_for_blocking_modal(hwnd);
-    if !pending_paths.is_empty() {
-        open_copydata_paths(hwnd, pending_paths);
-    } else if unsafe { IsWindowEnabled(hwnd).as_bool() } {
-        restore_editor_focus(hwnd);
-    } else {
-        log_debug(
-            "Blocking modal closed while its owner is still disabled; deferring editor focus restoration",
-        );
-        reactivate_modal_child_while_main_disabled(hwnd);
-    }
-    watchdog::exit_modal_dialog();
-    result
+    show_blocking_modal_message_box_owned(hwnd, hwnd, kind, message, title, flags)
 }
 
 fn open_copydata_paths(hwnd: HWND, paths: Vec<PathBuf>) {
@@ -23004,6 +23030,35 @@ pub(crate) fn show_info(hwnd: HWND, language: Language, message: &str) {
     let title = to_wide(&info_title(language));
     show_blocking_modal_message_box(
         hwnd,
+        BlockingModalKind::InfoDialog,
+        PCWSTR(wide.as_ptr()),
+        PCWSTR(title.as_ptr()),
+        MB_OK | MB_ICONINFORMATION,
+    );
+}
+
+/// Show an informational dialog owned by a secondary Sonarpad window while
+/// keeping blocking-modal bookkeeping attached to the main application window.
+pub(crate) fn show_info_owned_by(
+    owner_hwnd: HWND,
+    app_hwnd: HWND,
+    language: Language,
+    message: &str,
+) {
+    log_debug(&format!("Info shown: {message}"));
+    let effective_owner = if owner_hwnd.0 != 0 && is_window_handle_valid(owner_hwnd) {
+        owner_hwnd
+    } else {
+        log_debug(&format!(
+            "Info dialog secondary owner invalid; falling back to main window: owner={owner_hwnd:?} main={app_hwnd:?}"
+        ));
+        app_hwnd
+    };
+    let wide = to_wide(message);
+    let title = to_wide(&info_title(language));
+    show_blocking_modal_message_box_owned(
+        app_hwnd,
+        effective_owner,
         BlockingModalKind::InfoDialog,
         PCWSTR(wide.as_ptr()),
         PCWSTR(title.as_ptr()),

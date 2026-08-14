@@ -2767,16 +2767,11 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                 &labels.character_catalog_warning.replace("{error}", warning),
                             );
                         }
-                        // Keep this secondary window disabled while the completion MessageBox is
-                        // active. Otherwise Windows can restore focus to one of our controls after
-                        // sleep/resume even though the blocking completion dialog is still open.
-                        EnableWindow(hwnd, false);
-                        show_info(state.parent, state.language, &message);
+                        crate::show_info_owned_by(hwnd, state.parent, state.language, &message);
                         crate::recover_main_window_after_audio_description(
                             state.parent,
                             "completion_message_closed",
                         );
-                        EnableWindow(hwnd, true);
                         state.resume_checkpoint_path = None;
                         state.resume_mode = false;
                         set_text(state.gemini_model_label, &labels.gemini_model);

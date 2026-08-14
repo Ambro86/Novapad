@@ -494,5 +494,29 @@ class AudioDescriptionProjectWindowAccessibilityTests(unittest.TestCase):
         self.assertIn('show_project_info_with_title(', apply_done)
         self.assertIn('audio_description.project.edit_saved_title', PROJECT)
 
+    def test_completion_message_is_owned_by_audio_description_window(self):
+        marker = "crate::show_info_owned_by("
+        start = WINDOW.index(marker, WINDOW.index("WM_AD_DONE =>"))
+        block = WINDOW[start:start + 220]
+        self.assertIn("hwnd,", block)
+        self.assertIn("state.parent,", block)
+        self.assertIn("state.language,", block)
+
+    def test_completion_owned_info_keeps_main_state_separate_from_visual_owner(self):
+        self.assertIn("pub(crate) fn show_info_owned_by(", MAIN)
+        self.assertIn("show_blocking_modal_message_box_owned(", MAIN)
+        self.assertIn("MessageBoxW(owner_hwnd, message, title, flags)", MAIN)
+        self.assertIn("set_blocking_modal_active(app_hwnd, Some(kind))", MAIN)
+
+    def test_completion_flow_after_ok_is_unchanged(self):
+        start = WINDOW.index("crate::show_info_owned_by(", WINDOW.index("WM_AD_DONE =>"))
+        block = WINDOW[start:start + 900]
+        self.assertIn("recover_main_window_after_audio_description", block)
+        self.assertIn(
+            "open_result_in_player(hwnd, state.parent, outcome.output_path.clone());",
+            block,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -283,6 +283,18 @@ fn ytdlp_command(path: &Path) -> Command {
     cmd
 }
 
+const YOUTUBE_STANDARD_PLAYER_EXTRACTOR_ARGS: &str = "youtube:player_client=android";
+
+fn configure_ytdlp_standard_youtube_client(cmd: &mut Command, url: &str) {
+    if is_youtube_stream_url(url) {
+        // Do not let yt-dlp automatically select android_vr: its signed media
+        // URLs can return HTTP 403 even when the same public video works with
+        // the regular Android client.
+        cmd.arg("--extractor-args")
+            .arg(YOUTUBE_STANDARD_PLAYER_EXTRACTOR_ARGS);
+    }
+}
+
 #[cfg(test)]
 mod ytdlp_command_tests {
     use super::{
@@ -326,6 +338,23 @@ mod ytdlp_command_tests {
             .and_then(|pair| pair.get(1).cloned())
     }
 
+    fn configured_args(url: &str) -> Vec<String> {
+        let mut command = ytdlp_command(Path::new("yt-dlp.exe"));
+        configure_ytdlp_stream_download_command(
+            &mut command,
+            url,
+            Path::new("output.%(ext)s"),
+            &dialog(StreamOutputFormat::Auto),
+            None,
+            false,
+            None,
+        );
+        command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect()
+    }
+
     #[test]
     fn forces_utf8_for_captured_ytdlp_output() {
         let command = ytdlp_command(Path::new("yt-dlp.exe"));
@@ -351,6 +380,21 @@ mod ytdlp_command_tests {
             configured_selector(false).as_deref(),
             Some("bestaudio/best")
         );
+    }
+
+    #[test]
+    fn youtube_download_forces_standard_android_client() {
+        let args = configured_args("https://www.youtube.com/watch?v=test");
+        assert!(
+            args.windows(2)
+                .any(|pair| { pair == ["--extractor-args", "youtube:player_client=android"] })
+        );
+    }
+
+    #[test]
+    fn non_youtube_download_does_not_receive_youtube_client_options() {
+        let args = configured_args("https://example.com/media.webm");
+        assert!(!args.iter().any(|arg| arg.contains("player_client=")));
     }
 
     #[test]
@@ -411,7 +455,7 @@ fn youtube_ui_language_code(language: Language) -> &'static str {
 
 fn youtube_flat_playlist_extractor_args(language: Language) -> String {
     format!(
-        "youtube:lang={};youtubetab:approximate_date",
+        "youtube:player_client=android;lang={};youtubetab:approximate_date",
         youtube_ui_language_code(language)
     )
 }
@@ -2201,6 +2245,7 @@ struct ResolvedStreamSelection {
     collection_url: Option<String>,
     collection_page: Option<usize>,
     selected_label: Option<String>,
+    selected_title: Option<String>,
     previous_input: Option<String>,
     previous_collection_page: Option<usize>,
     previous_selected_label: Option<String>,
@@ -2210,7 +2255,7 @@ const STREAM_SELECTION_PAGE_SIZE: usize = 20;
 const STREAM_SELECTION_LOAD_MORE_KEY: &str = "stream_audio.load_more_videos";
 const STREAM_SELECTION_PREVIOUS_KEY: &str = "stream_audio.previous_results";
 const STREAM_SELECTION_DOWNLOAD_PLAYLIST_KEY: &str = "stream_audio.playlist_download_action";
-const YOUTUBE_MPV_STREAM_FORMAT: &str = "best[height<=360][ext=mp4]/18/best[height<=480]/best";
+const YOUTUBE_MPV_STREAM_FORMAT: &str = "18/best[height<=360][ext=mp4]/best[height<=480]/best";
 
 fn stream_entry_url(entry: &serde_json::Value) -> Option<String> {
     entry
@@ -2955,10 +3000,11 @@ fn fetch_youtube_comments_with_ytdlp(
         .arg("--write-comments")
         .arg("--dump-single-json")
         .arg("--no-warnings");
-    if let Some(limit) = max_parent_comments {
-        cmd.arg("--extractor-args")
-            .arg(format!("youtube:max_comments=all,{limit},all,all"));
-    }
+    let extractor_args = max_parent_comments.map_or_else(
+        || YOUTUBE_STANDARD_PLAYER_EXTRACTOR_ARGS.to_string(),
+        |limit| format!("youtube:player_client=android;max_comments=all,{limit},all,all"),
+    );
+    cmd.arg("--extractor-args").arg(extractor_args);
     let output = cmd
         .arg("--")
         .arg(url)
@@ -5686,6 +5732,7 @@ fn choose_youtube_collection_entry(
             collection_url: None,
             collection_page: None,
             selected_label: None,
+            selected_title: None,
             previous_input: None,
             previous_collection_page: None,
             previous_selected_label: None,
@@ -5737,6 +5784,7 @@ fn choose_youtube_collection_entry(
                         collection_url: None,
                         collection_page: None,
                         selected_label: None,
+                        selected_title: None,
                         previous_input: None,
                         previous_collection_page: None,
                         previous_selected_label: None,
@@ -5829,11 +5877,11 @@ fn choose_youtube_collection_entry(
             page = page.saturating_sub(1);
             continue;
         }
-        let selected_url = entries
+        let selected_entry = entries
             .into_iter()
             .find(|entry| entry.label == selected)
-            .map(|entry| entry.url);
-        if let Some(selected_url) = selected_url {
+            .map(|entry| (entry.url, entry.title));
+        if let Some((selected_url, selected_title)) = selected_entry {
             if is_youtube_collection_url(&selected_url) {
                 crate::log_debug(&format!(
                     "stream transition [collection_probe.selected_collection]: url={}",
@@ -5876,6 +5924,7 @@ fn choose_youtube_collection_entry(
                 collection_url: Some(url.to_string()),
                 collection_page: Some(page),
                 selected_label: Some(selected),
+                selected_title: Some(selected_title),
                 previous_input: None,
                 previous_collection_page: None,
                 previous_selected_label: None,
@@ -5991,11 +6040,11 @@ fn choose_youtube_search_entry(
             page = page.saturating_sub(1);
             continue;
         }
-        let selected_url = entries
+        let selected_entry = entries
             .into_iter()
             .find(|entry| entry.label == selected)
-            .map(|entry| entry.url);
-        if let Some(selected_url) = selected_url {
+            .map(|entry| (entry.url, entry.title));
+        if let Some((selected_url, selected_title)) = selected_entry {
             if is_youtube_collection_url(&selected_url) {
                 crate::log_debug(&format!(
                     "stream transition [search_probe.selected_collection]: url={}",
@@ -6032,6 +6081,7 @@ fn choose_youtube_search_entry(
                 collection_url: None,
                 collection_page: None,
                 selected_label: Some(selected),
+                selected_title: Some(selected_title),
                 previous_input: None,
                 previous_collection_page: None,
                 previous_selected_label: None,
@@ -6058,14 +6108,36 @@ fn is_members_only_stream_error(err: &str) -> bool {
     err_lc.contains("members-only")
         || err_lc.contains("members only")
         || err_lc.contains("join this channel to get access to members-only content")
+        || err_lc.contains("available to this channel's members")
+        || err_lc.contains("available to members of this channel")
 }
 
 fn is_drm_not_supported_stream_error(err: &str) -> bool {
     let err_lc = err.to_ascii_lowercase();
-    err_lc.contains("known to use drm protection")
+    err_lc.contains("this video is drm protected")
+        || err_lc.contains("known to use drm protection")
         || err_lc.contains("uses drm protection")
-        || err_lc.contains("not be supported")
+        || err_lc.contains("widevine")
         || err_lc.contains("[drm]")
+}
+
+fn youtube_mpv_error_detail(detail: &str) -> &str {
+    if detail.trim().is_empty() {
+        "MPV non ha caricato alcuna traccia audio."
+    } else {
+        detail
+    }
+}
+
+pub(crate) fn youtube_mpv_playback_error_message(language: Language, detail: &str) -> String {
+    let detail = youtube_mpv_error_detail(detail);
+    if is_members_only_stream_error(detail) {
+        members_only_stream_message(language)
+    } else if is_drm_not_supported_stream_error(detail) {
+        drm_not_supported_stream_message(language)
+    } else {
+        i18n::tr_f(language, "stream_audio.download_failed", &[("err", detail)])
+    }
 }
 
 fn members_only_stream_message(language: Language) -> String {
@@ -8385,6 +8457,7 @@ fn configure_ytdlp_stream_download_command(
     prefer_video: bool,
     credentials: Option<&YtdlpAuthCredentials>,
 ) {
+    configure_ytdlp_standard_youtube_client(cmd, url);
     cmd.arg("--no-playlist")
         .arg("--socket-timeout")
         .arg(YTDLP_SOCKET_TIMEOUT_SECS)
@@ -8962,7 +9035,9 @@ fn format_stream_entry_label(entry: &serde_json::Value, language: Language) -> S
     parts.join(" - ")
 }
 fn probe_stream_media_title(ytdlp_path: &Path, url: &str) -> Option<String> {
-    let output = ytdlp_command(ytdlp_path)
+    let mut command = ytdlp_command(ytdlp_path);
+    configure_ytdlp_standard_youtube_client(&mut command, url);
+    let output = command
         .arg("--no-playlist")
         .arg("--no-warnings")
         .arg("--skip-download")
@@ -8995,7 +9070,9 @@ fn probe_stream_media_title(ytdlp_path: &Path, url: &str) -> Option<String> {
 }
 
 fn probe_youtube_stream_playable(ytdlp_path: &Path, url: &str) -> Result<(), String> {
-    let output = ytdlp_command(ytdlp_path)
+    let mut command = ytdlp_command(ytdlp_path);
+    configure_ytdlp_standard_youtube_client(&mut command, url);
+    let output = command
         .arg("--no-playlist")
         .arg("--no-warnings")
         .arg("--skip-download")
@@ -9065,6 +9142,7 @@ fn probe_stream_audio_tracks(
     credentials: Option<&YtdlpAuthCredentials>,
 ) -> Result<Vec<StreamAudioTrack>, String> {
     let mut command = ytdlp_command(ytdlp_path);
+    configure_ytdlp_standard_youtube_client(&mut command, url);
     command
         .arg("--dump-single-json")
         .arg("--no-playlist")
@@ -10961,6 +11039,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
     let mut collection_url: Option<String> = None;
     let mut collection_page: Option<usize> = None;
     let mut selected_label = dialog_data.reopen_selected_label.clone();
+    let mut selected_title: Option<String> = None;
     let mut previous_input = dialog_data.previous_input.clone();
     let mut previous_collection_page = dialog_data.previous_collection_page;
     let mut previous_selected_label = dialog_data.previous_selected_label.clone();
@@ -11037,6 +11116,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         collection_url = resolved.collection_url;
         collection_page = resolved.collection_page;
         selected_label = resolved.selected_label;
+        selected_title = resolved.selected_title;
         previous_input = resolved.previous_input;
         previous_collection_page = resolved.previous_collection_page;
         previous_selected_label = resolved.previous_selected_label;
@@ -11229,30 +11309,11 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
             }
         };
         reclaim_stream_modal_parent_foreground(parent, "play_streaming_audio.before_mpv_title");
-        if is_youtube && let Err(err) = probe_youtube_stream_playable(&ytdlp_path, &url) {
-            crate::log_debug(&format!("YouTube stream preflight failed: {}", err));
-            let message = if is_members_only_stream_error(&err) {
-                members_only_stream_message(language)
-            } else {
-                i18n::tr_f(language, "stream_audio.download_failed", &[("err", &err)])
-            };
-            show_error(parent, language, &message);
-            if collection_url.is_some() || collection_page.is_some() {
-                set_pending_stream_reopen_context(Some(crate::YouTubeReturnContext {
-                    input: collection_url.clone().or_else(|| Some(input.clone())),
-                    collection_page,
-                    selected_label,
-                    previous_input,
-                    previous_collection_page,
-                    previous_selected_label,
-                }));
-                play_streaming_audio_from_url(parent);
-            } else {
-                post_focus_editor(parent);
-            }
-            return;
-        }
-        let stream_title = probe_stream_media_title(&ytdlp_path, &url);
+        let stream_title = if is_youtube {
+            selected_title.clone().or_else(|| selected_label.clone())
+        } else {
+            probe_stream_media_title(&ytdlp_path, &url)
+        };
         let ytdl_format = if is_youtube {
             Some(YOUTUBE_MPV_STREAM_FORMAT)
         } else {
@@ -11269,12 +11330,31 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 .map(|credentials| (credentials.username.as_str(), credentials.password.as_str())),
         ) {
             Ok(()) => {
+                // Playback and download intentionally retain separate choices:
+                // mpv owns YouTube format selection, while Save keeps the
+                // user's original download format/quality and credentials.
+                let save_selected_audio_format = if is_youtube {
+                    None
+                } else {
+                    selected_audio_format.clone()
+                };
+                let save_prefer_video = if is_youtube {
+                    true
+                } else {
+                    crate::is_local_mpv_video_mode_active(parent)
+                };
+                crate::log_debug(&format!(
+                    "YouTube save context isolated from playback: youtube={} selected_audio_format={} prefer_video={}",
+                    is_youtube,
+                    save_selected_audio_format.as_deref().unwrap_or(""),
+                    save_prefer_video
+                ));
                 set_active_stream_save_context(StreamSaveContext {
                     url: url.clone(),
                     title: stream_title.clone(),
                     dialog_data: dialog_data.clone(),
-                    selected_audio_format: selected_audio_format.clone(),
-                    prefer_video: is_youtube || crate::is_local_mpv_video_mode_active(parent),
+                    selected_audio_format: save_selected_audio_format,
+                    prefer_video: save_prefer_video,
                     ytdlp_path: ytdlp_path.clone(),
                     credentials: active_credentials.clone(),
                 });
@@ -11598,6 +11678,7 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                         let retry_prefix = format!("{prefix}_retry{}_{}", round + 1, idx + 1);
                         let retry_template = cache_dir.join(format!("{retry_prefix}.%(ext)s"));
                         let mut retry = ytdlp_command(&ytdlp_path);
+                        configure_ytdlp_standard_youtube_client(&mut retry, &url);
                         retry
                             .arg("--no-playlist")
                             .arg("--socket-timeout")
@@ -12272,7 +12353,9 @@ fn fetch_transcript_list_with_ytdlp(
     ytdlp_path: &Path,
     url: &str,
 ) -> Result<Vec<YtSubtitleOption>, ImportError> {
-    let output = ytdlp_command(ytdlp_path)
+    let mut command = ytdlp_command(ytdlp_path);
+    configure_ytdlp_standard_youtube_client(&mut command, url);
+    let output = command
         .arg("--no-playlist")
         .arg("--socket-timeout")
         .arg(YTDLP_SOCKET_TIMEOUT_SECS)
@@ -12429,6 +12512,7 @@ fn fetch_transcript_text_with_ytdlp(
     let output_template = temp_dir.join("yt_transcript_%(id)s.%(ext)s");
     let output_template_str = output_template.to_string_lossy().to_string();
     let mut cmd = ytdlp_command(ytdlp_path);
+    configure_ytdlp_standard_youtube_client(&mut cmd, url);
     cmd.arg("--no-playlist")
         .arg("--socket-timeout")
         .arg(YTDLP_SOCKET_TIMEOUT_SECS)

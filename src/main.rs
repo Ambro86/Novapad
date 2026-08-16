@@ -289,6 +289,7 @@ const WM_LOCAL_MPV_MENU_VISIBLE: u32 = WM_APP + 41;
 const WM_EDITOR_TRANSLATION_DONE: u32 = WM_APP + 42;
 const WM_EDITOR_SUMMARY_DONE: u32 = WM_APP + 43;
 const WM_REACTIVATE_MODAL_AFTER_EXTERNAL_OPEN: u32 = WM_APP + 44;
+const WM_YOUTUBE_MPV_PLAYBACK_FAILED: u32 = WM_APP + 45;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
@@ -1547,6 +1548,11 @@ struct MpvPlaybackStatus {
     volume: f32,
     speed: f32,
     pitch: f32,
+}
+
+struct YoutubeMpvPlaybackFailure {
+    process_id: u32,
+    detail: String,
 }
 
 fn media_playback_volume_from_settings(hwnd: HWND) -> f32 {
@@ -3224,6 +3230,183 @@ fn spawn_mpv_with_runtime_repair(
     }
 }
 
+fn youtube_mpv_log_has_failure(log: &str) -> Option<String> {
+    let lower = log.to_ascii_lowercase();
+    let last_success = ["starting playback", "playback restart complete"]
+        .into_iter()
+        .filter_map(|marker| lower.rfind(marker))
+        .max();
+    let semantic_groups: &[(&str, &[&str])] = &[
+        (
+            "members-only",
+            &[
+                "members-only",
+                "members only",
+                "join this channel",
+                "available to this channel's members",
+                "available to members of this channel",
+            ],
+        ),
+        (
+            "widevine drm",
+            &[
+                "widevine",
+                "this video is drm protected",
+                "uses drm protection",
+                "known to use drm protection",
+            ],
+        ),
+        (
+            "login required",
+            &[
+                "sign in to confirm",
+                "login required",
+                "use --username and --password",
+            ],
+        ),
+    ];
+    // A later transport error (often 403) must not hide YouTube's explicit
+    // access reason. These semantic errors therefore outrank generic failures.
+    for (detail, markers) in semantic_groups {
+        let position = markers
+            .iter()
+            .filter_map(|marker| lower.rfind(marker))
+            .max();
+        if position.is_some_and(|position| last_success.is_none_or(|success| position > success)) {
+            return Some((*detail).to_string());
+        }
+    }
+    let groups: &[(&str, &[&str])] = &[
+        ("youtube-dl failed", &["youtube-dl failed"]),
+        ("no video formats found", &["no video formats found"]),
+        (
+            "requested format is not available",
+            &["requested format is not available"],
+        ),
+        ("this video is unavailable", &["this video is unavailable"]),
+        ("http error 403", &["http error 403"]),
+        (
+            "failed to recognize file format",
+            &[
+                "failed to recognize file format",
+                "unable to recognize file format",
+            ],
+        ),
+    ];
+    let mut last_failure: Option<(usize, &str)> = None;
+    for (detail, markers) in groups {
+        for marker in *markers {
+            if let Some(position) = lower.rfind(marker)
+                && last_failure.is_none_or(|(current, _)| position > current)
+            {
+                last_failure = Some((position, detail));
+            }
+        }
+    }
+    last_failure
+        .filter(|(position, _)| last_success.is_none_or(|success| *position > success))
+        .map(|(_, detail)| detail.to_string())
+}
+
+fn monitor_youtube_mpv_startup(hwnd: HWND, process_id: u32, log_path: PathBuf) {
+    std::thread::spawn(move || {
+        // IPC has already confirmed an audio track. Keep a short asynchronous
+        // watch for an immediate end-file/HTTP failure after file-loaded.
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            let log = std::fs::read_to_string(&log_path).unwrap_or_default();
+            if let Some(detail) = youtube_mpv_log_has_failure(&log) {
+                log_debug(&format!(
+                    "Managed mpv YouTube end-file failure: pid={process_id} detail={detail}"
+                ));
+                let payload = Box::new(YoutubeMpvPlaybackFailure { process_id, detail });
+                let raw = Box::into_raw(payload);
+                unsafe {
+                    if PostMessageW(
+                        hwnd,
+                        WM_YOUTUBE_MPV_PLAYBACK_FAILED,
+                        WPARAM(0),
+                        LPARAM(raw as isize),
+                    )
+                    .is_err()
+                    {
+                        let _reclaimed_payload = Box::from_raw(raw);
+                    }
+                }
+                if let Err(error) = std::fs::remove_file(&log_path) {
+                    log_debug(&format!(
+                        "Managed mpv YouTube log cleanup failed: path={} error={error}",
+                        log_path.display()
+                    ));
+                }
+                return;
+            }
+            if Instant::now() >= deadline {
+                log_debug(&format!(
+                    "Managed mpv YouTube startup remained stable: pid={process_id}"
+                ));
+                if let Err(error) = std::fs::remove_file(&log_path) {
+                    log_debug(&format!(
+                        "Managed mpv YouTube log cleanup failed: path={} error={error}",
+                        log_path.display()
+                    ));
+                }
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    });
+}
+
+fn wait_for_youtube_mpv_file_loaded(
+    child: &mut std::process::Child,
+    ipc_path: &Path,
+    log_path: Option<&Path>,
+) -> Result<(), String> {
+    for attempt in 0..150_u64 {
+        if let Some(status) = child.try_wait().map_err(|err| err.to_string())? {
+            let detail = log_path
+                .and_then(|path| std::fs::read_to_string(path).ok())
+                .and_then(|log| youtube_mpv_log_has_failure(&log))
+                .unwrap_or_else(|| format!("mpv terminato prima di file-loaded: {status}"));
+            return Err(detail);
+        }
+        if let Ok(mut pipe) = open_mpv_ipc_pipe(ipc_path)
+            && let Ok(response) = send_mpv_ipc_request_with_id(
+                ipc_path,
+                &mut pipe,
+                r#"{"command":["get_property","track-list"]}"#,
+                700_000 + attempt,
+            )
+        {
+            let has_audio = response
+                .get("data")
+                .and_then(serde_json::Value::as_array)
+                .is_some_and(|tracks| {
+                    tracks.iter().any(|track| {
+                        track.get("type").and_then(serde_json::Value::as_str) == Some("audio")
+                    })
+                });
+            if has_audio {
+                log_debug(&format!(
+                    "Managed mpv YouTube IPC file-loaded confirmed: pid={} attempt={}",
+                    child.id(),
+                    attempt + 1
+                ));
+                return Ok(());
+            }
+        }
+        if let Some(detail) = log_path
+            .and_then(|path| std::fs::read_to_string(path).ok())
+            .and_then(|log| youtube_mpv_log_has_failure(&log))
+        {
+            return Err(detail);
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    Err("file-loaded timeout: mpv non ha caricato alcuna traccia audio".to_string())
+}
+
 fn clear_managed_mpv_state(hwnd: HWND) {
     if with_state(hwnd, |state| {
         state.active_mpv_session = None;
@@ -4800,15 +4983,63 @@ fn launch_stream_url_in_mpv_with_options(
     let initial_mpv_volume =
         media_playback_volume_to_mpv(media_playback_volume_from_settings(hwnd));
 
+    // YouTube playback is deliberately handed to mpv's ytdl hook.  Resolving a
+    // googlevideo URL in Sonarpad made playback depend on the extractor client
+    // selected by a separate yt-dlp invocation (notably android_vr), and those
+    // short-lived URLs can fail even though the normal watch URL still works.
+    // Sonarpad continues to store and download the original watch URL through
+    // the independent download pipeline; this pseudo-URL is playback-only.
+    let is_youtube = url.to_ascii_lowercase().contains("youtube.com/")
+        || url.to_ascii_lowercase().contains("youtu.be/");
+    let playback_input = if is_youtube {
+        format!("ytdl://{url}")
+    } else {
+        url.to_string()
+    };
+    // mpv logs its full command line. Never create this diagnostic file when
+    // username/password options are present; IPC still performs the load check.
+    let youtube_log_path = (is_youtube && ytdlp_credentials.is_none()).then(|| {
+        std::env::temp_dir().join(format!(
+            "sonarpad-youtube-mpv-{}-{}.log",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        ))
+    });
+
     let mut command = std::process::Command::new(&mpv_exe);
+    // Regression guard: .arg(if is_youtube { "--pause=no" } else { "--pause=yes" })
     command
         .current_dir(&mpv_dir)
-        .arg(url)
+        .arg(&playback_input)
         .arg("--no-terminal")
         .arg("--volume-max=300")
         .arg(format!("--volume={initial_mpv_volume:.3}"))
-        .arg("--pause=yes")
+        .arg(if is_youtube {
+            "--pause=no"
+        } else {
+            "--pause=yes"
+        })
         .arg(format!("--input-ipc-server={}", ipc_path.display()));
+    if is_youtube {
+        command.arg("--ytdl=yes");
+        if let Some(log_path) = youtube_log_path.as_ref() {
+            command
+                .arg(format!("--log-file={}", log_path.display()))
+                .arg("--msg-level=ytdl_hook=debug,cplayer=debug");
+        }
+        log_debug(&format!(
+            "Managed mpv YouTube direct playback: url={} log={}",
+            url,
+            youtube_log_path
+                .as_deref()
+                .map(Path::display)
+                .map(|value| value.to_string())
+                .unwrap_or_default()
+        ));
+    }
     if let Some(user_agent) = user_agent.map(str::trim).filter(|value| !value.is_empty()) {
         command.arg(format!("--user-agent={user_agent}"));
     }
@@ -4850,6 +5081,12 @@ fn launch_stream_url_in_mpv_with_options(
     if let Some(ytdl_format) = ytdl_format.filter(|value| !value.trim().is_empty()) {
         command.arg(format!("--ytdl-format={ytdl_format}"));
     }
+    let mut ytdl_raw_options = Vec::new();
+    if is_youtube {
+        // Avoid yt-dlp's automatic android_vr choice: its signed media URLs
+        // currently return 403 for otherwise public videos on Windows.
+        ytdl_raw_options.push("extractor-args=youtube:player_client=android".to_string());
+    }
     if let Some((username, password)) = ytdlp_credentials
         .filter(|(username, password)| !username.trim().is_empty() && !password.trim().is_empty())
     {
@@ -4857,10 +5094,11 @@ fn launch_stream_url_in_mpv_with_options(
             "Managed mpv yt-dlp auth args enabled username={} password_arg=true",
             username
         ));
-        command.arg(format!(
-            "--ytdl-raw-options=username={},password={}",
-            username, password
-        ));
+        ytdl_raw_options.push(format!("username={username}"));
+        ytdl_raw_options.push(format!("password={password}"));
+    }
+    if !ytdl_raw_options.is_empty() {
+        command.arg(format!("--ytdl-raw-options={}", ytdl_raw_options.join(",")));
     }
     if let Some(title) = title.filter(|value| !value.trim().is_empty()) {
         command.arg(format!("--title={title}"));
@@ -4876,6 +5114,39 @@ fn launch_stream_url_in_mpv_with_options(
             if stop_obsolete_mpv_child(hwnd, mpv_generation, &mut child, "stream ipc ready") {
                 set_local_mpv_video_mode(hwnd, false);
                 return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
+            }
+            if is_youtube
+                && let Err(detail) = wait_for_youtube_mpv_file_loaded(
+                    &mut child,
+                    &ipc_path,
+                    youtube_log_path.as_deref(),
+                )
+            {
+                log_debug(&format!(
+                    "Managed mpv YouTube IPC end-file/load failure: pid={} detail={}",
+                    child.id(),
+                    detail
+                ));
+                if let Err(error) = child.kill() {
+                    log_debug(&format!(
+                        "Managed mpv YouTube failed to stop after load error: {error}"
+                    ));
+                }
+                if let Err(error) = child.wait() {
+                    log_debug(&format!(
+                        "Managed mpv YouTube failed to wait after load error: {error}"
+                    ));
+                }
+                if let Some(log_path) = youtube_log_path.as_deref()
+                    && let Err(error) = std::fs::remove_file(log_path)
+                {
+                    log_debug(&format!(
+                        "Managed mpv YouTube log cleanup failed: path={} error={error}",
+                        log_path.display()
+                    ));
+                }
+                set_local_mpv_video_mode(hwnd, false);
+                return Err(detail);
             }
             let playback_path = PathBuf::from(url);
             if let Some(index) = editor_manager::ensure_audio_document_tab(hwnd, &playback_path) {
@@ -4916,6 +5187,9 @@ fn launch_stream_url_in_mpv_with_options(
             {
                 log_debug("Failed to persist stream mpv state");
             }
+            if let Some(log_path) = youtube_log_path.clone() {
+                monitor_youtube_mpv_startup(hwnd, child.id(), log_path);
+            }
             if prefer_audio_description {
                 select_raiplay_mpv_audio_track(hwnd);
             }
@@ -4923,10 +5197,12 @@ fn launch_stream_url_in_mpv_with_options(
                 set_local_mpv_video_mode(hwnd, false);
                 return Err("Riproduzione mpv annullata da una richiesta più recente.".to_string());
             }
-            if let Err(err) = try_send_command_to_managed_mpv(
-                hwnd,
-                r#"{"command":["set_property","pause",false]}"#,
-            ) {
+            if !is_youtube
+                && let Err(err) = try_send_command_to_managed_mpv(
+                    hwnd,
+                    r#"{"command":["set_property","pause",false]}"#,
+                )
+            {
                 log_debug(&format!(
                     "Managed mpv: failed to unpause generation {}: {}",
                     mpv_generation, err
@@ -10950,6 +11226,47 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     }
                 } else {
                     editor_manager::layout_children(hwnd);
+                }
+                LRESULT(0)
+            }
+            WM_YOUTUBE_MPV_PLAYBACK_FAILED => {
+                let payload = Box::from_raw(lparam.0 as *mut YoutubeMpvPlaybackFailure);
+                let is_current = with_state(hwnd, |state| {
+                    state
+                        .active_mpv_session
+                        .as_ref()
+                        .is_some_and(|session| session.process_id == payload.process_id)
+                })
+                .unwrap_or(false);
+                if is_current {
+                    let language =
+                        with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+                    let return_context =
+                        with_state(hwnd, |state| state.active_youtube_return_context.clone())
+                            .unwrap_or_default();
+                    log_debug(&format!(
+                        "Managed mpv YouTube playback failure handled: pid={} detail={}",
+                        payload.process_id, payload.detail
+                    ));
+                    stop_managed_mpv_playback(hwnd);
+                    editor_manager::close_current_document(hwnd);
+                    let message =
+                        app_windows::youtube_transcript_window::youtube_mpv_playback_error_message(
+                            language,
+                            &payload.detail,
+                        );
+                    show_error(hwnd, language, &message);
+                    if return_context.input.is_some() {
+                        app_windows::youtube_transcript_window::reopen_stream_selection(
+                            hwnd,
+                            return_context,
+                        );
+                    }
+                } else {
+                    log_debug(&format!(
+                        "Ignoring stale mpv YouTube failure: pid={} detail={}",
+                        payload.process_id, payload.detail
+                    ));
                 }
                 LRESULT(0)
             }

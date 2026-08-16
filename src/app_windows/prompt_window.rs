@@ -2614,7 +2614,10 @@ pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
                     format!("{existing}\n{pasted}")
                 };
                 let payload = if state.program_is_codex {
-                    combined
+                    // Codex enables terminal bracketed-paste mode. Wrapping the clipboard
+                    // payload makes embedded newlines paste into the composer instead of
+                    // being interpreted as separate Enter/submit keypresses.
+                    format!("\x1b[200~{combined}\x1b[201~")
                 } else {
                     combined.replace('\n', "\r\n")
                 };

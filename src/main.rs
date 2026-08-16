@@ -9629,6 +9629,31 @@ fn run_app(
                     continue;
                 }
             }
+            // The prompt/terminal window has special Ctrl+C/Ctrl+V handling. In particular,
+            // multiline clipboard text must be written directly to the PTY instead of being
+            // pasted into the single-line EDIT control. Give those shortcuts a chance before
+            // the generic EDIT shortcut handler consumes them.
+            let prompt_window = with_state(hwnd, |state| state.prompt_window).unwrap_or(HWND(0));
+            let prompt_focus = GetFocus();
+            let prompt_has_focus = prompt_window.0 != 0
+                && prompt_focus.0 != 0
+                && (prompt_focus == prompt_window || GetParent(prompt_focus) == prompt_window);
+            let plain_prompt_ctrl_c_or_v = if msg.message == WM_KEYDOWN {
+                let ctrl_down = (GetKeyState(VK_CONTROL.0 as i32) & (0x8000u16 as i16)) != 0;
+                let shift_down = (GetKeyState(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
+                let alt_down = (GetKeyState(VK_MENU.0 as i32) & (0x8000u16 as i16)) != 0;
+                let key = msg.wParam.0 as u32;
+                ctrl_down && !shift_down && !alt_down && (key == 'C' as u32 || key == 'V' as u32)
+            } else {
+                false
+            };
+            if prompt_has_focus
+                && plain_prompt_ctrl_c_or_v
+                && app_windows::prompt_window::handle_navigation(prompt_window, &msg)
+            {
+                continue;
+            }
+
             let main_editor_focused = get_active_edit(hwnd).is_some_and(|edit| GetFocus() == edit);
             if !main_editor_focused && handle_focused_edit_shortcut(&msg) {
                 continue;

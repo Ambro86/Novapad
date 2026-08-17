@@ -21,6 +21,7 @@ class AudioDescriptionPreferenceTests(unittest.TestCase):
             "audio_description_keep_character_catalog",
             "audio_description_character_catalog",
             "audio_description_save_project",
+            "audio_description_delete_video_after",
         ):
             self.assertIn(f"pub {field}", SETTINGS)
 
@@ -33,6 +34,7 @@ class AudioDescriptionPreferenceTests(unittest.TestCase):
         self.assertIn("audio_description_keep_character_catalog", WINDOW)
         self.assertIn("audio_description_character_catalog", WINDOW)
         self.assertIn("audio_description_save_project", WINDOW)
+        self.assertIn("audio_description_delete_video_after", WINDOW)
         self.assertIn("preferred_voice: tts_voice", WINDOW)
         self.assertIn("load_voices(hwnd, tts_engine);", WINDOW)
 
@@ -49,7 +51,14 @@ class AudioDescriptionPreferenceTests(unittest.TestCase):
             WINDOW,
         )
         self.assertIn("ID_EXTENDED | ID_SAVE_PROJECT if !state.running", WINDOW)
+        self.assertIn("ID_DELETE_VIDEO_AFTER if !state.running", WINDOW)
         self.assertIn("save_settings(app.settings.clone());", WINDOW)
+
+    def test_delete_video_option_is_hidden_and_blocked_when_project_is_saved(self):
+        self.assertIn("fn update_delete_video_visibility", WINDOW)
+        self.assertIn("if save_project { SW_HIDE } else { SW_SHOW }", WINDOW)
+        self.assertIn("delete_requested && !save_project", WINDOW)
+        self.assertIn("move_input_video_to_recycle_bin", WINDOW)
 
     def test_saved_voice_is_preferred_then_falls_back_by_language(self):
         self.assertIn("eq_ignore_ascii_case(&state.preferred_voice)", WINDOW)

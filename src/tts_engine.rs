@@ -2217,6 +2217,21 @@ struct DownloadAudioChunkRequest<'a> {
     cancel: Option<&'a AtomicBool>,
 }
 
+async fn async_sleep_with_cancellation(cancel: &AtomicBool, duration: Duration) -> bool {
+    let started = Instant::now();
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            return false;
+        }
+        let elapsed = started.elapsed();
+        if elapsed >= duration {
+            return true;
+        }
+        let remaining = duration.saturating_sub(elapsed);
+        tokio::time::sleep(remaining.min(Duration::from_millis(100))).await;
+    }
+}
+
 async fn download_audio_chunk_with_cancel(
     request: DownloadAudioChunkRequest<'_>,
 ) -> Result<Vec<u8>, String> {
@@ -2237,6 +2252,7 @@ async fn download_audio_chunk_with_cancel(
             request.tts_rate,
             request.tts_pitch,
             request.tts_volume,
+            request.cancel,
         )
         .await
         {
@@ -2261,7 +2277,14 @@ async fn download_audio_chunk_with_cancel(
                 if !retry_forever && attempt >= max_retries {
                     break e;
                 }
-                tokio::time::sleep(Duration::from_millis(edge_retry_delay_ms(&e, attempt))).await;
+                let delay = Duration::from_millis(edge_retry_delay_ms(&e, attempt));
+                if let Some(cancel) = request.cancel {
+                    if !async_sleep_with_cancellation(cancel, delay).await {
+                        return Err(cancelled_message(request.language));
+                    }
+                } else {
+                    tokio::time::sleep(delay).await;
+                }
                 attempt = attempt.saturating_add(1);
             }
         }
@@ -2280,6 +2303,7 @@ async fn download_audio_chunk_attempt(
     tts_rate: i32,
     tts_pitch: i32,
     tts_volume: i32,
+    cancel: Option<&AtomicBool>,
 ) -> Result<Vec<u8>, String> {
     let sec_ms_gec = generate_sec_ms_gec();
     let sec_ms_gec_version = "1-132.0.2917.39";
@@ -2323,6 +2347,9 @@ async fn download_audio_chunk_attempt(
             return Err("WebSocket connect timeout".to_string());
         }
     };
+    if cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+        return Err("cancelled".to_string());
+    }
     let (mut write, mut read): (
         futures_util::stream::SplitSink<_, Message>,
         futures_util::stream::SplitStream<_>,
@@ -2336,6 +2363,9 @@ async fn download_audio_chunk_attempt(
         .send(Message::Text(config_msg.into()))
         .await
         .map_err(|e: tungstenite::Error| e.to_string())?;
+    if cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+        return Err("cancelled".to_string());
+    }
 
     let sanitized_text = sanitize_edge_text(text);
     if !is_edge_text_usable(&sanitized_text) {
@@ -2355,7 +2385,17 @@ async fn download_audio_chunk_attempt(
         .map_err(|e: tungstenite::Error| e.to_string())?;
 
     let mut audio_data = Vec::new();
-    while let Some(msg) = read.next().await {
+    loop {
+        if cancel.is_some_and(|flag| flag.load(Ordering::Relaxed)) {
+            return Err("cancelled".to_string());
+        }
+        let next = match tokio::time::timeout(Duration::from_millis(100), read.next()).await {
+            Ok(next) => next,
+            Err(_) => continue,
+        };
+        let Some(msg) = next else {
+            break;
+        };
         let msg: Message = msg.map_err(|e: tungstenite::Error| e.to_string())?;
         match msg {
             Message::Text(text) if text.contains("Path:turn.end") => {
@@ -10478,7 +10518,9 @@ async fn synthesize_mixed_chunk_with_retry(
                         &err,
                     ));
                 }
-                tokio::time::sleep(retry_delay).await;
+                if !async_sleep_with_cancellation(synth.cancel.as_ref(), retry_delay).await {
+                    return Err(cancelled_message(synth.language));
+                }
                 attempt = attempt.saturating_add(1);
             }
         }

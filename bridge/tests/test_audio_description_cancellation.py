@@ -7,6 +7,8 @@ WINDOW = (ROOT / "src" / "app_windows" / "audio_description_window.rs").read_tex
 DESCRIBER = (
     ROOT / "bridge" / "audio_description_runtime" / "audio_describer" / "core" / "audio_describer.py"
 ).read_text(encoding="utf-8")
+TTS = (ROOT / "src" / "tts_engine.rs").read_text(encoding="utf-8")
+SAPI5 = (ROOT / "src" / "sapi5_engine.rs").read_text(encoding="utf-8")
 
 
 class AudioDescriptionCancellationTests(unittest.TestCase):
@@ -34,6 +36,14 @@ class AudioDescriptionCancellationTests(unittest.TestCase):
         self.assertIn("Audio description: cancellation completed; worker stopped", WINDOW)
 
 
+
+    def test_tts_synthesis_reacts_to_cancel_while_a_voice_is_busy(self):
+        self.assertIn("cancel: Some(config.cancel.as_ref())", TTS)
+        self.assertIn("timeout(Duration::from_millis(100), read.next())", TTS)
+        self.assertIn("async_sleep_with_cancellation", TTS)
+        self.assertIn("SPF_ASYNC.0 | SPF_IS_XML.0", SAPI5)
+        self.assertIn("SAPI5 export purge after cancellation failed", SAPI5)
+        self.assertIn("status.dwRunningState == SPRS_DONE.0 as u32", SAPI5)
 
     def test_user_cancel_is_logged_as_normal_control_flow_without_critical_traceback(self):
         cancel_start = DESCRIBER.index("except gemini.GeminiRetryCancelledError as e:")

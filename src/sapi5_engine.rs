@@ -987,10 +987,62 @@ fn speak_sapi_to_file_with_voice(
                 let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
                 let chunk_wide = to_wide(&ssml);
                 voice
-                    .Speak(PCWSTR(chunk_wide.as_ptr()), SPF_IS_XML.0 as u32, None)
+                    .Speak(
+                        PCWSTR(chunk_wide.as_ptr()),
+                        (SPF_ASYNC.0 | SPF_IS_XML.0) as u32,
+                        None,
+                    )
                     .map_err(|e| format!("Speak failed: {}", e))?;
-                if let Err(e) = voice.WaitUntilDone(u32::MAX) {
-                    crate::log_debug(&format!("Failed to wait for SAPI5: {}", e));
+                loop {
+                    if options.cancel.load(Ordering::Relaxed) {
+                        if let Err(e) =
+                            voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
+                        {
+                            crate::log_debug(&format!(
+                                "SAPI5 export purge after cancellation failed: {}",
+                                e
+                            ));
+                        }
+                        if let Err(e) = stream.Close() {
+                            crate::log_debug(&format!(
+                                "Failed to close SAPI5 stream after cancellation: {}",
+                                e
+                            ));
+                        }
+                        if let Err(e) = std::fs::remove_file(&part_wav)
+                            && e.kind() != std::io::ErrorKind::NotFound
+                        {
+                            crate::log_debug(&format!(
+                                "Failed to remove cancelled SAPI5 WAV part: {}",
+                                e
+                            ));
+                        }
+                        for p in &converted_parts {
+                            if let Err(e) = std::fs::remove_file(p) {
+                                crate::log_debug(&format!(
+                                    "Failed to remove temp MP3 part after cancellation: {}",
+                                    e
+                                ));
+                            }
+                        }
+                        if let Err(e) = std::fs::remove_dir_all(&temp_root)
+                            && e.kind() != std::io::ErrorKind::NotFound
+                        {
+                            crate::log_debug(&format!(
+                                "Failed to remove temp SAPI5 folder after cancellation: {}",
+                                e
+                            ));
+                        }
+                        return Err("Cancelled".to_string());
+                    }
+                    let mut status = SPVOICESTATUS::default();
+                    voice
+                        .GetStatus(&mut status, std::ptr::null_mut())
+                        .map_err(|e| format!("GetStatus failed: {}", e))?;
+                    if status.dwRunningState == SPRS_DONE.0 as u32 {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
                 }
                 if let Err(e) = stream.Close() {
                     crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
@@ -1121,13 +1173,49 @@ fn speak_sapi_to_file_with_voice(
                 let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
                 let chunk_wide = to_wide(&ssml);
                 voice
-                    .Speak(PCWSTR(chunk_wide.as_ptr()), SPF_IS_XML.0 as u32, None)
+                    .Speak(
+                        PCWSTR(chunk_wide.as_ptr()),
+                        (SPF_ASYNC.0 | SPF_IS_XML.0) as u32,
+                        None,
+                    )
                     .map_err(|e| format!("Speak failed: {}", e))?;
+                loop {
+                    if options.cancel.load(Ordering::Relaxed) {
+                        if let Err(e) =
+                            voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
+                        {
+                            crate::log_debug(&format!(
+                                "SAPI5 export purge after cancellation failed: {}",
+                                e
+                            ));
+                        }
+                        if let Err(e) = stream.Close() {
+                            crate::log_debug(&format!(
+                                "Failed to close SAPI5 stream after cancellation: {}",
+                                e
+                            ));
+                        }
+                        if let Err(e) = std::fs::remove_file(&wav_path)
+                            && e.kind() != std::io::ErrorKind::NotFound
+                        {
+                            crate::log_debug(&format!(
+                                "Failed to remove cancelled SAPI5 WAV: {}",
+                                e
+                            ));
+                        }
+                        return Err("Cancelled".to_string());
+                    }
+                    let mut status = SPVOICESTATUS::default();
+                    voice
+                        .GetStatus(&mut status, std::ptr::null_mut())
+                        .map_err(|e| format!("GetStatus failed: {}", e))?;
+                    if status.dwRunningState == SPRS_DONE.0 as u32 {
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
                 crate::log_debug(&format!("SAPI: chunk done. idx={}", i + 1));
                 progress_callback(i + 1);
-            }
-            if let Err(e) = voice.WaitUntilDone(u32::MAX) {
-                crate::log_debug(&format!("Failed to wait for SAPI5: {}", e));
             }
             if let Err(e) = stream.Close() {
                 crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));

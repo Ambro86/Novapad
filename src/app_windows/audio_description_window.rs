@@ -1,3 +1,5 @@
+use std::ffi::c_void;
+use std::os::windows::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, mpsc};
@@ -70,6 +72,7 @@ const ID_KEEP_CHARACTER_CATALOG: usize = 9670;
 const ID_CHARACTER_CATALOG: usize = 9671;
 const ID_CHARACTER_CATALOG_NAME: usize = 9672;
 const ID_CONTINUE_INTERRUPTED: usize = 9673;
+const ID_DELETE_VIDEO_AFTER: usize = 9674;
 
 const WM_AD_PROGRESS: u32 = WM_APP + 188;
 const WM_AD_STATUS: u32 = WM_APP + 189;
@@ -103,6 +106,7 @@ struct Labels {
     character_catalog_new_name_label: String,
     character_catalog_name_error: String,
     save_project: String,
+    delete_video_after: String,
     modify_project: String,
     gemini_api_key: String,
     gemini_get_key: String,
@@ -158,6 +162,7 @@ struct WindowState {
     character_catalog_name_edit: HWND,
     character_catalogs: Vec<AudioDescriptionCharacterCatalogSummary>,
     save_project_checkbox: HWND,
+    delete_video_after_checkbox: HWND,
     gemini_api_key_edit: HWND,
     gemini_model_label: HWND,
     gemini_model_combo: HWND,
@@ -191,6 +196,77 @@ struct OverloadPromptRequest {
     model: String,
     error: String,
     response: mpsc::SyncSender<AudioDescriptionOverloadDecision>,
+}
+
+struct AudioDescriptionDonePayload {
+    result: Result<AudioDescriptionOutcome, String>,
+    input_to_trash: Option<PathBuf>,
+}
+
+#[repr(C)]
+struct ShellFileOperationW {
+    hwnd: isize,
+    w_func: u32,
+    p_from: *const u16,
+    p_to: *const u16,
+    flags: u16,
+    any_operations_aborted: i32,
+    name_mappings: *mut c_void,
+    progress_title: *const u16,
+}
+
+#[link(name = "shell32")]
+unsafe extern "system" {
+    #[link_name = "SHFileOperationW"]
+    fn shell_file_operation_w(operation: *mut ShellFileOperationW) -> i32;
+}
+
+fn should_move_input_to_recycle_bin(delete_requested: bool, save_project: bool) -> bool {
+    delete_requested && !save_project
+}
+
+fn move_input_video_to_recycle_bin(owner: HWND, path: &Path) -> Result<(), String> {
+    const FO_DELETE: u32 = 3;
+    const FOF_SILENT: u16 = 0x0004;
+    const FOF_NOCONFIRMATION: u16 = 0x0010;
+    const FOF_ALLOWUNDO: u16 = 0x0040;
+    const FOF_NOERRORUI: u16 = 0x0400;
+
+    let full_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|error| format!("could not resolve the source video path: {error}"))?
+            .join(path)
+    };
+    if !full_path.is_file() {
+        return Err(format!("source video not found: {}", full_path.display()));
+    }
+
+    // SHFileOperation expects a double-NUL-terminated list of fully qualified paths.
+    let mut source: Vec<u16> = full_path.as_os_str().encode_wide().collect();
+    source.push(0);
+    source.push(0);
+    let mut operation = ShellFileOperationW {
+        hwnd: owner.0,
+        w_func: FO_DELETE,
+        p_from: source.as_ptr(),
+        p_to: std::ptr::null(),
+        flags: FOF_SILENT | FOF_NOCONFIRMATION | FOF_ALLOWUNDO | FOF_NOERRORUI,
+        any_operations_aborted: 0,
+        name_mappings: std::ptr::null_mut(),
+        progress_title: std::ptr::null(),
+    };
+    let result = unsafe { shell_file_operation_w(&mut operation) };
+    if result != 0 {
+        return Err(format!(
+            "Windows Recycle Bin operation failed with code {result}"
+        ));
+    }
+    if operation.any_operations_aborted != 0 {
+        return Err("Windows Recycle Bin operation was aborted".to_string());
+    }
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -398,6 +474,7 @@ fn labels(language: Language) -> Labels {
             "audio_description.character_catalog.name_error",
         ),
         save_project: i18n::tr(language, "audio_description.save_project"),
+        delete_video_after: i18n::tr(language, "audio_description.delete_video_after"),
         modify_project: i18n::tr(language, "audio_description.modify_project"),
         gemini_api_key: i18n::tr(language, "audio_description.gemini_api_key"),
         gemini_get_key: i18n::tr(language, "audio_description.gemini_get_key"),
@@ -571,7 +648,7 @@ fn open_window(parent: HWND) -> HWND {
             120,
             90,
             700,
-            800,
+            830,
             parent,
             HMENU(0),
             hinstance,
@@ -1141,6 +1218,7 @@ fn persist_audio_description_preferences(state: &WindowState) {
         recognize_characters && checkbox_checked(state.keep_character_catalog_checkbox);
     let character_catalog = selected_character_catalog_name(state);
     let save_project = checkbox_checked(state.save_project_checkbox);
+    let delete_video_after = checkbox_checked(state.delete_video_after_checkbox);
     if with_state(state.parent, |app| {
         app.settings.audio_description_language = Some(description_language);
         app.settings.audio_description_tts_engine = engine;
@@ -1157,11 +1235,22 @@ fn persist_audio_description_preferences(state: &WindowState) {
         app.settings.audio_description_keep_character_catalog = keep_character_catalog;
         app.settings.audio_description_character_catalog = character_catalog;
         app.settings.audio_description_save_project = save_project;
+        app.settings.audio_description_delete_video_after = delete_video_after;
         save_settings(app.settings.clone());
     })
     .is_none()
     {
         crate::log_debug("Audio description: app state unavailable while saving preferences");
+    }
+}
+
+fn update_delete_video_visibility(state: &WindowState) {
+    let save_project = checkbox_checked(state.save_project_checkbox);
+    unsafe {
+        ShowWindow(
+            state.delete_video_after_checkbox,
+            if save_project { SW_HIDE } else { SW_SHOW },
+        );
     }
 }
 
@@ -1418,6 +1507,7 @@ fn set_controls_enabled(state: &WindowState, enabled: bool) {
                 SetFocus(state.gemini_model_combo);
             } else {
                 update_character_catalog_visibility(state);
+                update_delete_video_visibility(state);
                 SetFocus(state.start_button);
             }
         } else {
@@ -1444,7 +1534,7 @@ fn start_job(hwnd: HWND, state: &mut WindowState) {
                 }
                 job.gemini_model = selected_model;
                 persist_gemini_settings(state.parent, &gemini_api_key, &job.gemini_model);
-                job
+                (job, None)
             }
             Err(error) => {
                 let message = labels.resume_invalid.replace("{error}", &error);
@@ -1508,8 +1598,13 @@ fn start_job(hwnd: HWND, state: &mut WindowState) {
             }
         };
         let save_project = checkbox_checked(state.save_project_checkbox);
+        let input_to_trash = should_move_input_to_recycle_bin(
+            checkbox_checked(state.delete_video_after_checkbox),
+            save_project,
+        )
+        .then(|| input.clone());
         persist_audio_description_preferences(state);
-        AudioDescriptionJob {
+        let job = AudioDescriptionJob {
             input_path: input,
             output_path: output,
             language_code: language_code(description_language).to_string(),
@@ -1528,8 +1623,10 @@ fn start_job(hwnd: HWND, state: &mut WindowState) {
             gemini_model,
             audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,
             resume_checkpoint_path: None,
-        }
+        };
+        (job, input_to_trash)
     };
+    let (job, input_to_trash) = job;
     let cancel = Arc::new(AtomicBool::new(false));
     state.cancel = Some(cancel.clone());
     state.exhausted_gemini_models.clear();
@@ -1631,7 +1728,10 @@ fn start_job(hwnd: HWND, state: &mut WindowState) {
                 })),
             },
         );
-        let payload = Box::new(result);
+        let payload = Box::new(AudioDescriptionDonePayload {
+            result,
+            input_to_trash,
+        });
         post_boxed_message(hwnd, WM_AD_DONE, WPARAM(0), payload);
     });
 }
@@ -1657,6 +1757,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     selected_character_catalog,
                     audio_description_save_folder,
                     save_project,
+                    delete_video_after,
                 ) = with_state(parent, |state| {
                     (
                         state.settings.language,
@@ -1676,6 +1777,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         state.settings.audio_description_character_catalog.clone(),
                         state.settings.audio_description_save_folder.clone(),
                         state.settings.audio_description_save_project,
+                        state.settings.audio_description_delete_video_after,
                     )
                 })
                 .unwrap_or((
@@ -1692,6 +1794,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     false,
                     String::new(),
                     default_audio_description_save_folder(),
+                    false,
                     false,
                 ));
                 let labels = labels(language);
@@ -2017,8 +2120,37 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     LPARAM(0),
                 );
 
+                let delete_video_after_checkbox = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.delete_video_after).as_ptr()),
+                    WS_CHILD | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    16,
+                    362,
+                    650,
+                    24,
+                    hwnd,
+                    HMENU(ID_DELETE_VIDEO_AFTER as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(
+                    delete_video_after_checkbox,
+                    BM_SETCHECK,
+                    WPARAM(if delete_video_after {
+                        BST_CHECKED.0 as usize
+                    } else {
+                        0
+                    }),
+                    LPARAM(0),
+                );
+                ShowWindow(
+                    delete_video_after_checkbox,
+                    if save_project { SW_HIDE } else { SW_SHOW },
+                );
+
                 let gemini_api_key_label =
-                    create_label(hwnd, &labels.gemini_api_key, 16, 370, 210, hfont);
+                    create_label(hwnd, &labels.gemini_api_key, 16, 400, 210, hfont);
                 let gemini_api_key_edit = CreateWindowExW(
                     WS_EX_CLIENTEDGE,
                     WC_EDIT,
@@ -2028,7 +2160,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         | WS_TABSTOP
                         | WINDOW_STYLE(ES_AUTOHSCROLL as u32 | ES_PASSWORD as u32),
                     16,
-                    390,
+                    420,
                     420,
                     24,
                     hwnd,
@@ -2042,7 +2174,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.gemini_get_key).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     446,
-                    388,
+                    418,
                     203,
                     28,
                     hwnd,
@@ -2052,14 +2184,14 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 );
 
                 let gemini_model_label =
-                    create_label(hwnd, &labels.gemini_model, 16, 426, 210, hfont);
+                    create_label(hwnd, &labels.gemini_model, 16, 456, 210, hfont);
                 let gemini_model_combo = CreateWindowExW(
                     WS_EX_CLIENTEDGE,
                     WC_COMBOBOXW,
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     16,
-                    446,
+                    476,
                     420,
                     220,
                     hwnd,
@@ -2078,7 +2210,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.gemini_refresh_models).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     446,
-                    444,
+                    474,
                     203,
                     28,
                     hwnd,
@@ -2087,14 +2219,14 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     None,
                 );
 
-                let engine_label = create_label(hwnd, &labels.engine, 16, 482, 200, hfont);
+                let engine_label = create_label(hwnd, &labels.engine, 16, 512, 200, hfont);
                 let engine_combo = CreateWindowExW(
                     Default::default(),
                     WC_COMBOBOXW,
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     16,
-                    502,
+                    532,
                     200,
                     150,
                     hwnd,
@@ -2117,14 +2249,14 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     LPARAM(0),
                 );
 
-                let voice_label = create_label(hwnd, &labels.voice, 236, 482, 200, hfont);
+                let voice_label = create_label(hwnd, &labels.voice, 236, 512, 200, hfont);
                 let voice_combo = CreateWindowExW(
                     Default::default(),
                     WC_COMBOBOXW,
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
                     236,
-                    502,
+                    532,
                     413,
                     220,
                     hwnd,
@@ -2140,7 +2272,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR::null(),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    546,
+                    576,
                     650,
                     20,
                     hwnd,
@@ -2155,7 +2287,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.ready).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
-                    576,
+                    606,
                     650,
                     48,
                     hwnd,
@@ -2169,7 +2301,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.modify_project).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     16,
-                    650,
+                    680,
                     210,
                     30,
                     hwnd,
@@ -2183,7 +2315,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.resume_title).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     236,
-                    650,
+                    680,
                     250,
                     30,
                     hwnd,
@@ -2197,7 +2329,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.start).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     496,
-                    650,
+                    680,
                     150,
                     30,
                     hwnd,
@@ -2211,7 +2343,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.cancel).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     390,
-                    690,
+                    720,
                     100,
                     30,
                     hwnd,
@@ -2226,7 +2358,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     PCWSTR(to_wide(&labels.close).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     510,
-                    690,
+                    720,
                     100,
                     30,
                     hwnd,
@@ -2258,6 +2390,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     character_catalog_name_label,
                     character_catalog_name_edit,
                     save_project_checkbox,
+                    delete_video_after_checkbox,
                     gemini_api_key_edit,
                     gemini_get_key_button,
                     gemini_model_combo,
@@ -2292,6 +2425,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     character_catalog_name_edit,
                     character_catalogs,
                     save_project_checkbox,
+                    delete_video_after_checkbox,
                     gemini_api_key_edit,
                     gemini_model_label,
                     gemini_model_combo,
@@ -2326,6 +2460,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         character_catalog_name_label,
                         character_catalog_name_edit,
                         save_project_checkbox,
+                        delete_video_after_checkbox,
                         gemini_api_key_edit,
                         gemini_get_key_button,
                         gemini_model_combo,
@@ -2448,6 +2583,12 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         persist_audio_description_preferences(state);
                     }
                     ID_EXTENDED | ID_SAVE_PROJECT if !state.running => {
+                        if id == ID_SAVE_PROJECT {
+                            update_delete_video_visibility(state);
+                        }
+                        persist_audio_description_preferences(state);
+                    }
+                    ID_DELETE_VIDEO_AFTER if !state.running => {
                         persist_audio_description_preferences(state);
                     }
                     ID_MODIFY_PROJECT if !state.running => {
@@ -2738,11 +2879,14 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 LRESULT(0)
             }
             WM_AD_DONE => {
-                let payload = lparam.0 as *mut Result<AudioDescriptionOutcome, String>;
+                let payload = lparam.0 as *mut AudioDescriptionDonePayload;
                 if payload.is_null() {
                     return LRESULT(0);
                 }
-                let result = *Box::from_raw(payload);
+                let AudioDescriptionDonePayload {
+                    result,
+                    input_to_trash,
+                } = *Box::from_raw(payload);
                 let pointer =
                     GetWindowLongPtrW(hwnd, windows::Win32::UI::WindowsAndMessaging::GWLP_USERDATA)
                         as *mut WindowState;
@@ -2798,6 +2942,33 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             message.push_str(
                                 &labels.character_catalog_warning.replace("{error}", warning),
                             );
+                        }
+                        if let Some(path) = input_to_trash.as_ref() {
+                            message.push_str("\r\n\r\n");
+                            match move_input_video_to_recycle_bin(hwnd, path) {
+                                Ok(()) => {
+                                    crate::log_debug(&format!(
+                                        "Audio description: moved source video to Recycle Bin: {}",
+                                        path.display()
+                                    ));
+                                    message.push_str(&i18n::tr_f(
+                                        state.language,
+                                        "audio_description.input_trashed",
+                                        &[("path", &path.to_string_lossy())],
+                                    ));
+                                }
+                                Err(error) => {
+                                    crate::log_debug(&format!(
+                                        "Audio description: failed to move source video to Recycle Bin: {}: {error}",
+                                        path.display()
+                                    ));
+                                    message.push_str(&i18n::tr_f(
+                                        state.language,
+                                        "audio_description.input_trash_failed",
+                                        &[("path", &path.to_string_lossy()), ("error", &error)],
+                                    ));
+                                }
+                            }
                         }
                         crate::show_info_owned_by(hwnd, state.parent, state.language, &message);
                         crate::recover_main_window_after_audio_description(
@@ -2860,6 +3031,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     SendMessageW(state.progress, PBM_SETPOS, WPARAM(0), LPARAM(0));
                     set_controls_enabled(state, true);
                     update_character_catalog_visibility(state);
+                    update_delete_video_visibility(state);
                     SetFocus(state.input);
                     crate::log_debug(
                         "Audio description: reset creation window for a fresh empty job",
@@ -2929,6 +3101,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         }),
                         LPARAM(0),
                     );
+                    update_delete_video_visibility(state);
                     SendMessageW(
                         state.engine_combo,
                         CB_SETCURSEL,
@@ -3115,8 +3288,15 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
 
 #[cfg(test)]
 mod tests {
-    use super::localized_status_text;
+    use super::{localized_status_text, should_move_input_to_recycle_bin};
     use crate::settings::Language;
+
+    #[test]
+    fn deleting_source_is_never_allowed_when_project_saving_is_enabled() {
+        assert!(should_move_input_to_recycle_bin(true, false));
+        assert!(!should_move_input_to_recycle_bin(true, true));
+        assert!(!should_move_input_to_recycle_bin(false, false));
+    }
 
     #[test]
     fn omni_port_audio_description_status_uses_localized_pyannote_count() {

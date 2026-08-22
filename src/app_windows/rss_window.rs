@@ -1,5 +1,5 @@
 use crate::accessibility::{nvda_speak, to_wide};
-use crate::app_windows::help_window;
+use crate::app_windows::{help_window, youtube_transcript_window};
 use crate::settings::{ListDateDisplayMode, ListTimeDisplayMode};
 
 use crate::editor_manager;
@@ -105,6 +105,7 @@ const ID_CTX_SHARE_EMAIL: usize = 1205;
 const ID_CTX_PROPERTIES: usize = 1206;
 const ID_CTX_ADD_TO_FAVORITES: usize = 1207;
 const ID_CTX_CHANGE_CITY: usize = 1208;
+const ID_CTX_SELECT_ARTICLES: usize = 1209;
 
 const WM_RSS_FETCH_COMPLETE: u32 = WM_USER + 200;
 const WM_RSS_IMPORT_COMPLETE: u32 = WM_USER + 201;
@@ -212,6 +213,21 @@ fn sync_active_rss_sources(state: &mut crate::AppState) {
         .insert(code, state.settings.rss_sources.clone());
 }
 
+fn load_or_migrate_active_rss_sources(
+    settings: &mut crate::settings::AppSettings,
+    code: &str,
+) -> bool {
+    if let Some(active) = settings.rss_sources_by_language.get(code).cloned() {
+        settings.rss_sources = active;
+        false
+    } else {
+        settings
+            .rss_sources_by_language
+            .insert(code.to_string(), settings.rss_sources.clone());
+        true
+    }
+}
+
 fn save_rss_settings(state: &mut crate::AppState) {
     sync_active_rss_sources(state);
     crate::settings::save_settings(state.settings.clone());
@@ -225,20 +241,8 @@ fn prepare_rss_language_state(parent: HWND) {
             state.settings.rss_news_language = code.clone();
             changed = true;
         }
-        if state.settings.rss_sources_by_language.is_empty() {
-            state
-                .settings
-                .rss_sources_by_language
-                .insert(code.clone(), state.settings.rss_sources.clone());
+        if load_or_migrate_active_rss_sources(&mut state.settings, &code) {
             changed = true;
-        } else {
-            let active = state
-                .settings
-                .rss_sources_by_language
-                .get(&code)
-                .cloned()
-                .unwrap_or_default();
-            state.settings.rss_sources = active;
         }
         if changed {
             save_rss_settings(state);
@@ -325,13 +329,131 @@ fn normalize_article_text(s: &str) -> String {
     collapse_blank_lines(&no_nul)
 }
 
+fn remove_favorite_article_by_key(items: &mut Vec<RssItem>, key: &str) -> bool {
+    let before = items.len();
+    items.retain(|item| rss_item_key(item) != key);
+    items.len() != before
+}
+
+fn restore_favorite_article_at(
+    items: &mut Vec<RssItem>,
+    item: RssItem,
+    key: &str,
+    position: usize,
+) -> bool {
+    if items.iter().any(|entry| rss_item_key(entry) == key) {
+        return false;
+    }
+    let insert_at = position.min(items.len());
+    items.insert(insert_at, item);
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         build_google_news_rss_url, decode_basic_html_entities, ensure_opml_extension,
-        format_google_news_source_title, load_default_feeds, normalize_rss_url_key,
+        format_google_news_source_title, load_default_feeds, load_or_migrate_active_rss_sources,
+        normalize_rss_url_key, remove_favorite_article_by_key, restore_favorite_article_at,
     };
+    use crate::tools::rss::{RssFeedCache, RssItem, RssSource, RssSourceType};
     use std::path::PathBuf;
+
+    fn test_rss_source(title: &str, url: &str) -> RssSource {
+        RssSource {
+            title: title.to_string(),
+            url: url.to_string(),
+            kind: RssSourceType::Feed,
+            user_title: true,
+            unread: false,
+            cache: RssFeedCache::default(),
+            last_seen_guid: None,
+            last_updated: None,
+            removed_item_keys: Vec::new(),
+            read_item_keys: Vec::new(),
+        }
+    }
+
+    fn test_rss_item(title: &str, guid: &str) -> RssItem {
+        RssItem {
+            title: title.to_string(),
+            guid: guid.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn deleting_rss_favorite_removes_it_from_persistent_collection() {
+        let first = test_rss_item("Primo", "favorite-1");
+        let second = test_rss_item("Secondo", "favorite-2");
+        let mut items = vec![first, second.clone()];
+
+        assert!(remove_favorite_article_by_key(&mut items, "favorite-1"));
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].guid, second.guid);
+    }
+
+    #[test]
+    fn undo_rss_favorite_delete_restores_it_without_duplicates() {
+        let first = test_rss_item("Primo", "favorite-1");
+        let second = test_rss_item("Secondo", "favorite-2");
+        let mut items = vec![second.clone()];
+
+        assert!(restore_favorite_article_at(
+            &mut items,
+            first.clone(),
+            "favorite-1",
+            0
+        ));
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].guid, first.guid);
+        assert_eq!(items[1].guid, second.guid);
+        assert!(!restore_favorite_article_at(
+            &mut items,
+            first,
+            "favorite-1",
+            0
+        ));
+        assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn rss_language_migration_preserves_current_sources_when_bucket_is_missing() {
+        let custom = test_rss_source("Fonte pessoal", "https://example.com/pessoal.xml");
+        let english = test_rss_source("English", "https://example.com/en.xml");
+        let mut settings = crate::settings::AppSettings {
+            rss_sources: vec![custom.clone()],
+            rss_sources_by_language: [("en".to_string(), vec![english])].into_iter().collect(),
+            ..Default::default()
+        };
+
+        let changed = load_or_migrate_active_rss_sources(&mut settings, "pt");
+
+        assert!(changed);
+        assert_eq!(settings.rss_sources, vec![custom]);
+        assert_eq!(
+            settings.rss_sources_by_language.get("pt"),
+            Some(&settings.rss_sources)
+        );
+    }
+
+    #[test]
+    fn rss_language_migration_loads_existing_language_bucket() {
+        let legacy = test_rss_source("Legacy", "https://example.com/legacy.xml");
+        let portuguese = test_rss_source("Português", "https://example.com/pt.xml");
+        let mut settings = crate::settings::AppSettings {
+            rss_sources: vec![legacy],
+            rss_sources_by_language: [("pt".to_string(), vec![portuguese.clone()])]
+                .into_iter()
+                .collect(),
+            ..Default::default()
+        };
+
+        let changed = load_or_migrate_active_rss_sources(&mut settings, "pt");
+
+        assert!(!changed);
+        assert_eq!(settings.rss_sources, vec![portuguese]);
+    }
 
     #[test]
     fn normalize_rss_url_key_keeps_query_parameters() {
@@ -1361,6 +1483,22 @@ fn load_favorites_source_items(
         return;
     }
     let (items, saved_read_item_keys) = with_state(parent, |ps| {
+        let legacy_removed_keys: HashSet<String> = ps
+            .settings
+            .rss_sources
+            .get(source_index)
+            .map(|src| src.removed_item_keys.iter().cloned().collect())
+            .unwrap_or_default();
+        if !legacy_removed_keys.is_empty() {
+            ps.settings
+                .rss_favorite_articles
+                .retain(|item| !legacy_removed_keys.contains(&rss_item_key(item)));
+            if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
+                src.removed_item_keys.clear();
+            }
+            save_rss_settings(ps);
+        }
+
         let mut items = ps.settings.rss_favorite_articles.clone();
         sort_items_by_date_desc(&mut items);
         let read_keys = ps
@@ -2084,21 +2222,13 @@ pub(crate) fn sync_default_sources_for_settings(
         .to_string();
     settings.rss_news_language = code.clone();
 
-    if settings.rss_sources_by_language.is_empty() {
-        settings
-            .rss_sources_by_language
-            .insert(code.clone(), settings.rss_sources.clone());
-    } else {
-        settings.rss_sources = settings
-            .rss_sources_by_language
-            .get(&code)
-            .cloned()
-            .unwrap_or_default();
-    }
+    let mut changed = load_or_migrate_active_rss_sources(settings, &code);
 
     let language = news_language_as_app_language(&code);
     let defaults = load_default_feeds(language);
-    let mut changed = apply_defaults_for_news_language(settings, language, &defaults);
+    if apply_defaults_for_news_language(settings, language, &defaults) {
+        changed = true;
+    }
     let previous = settings
         .rss_sources_by_language
         .insert(code, settings.rss_sources.clone());
@@ -4307,6 +4437,7 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
         let whatsapp_label = i18n::tr(language, "rss.context.share_whatsapp");
         let email_label = i18n::tr(language, "rss.context.share_email");
         let add_to_favorites_label = i18n::tr(language, "rss.context.add_to_favorites");
+        let select_articles_label = i18n::tr(language, "rss.context.select_articles");
         let properties_label = i18n::tr(language, "context.properties");
         let change_city_label = i18n::tr(language, "rss.city.change");
         let undo_label = i18n::tr(language, "edit.undo")
@@ -4517,6 +4648,12 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
                     PCWSTR(to_wide(&properties_label).as_ptr()),
                 ) {}
                 if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_SELECT_ARTICLES,
+                    PCWSTR(to_wide(&select_articles_label).as_ptr()),
+                ) {}
                 if let Err(_e) = AppendMenuW(
                     menu,
                     MF_STRING,
@@ -4991,6 +5128,10 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     }
                     ID_CTX_ADD_TO_FAVORITES => {
                         handle_add_article_to_favorites(hwnd);
+                        LRESULT(0)
+                    }
+                    ID_CTX_SELECT_ARTICLES => {
+                        handle_select_articles(hwnd);
                         LRESULT(0)
                     }
                     ID_CTX_PROPERTIES => {
@@ -7628,6 +7769,221 @@ fn handle_enter_action(hwnd: HWND, open_in_browser: bool) {
     }
 }
 
+fn handle_select_articles(hwnd: HWND) {
+    unsafe {
+        let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
+        if hwnd_tree.0 == 0 {
+            return;
+        }
+        let selected_hitem = windows::Win32::UI::Controls::HTREEITEM(
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(0),
+            )
+            .0,
+        );
+        if selected_hitem.0 == 0 {
+            return;
+        }
+        let source_hitem = windows::Win32::UI::Controls::HTREEITEM(
+            SendMessageW(
+                hwnd_tree,
+                TVM_GETNEXTITEM,
+                WPARAM(TVGN_PARENT as usize),
+                LPARAM(selected_hitem.0),
+            )
+            .0,
+        );
+        if source_hitem.0 == 0 {
+            return;
+        }
+        let Some((source_index, candidates)) = with_rss_state(hwnd, |s| {
+            let source_index = match s.node_data.get(&source_hitem.0) {
+                Some(NodeData::Source(index)) => *index,
+                _ => return None,
+            };
+            let items = s.source_items.get(&source_hitem.0)?;
+            let candidates = items
+                .items
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| !item.is_folder)
+                .map(|(position, item)| (position, item.clone()))
+                .collect::<Vec<_>>();
+            Some((source_index, candidates))
+        })
+        .flatten() else {
+            return;
+        };
+        if candidates.is_empty() {
+            return;
+        }
+
+        let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
+        let (language, require_confirm) = with_state(parent, |ps| {
+            (
+                ps.settings.language,
+                matches!(
+                    ps.settings.rss_delete_confirm_mode,
+                    crate::settings::RssDeleteConfirmMode::Article
+                        | crate::settings::RssDeleteConfirmMode::Both
+                ),
+            )
+        })
+        .unwrap_or((crate::settings::Language::default(), true));
+
+        let labels = candidates
+            .iter()
+            .map(|(_, item)| {
+                if item.title.trim().is_empty() {
+                    item.link.clone()
+                } else {
+                    item.title.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        let Some(mut selected_indices) =
+            youtube_transcript_window::choose_checkbox_selection_entries(
+                hwnd,
+                language,
+                youtube_transcript_window::CheckboxSelectionDialogText {
+                    title: i18n::tr(language, "rss.multi_select.title"),
+                    instructions: i18n::tr(language, "rss.multi_select.instructions"),
+                    accept_label: i18n::tr(language, "rss.multi_select.delete"),
+                    none_selected_message: i18n::tr(language, "rss.multi_select.none_selected"),
+                    selected_count_template: i18n::tr(
+                        language,
+                        "stream_audio.playlist_download_selected_count",
+                    ),
+                },
+                labels,
+            )
+        else {
+            SetFocus(hwnd_tree);
+            return;
+        };
+        selected_indices.sort_unstable();
+        selected_indices.dedup();
+        let selected = selected_indices
+            .into_iter()
+            .filter_map(|index| candidates.get(index).cloned())
+            .collect::<Vec<_>>();
+        if selected.is_empty() {
+            SetFocus(hwnd_tree);
+            return;
+        }
+
+        if require_confirm {
+            let count = selected.len().to_string();
+            let message = i18n::tr(language, "rss.multi_select.confirm").replace("{count}", &count);
+            let caption = i18n::tr(language, "rss.delete_title");
+            if MessageBoxW(
+                hwnd,
+                PCWSTR(to_wide(&message).as_ptr()),
+                PCWSTR(to_wide(&caption).as_ptr()),
+                MB_YESNOCANCEL | MB_ICONQUESTION,
+            ) != IDYES
+            {
+                SetFocus(hwnd_tree);
+                return;
+            }
+        }
+
+        let selected_keys = selected
+            .iter()
+            .map(|(_, item)| rss_item_key(item))
+            .collect::<HashSet<_>>();
+        let source_is_favorites = with_state(parent, |ps| {
+            ps.settings
+                .rss_sources
+                .get(source_index)
+                .is_some_and(is_favorites_source)
+        })
+        .unwrap_or(false);
+
+        with_state(parent, |ps| {
+            if source_is_favorites {
+                ps.settings
+                    .rss_favorite_articles
+                    .retain(|item| !selected_keys.contains(&rss_item_key(item)));
+                if let Some(source) = ps.settings.rss_sources.get_mut(source_index) {
+                    source
+                        .removed_item_keys
+                        .retain(|key| !selected_keys.contains(key));
+                }
+            } else if let Some(source) = ps.settings.rss_sources.get_mut(source_index) {
+                for key in &selected_keys {
+                    if !source
+                        .removed_item_keys
+                        .iter()
+                        .any(|existing| existing == key)
+                    {
+                        source.removed_item_keys.push(key.clone());
+                    }
+                }
+            }
+            save_rss_settings(ps);
+        });
+
+        let first_remaining_key = with_rss_state(hwnd, |s| {
+            let state = s.source_items.get_mut(&source_hitem.0)?;
+            let removed_loaded = selected
+                .iter()
+                .filter(|(position, _)| *position < state.loaded)
+                .count();
+            state
+                .items
+                .retain(|item| !selected_keys.contains(&rss_item_key(item)));
+            state.loaded = state
+                .loaded
+                .saturating_sub(removed_loaded)
+                .min(state.items.len());
+            state.items.first().map(rss_item_key)
+        })
+        .flatten()
+        .unwrap_or_default();
+
+        // Keep normal Undo semantics: each selected article can be restored with Ctrl+Z,
+        // in reverse deletion order, while preserving its original source position.
+        with_rss_state(hwnd, |s| {
+            for (position, item) in &selected {
+                s.removed_history.push(RssLastRemoved::Item {
+                    source_index,
+                    item: item.clone(),
+                    key: rss_item_key(item),
+                    position: *position,
+                });
+            }
+        });
+
+        with_rss_state(hwnd, |s| s.suppress_tree_selection_events = true);
+        let rebuilt = rebuild_source_children_from_state(hwnd, source_hitem, &first_remaining_key);
+        with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
+        if let Some(target) = rebuilt.filter(|item| item.0 != 0) {
+            SendMessageW(
+                hwnd_tree,
+                TVM_SELECTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(target.0),
+            );
+        } else {
+            SendMessageW(
+                hwnd_tree,
+                TVM_SELECTITEM,
+                WPARAM(TVGN_CARET as usize),
+                LPARAM(source_hitem.0),
+            );
+        }
+        SetFocus(hwnd_tree);
+        let count = selected.len().to_string();
+        announce_rss_status(
+            &i18n::tr(language, "rss.multi_select.deleted").replace("{count}", &count),
+        );
+    }
+}
+
 fn handle_delete(hwnd: HWND) {
     unsafe {
         let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
@@ -7880,7 +8236,26 @@ fn handle_delete(hwnd: HWND) {
                     if let Some(source_idx) = source_index {
                         source_idx_for_undo = Some(source_idx);
                         with_state(parent, |ps| {
-                            if let Some(src) = ps.settings.rss_sources.get_mut(source_idx)
+                            let is_favorites = ps
+                                .settings
+                                .rss_sources
+                                .get(source_idx)
+                                .is_some_and(is_favorites_source);
+                            if is_favorites {
+                                let removed = remove_favorite_article_by_key(
+                                    &mut ps.settings.rss_favorite_articles,
+                                    &key,
+                                );
+                                if let Some(src) = ps.settings.rss_sources.get_mut(source_idx) {
+                                    // Old builds could have recorded these keys even though the
+                                    // favorites loader never consumed them. Keep the special
+                                    // source clean now that deletion is persisted directly.
+                                    src.removed_item_keys.retain(|k| k != &key);
+                                }
+                                if removed {
+                                    save_rss_settings(ps);
+                                }
+                            } else if let Some(src) = ps.settings.rss_sources.get_mut(source_idx)
                                 && !src.removed_item_keys.iter().any(|k| k == &key)
                             {
                                 src.removed_item_keys.push(key.clone());
@@ -8053,7 +8428,25 @@ fn undo_last_delete(hwnd: HWND) {
                 let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
                 if parent.0 != 0 {
                     with_state(parent, |ps| {
-                        if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
+                        let is_favorites = ps
+                            .settings
+                            .rss_sources
+                            .get(source_index)
+                            .is_some_and(is_favorites_source);
+                        if is_favorites {
+                            let restored = restore_favorite_article_at(
+                                &mut ps.settings.rss_favorite_articles,
+                                item.clone(),
+                                &key,
+                                position,
+                            );
+                            if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
+                                src.removed_item_keys.retain(|k| k != &key);
+                            }
+                            if restored {
+                                save_rss_settings(ps);
+                            }
+                        } else if let Some(src) = ps.settings.rss_sources.get_mut(source_index) {
                             src.removed_item_keys.retain(|k| k != &key);
                             save_rss_settings(ps);
                         }

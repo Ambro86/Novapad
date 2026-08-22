@@ -290,6 +290,7 @@ const WM_EDITOR_TRANSLATION_DONE: u32 = WM_APP + 42;
 const WM_EDITOR_SUMMARY_DONE: u32 = WM_APP + 43;
 const WM_REACTIVATE_MODAL_AFTER_EXTERNAL_OPEN: u32 = WM_APP + 44;
 const WM_YOUTUBE_MPV_PLAYBACK_FAILED: u32 = WM_APP + 45;
+const WM_OPEN_AUDIO_DESCRIPTION_FOR_TV_RECORDING: u32 = WM_APP + 46;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
@@ -6947,6 +6948,30 @@ fn pause_active_playback_for_audio_description(hwnd: HWND) {
     }
 }
 
+pub(crate) fn post_audio_description_for_completed_tv_recording(hwnd: HWND, path: &Path) -> bool {
+    let payload = Box::new(path.to_path_buf());
+    let raw = Box::into_raw(payload);
+    let posted = unsafe {
+        PostMessageW(
+            hwnd,
+            WM_OPEN_AUDIO_DESCRIPTION_FOR_TV_RECORDING,
+            WPARAM(0),
+            LPARAM(raw as isize),
+        )
+    };
+    if let Err(error) = posted {
+        let reclaimed_payload = unsafe { Box::from_raw(raw) };
+        log_debug(&format!(
+            "Unable to post completed TV recording {} to audio-description window: {}",
+            reclaimed_payload.display(),
+            error
+        ));
+        false
+    } else {
+        true
+    }
+}
+
 fn open_audio_description_from_current_context(hwnd: HWND) {
     if let Some(path) = current_local_playback_media_path(hwnd)
         .filter(|path| file_handler::is_video_path(path.as_path()))
@@ -9240,6 +9265,7 @@ fn main() -> windows::core::Result<()> {
     let show_update_completed = args.iter().any(|arg| arg == "--after-update-completed");
     let force_new_window = args.iter().any(|arg| arg == "--new-window");
     let mut calendar_reminder_id = None;
+    let mut audio_description_input = None;
     let mut filtered_args = Vec::with_capacity(args.len());
     let mut index = 0usize;
     while index < args.len() {
@@ -9251,6 +9277,15 @@ fn main() -> windows::core::Result<()> {
         if argument == "--calendar-reminder" {
             if let Some(value) = args.get(index + 1) {
                 calendar_reminder_id = Some(value.clone());
+                index += 2;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+        if argument == "--audio-description-input" {
+            if let Some(value) = args.get(index + 1) {
+                audio_description_input = Some(value.clone());
                 index += 2;
             } else {
                 index += 1;
@@ -9281,6 +9316,7 @@ fn main() -> windows::core::Result<()> {
         &filtered_args,
         show_update_completed,
         calendar_reminder_id.as_deref(),
+        audio_description_input.as_deref(),
         force_new_window,
     ) {
         sentry_integration::capture_fatal_windows_error("run_app", &e);
@@ -9320,6 +9356,7 @@ fn run_app(
     args: &[String],
     show_update_completed: bool,
     calendar_reminder_id: Option<&str>,
+    audio_description_input: Option<&str>,
     force_new_window: bool,
 ) -> windows::core::Result<()> {
     unsafe {
@@ -9441,6 +9478,24 @@ fn run_app(
         theme::apply_to_window(hwnd);
         refresh_voice_panel(hwnd);
         app_windows::calendar_window::initialize_reminder_system(hwnd, calendar_reminder_id);
+        if let Some(path) = audio_description_input
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            let input = PathBuf::from(path);
+            if input.is_file() {
+                log_debug(&format!(
+                    "Opening audio-description window for completed TV recording: {}",
+                    input.display()
+                ));
+                app_windows::audio_description_window::open_with_input(hwnd, input);
+            } else {
+                log_debug(&format!(
+                    "Completed TV recording could not be opened for audio description because the file is unavailable: {}",
+                    input.display()
+                ));
+            }
+        }
         crate::log_if_err!(PostMessageW(
             hwnd,
             WM_CHECK_PENDING_UPDATE,
@@ -11226,6 +11281,22 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     }
                 } else {
                     editor_manager::layout_children(hwnd);
+                }
+                LRESULT(0)
+            }
+            WM_OPEN_AUDIO_DESCRIPTION_FOR_TV_RECORDING => {
+                let path = Box::from_raw(lparam.0 as *mut PathBuf);
+                if path.is_file() {
+                    log_debug(&format!(
+                        "Opening audio-description window after TV recording: {}",
+                        path.display()
+                    ));
+                    app_windows::audio_description_window::open_with_input(hwnd, *path);
+                } else {
+                    log_debug(&format!(
+                        "TV recording audio-description handoff ignored because the file is unavailable: {}",
+                        path.display()
+                    ));
                 }
                 LRESULT(0)
             }

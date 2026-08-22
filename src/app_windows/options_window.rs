@@ -126,6 +126,7 @@ const OPTIONS_ID_AUDIO_SPLIT_MINUTES: usize = 6058;
 const OPTIONS_ID_AUDIO_SPLIT_START_NUMBER: usize = 6059;
 const OPTIONS_ID_AUDIOBOOK_PART_NAMING: usize = 6120;
 const OPTIONS_ID_AUDIOBOOK_PART_ANNOUNCEMENT: usize = 6153;
+const OPTIONS_ID_AUDIO_DESCRIPTION_AFTER_TV_RECORDING: usize = 6154;
 const OPTIONS_ID_AUDIO_SPLIT_TEXT: usize = 6013;
 const OPTIONS_ID_AUDIO_SPLIT_PARTS_COUNT: usize = 6087;
 const OPTIONS_ID_AUDIO_SPLIT_REQUIRE_NEWLINE: usize = 6016;
@@ -1001,6 +1002,7 @@ struct OptionsDialogState {
     edit_audiobook_save_folder: HWND,
     button_audiobook_save_folder_browse: HWND,
     checkbox_show_media_save_confirmation: HWND,
+    checkbox_audio_description_after_tv_recording: HWND,
     label_audio_split: HWND,
     combo_audio_split: HWND,
     label_audio_split_minutes: HWND,
@@ -1287,6 +1289,7 @@ struct OptionsLabels {
     label_audiobook_save_folder: String,
     label_audiobook_save_folder_browse: String,
     label_show_media_save_confirmation: String,
+    label_audio_description_after_tv_recording: String,
     label_audio_split: String,
     label_audio_split_minutes: String,
     label_audio_split_parts_count: String,
@@ -1604,6 +1607,11 @@ fn options_labels(language: Language) -> OptionsLabels {
             language,
             "options.label.show_media_save_confirmation",
         ),
+        label_audio_description_after_tv_recording: if language == Language::Italian {
+            "Crea l'audiodescrizione dopo il termine della registrazione tv.".to_string()
+        } else {
+            String::new()
+        },
         label_audio_split: i18n::tr(language, "options.label.audio_split"),
         label_audio_split_minutes: i18n::tr(language, "options.label.audio_split_minutes"),
         label_audio_split_parts_count: i18n::tr(language, "options.label.audio_split_parts_count"),
@@ -4503,6 +4511,22 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                 );
                 y += 28;
 
+                let checkbox_audio_description_after_tv_recording = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.label_audio_description_after_tv_recording).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    170,
+                    y,
+                    440,
+                    20,
+                    hwnd,
+                    HMENU(OPTIONS_ID_AUDIO_DESCRIPTION_AFTER_TV_RECORDING as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                y += 28;
+
                 let label_audio_split = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
@@ -6454,6 +6478,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_audiobook_save_folder,
                     button_audiobook_save_folder_browse,
                     checkbox_show_media_save_confirmation,
+                    checkbox_audio_description_after_tv_recording,
                     label_audio_split,
                     combo_audio_split,
                     label_audio_split_minutes,
@@ -6668,6 +6693,7 @@ fn options_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     edit_audiobook_save_folder,
                     button_audiobook_save_folder_browse,
                     checkbox_show_media_save_confirmation,
+                    checkbox_audio_description_after_tv_recording,
                     label_audio_split,
                     combo_audio_split,
                     label_audio_split_minutes,
@@ -7426,6 +7452,7 @@ fn initialize_options_dialog(hwnd: HWND) {
             edit_audiobook_save_folder,
             _button_audiobook_save_folder_browse,
             checkbox_show_media_save_confirmation,
+            checkbox_audio_description_after_tv_recording,
             combo_audio_split,
             combo_audio_split_minutes,
             edit_audio_split_parts_count,
@@ -7579,6 +7606,7 @@ fn initialize_options_dialog(hwnd: HWND) {
                 state.edit_audiobook_save_folder,
                 state.button_audiobook_save_folder_browse,
                 state.checkbox_show_media_save_confirmation,
+                state.checkbox_audio_description_after_tv_recording,
                 state.combo_audio_split,
                 state.combo_audio_split_minutes,
                 state.edit_audio_split_parts_count,
@@ -9335,6 +9363,20 @@ fn initialize_options_dialog(hwnd: HWND) {
             } else {
                 0
             }),
+            LPARAM(0),
+        );
+        SendMessageW(
+            checkbox_audio_description_after_tv_recording,
+            BM_SETCHECK,
+            WPARAM(
+                if settings.language == Language::Italian
+                    && settings.audio_description_after_tv_recording
+                {
+                    BST_CHECKED.0 as usize
+                } else {
+                    0
+                },
+            ),
             LPARAM(0),
         );
 
@@ -11655,6 +11697,7 @@ fn apply_options_dialog(hwnd: HWND) {
             combo_audio_skip,
             edit_audiobook_save_folder,
             checkbox_show_media_save_confirmation,
+            checkbox_audio_description_after_tv_recording,
             combo_audio_split,
             combo_audio_split_minutes,
             edit_audio_split_parts_count,
@@ -11756,6 +11799,7 @@ fn apply_options_dialog(hwnd: HWND) {
                 state.combo_audio_skip,
                 state.edit_audiobook_save_folder,
                 state.checkbox_show_media_save_confirmation,
+                state.checkbox_audio_description_after_tv_recording,
                 state.combo_audio_split,
                 state.combo_audio_split_minutes,
                 state.edit_audio_split_parts_count,
@@ -12886,6 +12930,15 @@ fn apply_options_dialog(hwnd: HWND) {
         )
         .0 as u32
             == BST_CHECKED.0;
+        settings.audio_description_after_tv_recording = settings.language == Language::Italian
+            && SendMessageW(
+                checkbox_audio_description_after_tv_recording,
+                BM_GETCHECK,
+                WPARAM(0),
+                LPARAM(0),
+            )
+            .0 as u32
+                == BST_CHECKED.0;
 
         let cache_len = GetWindowTextLengthW(edit_podcast_cache_limit);
         if cache_len >= 0 {
@@ -14101,6 +14154,16 @@ fn layout_audio_tab(state: &OptionsDialogState, scroll_offset: i32) -> i32 {
         state.checkbox_show_media_save_confirmation,
         y,
     );
+    let show_audio_description_after_tv_recording =
+        with_state(state.parent, |app| app.settings.language).unwrap_or_default()
+            == Language::Italian;
+    if show_audio_description_after_tv_recording {
+        y = layout_checkbox(
+            "checkbox_audio_description_after_tv_recording",
+            state.checkbox_audio_description_after_tv_recording,
+            y,
+        );
+    }
     y = layout_label_control(
         "label_audio_split",
         state.label_audio_split,
@@ -14820,6 +14883,18 @@ fn set_active_tab(hwnd: HWND, index: i32) {
         ] {
             crate::show_window_safe(control, if show_audio { SW_SHOW } else { SW_HIDE });
         }
+
+        let show_audio_description_after_tv_recording = show_audio
+            && with_state(state.parent, |app| app.settings.language).unwrap_or_default()
+                == Language::Italian;
+        crate::show_window_safe(
+            state.checkbox_audio_description_after_tv_recording,
+            if show_audio_description_after_tv_recording {
+                SW_SHOW
+            } else {
+                SW_HIDE
+            },
+        );
 
         for control in [
             state.label_confirm_delete_rss_mode,

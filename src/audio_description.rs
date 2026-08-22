@@ -2,7 +2,7 @@ use crate::ffmpeg_export::{
     AudioDescriptionExportOptions, AudioDescriptionMixCue, export_audio_description_mp3,
 };
 use crate::settings::{
-    AudiobookPartAnnouncementMode, AudiobookPartNamingMode, Language, TtsEngine,
+    AudiobookPartAnnouncementMode, AudiobookPartNamingMode, DictionaryEntry, Language, TtsEngine,
 };
 use crate::tools::audio_description_bridge::{
     AudioDescriptionBridgeCallbacks, AudioDescriptionBridgeCheckpoint,
@@ -11,7 +11,8 @@ use crate::tools::audio_description_bridge::{
     BridgeDescription, BridgeInterval, run_audio_description_bridge,
 };
 use crate::tts_engine::{
-    AudiobookCommonOptions, MixedAudiobookConfig, TtsChunk, render_mixed_audiobook_part,
+    AudiobookCommonOptions, MixedAudiobookConfig, TtsChunk, audiobook_synthesis_parallelism,
+    render_mixed_audiobook_part, split_into_tts_chunks,
 };
 use rodio::Source;
 use serde::{Deserialize, Serialize};
@@ -19,7 +20,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::HWND;
 
 const MAX_SHIFT_SEC: f64 = 5.0;
@@ -79,6 +80,7 @@ pub struct AudioDescriptionJob {
     pub tts_rate: i32,
     pub tts_pitch: i32,
     pub tts_volume: i32,
+    pub dictionary: Vec<DictionaryEntry>,
     pub gemini_api_key: String,
     pub gemini_model: String,
     pub audiobook_bitrate_kbps: u32,
@@ -125,6 +127,8 @@ struct AudioDescriptionPartialCheckpoint {
     tts_rate: i32,
     tts_pitch: i32,
     tts_volume: i32,
+    #[serde(default)]
+    dictionary: Vec<DictionaryEntry>,
     gemini_model: String,
     audiobook_bitrate_kbps: u32,
     character_catalog: Option<AudioDescriptionPartialCatalog>,
@@ -562,6 +566,17 @@ struct SynthesizedDescription {
 }
 
 #[derive(Clone)]
+struct AudioDescriptionSynthesisTask {
+    synthesis_index: usize,
+    original_index: usize,
+    text: String,
+    desired_start_sec: f64,
+    mandatory: bool,
+    slot_start_sec: Option<f64>,
+    slot_end_sec: Option<f64>,
+}
+
+#[derive(Clone)]
 struct ScheduledDescription {
     original_index: usize,
     text: String,
@@ -637,6 +652,8 @@ pub struct AudioDescriptionProject {
     pub tts_rate: i32,
     pub tts_pitch: i32,
     pub tts_volume: i32,
+    #[serde(default)]
+    pub dictionary: Vec<DictionaryEntry>,
     pub bitrate_kbps: u32,
     pub ducking_db: f32,
     pub fade_ms: u32,
@@ -1118,6 +1135,40 @@ fn trim_edge_trailing_silence(samples: &mut Vec<f32>, sample_rate: u32, channels
     old_len.saturating_sub(samples.len())
 }
 
+fn audio_description_tts_chunks(text: &str, job: &AudioDescriptionJob) -> Vec<TtsChunk> {
+    split_into_tts_chunks(text, false, &job.dictionary, job.tts_engine)
+}
+
+fn audio_description_samples_have_signal(samples: &[f32]) -> bool {
+    samples
+        .iter()
+        .any(|sample| sample.is_finite() && sample.abs() > 0.00001)
+}
+
+fn audio_description_tts_error_is_empty_output(error: &str) -> bool {
+    let normalized = error.to_ascii_lowercase();
+    normalized.contains("decoded audio contains no samples")
+        || normalized.contains("audio contains no samples")
+        || normalized.contains("empty wav")
+        || normalized.contains("zero samples")
+}
+
+fn wait_for_empty_tts_retry(cancel: &AtomicBool) -> Result<(), String> {
+    const RETRY_DELAY: Duration = Duration::from_millis(750);
+    const POLL_DELAY: Duration = Duration::from_millis(75);
+    let mut waited = Duration::ZERO;
+    while waited < RETRY_DELAY {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("cancelled".to_string());
+        }
+        let remaining = RETRY_DELAY.saturating_sub(waited);
+        let sleep_for = remaining.min(POLL_DELAY);
+        std::thread::sleep(sleep_for);
+        waited = waited.saturating_add(sleep_for);
+    }
+    Ok(())
+}
+
 fn synthesize_description(
     text: &str,
     index: usize,
@@ -1126,12 +1177,13 @@ fn synthesize_description(
     cancel: Arc<AtomicBool>,
 ) -> Result<(Arc<[f32]>, u32, u16), String> {
     let output = cache_dir.join(format!("description_{index:05}.wav"));
-    let chunk = TtsChunk {
-        text_to_read: text.to_string(),
-        original_len: text.len(),
-        override_voice: None,
-        pause_ms: None,
-    };
+    let chunks = audio_description_tts_chunks(text, job);
+    if chunks.is_empty() {
+        return Err(format!(
+            "Audio description: TTS cue {} is empty after dictionary/normalization",
+            index
+        ));
+    }
     let options = AudiobookCommonOptions {
         voice: &job.tts_voice,
         output: &output,
@@ -1150,42 +1202,190 @@ fn synthesize_description(
     let config = MixedAudiobookConfig {
         main_engine: job.tts_engine,
     };
-    let mut progress = 0_usize;
-    if let Err(error) =
-        render_mixed_audiobook_part(&[chunk], &mut progress, &output, &options, &config)
-    {
+    let mut empty_attempt = 0_u64;
+
+    loop {
         if cancel.load(Ordering::Relaxed) {
             return Err("cancelled".to_string());
         }
-        return Err(error);
-    }
-    if !output.is_file() {
-        return Err(format!(
-            "Audio description: TTS did not create {}",
-            output.display()
-        ));
-    }
-    let (mut samples, sample_rate, channels) = read_wav_as_f32(&output)?;
-    if job.tts_engine == TtsEngine::Edge {
-        let removed = trim_edge_trailing_silence(&mut samples, sample_rate, channels);
-        if removed > 0 {
+        if output.exists() {
+            crate::log_if_err!(
+                fs::remove_file(&output),
+                "Audio description stale TTS output cleanup failed"
+            );
+        }
+
+        let mut progress = 0_usize;
+        if let Err(error) =
+            render_mixed_audiobook_part(&chunks, &mut progress, &output, &options, &config)
+        {
+            if cancel.load(Ordering::Relaxed) {
+                return Err("cancelled".to_string());
+            }
+            if audio_description_tts_error_is_empty_output(&error) {
+                empty_attempt = empty_attempt.saturating_add(1);
+                crate::log_debug(&format!(
+                    "Audio description: cue {} TTS renderer reported empty audio, retrying indefinitely; empty_attempt={} error={}",
+                    index, empty_attempt, error
+                ));
+                crate::log_if_err!(
+                    fs::remove_file(&output),
+                    "Audio description empty TTS output cleanup failed"
+                );
+                wait_for_empty_tts_retry(cancel.as_ref())?;
+                continue;
+            }
+            return Err(error);
+        }
+        if !output.is_file() {
+            empty_attempt = empty_attempt.saturating_add(1);
             crate::log_debug(&format!(
-                "Audio description: removed {} trailing Edge PCM samples from cue {}",
-                removed, index
+                "Audio description: cue {} TTS returned success without an output WAV, retrying indefinitely; empty_attempt={} path={}",
+                index,
+                empty_attempt,
+                output.display()
             ));
+            wait_for_empty_tts_retry(cancel.as_ref())?;
+            continue;
+        }
+
+        let output_len = fs::metadata(&output)
+            .map(|metadata| metadata.len())
+            .unwrap_or(0);
+        if output_len <= 44 {
+            empty_attempt = empty_attempt.saturating_add(1);
+            crate::log_debug(&format!(
+                "Audio description: cue {} produced an empty WAV ({} bytes), retrying indefinitely; empty_attempt={}",
+                index, output_len, empty_attempt
+            ));
+            crate::log_if_err!(
+                fs::remove_file(&output),
+                "Audio description empty TTS output cleanup failed"
+            );
+            wait_for_empty_tts_retry(cancel.as_ref())?;
+            continue;
+        }
+
+        let (mut samples, sample_rate, channels) = match read_wav_as_f32(&output) {
+            Ok(audio) => audio,
+            Err(error) if output_len <= 128 => {
+                empty_attempt = empty_attempt.saturating_add(1);
+                crate::log_debug(&format!(
+                    "Audio description: cue {} produced an unreadable tiny WAV ({} bytes: {}), retrying indefinitely; empty_attempt={}",
+                    index, output_len, error, empty_attempt
+                ));
+                crate::log_if_err!(
+                    fs::remove_file(&output),
+                    "Audio description empty TTS output cleanup failed"
+                );
+                wait_for_empty_tts_retry(cancel.as_ref())?;
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
+        if job.tts_engine == TtsEngine::Edge {
+            let removed = trim_edge_trailing_silence(&mut samples, sample_rate, channels);
+            if removed > 0 {
+                crate::log_debug(&format!(
+                    "Audio description: removed {} trailing Edge PCM samples from cue {}",
+                    removed, index
+                ));
+            }
+        }
+        crate::log_if_err!(
+            fs::remove_file(&output),
+            "Audio description cleanup operation failed"
+        );
+
+        if samples.is_empty() || !audio_description_samples_have_signal(&samples) {
+            empty_attempt = empty_attempt.saturating_add(1);
+            crate::log_debug(&format!(
+                "Audio description: TTS cue {} contains no audible PCM signal, retrying indefinitely; empty_attempt={}",
+                index, empty_attempt
+            ));
+            wait_for_empty_tts_retry(cancel.as_ref())?;
+            continue;
+        }
+        return Ok((Arc::from(samples), sample_rate, channels));
+    }
+}
+
+fn synthesize_description_tasks_parallel<F>(
+    tasks: &[AudioDescriptionSynthesisTask],
+    job: &AudioDescriptionJob,
+    cache_dir: &Path,
+    cancel: Arc<AtomicBool>,
+    mut on_completed: F,
+) -> Result<Vec<SynthesizedDescription>, String>
+where
+    F: FnMut(usize, usize),
+{
+    if tasks.is_empty() {
+        return Ok(Vec::new());
+    }
+    let parallelism = audiobook_synthesis_parallelism(job.tts_engine, &job.tts_voice)
+        .min(tasks.len())
+        .max(1);
+    crate::log_debug(&format!(
+        "Audio description: parallel TTS enabled engine={:?} descriptions={} concurrency={}",
+        job.tts_engine,
+        tasks.len(),
+        parallelism
+    ));
+
+    let mut synthesized = Vec::with_capacity(tasks.len());
+    let mut completed = 0_usize;
+    for batch_start in (0..tasks.len()).step_by(parallelism) {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("cancelled".to_string());
+        }
+        let batch_end = std::cmp::min(batch_start + parallelism, tasks.len());
+        let batch = &tasks[batch_start..batch_end];
+        let batch_results = std::thread::scope(|scope| {
+            let mut handles = Vec::with_capacity(batch.len());
+            for task in batch {
+                let cancel = cancel.clone();
+                handles.push(scope.spawn(move || {
+                    let (samples, sample_rate, channels) = synthesize_description(
+                        &task.text,
+                        task.synthesis_index,
+                        job,
+                        cache_dir,
+                        cancel,
+                    )?;
+                    Ok::<SynthesizedDescription, String>(SynthesizedDescription {
+                        original_index: task.original_index,
+                        text: task.text.clone(),
+                        desired_start_sec: task.desired_start_sec,
+                        mandatory: task.mandatory,
+                        slot_start_sec: task.slot_start_sec,
+                        slot_end_sec: task.slot_end_sec,
+                        samples,
+                        sample_rate,
+                        channels,
+                    })
+                }));
+            }
+            handles
+                .into_iter()
+                .map(|handle| {
+                    handle.join().unwrap_or_else(|_| {
+                        Err("Audio description: parallel TTS worker panicked".to_string())
+                    })
+                })
+                .collect::<Vec<_>>()
+        });
+
+        for result in batch_results {
+            if cancel.load(Ordering::Relaxed) {
+                return Err("cancelled".to_string());
+            }
+            synthesized.push(result?);
+            completed = completed.saturating_add(1);
+            on_completed(completed, tasks.len());
         }
     }
-    crate::log_if_err!(
-        fs::remove_file(&output),
-        "Audio description cleanup operation failed"
-    );
-    if samples.is_empty() {
-        return Err(format!(
-            "Audio description: TTS cue {} became empty after validation",
-            index
-        ));
-    }
-    Ok((Arc::from(samples), sample_rate, channels))
+    Ok(synthesized)
 }
 
 fn normalize_intervals(intervals: &[BridgeInterval], duration_sec: f64) -> Vec<(f64, f64)> {
@@ -1478,6 +1678,7 @@ fn save_audio_description_partial_checkpoint(
         tts_rate: job.tts_rate,
         tts_pitch: job.tts_pitch,
         tts_volume: job.tts_volume,
+        dictionary: job.dictionary.clone(),
         gemini_model: if checkpoint.gemini_model.trim().is_empty() {
             job.gemini_model.clone()
         } else {
@@ -1562,6 +1763,7 @@ pub fn audio_description_job_from_checkpoint(
         tts_rate: checkpoint.tts_rate,
         tts_pitch: checkpoint.tts_pitch,
         tts_volume: checkpoint.tts_volume,
+        dictionary: checkpoint.dictionary,
         gemini_api_key,
         gemini_model: checkpoint.gemini_model,
         audiobook_bitrate_kbps: checkpoint.audiobook_bitrate_kbps,
@@ -1647,6 +1849,7 @@ fn build_audio_description_project(
         tts_rate: job.tts_rate,
         tts_pitch: job.tts_pitch,
         tts_volume: job.tts_volume,
+        dictionary: job.dictionary.clone(),
         bitrate_kbps: AUDIO_DESCRIPTION_BITRATE_KBPS,
         ducking_db: AUDIO_DESCRIPTION_DUCKING_DB,
         fade_ms: AUDIO_DESCRIPTION_FADE_MS,
@@ -1827,6 +2030,7 @@ fn audio_description_job_from_project(project: &AudioDescriptionProject) -> Audi
         tts_rate: project.tts_rate,
         tts_pitch: project.tts_pitch,
         tts_volume: project.tts_volume,
+        dictionary: project.dictionary.clone(),
         gemini_api_key: String::new(),
         gemini_model: project.gemini_model.clone(),
         audiobook_bitrate_kbps: project.bitrate_kbps,
@@ -2093,46 +2297,39 @@ pub fn change_audio_description_project_voice(
     notify_progress(&mut callbacks, 0);
 
     let cache_dir = temporary_job_dir().map_err(AudioDescriptionProjectVoiceError::Other)?;
-    let synthesis_result =
-        (|| -> Result<Vec<SynthesizedDescription>, AudioDescriptionProjectVoiceError> {
-            let mut synthesized = Vec::with_capacity(project.descriptions.len());
-            for (index, description) in project.descriptions.iter().enumerate() {
-                if cancel.load(Ordering::Relaxed) {
-                    return Err(AudioDescriptionProjectVoiceError::Cancelled);
-                }
-                let (samples, sample_rate, channels) = synthesize_description(
-                    &description.text,
-                    description.id,
-                    &job,
-                    &cache_dir,
-                    cancel.clone(),
-                )
-                .map_err(|error| {
-                    if error == "cancelled" || cancel.load(Ordering::Relaxed) {
-                        AudioDescriptionProjectVoiceError::Cancelled
-                    } else {
-                        AudioDescriptionProjectVoiceError::Other(error)
-                    }
-                })?;
-                synthesized.push(SynthesizedDescription {
-                    original_index: description.id,
-                    text: description.text.clone(),
-                    desired_start_sec: description.source_start_sec,
-                    mandatory: false,
-                    slot_start_sec: None,
-                    slot_end_sec: None,
-                    samples,
-                    sample_rate,
-                    channels,
-                });
-                notify_progress(
-                    &mut callbacks,
-                    ((index + 1) as u32).saturating_mul(90)
-                        / project.descriptions.len().max(1) as u32,
-                );
-            }
-            Ok(synthesized)
-        })();
+    let tasks = project
+        .descriptions
+        .iter()
+        .enumerate()
+        .map(|(index, description)| AudioDescriptionSynthesisTask {
+            synthesis_index: index,
+            original_index: description.id,
+            text: description.text.clone(),
+            desired_start_sec: description.source_start_sec,
+            mandatory: false,
+            slot_start_sec: None,
+            slot_end_sec: None,
+        })
+        .collect::<Vec<_>>();
+    let synthesis_result = synthesize_description_tasks_parallel(
+        &tasks,
+        &job,
+        &cache_dir,
+        cancel.clone(),
+        |completed, total| {
+            notify_progress(
+                &mut callbacks,
+                (completed as u32).saturating_mul(90) / total.max(1) as u32,
+            );
+        },
+    )
+    .map_err(|error| {
+        if error == "cancelled" || cancel.load(Ordering::Relaxed) {
+            AudioDescriptionProjectVoiceError::Cancelled
+        } else {
+            AudioDescriptionProjectVoiceError::Other(error)
+        }
+    });
     crate::log_if_err!(
         fs::remove_dir_all(&cache_dir),
         "Audio description cleanup operation failed"
@@ -2407,32 +2604,32 @@ pub fn reexport_audio_description_project(
     );
     notify_progress(&mut callbacks, 0);
     let cache_dir = temporary_job_dir()?;
-    let synthesis_result = (|| -> Result<Vec<SynthesizedDescription>, String> {
-        let mut synthesized = Vec::with_capacity(project.descriptions.len());
-        for (index, description) in project.descriptions.iter().enumerate() {
-            if cancel.load(Ordering::Relaxed) {
-                return Err("cancelled".to_string());
-            }
-            let (samples, sample_rate, channels) =
-                synthesize_description(&description.text, index, &job, &cache_dir, cancel.clone())?;
-            synthesized.push(SynthesizedDescription {
-                original_index: description.id,
-                text: description.text.clone(),
-                desired_start_sec: description.source_start_sec,
-                mandatory: false,
-                slot_start_sec: None,
-                slot_end_sec: None,
-                samples,
-                sample_rate,
-                channels,
-            });
+    let tasks = project
+        .descriptions
+        .iter()
+        .enumerate()
+        .map(|(index, description)| AudioDescriptionSynthesisTask {
+            synthesis_index: index,
+            original_index: description.id,
+            text: description.text.clone(),
+            desired_start_sec: description.source_start_sec,
+            mandatory: false,
+            slot_start_sec: None,
+            slot_end_sec: None,
+        })
+        .collect::<Vec<_>>();
+    let synthesis_result = synthesize_description_tasks_parallel(
+        &tasks,
+        &job,
+        &cache_dir,
+        cancel.clone(),
+        |completed, total| {
             notify_progress(
                 &mut callbacks,
-                ((index + 1) as u32).saturating_mul(60) / project.descriptions.len().max(1) as u32,
+                (completed as u32).saturating_mul(60) / total.max(1) as u32,
             );
-        }
-        Ok(synthesized)
-    })();
+        },
+    );
     crate::log_if_err!(
         fs::remove_dir_all(&cache_dir),
         "Audio description cleanup operation failed"
@@ -2845,32 +3042,30 @@ pub fn create_audio_description(
         "Synthesizing descriptions with the selected Sonarpad voice...",
     );
     let cache_dir = temporary_job_dir()?;
-    let synthesis_result = (|| -> Result<Vec<SynthesizedDescription>, String> {
-        let mut synthesized = Vec::with_capacity(analysis.descriptions.len());
-        for (index, description) in analysis.descriptions.iter().enumerate() {
-            if cancel.load(Ordering::Relaxed) {
-                return Err("cancelled".to_string());
-            }
-            let (samples, sample_rate, channels) =
-                synthesize_description(&description.text, index, job, &cache_dir, cancel.clone())?;
-            synthesized.push(SynthesizedDescription {
-                original_index: index,
-                text: description.text.clone(),
-                desired_start_sec: description.start_sec,
-                mandatory: description.mandatory,
-                slot_start_sec: description.slot_start_sec,
-                slot_end_sec: description.slot_end_sec,
-                samples,
-                sample_rate,
-                channels,
-            });
-            let pct = 55
-                + (((index + 1) as u32).saturating_mul(25)
-                    / analysis.descriptions.len().max(1) as u32);
+    let tasks = analysis
+        .descriptions
+        .iter()
+        .enumerate()
+        .map(|(index, description)| AudioDescriptionSynthesisTask {
+            synthesis_index: index,
+            original_index: index,
+            text: description.text.clone(),
+            desired_start_sec: description.start_sec,
+            mandatory: description.mandatory,
+            slot_start_sec: description.slot_start_sec,
+            slot_end_sec: description.slot_end_sec,
+        })
+        .collect::<Vec<_>>();
+    let synthesis_result = synthesize_description_tasks_parallel(
+        &tasks,
+        job,
+        &cache_dir,
+        cancel.clone(),
+        |completed, total| {
+            let pct = 55 + (completed as u32).saturating_mul(25) / total.max(1) as u32;
             notify_progress(&mut callbacks, pct);
-        }
-        Ok(synthesized)
-    })();
+        },
+    );
     crate::log_if_err!(
         fs::remove_dir_all(&cache_dir),
         "Audio description cleanup operation failed"
@@ -3053,24 +3248,90 @@ mod tests {
         SynthesizedDescription, audio_description_character_catalog_dir,
         audio_description_character_catalog_path,
         audio_description_project_edit_available_duration, audio_description_project_path,
-        build_audio_description_project, choose_slot, delete_audio_description_project_description,
+        audio_description_samples_have_signal, audio_description_tts_chunks,
+        audio_description_tts_error_is_empty_output, build_audio_description_project, choose_slot,
+        delete_audio_description_project_description,
         load_audio_description_character_catalog_context, load_audio_description_project,
         merge_catalog_characters, merge_catalog_description, normalize_catalog_characters,
         save_audio_description_character_catalog, save_audio_description_project,
         schedule_synthesized_descriptions, scheduled_duration_sec, trim_edge_trailing_silence,
         validate_audio_description_project_edit_duration,
     };
-    use crate::settings::{Language, TtsEngine};
+    use crate::settings::{DictionaryEntry, Language, TtsEngine};
     use crate::tools::audio_description_bridge::{BridgeCharacter, BridgeInterval};
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
+    fn empty_tts_validation_rejects_silent_pcm_and_accepts_voice_signal() {
+        assert!(!audio_description_samples_have_signal(&[]));
+        assert!(!audio_description_samples_have_signal(&[0.0, 0.0, 0.0]));
+        assert!(audio_description_samples_have_signal(&[0.0, 0.001, 0.0]));
+    }
+
+    #[test]
+    fn empty_tts_renderer_errors_are_marked_for_indefinite_retry() {
+        assert!(audio_description_tts_error_is_empty_output(
+            "Segment decode failed: decoded audio contains no samples"
+        ));
+        assert!(audio_description_tts_error_is_empty_output(
+            "Audio description: empty WAV returned by engine"
+        ));
+        assert!(!audio_description_tts_error_is_empty_output(
+            "selected voice is not installed"
+        ));
+    }
+
+    #[test]
     fn project_path_keeps_the_audio_name_and_adds_project_suffix() {
         assert_eq!(
             audio_description_project_path(PathBuf::from("movie.mp3").as_path()),
             PathBuf::from("movie.sonarpad-ad.json")
+        );
+    }
+
+    #[test]
+    fn audio_description_tts_uses_voice_dictionary_replacements() {
+        let job = AudioDescriptionJob {
+            input_path: PathBuf::from("movie.mkv"),
+            output_path: PathBuf::from("movie.mp3"),
+            language_code: "it".to_string(),
+            tts_language: Language::Italian,
+            verbosity: AudioDescriptionVerbosity::Detailed,
+            allow_extended_pauses: false,
+            recognize_characters: true,
+            character_catalog: None,
+            save_project: false,
+            tts_engine: TtsEngine::Edge,
+            tts_voice: "it-IT-ElsaNeural".to_string(),
+            tts_rate: 0,
+            tts_pitch: 0,
+            tts_volume: 100,
+            dictionary: vec![DictionaryEntry {
+                original: "Sonarpad".to_string(),
+                replacement: "Sonar pad".to_string(),
+                match_case: true,
+                use_custom_voice: false,
+                custom_voice_engine: None,
+                custom_voice: None,
+            }],
+            gemini_api_key: String::new(),
+            gemini_model: "gemini".to_string(),
+            audiobook_bitrate_kbps: 192,
+            resume_checkpoint_path: None,
+        };
+        let chunks = audio_description_tts_chunks("Sonarpad descrive la scena.", &job);
+        assert!(!chunks.is_empty());
+        assert!(
+            chunks
+                .iter()
+                .any(|chunk| chunk.text_to_read.contains("Sonar pad"))
+        );
+        assert!(
+            chunks
+                .iter()
+                .all(|chunk| !chunk.text_to_read.contains("Sonarpad"))
         );
     }
 
@@ -3091,6 +3352,7 @@ mod tests {
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            dictionary: Vec::new(),
             gemini_api_key: String::new(),
             gemini_model: "gemini".to_string(),
             audiobook_bitrate_kbps: 192,
@@ -3262,6 +3524,7 @@ mod tests {
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            dictionary: Vec::new(),
             gemini_api_key: String::new(),
             gemini_model: "gemini-3.5-flash-lite".to_string(),
             audiobook_bitrate_kbps: 192,
@@ -3323,6 +3586,7 @@ mod tests {
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            dictionary: Vec::new(),
             gemini_api_key: String::new(),
             gemini_model: "gemini".to_string(),
             audiobook_bitrate_kbps: 192,
@@ -3591,6 +3855,7 @@ mod tests {
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            dictionary: Vec::new(),
             gemini_api_key: String::new(),
             gemini_model: "gemini-3.5-flash-lite".to_string(),
             audiobook_bitrate_kbps: 192,
@@ -3662,6 +3927,7 @@ mod tests {
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            dictionary: Vec::new(),
             gemini_api_key: String::new(),
             gemini_model: "gemini-3.5-flash-lite".to_string(),
             audiobook_bitrate_kbps: 192,
@@ -3701,6 +3967,7 @@ mod tests {
             tts_rate: 0,
             tts_pitch: 0,
             tts_volume: 100,
+            dictionary: Vec::new(),
             gemini_api_key: String::new(),
             gemini_model: "gemini-3.5-flash-lite".to_string(),
             audiobook_bitrate_kbps: 192,

@@ -1,6 +1,16 @@
 # Journal des modifications
 
-Non publié – 2026-08-10
+Version 0.8.5 – 2026-07-25
+
+Guide TV
+• Le guide TV affiche désormais les programmes dans une liste déroulante sélectionnable au lieu d’une liste de texte en lecture seule. Après avoir choisi un programme, Tab mène au nouveau bouton « Afficher le résumé du programme sélectionné », qui montre la description fournie par le service de guide.
+
+RSS et articles
+• Ajout de « Sélectionner des articles… » au menu contextuel des articles RSS. Cette commande ouvre la même fenêtre accessible à cases à cocher que pour le téléchargement des playlists : Espace sélectionne ou désélectionne plusieurs articles, Tab mène à Supprimer et tous les articles choisis sont supprimés en une seule opération.
+
+Enregistrements TV et audiodescriptions
+• Amélioration de la robustesse des horodatages Gemini pour les audiodescriptions : les horodatages mal formés `MM:SS:ms`, par exemple `01:13:473`, sont désormais normalisés sans perte en `MM:SS.ms` avant validation ; les contrôles existants de chunk et de créneau continuent de rejeter tout horodatage qui n’appartient pas à la scène courante.
+• Correction du focus clavier lorsque « Créer une audiodescription avec l’IA » s’ouvre automatiquement à la fin d’un enregistrement TV : la boucle de sélection TV encore active n’intercepte plus Tab, Espace, les flèches ni Échap destinés à la fenêtre d’audiodescription.
 
 Formats de livres numériques
 • Ajout de l’import des Kindle sans DRM en MOBI, AZW et AZW3, avec flux non compressés, PalmDOC et HUFF/CDIC et variantes MOBI 6/KF8/AZW3. Texte, chapitres et titres apparaissent dans l’index Sonarpad.
@@ -8,8 +18,6 @@ Formats de livres numériques
 • Les livres audio DAISY utilisent désormais le lecteur interne existant de Sonarpad : à l’ouverture, la table des matières DAISY apparaît, Entrée lit le chapitre choisi, Espace met en pause/reprend et Échap ferme le lecteur puis revient à l’index DAISY. Les limites SMIL clipBegin/clipEnd sont respectées et un chapitre peut se poursuivre automatiquement sur plusieurs fichiers audio.
 • Kindle et DAISY sont importés comme texte modifiable sans écraser l’e-book source ; Enregistrer utilise Enregistrer sous/exporter. Les Kindle avec DRM sont refusés explicitement.
 • MOBI/AZW/AZW3 et DAISY ont été ajoutés à Ouvrir dans les 17 langues et aux associations Windows. Les tests couvrent non compressé/PalmDOC/HUFF-CDIC, CDIC récursif, MOBI 6/8, DRM, DAISY 2.02/3 empaqueté/extrait et les entrées directes NCX/SMIL/DTBook.
-
-Version 0.8.5 – 2026-07-25
 
 Enregistrement et exportation des EPUB
 • Correction de « Enregistrer sous » pour les documents EPUB : lorsque TXT ou un autre format est choisi, l’extension sélectionnée est désormais appliquée au lieu de conserver .epub.

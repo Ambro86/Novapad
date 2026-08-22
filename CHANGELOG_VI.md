@@ -1,6 +1,16 @@
 # Nhật ký thay đổi
 
-Chưa phát hành – 2026-08-10
+Phiên bản 0.8.5 – 2026-07-25
+
+Lịch TV
+• Hướng dẫn TV giờ hiển thị các chương trình trong hộp tổ hợp có thể chọn thay vì danh sách văn bản chỉ đọc. Sau khi chọn một chương trình, phím Tab sẽ chuyển tới nút mới “Xem nội dung chương trình đã chọn”, hiển thị phần mô tả do dịch vụ lịch TV cung cấp.
+
+RSS và bài viết
+• Đã thêm “Chọn bài viết…” vào menu ngữ cảnh của bài viết RSS. Lệnh này mở cùng cửa sổ chọn có hộp kiểm dễ tiếp cận như khi tải playlist: dùng Phím cách để chọn hoặc bỏ chọn nhiều bài viết, nhấn Tab đến Xóa và xóa tất cả bài đã chọn trong một thao tác.
+
+Bản ghi TV và mô tả âm thanh
+• Tăng độ chắc chắn khi xử lý timestamp Gemini cho mô tả âm thanh: timestamp sai định dạng `MM:SS:ms`, ví dụ `01:13:473`, giờ được chuẩn hóa không mất độ chính xác thành `MM:SS.ms` trước khi kiểm tra; các kiểm tra chunk và slot hiện có vẫn loại mọi timestamp không thuộc cảnh hiện tại.
+• Đã sửa tiêu điểm bàn phím khi “Tạo mô tả âm thanh bằng AI” tự động mở sau khi bản ghi TV kết thúc: vòng lặp chọn TV vẫn còn hoạt động không còn chặn Tab, Phím cách, các phím mũi tên hoặc Escape dành cho cửa sổ mô tả âm thanh.
 
 Định dạng sách điện tử
 • Đã thêm nhập Kindle không DRM ở MOBI, AZW và AZW3, gồm luồng không nén, PalmDOC, HUFF/CDIC và các biến thể MOBI 6/KF8/AZW3. Văn bản, chương và tiêu đề có trong chỉ mục Sonarpad.
@@ -8,8 +18,6 @@ Chưa phát hành – 2026-08-10
 • Sách nói DAISY giờ dùng trình phát nội bộ hiện có của Sonarpad: khi mở sách sẽ hiện mục lục DAISY, Enter phát chương đã chọn, Space tạm dừng/tiếp tục và Escape đóng trình phát rồi quay lại mục lục DAISY. Các giới hạn SMIL clipBegin/clipEnd được tôn trọng và một chương có thể tự động tiếp tục qua nhiều tệp âm thanh.
 • Kindle và DAISY được nhập thành văn bản có thể sửa mà không ghi đè e-book nguồn; Lưu dùng Lưu thành/xuất. Kindle có DRM bị từ chối rõ ràng.
 • MOBI/AZW/AZW3 và DAISY được thêm vào hộp thoại Mở ở cả 17 ngôn ngữ và liên kết Windows. Kiểm thử bao phủ không nén/PalmDOC/HUFF-CDIC, CDIC đệ quy, MOBI 6/8, DRM, DAISY 2.02/3 đóng gói/giải nén và NCX/SMIL/DTBook trực tiếp.
-
-Phiên bản 0.8.5 – 2026-07-25
 
 Lưu và xuất EPUB
 • Đã sửa lệnh “Lưu thành” cho tài liệu EPUB: khi chọn TXT hoặc định dạng khác, phần mở rộng đã chọn giờ được áp dụng thay vì vẫn giữ .epub.

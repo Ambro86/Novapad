@@ -11,6 +11,7 @@ from audio_describer.core.audio_describer import (
     _find_large_chunk_gaps,
     _build_unified_prompts,
     _normalize_chunk_timestamps,
+    _mmss_to_total_seconds,
     _post_process_mmss_timestamps,
     _requires_per_chunk_upload,
     _should_use_per_chunk_uploads,
@@ -173,6 +174,39 @@ class ChunkTimestampTests(unittest.TestCase):
             for call in generate.call_args_list
         ))
         self.assertTrue(any("original audio" in status for status in statuses))
+
+    def test_gemini_colon_milliseconds_preserve_exact_timestamp(self):
+        self.assertAlmostEqual(_mmss_to_total_seconds("01:13:473"), 73.473)
+        self.assertAlmostEqual(_mmss_to_total_seconds("02:17:160"), 137.160)
+        self.assertAlmostEqual(_mmss_to_total_seconds("00:13:026"), 13.026)
+
+    def test_hour_timestamps_remain_unambiguous(self):
+        self.assertAlmostEqual(_mmss_to_total_seconds("01:02:03.500"), 3723.5)
+        self.assertAlmostEqual(_mmss_to_total_seconds("01:02:03"), 3723.0)
+        self.assertAlmostEqual(_mmss_to_total_seconds("01:02:03:500"), 3723.5)
+
+    def test_normalized_colon_milliseconds_still_face_chunk_range_audit(self):
+        corrected = _post_process_mmss_timestamps([
+            ("01:13:473", "01:17:210", "Dentro il chunk."),
+            ("99:13:473", "99:17:210", "Fuori dal chunk."),
+        ])
+
+        self.assertEqual(len(corrected), 2)
+        normalized = _normalize_chunk_timestamps(
+            corrected,
+            chunk_start=360.138,
+            chunk_end=543.689,
+            chunk_number=3,
+            force_mode="relative",
+        )
+        self.assertEqual(len(normalized), 1)
+        self.assertAlmostEqual(normalized[0][0], 433.611)
+        self.assertAlmostEqual(normalized[0][1], 437.348)
+        self.assertEqual(normalized[0][2], "Dentro il chunk.")
+
+    def test_invalid_colon_millisecond_seconds_are_rejected(self):
+        with self.assertRaises(ValueError):
+            _mmss_to_total_seconds("01:73:473")
 
     def test_out_of_order_gemini_entries_keep_their_scene_timestamps(self):
         raw = [

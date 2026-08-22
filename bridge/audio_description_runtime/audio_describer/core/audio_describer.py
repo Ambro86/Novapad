@@ -2159,7 +2159,7 @@ def _recover_large_chunk_gaps(
         "state. " + recovery_subject_rule + _AUDIO_CONTEXT_ONLY_RULE +
         "Return only valid JSON with keys character_glossary (an empty array) "
         "and audio_descriptions. Each audio description must contain start_time_mmss, end_time_mmss "
-        "and description_text, using the attached video's MM:SS timeline."
+        "and description_text, using the attached video's MM:SS timeline. Use a dot before milliseconds (MM:SS.ms), never a third colon."
     )
     if intensive_mode:
         system_instruction += (
@@ -2271,20 +2271,87 @@ def _recover_large_chunk_gaps(
 
 
 def _mmss_to_total_seconds(mmss_string):
-    if not isinstance(mmss_string, str) or mmss_string.count(':') != 1:
-        if isinstance(mmss_string, str) and ':' not in mmss_string:
-            try:
-                return float(mmss_string)
-            except ValueError:
-                pass
+    """Convert Gemini timestamps without guessing across incompatible timelines.
+
+    The requested format is MM:SS[.ms], but Gemini occasionally emits the
+    millisecond separator as a colon (for example ``01:13:473``).  Accept that
+    specific, mechanically reversible typo while keeping the downstream chunk
+    audit responsible for deciding whether the resulting timestamp belongs to
+    the current video slice.
+
+    Standard HH:MM:SS[.ms] is also accepted for completeness.  A three-part
+    timestamp whose final component is exactly three decimal digits is treated
+    as MM:SS:ms, because that is the malformed variant observed from Gemini;
+    otherwise three parts are interpreted as HH:MM:SS[.ms].
+    """
+    if not isinstance(mmss_string, str):
         app_logger.warning("Invalid MM:SS string format for conversion: '%s'" % mmss_string)
         raise ValueError(_("Invalid MM:SS string format: %s") % mmss_string)
-    parts = mmss_string.split(':', 1)
+
+    value = mmss_string.strip()
+    colon_count = value.count(':')
+    if colon_count == 0:
+        try:
+            total_seconds = float(value.replace(',', '.'))
+            if total_seconds < 0:
+                raise ValueError(_("Calculated total seconds is negative."))
+            return total_seconds
+        except (ValueError, TypeError):
+            app_logger.warning("Invalid MM:SS string format for conversion: '%s'" % mmss_string)
+            raise ValueError(_("Invalid MM:SS string format: %s") % mmss_string)
+
     try:
-        minutes = int(parts[0])
-        seconds_part_str = parts[1].replace(',', '.')
-        sec_float = float(seconds_part_str)
-        total_seconds = float(minutes * 60 + sec_float)
+        if colon_count == 1:
+            minutes_str, seconds_str = value.split(':', 1)
+            minutes = int(minutes_str)
+            seconds = float(seconds_str.replace(',', '.'))
+            total_seconds = float(minutes * 60 + seconds)
+        elif colon_count == 2:
+            first_str, second_str, third_str = value.split(':')
+            if re.fullmatch(r"\d{3}", third_str):
+                # Gemini typo: MM:SS:ms -> MM:SS.ms.  This preserves the
+                # numeric timestamp exactly; no temporal snapping occurs here.
+                minutes = int(first_str)
+                seconds = int(second_str)
+                milliseconds = int(third_str)
+                if not 0 <= seconds < 60:
+                    raise ValueError(_("Seconds component is outside 0-59."))
+                total_seconds = float(minutes * 60 + seconds + milliseconds / 1000.0)
+                app_logger.info(
+                    "Normalized Gemini MM:SS:ms timestamp '%s' to %.3fs.",
+                    mmss_string, total_seconds,
+                )
+            else:
+                # Unambiguous standard HH:MM:SS[.ms].
+                hours = int(first_str)
+                minutes = int(second_str)
+                seconds = float(third_str.replace(',', '.'))
+                if not 0 <= minutes < 60 or not 0 <= seconds < 60:
+                    raise ValueError(_("HH:MM:SS component is outside its valid range."))
+                total_seconds = float(hours * 3600 + minutes * 60 + seconds)
+        elif colon_count == 3:
+            # Also tolerate HH:MM:SS:ms when Gemini applies the same typo to
+            # an hour-bearing timestamp.  Require exactly three ms digits so
+            # malformed extra fields are not silently guessed.
+            hours_str, minutes_str, seconds_str, milliseconds_str = value.split(':')
+            if not re.fullmatch(r"\d{3}", milliseconds_str):
+                raise ValueError(_("Millisecond component must contain exactly three digits."))
+            hours = int(hours_str)
+            minutes = int(minutes_str)
+            seconds = int(seconds_str)
+            milliseconds = int(milliseconds_str)
+            if not 0 <= minutes < 60 or not 0 <= seconds < 60:
+                raise ValueError(_("HH:MM:SS component is outside its valid range."))
+            total_seconds = float(
+                hours * 3600 + minutes * 60 + seconds + milliseconds / 1000.0
+            )
+            app_logger.info(
+                "Normalized Gemini HH:MM:SS:ms timestamp '%s' to %.3fs.",
+                mmss_string, total_seconds,
+            )
+        else:
+            raise ValueError(_("Unexpected number of timestamp separators."))
+
         if total_seconds < 0:
             raise ValueError(_("Calculated total seconds is negative."))
         return total_seconds
@@ -2920,8 +2987,8 @@ Your entire output MUST be a single JSON object with two top-level keys: "charac
 {glossary_schema}
 
 2.  **"audio_descriptions":** An array of objects, where each object represents a timed description. Each description object must contain:
-    *   `"start_time_mmss"`: The start time of the description in "MM:SS" or "MM:SS.ms" format.
-    *   `"end_time_mmss"`: The end time of the description in "MM:SS" or "MM:SS.ms" format.
+    *   `"start_time_mmss"`: The start time of the description in "MM:SS" or "MM:SS.ms" format. Use a dot before milliseconds; never write `MM:SS:ms`.
+    *   `"end_time_mmss"`: The end time of the description in "MM:SS" or "MM:SS.ms" format. Use a dot before milliseconds; never write `MM:SS:ms`.
     *   `"description_text"`: The concise description text, written entirely in {target_language_name} and following all core directives.
 
 {core_directives}

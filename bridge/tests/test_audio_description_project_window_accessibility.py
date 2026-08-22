@@ -428,7 +428,7 @@ class AudioDescriptionProjectWindowAccessibilityTests(unittest.TestCase):
             AUDIO.index('pub fn change_audio_description_project_voice'):
             AUDIO.index('pub fn delete_audio_description_project_description')
         ]
-        synth = validation.index('synthesize_description(')
+        synth = validation.index('synthesize_description_tasks_parallel(')
         schedule = validation.index('schedule_synthesized_descriptions(')
         export = validation.index('export_audio_description_mp3(')
         project_save = validation.index('save_audio_description_project(&temporary_project, &updated)')
@@ -453,11 +453,11 @@ class AudioDescriptionProjectWindowAccessibilityTests(unittest.TestCase):
             AUDIO.index('pub fn change_audio_description_project_voice'):
             AUDIO.index('pub fn delete_audio_description_project_description')
         ]
-        self.assertEqual(validation.count('synthesize_description('), 1)
+        self.assertEqual(validation.count('synthesize_description_tasks_parallel('), 1)
         schedule = validation.index('schedule_synthesized_descriptions(')
         export = validation.index('export_audio_description_mp3(')
         between = validation[schedule:export]
-        self.assertNotIn('synthesize_description(', between)
+        self.assertNotIn('synthesize_description_tasks_parallel(', between)
         self.assertIn('samples: description.samples.clone()', between)
 
     def test_project_voice_change_is_explicit_and_tab_order_is_accessible(self):

@@ -1,6 +1,16 @@
 # Changelog
 
-Unreleased – 2026-08-10
+Version 0.8.5 – 2026-07-25
+
+TV guide
+• The TV guide now shows programs in a selectable combo box instead of a read-only text list. After choosing a program, Tab reaches the new “View selected program plot” button, which displays the program description supplied by the guide service.
+
+RSS and articles
+• Added “Select articles…” to the RSS article context menu. It opens the same accessible checkbox selection window used for playlist downloads: use Space to select or deselect multiple articles, press Tab to reach Delete, then remove all selected articles in one operation.
+
+TV recordings and audio descriptions
+• Improved Gemini timestamp robustness for audio descriptions: malformed `MM:SS:ms` timestamps such as `01:13:473` are now normalized losslessly to `MM:SS.ms` before validation, while the existing chunk/slot range audits still reject timestamps that do not belong to the current scene.
+• Fixed keyboard focus after automatically opening Create audio description with AI at the end of a TV recording: the still-active TV selection loop no longer intercepts Tab, Space, arrows or Escape intended for the audio-description window.
 
 E-book formats
 • Added native import for DRM-free Kindle e-books in `.mobi`, `.azw` and `.azw3`, including uncompressed MOBI, PalmDOC, legacy HUFF/CDIC text streams and KF8/AZW3 parsing. Text and chapter navigation are imported into Sonarpad's editor/index.
@@ -8,8 +18,6 @@ E-book formats
 • DAISY audio books now use Sonarpad's existing internal player: opening a book shows its DAISY table of contents, Enter plays the selected chapter, Space pauses/resumes, seeking stays within the chapter, and Escape closes the player and returns to the DAISY index. SMIL clipBegin/clipEnd boundaries are honored and chapters may continue automatically across multiple audio files.
 • Kindle and DAISY documents are imported as editable text without overwriting their source container; Save therefore uses Save As/export. DRM-protected Kindle books are rejected explicitly, and non-DAISY ZIP archives are rejected instead of being opened as binary text.
 • Updated Open-dialog filters in all 17 interface languages and Windows file associations. Added Rust regression tests for MOBI/AZW/AZW3, uncompressed/PalmDOC/HUFF-CDIC streams, recursive CDIC phrases, MOBI 6/8 headers, DRM rejection, packaged and extracted DAISY 2.02/3, direct NCC/SMIL/NCX/DTBook entry points, audio-only navigation, ZIP sniffing and localized Open filters.
-
-Version 0.8.5 – 2026-07-25
 
 Audio-description creation
 • The playback menu now offers “Create audio description with AI” for video links opened through Stream audio from URL, reusing the active yt-dlp save context and storing the downloaded video in the configured Media folder.
@@ -30,7 +38,6 @@ Audio-description creation
 • Worker states for upload, waiting, Gemini submission, response parsing, JSON repair and retries are now translated by Sonarpad and no longer expose English messages.
 • Fixed the worker PowerShell script: the `-3.14` selector is passed explicitly to pip and PyInstaller, preventing the `py` interactive console from opening accidentally.
 • The dedicated suite now contains 128 tests: 105 Python tests and 23 Rust tests, including coverage for all 17 prompt languages, glossary-language correction, complete interface localization and translated dynamic progress states.
-
 
 EPUB saving and export
 • Fixed Save As for EPUB documents: selecting TXT or another format now applies the selected extension instead of retaining .epub.

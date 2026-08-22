@@ -4,7 +4,9 @@ use chrono::{Datelike, Duration, Local, NaiveDate, TimeZone, Timelike};
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, DEFAULT_GUI_FONT, HBRUSH, HFONT};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows::Win32::UI::Input::KeyboardAndMouse::{VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    IsWindowEnabled, VK_ESCAPE, VK_RETURN, VK_SHIFT, VK_TAB,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW,
     DefWindowProcW, DestroyWindow, DispatchMessageW, ES_AUTOVSCROLL, ES_MULTILINE, ES_READONLY,
@@ -12,22 +14,25 @@ use windows::Win32::UI::WindowsAndMessaging::{
     IsDialogMessageW, IsWindow, LoadCursorW, MSG, MoveWindow, RegisterClassW, SW_SHOW,
     SetForegroundWindow, SetWindowLongPtrW, SetWindowTextW, ShowWindow, TranslateMessage, WM_APP,
     WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_SIZE,
-    WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_POPUP, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_POPUP,
+    WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
 use crate::accessibility::to_wide;
-use crate::tools::tv::{self, TvChannel};
+use crate::tools::tv::{self, TvChannel, TvProgram};
 
 const CLASS_NAME: &str = "SonarpadTvGuideWindow";
 const ID_LABEL_DAY: usize = 4101;
 const ID_COMBO_DAY: usize = 4102;
 const ID_LABEL_PROGRAMS: usize = 4103;
-const ID_EDIT_PROGRAMS: usize = 4104;
-const ID_BUTTON_CLOSE: usize = 4105;
+const ID_COMBO_PROGRAMS: usize = 4104;
+const ID_LABEL_PLOT: usize = 4105;
+const ID_BUTTON_CLOSE: usize = 4106;
+const ID_EDIT_PLOT: usize = 4107;
 const CB_ADDSTRING: u32 = 0x0143;
 const CB_GETCURSEL: u32 = 0x0147;
+const CB_RESETCONTENT: u32 = 0x014B;
 const CB_SETCURSEL: u32 = 0x014E;
 const CBN_SELCHANGE: u16 = 1;
 const WM_GUIDE_LOADED: u32 = WM_APP + 173;
@@ -36,14 +41,16 @@ struct TvGuideState {
     parent: HWND,
     channel: TvChannel,
     combo_day: HWND,
-    edit_programs: HWND,
+    combo_programs: HWND,
+    edit_plot: HWND,
+    programs: Vec<TvProgram>,
     dates: Vec<NaiveDate>,
     generation: u64,
 }
 
 struct TvGuideLoaded {
     generation: u64,
-    result: Result<String, String>,
+    result: Result<Vec<TvProgram>, String>,
 }
 
 pub(crate) fn open(parent: HWND, channel: TvChannel) {
@@ -64,7 +71,9 @@ pub(crate) fn open(parent: HWND, channel: TvChannel) {
             parent,
             channel,
             combo_day: HWND(0),
-            edit_programs: HWND(0),
+            combo_programs: HWND(0),
+            edit_plot: HWND(0),
+            programs: Vec::new(),
             dates: Vec::new(),
             generation: 0,
         });
@@ -143,8 +152,19 @@ fn handle_keyboard(hwnd: HWND, message: &MSG) -> bool {
     if key != VK_TAB.0 as u32 {
         return false;
     }
-    let controls = [ID_COMBO_DAY, ID_EDIT_PROGRAMS, ID_BUTTON_CLOSE]
-        .map(|id| unsafe { GetDlgItem(hwnd, id as i32) });
+    let controls = [
+        ID_COMBO_DAY,
+        ID_COMBO_PROGRAMS,
+        ID_EDIT_PLOT,
+        ID_BUTTON_CLOSE,
+    ]
+    .map(|id| unsafe { GetDlgItem(hwnd, id as i32) })
+    .into_iter()
+    .filter(|control| control.0 != 0 && unsafe { IsWindowEnabled(*control).as_bool() })
+    .collect::<Vec<_>>();
+    if controls.is_empty() {
+        return false;
+    }
     let current = crate::get_focus_safe();
     let backwards = (crate::get_key_state_safe(VK_SHIFT.0 as i32) & (0x8000u16 as i16)) != 0;
     let index = controls.iter().position(|control| *control == current);
@@ -197,6 +217,10 @@ fn wndproc_inner(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     start_load(hwnd);
                     return LRESULT(0);
                 }
+                if id == ID_COMBO_PROGRAMS && notification == CBN_SELCHANGE {
+                    update_selected_program_plot(hwnd);
+                    return LRESULT(0);
+                }
                 if id == ID_BUTTON_CLOSE {
                     crate::log_if_err!(DestroyWindow(hwnd));
                     return LRESULT(0);
@@ -207,11 +231,7 @@ fn wndproc_inner(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                 let payload = Box::from_raw(lparam.0 as *mut TvGuideLoaded);
                 let current_generation = with_state(hwnd, |state| state.generation).unwrap_or(0);
                 if payload.generation == current_generation {
-                    let text = payload.result.unwrap_or_else(|error| error);
-                    if let Some(edit) = with_state(hwnd, |state| state.edit_programs) {
-                        let wide = to_wide(&text);
-                        crate::log_if_err!(SetWindowTextW(edit, PCWSTR(wide.as_ptr())));
-                    }
+                    apply_loaded_programs(hwnd, payload.result);
                 }
                 LRESULT(0)
             }
@@ -283,23 +303,50 @@ unsafe fn create_controls(hwnd: HWND, state: &mut TvGuideState) {
             ID_LABEL_PROGRAMS,
             font,
         );
-        state.edit_programs = create_control(
+        state.combo_programs = create_control(
+            hwnd,
+            hinstance,
+            w!("COMBOBOX"),
+            "",
+            (
+                WS_CHILD
+                    | WS_VISIBLE
+                    | WS_TABSTOP
+                    | WS_BORDER
+                    | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(
+                        CBS_DROPDOWNLIST as u32,
+                    ),
+                0,
+            ),
+            ID_COMBO_PROGRAMS,
+            font,
+        );
+        create_control(
+            hwnd,
+            hinstance,
+            w!("STATIC"),
+            &crate::i18n::tr_tv("tv.guide.plot_label"),
+            (WS_CHILD | WS_VISIBLE, 0),
+            ID_LABEL_PLOT,
+            font,
+        );
+        state.edit_plot = create_control(
             hwnd,
             hinstance,
             w!("EDIT"),
-            &crate::i18n::tr_tv("tv.guide.loading"),
+            "",
             (
                 WS_CHILD
                     | WS_VISIBLE
                     | WS_TABSTOP
                     | WS_BORDER
                     | WS_VSCROLL
-                    | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_MULTILINE as u32)
-                    | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_AUTOVSCROLL as u32)
-                    | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(ES_READONLY as u32),
-                WS_EX_CLIENTEDGE.0,
+                    | windows::Win32::UI::WindowsAndMessaging::WINDOW_STYLE(
+                        (ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY) as u32,
+                    ),
+                0,
             ),
-            ID_EDIT_PROGRAMS,
+            ID_EDIT_PLOT,
             font,
         );
         create_control(
@@ -334,6 +381,7 @@ unsafe fn create_controls(hwnd: HWND, state: &mut TvGuideState) {
             );
         }
         crate::send_message_w_safe(state.combo_day, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+        set_program_controls_loading(state);
         layout(hwnd);
         crate::set_focus_safe(state.combo_day);
     }
@@ -382,13 +430,13 @@ fn start_load(hwnd: HWND) {
     .flatten() else {
         return;
     };
-    if let Some(edit) = with_state(hwnd, |state| state.edit_programs) {
-        let loading = to_wide(&crate::i18n::tr_tv("tv.guide.loading"));
-        crate::log_if_err!(unsafe { SetWindowTextW(edit, PCWSTR(loading.as_ptr())) });
+    if with_state(hwnd, set_program_controls_loading).is_none() {
+        crate::log_debug("TV guide: state unavailable while entering loading state");
+        return;
     }
     let hwnd_value = hwnd.0;
     thread::spawn(move || {
-        let result = load_guide_text(&channel, date);
+        let result = load_guide_programs(&channel, date);
         let payload = Box::new(TvGuideLoaded { generation, result });
         let payload_pointer = Box::into_raw(payload);
         if let Err(error) = crate::post_message_w_safe(
@@ -403,7 +451,7 @@ fn start_load(hwnd: HWND) {
     });
 }
 
-fn load_guide_text(channel: &TvChannel, date: NaiveDate) -> Result<String, String> {
+fn load_guide_programs(channel: &TvChannel, date: NaiveDate) -> Result<Vec<TvProgram>, String> {
     let now = Local::now();
     let today = now.date_naive();
     let now_seconds = now.timestamp();
@@ -430,26 +478,128 @@ fn load_guide_text(channel: &TvChannel, date: NaiveDate) -> Result<String, Strin
         date == today,
         programs.len()
     ));
-    if programs.is_empty() {
-        return Ok(crate::i18n::tr_tv("tv.guide.no_programs"));
+    Ok(programs)
+}
+
+fn program_label(program: &TvProgram) -> String {
+    let start = Local.timestamp_opt(program.start_time, 0).single();
+    let end = Local.timestamp_opt(program.end_time, 0).single();
+    match (start, end) {
+        (Some(start), Some(end)) => format!(
+            "{:02}:{:02} - {:02}:{:02}  {}",
+            start.hour(),
+            start.minute(),
+            end.hour(),
+            end.minute(),
+            program.title
+        ),
+        _ => program.title.clone(),
     }
-    let mut lines = Vec::with_capacity(programs.len());
-    for program in programs {
-        let start = Local.timestamp_opt(program.start_time, 0).single();
-        let end = Local.timestamp_opt(program.end_time, 0).single();
-        match (start, end) {
-            (Some(start), Some(end)) => lines.push(format!(
-                "{:02}:{:02} - {:02}:{:02}  {}",
-                start.hour(),
-                start.minute(),
-                end.hour(),
-                end.minute(),
-                program.title
-            )),
-            _ => lines.push(program.title),
+}
+
+fn reset_program_combo(combo: HWND, message: Option<&str>) {
+    crate::send_message_w_safe(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    if let Some(message) = message {
+        let wide = to_wide(message);
+        crate::send_message_w_safe(
+            combo,
+            CB_ADDSTRING,
+            WPARAM(0),
+            LPARAM(wide.as_ptr() as isize),
+        );
+        crate::send_message_w_safe(combo, CB_SETCURSEL, WPARAM(0), LPARAM(0));
+    }
+}
+
+fn set_program_controls_loading(state: &mut TvGuideState) {
+    state.programs.clear();
+    reset_program_combo(
+        state.combo_programs,
+        Some(&crate::i18n::tr_tv("tv.guide.loading")),
+    );
+    crate::enable_window_safe(state.combo_programs, false);
+    set_plot_text(state.edit_plot, &crate::i18n::tr_tv("tv.guide.loading"));
+}
+
+fn apply_loaded_programs(hwnd: HWND, result: Result<Vec<TvProgram>, String>) {
+    if with_state(hwnd, |state| {
+        state.programs.clear();
+        match result {
+            Ok(programs) if !programs.is_empty() => {
+                reset_program_combo(state.combo_programs, None);
+                for program in &programs {
+                    let label = to_wide(&program_label(program));
+                    crate::send_message_w_safe(
+                        state.combo_programs,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(label.as_ptr() as isize),
+                    );
+                }
+                state.programs = programs;
+                crate::send_message_w_safe(
+                    state.combo_programs,
+                    CB_SETCURSEL,
+                    WPARAM(0),
+                    LPARAM(0),
+                );
+                crate::enable_window_safe(state.combo_programs, true);
+                update_plot_for_state(state);
+            }
+            Ok(_) => {
+                reset_program_combo(
+                    state.combo_programs,
+                    Some(&crate::i18n::tr_tv("tv.guide.no_programs")),
+                );
+                crate::enable_window_safe(state.combo_programs, false);
+                set_plot_text(state.edit_plot, &crate::i18n::tr_tv("tv.guide.no_programs"));
+            }
+            Err(error) => {
+                reset_program_combo(state.combo_programs, Some(&error));
+                crate::enable_window_safe(state.combo_programs, false);
+                set_plot_text(state.edit_plot, &error);
+            }
         }
+    })
+    .is_none()
+    {
+        crate::log_debug("TV guide: state unavailable while applying loaded programs");
     }
-    Ok(lines.join("\r\n"))
+}
+
+fn set_plot_text(edit: HWND, text: &str) {
+    if edit.0 == 0 {
+        return;
+    }
+    let wide = to_wide(text);
+    unsafe {
+        crate::log_if_err!(SetWindowTextW(edit, PCWSTR(wide.as_ptr())));
+    }
+}
+
+fn update_plot_for_state(state: &mut TvGuideState) {
+    let selection =
+        crate::send_message_w_safe(state.combo_programs, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    if selection < 0 {
+        set_plot_text(state.edit_plot, &crate::i18n::tr_tv("tv.guide.no_plot"));
+        return;
+    }
+    let Some(program) = state.programs.get(selection as usize) else {
+        set_plot_text(state.edit_plot, &crate::i18n::tr_tv("tv.guide.no_plot"));
+        return;
+    };
+    let description = program.description.trim();
+    if description.is_empty() {
+        set_plot_text(state.edit_plot, &crate::i18n::tr_tv("tv.guide.no_plot"));
+    } else {
+        set_plot_text(state.edit_plot, description);
+    }
+}
+
+fn update_selected_program_plot(hwnd: HWND) {
+    if with_state(hwnd, update_plot_for_state).is_none() {
+        crate::log_debug("TV guide: state unavailable while updating selected program plot");
+    }
 }
 
 fn date_label(date: NaiveDate, today: NaiveDate) -> String {
@@ -529,11 +679,27 @@ fn layout(hwnd: HWND) {
             true
         ));
         crate::log_if_err!(MoveWindow(
-            GetDlgItem(hwnd, ID_EDIT_PROGRAMS as i32),
+            GetDlgItem(hwnd, ID_COMBO_PROGRAMS as i32),
             margin,
             108,
             width - margin * 2,
-            height - 178,
+            260,
+            true
+        ));
+        crate::log_if_err!(MoveWindow(
+            GetDlgItem(hwnd, ID_LABEL_PLOT as i32),
+            margin,
+            150,
+            width - margin * 2,
+            24,
+            true
+        ));
+        crate::log_if_err!(MoveWindow(
+            GetDlgItem(hwnd, ID_EDIT_PLOT as i32),
+            margin,
+            176,
+            width - margin * 2,
+            (height - 246).max(180),
             true
         ));
         crate::log_if_err!(MoveWindow(

@@ -102,6 +102,7 @@ pub(crate) struct TvProgram {
     pub(crate) title: String,
     pub(crate) start_time: i64,
     pub(crate) end_time: i64,
+    pub(crate) description: String,
 }
 
 #[derive(Clone)]
@@ -457,10 +458,17 @@ fn load_channel_guide_for_exact_name(
         if start_time <= 0 || end_time <= start_time {
             continue;
         }
+        let description = object
+            .get("description")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_string();
         programs.push(TvProgram {
             title: title.to_string(),
             start_time,
             end_time,
+            description,
         });
     }
     programs.sort_by_key(|program| program.start_time);
@@ -633,10 +641,17 @@ fn collect_tv_guide_programs_from_timeline_root(
             {
                 continue;
             }
+            let description = object
+                .get("description")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_string();
             programs_by_channel.entry(key).or_default().push(TvProgram {
                 title: title.to_string(),
                 start_time,
                 end_time,
+                description,
             });
         }
     }
@@ -1354,6 +1369,7 @@ mod tests {
                     "title": "Occhi di gatto",
                     "startTime": 100,
                     "endTime": 200,
+                    "description": "Tre sorelle inseguono un misterioso obiettivo.",
                     "metadata": {
                         "ch": "Italia 2",
                         "title": "Che campioni Holly e Benji!",
@@ -1372,6 +1388,10 @@ mod tests {
             .expect("Italia 2 should be collected from the main timeline row");
         assert_eq!(italy_two.len(), 1);
         assert_eq!(italy_two[0].title, "Occhi di gatto");
+        assert_eq!(
+            italy_two[0].description,
+            "Tre sorelle inseguono un misterioso obiettivo."
+        );
     }
 
     #[test]
@@ -1417,11 +1437,13 @@ mod tests {
                 title: "Chicago Med".to_string(),
                 start_time: 3 * 60,
                 end_time: 4 * 60,
+                description: String::new(),
             },
             TvProgram {
                 title: "Show reel".to_string(),
                 start_time: 3 * 60 + 40,
                 end_time: 4 * 60 + 15,
+                description: String::new(),
             },
         ];
 

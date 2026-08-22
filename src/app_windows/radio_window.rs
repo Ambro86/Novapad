@@ -158,6 +158,7 @@ struct RadioDialogState {
     page: usize,
     languages: Vec<(String, String)>,
     countries: Vec<(String, String)>,
+    player_return_focus: Option<RadioReturnFocus>,
 }
 
 struct RadioSearchComplete {
@@ -631,17 +632,10 @@ fn route_player_keyboard(
     crate::handle_player_command(parent, command);
     if stop {
         crate::log_debug(
-            "Radio: ESC stopped player, closing player document and focusing results list",
+            "Radio: ESC stopped player, closing player document and restoring source list focus",
         );
         crate::editor_manager::close_current_document(parent);
-        focus_results_list(hwnd);
-        crate::log_if_err!(crate::post_message_w_safe(
-            hwnd,
-            WM_RADIO_FOCUS_RESULTS,
-            WPARAM(0),
-            LPARAM(0)
-        ));
-        schedule_results_refocus(hwnd);
+        restore_player_return_focus(hwnd);
     }
     RadioLoopAction::Handled
 }
@@ -1713,6 +1707,7 @@ fn create_controls(hwnd: HWND, parent: HWND) {
         page: 0,
         languages,
         countries,
+        player_return_focus: None,
     });
     state.favorite_results = initial_results();
     crate::set_window_long_ptr_w_safe(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
@@ -2939,10 +2934,16 @@ fn change_page(hwnd: HWND, delta: isize) {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum RadioListKind {
     Favorites,
     Results,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct RadioReturnFocus {
+    kind: RadioListKind,
+    selection: isize,
 }
 
 fn selected_radio_list_kind(hwnd: HWND) -> Option<RadioListKind> {
@@ -2961,6 +2962,73 @@ fn selected_radio_list_kind(hwnd: HWND) -> Option<RadioListKind> {
 
 fn selected_result(hwnd: HWND, kind: RadioListKind) -> Option<RadioFavorite> {
     with_radio_state(hwnd, |state| selected_result_from_state(state, kind)).flatten()
+}
+
+fn remember_player_return_focus(hwnd: HWND, kind: RadioListKind) {
+    with_radio_state(hwnd, |state| {
+        let list = match kind {
+            RadioListKind::Favorites => state.list_favorites,
+            RadioListKind::Results => state.list_results,
+        };
+        let selection = crate::send_message_w_safe(list, LB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+        state.player_return_focus = Some(RadioReturnFocus { kind, selection });
+        crate::log_debug(&format!(
+            "Radio: remember player return focus kind={:?} selection={}",
+            kind, selection
+        ));
+    });
+}
+
+fn restore_player_return_focus(hwnd: HWND) {
+    let target = with_radio_state(hwnd, |state| state.player_return_focus).flatten();
+    let Some(target) = target else {
+        crate::log_debug("Radio: no remembered player return focus; falling back to results");
+        focus_results_list(hwnd);
+        schedule_results_refocus(hwnd);
+        return;
+    };
+
+    if target.selection >= 0 {
+        with_radio_state(hwnd, |state| {
+            let list = match target.kind {
+                RadioListKind::Favorites => state.list_favorites,
+                RadioListKind::Results => state.list_results,
+            };
+            crate::send_message_w_safe(
+                list,
+                LB_SETCURSEL,
+                WPARAM(target.selection as usize),
+                LPARAM(0),
+            );
+        });
+    }
+
+    crate::log_debug(&format!(
+        "Radio: restoring player return focus kind={:?} selection={}",
+        target.kind, target.selection
+    ));
+    match target.kind {
+        RadioListKind::Favorites => {
+            focus_favorites_list(hwnd);
+            crate::log_if_err!(crate::post_message_w_safe(
+                hwnd,
+                WM_RADIO_FOCUS_FAVORITES,
+                WPARAM(0),
+                LPARAM(0)
+            ));
+            schedule_favorites_refocus(hwnd);
+        }
+        RadioListKind::Results => {
+            focus_results_list(hwnd);
+            crate::log_if_err!(crate::post_message_w_safe(
+                hwnd,
+                WM_RADIO_FOCUS_RESULTS,
+                WPARAM(0),
+                LPARAM(0)
+            ));
+            schedule_results_refocus(hwnd);
+        }
+    }
 }
 
 enum RadioListAction {
@@ -3035,10 +3103,13 @@ fn open_selected_favorite(hwnd: HWND) {
         selected_result_from_state(state, RadioListKind::Favorites).map(|item| (state.parent, item))
     })
     .flatten()
-        && let Err(err) =
-            launch_stream_url_in_mpv(parent, &item.stream_url, Some(&item.name), None, None, None)
     {
-        message(hwnd, "Radio", &err);
+        remember_player_return_focus(hwnd, RadioListKind::Favorites);
+        if let Err(err) =
+            launch_stream_url_in_mpv(parent, &item.stream_url, Some(&item.name), None, None, None)
+        {
+            message(hwnd, "Radio", &err);
+        }
     }
 }
 
@@ -3051,6 +3122,7 @@ fn open_selected(hwnd: HWND) {
         Some((_, RadioListAction::PreviousPage)) => change_page(hwnd, -1),
         Some((_, RadioListAction::NextPage)) => change_page(hwnd, 1),
         Some((parent, RadioListAction::Open(item))) => {
+            remember_player_return_focus(hwnd, RadioListKind::Results);
             if let Err(err) = launch_stream_url_in_mpv(
                 parent,
                 &item.stream_url,

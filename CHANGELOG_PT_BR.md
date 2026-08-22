@@ -1,6 +1,16 @@
 # Changelog
 
-Não lançado – 2026-08-10
+Versão 0.8.5 – 2026-07-25
+
+Guia de TV
+• O guia de TV agora mostra os programas em uma caixa de combinação selecionável, em vez de uma lista de texto somente leitura. Depois de escolher um programa, Tab leva ao novo botão “Visualizar sinopse do programa selecionado”, que mostra a descrição fornecida pelo serviço da grade.
+
+RSS e artigos
+• Foi adicionada a opção “Selecionar artigos…” ao menu de contexto dos artigos RSS. Ela abre a mesma janela acessível com caixas de seleção usada no download de playlists: Espaço seleciona ou desmarca vários artigos, Tab chega a Excluir e todos os artigos escolhidos são removidos em uma única operação.
+
+Gravações de TV e audiodescrições
+• Tornado mais robusto o tratamento dos timestamps do Gemini nas audiodescrições: timestamps malformados `MM:SS:ms`, por exemplo `01:13:473`, agora são normalizados sem perda para `MM:SS.ms` antes da validação; as verificações existentes de chunk e slot continuam rejeitando qualquer timestamp que não pertença à cena atual.
+• Corrigido o foco do teclado quando “Criar audiodescrição com IA” é aberto automaticamente ao final de uma gravação de TV: o ciclo ainda ativo da seleção de TV não intercepta mais Tab, Espaço, setas ou Escape destinados à janela de audiodescrição.
 
 Formatos de e-book
 • Adicionada importação Kindle sem DRM em MOBI, AZW e AZW3, incluindo fluxos sem compressão, PalmDOC e HUFF/CDIC e variantes MOBI 6/KF8/AZW3. Texto, capítulos e títulos ficam disponíveis no índice do Sonarpad.
@@ -8,8 +18,6 @@ Formatos de e-book
 • Os audiolivros DAISY agora usam o player interno já existente do Sonarpad: ao abrir aparece o sumário DAISY, Enter reproduz o capítulo escolhido, Espaço pausa/retoma e Escape fecha o player e volta ao índice DAISY. Os limites SMIL clipBegin/clipEnd são respeitados e um capítulo pode continuar automaticamente por vários arquivos de áudio.
 • Kindle e DAISY são importados como texto editável sem sobrescrever o e-book original; Salvar usa Salvar como/exportar. Kindle com DRM é rejeitado explicitamente.
 • MOBI/AZW/AZW3 e DAISY foram adicionados à janela Abrir nos 17 idiomas e às associações do Windows. Os testes cobrem sem compressão/PalmDOC/HUFF-CDIC, CDIC recursivo, MOBI 6/8, DRM, DAISY 2.02/3 empacotado/extraído e entradas diretas NCX/SMIL/DTBook.
-
-Versão 0.8.5 – 2026-07-25
 
 Salvamento e exportação de EPUB
 • Corrigido “Salvar como” em documentos EPUB: ao escolher TXT ou outro formato, a extensão selecionada agora é aplicada em vez de manter .epub.
@@ -61,7 +69,6 @@ Modo escuro
 Idioma alemão
 • Adicionado o alemão como idioma completo da interface, selecionável nas Opções.
 • Notícias e RSS, corretor ortográfico, calendário e todas as citações, doações, guia e changelog estão integralmente disponíveis em alemão.
-
 
 Português (Brasil) e Google Notícias
 • Adicionado o Português (Brasil) como idioma completo e independente do Português (Portugal), selecionável nas Opções.

@@ -238,6 +238,11 @@ fn start_recording_and_playback(
     };
 
     if kind == StreamRecordingKind::Tv {
+        let open_audio_description_after = crate::with_state(parent, |state| {
+            state.settings.language == Language::Italian
+                && state.settings.audio_description_after_tv_recording
+        })
+        .unwrap_or(false);
         let temp_path = match mpv_stream_recording_temp_path(&output_path) {
             Ok(path) => path,
             Err(error) => {
@@ -263,10 +268,12 @@ fn start_recording_and_playback(
         let output_for_thread = output_path.clone();
         thread::spawn(move || {
             monitor_mpv_recording_until_player_closes(
+                parent,
                 mpv_process_id,
                 temp_path,
                 output_for_thread,
                 activity_id,
+                open_audio_description_after,
             );
         });
         return Ok(output_path);
@@ -908,20 +915,34 @@ fn record_tv_for_duration_with_hidden_mpv(
 }
 
 fn monitor_mpv_recording_until_player_closes(
+    parent: HWND,
     mpv_process_id: u32,
     temp_path: PathBuf,
     output_path: PathBuf,
     activity_id: String,
+    open_audio_description_after: bool,
 ) {
     while is_process_alive(mpv_process_id) {
         thread::sleep(Duration::from_millis(500));
     }
     // Il processo è terminato: il file stream-record non è più aperto da mpv.
     thread::sleep(Duration::from_millis(150));
-    finalize_mpv_recording(&temp_path, &output_path, &activity_id);
+    finalize_mpv_recording(
+        parent,
+        &temp_path,
+        &output_path,
+        &activity_id,
+        open_audio_description_after,
+    );
 }
 
-fn finalize_mpv_recording(temp_path: &Path, output_path: &Path, activity_id: &str) {
+fn finalize_mpv_recording(
+    parent: HWND,
+    temp_path: &Path,
+    output_path: &Path,
+    activity_id: &str,
+    open_audio_description_after: bool,
+) {
     remove_activity(activity_id);
     let temp_bytes = fs::metadata(temp_path)
         .map(|metadata| metadata.len())
@@ -941,6 +962,13 @@ fn finalize_mpv_recording(temp_path: &Path, output_path: &Path, activity_id: &st
     ));
     if !usable {
         remove_recording_file(output_path, "unusable mpv stream recording");
+    } else if open_audio_description_after {
+        let posted = crate::post_audio_description_for_completed_tv_recording(parent, output_path);
+        crate::log_debug(&format!(
+            "Completed TV recording audio-description handoff: posted={} output={}",
+            posted,
+            output_path.display()
+        ));
     }
 }
 

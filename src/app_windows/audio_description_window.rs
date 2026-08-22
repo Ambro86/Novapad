@@ -360,6 +360,18 @@ pub(crate) fn blocks_main_window_close(parent: HWND, window: HWND) -> bool {
         && !is_hidden_for_output_player(parent, window)
 }
 
+pub(crate) fn visible_window(parent: HWND) -> HWND {
+    let window = with_state(parent, |state| state.audio_description_window).unwrap_or(HWND(0));
+    if window.0 != 0
+        && crate::is_window_handle_valid(window)
+        && unsafe { IsWindowVisible(window).as_bool() }
+    {
+        window
+    } else {
+        HWND(0)
+    }
+}
+
 pub(crate) fn restore_on_parent_activation(parent: HWND) -> bool {
     let window = with_state(parent, |state| state.audio_description_window).unwrap_or(HWND(0));
     if !blocks_parent_focus(parent, window) {
@@ -1619,6 +1631,7 @@ fn start_job(hwnd: HWND, state: &mut WindowState) {
             tts_rate: settings.tts_rate,
             tts_pitch: settings.tts_pitch,
             tts_volume: settings.tts_volume,
+            dictionary: settings.dictionary.clone(),
             gemini_api_key,
             gemini_model,
             audiobook_bitrate_kbps: settings.audiobook_m4b_bitrate,

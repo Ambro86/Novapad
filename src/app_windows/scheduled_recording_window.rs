@@ -27,7 +27,7 @@ use windows::core::{PCWSTR, w};
 
 use crate::accessibility::to_wide;
 use crate::i18n;
-use crate::settings::{Language, RadioFavorite, settings_dir};
+use crate::settings::{Language, RadioFavorite, load_settings, settings_dir};
 use crate::stream_recording::{self, StreamRecordingKind};
 use crate::tools::tv::{self, TvChannel};
 
@@ -1025,6 +1025,35 @@ fn xml_escape(value: &str) -> String {
         .replace('\'', "&apos;")
 }
 
+fn maybe_open_audio_description_after_scheduled_tv_recording(path: &Path) {
+    let settings = load_settings();
+    if settings.language != Language::Italian || !settings.audio_description_after_tv_recording {
+        return;
+    }
+    let Ok(executable) = std::env::current_exe() else {
+        crate::log_debug(
+            "Scheduled TV recording: unable to resolve Sonarpad executable for audio-description handoff",
+        );
+        return;
+    };
+    match Command::new(executable)
+        .arg("--new-window")
+        .arg("--audio-description-input")
+        .arg(path)
+        .spawn()
+    {
+        Ok(_) => crate::log_debug(&format!(
+            "Scheduled TV recording opened in audio-description window: {}",
+            path.display()
+        )),
+        Err(error) => crate::log_debug(&format!(
+            "Scheduled TV recording audio-description handoff failed: path={} error={}",
+            path.display(),
+            error
+        )),
+    }
+}
+
 pub(crate) fn run_scheduled_recording(id: &str) -> i32 {
     let schedule = match load_schedule(id) {
         Ok(schedule) => schedule,
@@ -1074,6 +1103,9 @@ pub(crate) fn run_scheduled_recording(id: &str) -> i32 {
                 schedule.id,
                 path.display()
             ));
+            if matches!(&schedule.source, ScheduledRecordingSource::Tv { .. }) {
+                maybe_open_audio_description_after_scheduled_tv_recording(&path);
+            }
             0
         }
         Err(error) => {

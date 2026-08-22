@@ -1,6 +1,16 @@
 # Přehled změn
 
-Nevydáno – 2026-08-10
+Verze 0.8.5 – 2026-07-25
+
+TV program
+• TV program nyní zobrazuje pořady ve volitelném rozbalovacím poli namísto textového seznamu pouze pro čtení. Po výběru pořadu přejde Tab na nové tlačítko „Zobrazit děj vybraného pořadu“, které zobrazí popis dodaný službou TV programu.
+
+RSS a články
+• Do kontextové nabídky článků RSS byla přidána položka „Vybrat články…“. Otevře stejné přístupné okno se zaškrtávacími políčky jako stahování playlistu: Mezerníkem lze označit nebo odznačit více článků, klávesou Tab přejít na Odstranit a všechny vybrané články smazat najednou.
+
+Televizní nahrávky a audiopopis
+• Zpřesněno zpracování časových značek Gemini pro audiopopis: chybně zapsané značky `MM:SS:ms`, například `01:13:473`, se nyní beze ztráty normalizují na `MM:SS.ms` před ověřením; stávající kontroly chunku a slotu nadále odmítnou každou značku, která nepatří do aktuální scény.
+• Opraveno zaměření klávesnice při automatickém otevření „Vytvořit audiopopis pomocí AI“ po skončení televizního nahrávání: stále aktivní smyčka výběru TV již nezachytává Tab, Mezerník, šipky ani Escape určené pro okno audiopopisu.
 
 Formáty e-knih
 • Přidán import Kindle knih bez DRM ve formátech MOBI, AZW a AZW3, včetně nekomprimovaných, PalmDOC a HUFF/CDIC textových proudů a variant MOBI 6/KF8/AZW3. Text, kapitoly a nadpisy jsou dostupné v indexu dokumentu Sonarpad.
@@ -8,8 +18,6 @@ Formáty e-knih
 • Audioknihy DAISY nyní používají stávající interní přehrávač Sonarpadu: po otevření se zobrazí obsah DAISY, Enter přehraje vybranou kapitolu, Mezerník pozastaví/pokračuje a Escape zavře přehrávač a vrátí se do obsahu DAISY. Hranice SMIL clipBegin/clipEnd jsou respektovány a kapitola může automaticky pokračovat přes více zvukových souborů.
 • Kindle a DAISY se importují jako upravitelný text bez přepsání zdrojového e-booku; Uložit používá Uložit jako/export. Kindle s DRM jsou výslovně odmítnuty.
 • MOBI/AZW/AZW3 a DAISY byly přidány do dialogu Otevřít ve všech 17 jazycích a do asociací Windows. Testy pokrývají nekomprimované/PalmDOC/HUFF-CDIC, rekurzivní CDIC, MOBI 6/8, DRM a balené/rozbalené DAISY 2.02/3 i přímé NCX/SMIL/DTBook.
-
-Verze 0.8.5 – 2026-07-25
 
 Ukládání a export souborů EPUB
 • Opraveno „Uložit jako“ u dokumentů EPUB: při výběru TXT nebo jiného formátu se nyní použije zvolená přípona namísto zachování .epub.

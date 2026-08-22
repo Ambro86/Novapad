@@ -1,6 +1,16 @@
 # Dziennik zmian
 
-Nie wydano – 2026-08-10
+Wersja 0.8.5 – 2026-07-25
+
+Program TV
+• Program TV wyświetla teraz audycje w wybieralnym polu kombi zamiast w liście tekstowej tylko do odczytu. Po wybraniu audycji klawisz Tab przechodzi do nowego przycisku „Wyświetl opis wybranego programu”, który pokazuje opis dostarczony przez usługę przewodnika.
+
+RSS i artykuły
+• Do menu kontekstowego artykułów RSS dodano „Wybierz artykuły…“. Otwiera ono to samo dostępne okno z polami wyboru, które jest używane przy pobieraniu playlist: Spacją można zaznaczać lub odznaczać wiele artykułów, klawiszem Tab przejść do Usuń i usunąć wszystkie wybrane artykuły jedną operacją.
+
+Nagrania TV i audiodeskrypcje
+• Uodporniono obsługę znaczników czasu Gemini w audiodeskrypcji: błędnie zapisane znaczniki `MM:SS:ms`, np. `01:13:473`, są teraz bezstratnie normalizowane do `MM:SS.ms` przed walidacją; istniejące kontrole chunku i slotu nadal odrzucają każdy znacznik, który nie należy do bieżącej sceny.
+• Poprawiono fokus klawiatury, gdy po zakończeniu nagrania TV automatycznie otwiera się „Utwórz audiodeskrypcję z AI”: nadal aktywna pętla wyboru TV nie przechwytuje już klawiszy Tab, Spacja, strzałek ani Escape przeznaczonych dla okna audiodeskrypcji.
 
 Formaty e-booków
 • Dodano import książek Kindle bez DRM w MOBI, AZW i AZW3, obejmujący strumienie nieskompresowane, PalmDOC i HUFF/CDIC oraz warianty MOBI 6/KF8/AZW3. Tekst, rozdziały i nagłówki są dostępne w indeksie Sonarpad.
@@ -8,8 +18,6 @@ Formaty e-booków
 • Audiobooki DAISY korzystają teraz z istniejącego wewnętrznego odtwarzacza Sonarpada: po otwarciu pojawia się spis treści DAISY, Enter odtwarza wybrany rozdział, Spacja wstrzymuje/wznawia, a Escape zamyka odtwarzacz i wraca do indeksu DAISY. Granice SMIL clipBegin/clipEnd są respektowane, a rozdział może automatycznie przechodzić między wieloma plikami audio.
 • Kindle i DAISY są importowane jako tekst edytowalny bez nadpisywania źródłowego e-booka; Zapisz używa Zapisz jako/eksportu. Kindle z DRM są jawnie odrzucane.
 • MOBI/AZW/AZW3 i DAISY dodano do okna Otwórz we wszystkich 17 językach i do skojarzeń Windows. Testy obejmują nieskompresowane/PalmDOC/HUFF-CDIC, rekursywne CDIC, MOBI 6/8, DRM oraz DAISY 2.02/3 w pakietach i po rozpakowaniu, a także bezpośrednie NCX/SMIL/DTBook.
-
-Wersja 0.8.5 – 2026-07-25
 
 Zapisywanie i eksport plików EPUB
 • Poprawiono polecenie „Zapisz jako” dla dokumentów EPUB: po wybraniu TXT lub innego formatu stosowane jest teraz wybrane rozszerzenie zamiast pozostawiania .epub.

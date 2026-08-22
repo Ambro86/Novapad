@@ -1,6 +1,16 @@
 # Changelog
 
-Non rilasciato – 2026-08-10
+Versione 0.8.5 – 2026-07-25
+
+Guida TV
+• La guida TV ora mostra i programmi in una casella combinata selezionabile invece che in un elenco di testo di sola lettura. Dopo aver scelto un programma, con Tab si raggiunge il nuovo pulsante “Visualizza la trama del programma selezionato”, che mostra la descrizione fornita dal servizio della guida.
+
+RSS e articoli
+• Aggiunta la voce “Seleziona articoli…” al menu contestuale degli articoli RSS. Si apre la stessa finestra accessibile con caselle di selezione già usata per il download delle playlist: con Spazio si selezionano o deselezionano più articoli, con TAB si raggiunge Elimina e tutti gli articoli scelti vengono rimossi in un’unica operazione.
+
+Registrazioni TV e audiodescrizioni
+• Resa più robusta la gestione dei timestamp Gemini nelle audiodescrizioni: i timestamp malformati `MM:SS:ms`, ad esempio `01:13:473`, vengono ora normalizzati senza perdita in `MM:SS.ms` prima dei controlli; gli audit esistenti di chunk e slot continuano a scartare qualsiasi timestamp che non appartenga alla scena corrente.
+• Corretto il focus da tastiera quando “Crea audiodescrizione con IA” si apre automaticamente al termine di una registrazione TV: il ciclo ancora attivo della selezione TV non intercetta più TAB, Spazio, frecce o Escape destinati alla finestra dell’audiodescrizione.
 
 Formati e-book
 • Aggiunta l'importazione nativa degli e-book Kindle senza DRM nei formati `.mobi`, `.azw` e `.azw3`, comprese le varianti MOBI non compresse, PalmDOC, i flussi di testo HUFF/CDIC legacy e l'analisi KF8/AZW3. Testo e navigazione dei capitoli vengono importati nell'editor e nell'indice di Sonarpad.
@@ -8,8 +18,6 @@ Formati e-book
 • Gli audiolibri DAISY usano ora il player interno già esistente di Sonarpad: aprendo il libro compare l’indice DAISY, Invio riproduce il capitolo scelto, Spazio mette in pausa/riprende, gli spostamenti restano entro il capitolo ed Esc chiude il player e torna all’indice DAISY. Vengono rispettati i limiti SMIL clipBegin/clipEnd e un capitolo può proseguire automaticamente su più file audio.
 • I documenti Kindle e DAISY vengono importati come testo modificabile senza sovrascrivere il contenitore sorgente; Salva passa quindi a Salva con nome/esportazione. I Kindle protetti da DRM vengono rifiutati esplicitamente e gli ZIP non DAISY vengono rifiutati invece di essere aperti come testo binario.
 • Aggiornati i filtri della finestra Apri in tutte le 17 lingue dell'interfaccia e le associazioni file di Windows. Aggiunti test Rust di regressione per MOBI/AZW/AZW3, flussi non compressi/PalmDOC/HUFF-CDIC, frasi CDIC ricorsive, intestazioni MOBI 6/8, rifiuto DRM, DAISY 2.02/3 impacchettati ed estratti, ingresso diretto NCC/SMIL/NCX/DTBook, navigazione solo audio, riconoscimento ZIP e filtri Apri localizzati.
-
-Versione 0.8.5 – 2026-07-25
 
 Creazione di audiodescrizioni
 • Il menu Riproduci propone ora “Crea audiodescrizione con IA” anche per i link video aperti tramite Riproduci audio da streaming, riutilizzando il contesto di salvataggio yt-dlp e salvando il video nella cartella Media configurata.
@@ -31,7 +39,6 @@ Creazione di audiodescrizioni
 • La suite dedicata contiene ora 128 test: 105 Python e 23 Rust, compresa la copertura delle 17 lingue dei prompt, della correzione linguistica del glossario, della localizzazione completa dell’interfaccia e degli stati dinamici tradotti.
 
 • Quando Gemini segnala una quota realmente esaurita, Sonarpad permette ora di provare un altro modello, continuare ad attendere oppure interrompere. Il worker resta sul chunk corrente e conserva tutto il lavoro già completato; il modello alternativo viene usato anche per i chunk successivi e registrato nel progetto finale.
-
 
 Salvataggio ed esportazione EPUB
 • Corretto “Salva con nome” per i documenti EPUB: scegliendo TXT o un altro formato viene ora applicata l’estensione selezionata invece di mantenere .epub.

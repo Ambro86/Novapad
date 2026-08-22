@@ -10554,6 +10554,28 @@ fn google_audiobook_worker_limit() -> usize {
     google_audiobook_worker_limit_for_cores(logical_cores)
 }
 
+/// Returns the same engine-specific synthesis concurrency used by Sonarpad's
+/// audiobook pipeline. Audio descriptions use this to parallelize independent
+/// cues without changing their final ordering or scheduling.
+pub(crate) fn audiobook_synthesis_parallelism(engine: TtsEngine, voice: &str) -> usize {
+    match engine {
+        TtsEngine::Edge => MIXED_EDGE_PARALLELISM,
+        TtsEngine::Google => google_audiobook_worker_limit(),
+        TtsEngine::Sapi5 => {
+            sapi5_recover_interrupted_attempt();
+            let automatic = std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(4)
+                .clamp(2, SAPI5_MAX_PARALLEL_WORKERS);
+            load_sapi5_worker_limit(voice)
+                .unwrap_or(automatic)
+                .min(automatic)
+                .max(1)
+        }
+        TtsEngine::Sapi4 => requested_sapi4_worker_limit(30),
+    }
+}
+
 struct GoogleAudiobookTask {
     order: usize,
     first_chunk_index: usize,

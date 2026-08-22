@@ -1,6 +1,16 @@
 # Changelog
 
-Sin publicar – 2026-08-10
+Versión 0.8.5 – 2026-07-25
+
+Guía de TV
+• La guía de TV ahora muestra los programas en un cuadro combinado seleccionable en lugar de una lista de texto de solo lectura. Tras elegir un programa, Tab lleva al nuevo botón «Ver la trama del programa seleccionado», que muestra la descripción proporcionada por el servicio de guía.
+
+RSS y artículos
+• Se añadió “Seleccionar artículos…” al menú contextual de los artículos RSS. Abre la misma ventana accesible con casillas que se usa para descargar playlists: con Espacio se seleccionan o desmarcan varios artículos, con Tab se llega a Eliminar y todos los artículos elegidos se borran en una sola operación.
+
+Grabaciones de TV y audiodescripciones
+• Mejorada la robustez de los timestamps de Gemini en las audiodescripciones: los timestamps mal formados `MM:SS:ms`, por ejemplo `01:13:473`, ahora se normalizan sin pérdida a `MM:SS.ms` antes de validarlos; las comprobaciones existentes de chunk y slot siguen rechazando cualquier timestamp que no pertenezca a la escena actual.
+• Corregido el foco del teclado cuando “Crear audiodescripción con IA” se abre automáticamente al finalizar una grabación de TV: el bucle todavía activo de selección de TV ya no intercepta Tab, Espacio, flechas ni Escape destinados a la ventana de audiodescripción.
 
 Formatos de libros electrónicos
 • Añadida la importación de Kindle sin DRM en MOBI, AZW y AZW3, incluidos flujos sin comprimir, PalmDOC y HUFF/CDIC y variantes MOBI 6/KF8/AZW3. El texto, los capítulos y los encabezados aparecen en el índice de Sonarpad.
@@ -8,8 +18,6 @@ Formatos de libros electrónicos
 • Los audiolibros DAISY usan ahora el reproductor interno existente de Sonarpad: al abrir el libro aparece el índice DAISY, Intro reproduce el capítulo seleccionado, Espacio pausa/reanuda y Escape cierra el reproductor y vuelve al índice DAISY. Se respetan los límites SMIL clipBegin/clipEnd y un capítulo puede continuar automáticamente a través de varios archivos de audio.
 • Kindle y DAISY se importan como texto editable sin sobrescribir el e-book original; Guardar usa Guardar como/exportar. Los Kindle con DRM se rechazan explícitamente.
 • MOBI/AZW/AZW3 y DAISY se añadieron al diálogo Abrir en los 17 idiomas y a las asociaciones de Windows. Las pruebas cubren sin comprimir/PalmDOC/HUFF-CDIC, CDIC recursivo, MOBI 6/8, DRM, DAISY 2.02/3 empaquetado/extraído y entradas NCX/SMIL/DTBook directas.
-
-Versión 0.8.5 – 2026-07-25
 
 Guardado y exportación de EPUB
 • Se ha corregido «Guardar como» en los documentos EPUB: al elegir TXT u otro formato, ahora se aplica la extensión seleccionada en lugar de conservar .epub.

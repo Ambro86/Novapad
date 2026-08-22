@@ -2073,10 +2073,22 @@ struct PlaylistEntryDownloadRequest<'a> {
     credentials: Option<&'a YtdlpAuthCredentials>,
 }
 
+pub(crate) struct CheckboxSelectionDialogText {
+    pub(crate) title: String,
+    pub(crate) instructions: String,
+    pub(crate) accept_label: String,
+    pub(crate) none_selected_message: String,
+    pub(crate) selected_count_template: String,
+}
+
 struct PlaylistDownloadSelectionInit {
     parent: HWND,
     language: Language,
-    entries: Vec<StreamCollectionEntry>,
+    entries: Vec<String>,
+    instructions: String,
+    accept_label: String,
+    none_selected_message: String,
+    selected_count_template: String,
     result: PlaylistDownloadSelectionResult,
 }
 
@@ -2086,6 +2098,8 @@ struct PlaylistDownloadSelectionState {
     list: HWND,
     count_label: HWND,
     entry_count: usize,
+    none_selected_message: String,
+    selected_count_template: String,
     result: PlaylistDownloadSelectionResult,
 }
 
@@ -3193,6 +3207,33 @@ fn open_youtube_comments_window_with_mode(
             break;
         }
         unsafe {
+            // This flat TV/recordings selector owns a nested thread-wide message loop.
+            // When a completed TV recording automatically opens the detached
+            // audio-description window, messages for that window would otherwise be
+            // seen here first: IsDialogMessageW could steal TAB and the player router
+            // could steal Space/arrows.  Give every message that belongs to the
+            // audio-description window (or one of its controls) exclusively to that
+            // window before doing any flat-list/player handling.
+            let audio_description_window =
+                crate::app_windows::audio_description_window::visible_window(parent);
+            if audio_description_window.0 != 0
+                && (msg.hwnd == audio_description_window
+                    || IsChild(audio_description_window, msg.hwnd).as_bool())
+            {
+                if crate::app_windows::audio_description_window::handle_navigation(
+                    audio_description_window,
+                    &msg,
+                ) {
+                    continue;
+                }
+                if crate::accessibility::handle_accessibility(audio_description_window, &msg) {
+                    continue;
+                }
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+                continue;
+            }
+
             if msg.message == WM_KEYDOWN {
                 if keep_parent_enabled_for_player
                     && crate::is_mpv_playback_active(parent)
@@ -6699,8 +6740,8 @@ fn playlist_download_selected_indices(list: HWND) -> Vec<usize> {
         .collect()
 }
 
-fn playlist_download_insert_entry(list: HWND, index: usize, entry: &StreamCollectionEntry) {
-    let mut label = to_wide(&format!("{}. {}", entry.position, entry.label));
+fn playlist_download_insert_entry(list: HWND, index: usize, entry_label: &str) {
+    let mut label = to_wide(entry_label);
     let mut item = LVITEMW {
         mask: LVIF_TEXT,
         iItem: index as i32,
@@ -6739,11 +6780,10 @@ fn update_playlist_download_selection_count(state: &PlaylistDownloadSelectionSta
     let selected = playlist_download_selected_indices(state.list).len();
     let selected_text = selected.to_string();
     let total_text = state.entry_count.to_string();
-    let text = i18n::tr_f(
-        state.language,
-        "stream_audio.playlist_download_selected_count",
-        &[("selected", &selected_text), ("total", &total_text)],
-    );
+    let text = state
+        .selected_count_template
+        .replace("{selected}", &selected_text)
+        .replace("{total}", &total_text);
     unsafe {
         let wide = to_wide(&text);
         crate::log_if_err!(SetWindowTextW(state.count_label, PCWSTR(wide.as_ptr())));
@@ -6785,13 +6825,7 @@ fn playlist_download_selection_wndproc_inner(
                 let instructions = CreateWindowExW(
                     Default::default(),
                     WC_STATIC,
-                    PCWSTR(
-                        to_wide(&i18n::tr(
-                            init.language,
-                            "stream_audio.playlist_download_instructions",
-                        ))
-                        .as_ptr(),
-                    ),
+                    PCWSTR(to_wide(&init.instructions).as_ptr()),
                     WS_CHILD | WS_VISIBLE,
                     16,
                     14,
@@ -6894,13 +6928,7 @@ fn playlist_download_selection_wndproc_inner(
                 let download = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
-                    PCWSTR(
-                        to_wide(&i18n::tr(
-                            init.language,
-                            "stream_audio.playlist_download_button",
-                        ))
-                        .as_ptr(),
-                    ),
+                    PCWSTR(to_wide(&init.accept_label).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     470,
                     430,
@@ -6945,6 +6973,8 @@ fn playlist_download_selection_wndproc_inner(
                     list,
                     count_label,
                     entry_count: init.entries.len(),
+                    none_selected_message: init.none_selected_message.clone(),
+                    selected_count_template: init.selected_count_template.clone(),
                     result: Arc::clone(&init.result),
                 });
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
@@ -6998,14 +7028,7 @@ fn playlist_download_selection_wndproc_inner(
                     let accepted = with_playlist_download_selection_state(hwnd, |state| {
                         let selected = playlist_download_selected_indices(state.list);
                         if selected.is_empty() {
-                            show_error(
-                                hwnd,
-                                state.language,
-                                &i18n::tr(
-                                    state.language,
-                                    "stream_audio.playlist_download_none_selected",
-                                ),
-                            );
+                            show_error(hwnd, state.language, &state.none_selected_message);
                             SetFocus(state.list);
                             return false;
                         }
@@ -7094,10 +7117,11 @@ fn playlist_download_selection_wndproc_inner(
     }
 }
 
-fn choose_playlist_download_entries(
+pub(crate) fn choose_checkbox_selection_entries(
     parent: HWND,
     language: Language,
-    entries: Vec<StreamCollectionEntry>,
+    text: CheckboxSelectionDialogText,
+    entries: Vec<String>,
 ) -> Option<Vec<usize>> {
     if entries.is_empty() {
         return None;
@@ -7118,13 +7142,24 @@ fn choose_playlist_download_entries(
         RegisterClassW(&wc);
     }
     let result = Arc::new(Mutex::new(None));
+    let CheckboxSelectionDialogText {
+        title,
+        instructions,
+        accept_label,
+        none_selected_message,
+        selected_count_template,
+    } = text;
     let init = Box::new(PlaylistDownloadSelectionInit {
         parent,
         language,
         entries,
+        instructions,
+        accept_label,
+        none_selected_message,
+        selected_count_template,
         result: Arc::clone(&result),
     });
-    let title = to_wide(&i18n::tr(language, "stream_audio.playlist_download_title"));
+    let title = to_wide(&title);
     let init_ptr = Box::into_raw(init);
     let hwnd = unsafe {
         CreateWindowExW(
@@ -7179,6 +7214,35 @@ fn choose_playlist_download_entries(
         let guard = result.lock().unwrap_or_else(|err| err.into_inner());
         guard.clone()
     }
+}
+
+fn choose_playlist_download_entries(
+    parent: HWND,
+    language: Language,
+    entries: Vec<StreamCollectionEntry>,
+) -> Option<Vec<usize>> {
+    let display_entries = entries
+        .into_iter()
+        .map(|entry| format!("{}. {}", entry.position, entry.label))
+        .collect();
+    choose_checkbox_selection_entries(
+        parent,
+        language,
+        CheckboxSelectionDialogText {
+            title: i18n::tr(language, "stream_audio.playlist_download_title"),
+            instructions: i18n::tr(language, "stream_audio.playlist_download_instructions"),
+            accept_label: i18n::tr(language, "stream_audio.playlist_download_button"),
+            none_selected_message: i18n::tr(
+                language,
+                "stream_audio.playlist_download_none_selected",
+            ),
+            selected_count_template: i18n::tr(
+                language,
+                "stream_audio.playlist_download_selected_count",
+            ),
+        },
+        display_entries,
+    )
 }
 
 unsafe extern "system" fn stream_dialog_wndproc(

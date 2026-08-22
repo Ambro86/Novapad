@@ -1,6 +1,16 @@
 # Änderungsprotokoll
 
-Nicht veröffentlicht – 2026-08-10
+Version 0.8.5 – 2026-07-25
+
+TV-Programmführer
+• Der TV-Programmführer zeigt Sendungen jetzt in einem auswählbaren Kombinationsfeld statt in einer schreibgeschützten Textliste. Nach der Auswahl einer Sendung führt Tab zur neuen Schaltfläche „Inhalt der ausgewählten Sendung anzeigen“, die die vom Programmführerdienst gelieferte Beschreibung anzeigt.
+
+RSS und Artikel
+• Dem Kontextmenü der RSS-Artikel wurde „Artikel auswählen…“ hinzugefügt. Es öffnet dasselbe barrierefreie Auswahlfenster mit Kontrollkästchen wie beim Playlist-Download: Mit der Leertaste lassen sich mehrere Artikel markieren oder abwählen, mit Tab erreicht man Löschen und alle ausgewählten Artikel werden in einem Vorgang entfernt.
+
+TV-Aufnahmen und Audiodeskriptionen
+• Die Verarbeitung von Gemini-Zeitstempeln für Audiodeskriptionen wurde robuster gemacht: fehlerhaft formatierte `MM:SS:ms`-Werte wie `01:13:473` werden nun verlustfrei in `MM:SS.ms` normalisiert, bevor sie geprüft werden; die bestehenden Chunk- und Slot-Prüfungen verwerfen weiterhin jeden Zeitstempel, der nicht zur aktuellen Szene gehört.
+• Der Tastaturfokus wurde korrigiert, wenn „Audiodeskription mit KI erstellen“ nach Ende einer TV-Aufnahme automatisch geöffnet wird: Die noch aktive TV-Auswahlschleife fängt Tab, Leertaste, Pfeiltasten und Escape für das Audiodeskriptionsfenster nicht mehr ab.
 
 E-Book-Formate
 • DRM-freie Kindle-E-Books in MOBI, AZW und AZW3 können jetzt importiert werden, einschließlich unkomprimierter, PalmDOC- und HUFF/CDIC-Textströme sowie MOBI-6-/KF8-/AZW3-Varianten. Text, Kapitel und Überschriften erscheinen im Sonarpad-Dokumentindex.
@@ -8,8 +18,6 @@ E-Book-Formate
 • DAISY-Hörbücher verwenden jetzt den vorhandenen internen Sonarpad-Player: Beim Öffnen erscheint das DAISY-Inhaltsverzeichnis, Eingabe startet das gewählte Kapitel, Leertaste pausiert/setzt fort und Escape schließt den Player und kehrt zum DAISY-Index zurück. SMIL-Grenzen clipBegin/clipEnd werden beachtet und Kapitel können automatisch über mehrere Audiodateien fortgesetzt werden.
 • Kindle und DAISY werden als bearbeitbarer Text importiert, ohne das Quell-E-Book zu überschreiben; Speichern verwendet Speichern unter/Export. DRM-geschützte Kindle-Bücher werden ausdrücklich abgelehnt.
 • MOBI/AZW/AZW3 und DAISY wurden dem Öffnen-Dialog in allen 17 Oberflächensprachen und den Windows-Dateizuordnungen hinzugefügt. Tests decken unkomprimiert/PalmDOC/HUFF-CDIC, rekursive CDIC-Phrasen, MOBI 6/8, DRM sowie gepackte/entpackte DAISY-2.02/3-Varianten und direkte NCX/SMIL/DTBook-Einstiege ab.
-
-Version 0.8.5 – 2026-07-25
 
 Speichern und Exportieren von EPUB-Dateien
 • „Speichern unter“ für EPUB-Dokumente wurde korrigiert: Bei Auswahl von TXT oder einem anderen Format wird nun die gewählte Dateiendung verwendet, statt .epub beizubehalten.

@@ -7,6 +7,9 @@ Guia de TV
 
 RSS e artigos
 • Foi adicionada a opção “Selecionar artigos…” ao menu de contexto dos artigos RSS. Ela abre a mesma janela acessível com caixas de seleção usada no download de playlists: Espaço seleciona ou desmarca vários artigos, Tab chega a Excluir e todos os artigos escolhidos são removidos em uma única operação.
+• Os RSS agora oferecem suporte a pastas reais. Na importação OPML, os contêineres `<outline>` aninhados são preservados em vez de serem achatados, os feeds já existentes são colocados nas pastas importadas sem duplicação e a exportação OPML mantém a mesma hierarquia, inclusive pastas vazias.
+• Foi adicionado ao menu de contexto RSS o comando localizado “Criar nova pasta”, com uma caixa de diálogo acessível para digitar o nome. Os nós de pasta usam o comportamento nativo da árvore: Seta para a direita expande, Seta para a esquerda recolhe; excluir uma pasta remove todo o ramo e Ctrl+Z restaura em uma única operação a pasta, as subpastas e todos os feeds contidos.
+• Os feeds RSS agora podem ser reordenados dentro da pasta atual com Mover para cima, Mover para baixo, Mover para o início, Mover para o fim e Mover para a posição; a reordenação nunca move um feed para fora da sua pasta.
 
 Gravações de TV e audiodescrições
 • Tornado mais robusto o tratamento dos timestamps do Gemini nas audiodescrições: timestamps malformados `MM:SS:ms`, por exemplo `01:13:473`, agora são normalizados sem perda para `MM:SS.ms` antes da validação; as verificações existentes de chunk e slot continuam rejeitando qualquer timestamp que não pertença à cena atual.

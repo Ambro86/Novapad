@@ -7,6 +7,9 @@ Program TV
 
 RSS i artykuły
 • Do menu kontekstowego artykułów RSS dodano „Wybierz artykuły…“. Otwiera ono to samo dostępne okno z polami wyboru, które jest używane przy pobieraniu playlist: Spacją można zaznaczać lub odznaczać wiele artykułów, klawiszem Tab przejść do Usuń i usunąć wszystkie wybrane artykuły jedną operacją.
+• RSS obsługuje teraz prawdziwe foldery. Podczas importu OPML zagnieżdżone kontenery `<outline>` są zachowywane zamiast spłaszczane, istniejące kanały są umieszczane w importowanych folderach bez duplikowania, a eksport OPML zachowuje tę samą hierarchię, również puste foldery.
+• Do menu kontekstowego RSS dodano zlokalizowane polecenie „Utwórz nowy folder” z dostępnym oknem do wpisania nazwy. Węzły folderów używają natywnego zachowania drzewa: Strzałka w prawo rozwija, Strzałka w lewo zwija; usunięcie folderu usuwa całą jego gałąź, a Ctrl+Z w jednej operacji przywraca folder, podfoldery i wszystkie zawarte kanały.
+• Kanały RSS można teraz porządkować wewnątrz bieżącego folderu poleceniami Przenieś w górę, Przenieś w dół, Przenieś na początek, Przenieś na koniec i Przenieś na pozycję; zmiana kolejności nigdy nie przenosi kanału poza jego folder.
 
 Nagrania TV i audiodeskrypcje
 • Uodporniono obsługę znaczników czasu Gemini w audiodeskrypcji: błędnie zapisane znaczniki `MM:SS:ms`, np. `01:13:473`, są teraz bezstratnie normalizowane do `MM:SS.ms` przed walidacją; istniejące kontrole chunku i slotu nadal odrzucają każdy znacznik, który nie należy do bieżącej sceny.

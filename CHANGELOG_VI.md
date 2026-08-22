@@ -7,6 +7,9 @@ Lịch TV
 
 RSS và bài viết
 • Đã thêm “Chọn bài viết…” vào menu ngữ cảnh của bài viết RSS. Lệnh này mở cùng cửa sổ chọn có hộp kiểm dễ tiếp cận như khi tải playlist: dùng Phím cách để chọn hoặc bỏ chọn nhiều bài viết, nhấn Tab đến Xóa và xóa tất cả bài đã chọn trong một thao tác.
+• RSS giờ hỗ trợ các thư mục thực sự. Khi nhập OPML, các vùng chứa `<outline>` lồng nhau được giữ nguyên thay vì bị làm phẳng; các feed đã có được đưa vào đúng thư mục nhập mà không tạo bản sao, và khi xuất OPML Sonarpad giữ nguyên cùng cấu trúc thư mục, kể cả thư mục trống.
+• Đã thêm lệnh được bản địa hóa “Tạo thư mục mới” vào menu ngữ cảnh RSS, với hộp thoại dễ tiếp cận để nhập tên. Nút thư mục dùng hành vi cây gốc của Windows: Mũi tên phải mở rộng, Mũi tên trái thu gọn; xóa một thư mục sẽ xóa toàn bộ nhánh và Ctrl+Z khôi phục trong một thao tác thư mục, các thư mục con và mọi feed bên trong.
+• Các feed RSS giờ có thể được sắp xếp lại bên trong thư mục hiện tại bằng Di chuyển lên, Di chuyển xuống, Di chuyển lên đầu, Di chuyển xuống cuối và Di chuyển đến vị trí; việc sắp xếp không bao giờ đưa feed ra khỏi thư mục của nó.
 
 Bản ghi TV và mô tả âm thanh
 • Tăng độ chắc chắn khi xử lý timestamp Gemini cho mô tả âm thanh: timestamp sai định dạng `MM:SS:ms`, ví dụ `01:13:473`, giờ được chuẩn hóa không mất độ chính xác thành `MM:SS.ms` trước khi kiểm tra; các kiểm tra chunk và slot hiện có vẫn loại mọi timestamp không thuộc cảnh hiện tại.

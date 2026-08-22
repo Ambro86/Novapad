@@ -992,6 +992,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub rss_sources_by_language: HashMap<String, Vec<RssSource>>,
     #[serde(default)]
+    pub rss_folders_by_language: HashMap<String, Vec<Vec<String>>>,
+    #[serde(default)]
     pub rss_news_language: String,
     #[serde(default)]
     pub rss_local_city: String,
@@ -1430,6 +1432,7 @@ impl Default for AppSettings {
             spellcheck_fixed_language: "en-US".to_string(),
             rss_sources: Vec::new(),
             rss_sources_by_language: HashMap::new(),
+            rss_folders_by_language: HashMap::new(),
             rss_news_language: String::new(),
             rss_local_city: String::new(),
             rss_favorite_articles: Vec::new(),
@@ -3604,52 +3607,6 @@ pub fn error_title(language: Language) -> String {
 
 pub fn tts_no_text_message(language: Language) -> String {
     crate::i18n::tr(language, "app.tts_no_text")
-}
-
-pub fn move_rss_feed_up(settings: &mut AppSettings, index: usize) -> Option<usize> {
-    if index == 0 || index >= settings.rss_sources.len() {
-        return None;
-    }
-    settings.rss_sources.swap(index, index - 1);
-    Some(index - 1)
-}
-
-pub fn move_rss_feed_down(settings: &mut AppSettings, index: usize) -> Option<usize> {
-    if index + 1 >= settings.rss_sources.len() {
-        return None;
-    }
-    settings.rss_sources.swap(index, index + 1);
-    Some(index + 1)
-}
-
-pub fn move_rss_feed_to_top(settings: &mut AppSettings, index: usize) -> Option<usize> {
-    move_rss_feed_to_index(settings, index, 0)
-}
-
-pub fn move_rss_feed_to_bottom(settings: &mut AppSettings, index: usize) -> Option<usize> {
-    let len = settings.rss_sources.len();
-    if len == 0 {
-        return None;
-    }
-    move_rss_feed_to_index(settings, index, len - 1)
-}
-
-pub fn move_rss_feed_to_index(
-    settings: &mut AppSettings,
-    index: usize,
-    target_index: usize,
-) -> Option<usize> {
-    let len = settings.rss_sources.len();
-    if index >= len {
-        return None;
-    }
-    let target = target_index.min(len.saturating_sub(1));
-    if target == index {
-        return Some(index);
-    }
-    let item = settings.rss_sources.remove(index);
-    settings.rss_sources.insert(target, item);
-    Some(target)
 }
 
 pub fn move_podcast_feed_up(settings: &mut AppSettings, index: usize) -> Option<usize> {

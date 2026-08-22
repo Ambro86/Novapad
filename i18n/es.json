@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "Mover al final",
   "rss.reorder.move_down": "Bajar\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "Mover a la posición...",
+  "rss.reorder.move_to_folder": "Mover a la carpeta",
+  "rss.folder.main": "Carpeta principal",
   "rss.reorder.move_top": "Mover al inicio",
   "rss.reorder.move_up": "Subir\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "Movido a la posición {x}",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "Buscar descripciones:",
   "audio_description.project.search_button": "Buscar",
   "audio_description.overload.title": "Gemini temporalmente sobrecargado",
-  "audio_description.overload.message": "El modelo {model} está recibiendo demasiadas solicitudes y Gemini ha devuelto varias veces 503 UNAVAILABLE. ¿Quieres seguir esperando?\n\nSi eliges Sí, Sonarpad seguirá reintentando sin límite cada 5 segundos hasta que Gemini responda o canceles manualmente. El trabajo ya completado permanece guardado.\n\nDetalles: {error}"
+  "audio_description.overload.message": "El modelo {model} está recibiendo demasiadas solicitudes y Gemini ha devuelto varias veces 503 UNAVAILABLE. ¿Quieres seguir esperando?\n\nSi eliges Sí, Sonarpad seguirá reintentando sin límite cada 5 segundos hasta que Gemini responda o canceles manualmente. El trabajo ya completado permanece guardado.\n\nDetalles: {error}",
+  "rss.context.create_folder": "Crear nueva carpeta",
+  "rss.folder.title": "Crear nueva carpeta",
+  "rss.folder.name": "Nombre de la carpeta:",
+  "rss.folder.required": "Introduce un nombre para la carpeta.",
+  "rss.folder.exists": "Ya existe una carpeta con este nombre en esta ubicación.",
+  "rss.folder.created": "Carpeta creada",
+  "rss.folder.delete_title": "Eliminar carpeta",
+  "rss.folder.delete_confirm": "¿Eliminar la carpeta “{title}” y sus {count} fuentes RSS?",
+  "rss.folder.deleted": "Carpeta eliminada",
+  "rss.folder.restored": "Carpeta restaurada"
 }

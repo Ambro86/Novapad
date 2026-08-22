@@ -7,6 +7,9 @@ Guía de TV
 
 RSS y artículos
 • Se añadió “Seleccionar artículos…” al menú contextual de los artículos RSS. Abre la misma ventana accesible con casillas que se usa para descargar playlists: con Espacio se seleccionan o desmarcan varios artículos, con Tab se llega a Eliminar y todos los artículos elegidos se borran en una sola operación.
+• Los RSS ahora admiten carpetas reales. Al importar OPML se conservan los contenedores `<outline>` anidados en lugar de aplanarlos, los feeds ya existentes se colocan en las carpetas importadas sin duplicarse y la exportación OPML mantiene la misma jerarquía, incluidas las carpetas vacías.
+• Se añadió al menú contextual de RSS la orden localizada “Crear nueva carpeta”, con un diálogo accesible para escribir el nombre. Los nodos de carpeta usan el comportamiento nativo del árbol: Flecha derecha expande y Flecha izquierda contrae; al eliminar una carpeta se borra toda su rama y Ctrl+Z restaura en una sola operación la carpeta, sus subcarpetas y todos los feeds contenidos.
+• Los feeds RSS ahora pueden reordenarse dentro de su carpeta actual con Mover arriba, Mover abajo, Mover al principio, Mover al final y Mover a la posición; el reordenamiento nunca saca un feed de su carpeta.
 
 Grabaciones de TV y audiodescripciones
 • Mejorada la robustez de los timestamps de Gemini en las audiodescripciones: los timestamps mal formados `MM:SS:ms`, por ejemplo `01:13:473`, ahora se normalizan sin pérdida a `MM:SS.ms` antes de validarlos; las comprobaciones existentes de chunk y slot siguen rechazando cualquier timestamp que no pertenezca a la escena actual.

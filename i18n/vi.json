@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "Đưa xuống cuối",
   "rss.reorder.move_down": "Chuyển xuống\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "Di chuyển tới vị trí...",
+  "rss.reorder.move_to_folder": "Chuyển vào thư mục",
+  "rss.folder.main": "Thư mục chính",
   "rss.reorder.move_top": "Đưa lên đầu",
   "rss.reorder.move_up": "Chuyển lên\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "Đã chuyển tới vị trí {x}",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "Tìm mô tả:",
   "audio_description.project.search_button": "Tìm",
   "audio_description.overload.title": "Gemini tạm thời quá tải",
-  "audio_description.overload.message": "Mô hình {model} đang nhận quá nhiều yêu cầu và Gemini đã nhiều lần trả về 503 UNAVAILABLE. Bạn có muốn tiếp tục chờ không?\n\nNếu chọn Có, Sonarpad sẽ tiếp tục thử lại không giới hạn sau mỗi 5 giây cho đến khi Gemini phản hồi hoặc bạn hủy thủ công. Công việc đã hoàn thành vẫn được lưu.\n\nChi tiết: {error}"
+  "audio_description.overload.message": "Mô hình {model} đang nhận quá nhiều yêu cầu và Gemini đã nhiều lần trả về 503 UNAVAILABLE. Bạn có muốn tiếp tục chờ không?\n\nNếu chọn Có, Sonarpad sẽ tiếp tục thử lại không giới hạn sau mỗi 5 giây cho đến khi Gemini phản hồi hoặc bạn hủy thủ công. Công việc đã hoàn thành vẫn được lưu.\n\nChi tiết: {error}",
+  "rss.context.create_folder": "Tạo thư mục mới",
+  "rss.folder.title": "Tạo thư mục mới",
+  "rss.folder.name": "Tên thư mục:",
+  "rss.folder.required": "Nhập tên thư mục.",
+  "rss.folder.exists": "Đã có thư mục cùng tên tại vị trí này.",
+  "rss.folder.created": "Đã tạo thư mục",
+  "rss.folder.delete_title": "Xóa thư mục",
+  "rss.folder.delete_confirm": "Xóa thư mục “{title}” và {count} nguồn RSS bên trong?",
+  "rss.folder.deleted": "Đã xóa thư mục",
+  "rss.folder.restored": "Đã khôi phục thư mục"
 }

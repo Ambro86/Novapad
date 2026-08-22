@@ -7,6 +7,9 @@ Guide TV
 
 RSS et articles
 • Ajout de « Sélectionner des articles… » au menu contextuel des articles RSS. Cette commande ouvre la même fenêtre accessible à cases à cocher que pour le téléchargement des playlists : Espace sélectionne ou désélectionne plusieurs articles, Tab mène à Supprimer et tous les articles choisis sont supprimés en une seule opération.
+• Les RSS prennent désormais en charge de véritables dossiers. Lors de l’importation OPML, les conteneurs `<outline>` imbriqués sont conservés au lieu d’être aplatis, les flux déjà présents sont rangés dans les dossiers importés sans duplication et l’exportation OPML conserve la même hiérarchie, y compris les dossiers vides.
+• Ajout de la commande localisée « Créer un nouveau dossier » au menu contextuel RSS, avec une boîte de dialogue accessible pour saisir le nom. Les nœuds de dossier utilisent le comportement natif de l’arborescence : Flèche droite développe, Flèche gauche réduit ; supprimer un dossier supprime toute sa branche et Ctrl+Z restaure en une seule opération le dossier, ses sous-dossiers et tous les flux qu’il contenait.
+• Les flux RSS peuvent maintenant être réordonnés dans leur dossier courant avec Déplacer vers le haut, Déplacer vers le bas, Déplacer en haut, Déplacer en bas et Déplacer à la position ; le réordonnancement ne déplace jamais un flux hors de son dossier.
 
 Enregistrements TV et audiodescriptions
 • Amélioration de la robustesse des horodatages Gemini pour les audiodescriptions : les horodatages mal formés `MM:SS:ms`, par exemple `01:13:473`, sont désormais normalisés sans perte en `MM:SS.ms` avant validation ; les contrôles existants de chunk et de créneau continuent de rejeter tout horodatage qui n’appartient pas à la scène courante.

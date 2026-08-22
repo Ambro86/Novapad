@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "Flytta till botten",
   "rss.reorder.move_down": "Flytta ner\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "Flytta till position...",
+  "rss.reorder.move_to_folder": "Flytta till mapp",
+  "rss.folder.main": "Huvudmapp",
   "rss.reorder.move_top": "Flytta till toppen",
   "rss.reorder.move_up": "Flytta upp\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "Flyttad till position {x}",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "Sök beskrivningar:",
   "audio_description.project.search_button": "Sök",
   "audio_description.overload.title": "Gemini är tillfälligt överbelastat",
-  "audio_description.overload.message": "Modellen {model} får för många förfrågningar och Gemini har upprepade gånger returnerat 503 UNAVAILABLE. Vill du fortsätta vänta?\n\nOm du väljer Ja fortsätter Sonarpad att försöka utan gräns var 5:e sekund tills Gemini svarar eller du avbryter manuellt. Redan slutfört arbete förblir sparat.\n\nDetaljer: {error}"
+  "audio_description.overload.message": "Modellen {model} får för många förfrågningar och Gemini har upprepade gånger returnerat 503 UNAVAILABLE. Vill du fortsätta vänta?\n\nOm du väljer Ja fortsätter Sonarpad att försöka utan gräns var 5:e sekund tills Gemini svarar eller du avbryter manuellt. Redan slutfört arbete förblir sparat.\n\nDetaljer: {error}",
+  "rss.context.create_folder": "Skapa ny mapp",
+  "rss.folder.title": "Skapa ny mapp",
+  "rss.folder.name": "Mappnamn:",
+  "rss.folder.required": "Ange ett mappnamn.",
+  "rss.folder.exists": "Det finns redan en mapp med det här namnet här.",
+  "rss.folder.created": "Mapp skapad",
+  "rss.folder.delete_title": "Ta bort mapp",
+  "rss.folder.delete_confirm": "Ta bort mappen ”{title}” och dess {count} RSS-flöden?",
+  "rss.folder.deleted": "Mapp borttagen",
+  "rss.folder.restored": "Mapp återställd"
 }

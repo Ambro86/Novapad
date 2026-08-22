@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "Perkelti į apačią",
   "rss.reorder.move_down": "Pereiti žemyn\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "Perkelti į poziciją...",
+  "rss.reorder.move_to_folder": "Perkelti į aplanką",
+  "rss.folder.main": "Pagrindinis aplankas",
   "rss.reorder.move_top": "Perkelti į viršų",
   "rss.reorder.move_up": "Pereiti aukštyn\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "Perkelta į poziciją {x}",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "Ieškoti aprašų:",
   "audio_description.project.search_button": "Ieškoti",
   "audio_description.overload.title": "Gemini laikinai perkrautas",
-  "audio_description.overload.message": "Modelis {model} gauna per daug užklausų ir Gemini kelis kartus grąžino 503 UNAVAILABLE. Ar norite toliau laukti?\n\nPasirinkus Taip, Sonarpad bandys iš naujo neribotai kas 5 sekundes, kol Gemini atsakys arba atšauksite rankiniu būdu. Jau atliktas darbas liks išsaugotas.\n\nIšsami informacija: {error}"
+  "audio_description.overload.message": "Modelis {model} gauna per daug užklausų ir Gemini kelis kartus grąžino 503 UNAVAILABLE. Ar norite toliau laukti?\n\nPasirinkus Taip, Sonarpad bandys iš naujo neribotai kas 5 sekundes, kol Gemini atsakys arba atšauksite rankiniu būdu. Jau atliktas darbas liks išsaugotas.\n\nIšsami informacija: {error}",
+  "rss.context.create_folder": "Kurti naują aplanką",
+  "rss.folder.title": "Kurti naują aplanką",
+  "rss.folder.name": "Aplanko pavadinimas:",
+  "rss.folder.required": "Įveskite aplanko pavadinimą.",
+  "rss.folder.exists": "Šioje vietoje jau yra aplankas tokiu pavadinimu.",
+  "rss.folder.created": "Aplankas sukurtas",
+  "rss.folder.delete_title": "Ištrinti aplanką",
+  "rss.folder.delete_confirm": "Ištrinti aplanką „{title}“ ir jo {count} RSS kanalų?",
+  "rss.folder.deleted": "Aplankas ištrintas",
+  "rss.folder.restored": "Aplankas atkurtas"
 }

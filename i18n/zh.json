@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "移至底部",
   "rss.reorder.move_down": "往下移动\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "移动到位置...",
+  "rss.reorder.move_to_folder": "移动到文件夹",
+  "rss.folder.main": "主文件夹",
   "rss.reorder.move_top": "移至顶部",
   "rss.reorder.move_up": "往上移动\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "移至位置 {x}",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "搜索描述：",
   "audio_description.project.search_button": "搜索",
   "audio_description.overload.title": "Gemini 暂时过载",
-  "audio_description.overload.message": "模型 {model} 当前收到过多请求，Gemini 已多次返回 503 UNAVAILABLE。是否继续等待？\n\n如果选择“是”，Sonarpad 将每 5 秒无限重试，直到 Gemini 响应或你手动取消。已经完成的工作会保留。\n\n详细信息：{error}"
+  "audio_description.overload.message": "模型 {model} 当前收到过多请求，Gemini 已多次返回 503 UNAVAILABLE。是否继续等待？\n\n如果选择“是”，Sonarpad 将每 5 秒无限重试，直到 Gemini 响应或你手动取消。已经完成的工作会保留。\n\n详细信息：{error}",
+  "rss.context.create_folder": "新建文件夹",
+  "rss.folder.title": "新建文件夹",
+  "rss.folder.name": "文件夹名称：",
+  "rss.folder.required": "请输入文件夹名称。",
+  "rss.folder.exists": "此位置已存在同名文件夹。",
+  "rss.folder.created": "文件夹已创建",
+  "rss.folder.delete_title": "删除文件夹",
+  "rss.folder.delete_confirm": "删除文件夹“{title}”及其中的 {count} 个 RSS 源吗？",
+  "rss.folder.deleted": "文件夹已删除",
+  "rss.folder.restored": "文件夹已恢复"
 }

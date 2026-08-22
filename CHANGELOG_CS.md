@@ -7,6 +7,9 @@ TV program
 
 RSS a články
 • Do kontextové nabídky článků RSS byla přidána položka „Vybrat články…“. Otevře stejné přístupné okno se zaškrtávacími políčky jako stahování playlistu: Mezerníkem lze označit nebo odznačit více článků, klávesou Tab přejít na Odstranit a všechny vybrané články smazat najednou.
+• RSS nyní podporuje skutečné složky. Při importu OPML se vnořené kontejnery `<outline>` zachovají místo zploštění, již existující kanály se bez duplicit zařadí do importovaných složek a export OPML zachová stejnou hierarchii včetně prázdných složek.
+• Do kontextové nabídky RSS byl přidán lokalizovaný příkaz „Vytvořit novou složku“ s přístupným dialogem pro zadání názvu. Uzly složek používají nativní chování stromu: Šipka doprava rozbalí, Šipka doleva sbalí; odstranění složky smaže celou její větev a Ctrl+Z v jediné operaci obnoví složku, podsložky i všechny obsažené kanály.
+• Kanály RSS lze nyní řadit uvnitř aktuální složky pomocí Přesunout nahoru, Přesunout dolů, Přesunout na začátek, Přesunout na konec a Přesunout na pozici; řazení nikdy nepřesune kanál mimo jeho složku.
 
 Televizní nahrávky a audiopopis
 • Zpřesněno zpracování časových značek Gemini pro audiopopis: chybně zapsané značky `MM:SS:ms`, například `01:13:473`, se nyní beze ztráty normalizují na `MM:SS.ms` před ověřením; stávající kontroly chunku a slotu nadále odmítnou každou značku, která nepatří do aktuální scény.

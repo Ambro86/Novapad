@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "Posunout na konec",
   "rss.reorder.move_down": "Posunout dolů\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "Posunout na pozici...",
+  "rss.reorder.move_to_folder": "Přesunout do složky",
+  "rss.folder.main": "Hlavní složka",
   "rss.reorder.move_top": "Posunout na začátek",
   "rss.reorder.move_up": "Posunout nahoru\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "Přesunuto na pozici {x}",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "Hledat popisy:",
   "audio_description.project.search_button": "Hledat",
   "audio_description.overload.title": "Gemini je dočasně přetížený",
-  "audio_description.overload.message": "Model {model} přijímá příliš mnoho požadavků a Gemini opakovaně vrátil 503 UNAVAILABLE. Chcete dále čekat?\n\nPokud zvolíte Ano, Sonarpad bude bez omezení opakovat pokus každých 5 sekund, dokud Gemini neodpoví nebo úlohu ručně nezrušíte. Již dokončená práce zůstane uložena.\n\nPodrobnosti: {error}"
+  "audio_description.overload.message": "Model {model} přijímá příliš mnoho požadavků a Gemini opakovaně vrátil 503 UNAVAILABLE. Chcete dále čekat?\n\nPokud zvolíte Ano, Sonarpad bude bez omezení opakovat pokus každých 5 sekund, dokud Gemini neodpoví nebo úlohu ručně nezrušíte. Již dokončená práce zůstane uložena.\n\nPodrobnosti: {error}",
+  "rss.context.create_folder": "Vytvořit novou složku",
+  "rss.folder.title": "Vytvořit novou složku",
+  "rss.folder.name": "Název složky:",
+  "rss.folder.required": "Zadejte název složky.",
+  "rss.folder.exists": "Složka s tímto názvem již v tomto umístění existuje.",
+  "rss.folder.created": "Složka vytvořena",
+  "rss.folder.delete_title": "Odstranit složku",
+  "rss.folder.delete_confirm": "Odstranit složku „{title}“ a jejích {count} RSS kanálů?",
+  "rss.folder.deleted": "Složka odstraněna",
+  "rss.folder.restored": "Složka obnovena"
 }

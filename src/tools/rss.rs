@@ -52,6 +52,8 @@ pub struct RssSource {
     pub title: String,
     pub url: String,
     pub kind: RssSourceType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub folder_path: Vec<String>,
     #[serde(default)]
     pub user_title: bool,
     #[serde(default)]

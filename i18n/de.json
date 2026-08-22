@@ -1642,6 +1642,8 @@
   "rss.reorder.move_bottom": "Ganz nach unten verschieben",
   "rss.reorder.move_down": "Nach unten verschieben\tStrg+Umschalt+Pfeil nach unten",
   "rss.reorder.move_to_position": "An Position verschieben...",
+  "rss.reorder.move_to_folder": "In Ordner verschieben",
+  "rss.folder.main": "Hauptordner",
   "rss.reorder.move_top": "Ganz nach oben verschieben",
   "rss.reorder.move_up": "Nach oben verschieben\tStrg+Umschalt+Pfeil nach oben",
   "rss.reorder.moved_position": "An Position {x} verschoben",
@@ -2147,5 +2149,15 @@
   "audio_description.project.search": "Beschreibungen suchen:",
   "audio_description.project.search_button": "Suchen",
   "audio_description.overload.title": "Gemini vorübergehend überlastet",
-  "audio_description.overload.message": "Das Modell {model} erhält zu viele Anfragen und Gemini hat wiederholt 503 UNAVAILABLE zurückgegeben. Möchten Sie weiter warten?\n\nWenn Sie Ja wählen, versucht Sonarpad unbegrenzt alle 5 Sekunden erneut, bis Gemini antwortet oder Sie manuell abbrechen. Bereits abgeschlossene Arbeit bleibt gespeichert.\n\nDetails: {error}"
+  "audio_description.overload.message": "Das Modell {model} erhält zu viele Anfragen und Gemini hat wiederholt 503 UNAVAILABLE zurückgegeben. Möchten Sie weiter warten?\n\nWenn Sie Ja wählen, versucht Sonarpad unbegrenzt alle 5 Sekunden erneut, bis Gemini antwortet oder Sie manuell abbrechen. Bereits abgeschlossene Arbeit bleibt gespeichert.\n\nDetails: {error}",
+  "rss.context.create_folder": "Neuen Ordner erstellen",
+  "rss.folder.title": "Neuen Ordner erstellen",
+  "rss.folder.name": "Ordnername:",
+  "rss.folder.required": "Geben Sie einen Ordnernamen ein.",
+  "rss.folder.exists": "An dieser Stelle gibt es bereits einen Ordner mit diesem Namen.",
+  "rss.folder.created": "Ordner erstellt",
+  "rss.folder.delete_title": "Ordner löschen",
+  "rss.folder.delete_confirm": "Ordner „{title}“ und seine {count} RSS-Feeds löschen?",
+  "rss.folder.deleted": "Ordner gelöscht",
+  "rss.folder.restored": "Ordner wiederhergestellt"
 }

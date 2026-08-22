@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "Déplacer tout en bas",
   "rss.reorder.move_down": "Descendre\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "Déplacer à la position...",
+  "rss.reorder.move_to_folder": "Déplacer vers le dossier",
+  "rss.folder.main": "Dossier principal",
   "rss.reorder.move_top": "Déplacer tout en haut",
   "rss.reorder.move_up": "Monter\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "Déplacé à la position {x}",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "Rechercher des descriptions :",
   "audio_description.project.search_button": "Rechercher",
   "audio_description.overload.title": "Gemini temporairement surchargé",
-  "audio_description.overload.message": "Le modèle {model} reçoit trop de requêtes et Gemini a renvoyé plusieurs fois 503 UNAVAILABLE. Voulez-vous continuer à attendre ?\n\nSi vous choisissez Oui, Sonarpad réessaiera sans limite toutes les 5 secondes jusqu’à ce que Gemini réponde ou que vous annuliez manuellement. Le travail déjà terminé reste enregistré.\n\nDétails : {error}"
+  "audio_description.overload.message": "Le modèle {model} reçoit trop de requêtes et Gemini a renvoyé plusieurs fois 503 UNAVAILABLE. Voulez-vous continuer à attendre ?\n\nSi vous choisissez Oui, Sonarpad réessaiera sans limite toutes les 5 secondes jusqu’à ce que Gemini réponde ou que vous annuliez manuellement. Le travail déjà terminé reste enregistré.\n\nDétails : {error}",
+  "rss.context.create_folder": "Créer un nouveau dossier",
+  "rss.folder.title": "Créer un nouveau dossier",
+  "rss.folder.name": "Nom du dossier :",
+  "rss.folder.required": "Saisissez un nom de dossier.",
+  "rss.folder.exists": "Un dossier portant ce nom existe déjà à cet emplacement.",
+  "rss.folder.created": "Dossier créé",
+  "rss.folder.delete_title": "Supprimer le dossier",
+  "rss.folder.delete_confirm": "Supprimer le dossier « {title} » et ses {count} flux RSS ?",
+  "rss.folder.deleted": "Dossier supprimé",
+  "rss.folder.restored": "Dossier restauré"
 }

@@ -32,8 +32,8 @@ use windows::Win32::UI::Controls::{
     TVGN_NEXT, TVGN_PARENT, TVGN_ROOT, TVHITTESTINFO, TVI_FIRST, TVI_LAST, TVI_ROOT, TVIF_PARAM,
     TVIF_TEXT, TVINSERTSTRUCTW, TVINSERTSTRUCTW_0, TVITEMEXW_CHILDREN, TVITEMW, TVM_DELETEITEM,
     TVM_ENSUREVISIBLE, TVM_EXPAND, TVM_GETITEMW, TVM_GETNEXTITEM, TVM_HITTEST, TVM_INSERTITEMW,
-    TVM_SELECTITEM, TVM_SETITEMW, TVM_SORTCHILDRENCB, TVN_ITEMEXPANDINGW, TVN_KEYDOWN,
-    TVN_SELCHANGEDW, TVSORTCB, WC_BUTTON, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC,
+    TVM_SELECTITEM, TVM_SETITEMW, TVN_ITEMEXPANDINGW, TVN_KEYDOWN, TVN_SELCHANGEDW, WC_BUTTON,
+    WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetFocus, GetKeyState, IsWindowEnabled, SetActiveWindow, SetFocus, VK_APPS, VK_CONTROL,
@@ -59,6 +59,7 @@ use windows::core::{PCWSTR, PWSTR, w};
 
 const RSS_WINDOW_CLASS: &str = "SonarpadRssWindow";
 const RSS_CITY_WINDOW_CLASS: &str = "SonarpadRssCityWindow";
+const RSS_FOLDER_WINDOW_CLASS: &str = "SonarpadRssFolderWindow";
 const RSS_COMMUNITY_ADD_WINDOW_CLASS: &str = "SonarpadRssCommunityAddWindow";
 const RSS_COMMUNITY_LIST_WINDOW_CLASS: &str = "SonarpadRssCommunityListWindow";
 const ID_CITY_EDIT: usize = 1601;
@@ -71,6 +72,9 @@ const ID_COMMUNITY_ADD_CANCEL: usize = 1704;
 const ID_COMMUNITY_LIST: usize = 1801;
 const ID_COMMUNITY_LIST_ADD: usize = 1802;
 const ID_COMMUNITY_LIST_CLOSE: usize = 1803;
+const ID_FOLDER_EDIT: usize = 1901;
+const ID_FOLDER_OK: usize = 1902;
+const ID_FOLDER_CANCEL: usize = 1903;
 
 #[inline]
 fn ignore_bool(_value: bool) {}
@@ -97,6 +101,9 @@ const ID_CTX_SORT_ASC: usize = 1306;
 const ID_CTX_SORT_DESC: usize = 1307;
 const ID_CTX_SORT_NEWEST: usize = 1308;
 const ID_CTX_SORT_OLDEST: usize = 1309;
+const ID_CTX_MOVE_FOLDER_BASE: usize = 2000;
+const ID_CTX_MOVE_FOLDER_LIMIT: usize = 1000;
+const ID_CTX_MOVE_FOLDER_END: usize = ID_CTX_MOVE_FOLDER_BASE + ID_CTX_MOVE_FOLDER_LIMIT - 1;
 const ID_CTX_OPEN_BROWSER: usize = 1201;
 const ID_CTX_SHARE_FACEBOOK: usize = 1202;
 const ID_CTX_SHARE_TWITTER: usize = 1203;
@@ -106,6 +113,7 @@ const ID_CTX_PROPERTIES: usize = 1206;
 const ID_CTX_ADD_TO_FAVORITES: usize = 1207;
 const ID_CTX_CHANGE_CITY: usize = 1208;
 const ID_CTX_SELECT_ARTICLES: usize = 1209;
+const ID_CTX_CREATE_FOLDER: usize = 1210;
 
 const WM_RSS_FETCH_COMPLETE: u32 = WM_USER + 200;
 const WM_RSS_IMPORT_COMPLETE: u32 = WM_USER + 201;
@@ -213,6 +221,52 @@ fn sync_active_rss_sources(state: &mut crate::AppState) {
         .insert(code, state.settings.rss_sources.clone());
 }
 
+fn normalized_folder_path(path: &[String]) -> Vec<String> {
+    path.iter()
+        .map(|part| part.trim())
+        .filter(|part| !part.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn add_folder_path_with_parents(paths: &mut Vec<Vec<String>>, path: &[String]) {
+    let normalized = normalized_folder_path(path);
+    for depth in 1..=normalized.len() {
+        let prefix = normalized[..depth].to_vec();
+        if !paths.contains(&prefix) {
+            paths.push(prefix);
+        }
+    }
+}
+
+fn rss_folder_paths_for_settings(settings: &crate::settings::AppSettings) -> Vec<Vec<String>> {
+    let code = normalize_news_language_code(&settings.rss_news_language)
+        .unwrap_or_else(|| default_news_language_code(settings.language));
+    let mut paths = settings
+        .rss_folders_by_language
+        .get(code)
+        .cloned()
+        .unwrap_or_default();
+    for source in &settings.rss_sources {
+        add_folder_path_with_parents(&mut paths, &source.folder_path);
+    }
+    paths
+}
+
+fn sync_active_rss_folders(state: &mut crate::AppState) {
+    let code = active_news_language_code_from_state(state);
+    let mut paths = state
+        .settings
+        .rss_folders_by_language
+        .get(&code)
+        .cloned()
+        .unwrap_or_default();
+    for source in &state.settings.rss_sources {
+        add_folder_path_with_parents(&mut paths, &source.folder_path);
+    }
+    state.settings.rss_folders_by_language.insert(code, paths);
+}
+
 fn load_or_migrate_active_rss_sources(
     settings: &mut crate::settings::AppSettings,
     code: &str,
@@ -230,6 +284,7 @@ fn load_or_migrate_active_rss_sources(
 
 fn save_rss_settings(state: &mut crate::AppState) {
     sync_active_rss_sources(state);
+    sync_active_rss_folders(state);
     crate::settings::save_settings(state.settings.clone());
 }
 
@@ -352,9 +407,13 @@ fn restore_favorite_article_at(
 #[cfg(test)]
 mod tests {
     use super::{
-        build_google_news_rss_url, decode_basic_html_entities, ensure_opml_extension,
-        format_google_news_source_title, load_default_feeds, load_or_migrate_active_rss_sources,
-        normalize_rss_url_key, remove_favorite_article_by_key, restore_favorite_article_at,
+        ReorderAction, add_folder_path_with_parents, build_google_news_rss_url,
+        decode_basic_html_entities, ensure_opml_extension, format_google_news_source_title,
+        load_default_feeds, load_or_migrate_active_rss_sources, merge_imported_opml_sources,
+        move_folder_destinations, move_rss_source_to_folder, normalize_rss_url_key,
+        parse_opml_folder_paths, parse_opml_sources, remove_favorite_article_by_key,
+        reorder_rss_source_within_folder, restore_favorite_article_at,
+        rss_folder_paths_for_settings, write_sources_to_opml, write_sources_to_opml_with_folders,
     };
     use crate::tools::rss::{RssFeedCache, RssItem, RssSource, RssSourceType};
     use std::path::PathBuf;
@@ -364,6 +423,7 @@ mod tests {
             title: title.to_string(),
             url: url.to_string(),
             kind: RssSourceType::Feed,
+            folder_path: Vec::new(),
             user_title: true,
             unread: false,
             cache: RssFeedCache::default(),
@@ -561,6 +621,243 @@ mod tests {
         assert_eq!(
             ensure_opml_extension(PathBuf::from("Sonarpad Rss.opml")),
             PathBuf::from("Sonarpad Rss.opml")
+        );
+    }
+
+    #[test]
+    fn arturo_style_opml_preserves_outline_folders() {
+        let opml = r#"<?xml version="1.0" encoding="utf-8"?>
+<opml version="2.0">
+  <head><title>Medios españoles — OPML para lector RSS</title></head>
+  <body>
+    <outline text="01 — Actualidad y generalistas" title="01 — Actualidad y generalistas">
+      <outline type="rss" text="EL PAÍS" title="EL PAÍS" xmlUrl="https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada"/>
+      <outline type="rss" text="El Confidencial — España" title="El Confidencial — España" xmlUrl="https://rss.elconfidencial.com/espana/"/>
+    </outline>
+    <outline text="05 — Tecnología, IA e internet" title="05 — Tecnología, IA e internet">
+      <outline type="rss" text="Xataka" title="Xataka" xmlUrl="https://www.xataka.com/index.xml"/>
+    </outline>
+  </body>
+</opml>"#;
+
+        let sources = parse_opml_sources(opml);
+
+        assert_eq!(sources.len(), 3);
+        assert_eq!(
+            sources[0].folder_path,
+            vec!["01 — Actualidad y generalistas".to_string()]
+        );
+        assert_eq!(sources[0].title, "EL PAÍS");
+        assert_eq!(sources[1].folder_path, sources[0].folder_path);
+        assert_eq!(
+            sources[2].folder_path,
+            vec!["05 — Tecnología, IA e internet".to_string()]
+        );
+        assert_eq!(sources[2].title, "Xataka");
+    }
+
+    #[test]
+    fn opml_parser_keeps_flat_feeds_at_root() {
+        let opml = r#"<opml version="1.0"><body>
+<outline type="rss" text="Root feed" xmlUrl="https://example.com/feed.xml"/>
+</body></opml>"#;
+
+        let sources = parse_opml_sources(opml);
+
+        assert_eq!(sources.len(), 1);
+        assert!(sources[0].folder_path.is_empty());
+        assert_eq!(sources[0].title, "Root feed");
+    }
+
+    #[test]
+    fn reimporting_foldered_opml_organizes_existing_feed_without_duplicate() {
+        let mut existing = vec![test_rss_source(
+            "Xataka",
+            "https://www.xataka.com/index.xml",
+        )];
+        let imported = parse_opml_sources(
+            r#"<opml version="2.0"><body>
+<outline text="05 — Tecnología, IA e internet">
+  <outline type="rss" text="Xataka" xmlUrl="https://www.xataka.com/index.xml"/>
+</outline>
+</body></opml>"#,
+        );
+
+        let (added, organized) = merge_imported_opml_sources(&mut existing, imported);
+
+        assert_eq!(added, 0);
+        assert_eq!(organized, 1);
+        assert_eq!(existing.len(), 1);
+        assert_eq!(
+            existing[0].folder_path,
+            vec!["05 — Tecnología, IA e internet".to_string()]
+        );
+    }
+
+    #[test]
+    fn legacy_rss_source_json_defaults_to_root_folder() {
+        let source: RssSource = serde_json::from_str(
+            r#"{"title":"Legacy","url":"https://example.com/feed.xml","kind":"Feed"}"#,
+        )
+        .expect("legacy RSS source should deserialize");
+
+        assert!(source.folder_path.is_empty());
+    }
+
+    #[test]
+    fn folder_registry_keeps_empty_folder_and_parent_paths() {
+        let mut settings = crate::settings::AppSettings {
+            rss_news_language: "es".to_string(),
+            ..Default::default()
+        };
+        let paths = settings
+            .rss_folders_by_language
+            .entry("es".to_string())
+            .or_default();
+        add_folder_path_with_parents(paths, &["Tecnología".to_string(), "IA".to_string()]);
+
+        let active = rss_folder_paths_for_settings(&settings);
+
+        assert_eq!(
+            active,
+            vec![
+                vec!["Tecnología".to_string()],
+                vec!["Tecnología".to_string(), "IA".to_string()]
+            ]
+        );
+    }
+
+    #[test]
+    fn reordering_feed_inside_folder_only_changes_sibling_order() {
+        let mut a1 = test_rss_source("A1", "https://example.com/a1.xml");
+        a1.folder_path = vec!["Cartella A".to_string()];
+        let mut b1 = test_rss_source("B1", "https://example.com/b1.xml");
+        b1.folder_path = vec!["Cartella B".to_string()];
+        let mut a2 = test_rss_source("A2", "https://example.com/a2.xml");
+        a2.folder_path = vec!["Cartella A".to_string()];
+        let mut settings = crate::settings::AppSettings {
+            rss_sources: vec![a1, b1, a2],
+            ..Default::default()
+        };
+
+        let new_index = reorder_rss_source_within_folder(&mut settings, 2, ReorderAction::Up, 0);
+
+        assert_eq!(new_index, Some(0));
+        assert_eq!(settings.rss_sources[0].title, "A2");
+        assert_eq!(settings.rss_sources[1].title, "B1");
+        assert_eq!(settings.rss_sources[2].title, "A1");
+        assert_eq!(
+            settings.rss_sources[0].folder_path,
+            vec!["Cartella A".to_string()]
+        );
+        assert_eq!(
+            settings.rss_sources[1].folder_path,
+            vec!["Cartella B".to_string()]
+        );
+    }
+
+    #[test]
+    fn move_to_folder_destinations_from_root_omit_main_folder() {
+        let root = test_rss_source("Root", "https://example.com/root.xml");
+        let mut in_a = test_rss_source("A", "https://example.com/a.xml");
+        in_a.folder_path = vec!["Cartella A".to_string()];
+        let mut in_b = test_rss_source("B", "https://example.com/b.xml");
+        in_b.folder_path = vec!["Cartella B".to_string()];
+        let settings = crate::settings::AppSettings {
+            rss_sources: vec![root, in_a, in_b],
+            ..Default::default()
+        };
+
+        let destinations = move_folder_destinations(&settings, 0);
+
+        assert_eq!(
+            destinations,
+            vec![
+                vec!["Cartella A".to_string()],
+                vec!["Cartella B".to_string()]
+            ]
+        );
+    }
+
+    #[test]
+    fn move_to_folder_destinations_inside_folder_include_root_and_omit_current() {
+        let mut in_a = test_rss_source("A", "https://example.com/a.xml");
+        in_a.folder_path = vec!["Cartella A".to_string()];
+        let mut in_b = test_rss_source("B", "https://example.com/b.xml");
+        in_b.folder_path = vec!["Cartella B".to_string()];
+        let settings = crate::settings::AppSettings {
+            rss_sources: vec![in_a, in_b],
+            ..Default::default()
+        };
+
+        let destinations = move_folder_destinations(&settings, 0);
+
+        assert_eq!(
+            destinations,
+            vec![Vec::<String>::new(), vec!["Cartella B".to_string()]]
+        );
+    }
+
+    #[test]
+    fn moving_feed_to_folder_places_it_after_existing_destination_siblings() {
+        let mut source = test_rss_source("Da spostare", "https://example.com/source.xml");
+        source.folder_path = vec!["Cartella A".to_string()];
+        let mut b1 = test_rss_source("B1", "https://example.com/b1.xml");
+        b1.folder_path = vec!["Cartella B".to_string()];
+        let mut b2 = test_rss_source("B2", "https://example.com/b2.xml");
+        b2.folder_path = vec!["Cartella B".to_string()];
+        let mut settings = crate::settings::AppSettings {
+            rss_sources: vec![source, b1, b2],
+            ..Default::default()
+        };
+
+        let new_index = move_rss_source_to_folder(&mut settings, 0, &["Cartella B".to_string()]);
+
+        assert_eq!(new_index, Some(2));
+        assert_eq!(settings.rss_sources[2].title, "Da spostare");
+        assert_eq!(
+            settings.rss_sources[2].folder_path,
+            vec!["Cartella B".to_string()]
+        );
+    }
+
+    #[test]
+    fn opml_empty_folders_are_preserved_by_export_and_parser() {
+        let folders = vec![
+            vec!["Cartella vuota".to_string()],
+            vec!["Cartella vuota".to_string(), "Sottocartella".to_string()],
+        ];
+        let mut bytes = Vec::new();
+
+        write_sources_to_opml_with_folders(&mut bytes, &[], &folders)
+            .expect("empty-folder OPML export should succeed");
+        let exported = String::from_utf8(bytes).expect("exported OPML should be UTF-8");
+        let parsed_folders = parse_opml_folder_paths(&exported);
+
+        assert_eq!(parsed_folders, folders);
+    }
+
+    #[test]
+    fn opml_export_round_trip_preserves_folder_paths() {
+        let mut first = test_rss_source("EL PAÍS", "https://example.com/elpais.xml");
+        first.folder_path = vec!["01 — Actualidad y generalistas".to_string()];
+        let mut second = test_rss_source("Xataka", "https://example.com/xataka.xml");
+        second.folder_path = vec!["05 — Tecnología, IA e internet".to_string()];
+        let mut bytes = Vec::new();
+
+        write_sources_to_opml(&mut bytes, &[first, second]).expect("OPML export should succeed");
+        let exported = String::from_utf8(bytes).expect("exported OPML should be UTF-8");
+        let parsed = parse_opml_sources(&exported);
+
+        assert!(exported.contains("<opml version=\"2.0\">"));
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(
+            parsed[0].folder_path,
+            vec!["01 — Actualidad y generalistas".to_string()]
+        );
+        assert_eq!(
+            parsed[1].folder_path,
+            vec!["05 — Tecnología, IA e internet".to_string()]
         );
     }
 }
@@ -1149,14 +1446,23 @@ fn ensure_opml_extension(path: PathBuf) -> PathBuf {
     }
 }
 
-fn parse_opml_sources(text: &str) -> Vec<(String, String)> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ImportedOpmlSource {
+    title: String,
+    url: String,
+    folder_path: Vec<String>,
+}
+
+fn parse_opml_sources(text: &str) -> Vec<ImportedOpmlSource> {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
     let mut out = Vec::new();
+    let mut folder_path = Vec::new();
+    let mut outline_folder_stack = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+            Ok(Event::Start(e)) => {
                 if !e.name().as_ref().eq_ignore_ascii_case(b"outline") {
                     buf.clear();
                     continue;
@@ -1178,7 +1484,54 @@ fn parse_opml_sources(text: &str) -> Vec<(String, String)> {
                     }
                 }
                 if !url.trim().is_empty() {
-                    out.push((title, url));
+                    out.push(ImportedOpmlSource {
+                        title,
+                        url,
+                        folder_path: folder_path.clone(),
+                    });
+                    outline_folder_stack.push(false);
+                } else if !title.trim().is_empty() {
+                    folder_path.push(title.trim().to_string());
+                    outline_folder_stack.push(true);
+                } else {
+                    outline_folder_stack.push(false);
+                }
+            }
+            Ok(Event::Empty(e)) => {
+                if !e.name().as_ref().eq_ignore_ascii_case(b"outline") {
+                    buf.clear();
+                    continue;
+                }
+                let mut url = String::new();
+                let mut title = String::new();
+                for attr in e.attributes().flatten() {
+                    let key = attr.key.as_ref();
+                    let value = attr
+                        .decode_and_unescape_value(reader.decoder())
+                        .unwrap_or_default()
+                        .to_string();
+                    if key.eq_ignore_ascii_case(b"xmlUrl") {
+                        url = value;
+                    } else if title.is_empty()
+                        && (key.eq_ignore_ascii_case(b"title") || key.eq_ignore_ascii_case(b"text"))
+                    {
+                        title = value;
+                    }
+                }
+                if !url.trim().is_empty() {
+                    out.push(ImportedOpmlSource {
+                        title,
+                        url,
+                        folder_path: folder_path.clone(),
+                    });
+                }
+            }
+            Ok(Event::End(e)) => {
+                if e.name().as_ref().eq_ignore_ascii_case(b"outline")
+                    && let Some(was_folder) = outline_folder_stack.pop()
+                    && was_folder
+                {
+                    folder_path.truncate(folder_path.len().saturating_sub(1));
                 }
             }
             Ok(Event::Eof) => break,
@@ -1188,6 +1541,143 @@ fn parse_opml_sources(text: &str) -> Vec<(String, String)> {
         buf.clear();
     }
     out
+}
+
+fn parse_opml_folder_paths(text: &str) -> Vec<Vec<String>> {
+    let mut reader = Reader::from_str(text);
+    reader.config_mut().trim_text(true);
+    let mut buf = Vec::new();
+    let mut folders = Vec::new();
+    let mut current_path = Vec::new();
+    let mut outline_folder_stack = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                if !e.name().as_ref().eq_ignore_ascii_case(b"outline") {
+                    buf.clear();
+                    continue;
+                }
+                let mut has_url = false;
+                let mut title = String::new();
+                for attr in e.attributes().flatten() {
+                    let key = attr.key.as_ref();
+                    let value = attr
+                        .decode_and_unescape_value(reader.decoder())
+                        .unwrap_or_default()
+                        .to_string();
+                    if key.eq_ignore_ascii_case(b"xmlUrl") && !value.trim().is_empty() {
+                        has_url = true;
+                    } else if title.is_empty()
+                        && (key.eq_ignore_ascii_case(b"title") || key.eq_ignore_ascii_case(b"text"))
+                    {
+                        title = value;
+                    }
+                }
+                if !has_url && !title.trim().is_empty() {
+                    current_path.push(title.trim().to_string());
+                    if !folders.contains(&current_path) {
+                        folders.push(current_path.clone());
+                    }
+                    outline_folder_stack.push(true);
+                } else {
+                    outline_folder_stack.push(false);
+                }
+            }
+            Ok(Event::Empty(e)) => {
+                if !e.name().as_ref().eq_ignore_ascii_case(b"outline") {
+                    buf.clear();
+                    continue;
+                }
+                let mut has_url = false;
+                let mut title = String::new();
+                for attr in e.attributes().flatten() {
+                    let key = attr.key.as_ref();
+                    let value = attr
+                        .decode_and_unescape_value(reader.decoder())
+                        .unwrap_or_default()
+                        .to_string();
+                    if key.eq_ignore_ascii_case(b"xmlUrl") && !value.trim().is_empty() {
+                        has_url = true;
+                    } else if title.is_empty()
+                        && (key.eq_ignore_ascii_case(b"title") || key.eq_ignore_ascii_case(b"text"))
+                    {
+                        title = value;
+                    }
+                }
+                if !has_url && !title.trim().is_empty() {
+                    let mut path = current_path.clone();
+                    path.push(title.trim().to_string());
+                    if !folders.contains(&path) {
+                        folders.push(path);
+                    }
+                }
+            }
+            Ok(Event::End(e)) => {
+                if e.name().as_ref().eq_ignore_ascii_case(b"outline")
+                    && let Some(was_folder) = outline_folder_stack.pop()
+                    && was_folder
+                {
+                    current_path.truncate(current_path.len().saturating_sub(1));
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+        buf.clear();
+    }
+    folders
+}
+
+fn merge_imported_opml_sources(
+    rss_sources: &mut Vec<RssSource>,
+    imported_sources: Vec<ImportedOpmlSource>,
+) -> (usize, usize) {
+    let mut existing: HashMap<String, usize> = rss_sources
+        .iter()
+        .enumerate()
+        .map(|(index, source)| (normalize_rss_url_key(&source.url), index))
+        .collect();
+    let mut added = 0;
+    let mut organized = 0;
+
+    for imported in imported_sources {
+        let ImportedOpmlSource {
+            title,
+            url,
+            folder_path,
+        } = imported;
+        let key = normalize_rss_url_key(&url);
+        if let Some(existing_index) = existing.get(&key).copied() {
+            if !folder_path.is_empty()
+                && let Some(source) = rss_sources.get_mut(existing_index)
+                && source.folder_path != folder_path
+            {
+                source.folder_path = folder_path;
+                organized += 1;
+            }
+            continue;
+        }
+
+        let user_title = title.trim() != url.trim();
+        rss_sources.push(RssSource {
+            title,
+            url,
+            kind: RssSourceType::Feed,
+            folder_path,
+            user_title,
+            unread: false,
+            cache: RssFeedCache::default(),
+            last_seen_guid: None,
+            last_updated: None,
+            removed_item_keys: Vec::new(),
+            read_item_keys: Vec::new(),
+        });
+        existing.insert(key, rss_sources.len() - 1);
+        added += 1;
+    }
+
+    (added, organized)
 }
 
 fn open_import_txt_dialog(hwnd: HWND, language: crate::settings::Language) -> Option<PathBuf> {
@@ -1241,40 +1731,153 @@ fn escape_opml_attr(value: &str) -> String {
         .replace('"', "&quot;")
 }
 
+#[derive(Default)]
+struct OpmlFolderTree {
+    name: String,
+    source_indices: Vec<usize>,
+    children: Vec<OpmlFolderTree>,
+}
+
+fn opml_folder_node_mut<'a>(
+    children: &'a mut Vec<OpmlFolderTree>,
+    path: &[String],
+) -> Option<&'a mut OpmlFolderTree> {
+    let (first, rest) = path.split_first()?;
+    let position = children
+        .iter()
+        .position(|child| child.name == *first)
+        .unwrap_or_else(|| {
+            children.push(OpmlFolderTree {
+                name: first.clone(),
+                ..Default::default()
+            });
+            children.len() - 1
+        });
+    if rest.is_empty() {
+        children.get_mut(position)
+    } else {
+        let child = children.get_mut(position)?;
+        opml_folder_node_mut(&mut child.children, rest)
+    }
+}
+
+fn write_opml_source<W: Write>(
+    writer: &mut W,
+    source: &RssSource,
+    depth: usize,
+) -> Result<(), String> {
+    let title = if source.title.trim().is_empty() {
+        source.url.clone()
+    } else {
+        source.title.clone()
+    };
+    let indent = "  ".repeat(depth);
+    writeln!(
+        writer,
+        "{indent}<outline type=\"rss\" text=\"{}\" title=\"{}\" xmlUrl=\"{}\" />",
+        escape_opml_attr(&title),
+        escape_opml_attr(&title),
+        escape_opml_attr(&source.url)
+    )
+    .map_err(|e| e.to_string())
+}
+
+fn write_opml_folder<W: Write>(
+    writer: &mut W,
+    folder: &OpmlFolderTree,
+    sources: &[RssSource],
+    depth: usize,
+) -> Result<(), String> {
+    let indent = "  ".repeat(depth);
+    writeln!(
+        writer,
+        "{indent}<outline text=\"{}\" title=\"{}\">",
+        escape_opml_attr(&folder.name),
+        escape_opml_attr(&folder.name)
+    )
+    .map_err(|e| e.to_string())?;
+    for source_index in &folder.source_indices {
+        if let Some(source) = sources.get(*source_index) {
+            write_opml_source(writer, source, depth + 1)?;
+        }
+    }
+    for child in &folder.children {
+        write_opml_folder(writer, child, sources, depth + 1)?;
+    }
+    writeln!(writer, "{indent}</outline>").map_err(|e| e.to_string())
+}
+
+fn write_sources_to_opml_with_folders<W: Write>(
+    writer: &mut W,
+    sources: &[RssSource],
+    folder_paths: &[Vec<String>],
+) -> Result<(), String> {
+    writeln!(
+        writer,
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"2.0\">\n<head>\n<title>Sonarpad RSS</title>\n</head>\n<body>"
+    )
+    .map_err(|e| e.to_string())?;
+
+    let mut folders = Vec::new();
+    for path in folder_paths {
+        let normalized = normalized_folder_path(path);
+        if !normalized.is_empty() {
+            let folder_node = opml_folder_node_mut(&mut folders, &normalized);
+            if folder_node.is_none() {
+                return Err("invalid OPML folder path".to_string());
+            }
+        }
+    }
+
+    let mut root_sources = Vec::new();
+    for (index, source) in sources.iter().enumerate() {
+        let normalized = normalized_folder_path(&source.folder_path);
+        if normalized.is_empty() {
+            root_sources.push(index);
+        } else if let Some(folder) = opml_folder_node_mut(&mut folders, &normalized) {
+            folder.source_indices.push(index);
+        }
+    }
+
+    for source_index in root_sources {
+        if let Some(source) = sources.get(source_index) {
+            write_opml_source(writer, source, 1)?;
+        }
+    }
+    for folder in &folders {
+        write_opml_folder(writer, folder, sources, 1)?;
+    }
+    writeln!(writer, "</body>\n</opml>").map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[cfg(test)]
+fn write_sources_to_opml<W: Write>(writer: &mut W, sources: &[RssSource]) -> Result<(), String> {
+    let mut folders = Vec::new();
+    for source in sources {
+        add_folder_path_with_parents(&mut folders, &source.folder_path);
+    }
+    write_sources_to_opml_with_folders(writer, sources, &folders)
+}
+
 fn export_sources_to_opml_file(hwnd: HWND, path: &Path) -> Result<usize, String> {
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return Err("missing parent".to_string());
     }
-    let sources =
-        { with_state(parent, |state| state.settings.rss_sources.clone()) }.unwrap_or_default();
-    if sources.is_empty() {
+    let (sources, folders) = with_state(parent, |state| {
+        (
+            state.settings.rss_sources.clone(),
+            rss_folder_paths_for_settings(&state.settings),
+        )
+    })
+    .unwrap_or_default();
+    if sources.is_empty() && folders.is_empty() {
         return Ok(0);
     }
 
     let mut file = File::create(path).map_err(|e| e.to_string())?;
-    writeln!(
-        file,
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"1.0\">\n<head>\n<title>Sonarpad RSS</title>\n</head>\n<body>"
-    )
-    .map_err(|e| e.to_string())?;
-
-    for src in &sources {
-        let title = if src.title.trim().is_empty() {
-            src.url.clone()
-        } else {
-            src.title.clone()
-        };
-        writeln!(
-            file,
-            "  <outline text=\"{}\" title=\"{}\" xmlUrl=\"{}\" />",
-            escape_opml_attr(&title),
-            escape_opml_attr(&title),
-            escape_opml_attr(&src.url)
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    writeln!(file, "</body>\n</opml>").map_err(|e| e.to_string())?;
+    write_sources_to_opml_with_folders(&mut file, &sources, &folders)?;
     Ok(sources.len())
 }
 
@@ -1302,55 +1905,50 @@ fn import_sources_from_file(hwnd: HWND, path: &Path) -> usize {
     } else {
         Vec::new()
     };
+    let opml_folders = if is_opml {
+        parse_opml_folder_paths(&text)
+    } else {
+        Vec::new()
+    };
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     if parent.0 == 0 {
         return 0;
     }
-    let mut added = 0;
-    if with_state(parent, |state| {
-        let mut existing: std::collections::HashSet<String> = state
+    let import_result = with_state(parent, |state| {
+        let (added, organized) =
+            merge_imported_opml_sources(&mut state.settings.rss_sources, opml_sources);
+        let code = active_news_language_code_from_state(state);
+        let folders = state
             .settings
-            .rss_sources
-            .iter()
-            .map(|s| s.url.clone())
-            .collect();
-        for (title, url) in opml_sources {
-            let key = url.clone();
-            if existing.contains(&key) {
-                continue;
-            }
-            state.settings.rss_sources.push(RssSource {
-                title: title.clone(),
-                url: url.clone(),
-                kind: RssSourceType::Feed,
-                user_title: title.trim() != url.trim(),
-                unread: false,
-                cache: RssFeedCache::default(),
-                last_seen_guid: None,
-                last_updated: None,
-                removed_item_keys: Vec::new(),
-                read_item_keys: Vec::new(),
-            });
-            existing.insert(key);
-            added += 1;
+            .rss_folders_by_language
+            .entry(code)
+            .or_default();
+        let before = folders.len();
+        for folder in opml_folders {
+            add_folder_path_with_parents(folders, &folder);
         }
-        if added > 0 {
+        let folder_added = folders.len().saturating_sub(before);
+        if added > 0 || organized > 0 || folder_added > 0 {
             save_rss_settings(state);
         }
-    })
-    .is_none()
-    {
+        (added, organized, folder_added)
+    });
+    let Some((added, organized, folder_added)) = import_result else {
         crate::log_debug("Failed to access state in import_opml_file");
-    }
-    if added > 0 {
+        return 0;
+    };
+    let source_changes = added + organized;
+    if source_changes > 0 || folder_added > 0 {
         log_debug(&format!(
-            "rss_import_file_added path=\"{}\" count={}",
+            "rss_import_file_changed path=\"{}\" added={} organized={} folders={}",
             path.to_string_lossy(),
-            added
+            added,
+            organized,
+            folder_added
         ));
         reload_tree(hwnd);
     }
-    added
+    source_changes
 }
 
 fn is_valid_article_url(url: &str) -> bool {
@@ -1358,19 +1956,6 @@ fn is_valid_article_url(url: &str) -> bool {
         return false;
     };
     matches!(parsed.scheme(), "http" | "https")
-}
-
-fn move_vec_to_index<T>(items: &mut Vec<T>, from: usize, to: usize) -> bool {
-    if from >= items.len() {
-        return false;
-    }
-    let target = to.min(items.len().saturating_sub(1));
-    if from == target {
-        return false;
-    }
-    let item = items.remove(from);
-    items.insert(target, item);
-    true
 }
 
 fn rss_item_key(item: &RssItem) -> String {
@@ -1458,6 +2043,7 @@ fn ensure_favorites_source(parent: HWND) -> usize {
             title: favorites_source_title(ps.settings.language),
             url: RSS_FAVORITES_SOURCE_URL.to_string(),
             kind: RssSourceType::Feed,
+            folder_path: Vec::new(),
             user_title: true,
             unread: false,
             cache: RssFeedCache::default(),
@@ -1623,57 +2209,6 @@ fn prune_persisted_read_keys_for_source(
     }
 }
 
-unsafe extern "system" fn rss_tree_compare(
-    lparam1: LPARAM,
-    lparam2: LPARAM,
-    _lparam_sort: LPARAM,
-) -> i32 {
-    crate::panic_guard::guard(
-        "rss_tree_compare",
-        || 0,
-        || {
-            let a = lparam1.0;
-            let b = lparam2.0;
-            a.cmp(&b) as i32
-        },
-    )
-}
-
-fn collect_source_root_items(
-    hwnd: HWND,
-    hwnd_tree: HWND,
-) -> Vec<windows::Win32::UI::Controls::HTREEITEM> {
-    let mut items = Vec::new();
-    let mut current = windows::Win32::UI::Controls::HTREEITEM(
-        crate::send_message_w_safe(
-            hwnd_tree,
-            TVM_GETNEXTITEM,
-            WPARAM(TVGN_ROOT as usize),
-            LPARAM(0),
-        )
-        .0,
-    );
-    while current.0 != 0 {
-        let is_source = with_rss_state(hwnd, |state| {
-            matches!(state.node_data.get(&current.0), Some(NodeData::Source(_)))
-        })
-        .unwrap_or(false);
-        if is_source {
-            items.push(current);
-        }
-        current = windows::Win32::UI::Controls::HTREEITEM(
-            crate::send_message_w_safe(
-                hwnd_tree,
-                TVM_GETNEXTITEM,
-                WPARAM(TVGN_NEXT as usize),
-                LPARAM(current.0),
-            )
-            .0,
-        );
-    }
-    items
-}
-
 fn select_first_root_if_needed(hwnd: HWND, hwnd_tree: HWND) {
     if hwnd_tree.0 == 0 {
         return;
@@ -1711,43 +2246,6 @@ fn select_first_root_if_needed(hwnd: HWND, hwnd_tree: HWND) {
         }
         with_rss_state(hwnd, |s| s.last_selected = first.0);
     }
-}
-
-fn apply_root_order(
-    hwnd: HWND,
-    hwnd_tree: HWND,
-    ordered_items: &[windows::Win32::UI::Controls::HTREEITEM],
-) {
-    for (i, hitem) in ordered_items.iter().enumerate() {
-        let mut item = TVITEMW {
-            mask: TVIF_PARAM,
-            lParam: LPARAM(i as isize),
-            ..Default::default()
-        };
-        item.hItem = *hitem;
-        crate::send_message_w_safe(
-            hwnd_tree,
-            TVM_SETITEMW,
-            WPARAM(0),
-            LPARAM(&mut item as *mut _ as isize),
-        );
-    }
-    with_rss_state(hwnd, |s| {
-        for (i, hitem) in ordered_items.iter().enumerate() {
-            s.node_data.insert(hitem.0, NodeData::Source(i));
-        }
-    });
-    let mut sort_cb = TVSORTCB {
-        hParent: TVI_ROOT,
-        lpfnCompare: Some(rss_tree_compare),
-        lParam: LPARAM(0),
-    };
-    crate::send_message_w_safe(
-        hwnd_tree,
-        TVM_SORTCHILDRENCB,
-        WPARAM(0),
-        LPARAM(&mut sort_cb as *mut _ as isize),
-    );
 }
 
 fn announce_rss_status(message: &str) {
@@ -2115,6 +2613,7 @@ fn apply_default_sources(
             title: title.clone(),
             url: url.clone(),
             kind: RssSourceType::Feed,
+            folder_path: Vec::new(),
             user_title: title.trim() != url.trim(),
             unread: false,
             cache: rss::RssFeedCache::default(),
@@ -2263,6 +2762,7 @@ struct RssWindowState {
     community_add_dialog: HWND,
     community_list_dialog: HWND,
     city_dialog: HWND,
+    folder_dialog: HWND,
     pending_local_category: isize,
 }
 
@@ -2279,6 +2779,13 @@ enum RssLastRemoved {
         item: RssItem,
         key: String,
         position: usize,
+    },
+    Folder {
+        path: Vec<String>,
+        sources: Vec<(usize, RssSource, Option<String>)>,
+        folders: Vec<Vec<String>>,
+        language: crate::settings::Language,
+        news_code: String,
     },
 }
 
@@ -2525,6 +3032,7 @@ fn google_news_local_url(code: &str, city: &str) -> String {
 enum NodeData {
     GoogleNewsRoot,
     GoogleNewsCategory(GoogleNewsCategory),
+    Folder(Vec<String>),
     Source(usize), // Index in settings
     Item(RssItem),
     LoadMore,
@@ -2539,6 +3047,12 @@ struct SourceItemsState {
 struct RssCityDialogState {
     parent: HWND,
     category_hitem: isize,
+    edit: HWND,
+}
+
+struct RssFolderDialogState {
+    parent: HWND,
+    base_path: Vec<String>,
     edit: HWND,
 }
 
@@ -2562,6 +3076,15 @@ fn with_rss_city_state<R>(
     callback: impl FnOnce(&mut RssCityDialogState) -> R,
 ) -> Option<R> {
     let pointer = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut RssCityDialogState;
+    crate::with_raw_mut_ptr_safe(pointer, callback)
+}
+
+fn with_rss_folder_state<R>(
+    hwnd: HWND,
+    callback: impl FnOnce(&mut RssFolderDialogState) -> R,
+) -> Option<R> {
+    let pointer =
+        crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA) as *mut RssFolderDialogState;
     crate::with_raw_mut_ptr_safe(pointer, callback)
 }
 
@@ -2821,6 +3344,339 @@ unsafe extern "system" fn rss_city_wndproc(
     }
 }
 
+fn selected_folder_creation_base(hwnd: HWND) -> Vec<String> {
+    let tree = with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
+    if tree.0 == 0 {
+        return Vec::new();
+    }
+    let selected = windows::Win32::UI::Controls::HTREEITEM(
+        crate::send_message_w_safe(
+            tree,
+            TVM_GETNEXTITEM,
+            WPARAM(TVGN_CARET as usize),
+            LPARAM(0),
+        )
+        .0,
+    );
+    if selected.0 == 0 {
+        return Vec::new();
+    }
+    with_rss_state(hwnd, |state| match state.node_data.get(&selected.0) {
+        Some(NodeData::Folder(path)) => path.clone(),
+        Some(NodeData::Source(index)) => with_state(state.parent, |parent_state| {
+            parent_state
+                .settings
+                .rss_sources
+                .get(*index)
+                .map(|source| source.folder_path.clone())
+                .unwrap_or_default()
+        })
+        .unwrap_or_default(),
+        _ => Vec::new(),
+    })
+    .unwrap_or_default()
+}
+
+fn select_folder_path(hwnd: HWND, path: &[String]) {
+    let target = with_rss_state(hwnd, |state| {
+        state
+            .node_data
+            .iter()
+            .find_map(|(handle, node)| match node {
+                NodeData::Folder(candidate) if candidate == path => Some(*handle),
+                _ => None,
+            })
+    })
+    .flatten();
+    let Some(handle) = target else {
+        return;
+    };
+    let tree = with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
+    if tree.0 == 0 {
+        return;
+    }
+    crate::send_message_w_safe(
+        tree,
+        TVM_SELECTITEM,
+        WPARAM(TVGN_CARET as usize),
+        LPARAM(handle),
+    );
+    crate::send_message_w_safe(tree, TVM_ENSUREVISIBLE, WPARAM(0), LPARAM(handle));
+    crate::set_focus_safe(tree);
+}
+
+fn show_create_rss_folder_dialog(rss_hwnd: HWND) {
+    let existing = with_rss_state(rss_hwnd, |state| state.folder_dialog).unwrap_or(HWND(0));
+    if existing.0 != 0 {
+        crate::set_foreground_window_safe(existing);
+        let edit = with_rss_folder_state(existing, |state| state.edit).unwrap_or(HWND(0));
+        if edit.0 != 0 {
+            crate::set_focus_safe(edit);
+        }
+        return;
+    }
+
+    let base_path = selected_folder_creation_base(rss_hwnd);
+    unsafe {
+        let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+        let class_name = to_wide(RSS_FOLDER_WINDOW_CLASS);
+        let window_class = WNDCLASSW {
+            hCursor: windows::Win32::UI::WindowsAndMessaging::LoadCursorW(
+                None,
+                windows::Win32::UI::WindowsAndMessaging::IDC_ARROW,
+            )
+            .unwrap_or_default(),
+            hInstance: hinstance,
+            lpszClassName: PCWSTR(class_name.as_ptr()),
+            lpfnWndProc: Some(rss_folder_wndproc),
+            hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+            ..Default::default()
+        };
+        RegisterClassW(&window_class);
+
+        let language = with_rss_state(rss_hwnd, |state| {
+            with_state(state.parent, |parent_state| parent_state.settings.language)
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+        let title = to_wide(&i18n::tr(language, "rss.folder.title"));
+        let init = Box::new((rss_hwnd, base_path));
+        let init_ptr = Box::into_raw(init);
+        let dialog = CreateWindowExW(
+            WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_POPUP | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            500,
+            190,
+            rss_hwnd,
+            None,
+            hinstance,
+            Some(init_ptr as *const _),
+        );
+        if dialog.0 == 0 {
+            let _unused_init = Box::from_raw(init_ptr);
+            return;
+        }
+        with_rss_state(rss_hwnd, |state| state.folder_dialog = dialog);
+        crate::enable_window_safe(rss_hwnd, false);
+        crate::set_foreground_window_safe(dialog);
+    }
+}
+
+unsafe extern "system" fn rss_folder_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    crate::panic_guard::guard(
+        "rss_folder_wndproc",
+        || crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam),
+        || rss_folder_wndproc_inner(hwnd, msg, wparam, lparam),
+    )
+}
+
+fn rss_folder_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*create).lpCreateParams as *mut (HWND, Vec<String>);
+                if init_ptr.is_null() {
+                    return LRESULT(-1);
+                }
+                let (parent, base_path) = *Box::from_raw(init_ptr);
+                let language = with_rss_state(parent, |state| {
+                    with_state(state.parent, |parent_state| parent_state.settings.language)
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+                let hinstance = HINSTANCE(GetModuleHandleW(None).unwrap_or_default().0);
+                let label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.folder.name")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    12,
+                    15,
+                    450,
+                    24,
+                    hwnd,
+                    None,
+                    hinstance,
+                    None,
+                );
+                let edit = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    w!("EDIT"),
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(ES_AUTOHSCROLL as u32),
+                    12,
+                    45,
+                    450,
+                    28,
+                    hwnd,
+                    HMENU(ID_FOLDER_EDIT as isize),
+                    hinstance,
+                    None,
+                );
+                let ok = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "common.ok")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    252,
+                    92,
+                    100,
+                    30,
+                    hwnd,
+                    HMENU(ID_FOLDER_OK as isize),
+                    hinstance,
+                    None,
+                );
+                let cancel = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(language, "common.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    362,
+                    92,
+                    100,
+                    30,
+                    hwnd,
+                    HMENU(ID_FOLDER_CANCEL as isize),
+                    hinstance,
+                    None,
+                );
+                for control in [edit, ok, cancel] {
+                    subclass_auxiliary_dialog_control(control);
+                }
+                let font = with_rss_state(parent, |state| {
+                    with_state(state.parent, |parent_state| parent_state.hfont).unwrap_or(HFONT(0))
+                })
+                .unwrap_or(HFONT(0));
+                if font.0 != 0 {
+                    for control in [label, edit, ok, cancel] {
+                        SendMessageW(control, WM_SETFONT, WPARAM(font.0 as usize), LPARAM(1));
+                    }
+                }
+                let state = Box::new(RssFolderDialogState {
+                    parent,
+                    base_path,
+                    edit,
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                SetFocus(edit);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let id = wparam.0 & 0xffff;
+                match id {
+                    ID_FOLDER_OK | 1 => {
+                        let Some((parent, base_path, edit)) =
+                            with_rss_folder_state(hwnd, |state| {
+                                (state.parent, state.base_path.clone(), state.edit)
+                            })
+                        else {
+                            return LRESULT(0);
+                        };
+                        let name = read_control_text(edit).trim().to_string();
+                        let language = with_rss_state(parent, |state| {
+                            with_state(state.parent, |parent_state| parent_state.settings.language)
+                                .unwrap_or_default()
+                        })
+                        .unwrap_or_default();
+                        if name.is_empty() {
+                            MessageBoxW(
+                                hwnd,
+                                PCWSTR(
+                                    to_wide(&i18n::tr(language, "rss.folder.required")).as_ptr(),
+                                ),
+                                PCWSTR(to_wide(&i18n::tr(language, "rss.folder.title")).as_ptr()),
+                                MB_OK | MB_ICONINFORMATION,
+                            );
+                            SetFocus(edit);
+                            return LRESULT(0);
+                        }
+                        let mut new_path = base_path;
+                        new_path.push(name);
+                        new_path = normalized_folder_path(&new_path);
+                        let app_parent =
+                            with_rss_state(parent, |state| state.parent).unwrap_or(HWND(0));
+                        let created = with_state(app_parent, |app_state| {
+                            let existing = rss_folder_paths_for_settings(&app_state.settings);
+                            if existing.contains(&new_path) {
+                                return false;
+                            }
+                            let code = active_news_language_code_from_state(app_state);
+                            let folders = app_state
+                                .settings
+                                .rss_folders_by_language
+                                .entry(code)
+                                .or_default();
+                            add_folder_path_with_parents(folders, &new_path);
+                            save_rss_settings(app_state);
+                            true
+                        })
+                        .unwrap_or(false);
+                        if !created {
+                            MessageBoxW(
+                                hwnd,
+                                PCWSTR(to_wide(&i18n::tr(language, "rss.folder.exists")).as_ptr()),
+                                PCWSTR(to_wide(&i18n::tr(language, "rss.folder.title")).as_ptr()),
+                                MB_OK | MB_ICONINFORMATION,
+                            );
+                            SetFocus(edit);
+                            return LRESULT(0);
+                        }
+                        reload_tree(parent);
+                        select_folder_path(parent, &new_path);
+                        announce_rss_status(&i18n::tr(language, "rss.folder.created"));
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        LRESULT(0)
+                    }
+                    ID_FOLDER_CANCEL | 2 => {
+                        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                        LRESULT(0)
+                    }
+                    _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+                }
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u16 == VK_ESCAPE.0 {
+                    crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_CLOSE => {
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let pointer = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut RssFolderDialogState;
+                if !pointer.is_null() {
+                    let state = Box::from_raw(pointer);
+                    let parent = state.parent;
+                    with_rss_state(parent, |rss_state| rss_state.folder_dialog = HWND(0));
+                    crate::enable_window_safe(parent, true);
+                    crate::set_foreground_window_safe(parent);
+                    let tree =
+                        with_rss_state(parent, |rss_state| rss_state.hwnd_tree).unwrap_or(HWND(0));
+                    if tree.0 != 0 {
+                        crate::set_focus_safe(tree);
+                    }
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
+    }
+}
+
 fn show_change_city_for_selected_category(hwnd: HWND) {
     let tree = with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
     if tree.0 == 0 {
@@ -2894,6 +3750,7 @@ static COMMUNITY_LIST_TAB_ORDER: [usize; 3] = [
     ID_COMMUNITY_LIST_ADD,
     ID_COMMUNITY_LIST_CLOSE,
 ];
+static FOLDER_DIALOG_TAB_ORDER: [usize; 3] = [ID_FOLDER_EDIT, ID_FOLDER_OK, ID_FOLDER_CANCEL];
 static RSS_MAIN_BUTTON_TAB_ORDER: [usize; 7] = [
     ID_BTN_ADD,
     ID_BTN_COMMUNITY_ADD,
@@ -2919,6 +3776,8 @@ fn auxiliary_dialog_navigation(id: usize) -> Option<(&'static [usize], usize, us
             ID_COMMUNITY_LIST_ADD,
             ID_COMMUNITY_LIST_CLOSE,
         ))
+    } else if FOLDER_DIALOG_TAB_ORDER.contains(&id) {
+        Some((&FOLDER_DIALOG_TAB_ORDER, ID_FOLDER_OK, ID_FOLDER_CANCEL))
     } else {
         None
     }
@@ -4088,6 +4947,7 @@ fn add_selected_community_source(hwnd: HWND) {
             title: source.name.clone(),
             url: source.url.clone(),
             kind: RssSourceType::Feed,
+            folder_path: Vec::new(),
             user_title: true,
             unread: false,
             cache: rss::RssFeedCache::default(),
@@ -4399,17 +5259,18 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
             return;
         }
 
-        let (is_source, source_index, article_item, local_google_category) =
+        let (is_source, source_index, folder_path, article_item, local_google_category) =
             with_rss_state(hwnd, |state| match state.node_data.get(&hitem.0) {
-                Some(NodeData::Source(index)) => (true, Some(*index), None, false),
-                Some(NodeData::Item(item)) => (false, None, Some(item.clone()), false),
+                Some(NodeData::Source(index)) => (true, Some(*index), None, None, false),
+                Some(NodeData::Folder(path)) => (false, None, Some(path.clone()), None, false),
+                Some(NodeData::Item(item)) => (false, None, None, Some(item.clone()), false),
                 Some(NodeData::GoogleNewsCategory(category)) if category.is_local => {
-                    (false, None, None, true)
+                    (false, None, None, None, true)
                 }
-                _ => (false, None, None, false),
+                _ => (false, None, None, None, false),
             })
-            .unwrap_or((false, None, None, false));
-        if !is_source && article_item.is_none() && !local_google_category {
+            .unwrap_or((false, None, None, None, false));
+        if !is_source && folder_path.is_none() && article_item.is_none() && !local_google_category {
             return;
         }
 
@@ -4427,6 +5288,8 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
         let reorder_top = i18n::tr(language, "rss.reorder.move_top");
         let reorder_bottom = i18n::tr(language, "rss.reorder.move_bottom");
         let reorder_position = i18n::tr(language, "rss.reorder.move_to_position");
+        let move_to_folder_label = i18n::tr(language, "rss.reorder.move_to_folder");
+        let main_folder_label = i18n::tr(language, "rss.folder.main");
         let sort_asc = i18n::tr(language, "rss.reorder.title_asc");
         let sort_desc = i18n::tr(language, "rss.reorder.title_desc");
         let sort_newest = i18n::tr(language, "rss.reorder.date_newest");
@@ -4440,6 +5303,7 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
         let select_articles_label = i18n::tr(language, "rss.context.select_articles");
         let properties_label = i18n::tr(language, "context.properties");
         let change_city_label = i18n::tr(language, "rss.city.change");
+        let create_folder_label = i18n::tr(language, "rss.context.create_folder");
         let undo_label = i18n::tr(language, "edit.undo")
             .split('\t')
             .next()
@@ -4471,12 +5335,43 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
                     ID_CTX_CHANGE_CITY,
                     PCWSTR(to_wide(&change_city_label).as_ptr()),
                 ) {}
+            } else if folder_path.is_some() {
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_CREATE_FOLDER,
+                    PCWSTR(to_wide(&create_folder_label).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_DELETE,
+                    PCWSTR(to_wide(&i18n::tr(language, "rss.folder.delete_title")).as_ptr()),
+                ) {}
+                if let Err(_e) = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null()) {}
+                let undo_flags = if has_undo {
+                    MF_STRING
+                } else {
+                    MF_STRING | MF_GRAYED
+                };
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    undo_flags,
+                    ID_CTX_UNDO_DELETE,
+                    PCWSTR(to_wide(&undo_label).as_ptr()),
+                ) {}
             } else if is_source {
                 let source_action_flags = if is_favorites_source_node {
                     MF_STRING | MF_GRAYED
                 } else {
                     MF_STRING
                 };
+                if let Err(_e) = AppendMenuW(
+                    menu,
+                    MF_STRING,
+                    ID_CTX_CREATE_FOLDER,
+                    PCWSTR(to_wide(&create_folder_label).as_ptr()),
+                ) {}
                 if let Err(_e) = AppendMenuW(
                     menu,
                     source_action_flags,
@@ -4514,13 +5409,20 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
                     PCWSTR(to_wide(&undo_label).as_ptr()),
                 ) {}
                 if let Some(idx) = source_index {
-                    let total = with_rss_state(hwnd, |s| {
-                        with_state(s.parent, |ps| ps.settings.rss_sources.len())
+                    let (position, total) = with_rss_state(hwnd, |s| {
+                        with_state(s.parent, |ps| {
+                            let siblings = source_sibling_indices(&ps.settings, idx);
+                            let position = siblings
+                                .iter()
+                                .position(|candidate| *candidate == idx)
+                                .unwrap_or(0);
+                            (position, siblings.len())
+                        })
                     })
                     .flatten()
-                    .unwrap_or(0);
-                    let at_top = idx == 0;
-                    let at_bottom = total == 0 || idx + 1 >= total;
+                    .unwrap_or((0, 0));
+                    let at_top = position == 0;
+                    let at_bottom = total == 0 || position + 1 >= total;
                     if let Ok(submenu) = CreatePopupMenu()
                         && submenu.0 != 0
                     {
@@ -4564,6 +5466,40 @@ fn show_rss_context_menu(hwnd: HWND, x: i32, y: i32, use_hit_test: bool) {
                             ID_CTX_REORDER_POSITION,
                             PCWSTR(to_wide(&reorder_position).as_ptr()),
                         ) {}
+                        if !is_favorites_source_node {
+                            let destinations = with_rss_state(hwnd, |state| {
+                                with_state(state.parent, |parent_state| {
+                                    move_folder_destinations(&parent_state.settings, idx)
+                                })
+                                .unwrap_or_default()
+                            })
+                            .unwrap_or_default();
+                            if !destinations.is_empty()
+                                && let Ok(folder_menu) = CreatePopupMenu()
+                                && folder_menu.0 != 0
+                            {
+                                for (destination_index, destination) in destinations
+                                    .iter()
+                                    .take(ID_CTX_MOVE_FOLDER_LIMIT)
+                                    .enumerate()
+                                {
+                                    let label =
+                                        folder_destination_label(destination, &main_folder_label);
+                                    if let Err(_e) = AppendMenuW(
+                                        folder_menu,
+                                        MF_STRING,
+                                        ID_CTX_MOVE_FOLDER_BASE + destination_index,
+                                        PCWSTR(to_wide(&label).as_ptr()),
+                                    ) {}
+                                }
+                                if let Err(_e) = AppendMenuW(
+                                    submenu,
+                                    MF_POPUP,
+                                    folder_menu.0 as usize,
+                                    PCWSTR(to_wide(&move_to_folder_label).as_ptr()),
+                                ) {}
+                            }
+                        }
                         if let Err(_e) = AppendMenuW(submenu, MF_SEPARATOR, 0, PCWSTR::null()) {}
                         if let Err(_e) = AppendMenuW(
                             submenu,
@@ -4741,6 +5677,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     community_add_dialog: HWND(0),
                     community_list_dialog: HWND(0),
                     city_dialog: HWND(0),
+                    folder_dialog: HWND(0),
                     pending_local_category: 0,
                 });
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
@@ -5054,6 +5991,14 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
 
                         LRESULT(0)
                     }
+                    id if (ID_CTX_MOVE_FOLDER_BASE..=ID_CTX_MOVE_FOLDER_END).contains(&id) => {
+                        handle_move_source_to_folder(hwnd, id - ID_CTX_MOVE_FOLDER_BASE);
+                        LRESULT(0)
+                    }
+                    ID_CTX_CREATE_FOLDER => {
+                        show_create_rss_folder_dialog(hwnd);
+                        LRESULT(0)
+                    }
                     ID_CTX_EDIT => {
                         handle_edit_source(hwnd);
                         LRESULT(0)
@@ -5222,6 +6167,7 @@ fn rss_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                                 title: title.clone(),
                                 url: url.clone(),
                                 kind: RssSourceType::Site,
+                                folder_path: Vec::new(),
                                 user_title: title.trim() != url.trim(),
                                 unread: false,
                                 cache: rss::RssFeedCache::default(),
@@ -6343,12 +7289,68 @@ fn create_controls(hwnd: HWND) {
     }
 }
 
+fn ensure_folder_tree_path(
+    hwnd: HWND,
+    hwnd_tree: HWND,
+    folder_handles: &mut HashMap<Vec<String>, windows::Win32::UI::Controls::HTREEITEM>,
+    path: &[String],
+) -> windows::Win32::UI::Controls::HTREEITEM {
+    let mut parent_hitem = TVI_ROOT;
+    let mut current_path = Vec::new();
+    for part in path {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        current_path.push(part.to_string());
+        if let Some(existing) = folder_handles.get(&current_path) {
+            parent_hitem = *existing;
+            continue;
+        }
+        let text = to_wide(part);
+        let mut insert = TVINSERTSTRUCTW {
+            hParent: parent_hitem,
+            hInsertAfter: TVI_LAST,
+            Anonymous: TVINSERTSTRUCTW_0 {
+                item: TVITEMW {
+                    mask: TVIF_TEXT | TVIF_PARAM,
+                    pszText: windows::core::PWSTR(text.as_ptr() as *mut _),
+                    lParam: LPARAM(-2),
+                    ..Default::default()
+                },
+            },
+        };
+        let folder_hitem = windows::Win32::UI::Controls::HTREEITEM(
+            crate::send_message_w_safe(
+                hwnd_tree,
+                TVM_INSERTITEMW,
+                WPARAM(0),
+                LPARAM(&mut insert as *mut _ as isize),
+            )
+            .0,
+        );
+        if folder_hitem.0 == 0 {
+            continue;
+        }
+        let stored_path = current_path.clone();
+        with_rss_state(hwnd, |state| {
+            state
+                .node_data
+                .insert(folder_hitem.0, NodeData::Folder(stored_path));
+        });
+        folder_handles.insert(current_path.clone(), folder_hitem);
+        parent_hitem = folder_hitem;
+    }
+    parent_hitem
+}
+
 fn reload_tree(hwnd: HWND) {
-    let (hwnd_tree, sources, language, announce_unread, unread_label_position) =
+    let (hwnd_tree, sources, folders, language, announce_unread, unread_label_position) =
         match with_rss_state(hwnd, |s| {
             (
                 s.hwnd_tree,
                 { with_state(s.parent, |ps| ps.settings.rss_sources.clone()) },
+                { with_state(s.parent, |ps| rss_folder_paths_for_settings(&ps.settings)) },
                 { with_state(s.parent, |ps| ps.settings.language) },
                 { with_state(s.parent, |ps| ps.settings.announce_unread_rss_podcast_items) },
                 { with_state(s.parent, |ps| ps.settings.rss_podcast_unread_label_position) },
@@ -6357,10 +7359,18 @@ fn reload_tree(hwnd: HWND) {
             Some((
                 t,
                 Some(src),
+                Some(folders),
                 Some(language),
                 Some(announce_unread),
                 Some(unread_label_position),
-            )) => (t, src, language, announce_unread, unread_label_position),
+            )) => (
+                t,
+                src,
+                folders,
+                language,
+                announce_unread,
+                unread_label_position,
+            ),
             _ => return,
         };
 
@@ -6400,7 +7410,15 @@ fn reload_tree(hwnd: HWND) {
             .insert(google_hitem.0, NodeData::GoogleNewsRoot);
     });
 
+    let mut folder_handles: HashMap<Vec<String>, windows::Win32::UI::Controls::HTREEITEM> =
+        HashMap::new();
+    for folder_path in &folders {
+        ensure_folder_tree_path(hwnd, hwnd_tree, &mut folder_handles, folder_path);
+    }
     for (i, source) in sources.into_iter().enumerate() {
+        let parent_hitem =
+            ensure_folder_tree_path(hwnd, hwnd_tree, &mut folder_handles, &source.folder_path);
+
         let title = to_wide(&rss_source_display_title(
             &source,
             language,
@@ -6408,7 +7426,7 @@ fn reload_tree(hwnd: HWND) {
             unread_label_position,
         ));
         let mut tvis = TVINSERTSTRUCTW {
-            hParent: TVI_ROOT,
+            hParent: parent_hitem,
             hInsertAfter: TVI_LAST,
             Anonymous: TVINSERTSTRUCTW_0 {
                 item: TVITEMW {
@@ -6779,6 +7797,7 @@ fn handle_expand(hwnd: HWND, hitem: windows::Win32::UI::Controls::HTREEITEM) {
             populate_google_news_categories(hwnd, hitem);
             return;
         }
+        Some(NodeData::Folder(_)) => return,
         Some(NodeData::Item(item)) if !item.related_items.is_empty() => {
             populate_related_article_nodes(hwnd, hitem, item);
             return;
@@ -7984,6 +9003,178 @@ fn handle_select_articles(hwnd: HWND) {
     }
 }
 
+fn removed_default_list_mut(
+    settings: &mut crate::settings::AppSettings,
+    language: crate::settings::Language,
+) -> &mut Vec<String> {
+    match language {
+        crate::settings::Language::German => &mut settings.rss_removed_default_de,
+        crate::settings::Language::Italian => &mut settings.rss_removed_default_it,
+        crate::settings::Language::Spanish => &mut settings.rss_removed_default_es,
+        crate::settings::Language::Portuguese => &mut settings.rss_removed_default_pt,
+        crate::settings::Language::PortugueseBrazilian => &mut settings.rss_removed_default_pt_br,
+        crate::settings::Language::Vietnamese => &mut settings.rss_removed_default_vi,
+        crate::settings::Language::Czech => &mut settings.rss_removed_default_cs,
+        crate::settings::Language::Polish => &mut settings.rss_removed_default_pl,
+        crate::settings::Language::French => &mut settings.rss_removed_default_fr,
+        crate::settings::Language::Serbian => &mut settings.rss_removed_default_sr,
+        crate::settings::Language::Hindi => &mut settings.rss_removed_default_hi,
+        crate::settings::Language::English
+        | crate::settings::Language::Swedish
+        | crate::settings::Language::Ukrainian
+        | crate::settings::Language::Lithuanian
+        | crate::settings::Language::Russian
+        | crate::settings::Language::Chinese => &mut settings.rss_removed_default_en,
+    }
+}
+
+fn mark_default_rss_source_removed(
+    settings: &mut crate::settings::AppSettings,
+    language: crate::settings::Language,
+    url: &str,
+) -> Option<String> {
+    let key = normalize_rss_url_key(url);
+    if key.is_empty() {
+        return None;
+    }
+    let is_default = load_default_feeds(language)
+        .into_iter()
+        .any(|(_title, default_url)| normalize_rss_url_key(&default_url) == key);
+    if !is_default {
+        return None;
+    }
+    let removed = removed_default_list_mut(settings, language);
+    if removed
+        .iter()
+        .any(|existing| normalize_rss_url_key(existing) == key)
+    {
+        return None;
+    }
+    removed.push(key.clone());
+    Some(key)
+}
+
+fn unmark_default_rss_source_removed(
+    settings: &mut crate::settings::AppSettings,
+    language: crate::settings::Language,
+    key: &str,
+) {
+    let removed = removed_default_list_mut(settings, language);
+    removed.retain(|url| normalize_rss_url_key(url) != key);
+}
+
+fn handle_delete_folder(hwnd: HWND, folder_path: Vec<String>) {
+    let folder_path = normalized_folder_path(&folder_path);
+    if folder_path.is_empty() {
+        return;
+    }
+    let parent = with_rss_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+    let (language, news_code, news_language, source_count) = with_state(parent, |state| {
+        let code = active_news_language_code_from_state(state);
+        let count = state
+            .settings
+            .rss_sources
+            .iter()
+            .filter(|source| source.folder_path.starts_with(folder_path.as_slice()))
+            .count();
+        (
+            state.settings.language,
+            code.clone(),
+            news_language_as_app_language(&code),
+            count,
+        )
+    })
+    .unwrap_or((
+        crate::settings::Language::default(),
+        String::new(),
+        crate::settings::Language::default(),
+        0,
+    ));
+    let folder_name = folder_path.last().cloned().unwrap_or_default();
+    let message = i18n::tr(language, "rss.folder.delete_confirm")
+        .replace("{title}", &folder_name)
+        .replace("{count}", &source_count.to_string());
+    let caption = i18n::tr(language, "rss.folder.delete_title");
+    let confirmed = unsafe {
+        MessageBoxW(
+            hwnd,
+            PCWSTR(to_wide(&message).as_ptr()),
+            PCWSTR(to_wide(&caption).as_ptr()),
+            MB_YESNOCANCEL | MB_ICONQUESTION,
+        ) == IDYES
+    };
+    if !confirmed {
+        return;
+    }
+
+    let removed = with_state(parent, |state| {
+        let stored_folders = state
+            .settings
+            .rss_folders_by_language
+            .get(&news_code)
+            .cloned()
+            .unwrap_or_default();
+        let folders = stored_folders
+            .into_iter()
+            .filter(|path| path.starts_with(folder_path.as_slice()))
+            .collect::<Vec<_>>();
+        let candidates = state
+            .settings
+            .rss_sources
+            .iter()
+            .enumerate()
+            .filter(|(_index, source)| source.folder_path.starts_with(folder_path.as_slice()))
+            .map(|(index, source)| (index, source.clone()))
+            .collect::<Vec<_>>();
+        let mut sources = Vec::with_capacity(candidates.len());
+        for (index, source) in candidates {
+            let default_key =
+                mark_default_rss_source_removed(&mut state.settings, news_language, &source.url);
+            sources.push((index, source, default_key));
+        }
+        state
+            .settings
+            .rss_sources
+            .retain(|source| !source.folder_path.starts_with(folder_path.as_slice()));
+        if let Some(active_folders) = state.settings.rss_folders_by_language.get_mut(&news_code) {
+            active_folders.retain(|path| !path.starts_with(folder_path.as_slice()));
+        }
+        save_rss_settings(state);
+        (sources, folders)
+    });
+    let Some((sources, folders)) = removed else {
+        return;
+    };
+
+    with_rss_state(hwnd, |state| {
+        state.removed_history.push(RssLastRemoved::Folder {
+            path: folder_path,
+            sources,
+            folders,
+            language: news_language,
+            news_code,
+        });
+        state.suppress_tree_selection_events = true;
+    });
+    let tree = with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
+    if tree.0 != 0 {
+        crate::send_message_w_safe(tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+    }
+    reload_tree(hwnd);
+    if tree.0 != 0 {
+        crate::send_message_w_safe(tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+        with_rss_state(hwnd, |state| state.suppress_tree_selection_events = false);
+        select_first_root_if_needed(hwnd, tree);
+        crate::set_focus_safe(tree);
+    } else {
+        with_rss_state(hwnd, |state| state.suppress_tree_selection_events = false);
+    }
+    announce_rss_status(&i18n::tr(language, "rss.folder.deleted"));
+}
+
 fn handle_delete(hwnd: HWND) {
     unsafe {
         let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
@@ -8001,6 +9192,11 @@ fn handle_delete(hwnd: HWND) {
         }
 
         let selected_node = with_rss_state(hwnd, |s| s.node_data.get(&hitem.0).cloned()).flatten();
+
+        if let Some(NodeData::Folder(folder_path)) = selected_node.as_ref() {
+            handle_delete_folder(hwnd, folder_path.clone());
+            return;
+        }
 
         if let Some(NodeData::Source(idx)) = selected_node {
             let source_info = with_rss_state(hwnd, |s| {
@@ -8418,6 +9614,76 @@ fn undo_last_delete(hwnd: HWND) {
                     with_rss_state(hwnd, |s| s.suppress_tree_selection_events = false);
                 }
                 schedule_delayed_source_select(hwnd, restored_index);
+            }
+            RssLastRemoved::Folder {
+                path,
+                mut sources,
+                folders,
+                language,
+                news_code,
+            } => {
+                let parent = with_rss_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+                if parent.0 == 0 {
+                    return;
+                }
+                sources.sort_by_key(|(index, _source, _key)| *index);
+                let default_keys = sources
+                    .iter()
+                    .filter_map(|(_index, _source, key)| key.clone())
+                    .collect::<Vec<_>>();
+                let restored_to_active = with_state(parent, |state| {
+                    let active_code = active_news_language_code_from_state(state);
+                    if active_code == news_code {
+                        for (index, source, _default_key) in sources {
+                            let insert_at = index.min(state.settings.rss_sources.len());
+                            state.settings.rss_sources.insert(insert_at, source);
+                        }
+                    } else {
+                        let bucket = state
+                            .settings
+                            .rss_sources_by_language
+                            .entry(news_code.clone())
+                            .or_default();
+                        for (index, source, _default_key) in sources {
+                            let insert_at = index.min(bucket.len());
+                            bucket.insert(insert_at, source);
+                        }
+                    }
+                    for key in default_keys {
+                        unmark_default_rss_source_removed(&mut state.settings, language, &key);
+                    }
+                    let folder_bucket = state
+                        .settings
+                        .rss_folders_by_language
+                        .entry(news_code.clone())
+                        .or_default();
+                    for folder in folders {
+                        add_folder_path_with_parents(folder_bucket, &folder);
+                    }
+                    add_folder_path_with_parents(folder_bucket, &path);
+                    save_rss_settings(state);
+                    active_code == news_code
+                })
+                .unwrap_or(false);
+
+                if restored_to_active {
+                    let tree = with_rss_state(hwnd, |state| state.hwnd_tree).unwrap_or(HWND(0));
+                    with_rss_state(hwnd, |state| state.suppress_tree_selection_events = true);
+                    if tree.0 != 0 {
+                        SendMessageW(tree, WM_SETREDRAW, WPARAM(0), LPARAM(0));
+                    }
+                    reload_tree(hwnd);
+                    if tree.0 != 0 {
+                        SendMessageW(tree, WM_SETREDRAW, WPARAM(1), LPARAM(0));
+                        with_rss_state(hwnd, |state| state.suppress_tree_selection_events = false);
+                        select_folder_path(hwnd, &path);
+                    } else {
+                        with_rss_state(hwnd, |state| state.suppress_tree_selection_events = false);
+                    }
+                }
+                let ui_language =
+                    with_state(parent, |state| state.settings.language).unwrap_or_default();
+                announce_rss_status(&i18n::tr(ui_language, "rss.folder.restored"));
             }
             RssLastRemoved::Item {
                 source_index,
@@ -8846,54 +10112,191 @@ fn selected_source_index(hwnd: HWND) -> Option<usize> {
     .flatten()
 }
 
+fn source_sibling_indices(
+    settings: &crate::settings::AppSettings,
+    source_index: usize,
+) -> Vec<usize> {
+    let Some(source) = settings.rss_sources.get(source_index) else {
+        return Vec::new();
+    };
+    let folder_path = &source.folder_path;
+    settings
+        .rss_sources
+        .iter()
+        .enumerate()
+        .filter_map(|(index, candidate)| {
+            if candidate.folder_path == *folder_path {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn move_folder_destinations(
+    settings: &crate::settings::AppSettings,
+    source_index: usize,
+) -> Vec<Vec<String>> {
+    let Some(source) = settings.rss_sources.get(source_index) else {
+        return Vec::new();
+    };
+    let current_path = normalized_folder_path(&source.folder_path);
+    let mut destinations = Vec::new();
+    if !current_path.is_empty() {
+        destinations.push(Vec::new());
+    }
+
+    let mut folders = rss_folder_paths_for_settings(settings)
+        .into_iter()
+        .map(|path| normalized_folder_path(&path))
+        .filter(|path| !path.is_empty() && *path != current_path)
+        .collect::<Vec<_>>();
+    folders.sort_by_key(|path| {
+        path.iter()
+            .map(|part| part.to_lowercase())
+            .collect::<Vec<_>>()
+            .join("\u{0}")
+    });
+    folders.dedup();
+    destinations.extend(folders);
+    destinations
+}
+
+fn move_rss_source_to_folder(
+    settings: &mut crate::settings::AppSettings,
+    source_index: usize,
+    destination_path: &[String],
+) -> Option<usize> {
+    let destination_path = normalized_folder_path(destination_path);
+    let current_path = settings
+        .rss_sources
+        .get(source_index)
+        .map(|source| normalized_folder_path(&source.folder_path))?;
+    if current_path == destination_path {
+        return Some(source_index);
+    }
+
+    let mut moved_source = settings.rss_sources.remove(source_index);
+    moved_source.folder_path = destination_path.clone();
+    let insert_at = settings
+        .rss_sources
+        .iter()
+        .rposition(|source| normalized_folder_path(&source.folder_path) == destination_path)
+        .map(|index| index + 1)
+        .unwrap_or(settings.rss_sources.len());
+    settings.rss_sources.insert(insert_at, moved_source);
+    Some(insert_at)
+}
+
+fn folder_destination_label(path: &[String], main_folder_label: &str) -> String {
+    if path.is_empty() {
+        main_folder_label.to_string()
+    } else {
+        path.join(" > ")
+    }
+}
+
+fn reorder_rss_source_within_folder(
+    settings: &mut crate::settings::AppSettings,
+    source_index: usize,
+    action: ReorderAction,
+    target_position: usize,
+) -> Option<usize> {
+    let sibling_indices = source_sibling_indices(settings, source_index);
+    let current_position = sibling_indices
+        .iter()
+        .position(|index| *index == source_index)?;
+    if sibling_indices.is_empty() {
+        return None;
+    }
+    let destination_position = match action {
+        ReorderAction::Up => current_position.saturating_sub(1),
+        ReorderAction::Down => (current_position + 1).min(sibling_indices.len() - 1),
+        ReorderAction::Top => 0,
+        ReorderAction::Bottom => sibling_indices.len() - 1,
+        ReorderAction::Position => target_position.min(sibling_indices.len() - 1),
+    };
+    if destination_position == current_position {
+        return Some(source_index);
+    }
+
+    let mut siblings = sibling_indices
+        .iter()
+        .filter_map(|index| settings.rss_sources.get(*index).cloned())
+        .collect::<Vec<_>>();
+    if siblings.len() != sibling_indices.len() {
+        return None;
+    }
+    let moved_source = siblings.remove(current_position);
+    siblings.insert(destination_position, moved_source);
+    for (slot, source) in sibling_indices.iter().zip(siblings) {
+        settings.rss_sources[*slot] = source;
+    }
+    Some(sibling_indices[destination_position])
+}
+
 fn apply_reorder_action(
     hwnd: HWND,
     source_index: usize,
     action: ReorderAction,
-    target_index: usize,
+    target_position: usize,
 ) -> Option<usize> {
-    let hwnd_tree = with_rss_state(hwnd, |s| s.hwnd_tree).unwrap_or(HWND(0));
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
-    if hwnd_tree.0 == 0 || parent.0 == 0 {
+    if parent.0 == 0 {
         return None;
     }
-    let mut root_items = collect_source_root_items(hwnd, hwnd_tree);
-    if source_index >= root_items.len() {
-        return None;
-    }
-    let new_index = {
-        with_state(parent, |ps| {
-            let moved = match action {
-                ReorderAction::Up => {
-                    crate::settings::move_rss_feed_up(&mut ps.settings, source_index)
-                }
-                ReorderAction::Down => {
-                    crate::settings::move_rss_feed_down(&mut ps.settings, source_index)
-                }
-                ReorderAction::Top => {
-                    crate::settings::move_rss_feed_to_top(&mut ps.settings, source_index)
-                }
-                ReorderAction::Bottom => {
-                    crate::settings::move_rss_feed_to_bottom(&mut ps.settings, source_index)
-                }
-                ReorderAction::Position => crate::settings::move_rss_feed_to_index(
-                    &mut ps.settings,
-                    source_index,
-                    target_index,
-                ),
-            };
-            if moved.is_some() {
-                save_rss_settings(ps);
-            }
-            moved
-        })
-        .flatten()
-    };
-    let new_index = new_index?;
-    if move_vec_to_index(&mut root_items, source_index, new_index) {
-        apply_root_order(hwnd, hwnd_tree, &root_items);
-    }
+    let new_index = with_state(parent, |ps| {
+        let new_index = reorder_rss_source_within_folder(
+            &mut ps.settings,
+            source_index,
+            action,
+            target_position,
+        );
+        if new_index.is_some() {
+            save_rss_settings(ps);
+        }
+        new_index
+    })
+    .flatten()?;
+
+    reload_tree(hwnd);
+    schedule_delayed_source_select(hwnd, new_index);
     Some(new_index)
+}
+
+fn handle_move_source_to_folder(hwnd: HWND, destination_index: usize) {
+    let Some(source_index) = selected_source_index(hwnd) else {
+        return;
+    };
+    let parent = with_rss_state(hwnd, |state| state.parent).unwrap_or(HWND(0));
+    if parent.0 == 0 {
+        return;
+    }
+    let destination = with_state(parent, |state| {
+        move_folder_destinations(&state.settings, source_index)
+            .get(destination_index)
+            .cloned()
+    })
+    .flatten();
+    let Some(destination) = destination else {
+        return;
+    };
+
+    let new_index = with_state(parent, |state| {
+        let new_index = move_rss_source_to_folder(&mut state.settings, source_index, &destination);
+        if new_index.is_some() {
+            save_rss_settings(state);
+        }
+        new_index
+    })
+    .flatten();
+    let Some(new_index) = new_index else {
+        return;
+    };
+
+    reload_tree(hwnd);
+    select_source_by_index(hwnd, new_index);
 }
 
 fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
@@ -8902,7 +10305,10 @@ fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
     };
     let parent = with_rss_state(hwnd, |s| s.parent).unwrap_or(HWND(0));
     let language = { with_state(parent, |ps| ps.settings.language) }.unwrap_or_default();
-    let total = { with_state(parent, |ps| ps.settings.rss_sources.len()) }.unwrap_or(0);
+    let total = with_state(parent, |ps| {
+        source_sibling_indices(&ps.settings, source_index).len()
+    })
+    .unwrap_or(0);
     if total == 0 {
         return;
     }
@@ -8920,8 +10326,16 @@ fn handle_reorder_action(hwnd: HWND, action: ReorderAction) {
     if let Some(new_index) = new_index
         && new_index != source_index
     {
+        let position = with_state(parent, |ps| {
+            source_sibling_indices(&ps.settings, new_index)
+                .iter()
+                .position(|index| *index == new_index)
+                .map(|value| value + 1)
+        })
+        .flatten()
+        .unwrap_or(1);
         let template = i18n::tr(language, "rss.reorder.moved_position");
-        let message = template.replace("{x}", &(new_index + 1).to_string());
+        let message = template.replace("{x}", &position.to_string());
         announce_rss_status(&message);
     }
 }
@@ -9310,6 +10724,11 @@ fn insert_favorites_source_node_without_reload(
             match removed {
                 RssLastRemoved::Source { index, .. } => *index += 1,
                 RssLastRemoved::Item { source_index, .. } => *source_index += 1,
+                RssLastRemoved::Folder { sources, .. } => {
+                    for (index, _source, _key) in sources {
+                        *index += 1;
+                    }
+                }
             }
         }
     });

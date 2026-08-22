@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "Переместить в конец",
   "rss.reorder.move_down": "Переместить вниз\tCtrl+Shift+Стрелка вниз",
   "rss.reorder.move_to_position": "Переместить на позицию...",
+  "rss.reorder.move_to_folder": "Переместить в папку",
+  "rss.folder.main": "Главная папка",
   "rss.reorder.move_top": "Переместить в начало",
   "rss.reorder.move_up": "Переместить вверх\tCtrl+Shift+Стрелка вверх",
   "rss.reorder.moved_position": "Перемещено на позицию {x}",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "Искать описания:",
   "audio_description.project.search_button": "Искать",
   "audio_description.overload.title": "Gemini временно перегружен",
-  "audio_description.overload.message": "Модель {model} получает слишком много запросов, и Gemini несколько раз вернул 503 UNAVAILABLE. Продолжить ожидание?\n\nЕсли выбрать Да, Sonarpad будет повторять запрос без ограничений каждые 5 секунд, пока Gemini не ответит или вы не отмените вручную. Уже выполненная работа останется сохранённой.\n\nПодробности: {error}"
+  "audio_description.overload.message": "Модель {model} получает слишком много запросов, и Gemini несколько раз вернул 503 UNAVAILABLE. Продолжить ожидание?\n\nЕсли выбрать Да, Sonarpad будет повторять запрос без ограничений каждые 5 секунд, пока Gemini не ответит или вы не отмените вручную. Уже выполненная работа останется сохранённой.\n\nПодробности: {error}",
+  "rss.context.create_folder": "Создать новую папку",
+  "rss.folder.title": "Создать новую папку",
+  "rss.folder.name": "Имя папки:",
+  "rss.folder.required": "Введите имя папки.",
+  "rss.folder.exists": "Папка с таким именем уже существует в этом месте.",
+  "rss.folder.created": "Папка создана",
+  "rss.folder.delete_title": "Удалить папку",
+  "rss.folder.delete_confirm": "Удалить папку «{title}» и её RSS-ленты ({count})?",
+  "rss.folder.deleted": "Папка удалена",
+  "rss.folder.restored": "Папка восстановлена"
 }

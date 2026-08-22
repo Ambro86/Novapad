@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "Przesuń na dół",
   "rss.reorder.move_down": "Przesuń w dół\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "Przesuń na pozycję...",
+  "rss.reorder.move_to_folder": "Przenieś do folderu",
+  "rss.folder.main": "Folder główny",
   "rss.reorder.move_top": "Przesuń na górę",
   "rss.reorder.move_up": "Przesuń w górę\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "Przesunięto na pozycję {x}",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "Szukaj opisów:",
   "audio_description.project.search_button": "Szukaj",
   "audio_description.overload.title": "Gemini jest tymczasowo przeciążony",
-  "audio_description.overload.message": "Model {model} otrzymuje zbyt wiele żądań i Gemini wielokrotnie zwrócił 503 UNAVAILABLE. Czy chcesz nadal czekać?\n\nJeśli wybierzesz Tak, Sonarpad będzie ponawiał próbę bez limitu co 5 sekund, aż Gemini odpowie lub ręcznie anulujesz. Ukończona praca pozostanie zapisana.\n\nSzczegóły: {error}"
+  "audio_description.overload.message": "Model {model} otrzymuje zbyt wiele żądań i Gemini wielokrotnie zwrócił 503 UNAVAILABLE. Czy chcesz nadal czekać?\n\nJeśli wybierzesz Tak, Sonarpad będzie ponawiał próbę bez limitu co 5 sekund, aż Gemini odpowie lub ręcznie anulujesz. Ukończona praca pozostanie zapisana.\n\nSzczegóły: {error}",
+  "rss.context.create_folder": "Utwórz nowy folder",
+  "rss.folder.title": "Utwórz nowy folder",
+  "rss.folder.name": "Nazwa folderu:",
+  "rss.folder.required": "Wpisz nazwę folderu.",
+  "rss.folder.exists": "Folder o tej nazwie już istnieje w tym miejscu.",
+  "rss.folder.created": "Folder utworzony",
+  "rss.folder.delete_title": "Usuń folder",
+  "rss.folder.delete_confirm": "Usunąć folder „{title}” i jego kanały RSS ({count})?",
+  "rss.folder.deleted": "Folder usunięty",
+  "rss.folder.restored": "Folder przywrócony"
 }

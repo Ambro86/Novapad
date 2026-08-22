@@ -7,6 +7,9 @@ TV guide
 
 RSS and articles
 • Added “Select articles…” to the RSS article context menu. It opens the same accessible checkbox selection window used for playlist downloads: use Space to select or deselect multiple articles, press Tab to reach Delete, then remove all selected articles in one operation.
+• RSS now supports real folders. Nested OPML `<outline>` containers are preserved during import instead of being flattened, existing feeds are moved into the imported folders without duplication, and OPML export keeps the same folder hierarchy, including empty folders.
+• Added the localized “Create new folder” command to the RSS context menu with an accessible name dialog. Folder nodes use the native tree behavior: Right Arrow expands, Left Arrow collapses; deleting a folder removes its complete branch and Ctrl+Z restores the folder, subfolders and all contained feeds in one operation.
+• RSS feeds can now be reordered inside their current folder with Move up, Move down, Move to top, Move to bottom and Move to position; reordering never moves a feed outside its folder.
 
 TV recordings and audio descriptions
 • Improved Gemini timestamp robustness for audio descriptions: malformed `MM:SS:ms` timestamps such as `01:13:473` are now normalized losslessly to `MM:SS.ms` before validation, while the existing chunk/slot range audits still reject timestamps that do not belong to the current scene.

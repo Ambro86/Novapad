@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "Pomeri na dno.",
   "rss.reorder.move_down": "Pomeri nadole.\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "Pomeri na poziciju…",
+  "rss.reorder.move_to_folder": "Premesti u fasciklu",
+  "rss.folder.main": "Glavna fascikla",
   "rss.reorder.move_top": "Pomeri na vrh.",
   "rss.reorder.move_up": "Pomeri nagore.\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "Premešteno na poziciju {x}",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "Претражи описе:",
   "audio_description.project.search_button": "Претражи",
   "audio_description.overload.title": "Gemini је привремено преоптерећен",
-  "audio_description.overload.message": "Модел {model} прима превише захтева и Gemini је више пута вратио 503 UNAVAILABLE. Желите ли да наставите да чекате?\n\nАко изаберете Да, Sonarpad ће покушавати неограничено на сваких 5 секунди док Gemini не одговори или ручно не откажете. Већ завршен рад остаје сачуван.\n\nДетаљи: {error}"
+  "audio_description.overload.message": "Модел {model} прима превише захтева и Gemini је више пута вратио 503 UNAVAILABLE. Желите ли да наставите да чекате?\n\nАко изаберете Да, Sonarpad ће покушавати неограничено на сваких 5 секунди док Gemini не одговори или ручно не откажете. Већ завршен рад остаје сачуван.\n\nДетаљи: {error}",
+  "rss.context.create_folder": "Kreiraj novu fasciklu",
+  "rss.folder.title": "Kreiraj novu fasciklu",
+  "rss.folder.name": "Naziv fascikle:",
+  "rss.folder.required": "Unesite naziv fascikle.",
+  "rss.folder.exists": "Fascikla sa ovim nazivom već postoji na ovom mestu.",
+  "rss.folder.created": "Fascikla je kreirana",
+  "rss.folder.delete_title": "Obriši fasciklu",
+  "rss.folder.delete_confirm": "Obrisati fasciklu „{title}“ i njenih {count} RSS izvora?",
+  "rss.folder.deleted": "Fascikla je obrisana",
+  "rss.folder.restored": "Fascikla je vraćena"
 }

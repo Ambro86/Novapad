@@ -7,6 +7,9 @@ Version 0.8.5 – 2026-07-25
 
 RSS और लेख
 • RSS लेखों के संदर्भ मेनू में “लेख चुनें…” जोड़ा गया है। यह playlist download में उपयोग होने वाली उसी सुलभ checkbox चयन विंडो को खोलता है: Space से कई लेख चुनें या चयन हटाएँ, Tab से हटाएँ बटन तक जाएँ और सभी चुने हुए लेख एक ही कार्रवाई में हटाएँ।
+• RSS अब वास्तविक फ़ोल्डरों का समर्थन करता है। OPML आयात करते समय nested `<outline>` containers को flat list में बदलने के बजाय सुरक्षित रखा जाता है, पहले से मौजूद feeds को बिना duplicate बनाए imported folders में रखा जाता है और OPML export वही folder hierarchy बनाए रखता है, जिसमें खाली folders भी शामिल हैं।
+• RSS context menu में localized “नया फ़ोल्डर बनाएँ” command जोड़ा गया है, जिसमें नाम लिखने के लिए accessible dialog है। Folder nodes native tree behavior का उपयोग करते हैं: Right Arrow विस्तार करता है, Left Arrow समेटता है; किसी folder को हटाने पर उसकी पूरी branch हटती है और Ctrl+Z एक ही operation में folder, subfolders और सभी feeds को पुनर्स्थापित करता है।
+• RSS feeds को अब वर्तमान folder के भीतर Move up, Move down, Move to top, Move to bottom और Move to position से पुनः क्रमित किया जा सकता है; reordering किसी feed को उसके folder से बाहर नहीं ले जाता।
 
 ई-बुक प्रारूप
 • DRM-रहित Kindle पुस्तकों के लिए MOBI, AZW और AZW3 आयात जोड़ा गया है, जिसमें uncompressed, PalmDOC और HUFF/CDIC text streams तथा MOBI 6/KF8/AZW3 variants शामिल हैं। Text, chapters और headings Sonarpad document index में उपलब्ध हैं।

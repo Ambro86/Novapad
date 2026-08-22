@@ -1642,6 +1642,8 @@
   "rss.reorder.move_bottom": "Mover para o fundo",
   "rss.reorder.move_down": "Descer\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "Mover para a posição...",
+  "rss.reorder.move_to_folder": "Mover para a pasta",
+  "rss.folder.main": "Pasta principal",
   "rss.reorder.move_top": "Mover para o topo",
   "rss.reorder.move_up": "Subir\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "Movido para a posição {x}",
@@ -2147,5 +2149,15 @@
   "audio_description.project.search": "Pesquisar descrições:",
   "audio_description.project.search_button": "Pesquisar",
   "audio_description.overload.title": "Gemini temporariamente sobrecarregado",
-  "audio_description.overload.message": "O modelo {model} está recebendo solicitações demais e o Gemini retornou repetidamente 503 UNAVAILABLE. Deseja continuar aguardando?\n\nSe escolher Sim, o Sonarpad continuará tentando sem limite a cada 5 segundos até o Gemini responder ou você cancelar manualmente. O trabalho já concluído permanece salvo.\n\nDetalhes: {error}"
+  "audio_description.overload.message": "O modelo {model} está recebendo solicitações demais e o Gemini retornou repetidamente 503 UNAVAILABLE. Deseja continuar aguardando?\n\nSe escolher Sim, o Sonarpad continuará tentando sem limite a cada 5 segundos até o Gemini responder ou você cancelar manualmente. O trabalho já concluído permanece salvo.\n\nDetalhes: {error}",
+  "rss.context.create_folder": "Criar nova pasta",
+  "rss.folder.title": "Criar nova pasta",
+  "rss.folder.name": "Nome da pasta:",
+  "rss.folder.required": "Digite um nome para a pasta.",
+  "rss.folder.exists": "Já existe uma pasta com este nome neste local.",
+  "rss.folder.created": "Pasta criada",
+  "rss.folder.delete_title": "Excluir pasta",
+  "rss.folder.delete_confirm": "Excluir a pasta “{title}” e seus {count} feeds RSS?",
+  "rss.folder.deleted": "Pasta excluída",
+  "rss.folder.restored": "Pasta restaurada"
 }

@@ -1590,6 +1590,8 @@
   "rss.reorder.move_bottom": "नीचे ले जाएँ",
   "rss.reorder.move_down": "नीचे ले जाएँ\tCtrl+Shift+Freccia Giù",
   "rss.reorder.move_to_position": "स्थिति पर ले जाएँ...",
+  "rss.reorder.move_to_folder": "फ़ोल्डर में ले जाएँ",
+  "rss.folder.main": "मुख्य फ़ोल्डर",
   "rss.reorder.move_top": "शीर्ष पर ले जाएँ",
   "rss.reorder.move_up": "ऊपर ले जाएँ\tCtrl+Shift+Freccia Su",
   "rss.reorder.moved_position": "स्थिति {x} पर ले जाया गया",
@@ -2095,5 +2097,15 @@
   "audio_description.project.search": "विवरण खोजें:",
   "audio_description.project.search_button": "खोजें",
   "audio_description.overload.title": "Gemini अस्थायी रूप से अधिक व्यस्त है",
-  "audio_description.overload.message": "मॉडल {model} पर बहुत अधिक अनुरोध आ रहे हैं और Gemini ने कई बार 503 UNAVAILABLE लौटाया है। क्या आप प्रतीक्षा जारी रखना चाहते हैं?\n\nयदि आप हाँ चुनते हैं, तो Sonarpad हर 5 सेकंड में बिना सीमा के पुनः प्रयास करता रहेगा, जब तक Gemini उत्तर न दे या आप मैन्युअल रूप से रद्द न करें। पूरा हो चुका काम सुरक्षित रहेगा।\n\nविवरण: {error}"
+  "audio_description.overload.message": "मॉडल {model} पर बहुत अधिक अनुरोध आ रहे हैं और Gemini ने कई बार 503 UNAVAILABLE लौटाया है। क्या आप प्रतीक्षा जारी रखना चाहते हैं?\n\nयदि आप हाँ चुनते हैं, तो Sonarpad हर 5 सेकंड में बिना सीमा के पुनः प्रयास करता रहेगा, जब तक Gemini उत्तर न दे या आप मैन्युअल रूप से रद्द न करें। पूरा हो चुका काम सुरक्षित रहेगा।\n\nविवरण: {error}",
+  "rss.context.create_folder": "नया फ़ोल्डर बनाएँ",
+  "rss.folder.title": "नया फ़ोल्डर बनाएँ",
+  "rss.folder.name": "फ़ोल्डर का नाम:",
+  "rss.folder.required": "फ़ोल्डर का नाम दर्ज करें।",
+  "rss.folder.exists": "इस स्थान पर इस नाम का फ़ोल्डर पहले से मौजूद है।",
+  "rss.folder.created": "फ़ोल्डर बनाया गया",
+  "rss.folder.delete_title": "फ़ोल्डर हटाएँ",
+  "rss.folder.delete_confirm": "फ़ोल्डर “{title}” और उसके {count} RSS फ़ीड हटाएँ?",
+  "rss.folder.deleted": "फ़ोल्डर हटाया गया",
+  "rss.folder.restored": "फ़ोल्डर बहाल किया गया"
 }

@@ -7,6 +7,9 @@ TV-Programmführer
 
 RSS und Artikel
 • Dem Kontextmenü der RSS-Artikel wurde „Artikel auswählen…“ hinzugefügt. Es öffnet dasselbe barrierefreie Auswahlfenster mit Kontrollkästchen wie beim Playlist-Download: Mit der Leertaste lassen sich mehrere Artikel markieren oder abwählen, mit Tab erreicht man Löschen und alle ausgewählten Artikel werden in einem Vorgang entfernt.
+• RSS unterstützt jetzt echte Ordner. Beim OPML-Import bleiben verschachtelte `<outline>`-Container erhalten, statt abgeflacht zu werden; bereits vorhandene Feeds werden ohne Duplikate den importierten Ordnern zugeordnet und der OPML-Export erhält dieselbe Hierarchie einschließlich leerer Ordner.
+• Dem RSS-Kontextmenü wurde der lokalisierte Befehl „Neuen Ordner erstellen“ mit einem barrierefreien Dialog zur Namenseingabe hinzugefügt. Ordnerknoten verwenden das native Baumverhalten: Pfeil rechts erweitert, Pfeil links reduziert; beim Löschen eines Ordners wird der gesamte Zweig entfernt und Strg+Z stellt Ordner, Unterordner und alle enthaltenen Feeds in einem Schritt wieder her.
+• RSS-Feeds können jetzt innerhalb ihres aktuellen Ordners mit Nach oben, Nach unten, An den Anfang, Ans Ende und An Position verschoben werden; beim Sortieren wird ein Feed niemals aus seinem Ordner herausbewegt.
 
 TV-Aufnahmen und Audiodeskriptionen
 • Die Verarbeitung von Gemini-Zeitstempeln für Audiodeskriptionen wurde robuster gemacht: fehlerhaft formatierte `MM:SS:ms`-Werte wie `01:13:473` werden nun verlustfrei in `MM:SS.ms` normalisiert, bevor sie geprüft werden; die bestehenden Chunk- und Slot-Prüfungen verwerfen weiterhin jeden Zeitstempel, der nicht zur aktuellen Szene gehört.

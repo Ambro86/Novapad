@@ -285,9 +285,25 @@ def _gemini_status(message: str) -> None:
         _status("gemini_processing", "")
 
 
-def _normalise_descriptions(descriptions, mandatory_slots=None) -> list[dict]:
+def _normalise_descriptions(
+    descriptions, mandatory_slots=None, source_descriptions=None
+) -> list[dict]:
     result: list[dict] = []
     mandatory_slots = list(mandatory_slots or [])
+    source_rows = []
+    for source_index, item in enumerate(source_descriptions or []):
+        if not isinstance(item, (list, tuple)) or len(item) < 3:
+            continue
+        try:
+            source_start = max(0.0, float(item[0]))
+            source_end = max(source_start, float(item[1]))
+        except (TypeError, ValueError):
+            continue
+        source_text = str(item[2] or "").strip()
+        if source_text:
+            source_rows.append((source_start, source_end, source_text, source_index))
+    claimed_sources = set()
+
     for item in descriptions or []:
         if not isinstance(item, (list, tuple)) or len(item) < 3:
             continue
@@ -299,7 +315,30 @@ def _normalise_descriptions(descriptions, mandatory_slots=None) -> list[dict]:
         text = str(item[2] or "").strip()
         if not text:
             continue
-        result.append({"start_sec": start, "end_sec": end, "text": text})
+
+        visual_start = start
+        matching_sources = [
+            row for row in source_rows
+            if row[3] not in claimed_sources and row[2] == text
+        ]
+        if matching_sources:
+            source_start, source_end, _source_text, source_index = min(
+                matching_sources,
+                key=lambda row: (
+                    abs(row[0] - start),
+                    abs(row[1] - end),
+                    row[3],
+                ),
+            )
+            claimed_sources.add(source_index)
+            visual_start = source_start
+
+        result.append({
+            "start_sec": start,
+            "end_sec": end,
+            "visual_start_sec": visual_start,
+            "text": text,
+        })
 
     # Mark exactly one representative description per mandatory slot. Extra
     # descriptions in the same silence remain optional so downstream exact-TTS
@@ -460,7 +499,7 @@ def run(request: dict) -> dict:
         len(final_missing_slots),
         ",".join(slot["id"] for slot in final_missing_slots) or "none",
     )
-    normalized = _normalise_descriptions(aligned, mandatory_slots)
+    normalized = _normalise_descriptions(aligned, mandatory_slots, descriptions)
     model = str(request.get("gemini_model") or "gemini-3.5-flash-lite").strip()
     protected = [
         {"start_sec": float(start), "end_sec": float(end)}

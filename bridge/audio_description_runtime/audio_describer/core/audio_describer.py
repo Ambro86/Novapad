@@ -2392,20 +2392,24 @@ def _post_process_mmss_timestamps(descriptions_list_raw_times, status_update_cal
     if reordered_count:
         app_logger.warning(
             "Timestamp post-processing restored chronological order for "
-            "%d of %d descriptions before overlap correction.",
+            "%d of %d descriptions before overlap handling.",
             reordered_count, len(parsed_descriptions),
         )
 
     corrected_descriptions = []
     last_corrected_end_time_sec = 0.0
     num_adjustments_made = 0
+    preserved_overlaps = 0
     for current_start_sec, current_end_sec, _original_index, text in parsed_descriptions:
         made_adjustment_this_iteration = False
         adjusted_start_sec = current_start_sec
         adjusted_end_sec = current_end_sec
         if corrected_descriptions and adjusted_start_sec < last_corrected_end_time_sec:
-            adjusted_start_sec = last_corrected_end_time_sec + 0.001
-            made_adjustment_this_iteration = True
+            # Preserve Gemini's visual timestamp.  Overlap is a scheduling
+            # conflict, not evidence that the later visual event happened after
+            # the previous narration.  The silence schedulers resolve the
+            # collision later without rewriting the visual origin.
+            preserved_overlaps += 1
         if adjusted_end_sec <= adjusted_start_sec:
             original_duration_from_ai = current_end_sec - current_start_sec
             duration_to_add = max(0.1, original_duration_from_ai if original_duration_from_ai > 0 else 0.1)
@@ -2415,7 +2419,13 @@ def _post_process_mmss_timestamps(descriptions_list_raw_times, status_update_cal
         if made_adjustment_this_iteration:
             num_adjustments_made += 1
         corrected_descriptions.append((adjusted_start_sec, adjusted_end_sec, text))
-        last_corrected_end_time_sec = adjusted_end_sec
+        last_corrected_end_time_sec = max(last_corrected_end_time_sec, adjusted_end_sec)
+    if preserved_overlaps:
+        app_logger.warning(
+            "Timestamp post-processing preserved %d overlapping Gemini timestamp(s) "
+            "for downstream silence scheduling instead of shifting their visual timing.",
+            preserved_overlaps,
+        )
     if status_update_callback:
         _log_status_local(_("Timestamp correction complete. %(count)d descriptions processed, %(adjusted_count)d had timestamps adjusted.") % {'count': len(corrected_descriptions), 'adjusted_count': num_adjustments_made})
     return corrected_descriptions

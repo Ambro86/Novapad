@@ -235,6 +235,17 @@ class ChunkTimestampTests(unittest.TestCase):
         self.assertAlmostEqual(ring[0], 71.0)
         self.assertAlmostEqual(ring[1], 75.2)
 
+    def test_overlapping_gemini_entries_preserve_visual_start_times(self):
+        corrected = _post_process_mmss_timestamps([
+            ("00:10.000", "00:16.000", "Prima azione."),
+            ("00:12.000", "00:14.000", "Seconda azione."),
+        ])
+
+        self.assertEqual(len(corrected), 2)
+        self.assertAlmostEqual(corrected[0][0], 10.0)
+        self.assertAlmostEqual(corrected[1][0], 12.0)
+        self.assertAlmostEqual(corrected[1][1], 14.0)
+
     def test_code_13_file_processing_retries_until_upload_succeeds(self):
         client = object()
         success = object()

@@ -128,6 +128,16 @@ class BridgeProtocolTests(unittest.TestCase):
         self.assertEqual([item["text"] for item in normalized], ["Prima", "Fine corretta", "Seconda"])
         self.assertEqual(normalized[1]["start_sec"], normalized[1]["end_sec"])
 
+    def test_normalise_descriptions_preserves_visual_origin_after_alignment(self):
+        normalized = bridge._normalise_descriptions(
+            [(15.0, 17.0, "Azione")],
+            source_descriptions=[(10.0, 12.0, "Azione")],
+        )
+
+        self.assertEqual(len(normalized), 1)
+        self.assertAlmostEqual(normalized[0]["start_sec"], 15.0)
+        self.assertAlmostEqual(normalized[0]["visual_start_sec"], 10.0)
+
     def test_validate_request_accepts_host_prepared_media_and_rejects_bad_timeline(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

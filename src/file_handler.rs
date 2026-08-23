@@ -856,7 +856,7 @@ fn parse_ppt_records(data: &[u8], out: &mut Vec<String>) {
         match rec_type {
             4000 => {
                 let mut utf16 = Vec::with_capacity(rec_len / 2);
-                for chunk in data[body_start..body_end].chunks_exact(2) {
+                for chunk in data[body_start..body_end].as_chunks::<2>().0 {
                     utf16.push(u16::from_le_bytes([chunk[0], chunk[1]]));
                 }
                 let text = String::from_utf16_lossy(&utf16);
@@ -2329,7 +2329,7 @@ fn extract_doc_text_piece_table(word: &[u8], table: &[u8]) -> Option<String> {
                 continue;
             }
             let mut utf16 = Vec::with_capacity(byte_len / 2);
-            for chunk in word[piece.offset..end].chunks_exact(2) {
+            for chunk in word[piece.offset..end].as_chunks::<2>().0 {
                 utf16.push(u16::from_le_bytes([chunk[0], chunk[1]]));
             }
             out.push_str(&String::from_utf16_lossy(&utf16));
@@ -2439,7 +2439,7 @@ fn clean_doc_text(text: String) -> String {
 fn extract_utf16_strings(buffer: &[u8]) -> String {
     let mut text = String::new();
     let mut current_seq = Vec::new();
-    for chunk in buffer.chunks_exact(2) {
+    for chunk in buffer.as_chunks::<2>().0 {
         let unit = u16::from_le_bytes([chunk[0], chunk[1]]);
         if (unit >= 32 && unit != 0xFFFF) || unit == 10 || unit == 13 || unit == 9 {
             current_seq.push(unit);

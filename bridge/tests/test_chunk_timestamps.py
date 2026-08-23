@@ -543,6 +543,9 @@ class ChunkTimestampTests(unittest.TestCase):
         self.assertIn("S0002=6.000-10.000", prompt)
         self.assertIn("NEVER REPEAT AN ACTION", system)
         self.assertIn("does not permit repeating or paraphrasing", prompt)
+        self.assertIn("slot boundaries are only the allowed container", prompt)
+        self.assertIn("Never delay an action to a later part of the same slot", prompt)
+        self.assertIn("returned start/end must coincide with the moment", system)
         self.assertIn("AVOID REPETITIVE SUBJECT LABELS", system)
         self.assertIn("Do not introduce a name", system)
 
@@ -573,7 +576,7 @@ class ChunkTimestampTests(unittest.TestCase):
         ):
             _system, prompt = _build_unified_prompts(
                 "", "gemini-test", intensive_mode=True,
-                extended_anchors_text="E0001=4.000-5.200",
+                extended_anchors_text="E0001=PAUSE 4.000-5.200 -> IMMEDIATE_SCENE 5.200-9.200",
             )
 
         self.assertIn("OPTIONAL INTENSIVE SHORT-GAP", prompt)
@@ -594,12 +597,16 @@ class ChunkTimestampTests(unittest.TestCase):
             _system, prompt = _build_unified_prompts(
                 "", "gemini-test", intensive_mode=True,
                 extended_mode=True,
-                extended_anchors_text="E0001=4.000-5.200",
+                extended_anchors_text="E0001=PAUSE 4.000-5.200 -> IMMEDIATE_SCENE 5.200-9.200",
             )
 
         self.assertIn("OPTIONAL INTENSIVE SHORT-GAP", prompt)
         self.assertIn("may pause", prompt)
         self.assertIn("only if", prompt)
+        self.assertIn("IMMEDIATE_SCENE", prompt)
+        self.assertIn("scene beginning directly after the pause", prompt)
+        self.assertIn("NEVER use E0001", prompt)
+        self.assertIn("Never use an extended pause as storage", _system)
 
     def test_completed_checkpoint_reuses_descriptions_without_new_gemini_chunk_calls(self):
         import tempfile

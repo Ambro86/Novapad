@@ -1167,6 +1167,8 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
                         **anchor,
                         "start": anchor["start"] - chunk_start,
                         "end": anchor["end"] - chunk_start,
+                        "scene_start": anchor["scene_start"] - chunk_start,
+                        "scene_end": anchor["scene_end"] - chunk_start,
                     }
                     for anchor in extended_anchors
                 ]
@@ -2950,12 +2952,38 @@ def _build_unified_prompts(user_prompt, model_name_to_use, dialogue_free_windows
         "what is visibly present there: a logo, title card, setting, framing, stationary character "
         "or object, or the current resulting state. A static or mundane description that is correct "
         "for the slot is always preferable to an interesting action seen even a few seconds before "
-        "or after it. You may add more descriptions inside the same slot when distinct, useful visual "
-        "changes occur and there is enough time. Keep entries chronological, non-overlapping, and "
-        "keep their combined words within the slot's word budget."
+        "or after it. A mandatory slot is a container, not a license to shift an action in time: "
+        "choose the exact sub-range where the described action, pose, or state is actually visible. "
+        "If an action has already ended earlier in the same slot, do not describe it later in that "
+        "slot; describe what is visible at the chosen timestamp instead. You may add more descriptions "
+        "inside the same slot when distinct, useful visual changes occur and there is enough time. "
+        "Keep entries chronological, non-overlapping, and keep their combined words within the slot's "
+        "word budget."
         if intensive_mode else
         "2.  **BE SELECTIVE AND CONCISE (2 WORDS/SECOND RULE):** Describe only NEW and "
         "PLOT-CRITICAL visual information. A 3-second description can have a maximum of 6 words."
+    )
+    grounding_directive = (
+        "7.  **GROUND EVERY DESCRIPTION IN THE CORRECT VISUAL MOMENT:** For normal and mandatory "
+        "descriptions, re-inspect only the frames inside the chosen start/end interval and describe "
+        "only what is actually visible there. For a mandatory slot, the returned start/end must "
+        "coincide with the moment the described visual fact is visible; never place an already-finished "
+        "action later in the same slot merely because there is more narration room there. For an "
+        "OPTIONAL INTENSIVE SHORT-GAP anchor, the "
+        "timestamp marks the PAUSE point, so use the anchor's explicitly listed IMMEDIATE_SCENE "
+        "window instead: describe only the scene that begins directly after that pause. Never use "
+        "an extended pause as storage for an action from farther ahead in the clip. Earlier or later "
+        "scenes are context only, not evidence for the current description."
+        if intensive_mode and extended_anchors_text else
+        "7.  **GROUND EVERY DESCRIPTION IN ITS EXACT TIME RANGE:** Before writing each entry, "
+        "re-inspect the frames inside its chosen start/end interval. Every described character, "
+        "object, pose, and action must actually be visible during that same interval. When the entry "
+        "belongs to a mandatory slot, the returned start/end must coincide with the moment the visual "
+        "fact is visible; the slot boundaries do not make earlier and later moments interchangeable. "
+        "Never borrow, move, or repeat an action seen earlier or later in the clip just to fill an available "
+        "silence. Earlier descriptions are context, not evidence for the current image. If nothing "
+        "changes, describe the current visible character, pose, setting, or resulting state instead "
+        "of recalling a previous action."
     )
     core_directives = f"""
 **CORE DIRECTIVES (Apply to `audio_descriptions`):**
@@ -2969,12 +2997,7 @@ def _build_unified_prompts(user_prompt, model_name_to_use, dialogue_free_windows
     crown, do not later say that the person sets the crown on the ruler's head. Describe only a truly
     new visual development or the resulting state.
 {subject_repetition_directive}
-7.  **GROUND EVERY DESCRIPTION IN ITS EXACT TIME RANGE:** Before writing each entry, re-inspect the
-    frames inside its chosen start/end interval. Every described character, object, pose, and action
-    must actually be visible during that same interval. Never borrow, move, or repeat an action seen
-    earlier or later in the clip just to fill an available silence. Earlier descriptions are context,
-    not evidence for the current image. If nothing changes, describe the current visible character,
-    pose, setting, or resulting state instead of recalling a previous action.
+{grounding_directive}
 """
 
     # The main system instruction, now asking for a unified JSON object.
@@ -3039,9 +3062,12 @@ Your entire output MUST be a single JSON object with two top-level keys: "charac
                 "use a different useful visual fact or the newly reached state instead. For EACH slot, "
                 "inspect only the frames inside that slot before choosing the text. Every character, "
                 "object, and action named in the entry must be visible inside that exact slot; never "
-                "pull an action from a preceding or following scene. If those frames are static, "
-                "describe their current visible state or setting, including a logo or title card when "
-                "that is what is actually visible. Temporal correctness is more important than visual "
+                "pull an action from a preceding or following scene. The slot boundaries are only "
+                "the allowed container: choose start/end around the exact frames that show the fact "
+                "you describe. Never delay an action to a later part of the same slot after that action "
+                "has ended, and never anticipate an action that has not started yet. If those frames are "
+                "static, describe their current visible state or setting, including a logo or title card "
+                "when that is what is actually visible. Temporal correctness is more important than visual "
                 "interest: a plain but correct description is always preferable to an action seen "
                 "outside the slot.",
             ])
@@ -3062,11 +3088,20 @@ Your entire output MUST be a single JSON object with two top-level keys: "charac
         user_prompt_parts.extend([
             "*   **OPTIONAL INTENSIVE SHORT-GAP ANCHORS (1+ second speech-free gaps):** "
             + extended_anchors_text,
+            "*   Each item has a `PAUSE` range and a bounded `IMMEDIATE_SCENE` range. The "
+            "description timestamp MUST stay entirely inside that item's PAUSE range, but the "
+            "`description_text` MUST describe ONLY visual information visible in that same item's "
+            "IMMEDIATE_SCENE range — the scene beginning directly after the pause. This mapping is "
+            "strict: NEVER use E0001 to describe E0002, a later shot, a later scene, or anything "
+            "outside E0001's IMMEDIATE_SCENE window, even if it is more important or visually "
+            "interesting. Before returning each extended-anchor entry, re-inspect that exact "
+            "IMMEDIATE_SCENE window and discard the entry if its action, object, character, or "
+            "setting is not visibly present there.",
             "*   These anchors are OPTIONAL, not mandatory. Use one only for important, "
-            "plot-relevant visual information that cannot be placed in a normal mandatory "
-            "slot. Keep it as concise as possible and place its timestamp entirely inside one "
-            "listed anchor. Use at most one description per anchor. Do not fill minor pauses, "
-            "breaths, or every available anchor. " + short_gap_instruction,
+            "plot-relevant visual information from its immediate following scene that cannot be "
+            "placed in a normal mandatory slot. Keep it as concise as possible. Use at most one "
+            "description per anchor. Do not fill minor pauses, breaths, or every available anchor. "
+            + short_gap_instruction,
         ])
     elif intensive_mode:
         user_prompt_parts.append(

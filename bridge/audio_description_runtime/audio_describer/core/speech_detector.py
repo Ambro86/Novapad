@@ -40,6 +40,8 @@ DEFAULT_PADDING_SEC = 0.25
 DEFAULT_MAX_SHIFT_SEC = 5.0
 DEFAULT_MAX_INTENSIVE_SLOT_SEC = 15.0
 DEFAULT_EXTENDED_ANCHOR_SEC = 1.0
+DEFAULT_EXTENDED_SCENE_LOOKAHEAD_SEC = 4.0
+DEFAULT_EXTENDED_SCENE_MIN_CONTEXT_SEC = 0.5
 _ONNX_SESSION = None
 _ONNX_SESSION_PATH = None
 
@@ -266,20 +268,32 @@ def _align_descriptions_prioritizing_slots(
             ]
             desired_start = max(slot_start, float(item[0]))
             # A mandatory cue has already been grounded to this exact silence
-            # slot by the intensive-coverage pass.  The pre-TTS duration is
-            # only an estimate (2 words/sec), so it must never be allowed to
-            # delete the required cue before the exact synthesized duration is
-            # known in Rust.  Fit the provisional window inside the slot and
-            # allow movement anywhere within that same grounded slot.
-            max_available = max(
-                (end - start for start, end in slot_free), default=0.0
-            )
-            if max_available <= 0.0:
+            # slot by the intensive-coverage pass, but the exact timestamp still
+            # represents the visual moment Gemini chose.  Do not treat the whole
+            # slot as temporally interchangeable: keep the provisional placement
+            # within the normal shift limit.  Because the pre-TTS duration is only
+            # an estimate (2 words/sec), clamp the provisional reservation near
+            # that visual moment rather than moving the cue far across the slot.
+            grounded_max_available = 0.0
+            shift_limit = max(0.0, float(max_shift_sec))
+            for free_start, free_end in slot_free:
+                earliest_grounded_start = max(
+                    free_start, desired_start - shift_limit
+                )
+                latest_grounded_start = min(
+                    free_end, desired_start + shift_limit
+                )
+                if latest_grounded_start + 1e-6 < earliest_grounded_start:
+                    continue
+                grounded_max_available = max(
+                    grounded_max_available, free_end - earliest_grounded_start
+                )
+            if grounded_max_available <= 0.0:
                 continue
-            planning_duration = min(required, max_available)
+            planning_duration = min(required, grounded_max_available)
             chosen = _choose_slot(
                 slot_free, desired_start, planning_duration, earliest_start=0.0,
-                max_shift_sec=max(max_shift_sec, slot_end - slot_start),
+                max_shift_sec=shift_limit,
             )
             if chosen is None:
                 continue
@@ -563,16 +577,20 @@ def extended_description_anchors(
     protected_intervals, duration_sec, normal_min_duration_sec=3.0,
     range_start=0.0, range_end=None, id_suffix="",
     min_anchor_sec=DEFAULT_EXTENDED_ANCHOR_SEC,
+    scene_lookahead_sec=DEFAULT_EXTENDED_SCENE_LOOKAHEAD_SEC,
 ):
-    """Return optional short gaps for intensive description candidates.
+    """Return optional short gaps paired with their immediate following scene.
 
-    Exact TTS scheduling later decides whether each candidate fits naturally;
-    extended mode may use the same anchor as a playback-pause fallback.
+    The short gap is where playback may pause.  The narration must describe only
+    the visual scene immediately after that pause, never a convenient scene much
+    later in the clip.  A bounded post-anchor scene window makes that temporal
+    contract explicit to Gemini.
     """
     range_start = max(0.0, float(range_start))
     range_end = float(duration_sec if range_end is None else range_end)
     minimum = max(0.1, float(min_anchor_sec))
     normal_minimum = max(minimum, float(normal_min_duration_sec))
+    lookahead = max(DEFAULT_EXTENDED_SCENE_MIN_CONTEXT_SEC, float(scene_lookahead_sec))
     anchors = []
     for index, (free_start, free_end) in enumerate(
         speech_free_intervals(protected_intervals, duration_sec), start=1
@@ -580,20 +598,37 @@ def extended_description_anchors(
         start = max(free_start, range_start)
         end = min(free_end, range_end)
         duration = end - start
-        if minimum <= duration < normal_minimum:
+        scene_start = end
+        scene_end = min(range_end, scene_start + lookahead)
+        if (
+            minimum <= duration < normal_minimum
+            and scene_end - scene_start >= DEFAULT_EXTENDED_SCENE_MIN_CONTEXT_SEC
+        ):
             anchors.append({
                 "id": f"E{index:04d}{id_suffix}",
                 "start": start,
                 "end": end,
+                "scene_start": scene_start,
+                "scene_end": scene_end,
             })
     return anchors
 
 
 def format_extended_anchors_for_prompt(anchors):
-    return ", ".join(
-        f"{anchor['id']}={anchor['start']:.3f}-{anchor['end']:.3f}"
-        for anchor in anchors or []
-    )
+    formatted = []
+    for anchor in anchors or []:
+        scene_start = float(anchor.get("scene_start", anchor["end"]))
+        scene_end = float(
+            anchor.get(
+                "scene_end",
+                scene_start + DEFAULT_EXTENDED_SCENE_LOOKAHEAD_SEC,
+            )
+        )
+        formatted.append(
+            f"{anchor['id']}=PAUSE {anchor['start']:.3f}-{anchor['end']:.3f} "
+            f"-> IMMEDIATE_SCENE {scene_start:.3f}-{scene_end:.3f}"
+        )
+    return ", ".join(formatted)
 
 
 def format_intensive_slots_for_prompt(slots):

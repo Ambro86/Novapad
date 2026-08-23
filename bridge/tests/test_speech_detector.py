@@ -221,18 +221,19 @@ class SpeechDetectorIntervalTests(unittest.TestCase):
         self.assertLessEqual(aligned[0][1], 8.0)
         self.assertEqual(aligned[0][2], descriptions[0][2])
 
-    def test_priority_alignment_can_reposition_mandatory_anywhere_inside_its_slot(self):
+    def test_priority_alignment_keeps_mandatory_near_visual_timestamp(self):
         descriptions = [
-            (14.5, 15.0, "uno due tre quattro cinque sei sette otto nove dieci"),
+            (19.5, 20.0, "uno due tre quattro cinque sei sette otto nove dieci undici dodici tredici quattordici quindici sedici diciassette diciotto diciannove venti"),
         ]
-        required_slots = [{"id": "S1", "start": 5.0, "end": 15.0}]
+        required_slots = [{"id": "S1", "start": 5.0, "end": 20.0}]
         aligned, dropped = align_descriptions_prioritizing_slots(
-            descriptions, [], 20.0, required_slots
+            descriptions, [], 25.0, required_slots
         )
         self.assertEqual(dropped, 0)
         self.assertEqual(len(aligned), 1)
-        self.assertGreaterEqual(aligned[0][0], 5.0)
-        self.assertLessEqual(aligned[0][1], 15.0)
+        self.assertGreaterEqual(aligned[0][0], 14.5)
+        self.assertLessEqual(aligned[0][1], 20.0)
+        self.assertEqual(aligned[0][2], descriptions[0][2])
 
     def test_description_is_dropped_without_nearby_room(self):
         aligned, dropped = align_descriptions(
@@ -290,6 +291,20 @@ class SpeechDetectorIntervalTests(unittest.TestCase):
             [(item["start"], item["end"]) for item in anchors],
             [(0.0, 1.5), (3.0, 5.0)],
         )
+        self.assertEqual(
+            [(item["scene_start"], item["scene_end"]) for item in anchors],
+            [(1.5, 5.5), (5.0, 9.0)],
+        )
+        formatted = speech_detector.format_extended_anchors_for_prompt(anchors)
+        self.assertIn("E0001=PAUSE 0.000-1.500 -> IMMEDIATE_SCENE 1.500-5.500", formatted)
+        self.assertIn("E0002=PAUSE 3.000-5.000 -> IMMEDIATE_SCENE 5.000-9.000", formatted)
+
+    def test_extended_anchor_at_chunk_tail_is_not_offered_without_following_scene(self):
+        anchors = extended_description_anchors(
+            [(0.0, 8.0)], duration_sec=10.0,
+            normal_min_duration_sec=3.0, range_start=0.0, range_end=10.0,
+        )
+        self.assertEqual(anchors, [])
 
     def test_intensive_slots_are_clipped_to_chunk_and_have_word_budget(self):
         slots = intensive_description_slots(

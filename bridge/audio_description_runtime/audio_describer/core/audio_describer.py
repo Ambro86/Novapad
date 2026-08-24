@@ -3196,6 +3196,17 @@ Your entire output MUST be a single JSON object with two top-level keys: "charac
                 "interest: a plain but correct description is always preferable to an action seen "
                 "outside the slot.",
             ])
+            if "LONG_SILENCE_PART" in intensive_slots_text:
+                user_prompt_parts.append(
+                    "*   **LONG-SILENCE PARTITIONS:** Any slot marked `LONG_SILENCE_PART n/N` is "
+                    "an artificial balanced subdivision of one longer dialogue-free window, NOT a "
+                    "scene boundary or narrative beat. Treat each marked part as an independent visual "
+                    "checkpoint. Re-inspect only frames inside that exact part and describe what is "
+                    "visibly true there now. Never carry an action, pose, reaction, movement, or setting "
+                    "forward from the preceding part merely for narrative continuity; if it ended before "
+                    "this part starts, it is invalid here. Likewise, never borrow an action from a later "
+                    "part. Temporal correctness has absolute priority over preserving a story sequence."
+                )
         else:
             user_prompt_parts.append(
                 "*   **INTENSIVE MODE:** This chunk has no dialogue-free interval long enough. "

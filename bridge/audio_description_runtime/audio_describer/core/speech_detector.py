@@ -569,6 +569,11 @@ def intensive_description_slots(protected_intervals, duration_sec,
                     "start": part_start,
                     "end": part_end,
                     "max_words": max(1, int((part_end - part_start) * 2.0)),
+                    # These are synthetic subdivisions of one long silence,
+                    # not scene boundaries.  Keep that fact available to the
+                    # first-pass Gemini prompt without triggering another call.
+                    "partition_index": part_index + 1,
+                    "partition_count": part_count,
                 })
     return slots
 
@@ -633,11 +638,20 @@ def format_extended_anchors_for_prompt(anchors):
 
 def format_intensive_slots_for_prompt(slots):
     """Format mandatory slots with a word budget Gemini can follow."""
-    return ", ".join(
-        f"{slot['id']}={slot['start']:.3f}-{slot['end']:.3f} "
-        f"(max {slot['max_words']} words)"
-        for slot in slots or []
-    )
+    formatted = []
+    for slot in slots or []:
+        partition_count = int(slot.get("partition_count", 1))
+        partition_note = ""
+        if partition_count > 1:
+            partition_note = (
+                f"; LONG_SILENCE_PART {int(slot.get('partition_index', 1))}/"
+                f"{partition_count}; inspect this part independently"
+            )
+        formatted.append(
+            f"{slot['id']}={slot['start']:.3f}-{slot['end']:.3f} "
+            f"(max {slot['max_words']} words{partition_note})"
+        )
+    return ", ".join(formatted)
 
 
 def uncovered_intensive_slots(descriptions, slots):

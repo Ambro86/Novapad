@@ -357,6 +357,12 @@ class SpeechDetectorIntervalTests(unittest.TestCase):
         self.assertEqual(slots[-1]["end"], 109.637)
         self.assertTrue(all(slot["end"] - slot["start"] <= 15.0 for slot in slots))
         self.assertEqual(len({slot["id"] for slot in slots}), len(slots))
+        self.assertTrue(all(slot["partition_count"] == 8 for slot in slots))
+        self.assertEqual(slots[0]["partition_index"], 1)
+        self.assertEqual(slots[-1]["partition_index"], 8)
+        formatted = speech_detector.format_intensive_slots_for_prompt(slots)
+        self.assertIn("LONG_SILENCE_PART 1/8; inspect this part independently", formatted)
+        self.assertIn("LONG_SILENCE_PART 8/8; inspect this part independently", formatted)
         missing = uncovered_intensive_slots(
             [(1.0, 2.0, "Copre soltanto la prima parte")], slots
         )

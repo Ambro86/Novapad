@@ -604,6 +604,29 @@ class ChunkTimestampTests(unittest.TestCase):
         self.assertIn("AVOID REPETITIVE SUBJECT LABELS", system)
         self.assertIn("Do not introduce a name", system)
 
+    def test_intensive_prompt_explains_long_silence_partitions_without_second_pass(self):
+        settings = {
+            "application_language": "it",
+            "enable_character_glossary": False,
+            "gemini_description_verbosity": "standard",
+        }
+        with mock.patch(
+            "audio_describer.core.audio_describer.config_model.get_setting",
+            side_effect=lambda key: settings.get(key),
+        ):
+            _system, prompt = _build_unified_prompts(
+                "", "gemini-test", "0.000-30.000",
+                "S0001P001=0.000-15.000 (max 30 words; LONG_SILENCE_PART 1/2; inspect this part independently), "
+                "S0001P002=15.000-30.000 (max 30 words; LONG_SILENCE_PART 2/2; inspect this part independently)",
+                intensive_mode=True,
+            )
+
+        self.assertIn("LONG-SILENCE PARTITIONS", prompt)
+        self.assertIn("artificial balanced subdivision", prompt)
+        self.assertIn("independent visual checkpoint", prompt)
+        self.assertIn("Never carry an action", prompt)
+        self.assertIn("never borrow an action from a later part", prompt)
+
     def test_intensive_prompt_with_no_slots_forbids_invented_timestamps(self):
         settings = {
             "application_language": "it",

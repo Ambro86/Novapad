@@ -333,12 +333,16 @@ def _normalise_descriptions(
             claimed_sources.add(source_index)
             visual_start = source_start
 
-        result.append({
+        row = {
             "start_sec": start,
             "end_sec": end,
             "visual_start_sec": visual_start,
             "text": text,
-        })
+        }
+        visual_evidence = audio_describer.get_visual_evidence_time(visual_start, text)
+        if visual_evidence is not None:
+            row["visual_evidence_time_sec"] = visual_evidence
+        result.append(row)
 
     # Mark exactly one representative description per mandatory slot. Extra
     # descriptions in the same silence remain optional so downstream exact-TTS

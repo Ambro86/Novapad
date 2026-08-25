@@ -14,6 +14,11 @@ from audio_describer.core.audio_describer import (
     _normalize_chunk_timestamps,
     _mmss_to_total_seconds,
     _post_process_mmss_timestamps,
+    _parse_unified_response,
+    _register_visual_evidence_records,
+    _retime_visual_evidence_records,
+    _reset_visual_evidence_registry,
+    get_visual_evidence_time,
     _requires_per_chunk_upload,
     _should_use_per_chunk_uploads,
     _suppress_repeated_leading_character_names,
@@ -228,6 +233,73 @@ class ChunkTimestampTests(unittest.TestCase):
         self.assertAlmostEqual(_mmss_to_total_seconds("01:02:03.500"), 3723.5)
         self.assertAlmostEqual(_mmss_to_total_seconds("01:02:03"), 3723.0)
         self.assertAlmostEqual(_mmss_to_total_seconds("01:02:03:500"), 3723.5)
+
+    def test_local_recovery_repairs_two_digit_colon_fraction_only_in_window(self):
+        corrected = _post_process_mmss_timestamps(
+            [
+                ("02:02:18", "02:19:52", "Cena sulla zattera."),
+                ("02:54:53", "03:00:23", "Orizzonte serale."),
+            ],
+            local_timeline_window=(0.0, 182.110),
+        )
+
+        self.assertEqual(corrected, [
+            (122.18, 139.52, "Cena sulla zattera."),
+            (174.53, 180.23, "Orizzonte serale."),
+        ])
+
+    def test_logged_chunk_two_recovery_entries_cover_all_three_missing_ranges(self):
+        corrected = _post_process_mmss_timestamps(
+            [
+                ("01:54:29", "02:08:43", "Cena illuminata da una candela."),
+                ("02:22:55", "02:37:08", "Zattera al tramonto."),
+                ("02:54:03", "02:57:12", "Costa frastagliata."),
+            ],
+            local_timeline_window=(0.0, 182.110),
+        )
+        gaps = [
+            (114.498, 128.712),
+            (142.925, 157.139),
+            (174.053, 177.203),
+        ]
+
+        self.assertTrue(all(
+            _description_belongs_to_gaps(item, [gap])
+            for item, gap in zip(corrected, gaps)
+        ))
+
+    def test_local_recovery_does_not_reinterpret_valid_hour_timestamp(self):
+        corrected = _post_process_mmss_timestamps(
+            [("01:02:03", "01:02:08", "Video lungo.")],
+            local_timeline_window=(3600.0, 3900.0),
+        )
+
+        self.assertEqual(corrected, [(3723.0, 3728.0, "Video lungo.")])
+
+    def test_local_recovery_keeps_out_of_window_typo_for_range_audit(self):
+        corrected = _post_process_mmss_timestamps(
+            [("09:30:20", "09:31:20", "Fuori dal chunk.")],
+            local_timeline_window=(0.0, 182.110),
+        )
+
+        self.assertEqual(corrected, [(34220.0, 34280.0, "Fuori dal chunk.")])
+
+    def test_recovery_visual_evidence_follows_contextually_repaired_timestamp(self):
+        records = [
+            (7338.0, 8392.0, "Cena sulla zattera.", 120.5),
+        ]
+        descriptions = [
+            (304.62, 321.96, "Cena sulla zattera."),
+        ]
+
+        retimed = _retime_visual_evidence_records(
+            records, descriptions, timeline_offset_sec=182.44
+        )
+
+        self.assertEqual(len(retimed), 1)
+        self.assertAlmostEqual(retimed[0][0], 122.18)
+        self.assertAlmostEqual(retimed[0][1], 139.52)
+        self.assertEqual(retimed[0][2:], ("Cena sulla zattera.", 120.5))
 
     def test_normalized_colon_milliseconds_still_face_chunk_range_audit(self):
         corrected = _post_process_mmss_timestamps([
@@ -626,6 +698,29 @@ class ChunkTimestampTests(unittest.TestCase):
         self.assertIn("independent visual checkpoint", prompt)
         self.assertIn("Never carry an action", prompt)
         self.assertIn("never borrow an action from a later part", prompt)
+        self.assertIn("visual_evidence_time_seconds", _system)
+        self.assertIn("exact evidence frame", prompt)
+        self.assertIn("MUST fall inside", _system)
+
+    def test_visual_evidence_metadata_is_captured_without_changing_timestamps(self):
+        _reset_visual_evidence_registry()
+        response = (
+            '{"character_glossary":[],"audio_descriptions":['
+            '{"start_time_mmss":"00:10.000","end_time_mmss":"00:12.000",'
+            '"visual_evidence_time_seconds":11.25,"description_text":"Azione visibile"}'
+            ']}'
+        )
+        descriptions, _glossary, parse_ok = _parse_unified_response(response, None)
+        self.assertTrue(parse_ok)
+        self.assertEqual(descriptions, [("00:10.000", "00:12.000", "Azione visibile")])
+        from audio_describer.core import audio_describer as describer_module
+        _register_visual_evidence_records(
+            list(describer_module._LAST_PARSED_VISUAL_EVIDENCE_RAW),
+            timeline_offset_sec=100.0,
+        )
+        self.assertAlmostEqual(
+            get_visual_evidence_time(110.0, "Azione visibile"), 111.25
+        )
 
     def test_intensive_prompt_with_no_slots_forbids_invented_timestamps(self):
         settings = {

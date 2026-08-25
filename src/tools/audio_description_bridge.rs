@@ -75,6 +75,8 @@ pub struct BridgeDescription {
     #[serde(default)]
     pub visual_start_sec: Option<f64>,
     #[serde(default)]
+    pub visual_evidence_time_sec: Option<f64>,
+    #[serde(default)]
     pub end_sec: f64,
     pub text: String,
     #[serde(default)]

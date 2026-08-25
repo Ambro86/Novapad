@@ -57,6 +57,115 @@ _AUDIO_CONTEXT_ONLY_RULE = (
     "visible. Never describe that someone talks, asks, answers, shouts, whispers, or says "
     "something; describe only new visual information. "
 )
+# Diagnostic temporal grounding returned by Gemini.  This metadata never
+# changes scheduling; it is retained so Sonarpad can compare the requested
+# description timestamp with the exact video instant Gemini claims as visual
+# evidence for the sentence.
+_LAST_PARSED_VISUAL_EVIDENCE_RAW = []
+_VISUAL_EVIDENCE_RECORDS = []
+
+
+def _reset_visual_evidence_registry():
+    _LAST_PARSED_VISUAL_EVIDENCE_RAW.clear()
+    _VISUAL_EVIDENCE_RECORDS.clear()
+
+
+def _parse_visual_evidence_seconds(value):
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        try:
+            seconds = _mmss_to_total_seconds(str(value))
+        except (TypeError, ValueError):
+            return None
+    if not math.isfinite(seconds) or seconds < 0:
+        return None
+    return seconds
+
+
+def _capture_visual_evidence_item(item):
+    if not isinstance(item, dict):
+        return
+    start = item.get("start_time_mmss")
+    end = item.get("end_time_mmss")
+    text = str(item.get("description_text") or "").strip()
+    evidence = _parse_visual_evidence_seconds(
+        item.get("visual_evidence_time_seconds")
+    )
+    if start is None or end is None or not text or evidence is None:
+        return
+    try:
+        start_sec = _mmss_to_total_seconds(str(start))
+        end_sec = _mmss_to_total_seconds(str(end))
+    except ValueError:
+        return
+    _LAST_PARSED_VISUAL_EVIDENCE_RAW.append(
+        (start_sec, end_sec, text, evidence)
+    )
+
+
+def _register_visual_evidence_records(records, timeline_offset_sec=0.0):
+    offset = float(timeline_offset_sec or 0.0)
+    for start, end, text, evidence in records or []:
+        absolute_start = float(start) + offset
+        absolute_end = float(end) + offset
+        absolute_evidence = float(evidence) + offset
+        _VISUAL_EVIDENCE_RECORDS.append(
+            (absolute_start, absolute_end, str(text or "").strip(), absolute_evidence)
+        )
+        app_logger.info(
+            "Gemini visual evidence: description=%.3f-%.3f evidence=%.3f delta=%+.3fs text=%r",
+            absolute_start, absolute_end, absolute_evidence,
+            absolute_evidence - absolute_start, str(text or "").strip()[:120],
+        )
+
+
+def _retime_visual_evidence_records(records, descriptions, timeline_offset_sec=0.0):
+    """Keep evidence metadata aligned after contextual timestamp repair."""
+    offset = float(timeline_offset_sec or 0.0)
+    remaining = list(descriptions or [])
+    retimed = []
+    for raw_start, raw_end, text, evidence in records or []:
+        normalized_text = " ".join(str(text or "").split()).casefold()
+        match_index = next(
+            (
+                index for index, item in enumerate(remaining)
+                if " ".join(str(item[2] or "").split()).casefold() == normalized_text
+            ),
+            None,
+        )
+        if match_index is None:
+            retimed.append((raw_start, raw_end, text, evidence))
+            continue
+        start, end, corrected_text = remaining.pop(match_index)
+        retimed.append(
+            (float(start) - offset, float(end) - offset, corrected_text, evidence)
+        )
+    return retimed
+
+
+def get_visual_evidence_time(start_sec, text=""):
+    if not _VISUAL_EVIDENCE_RECORDS:
+        return None
+    start = float(start_sec)
+    normalized_text = " ".join(str(text or "").split()).casefold()
+    candidates = sorted(
+        _VISUAL_EVIDENCE_RECORDS,
+        key=lambda row: (
+            0 if normalized_text and " ".join(row[2].split()).casefold() == normalized_text else 1,
+            abs(row[0] - start),
+        ),
+    )
+    if not candidates:
+        return None
+    best = candidates[0]
+    if abs(best[0] - start) > 0.35:
+        return None
+    return float(best[3])
+
+
 _LANGUAGE_NAMES = {
     "ar": "Arabic",
     "cs": "Czech",
@@ -921,6 +1030,7 @@ def _generate_blocked_chunk_by_minutes(
                 response,
                 status_update_callback=status_update_callback,
             )
+            minute_visual_evidence = list(_LAST_PARSED_VISUAL_EVIDENCE_RAW)
             raw_descriptions, language_usage = _correct_description_language(
                 client, model_name, raw_descriptions, status_update_callback
             )
@@ -941,6 +1051,9 @@ def _generate_blocked_chunk_by_minutes(
                 chunk_start=chunk_start,
                 chunk_number=chunk_number,
                 minute_number=minute_label,
+            )
+            _register_visual_evidence_records(
+                minute_visual_evidence, timeline_offset_sec=minute_start
             )
             recovered_descriptions.extend(normalized)
             if enable_glossary:
@@ -1005,6 +1118,7 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
         _update_status(_("Error: Video file not found: %s") % video_path)
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
+    _reset_visual_evidence_registry()
     video_file_obj = None
     client = None
     all_descriptions = []
@@ -1052,6 +1166,11 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
             text = str(item.get("text") or "").strip()
             if text and end > start:
                 all_descriptions.append((start, end, text))
+                evidence = _parse_visual_evidence_seconds(
+                    item.get("visual_evidence_time_sec")
+                )
+                if evidence is not None:
+                    _VISUAL_EVIDENCE_RECORDS.append((start, end, text, evidence))
         app_logger.info(
             "Using %d physical chunk(s) prepared by Sonarpad's Rust FFmpeg backend.",
             num_chunks,
@@ -1267,6 +1386,7 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
                 _("Chunk %d/%d: asking Gemini for descriptions…") % (i + 1, num_chunks)
             )
             minute_fallback_used = False
+            chunk_visual_evidence = []
             try:
                 try:
                     response = gemini.generate_content_with_retry(
@@ -1332,6 +1452,7 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
                     response,
                     status_update_callback=_update_status,
                 )
+                chunk_visual_evidence = list(_LAST_PARSED_VISUAL_EVIDENCE_RAW)
 
                 # Validate this model response before mixing it with descriptions
                 # from other chunks. A few English entries can otherwise disappear
@@ -1418,6 +1539,10 @@ def generate_descriptions_chunked(video_path, chunk_duration_sec, user_prompt=""
                 normalized_chunk = _normalize_chunk_timestamps(
                     corrected_chunk, chunk_start, chunk_end, i + 1,
                     force_mode="relative" if use_per_chunk_uploads else None,
+                )
+                _register_visual_evidence_records(
+                    chunk_visual_evidence,
+                    timeline_offset_sec=chunk_start if use_per_chunk_uploads else 0.0,
                 )
             max_recovery_passes = 0 if minute_fallback_used else (
                 3 if intensive_mode else 1
@@ -2275,8 +2400,10 @@ def _recover_large_chunk_gaps(
         "or setting the crown again. Use only a genuinely new visible development or the resulting "
         "state. " + recovery_subject_rule + _AUDIO_CONTEXT_ONLY_RULE +
         "Return only valid JSON with keys character_glossary (an empty array) "
-        "and audio_descriptions. Each audio description must contain start_time_mmss, end_time_mmss "
-        "and description_text, using the attached video's MM:SS timeline. Use a dot before milliseconds (MM:SS.ms), never a third colon."
+        "and audio_descriptions. Each audio description must contain start_time_mmss, end_time_mmss, "
+        "visual_evidence_time_seconds and description_text, using the attached video's timeline. "
+        "The visual evidence value is a JSON number for the exact second where the fact is directly visible "
+        "and must fall inside that entry's start/end interval. Use a dot before milliseconds (MM:SS.ms), never a third colon."
     )
     if intensive_mode:
         system_instruction += (
@@ -2346,9 +2473,15 @@ def _recover_large_chunk_gaps(
         recovered_raw, _glossary, parse_ok = _parse_unified_response(
             response_text, status_update_callback
         )
+        recovery_visual_evidence = list(_LAST_PARSED_VISUAL_EVIDENCE_RAW)
         if not parse_ok:
             raise ValueError("Gemini gap recovery returned invalid JSON")
-        recovered = _post_process_mmss_timestamps(recovered_raw, status_update_callback)
+        recovered = _post_process_mmss_timestamps(
+            recovered_raw,
+            status_update_callback,
+            local_timeline_window=(media_chunk_start, media_chunk_end)
+            if media_uses_local_timeline else None,
+        )
         recovered = _normalize_chunk_timestamps(
             recovered, media_chunk_start, media_chunk_end, chunk_number,
             force_mode="relative" if media_uses_local_timeline else None,
@@ -2358,6 +2491,14 @@ def _recover_large_chunk_gaps(
                 (start + media_offset, end + media_offset, text)
                 for start, end, text in recovered
             ]
+        _register_visual_evidence_records(
+            _retime_visual_evidence_records(
+                recovery_visual_evidence,
+                recovered,
+                timeline_offset_sec=media_offset,
+            ),
+            timeline_offset_sec=media_offset,
+        )
         # Gap recovery is a separate Gemini response and can occasionally
         # switch language even when the main chunk was correct. Check it before
         # combining it with the much larger Italian result set.
@@ -2476,7 +2617,50 @@ def _mmss_to_total_seconds(mmss_string):
         app_logger.error("Error parsing MM:SS components in '%s': %s" % (mmss_string, e))
         raise ValueError(_("Invalid MM:SS components in '%s': %s") % (mmss_string, e))
 
-def _post_process_mmss_timestamps(descriptions_list_raw_times, status_update_callback=None):
+def _mmss_to_total_seconds_in_local_window(value, window_start, window_end):
+    """Parse a timestamp, repairing one contextually unambiguous Gemini typo.
+
+    ``MM:SS:ff`` is ambiguous with valid ``HH:MM:SS`` and therefore must not
+    be accepted by the global parser. Gap recovery over an extracted chunk,
+    however, has an authoritative local timeline. If the normal hour-based
+    interpretation is outside that timeline while the fractional
+    interpretation is inside it, the repair is mechanically safe.
+    """
+    parsed = _mmss_to_total_seconds(value)
+    start = float(window_start)
+    end = float(window_end)
+    tolerance_sec = 2.0
+    if start - tolerance_sec <= parsed <= end + tolerance_sec:
+        return parsed
+
+    match = re.fullmatch(r"\s*(\d+):([0-5]\d):(\d{1,2})\s*", str(value))
+    if match is None:
+        return parsed
+
+    minutes = int(match.group(1))
+    seconds = int(match.group(2))
+    fraction_text = match.group(3)
+    repaired = float(
+        minutes * 60
+        + seconds
+        + int(fraction_text) / (10 ** len(fraction_text))
+    )
+    if not start - tolerance_sec <= repaired <= end + tolerance_sec:
+        return parsed
+
+    app_logger.warning(
+        "Normalized contextually unambiguous Gemini MM:SS:fraction timestamp "
+        "'%s' from %.3fs to %.3fs for local recovery window %.3f-%.3fs.",
+        value, parsed, repaired, start, end,
+    )
+    return repaired
+
+
+def _post_process_mmss_timestamps(
+    descriptions_list_raw_times,
+    status_update_callback=None,
+    local_timeline_window=None,
+):
     if not descriptions_list_raw_times:
         return []
     def _log_status_local(message):
@@ -2487,8 +2671,17 @@ def _post_process_mmss_timestamps(descriptions_list_raw_times, status_update_cal
         descriptions_list_raw_times
     ):
         try:
-            current_start_sec = _mmss_to_total_seconds(start_mmss_str)
-            current_end_sec = _mmss_to_total_seconds(end_mmss_str)
+            if local_timeline_window is None:
+                current_start_sec = _mmss_to_total_seconds(start_mmss_str)
+                current_end_sec = _mmss_to_total_seconds(end_mmss_str)
+            else:
+                window_start, window_end = local_timeline_window
+                current_start_sec = _mmss_to_total_seconds_in_local_window(
+                    start_mmss_str, window_start, window_end
+                )
+                current_end_sec = _mmss_to_total_seconds_in_local_window(
+                    end_mmss_str, window_start, window_end
+                )
         except ValueError:
             _log_status_local(_("Skipping description due to invalid MM:SS format."))
             continue
@@ -2666,6 +2859,7 @@ def _extract_descriptions_and_glossary_from_dict(data, status_update_callback):
     if isinstance(descriptions_raw, list):
         for item in descriptions_raw:
             if isinstance(item, dict):
+                _capture_visual_evidence_item(item)
                 start = item.get("start_time_mmss")
                 end = item.get("end_time_mmss")
                 text = item.get("description_text")
@@ -2718,6 +2912,7 @@ def _salvage_partial_unified_json(processed_str, status_update_callback):
         end_t = obj.get("end_time_mmss")
         text = obj.get("description_text")
         if start_t is not None and end_t is not None and text is not None:
+            _capture_visual_evidence_item(obj)
             descriptions.append((str(start_t), str(end_t), str(text).strip()))
         elif "id" in obj and "description" in obj and "description_text" not in obj:
             glossary.append(obj)
@@ -2758,6 +2953,7 @@ def _parse_unified_response(json_string, status_update_callback):
     Returns (descriptions, glossary, parse_ok) where parse_ok is True only if
     the full document was valid JSON (not merely salvaged fragments).
     """
+    _LAST_PARSED_VISUAL_EVIDENCE_RAW.clear()
     if not json_string:
         return [], [], False
 
@@ -2835,7 +3031,8 @@ def _request_json_repair_from_gemini(
         "Output ONLY one valid JSON object (no markdown fences, no commentary) with exactly these keys:\n"
         + glossary_repair_rule
         + '2. "audio_descriptions": array of objects { "start_time_mmss", "end_time_mmss", '
-        '"description_text" } using MM:SS or MM:SS.ms times.\n'
+        '"visual_evidence_time_seconds", "description_text" } using MM:SS or MM:SS.ms times. '
+        'Preserve the exact numeric visual_evidence_time_seconds value for every recovered description.\n'
         "Rules:\n"
         "- The JSON MUST parse with a standard JSON parser (closed braces/brackets, escaped quotes).\n"
         "- If the previous output was truncated, keep every complete description you can recover "
@@ -3123,6 +3320,13 @@ def _build_unified_prompts(user_prompt, model_name_to_use, dialogue_free_windows
     new visual development or the resulting state.
 {subject_repetition_directive}
 {grounding_directive}
+8.  **REPORT THE EXACT VISUAL-EVIDENCE INSTANT:** For every description, set
+    `visual_evidence_time_seconds` to the precise video second at which the described visual fact
+    is directly visible. Re-inspect that exact instant before returning it. This is not a guessed
+    narration time and not the start of the silence: it is the evidence frame for the sentence.
+    It MUST use the same local/absolute timeline requested for the description and MUST fall inside
+    that description's returned start/end interval. If the event is already over at the candidate
+    time, do not reuse it; choose a fact that is actually visible there instead.
 """
 
     # The main system instruction, now asking for a unified JSON object.
@@ -3137,6 +3341,7 @@ Your entire output MUST be a single JSON object with two top-level keys: "charac
 2.  **"audio_descriptions":** An array of objects, where each object represents a timed description. Each description object must contain:
     *   `"start_time_mmss"`: The start time of the description in "MM:SS" or "MM:SS.ms" format. Use a dot before milliseconds; never write `MM:SS:ms`.
     *   `"end_time_mmss"`: The end time of the description in "MM:SS" or "MM:SS.ms" format. Use a dot before milliseconds; never write `MM:SS:ms`.
+    *   `"visual_evidence_time_seconds"`: A JSON number giving the exact second, on the same timeline as the timestamps above, where the described visual fact is directly visible. It must fall between this object's start and end times.
     *   `"description_text"`: The concise description text, written entirely in {target_language_name} and following all core directives.
 
 {core_directives}
@@ -3145,7 +3350,7 @@ Your entire output MUST be a single JSON object with two top-level keys: "charac
 {{
   "character_glossary": {example_glossary_json},
   "audio_descriptions": [
-    {{"start_time_mmss": "00:10.500", "end_time_mmss": "00:12.000", "description_text": {json.dumps(description_example, ensure_ascii=False)}}}
+    {{"start_time_mmss": "00:10.500", "end_time_mmss": "00:12.000", "visual_evidence_time_seconds": 11.2, "description_text": {json.dumps(description_example, ensure_ascii=False)}}}
   ]
 }}
 """
@@ -3189,7 +3394,9 @@ Your entire output MUST be a single JSON object with two top-level keys: "charac
                 "object, and action named in the entry must be visible inside that exact slot; never "
                 "pull an action from a preceding or following scene. The slot boundaries are only "
                 "the allowed container: choose start/end around the exact frames that show the fact "
-                "you describe. Never delay an action to a later part of the same slot after that action "
+                "you describe. Also report `visual_evidence_time_seconds` for the exact evidence frame "
+                "inside that returned interval; do not merely copy the silence start unless that frame "
+                "really shows the described fact. Never delay an action to a later part of the same slot after that action "
                 "has ended, and never anticipate an action that has not started yet. If those frames are "
                 "static, describe their current visible state or setting, including a logo or title card "
                 "when that is what is actually visible. Temporal correctness is more important than visual "

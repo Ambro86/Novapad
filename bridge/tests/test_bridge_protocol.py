@@ -138,6 +138,18 @@ class BridgeProtocolTests(unittest.TestCase):
         self.assertAlmostEqual(normalized[0]["start_sec"], 15.0)
         self.assertAlmostEqual(normalized[0]["visual_start_sec"], 10.0)
 
+    def test_normalise_descriptions_keeps_visual_evidence_as_passive_metadata(self):
+        with mock.patch.object(
+            bridge.audio_describer, "get_visual_evidence_time", return_value=11.25
+        ):
+            normalized = bridge._normalise_descriptions(
+                [(15.0, 17.0, "Azione")],
+                source_descriptions=[(10.0, 12.0, "Azione")],
+            )
+        self.assertAlmostEqual(normalized[0]["start_sec"], 15.0)
+        self.assertAlmostEqual(normalized[0]["visual_start_sec"], 10.0)
+        self.assertAlmostEqual(normalized[0]["visual_evidence_time_sec"], 11.25)
+
     def test_validate_request_accepts_host_prepared_media_and_rejects_bad_timeline(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -28,8 +28,14 @@ class WindowsMediaContextActionsTests(unittest.TestCase):
         self.assertIn("fn append_context_actions_to_menu", self.selector)
         self.assertIn("MF_POPUP", self.selector)
         self.assertIn("append_recursive", self.selector)
-        self.assertIn("append_context_actions_to_menu(\n                    menu,", self.selector)
-        self.assertIn("append_context_actions_to_menu(\n            menu,", self.youtube)
+        self.assertRegex(
+            self.selector,
+            r"append_context_actions_to_menu\(\s*menu,",
+        )
+        self.assertRegex(
+            self.youtube,
+            r"append_context_actions_to_menu\(\s*menu,",
+        )
 
     def test_youtube_video_context_reuses_existing_media_actions(self):
         block = self.youtube[
@@ -102,17 +108,17 @@ class WindowsMediaContextActionsTests(unittest.TestCase):
         youtube_context = self.youtube[youtube_context_start:youtube_context_end]
         self.assertIn("restore_active_media_context_list(parent);", youtube_context)
 
-        self.assertIn(
-            "youtube_transcript_window::restore_active_media_context_list(hwnd)",
+        self.assertRegex(
             self.main,
+            r"youtube_transcript_window::restore_active_media_context_list\(\s*hwnd\s*\)",
         )
         self.assertIn(
             "youtube_transcript_window::has_active_media_context_list(hwnd)",
             self.main,
         )
-        self.assertIn(
-            "youtube_transcript_window::restore_active_media_context_list(parent);",
+        self.assertRegex(
             self.rai_ad,
+            r"youtube_transcript_window::restore_active_media_context_list\(\s*parent\s*,?\s*\);",
         )
 
     def test_media_save_progress_does_not_bounce_focus_to_editor_when_list_is_open(self):

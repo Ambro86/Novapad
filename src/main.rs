@@ -8049,6 +8049,11 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
         )
     });
     prevent_sleep(false);
+    let transcription_succeeded = !result.cancelled && result.error_message.is_none();
+    let dismissed_media_context = transcription_succeeded
+        && app_windows::youtube_transcript_window::dismiss_active_media_context_lists_for_editor(
+            hwnd,
+        );
     close_whisper_progress_window(hwnd);
     crate::menu::update_playback_menu(hwnd, true);
 
@@ -8059,6 +8064,13 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
     if let Some(err) = result.error_message {
         screen_reader_speak(&err);
         return;
+    }
+
+    // A transcription launched from a media selector replaces that selector with the
+    // result document.  Re-enable the editor parent only for that workflow; do not
+    // disturb unrelated modal windows that the user may have opened independently.
+    if dismissed_media_context {
+        crate::enable_window_safe(hwnd, true);
     }
 
     let default_prefix = i18n::tr(language, "whisper.default_filename");

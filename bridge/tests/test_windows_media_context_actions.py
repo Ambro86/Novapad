@@ -186,6 +186,45 @@ class WindowsMediaContextActionsTests(unittest.TestCase):
             self.selector,
         )
 
+
+    def test_successful_transcription_dismisses_originating_media_lists_before_editor(self):
+        self.assertIn(
+            "pub fn close_active_interpreter_selects_for_parent",
+            self.selector,
+        )
+        self.assertIn(
+            "pub(crate) fn dismiss_active_media_context_lists_for_editor",
+            self.youtube,
+        )
+
+        start = self.main.index("fn apply_whisper_transcription_result(")
+        end = self.main.index("fn auto_save_whisper_transcription(", start)
+        block = self.main[start:end]
+        self.assertIn("let transcription_succeeded = !result.cancelled", block)
+        self.assertIn("let dismissed_media_context = transcription_succeeded", block)
+        self.assertIn(
+            "youtube_transcript_window::dismiss_active_media_context_lists_for_editor(",
+            block,
+        )
+        self.assertLess(
+            block.index("dismiss_active_media_context_lists_for_editor("),
+            block.index("close_whisper_progress_window(hwnd);"),
+        )
+        self.assertIn("if dismissed_media_context", block)
+        self.assertLess(
+            block.index("crate::enable_window_safe(hwnd, true);"),
+            block.index("editor_manager::new_document(hwnd);"),
+        )
+
+        dismiss_start = self.youtube.index(
+            "pub(crate) fn dismiss_active_media_context_lists_for_editor"
+        )
+        dismiss_end = self.youtube.index("const EVENT_OBJECT_FOCUS", dismiss_start)
+        dismiss_block = self.youtube[dismiss_start:dismiss_end]
+        self.assertIn("close_active_interpreter_selects_for_parent", dismiss_block)
+        self.assertIn("destroy_window_safe(dialog)", dismiss_block)
+        self.assertIn("enable_window_safe(parent, true)", dismiss_block)
+
     def test_all_rust_context_action_initializers_have_children_field(self):
         rust_sources = "\n".join(
             path.read_text(encoding="utf-8", errors="ignore")

@@ -169,6 +169,40 @@ pub(crate) fn restore_active_media_context_list(parent: HWND) -> bool {
     restore_youtube_comments_dialog_focus(dialog);
     true
 }
+
+pub(crate) fn dismiss_active_media_context_lists_for_editor(parent: HWND) -> bool {
+    let mut closed =
+        crate::app_windows::interpreter_select_window::close_active_interpreter_selects_for_parent(
+            parent,
+        );
+    let dialogs = {
+        let mut windows = ACTIVE_MULTILINE_SELECT_WINDOWS
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        windows.retain(|(dialog, _)| crate::is_window_handle_valid(HWND(*dialog)));
+        windows
+            .iter()
+            .filter(|(_, registered_parent)| *registered_parent == parent.0)
+            .map(|(dialog, _)| HWND(*dialog))
+            .collect::<Vec<_>>()
+    };
+    for dialog in dialogs.into_iter().rev() {
+        crate::log_debug(&format!(
+            "Closing active multiline selector for transcription result dialog={:?} parent={:?}",
+            dialog, parent
+        ));
+        crate::log_if_err!(crate::destroy_window_safe(dialog));
+        closed = true;
+    }
+    if closed {
+        crate::enable_window_safe(parent, true);
+        crate::log_debug(&format!(
+            "Transcription result dismissed media context lists and re-enabled editor parent={:?}",
+            parent
+        ));
+    }
+    closed
+}
 const EVENT_OBJECT_FOCUS: u32 = 0x8005;
 const EVENT_OBJECT_VALUECHANGE: u32 = 0x800E;
 const OBJID_CLIENT: i32 = -4;

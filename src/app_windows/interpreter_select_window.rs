@@ -90,6 +90,31 @@ pub fn restore_active_interpreter_select_for_parent(parent: HWND) -> bool {
     restore_interpreter_select_focus(dialog)
 }
 
+pub fn close_active_interpreter_selects_for_parent(parent: HWND) -> bool {
+    let dialogs = {
+        let mut windows = ACTIVE_INTERPRETER_SELECT_WINDOWS
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        windows.retain(|(dialog, _)| crate::is_window_handle_valid(HWND(*dialog)));
+        windows
+            .iter()
+            .filter(|(_, registered_parent)| *registered_parent == parent.0)
+            .map(|(dialog, _)| HWND(*dialog))
+            .collect::<Vec<_>>()
+    };
+    if dialogs.is_empty() {
+        return false;
+    }
+    for dialog in dialogs.into_iter().rev() {
+        crate::log_debug(&format!(
+            "Closing active interpreter selector for transcription result dialog={:?} parent={:?}",
+            dialog, parent
+        ));
+        crate::log_if_err!(crate::destroy_window_safe(dialog));
+    }
+    true
+}
+
 type ContextActionEnabled = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 type ContextActionHandler = Arc<dyn Fn(String) + Send + Sync>;
 

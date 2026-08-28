@@ -105,6 +105,7 @@ Dlouhé zvukové přepisy
 • Opraven přepis dlouhých zvukových souborů: zvuk se nyní automaticky rozdělí na patnáctiminutové části, postupně se přepíše a poté znovu spojí, čímž se předchází chybám u dlouhých nahrávek.
 
 YouTube
+• Nejužitečnější akce, které byly dříve dostupné jen po otevření videa na YouTube a vstupu do nabídky Přehrávání, jsou nyní dostupné také přímo v kontextové nabídce stejného videa, například „Přepsat aktuální audio“, „Vytvořit audiopopis pomocí AI“ a „Uložit médium“, pro snazší používání.
 • Přidána položka „Kopírovat odkaz“, dostupná také pomocí Ctrl+C, která zkopíruje do schránky URL vybraného videa, playlistu nebo kanálu YouTube.
 
 Verze 0.8.1 – 2026-07-16

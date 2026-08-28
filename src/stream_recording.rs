@@ -1301,6 +1301,7 @@ pub(crate) fn open_recordings(
             label: delete_label,
             ctrl_c_shortcut: false,
             delete_shortcut: true,
+            children: Vec::new(),
             enabled: Arc::new(|id| Path::new(id).is_file()),
             handler: Arc::new(move |id| {
                 let dialog = crate::get_foreground_window_safe();

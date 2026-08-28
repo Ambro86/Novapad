@@ -118,6 +118,57 @@ const YOUTUBE_COMMENTS_REFRESH_TIMER_ID: usize = 9337;
 // but hidden behind the visible mpv surface. Esc stops mpv and restores this list.
 static ACTIVE_PLAYER_RETURN_FLAT_LIST: AtomicIsize = AtomicIsize::new(0);
 static ACTIVE_PLAYER_RETURN_PARENT: AtomicIsize = AtomicIsize::new(0);
+static ACTIVE_MULTILINE_SELECT_WINDOWS: Mutex<Vec<(isize, isize)>> = Mutex::new(Vec::new());
+
+fn register_active_multiline_select(dialog: HWND, parent: HWND) {
+    let mut windows = ACTIVE_MULTILINE_SELECT_WINDOWS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    windows.retain(|(active_dialog, _)| *active_dialog != dialog.0);
+    windows.push((dialog.0, parent.0));
+}
+
+fn unregister_active_multiline_select(dialog: HWND) {
+    let mut windows = ACTIVE_MULTILINE_SELECT_WINDOWS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    windows.retain(|(active_dialog, _)| *active_dialog != dialog.0);
+}
+
+fn active_multiline_select_for_parent(parent: HWND) -> Option<HWND> {
+    let mut windows = ACTIVE_MULTILINE_SELECT_WINDOWS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    windows.retain(|(dialog, _)| crate::is_window_handle_valid(HWND(*dialog)));
+    windows
+        .iter()
+        .rev()
+        .find(|(_, registered_parent)| *registered_parent == parent.0)
+        .map(|(dialog, _)| HWND(*dialog))
+}
+
+pub(crate) fn has_active_media_context_list(parent: HWND) -> bool {
+    crate::app_windows::interpreter_select_window::has_active_interpreter_select_for_parent(parent)
+        || active_multiline_select_for_parent(parent).is_some()
+}
+
+pub(crate) fn restore_active_media_context_list(parent: HWND) -> bool {
+    if crate::app_windows::interpreter_select_window::restore_active_interpreter_select_for_parent(
+        parent,
+    ) {
+        return true;
+    }
+    let Some(dialog) = active_multiline_select_for_parent(parent) else {
+        return false;
+    };
+    crate::log_debug(&format!(
+        "Restoring active multiline selector after media action dialog={:?} parent={:?}",
+        dialog, parent
+    ));
+    crate::enable_window_safe(parent, false);
+    restore_youtube_comments_dialog_focus(dialog);
+    true
+}
 const EVENT_OBJECT_FOCUS: u32 = 0x8005;
 const EVENT_OBJECT_VALUECHANGE: u32 = 0x800E;
 const OBJID_CLIENT: i32 = -4;
@@ -2039,6 +2090,7 @@ struct StreamCollectionPageRequest<'a> {
     has_more: bool,
     show_playlist_download_action: bool,
     initial_selected_label: Option<&'a str>,
+    download_options: PlaylistDownloadOptions,
 }
 
 #[derive(Clone, Copy)]
@@ -2498,6 +2550,202 @@ fn probe_youtube_search_entries(
     Ok((collected, has_more))
 }
 
+fn youtube_context_menu_label(language: Language, key: &str) -> String {
+    i18n::tr(language, key)
+        .replace('&', "")
+        .split('\t')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+fn youtube_context_quality_for_format(
+    format: StreamOutputFormat,
+    options: PlaylistDownloadOptions,
+) -> StreamQualitySelection {
+    match (format, options.format, options.quality) {
+        (StreamOutputFormat::Mp4, StreamOutputFormat::Mp4, quality) => quality,
+        (StreamOutputFormat::Mp3, StreamOutputFormat::Mp3, quality) => quality,
+        _ => StreamQualitySelection::Original,
+    }
+}
+
+fn youtube_selection_save_context(
+    parent: HWND,
+    ytdlp_path: &Path,
+    entry: &StreamCollectionEntry,
+    format: StreamOutputFormat,
+    quality: StreamQualitySelection,
+) -> StreamSaveContext {
+    let credentials = stream_auth_site_key(&entry.url)
+        .as_deref()
+        .and_then(|site| load_saved_stream_site_credentials(parent, site));
+    StreamSaveContext {
+        url: entry.url.clone(),
+        title: Some(entry.title.clone()),
+        dialog_data: StreamDialogResult {
+            url: entry.url.clone(),
+            format,
+            quality,
+            direct_play: false,
+            reopen_collection_page: None,
+            reopen_selected_label: None,
+            previous_input: None,
+            previous_collection_page: None,
+            previous_selected_label: None,
+        },
+        selected_audio_format: None,
+        prefer_video: true,
+        ytdlp_path: ytdlp_path.to_path_buf(),
+        credentials,
+    }
+}
+
+fn youtube_video_context_actions(
+    parent: HWND,
+    language: Language,
+    ytdlp_path: Arc<PathBuf>,
+    entries: Arc<Vec<StreamCollectionEntry>>,
+    download_options: PlaylistDownloadOptions,
+) -> Vec<crate::app_windows::interpreter_select_window::InterpreterContextAction> {
+    use crate::app_windows::interpreter_select_window::InterpreterContextAction;
+
+    let video_enabled = |entries: Arc<Vec<StreamCollectionEntry>>| {
+        Arc::new(move |selected: &str| {
+            entries
+                .iter()
+                .find(|entry| entry.label == selected)
+                .map(|entry| {
+                    !is_youtube_collection_url(&entry.url) && extract_video_id(&entry.url).is_some()
+                })
+                .unwrap_or(false)
+        }) as Arc<dyn Fn(&str) -> bool + Send + Sync>
+    };
+
+    let mut save_children = Vec::new();
+    for format in [
+        StreamOutputFormat::Mp4,
+        StreamOutputFormat::Mp3,
+        StreamOutputFormat::M4a,
+        StreamOutputFormat::Opus,
+        StreamOutputFormat::Ogg,
+        StreamOutputFormat::Wav,
+        StreamOutputFormat::Flac,
+    ] {
+        let child_entries = Arc::clone(&entries);
+        let child_entries_for_handler = Arc::clone(&entries);
+        let child_ytdlp_path = Arc::clone(&ytdlp_path);
+        let child_quality = youtube_context_quality_for_format(format, download_options);
+        save_children.push(InterpreterContextAction {
+            label: format.settings_value().to_ascii_uppercase(),
+            ctrl_c_shortcut: false,
+            delete_shortcut: false,
+            enabled: video_enabled(child_entries),
+            handler: Arc::new(move |selected: String| {
+                let Some(entry) = child_entries_for_handler
+                    .iter()
+                    .find(|entry| entry.label == selected)
+                else {
+                    return;
+                };
+                let context = youtube_selection_save_context(
+                    parent,
+                    &child_ytdlp_path,
+                    entry,
+                    format,
+                    child_quality,
+                );
+                let active_url = context.url.clone();
+                with_temporary_stream_save_context(context, || {
+                    download_active_streaming_audio_media(parent, &active_url, language);
+                });
+                restore_active_media_context_list(parent);
+            }),
+            children: Vec::new(),
+        });
+    }
+
+    let save_action = InterpreterContextAction {
+        label: youtube_context_menu_label(language, "playback.download_episode"),
+        ctrl_c_shortcut: false,
+        delete_shortcut: false,
+        enabled: video_enabled(Arc::clone(&entries)),
+        handler: Arc::new(|_| {}),
+        children: save_children,
+    };
+
+    let transcribe_entries = Arc::clone(&entries);
+    let transcribe_entries_for_handler = Arc::clone(&entries);
+    let transcribe_ytdlp_path = Arc::clone(&ytdlp_path);
+    let transcribe_action = InterpreterContextAction {
+        label: youtube_context_menu_label(language, "playback.transcribe_current"),
+        ctrl_c_shortcut: false,
+        delete_shortcut: false,
+        enabled: video_enabled(transcribe_entries),
+        handler: Arc::new(move |selected: String| {
+            let Some(entry) = transcribe_entries_for_handler
+                .iter()
+                .find(|entry| entry.label == selected)
+            else {
+                return;
+            };
+            let context = youtube_selection_save_context(
+                parent,
+                &transcribe_ytdlp_path,
+                entry,
+                StreamOutputFormat::Auto,
+                StreamQualitySelection::Original,
+            );
+            let active_url = context.url.clone();
+            let media_title = Some(entry.title.clone());
+            let downloaded_path = with_temporary_stream_save_context(context, || {
+                download_active_streaming_audio_media_for_transcription(
+                    parent,
+                    &active_url,
+                    language,
+                )
+            });
+            if let Some(path) = downloaded_path {
+                crate::start_whisper_transcription_for_media(parent, path, media_title);
+            }
+        }),
+        children: Vec::new(),
+    };
+
+    let audio_description_entries = Arc::clone(&entries);
+    let audio_description_entries_for_handler = Arc::clone(&entries);
+    let audio_description_ytdlp_path = Arc::clone(&ytdlp_path);
+    let audio_description_action = InterpreterContextAction {
+        label: youtube_context_menu_label(language, "menu.create_audio_description"),
+        ctrl_c_shortcut: false,
+        delete_shortcut: false,
+        enabled: video_enabled(audio_description_entries),
+        handler: Arc::new(move |selected: String| {
+            let Some(entry) = audio_description_entries_for_handler
+                .iter()
+                .find(|entry| entry.label == selected)
+            else {
+                return;
+            };
+            let context = youtube_selection_save_context(
+                parent,
+                &audio_description_ytdlp_path,
+                entry,
+                StreamOutputFormat::Auto,
+                StreamQualitySelection::Original,
+            );
+            let active_url = context.url.clone();
+            with_temporary_stream_save_context(context, || {
+                download_active_youtube_for_audio_description(parent, &active_url, language);
+            });
+        }),
+        children: Vec::new(),
+    };
+
+    vec![save_action, transcribe_action, audio_description_action]
+}
+
 fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>) -> Option<String> {
     let StreamCollectionPageRequest {
         parent,
@@ -2508,6 +2756,7 @@ fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>)
         has_more,
         show_playlist_download_action,
         initial_selected_label,
+        download_options,
     } = request;
     let mut labels = Vec::with_capacity(
         entries.len()
@@ -2527,6 +2776,13 @@ fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>)
     }
     let favorite_candidates = Arc::new(entries.to_vec());
     let ytdlp_path = Arc::new(ytdlp_path.to_path_buf());
+    let video_actions = youtube_video_context_actions(
+        parent,
+        language,
+        Arc::clone(&ytdlp_path),
+        Arc::clone(&favorite_candidates),
+        download_options,
+    );
     let add_to_favorites_action =
         crate::app_windows::interpreter_select_window::InterpreterContextAction {
             label: tr_or(
@@ -2536,6 +2792,7 @@ fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>)
             ),
             ctrl_c_shortcut: false,
             delete_shortcut: false,
+            children: Vec::new(),
             enabled: {
                 let favorite_candidates = Arc::clone(&favorite_candidates);
                 Arc::new(move |selected: &str| {
@@ -2562,6 +2819,7 @@ fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>)
             label: format!("{} (Ctrl+C)", i18n::tr(language, "stream_audio.copy_link")),
             ctrl_c_shortcut: true,
             delete_shortcut: false,
+            children: Vec::new(),
             enabled: {
                 let favorite_candidates = Arc::clone(&favorite_candidates);
                 Arc::new(move |selected: &str| {
@@ -2589,6 +2847,7 @@ fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>)
             label: tr_or(language, "stream_audio.view_comments", "View comments"),
             ctrl_c_shortcut: false,
             delete_shortcut: false,
+            children: Vec::new(),
             enabled: {
                 let favorite_candidates = Arc::clone(&favorite_candidates);
                 Arc::new(move |selected: &str| {
@@ -2626,11 +2885,10 @@ fn choose_stream_collection_entry_page(request: StreamCollectionPageRequest<'_>)
         language,
         i18n::tr(language, "stream_audio.prompt_title"),
         initial_selected_label.map(ToOwned::to_owned),
-        vec![
-            copy_link_action,
-            view_comments_action,
-            add_to_favorites_action,
-        ],
+        video_actions
+            .into_iter()
+            .chain([copy_link_action, view_comments_action, add_to_favorites_action])
+            .collect(),
     )
 }
 
@@ -3175,6 +3433,10 @@ fn open_youtube_comments_window_with_mode(
     };
     if hwnd.0 == 0 {
         return YoutubeCommentsDialogAction::None;
+    }
+
+    if is_flat_selection {
+        register_active_multiline_select(hwnd, parent);
     }
 
     if keep_parent_enabled_for_player {
@@ -3995,6 +4257,7 @@ fn youtube_comments_dialog_wndproc_inner(
             LRESULT(0)
         }
         WM_NCDESTROY => {
+            unregister_active_multiline_select(hwnd);
             let had_refresh =
                 with_youtube_comments_state(hwnd, |state| state.flat_refresh.is_some())
                     .unwrap_or(false);
@@ -4746,8 +5009,15 @@ fn sync_youtube_comments_accessibility_proxy_selection(
         LPARAM(0),
     );
     if focus_proxy {
-        unsafe {
-            SetFocus(state.accessibility_proxy);
+        if crate::media_action_progress_is_active(state.parent) {
+            crate::log_debug(&format!(
+                "YT comments sync proxy selection: preserving active progress modal parent={:?}",
+                state.parent
+            ));
+        } else {
+            unsafe {
+                SetFocus(state.accessibility_proxy);
+            }
         }
     }
 }
@@ -4818,16 +5088,6 @@ fn show_youtube_comments_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM
         let Some(selected_id) = selected_youtube_comment_id(state) else {
             return false;
         };
-        let applicable_actions = state
-            .flat_context_actions
-            .iter()
-            .filter(|action| (action.enabled)(&selected_id))
-            .cloned()
-            .collect::<Vec<_>>();
-        if applicable_actions.is_empty() {
-            return false;
-        }
-
         let menu = match CreatePopupMenu() {
             Ok(menu) => menu,
             Err(err) => {
@@ -4835,16 +5095,25 @@ fn show_youtube_comments_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM
                 return false;
             }
         };
-        for (index, action) in applicable_actions.iter().enumerate() {
-            let label = to_wide(&action.label);
-            if let Err(err) = AppendMenuW(menu, MF_STRING, index + 1, PCWSTR(label.as_ptr())) {
-                crate::log_debug(&format!(
-                    "Failed to append multiline context menu item: {}",
-                    err
-                ));
-                crate::log_if_err!(DestroyMenu(menu));
-                return false;
-            }
+        let applicable_actions =
+            match crate::app_windows::interpreter_select_window::append_context_actions_to_menu(
+                menu,
+                &state.flat_context_actions,
+                &selected_id,
+            ) {
+                Ok(actions) => actions,
+                Err(err) => {
+                    crate::log_debug(&format!(
+                        "Failed to append multiline context menu item: {}",
+                        err
+                    ));
+                    crate::log_if_err!(DestroyMenu(menu));
+                    return false;
+                }
+            };
+        if applicable_actions.is_empty() {
+            crate::log_if_err!(DestroyMenu(menu));
+            return false;
         }
         let point = if lparam.0 == -1 {
             let mut pt = POINT::default();
@@ -4877,10 +5146,18 @@ fn show_youtube_comments_context_menu(hwnd: HWND, wparam: WPARAM, lparam: LPARAM
             let index = command.0 as usize - 1;
             if let Some(action) = applicable_actions.get(index) {
                 (action.handler)(selected_id);
-                crate::set_foreground_window_safe(hwnd);
-                if state.flat_list_mode && crate::is_window_handle_valid(state.accessibility_proxy)
-                {
-                    sync_youtube_comments_accessibility_proxy_selection(state, true);
+                if crate::media_action_progress_is_active(state.parent) {
+                    crate::log_debug(&format!(
+                        "YT comments context action: preserving active progress modal parent={:?}",
+                        state.parent
+                    ));
+                } else {
+                    crate::set_foreground_window_safe(hwnd);
+                    if state.flat_list_mode
+                        && crate::is_window_handle_valid(state.accessibility_proxy)
+                    {
+                        sync_youtube_comments_accessibility_proxy_selection(state, true);
+                    }
                 }
             }
         }
@@ -5872,6 +6149,7 @@ fn choose_youtube_collection_entry(
             show_playlist_download_action: normalize_youtube_playlist_url_from_input(url).is_some(),
             initial_selected_label: initial_selected_label
                 .filter(|_| page == initial_page.unwrap_or(0)),
+            download_options: playlist_download_options,
         }) else {
             if page > 0 {
                 crate::log_debug(&format!(
@@ -6059,6 +6337,7 @@ fn choose_youtube_search_entry(
             has_more,
             show_playlist_download_action: false,
             initial_selected_label: initial_selected_label.filter(|_| page == 0),
+            download_options: playlist_download_options,
         }) else {
             if page > 0 {
                 crate::log_debug(&format!(
@@ -6346,6 +6625,24 @@ fn active_stream_save_context_for_url(url: &str) -> Option<StreamSaveContext> {
         .lock()
         .unwrap_or_else(|err| err.into_inner());
     guard.as_ref().filter(|context| context.url == url).cloned()
+}
+
+fn with_temporary_stream_save_context<T>(
+    context: StreamSaveContext,
+    action: impl FnOnce() -> T,
+) -> T {
+    let previous = {
+        let mut guard = ACTIVE_STREAM_SAVE_CONTEXT
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        guard.replace(context)
+    };
+    let result = action();
+    let mut guard = ACTIVE_STREAM_SAVE_CONTEXT
+        .lock()
+        .unwrap_or_else(|err| err.into_inner());
+    *guard = previous;
+    result
 }
 
 pub(crate) fn can_create_audio_description_from_active_youtube(active_url: &str) -> bool {
@@ -10384,6 +10681,9 @@ pub(crate) fn download_active_streaming_audio_media(
         "stream_audio.progress_downloading",
         true,
     );
+    if has_active_media_context_list(parent) {
+        crate::app_windows::podcast_save_window::suppress_parent_restore_on_close(progress);
+    }
     report_progress_status(
         progress,
         &i18n::tr(language, "stream_audio.progress_downloading"),
@@ -10457,6 +10757,9 @@ pub(crate) fn download_active_streaming_audio_media(
                 "stream_audio.progress_downloading",
                 true,
             );
+            if has_active_media_context_list(parent) {
+                crate::app_windows::podcast_save_window::suppress_parent_restore_on_close(progress);
+            }
             attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
                 parent,
                 progress,

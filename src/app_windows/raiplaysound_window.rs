@@ -106,6 +106,7 @@ fn browse_page(
                 ),
                 ctrl_c_shortcut: true,
                 delete_shortcut: false,
+                children: Vec::new(),
                 enabled: Arc::new(move |selected_id: &str| {
                     context_items_for_copy_enabled
                         .iter()
@@ -144,6 +145,7 @@ fn browse_page(
                 label: "Aggiungi ai podcast".to_string(),
                 ctrl_c_shortcut: false,
                 delete_shortcut: false,
+                children: Vec::new(),
                 enabled: Arc::new(move |selected_id: &str| {
                     if !raiplaysound::is_raiplaysound_url(&container_url_for_enabled) {
                         return false;

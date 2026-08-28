@@ -1,6 +1,5 @@
 use flate2::read::GzDecoder;
 use rand::Rng;
-use rand::seq::SliceRandom;
 use reqwest::Client;
 use reqwest::header::{
     ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE, AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderName,
@@ -78,6 +77,9 @@ pub struct TranslatorGoogleFree {
     client: Client,
 }
 
+const GOOGLE_TRANSLATE_URL: &str = "https://translate-pa.googleapis.com/v1/translate";
+const GOOGLE_TRANSLATE_API_KEY: &str = "AIzaSyDLEeFI5OtFBwYBIoK_jj5m32rZK5CkCXA";
+
 impl TranslatorGoogleFree {
     pub fn new(
         target_lang: impl Into<String>,
@@ -95,31 +97,6 @@ impl TranslatorGoogleFree {
         })
     }
 
-    fn endpoints() -> &'static [&'static str] {
-        &[
-            "https://translate.googleapis.com/translate_a/single",
-            "https://translate.googleapis.mirror.nvdadr.com/translate_a/single",
-            "https://translate.google.com/translate_a/single",
-            "https://translate.google.co.in/translate_a/single",
-            "https://translate.google.co.uk/translate_a/single",
-            "https://translate.google.com.au/translate_a/single",
-            "https://translate.google.ca/translate_a/single",
-            "https://translate.google.de/translate_a/single",
-            "https://translate.google.es/translate_a/single",
-            "https://translate.google.fr/translate_a/single",
-            "https://translate.google.it/translate_a/single",
-            "https://translate.google.nl/translate_a/single",
-            "https://translate.google.pt/translate_a/single",
-            "https://translate.google.ru/translate_a/single",
-        ]
-    }
-
-    fn endpoints_random_order() -> Vec<&'static str> {
-        let mut endpoints = Self::endpoints().to_vec();
-        endpoints.shuffle(&mut rand::thread_rng());
-        endpoints
-    }
-
     fn normalized_google_lang(lang: &str) -> String {
         match lang.trim().to_ascii_lowercase().as_str() {
             "iw" => "he".to_string(),
@@ -131,22 +108,26 @@ impl TranslatorGoogleFree {
     }
 
     fn parse_result(response: Value) -> Result<String, TranslatorError> {
-        let sentences = response["sentences"]
-            .as_array()
-            .ok_or(TranslatorError::MissingTranslatedText)?;
         let mut translated = String::new();
 
-        for sentence in sentences {
-            if let Some(text) = sentence["trans"].as_str() {
-                translated.push_str(text);
+        if let Some(sentences) = response.get(1).and_then(Value::as_array) {
+            for sentence in sentences {
+                if let Some(text) = sentence.get(0).and_then(Value::as_str) {
+                    translated.push_str(text);
+                }
             }
         }
-
-        if translated.is_empty() && !sentences.is_empty() {
-            return Err(TranslatorError::MissingTranslatedText);
+        if translated.is_empty()
+            && let Some(text) = response.get(0).and_then(Value::as_str)
+        {
+            translated.push_str(text);
         }
 
-        Ok(translated)
+        if translated.is_empty() {
+            Err(TranslatorError::MissingTranslatedText)
+        } else {
+            Ok(translated)
+        }
     }
 
     async fn translate_with_endpoint(
@@ -161,13 +142,19 @@ impl TranslatorGoogleFree {
             .client
             .get(endpoint)
             .header(USER_AGENT, HeaderValue::from_static("Mozilla/5.0"))
+            .header(
+                CONTENT_TYPE,
+                HeaderValue::from_static("application/json+protobuf"),
+            )
             .query(&[
-                ("client", "gtx"),
-                ("sl", source_lang.as_str()),
-                ("tl", target_lang.as_str()),
-                ("dt", "t"),
-                ("dj", "1"),
-                ("q", text),
+                ("params.client", "gtx"),
+                ("query.source_language", source_lang.as_str()),
+                ("query.target_language", target_lang.as_str()),
+                ("query.display_language", target_lang.as_str()),
+                ("query.text", text),
+                ("key", GOOGLE_TRANSLATE_API_KEY),
+                ("data_types", "TRANSLATION"),
+                ("data_types", "SENTENCE_SPLITS"),
             ])
             .send()
             .await
@@ -193,16 +180,8 @@ impl TranslatorGoogleFree {
     }
 
     pub async fn translate(&self, text: &str) -> Result<String, TranslatorError> {
-        let mut last_error = None;
-
-        for endpoint in Self::endpoints_random_order() {
-            match self.translate_with_endpoint(endpoint, text).await {
-                Ok(translated) => return Ok(translated),
-                Err(err) => last_error = Some(err),
-            }
-        }
-
-        Err(last_error.unwrap_or(TranslatorError::MissingTranslatedText))
+        self.translate_with_endpoint(GOOGLE_TRANSLATE_URL, text)
+            .await
     }
 
     pub async fn translate_chunked_cancellable_with_progress(
@@ -878,5 +857,44 @@ impl TranslatorGemini {
         }
 
         Ok(translated_text)
+    }
+}
+
+#[cfg(test)]
+mod google_translate_tests {
+    use super::{TranslatorError, TranslatorGoogleFree};
+    use serde_json::json;
+
+    #[test]
+    fn parses_new_google_sentence_array() {
+        let response = json!([
+            "Ciao mondo",
+            [["Ciao ", "Hello "], ["mondo", "world"]],
+            null,
+            null,
+            [["en"], null, [1], ["en"]],
+            "en"
+        ]);
+
+        let translated = TranslatorGoogleFree::parse_result(response).unwrap();
+        assert_eq!(translated, "Ciao mondo");
+    }
+
+    #[test]
+    fn falls_back_to_top_level_translation() {
+        let response = json!(["Ciao mondo", null, null, null, null, "en"]);
+
+        let translated = TranslatorGoogleFree::parse_result(response).unwrap();
+        assert_eq!(translated, "Ciao mondo");
+    }
+
+    #[test]
+    fn rejects_response_without_translation() {
+        let response = json!([null, [], null, null, null, "en"]);
+
+        assert!(matches!(
+            TranslatorGoogleFree::parse_result(response),
+            Err(TranslatorError::MissingTranslatedText)
+        ));
     }
 }

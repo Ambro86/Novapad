@@ -20,8 +20,17 @@ class _Response:
 
 
 class LanguageDetectorTests(unittest.TestCase):
-    def test_google_src_and_confidence_are_returned(self):
-        opener = mock.Mock(return_value=_Response({"src": "en", "confidence": 0.98}))
+    def test_google_source_language_and_confidence_are_returned(self):
+        payload = [
+            "Questa è una descrizione audio inglese sufficientemente lunga.",
+            [["Questa è una descrizione audio inglese sufficientemente lunga.",
+              "This is a sufficiently long English audio description."]],
+            None,
+            None,
+            [["en"], None, [0.98], ["en"]],
+            "en",
+        ]
+        opener = mock.Mock(return_value=_Response(payload))
         result = language_detector.detect_language(
             "This is a sufficiently long English audio description.",
             target_language="it",
@@ -29,7 +38,11 @@ class LanguageDetectorTests(unittest.TestCase):
         )
         self.assertEqual(result.language, "en")
         self.assertEqual(result.confidence, 0.98)
-        self.assertIn("sl=auto", opener.call_args.args[0].full_url)
+        request = opener.call_args.args[0]
+        self.assertIn("translate-pa.googleapis.com/v1/translate", request.full_url)
+        self.assertIn("query.source_language=auto", request.full_url)
+        self.assertIn("query.target_language=it", request.full_url)
+        self.assertEqual(request.get_header("Content-type"), "application/json+protobuf")
 
     def test_short_text_is_not_detected(self):
         opener = mock.Mock()
@@ -37,12 +50,34 @@ class LanguageDetectorTests(unittest.TestCase):
         opener.assert_not_called()
 
     def test_short_english_description_is_still_checked(self):
-        opener = mock.Mock(return_value=_Response({"src": "en", "confidence": 0.99}))
+        opener = mock.Mock(return_value=_Response([
+            "I nani osservano con gioia",
+            [["I nani osservano con gioia", "Dwarves observe joyously"]],
+            None,
+            None,
+            [["en"], None, [0.99], ["en"]],
+            "en",
+        ]))
         result = language_detector.detect_language(
             "Dwarves observe joyously", target_language="it", opener=opener
         )
         self.assertEqual(result.language, "en")
         opener.assert_called_once()
+
+    def test_language_metadata_fallback_is_supported(self):
+        opener = mock.Mock(return_value=_Response([
+            "hello friend how are you",
+            [["hello friend how are you", "ciao amico come stai"]],
+            None,
+            None,
+            [["it"], None, [1], ["it"]],
+            None,
+        ]))
+        result = language_detector.detect_language(
+            "ciao amico come stai", target_language="en", opener=opener
+        )
+        self.assertEqual(result.language, "it")
+        self.assertEqual(result.confidence, 1.0)
 
     def test_locale_variants_match(self):
         self.assertTrue(language_detector.languages_match("pt-BR", "pt"))

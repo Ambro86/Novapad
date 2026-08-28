@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -75,6 +75,125 @@ pub(crate) fn ensure_rai_luce_access_with_title(
     )
 }
 
+fn context_menu_label(language: Language, key: &str) -> String {
+    crate::i18n::tr(language, key)
+        .replace('&', "")
+        .split('\t')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+fn optional_media_title(title: &str) -> Option<String> {
+    let title = title.trim();
+    if title.is_empty() {
+        None
+    } else {
+        Some(title.to_string())
+    }
+}
+
+fn catalog_context_actions(
+    parent: HWND,
+    language: Language,
+    items_by_key: HashMap<String, CatalogItem>,
+) -> Vec<InterpreterContextAction> {
+    let items = Arc::new(items_by_key);
+    let enabled_for = |items: Arc<HashMap<String, CatalogItem>>| {
+        Arc::new(move |selected_key: &str| {
+            items
+                .get(selected_key)
+                .map(|item| !item.audio_url.trim().is_empty())
+                .unwrap_or(false)
+        }) as Arc<dyn Fn(&str) -> bool + Send + Sync>
+    };
+
+    let save_items = Arc::clone(&items);
+    let save_action = InterpreterContextAction {
+        label: context_menu_label(language, "playback.download_episode"),
+        ctrl_c_shortcut: false,
+        delete_shortcut: false,
+        enabled: enabled_for(Arc::clone(&items)),
+        handler: Arc::new(move |selected_key: String| {
+            let Some(item) = save_items.get(&selected_key) else {
+                return;
+            };
+            let resolved_url = match rai_audiodescrizioni::resolve_audio_url(&item.audio_url) {
+                Ok(url) => url,
+                Err(err) => {
+                    show_error(parent, language, &err);
+                    return;
+                }
+            };
+            crate::download_podcast_episode(
+                parent,
+                Some(resolved_url),
+                None,
+                optional_media_title(&item.title),
+                None,
+                language,
+            );
+            crate::app_windows::youtube_transcript_window::restore_active_media_context_list(
+                parent,
+            );
+        }),
+        children: Vec::new(),
+    };
+
+    let transcribe_items = Arc::clone(&items);
+    let transcribe_action = InterpreterContextAction {
+        label: context_menu_label(language, "playback.transcribe_current"),
+        ctrl_c_shortcut: false,
+        delete_shortcut: false,
+        enabled: enabled_for(Arc::clone(&items)),
+        handler: Arc::new(move |selected_key: String| {
+            let Some(item) = transcribe_items.get(&selected_key) else {
+                return;
+            };
+            let resolved_url = match rai_audiodescrizioni::resolve_audio_url(&item.audio_url) {
+                Ok(url) => url,
+                Err(err) => {
+                    show_error(parent, language, &err);
+                    return;
+                }
+            };
+            crate::start_whisper_transcription_for_remote_media(
+                parent,
+                resolved_url,
+                optional_media_title(&item.title),
+            );
+        }),
+        children: Vec::new(),
+    };
+
+    let copy_items = Arc::clone(&items);
+    let copy_action = InterpreterContextAction {
+        label: format!(
+            "{} (Ctrl+C)",
+            crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
+        ),
+        ctrl_c_shortcut: true,
+        delete_shortcut: false,
+        enabled: enabled_for(items),
+        handler: Arc::new(move |selected_key: String| {
+            if let Some(item) = copy_items.get(&selected_key) {
+                copy_text_to_clipboard(
+                    parent,
+                    &format_resolved_audio_url_clipboard_text(
+                        language,
+                        &item.title,
+                        &item.audio_url,
+                    ),
+                );
+            }
+        }),
+        children: Vec::new(),
+    };
+
+    vec![save_action, transcribe_action, copy_action]
+}
+
 fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option<String>) {
     crate::screen_reader_speak(&crate::i18n::tr(
         language,
@@ -111,10 +230,12 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
             .find(|(_, item)| item.item_id == item_id)
             .map(|(label, _)| label.clone())
     });
-    let display_items_for_enabled = display_items.clone();
-    let display_items_for_handler = display_items.clone();
+    let context_items = display_items
+        .iter()
+        .cloned()
+        .collect::<HashMap<String, CatalogItem>>();
     let filter_label = crate::i18n::tr(language, "wikipedia.search_label");
-    let selection = interpreter_select_window::select_interpreter_with_secondary_action_and_context_action_and_initial_without_parent_restore(
+    let selection = interpreter_select_window::select_interpreter_with_secondary_action_and_context_actions_and_initial_without_parent_restore(
         parent,
         labels,
         language,
@@ -124,36 +245,7 @@ fn open_recent_catalog(parent: HWND, language: Language, initial_item_id: Option
             filter_label: Some(filter_label),
         },
         initial_label,
-        InterpreterContextAction {
-            label: format!(
-                "{} (Ctrl+C)",
-                crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
-            ),
-            ctrl_c_shortcut: true,
-            delete_shortcut: false,
-            enabled: Arc::new(move |selected_label: &str| {
-                display_items_for_enabled
-                    .iter()
-                    .find(|(label, _)| label == selected_label)
-                    .map(|(_, item)| !item.audio_url.trim().is_empty())
-                    .unwrap_or(false)
-            }),
-            handler: Arc::new(move |selected_label: String| {
-                if let Some((_, item)) = display_items_for_handler
-                    .iter()
-                    .find(|(label, _)| label == &selected_label)
-                {
-                    copy_text_to_clipboard(
-                        parent,
-                        &format_resolved_audio_url_clipboard_text(
-                            language,
-                            &item.title,
-                            &item.audio_url,
-                        ),
-                    );
-                }
-            }),
-        },
+        catalog_context_actions(parent, language, context_items),
     );
 
     match selection {
@@ -240,47 +332,20 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
         .flat_map(|group| group.items.iter().cloned())
         .map(|item| (item.item_id.clone(), item))
         .collect();
-    let item_by_id_for_enabled = item_by_id.clone();
-    let item_by_id_for_handler = item_by_id.clone();
     let filter_label = crate::i18n::tr(language, "wikipedia.search_label");
     let selection = if film_items.is_empty() {
-        interpreter_select_window::select_grouped_interpreter_with_context_action_without_parent_restore_on_accept(
+        interpreter_select_window::select_grouped_interpreter_with_context_actions_without_parent_restore_on_accept(
             parent,
             grouped_items,
             language,
             crate::i18n::tr(language, "rai_audiodescrizioni.window.full_title"),
             Some(filter_label),
             initial_item_id,
-            InterpreterContextAction {
-                label: format!(
-                    "{} (Ctrl+C)",
-                    crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
-                ),
-                ctrl_c_shortcut: true,
-                delete_shortcut: false,
-                enabled: Arc::new(move |selected_value: &str| {
-                    item_by_id_for_enabled
-                        .get(selected_value)
-                        .map(|item| !item.audio_url.trim().is_empty())
-                        .unwrap_or(false)
-                }),
-                handler: Arc::new(move |selected_value: String| {
-                    if let Some(item) = item_by_id_for_handler.get(&selected_value) {
-                        copy_text_to_clipboard(
-                            parent,
-                            &format_resolved_audio_url_clipboard_text(
-                                language,
-                                &item.title,
-                                &item.audio_url,
-                            ),
-                        );
-                    }
-                }),
-            },
+            catalog_context_actions(parent, language, item_by_id.clone()),
         )
         .map(InterpreterSelectionResult::Item)
     } else {
-        interpreter_select_window::select_grouped_interpreter_with_secondary_action_and_context_action_without_parent_restore_on_accept(
+        interpreter_select_window::select_grouped_interpreter_with_secondary_action_and_context_actions_without_parent_restore_on_accept(
             parent,
             grouped_items,
             language,
@@ -290,32 +355,7 @@ fn open_grouped_catalog(parent: HWND, language: Language, initial_item_id: Optio
                 filter_label: Some(filter_label),
             },
             initial_item_id,
-            InterpreterContextAction {
-                label: format!(
-                    "{} (Ctrl+C)",
-                    crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
-                ),
-                ctrl_c_shortcut: true,
-                delete_shortcut: false,
-                enabled: Arc::new(move |selected_value: &str| {
-                    item_by_id_for_enabled
-                        .get(selected_value)
-                        .map(|item| !item.audio_url.trim().is_empty())
-                        .unwrap_or(false)
-                }),
-                handler: Arc::new(move |selected_value: String| {
-                    if let Some(item) = item_by_id_for_handler.get(&selected_value) {
-                        copy_text_to_clipboard(
-                            parent,
-                            &format_resolved_audio_url_clipboard_text(
-                                language,
-                                &item.title,
-                                &item.audio_url,
-                            ),
-                        );
-                    }
-                }),
-            },
+            catalog_context_actions(parent, language, item_by_id.clone()),
         )
     };
     let Some(selected_value) = selection else {
@@ -485,8 +525,10 @@ fn open_film_catalog(parent: HWND, language: Language, items: &[CatalogItem]) {
         return;
     }
     let (display_items, labels) = build_display_items(items, language);
-    let display_items_for_enabled = display_items.clone();
-    let display_items_for_handler = display_items.clone();
+    let context_items = display_items
+        .iter()
+        .cloned()
+        .collect::<HashMap<String, CatalogItem>>();
     let selection =
         interpreter_select_window::select_interpreter_with_context_actions_without_parent_restore_on_accept(
             parent,
@@ -494,36 +536,7 @@ fn open_film_catalog(parent: HWND, language: Language, items: &[CatalogItem]) {
             language,
             "Film".to_string(),
             None,
-            vec![InterpreterContextAction {
-                label: format!(
-                    "{} (Ctrl+C)",
-                    crate::i18n::tr(language, "rai_audiodescrizioni.copy_audio_url")
-                ),
-                ctrl_c_shortcut: true,
-                delete_shortcut: false,
-                enabled: Arc::new(move |selected_label: &str| {
-                    display_items_for_enabled
-                        .iter()
-                        .find(|(label, _)| label == selected_label)
-                        .map(|(_, item)| !item.audio_url.trim().is_empty())
-                        .unwrap_or(false)
-                }),
-                handler: Arc::new(move |selected_label: String| {
-                    if let Some((_, item)) = display_items_for_handler
-                        .iter()
-                        .find(|(label, _)| label == &selected_label)
-                    {
-                        copy_text_to_clipboard(
-                            parent,
-                            &format_resolved_audio_url_clipboard_text(
-                                language,
-                                &item.title,
-                                &item.audio_url,
-                            ),
-                        );
-                    }
-                }),
-            }],
+            catalog_context_actions(parent, language, context_items),
         );
     let Some(selected_label) = selection else {
         let initial_item_id =

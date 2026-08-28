@@ -1,9 +1,9 @@
 """Small Google Translate language-detection helper.
 
-The free Translate endpoint is already used by the companion Sonarpad project.
-With ``sl=auto`` and ``dj=1`` its JSON response includes the detected source
-language in ``src``.  Detection is deliberately best-effort: description
-generation must still succeed when this unofficial endpoint is unavailable.
+The Translate endpoint used by the current Instant Translate add-on returns
+the detected source language alongside the translation. Detection is
+deliberately best-effort: description generation must still succeed when this
+unofficial endpoint is unavailable.
 """
 
 import json
@@ -13,7 +13,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
-_GOOGLE_TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
+_GOOGLE_TRANSLATE_URL = "https://translate-pa.googleapis.com/v1/translate"
+_GOOGLE_TRANSLATE_API_KEY = "AIzaSyDLEeFI5OtFBwYBIoK_jj5m32rZK5CkCXA"
 _MAX_SAMPLE_CHARS = 1500
 _MIN_LETTER_COUNT = 8
 
@@ -39,6 +40,16 @@ def languages_match(detected, expected):
 
 
 def _confidence_from_response(payload):
+    if isinstance(payload, list):
+        # The language metadata is currently at index 4. Its third item is a
+        # list containing the confidence for the detected language.
+        try:
+            confidence = payload[4][2][0]
+        except (IndexError, TypeError):
+            return None
+        return float(confidence) if isinstance(confidence, (int, float)) else None
+
+    # Retain tolerant parsing for recorded responses from older builds.
     confidence = payload.get("confidence")
     if isinstance(confidence, (int, float)):
         return float(confidence)
@@ -46,6 +57,31 @@ def _confidence_from_response(payload):
     if values and isinstance(values[0], (int, float)):
         return float(values[0])
     return None
+
+
+def _language_from_response(payload):
+    if isinstance(payload, list):
+        try:
+            language = normalize_language_code(payload[5])
+        except (IndexError, TypeError):
+            language = ""
+        if language:
+            return language
+        # Be defensive if Google omits the top-level detected-language slot.
+        for path in ((4, 0, 0), (4, 3, 0)):
+            try:
+                language = normalize_language_code(payload[path[0]][path[1]][path[2]])
+            except (IndexError, TypeError):
+                continue
+            if language:
+                return language
+        return ""
+
+    language = normalize_language_code(payload.get("src"))
+    if language:
+        return language
+    source_languages = payload.get("ld_result", {}).get("srclangs", [])
+    return normalize_language_code(source_languages[0]) if source_languages else ""
 
 
 def detect_language(text, target_language="en", timeout=10, opener=urlopen):
@@ -62,26 +98,28 @@ def detect_language(text, target_language="en", timeout=10, opener=urlopen):
     if len(re.findall(r"[^\W\d_]", sample, flags=re.UNICODE)) < _MIN_LETTER_COUNT:
         return None
 
-    query = urlencode({
-        "client": "gtx",
-        "sl": "auto",
-        "tl": normalize_language_code(target_language) or "en",
-        "dt": "t",
-        "dj": "1",
-        "q": sample,
-    })
+    target = normalize_language_code(target_language) or "en"
+    query = urlencode([
+        ("params.client", "gtx"),
+        ("query.source_language", "auto"),
+        ("query.target_language", target),
+        ("query.display_language", target),
+        ("query.text", sample),
+        ("key", _GOOGLE_TRANSLATE_API_KEY),
+        ("data_types", "TRANSLATION"),
+        ("data_types", "SENTENCE_SPLITS"),
+    ])
     request = Request(
         f"{_GOOGLE_TRANSLATE_URL}?{query}",
-        headers={"User-Agent": "Mozilla/5.0"},
+        headers={
+            "Content-Type": "application/json+protobuf",
+            "User-Agent": "Mozilla/5.0",
+        },
     )
     with opener(request, timeout=timeout) as response:
         payload = json.loads(response.read().decode("utf-8"))
 
-    language = normalize_language_code(payload.get("src"))
-    if not language:
-        source_languages = payload.get("ld_result", {}).get("srclangs", [])
-        if source_languages:
-            language = normalize_language_code(source_languages[0])
+    language = _language_from_response(payload)
     if not language:
         return None
     return LanguageDetection(language, _confidence_from_response(payload))

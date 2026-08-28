@@ -1,5 +1,5 @@
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 use windows::Win32::Foundation::HWND;
 
 use crate::app_windows::youtube_transcript_window::{
@@ -12,6 +12,63 @@ use crate::{RaiAudioOrigin, show_error, with_state};
 enum BrowseOutcome {
     Cancelled,
     MediaStarted,
+}
+
+type RaiPlayContextTargetCache = Arc<Mutex<HashMap<String, Result<PlaybackTarget, String>>>>;
+
+fn context_menu_label(language: Language, key: &str) -> String {
+    crate::i18n::tr(language, key)
+        .replace('&', "")
+        .split('\t')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+fn optional_media_title(title: &str) -> Option<String> {
+    let title = title.trim();
+    if title.is_empty() {
+        None
+    } else {
+        Some(title.to_string())
+    }
+}
+
+fn cached_context_playback_target(
+    items: &[BrowseItem],
+    selected_id: &str,
+    cache: &RaiPlayContextTargetCache,
+) -> Option<PlaybackTarget> {
+    if let Some(cached) = cache
+        .lock()
+        .unwrap_or_else(|err| err.into_inner())
+        .get(selected_id)
+        .cloned()
+    {
+        return cached.ok();
+    }
+    let item = items.iter().find(|item| item.id == selected_id)?;
+    if item.kind != BrowseItemKind::Media {
+        return None;
+    }
+    let media_url = item.media_url.as_deref()?.trim();
+    if media_url.is_empty() {
+        return None;
+    }
+    let resolved = raiplay::resolve_playback_target(media_url);
+    cache
+        .lock()
+        .unwrap_or_else(|err| err.into_inner())
+        .insert(selected_id.to_string(), resolved.clone());
+    resolved.ok()
+}
+
+fn context_target_is_vod(target: &PlaybackTarget) -> bool {
+    match target {
+        PlaybackTarget::DirectStream { is_live, .. } => !*is_live,
+        PlaybackTarget::Download(_) => true,
+    }
 }
 
 pub fn open(parent: HWND) {
@@ -131,6 +188,154 @@ fn browse_page(
                 description: item.description.clone(),
             })
             .collect::<Vec<_>>();
+        let context_target_cache: RaiPlayContextTargetCache = Arc::new(Mutex::new(HashMap::new()));
+
+        let save_items_for_enabled = page.items.clone();
+        let save_cache_for_enabled = Arc::clone(&context_target_cache);
+        let save_items_for_handler = page.items.clone();
+        let save_page_for_handler = page.clone();
+        let save_cache_for_handler = Arc::clone(&context_target_cache);
+        let save_context_action =
+            crate::app_windows::interpreter_select_window::InterpreterContextAction {
+                label: context_menu_label(language, "playback.download_episode"),
+                ctrl_c_shortcut: false,
+                delete_shortcut: false,
+                children: Vec::new(),
+                enabled: Arc::new(move |selected_id: &str| {
+                    cached_context_playback_target(
+                        &save_items_for_enabled,
+                        selected_id,
+                        &save_cache_for_enabled,
+                    )
+                    .as_ref()
+                    .is_some_and(context_target_is_vod)
+                }),
+                handler: Arc::new(move |selected_id: String| {
+                    let Some(item) = save_items_for_handler
+                        .iter()
+                        .find(|item| item.id == selected_id)
+                    else {
+                        return;
+                    };
+                    let Some(target) = cached_context_playback_target(
+                        &save_items_for_handler,
+                        &selected_id,
+                        &save_cache_for_handler,
+                    )
+                    .filter(context_target_is_vod) else {
+                        return;
+                    };
+                    let title = optional_media_title(&item.title);
+                    let container_title = dedupe_raiplay_container_title(
+                        preferred_container_title(&save_page_for_handler, item),
+                        title.as_deref(),
+                    );
+                    crate::save_raiplay_context_media(
+                        parent,
+                        language,
+                        target,
+                        container_title,
+                        title,
+                    );
+                }),
+            };
+
+        let transcribe_items_for_enabled = page.items.clone();
+        let transcribe_cache_for_enabled = Arc::clone(&context_target_cache);
+        let transcribe_items_for_handler = page.items.clone();
+        let transcribe_cache_for_handler = Arc::clone(&context_target_cache);
+        let transcribe_context_action =
+            crate::app_windows::interpreter_select_window::InterpreterContextAction {
+                label: context_menu_label(language, "playback.transcribe_current"),
+                ctrl_c_shortcut: false,
+                delete_shortcut: false,
+                children: Vec::new(),
+                enabled: Arc::new(move |selected_id: &str| {
+                    cached_context_playback_target(
+                        &transcribe_items_for_enabled,
+                        selected_id,
+                        &transcribe_cache_for_enabled,
+                    )
+                    .as_ref()
+                    .is_some_and(context_target_is_vod)
+                }),
+                handler: Arc::new(move |selected_id: String| {
+                    let Some(item) = transcribe_items_for_handler
+                        .iter()
+                        .find(|item| item.id == selected_id)
+                    else {
+                        return;
+                    };
+                    let Some(target) = cached_context_playback_target(
+                        &transcribe_items_for_handler,
+                        &selected_id,
+                        &transcribe_cache_for_handler,
+                    )
+                    .filter(context_target_is_vod) else {
+                        return;
+                    };
+                    let audio_url = match target {
+                        PlaybackTarget::DirectStream { url, .. }
+                        | PlaybackTarget::Download(url) => url,
+                    };
+                    crate::start_whisper_transcription_for_remote_media(
+                        parent,
+                        audio_url,
+                        optional_media_title(&item.title),
+                    );
+                }),
+            };
+
+        let ad_items_for_enabled = page.items.clone();
+        let ad_cache_for_enabled = Arc::clone(&context_target_cache);
+        let ad_items_for_handler = page.items.clone();
+        let ad_page_for_handler = page.clone();
+        let ad_cache_for_handler = Arc::clone(&context_target_cache);
+        let audio_description_context_action =
+            crate::app_windows::interpreter_select_window::InterpreterContextAction {
+                label: context_menu_label(language, "menu.create_audio_description"),
+                ctrl_c_shortcut: false,
+                delete_shortcut: false,
+                children: Vec::new(),
+                enabled: Arc::new(move |selected_id: &str| {
+                    cached_context_playback_target(
+                        &ad_items_for_enabled,
+                        selected_id,
+                        &ad_cache_for_enabled,
+                    )
+                    .as_ref()
+                    .is_some_and(context_target_is_vod)
+                }),
+                handler: Arc::new(move |selected_id: String| {
+                    let Some(item) = ad_items_for_handler
+                        .iter()
+                        .find(|item| item.id == selected_id)
+                    else {
+                        return;
+                    };
+                    let Some(target) = cached_context_playback_target(
+                        &ad_items_for_handler,
+                        &selected_id,
+                        &ad_cache_for_handler,
+                    )
+                    .filter(context_target_is_vod) else {
+                        return;
+                    };
+                    let title = optional_media_title(&item.title);
+                    let container_title = dedupe_raiplay_container_title(
+                        preferred_container_title(&ad_page_for_handler, item),
+                        title.as_deref(),
+                    );
+                    crate::create_audio_description_from_raiplay_context(
+                        parent,
+                        language,
+                        target,
+                        container_title,
+                        title,
+                    );
+                }),
+            };
+
         let context_items_for_enabled = page.items.clone();
         let context_items_for_handler = page.items.clone();
         let context_action =
@@ -141,6 +346,7 @@ fn browse_page(
                 ),
                 ctrl_c_shortcut: true,
                 delete_shortcut: false,
+                children: Vec::new(),
                 enabled: Arc::new(move |selected_id: &str| {
                     context_items_for_enabled
                         .iter()
@@ -195,7 +401,12 @@ fn browse_page(
                 search_button_label: "Cerca".to_string(),
                 show_search_edit: true,
                 secondary_action_label: None,
-                context_actions: vec![context_action],
+                context_actions: vec![
+                    save_context_action,
+                    transcribe_context_action,
+                    audio_description_context_action,
+                    context_action,
+                ],
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
                 escape_stops_active_player: false,

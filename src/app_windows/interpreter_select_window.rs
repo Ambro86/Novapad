@@ -17,13 +17,13 @@ use windows::Win32::UI::WindowsAndMessaging::{
     DefWindowProcW, DestroyMenu, DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, GWLP_USERDATA,
     GetCursorPos, GetWindowTextLengthW, GetWindowTextW, HMENU, HWND_TOPMOST, IDC_ARROW,
     IsDialogMessageW, LB_ADDSTRING, LB_GETCURSEL, LB_GETTEXT, LB_GETTEXTLEN, LB_RESETCONTENT,
-    LB_SETCARETINDEX, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MF_STRING, MSG, PostMessageW, SW_HIDE,
-    SW_SHOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
-    SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu,
-    TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU,
-    WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW, WS_CAPTION, WS_CHILD,
-    WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    LB_SETCARETINDEX, LB_SETCURSEL, LBS_NOTIFY, LoadCursorW, MF_POPUP, MF_STRING, MSG,
+    PostMessageW, SW_HIDE, SW_SHOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW,
+    SetForegroundWindow, SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD,
+    TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_ACTIVATE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_CONTEXTMENU, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFONT, WM_SETREDRAW, WNDCLASSW,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, w};
 
@@ -40,6 +40,55 @@ const ID_SECONDARY: usize = 9204;
 const ID_FILTER_EDIT: usize = 9205;
 const ID_FLAT_LIST: usize = 9206;
 const WM_RESTORE_LIST_FOCUS: u32 = WM_APP + 1;
+
+// Keep track of open interpreter selectors so a media-save action launched from
+// a context menu can return focus to the exact list that initiated it. Store
+// raw HWND values to avoid imposing Send/Sync requirements on HWND itself.
+static ACTIVE_INTERPRETER_SELECT_WINDOWS: Mutex<Vec<(isize, isize)>> = Mutex::new(Vec::new());
+
+fn register_active_interpreter_select(hwnd: HWND, parent: HWND) {
+    let mut windows = ACTIVE_INTERPRETER_SELECT_WINDOWS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    windows.retain(|(dialog, _)| *dialog != hwnd.0);
+    windows.push((hwnd.0, parent.0));
+}
+
+fn unregister_active_interpreter_select(hwnd: HWND) {
+    let mut windows = ACTIVE_INTERPRETER_SELECT_WINDOWS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    windows.retain(|(dialog, _)| *dialog != hwnd.0);
+}
+
+fn active_interpreter_select_for_parent(parent: HWND) -> Option<HWND> {
+    let mut windows = ACTIVE_INTERPRETER_SELECT_WINDOWS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    windows.retain(|(dialog, _)| crate::is_window_handle_valid(HWND(*dialog)));
+    windows
+        .iter()
+        .rev()
+        .find(|(_, registered_parent)| *registered_parent == parent.0)
+        .map(|(dialog, _)| HWND(*dialog))
+}
+
+pub fn has_active_interpreter_select_for_parent(parent: HWND) -> bool {
+    active_interpreter_select_for_parent(parent).is_some()
+}
+
+pub fn restore_active_interpreter_select_for_parent(parent: HWND) -> bool {
+    let Some(dialog) = active_interpreter_select_for_parent(parent) else {
+        return false;
+    };
+    crate::log_debug(&format!(
+        "Restoring active interpreter selector after media action dialog={:?} parent={:?}",
+        dialog, parent
+    ));
+    crate::enable_window_safe(parent, false);
+    crate::set_foreground_window_safe(dialog);
+    restore_interpreter_select_focus(dialog)
+}
 
 type ContextActionEnabled = Arc<dyn Fn(&str) -> bool + Send + Sync>;
 type ContextActionHandler = Arc<dyn Fn(String) + Send + Sync>;
@@ -126,6 +175,65 @@ pub struct InterpreterContextAction {
     pub delete_shortcut: bool,
     pub enabled: ContextActionEnabled,
     pub handler: ContextActionHandler,
+    pub children: Vec<InterpreterContextAction>,
+}
+
+pub(crate) fn append_context_actions_to_menu(
+    menu: HMENU,
+    actions: &[InterpreterContextAction],
+    selected_value: &str,
+) -> Result<Vec<InterpreterContextAction>, String> {
+    fn append_recursive(
+        menu: HMENU,
+        actions: &[InterpreterContextAction],
+        selected_value: &str,
+        commands: &mut Vec<InterpreterContextAction>,
+    ) -> Result<usize, String> {
+        let mut appended = 0usize;
+        for action in actions {
+            if !(action.enabled)(selected_value) {
+                continue;
+            }
+            if action.children.is_empty() {
+                let command_id = commands.len() + 1;
+                let label_w = to_wide(&action.label);
+                unsafe {
+                    AppendMenuW(menu, MF_STRING, command_id, PCWSTR(label_w.as_ptr()))
+                        .map_err(|err| err.to_string())?;
+                }
+                commands.push(action.clone());
+                appended += 1;
+                continue;
+            }
+
+            let submenu = unsafe { CreatePopupMenu() }.map_err(|err| err.to_string())?;
+            let child_count =
+                match append_recursive(submenu, &action.children, selected_value, commands) {
+                    Ok(count) => count,
+                    Err(err) => {
+                        crate::log_if_err!(unsafe { DestroyMenu(submenu) });
+                        return Err(err);
+                    }
+                };
+            if child_count == 0 {
+                crate::log_if_err!(unsafe { DestroyMenu(submenu) });
+                continue;
+            }
+            let label_w = to_wide(&action.label);
+            if let Err(err) =
+                unsafe { AppendMenuW(menu, MF_POPUP, submenu.0 as usize, PCWSTR(label_w.as_ptr())) }
+            {
+                crate::log_if_err!(unsafe { DestroyMenu(submenu) });
+                return Err(err.to_string());
+            }
+            appended += 1;
+        }
+        Ok(appended)
+    }
+
+    let mut commands = Vec::new();
+    append_recursive(menu, actions, selected_value, &mut commands)?;
+    Ok(commands)
 }
 
 pub struct InterpreterSecondaryActionOptions {
@@ -149,26 +257,6 @@ pub fn select_interpreter(
         Some(InterpreterSelectionResult::Item(value)) => Some(value),
         _ => None,
     }
-}
-
-pub fn select_interpreter_with_secondary_action_and_context_action_and_initial_without_parent_restore(
-    parent: HWND,
-    items: Vec<String>,
-    language: Language,
-    title: String,
-    secondary_action: InterpreterSecondaryActionOptions,
-    initial_value: Option<String>,
-    context_action: InterpreterContextAction,
-) -> Option<InterpreterSelectionResult> {
-    select_interpreter_with_secondary_action_and_context_actions_and_initial_without_parent_restore(
-        parent,
-        items,
-        language,
-        title,
-        secondary_action,
-        initial_value,
-        vec![context_action],
-    )
 }
 
 pub fn select_interpreter_with_secondary_action_and_context_actions_and_initial_without_parent_restore(
@@ -223,26 +311,6 @@ pub fn select_interpreter_with_context_actions_without_parent_restore_on_accept(
     }
 }
 
-pub fn select_grouped_interpreter_with_context_action_without_parent_restore_on_accept(
-    parent: HWND,
-    groups: Vec<GroupedSelectGroup>,
-    language: Language,
-    title: String,
-    filter_label: Option<String>,
-    initial_value: Option<String>,
-    context_action: InterpreterContextAction,
-) -> Option<String> {
-    select_grouped_interpreter_with_context_actions_without_parent_restore_on_accept(
-        parent,
-        groups,
-        language,
-        title,
-        filter_label,
-        initial_value,
-        vec![context_action],
-    )
-}
-
 pub fn select_grouped_interpreter_with_context_actions_without_parent_restore_on_accept(
     parent: HWND,
     groups: Vec<GroupedSelectGroup>,
@@ -272,14 +340,14 @@ pub fn select_grouped_interpreter_with_context_actions_without_parent_restore_on
     }
 }
 
-pub fn select_grouped_interpreter_with_secondary_action_and_context_action_without_parent_restore_on_accept(
+pub fn select_grouped_interpreter_with_secondary_action_and_context_actions_without_parent_restore_on_accept(
     parent: HWND,
     groups: Vec<GroupedSelectGroup>,
     language: Language,
     title: String,
     secondary_action: InterpreterSecondaryActionOptions,
     initial_value: Option<String>,
-    context_action: InterpreterContextAction,
+    context_actions: Vec<InterpreterContextAction>,
 ) -> Option<InterpreterSelectionResult> {
     select_interpreter_internal(
         parent,
@@ -294,7 +362,7 @@ pub fn select_grouped_interpreter_with_secondary_action_and_context_action_witho
             suppress_parent_restore_on_cancel: true,
             pin_topmost: true,
             initial_tree_value: initial_value,
-            context_actions: vec![context_action],
+            context_actions,
             ..Default::default()
         },
     )
@@ -361,6 +429,8 @@ fn select_interpreter_internal(
     if hwnd.0 == 0 {
         return None;
     }
+
+    register_active_interpreter_select(hwnd, parent);
 
     unsafe {
         EnableWindow(parent, false);
@@ -867,7 +937,15 @@ fn interpreter_select_wndproc_inner(
             crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_RESTORE_LIST_FOCUS => {
-            restore_interpreter_select_focus(hwnd);
+            let parent = crate::get_parent_safe(hwnd);
+            if crate::media_action_progress_is_active(parent) {
+                crate::log_debug(&format!(
+                    "interpreter_select restore focus suppressed for active progress modal hwnd={:?} parent={:?}",
+                    hwnd, parent
+                ));
+            } else {
+                restore_interpreter_select_focus(hwnd);
+            }
             LRESULT(0)
         }
         WM_CONTEXTMENU => {
@@ -902,15 +980,6 @@ fn interpreter_select_wndproc_inner(
                         value
                     }
                 };
-                let applicable_actions: Vec<InterpreterContextAction> = state
-                    .context_actions
-                    .iter()
-                    .filter(|action| (action.enabled)(&value))
-                    .cloned()
-                    .collect();
-                if applicable_actions.is_empty() {
-                    return false;
-                }
                 let menu = match unsafe { CreatePopupMenu() } {
                     Ok(menu) => menu,
                     Err(err) => {
@@ -921,11 +990,13 @@ fn interpreter_select_wndproc_inner(
                         return false;
                     }
                 };
-                for (index, action) in applicable_actions.iter().enumerate() {
-                    let label_w = to_wide(&action.label);
-                    if let Err(err) = unsafe {
-                        AppendMenuW(menu, MF_STRING, index + 1, PCWSTR(label_w.as_ptr()))
-                    } {
+                let applicable_actions = match append_context_actions_to_menu(
+                    menu,
+                    &state.context_actions,
+                    &value,
+                ) {
+                    Ok(actions) => actions,
+                    Err(err) => {
                         crate::log_debug(&format!(
                             "Failed to append interpreter selection context menu item: {}",
                             err
@@ -933,6 +1004,10 @@ fn interpreter_select_wndproc_inner(
                         crate::log_if_err!(unsafe { DestroyMenu(menu) });
                         return false;
                     }
+                };
+                if applicable_actions.is_empty() {
+                    crate::log_if_err!(unsafe { DestroyMenu(menu) });
+                    return false;
                 }
                 let point = if lparam.0 == -1 {
                     let mut pt = POINT::default();
@@ -1095,6 +1170,7 @@ fn interpreter_select_wndproc_inner(
             LRESULT(0)
         }
         WM_NCDESTROY => {
+            unregister_active_interpreter_select(hwnd);
             let ptr = crate::get_window_long_ptr_w_safe(hwnd, GWLP_USERDATA)
                 as *mut InterpreterSelectState;
             if !ptr.is_null() {

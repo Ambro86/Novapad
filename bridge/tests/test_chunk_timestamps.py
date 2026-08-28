@@ -268,6 +268,32 @@ class ChunkTimestampTests(unittest.TestCase):
             for item, gap in zip(corrected, gaps)
         ))
 
+    def test_locke_key_s2e2_recovery_colon_fractions_stay_inside_local_chunks(self):
+        chunk_three = _post_process_mmss_timestamps(
+            [
+                ("02:20:09", "02:39:57", "Josh guarda altrove."),
+                ("02:53:52", "02:55:32", "L'insegnante guarda la classe."),
+            ],
+            local_timeline_window=(0.0, 181.0),
+        )
+        chunk_eleven = _post_process_mmss_timestamps(
+            [
+                ("02:05:08", "02:15:29", "Gabe guarda intorno."),
+                ("02:28:49", "02:38:55", "Bode beve."),
+                ("02:38:55", "02:50:21", "L'attrezzo viene afferrato."),
+            ],
+            local_timeline_window=(0.0, 184.088),
+        )
+
+        self.assertEqual(
+            [(140.09, 159.57), (173.52, 175.32)],
+            [(start, end) for start, end, _text in chunk_three],
+        )
+        self.assertEqual(
+            [(125.08, 135.29), (148.49, 158.55), (158.55, 170.21)],
+            [(start, end) for start, end, _text in chunk_eleven],
+        )
+
     def test_local_recovery_does_not_reinterpret_valid_hour_timestamp(self):
         corrected = _post_process_mmss_timestamps(
             [("01:02:03", "01:02:08", "Video lungo.")],

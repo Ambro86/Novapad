@@ -1363,6 +1363,7 @@ pub struct Document {
     pub route_map: Option<RouteMapData>,
     pub epub_index: Vec<EpubIndexEntry>,
     pub epub_original_text: Option<String>,
+    pub pdf_is_imported_source: bool,
 }
 
 #[derive(Clone)]
@@ -1395,6 +1396,7 @@ impl Default for Document {
             route_map: None,
             epub_index: Vec::new(),
             epub_original_text: None,
+            pdf_is_imported_source: false,
         }
     }
 }
@@ -3291,6 +3293,7 @@ pub fn new_document(hwnd: HWND) {
                 route_map: None,
                 epub_index: Vec::new(),
                 epub_original_text: None,
+                pdf_is_imported_source: false,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -3340,6 +3343,7 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
                 route_map: None,
                 epub_index: Vec::new(),
                 epub_original_text: None,
+                pdf_is_imported_source: false,
             };
             SendMessageW(hwnd_edit, EM_SETREADONLY, WPARAM(1), LPARAM(0));
             ShowWindow(hwnd_edit, SW_HIDE);
@@ -3941,6 +3945,7 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
                 route_map: None,
                 epub_index: Vec::new(),
                 epub_original_text: None,
+                pdf_is_imported_source: false,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, title, (state.docs.len() - 1) as i32);
@@ -4621,6 +4626,22 @@ fn should_export_epub_copy(source_is_epub: bool, force_dialog: bool, target_is_e
     source_is_epub && force_dialog && !target_is_epub
 }
 
+fn requires_save_as_for_lossy_source(format: FileFormat, pdf_is_imported_source: bool) -> bool {
+    matches!(
+        format,
+        FileFormat::Docx
+            | FileFormat::Odt
+            | FileFormat::Doc
+            | FileFormat::Spreadsheet
+            | FileFormat::Html
+            | FileFormat::Ppt
+            | FileFormat::Pptx
+            | FileFormat::Odp
+            | FileFormat::KindleEbook
+            | FileFormat::Daisy
+    ) || matches!(format, FileFormat::Pdf) && pdf_is_imported_source
+}
+
 pub fn save_current_document(hwnd: HWND) -> bool {
     save_document_at(hwnd, get_current_index(hwnd), false)
 }
@@ -4672,19 +4693,9 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                 && epub_original_text.is_some();
             let prefer_title_for_save_suggestion =
                 state.docs[index].prefer_title_for_save_suggestion;
-            let is_lossy_doc = matches!(
+            let is_lossy_doc = requires_save_as_for_lossy_source(
                 state.docs[index].format,
-                FileFormat::Docx
-                    | FileFormat::Odt
-                    | FileFormat::Doc
-                    | FileFormat::Pdf
-                    | FileFormat::Spreadsheet
-                    | FileFormat::Html
-                    | FileFormat::Ppt
-                    | FileFormat::Pptx
-                    | FileFormat::Odp
-                    | FileFormat::KindleEbook
-                    | FileFormat::Daisy
+                state.docs[index].pdf_is_imported_source,
             );
             let mut suggested_name = state.docs[index]
                 .path
@@ -4932,6 +4943,10 @@ pub fn save_document_at(hwnd: HWND, index: usize, force_dialog: bool) -> bool {
                 if !exporting_epub_copy {
                     state.docs[index].format = FileFormat::Text(encoding);
                 }
+            }
+
+            if !exporting_epub_copy {
+                state.docs[index].pdf_is_imported_source = false;
             }
 
             if exporting_epub_copy {
@@ -5356,6 +5371,17 @@ mod tests {
         assert!(!should_export_epub_copy(true, false, false));
         assert!(!should_export_epub_copy(true, true, true));
         assert!(!should_export_epub_copy(false, true, false));
+    }
+
+    #[test]
+    fn imported_pdf_requires_save_as_but_generated_pdf_does_not() {
+        assert!(requires_save_as_for_lossy_source(FileFormat::Pdf, true));
+        assert!(!requires_save_as_for_lossy_source(FileFormat::Pdf, false));
+        assert!(requires_save_as_for_lossy_source(FileFormat::Docx, false));
+        assert!(!requires_save_as_for_lossy_source(
+            FileFormat::Text(TextEncoding::Utf8),
+            false
+        ));
     }
 
     #[test]

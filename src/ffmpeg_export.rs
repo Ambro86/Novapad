@@ -517,6 +517,37 @@ fn segment_format_from_path(path: &Path) -> Option<&'static str> {
     }
 }
 
+fn repair_segment_packet_timestamps(
+    packet: *mut AVPacket,
+    next_timestamp: &mut Option<i64>,
+) -> bool {
+    if packet.is_null() {
+        return false;
+    }
+    unsafe {
+        let pts_missing = (*packet).pts == AV_NOPTS_VALUE_I64;
+        let dts_missing = (*packet).dts == AV_NOPTS_VALUE_I64;
+        if !pts_missing && !dts_missing {
+            let duration = (*packet).duration.max(1);
+            *next_timestamp = Some((*packet).pts.max((*packet).dts).saturating_add(duration));
+            return false;
+        }
+
+        if pts_missing && !dts_missing {
+            (*packet).pts = (*packet).dts;
+        } else if !pts_missing && dts_missing {
+            (*packet).dts = (*packet).pts;
+        } else {
+            let timestamp = (*next_timestamp).unwrap_or(0);
+            (*packet).pts = timestamp;
+            (*packet).dts = timestamp;
+        }
+        let duration = (*packet).duration.max(1);
+        *next_timestamp = Some((*packet).pts.max((*packet).dts).saturating_add(duration));
+    }
+    true
+}
+
 pub fn media_duration_seconds(path: &Path) -> Option<f64> {
     let api = ffmpeg_api().ok()?;
     let input_c = CString::new(path.to_string_lossy().as_bytes()).ok()?;
@@ -608,13 +639,16 @@ fn segment_media_file_inner(
     let mut in_ctx: *mut AVFormatContext = ptr::null_mut();
     let mut out_ctx: *mut AVFormatContext = ptr::null_mut();
 
+    let mut input_options: *mut AVDictionary = ptr::null_mut();
+    dict_set_str(api, &mut input_options, "fflags", "+genpts+discardcorrupt")?;
     let open_ret = crate::ffmpeg_source::avformat_open_input_safe(
         api,
         &mut in_ctx,
         input_c.as_ptr(),
         ptr::null_mut(),
-        ptr::null_mut(),
+        &mut input_options,
     );
+    crate::ffmpeg_source::av_dict_free_safe(api, &mut input_options);
     if open_ret < 0 || in_ctx.is_null() {
         return Err("FFmpeg: failed to open input".to_string());
     }
@@ -645,6 +679,7 @@ fn segment_media_file_inner(
 
     let nb_streams = crate::ffmpeg_source::av_format_context_nb_streams_safe(in_ctx) as usize;
     let mut stream_map: Vec<*mut AVStream> = vec![ptr::null_mut(); nb_streams];
+    let mut next_timestamps: Vec<Option<i64>> = vec![None; nb_streams];
     let mut mapped_streams = 0usize;
     for (i, stream_slot) in stream_map.iter_mut().enumerate() {
         let in_stream = unsafe { *(*in_ctx).streams.add(i) };
@@ -728,6 +763,8 @@ fn segment_media_file_inner(
         cb(0);
     }
     let mut last_pct = 0u32;
+    let mut repaired_timestamp_packets = 0u64;
+    let mut segment_write_error: Option<String> = None;
     let mut pkt = crate::ffmpeg_source::av_packet_alloc_safe(api);
     if pkt.is_null() {
         let trailer_ret = crate::ffmpeg_source::av_write_trailer_safe(api, out_ctx);
@@ -757,6 +794,9 @@ fn segment_media_file_inner(
         }
         let in_stream = unsafe { *(*in_ctx).streams.add(input_index as usize) };
         let out_stream = stream_map[input_index as usize];
+        if repair_segment_packet_timestamps(pkt, &mut next_timestamps[input_index as usize]) {
+            repaired_timestamp_packets = repaired_timestamp_packets.saturating_add(1);
+        }
         if let (Some(total), Some(cb)) = (total_duration_us, progress.as_deref_mut()) {
             let pts = unsafe { (*pkt).pts };
             if total > 0 && pts != AV_NOPTS_VALUE_I64 {
@@ -789,7 +829,13 @@ fn segment_media_file_inner(
         );
         let write_ret = crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt);
         if write_ret < 0 {
-            log_debug(&format!("FFmpeg: segment write failed: {}", write_ret));
+            segment_write_error = Some(format!(
+                "FFmpeg: segment write failed: {} ({})",
+                ffmpeg_error_text(api, write_ret),
+                write_ret
+            ));
+            crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
+            break;
         }
         crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
     }
@@ -801,6 +847,23 @@ fn segment_media_file_inner(
     crate::ffmpeg_source::av_packet_free_safe(api, &mut pkt);
     crate::ffmpeg_source::avformat_free_context_safe(api, out_ctx);
     crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
+    if repaired_timestamp_packets > 0 {
+        log_debug(&format!(
+            "FFmpeg: repaired timestamps for {} packet(s) while segmenting {}",
+            repaired_timestamp_packets,
+            input_path.display()
+        ));
+    }
+    if let Some(error) = segment_write_error {
+        return Err(error);
+    }
+    if trailer_ret < 0 {
+        return Err(format!(
+            "FFmpeg: failed to finalize segmented output: {} ({})",
+            ffmpeg_error_text(api, trailer_ret),
+            trailer_ret
+        ));
+    }
     if let Some(cb) = progress.as_mut() {
         cb(100);
     }

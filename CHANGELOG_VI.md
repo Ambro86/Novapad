@@ -105,6 +105,7 @@ Phiên âm thanh dài
 • Đã sửa lỗi phiên âm các tệp âm thanh dài: âm thanh giờ được tự động chia thành các phần 15 phút, phiên âm lần lượt rồi ghép lại, tránh các lỗi có thể xảy ra với bản ghi dài.
 
 YouTube
+• Các thao tác hữu ích nhất trước đây chỉ có thể truy cập sau khi mở video YouTube và vào menu Phát giờ cũng có sẵn trực tiếp trong menu ngữ cảnh của chính video đó, chẳng hạn như “Chuyển âm thanh hiện tại thành văn bản”, “Tạo thuyết minh hình ảnh bằng AI” và “Lưu media”, giúp sử dụng thuận tiện hơn.
 • Đã thêm lệnh “Sao chép liên kết”, cũng có thể dùng bằng Ctrl+C, để sao chép URL của video, danh sách phát hoặc kênh YouTube đang chọn vào bảng tạm.
 
 Phiên bản 0.8.1 – 2026-07-16

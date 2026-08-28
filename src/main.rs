@@ -780,6 +780,7 @@ fn tracked_progress_modal_while_main_disabled(hwnd: HWND) -> HWND {
         [
             state.podcast_save_window,
             state.update_progress_window,
+            state.transcription_progress_window,
             state.replace_progress_window,
             state.editor_translation_progress_window,
         ]
@@ -794,24 +795,18 @@ fn tracked_progress_modal_while_main_disabled(hwnd: HWND) -> HWND {
     .unwrap_or(HWND(0))
 }
 
+pub(crate) fn media_action_progress_is_active(hwnd: HWND) -> bool {
+    tracked_progress_modal_while_main_disabled(hwnd).0 != 0
+}
+
 fn reactivate_modal_child_while_main_disabled(hwnd: HWND) -> bool {
     if unsafe { IsWindowEnabled(hwnd).as_bool() } {
         return false;
     }
 
-    let popup = unsafe { GetLastActivePopup(hwnd) };
-    if popup.0 != 0 && popup != hwnd && is_window_handle_valid(popup) {
-        log_debug(&format!(
-            "Reactivating modal popup while main window is disabled: popup={popup:?}"
-        ));
-        bring_modal_window_to_foreground(popup);
-        return true;
-    }
-
-    // GetLastActivePopup(main) can temporarily return the disabled main window when
-    // the embedded MPV menu is activated while a progress dialog owns the focus.
-    // Fall back to progress dialogs tracked in AppState, and preserve any nested
-    // popup (for example the cancel-confirmation message box) owned by that dialog.
+    // A context-list popup can remain the main window's last-active popup after it
+    // launches an asynchronous save. Prefer the progress dialog tracked by AppState
+    // so the list cannot immediately steal foreground/focus back from the download.
     let tracked = tracked_progress_modal_while_main_disabled(hwnd);
     if tracked.0 != 0 {
         let nested = unsafe { GetLastActivePopup(tracked) };
@@ -824,6 +819,15 @@ fn reactivate_modal_child_while_main_disabled(hwnd: HWND) -> bool {
             "Main window disabled: restoring tracked progress modal target={target:?} tracked={tracked:?}"
         ));
         bring_modal_window_to_foreground(target);
+        return true;
+    }
+
+    let popup = unsafe { GetLastActivePopup(hwnd) };
+    if popup.0 != 0 && popup != hwnd && is_window_handle_valid(popup) {
+        log_debug(&format!(
+            "Reactivating modal popup while main window is disabled: popup={popup:?}"
+        ));
+        bring_modal_window_to_foreground(popup);
         return true;
     }
 
@@ -2573,6 +2577,61 @@ struct PodcastProgressDownloadRequest {
     open_audio_description: bool,
 }
 
+fn run_raiplay_context_media_action(
+    hwnd: HWND,
+    language: Language,
+    playback_target: crate::tools::raiplay::PlaybackTarget,
+    podcast_title: Option<String>,
+    title: Option<String>,
+    open_audio_description: bool,
+) {
+    let (url, media_url) = match playback_target {
+        crate::tools::raiplay::PlaybackTarget::DirectStream {
+            url,
+            media_url,
+            is_live,
+            ..
+        } => {
+            if is_live {
+                return;
+            }
+            (Some(url), Some(media_url))
+        }
+        crate::tools::raiplay::PlaybackTarget::Download(url) => (Some(url), None),
+    };
+    download_podcast_episode_with_progress(PodcastProgressDownloadRequest {
+        hwnd,
+        url,
+        media_url,
+        podcast_title,
+        title,
+        cache_path: None,
+        language,
+        rai_origin: RaiAudioOrigin::RaiPlay,
+        open_audio_description,
+    });
+}
+
+pub(crate) fn save_raiplay_context_media(
+    hwnd: HWND,
+    language: Language,
+    playback_target: crate::tools::raiplay::PlaybackTarget,
+    podcast_title: Option<String>,
+    title: Option<String>,
+) {
+    run_raiplay_context_media_action(hwnd, language, playback_target, podcast_title, title, false);
+}
+
+pub(crate) fn create_audio_description_from_raiplay_context(
+    hwnd: HWND,
+    language: Language,
+    playback_target: crate::tools::raiplay::PlaybackTarget,
+    podcast_title: Option<String>,
+    title: Option<String>,
+) {
+    run_raiplay_context_media_action(hwnd, language, playback_target, podcast_title, title, true);
+}
+
 fn download_podcast_episode_with_progress(request: PodcastProgressDownloadRequest) {
     let PodcastProgressDownloadRequest {
         hwnd,
@@ -2695,6 +2754,13 @@ fn download_podcast_episode_with_progress(request: PodcastProgressDownloadReques
         state.podcast_save_cancel_token = Some(cancel_flag.clone());
     });
     open_podcast_save_progress_window(hwnd, language);
+    if !open_audio_description
+        && app_windows::youtube_transcript_window::has_active_media_context_list(hwnd)
+    {
+        let progress_dialog =
+            with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
+        app_windows::podcast_save_window::suppress_parent_restore_on_close(progress_dialog);
+    }
     update_podcast_save_progress_window(hwnd, 0);
     let hwnd_copy = hwnd;
     std::thread::spawn(move || {
@@ -7457,6 +7523,34 @@ fn collect_transcribable_audio_files_in_folder(folder: &Path) -> Vec<PathBuf> {
 }
 
 fn start_whisper_transcription(hwnd: HWND) {
+    start_whisper_transcription_with_media(hwnd, None, true);
+}
+
+pub(crate) fn start_whisper_transcription_for_media(
+    hwnd: HWND,
+    media_path: PathBuf,
+    media_title: Option<String>,
+) {
+    start_whisper_transcription_with_media(hwnd, Some((media_path, None, media_title)), false);
+}
+
+pub(crate) fn start_whisper_transcription_for_remote_media(
+    hwnd: HWND,
+    media_url: String,
+    media_title: Option<String>,
+) {
+    start_whisper_transcription_with_media(
+        hwnd,
+        Some((PathBuf::from(media_url), None, media_title)),
+        false,
+    );
+}
+
+fn start_whisper_transcription_with_media(
+    hwnd: HWND,
+    explicit_media: Option<(PathBuf, Option<i32>, Option<String>)>,
+    download_direct_stream_with_ytdlp: bool,
+) {
     let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
     let whisper_audio_language =
         with_state(hwnd, |state| state.settings.whisper_audio_language.clone()).unwrap_or_default();
@@ -7467,43 +7561,45 @@ fn start_whisper_transcription(hwnd: HWND) {
     let Some(whisper_profile) = choose_whisper_profile_if_needed(hwnd, language) else {
         return;
     };
-    let media_info = with_state(hwnd, |state| {
-        let active_stream_title_for_path = |path: &Path| {
-            state
-                .active_podcast_episode_url
-                .as_ref()
-                .filter(|url| path.to_string_lossy() == url.as_str())
-                .and(state.active_podcast_episode_title.clone())
-        };
-        if let Some(player) = state.active_audiobook.as_ref() {
-            return Some((
-                player.path.clone(),
-                state.selected_audio_track,
-                active_stream_title_for_path(&player.path),
-            ));
-        }
-        state.docs.get(state.current).and_then(|doc| {
-            if matches!(doc.format, FileFormat::Audiobook) {
-                doc.path.as_ref().map(|path| {
-                    (
-                        path.clone(),
-                        state.selected_audio_track,
-                        active_stream_title_for_path(path),
-                    )
-                })
-            } else {
-                None
+    let media_info = explicit_media.or_else(|| {
+        with_state(hwnd, |state| {
+            let active_stream_title_for_path = |path: &Path| {
+                state
+                    .active_podcast_episode_url
+                    .as_ref()
+                    .filter(|url| path.to_string_lossy() == url.as_str())
+                    .and(state.active_podcast_episode_title.clone())
+            };
+            if let Some(player) = state.active_audiobook.as_ref() {
+                return Some((
+                    player.path.clone(),
+                    state.selected_audio_track,
+                    active_stream_title_for_path(&player.path),
+                ));
             }
+            state.docs.get(state.current).and_then(|doc| {
+                if matches!(doc.format, FileFormat::Audiobook) {
+                    doc.path.as_ref().map(|path| {
+                        (
+                            path.clone(),
+                            state.selected_audio_track,
+                            active_stream_title_for_path(path),
+                        )
+                    })
+                } else {
+                    None
+                }
+            })
         })
-    })
-    .flatten();
+        .flatten()
+    });
 
     let Some((mut media_path, mut stream_index, media_title)) = media_info else {
         screen_reader_speak(&i18n::tr(language, "whisper.error.no_active_media"));
         return;
     };
 
-    if is_direct_stream_url_path(&media_path) {
+    if download_direct_stream_with_ytdlp && is_direct_stream_url_path(&media_path) {
         let active_url = media_path.to_string_lossy().to_string();
         let Some(downloaded_path) = app_windows::youtube_transcript_window::download_active_streaming_audio_media_for_transcription(
             hwnd,
@@ -11842,6 +11938,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 if let Some(err) = payload.error {
                     if err == "Saving canceled." {
                         screen_reader_speak(&i18n::tr(payload.language, "podcast.save.canceled"));
+                        app_windows::youtube_transcript_window::restore_active_media_context_list(
+                            hwnd,
+                        );
                         return LRESULT(0);
                     }
                     let body = i18n::tr_f(
@@ -11858,6 +11957,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         PCWSTR(title_w.as_ptr()),
                         MB_OK | MB_ICONERROR,
                     );
+                    app_windows::youtube_transcript_window::restore_active_media_context_list(hwnd);
                     return LRESULT(0);
                 }
 
@@ -11873,6 +11973,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     with_state(hwnd, |state| state.settings.show_media_save_confirmation)
                         .unwrap_or(true);
                 if !show_confirmation {
+                    app_windows::youtube_transcript_window::restore_active_media_context_list(hwnd);
                     return LRESULT(0);
                 }
 
@@ -11893,6 +11994,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     PCWSTR(title_w.as_ptr()),
                     MB_YESNO | MB_ICONINFORMATION,
                 );
+                let mut opened_folder = false;
                 if response == IDYES {
                     let folder = payload
                         .target_path
@@ -11914,7 +12016,12 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                             folder.to_string_lossy(),
                             open_res.0
                         ));
+                    } else {
+                        opened_folder = true;
                     }
+                }
+                if !opened_folder {
+                    app_windows::youtube_transcript_window::restore_active_media_context_list(hwnd);
                 }
                 LRESULT(0)
             }
@@ -21658,6 +21765,10 @@ mod tests {
         let mut path = PathBuf::from("book.epub");
         apply_selected_save_filter_extension(&mut path, "*.txt");
         assert_eq!(path, PathBuf::from("book.txt"));
+
+        let mut text_path = PathBuf::from("document.txt");
+        apply_selected_save_filter_extension(&mut text_path, "*.pdf");
+        assert_eq!(text_path, PathBuf::from("document.pdf"));
     }
 
     #[test]
@@ -22261,6 +22372,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 route_map: None,
                 epub_index: Vec::new(),
                 epub_original_text: None,
+                pdf_is_imported_source: true,
             };
             state.docs.push(doc);
             insert_tab(state.hwnd_tab, &title, (state.docs.len() - 1) as i32);
@@ -22511,6 +22623,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 route_map: None,
                 epub_index: loaded.epub_index,
                 epub_original_text: loaded.epub_original_text,
+                pdf_is_imported_source: false,
             };
             state.docs.push(doc);
             if large_file_no_wrap {
@@ -23546,7 +23659,7 @@ struct CustomFileDialogEventHandler {
     _encodings: Vec<String>,
     _initial_encoding: TextEncoding,
     _txt_filter_index: u32,
-    _filter_default_extensions: Vec<Option<String>>,
+    _filter_patterns: Vec<String>,
 }
 
 impl IFileDialogEvents_Impl for CustomFileDialogEventHandler {
@@ -23580,12 +23693,30 @@ impl IFileDialogEvents_Impl for CustomFileDialogEventHandler {
             };
             let filter_index = pfd.GetFileTypeIndex()?;
             crate::log_debug(&format!("OnTypeChange: filter_index = {}", filter_index));
-            if let Some(extension) = self
-                ._filter_default_extensions
+            if let Some(pattern) = self
+                ._filter_patterns
                 .get(filter_index.saturating_sub(1) as usize)
             {
-                let extension_wide = to_wide(extension.as_deref().unwrap_or(""));
+                let extension = default_extension_from_filter_pattern(pattern).unwrap_or_default();
+                let extension_wide = to_wide(&extension);
                 crate::log_if_err!(pfd.SetDefaultExtension(PCWSTR(extension_wide.as_ptr())));
+
+                if let Ok(file_name_ptr) = pfd.GetFileName() {
+                    let current_name = file_name_ptr.to_string().unwrap_or_default();
+                    CoTaskMemFree(Some(file_name_ptr.0 as *const _));
+                    if !current_name.trim().is_empty() {
+                        let mut updated_path = PathBuf::from(&current_name);
+                        apply_selected_save_filter_extension(&mut updated_path, pattern);
+                        let updated_name = updated_path.to_string_lossy();
+                        if updated_name.as_ref() != current_name.as_str() {
+                            let updated_name_wide = to_wide(updated_name.as_ref());
+                            crate::log_if_err!(
+                                pfd.SetFileName(PCWSTR(updated_name_wide.as_ptr())),
+                                "Save dialog: update visible filename extension failed"
+                            );
+                        }
+                    }
+                }
             }
             let pfdc: IFileDialogCustomize = pfd.cast()?;
             let is_txt = filter_index == self._txt_filter_index;
@@ -23739,7 +23870,7 @@ pub(crate) fn open_file_dialog_with_encoding(
             _encodings: encodings,
             _initial_encoding: TextEncoding::Utf8,
             _txt_filter_index: 2,
-            _filter_default_extensions: Vec::new(),
+            _filter_patterns: Vec::new(),
         }
         .into();
         let cookie = pfd.Advise(&handler).ok()?;
@@ -23922,9 +24053,9 @@ pub(crate) fn save_file_dialog_with_encoding(
             .position(|(_, pattern)| filter_pattern_contains_extension(pattern, "txt"))
             .map(|index| index as u32 + 1)
             .unwrap_or(1);
-        let filter_default_extensions: Vec<Option<String>> = filter_pairs
+        let filter_patterns: Vec<String> = filter_pairs
             .iter()
-            .map(|(_, pattern)| default_extension_from_filter_pattern(pattern))
+            .map(|(_, pattern)| pattern.clone())
             .collect();
 
         let name_wides: Vec<Vec<u16>> =
@@ -24002,7 +24133,7 @@ pub(crate) fn save_file_dialog_with_encoding(
             _encodings: encodings,
             _initial_encoding: initial_encoding,
             _txt_filter_index: txt_filter_index,
-            _filter_default_extensions: filter_default_extensions,
+            _filter_patterns: filter_patterns,
         }
         .into();
         let cookie = pfd.Advise(&handler).ok()?;

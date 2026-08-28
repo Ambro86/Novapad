@@ -9,10 +9,10 @@ BRIDGE = (ROOT / "src" / "tools" / "audio_description_bridge.rs").read_text(enco
 class AudioDescriptionBridgeDeliveryTests(unittest.TestCase):
     def test_bridge_uses_faster_whisper_style_versioned_cache_without_manifest(self):
         self.assertIn(
-            'const BRIDGE_CACHE_FILE_NAME: &str = "audio_description_bridge_v1.exe";',
+            'const BRIDGE_CACHE_FILE_NAME: &str = "audio_description_bridge_v2.exe";',
             BRIDGE,
         )
-        self.assertNotIn("audio_description_bridge_v22.exe", BRIDGE)
+        self.assertNotIn("audio_description_bridge_v1.exe", BRIDGE)
         self.assertNotIn("bridge-version.txt", BRIDGE)
         self.assertNotIn("audiodescription-version", BRIDGE)
 

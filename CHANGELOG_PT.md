@@ -105,6 +105,7 @@ Transcrições de áudio longas
 • Corrigida a transcrição de ficheiros de áudio longos: o áudio é agora dividido automaticamente em partes de 15 minutos, transcrito uma parte de cada vez e depois reunido, evitando erros que podiam ocorrer com gravações longas.
 
 YouTube
+• As ações mais úteis que anteriormente só estavam disponíveis depois de abrir um vídeo do YouTube e aceder ao menu Reprodução estão agora também disponíveis diretamente no menu de contexto do mesmo vídeo, como «Transcrever áudio atual», «Criar audiodescrição com IA» e «Guardar mídia», para uma utilização mais simples.
 • Adicionada a opção “Copiar ligação”, também disponível com Ctrl+C, para copiar para a área de transferência o URL do vídeo, da lista de reprodução ou do canal do YouTube selecionado.
 
 Versão 0.8.1 – 2026-07-16

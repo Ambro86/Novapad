@@ -105,6 +105,7 @@ Długie transkrypcje audio
 • Naprawiono transkrypcję długich plików audio: dźwięk jest teraz automatycznie dzielony na 15-minutowe części, transkrybowany kolejno, a następnie ponownie łączony, co zapobiega błędom występującym przy długich nagraniach.
 
 YouTube
+• Najbardziej przydatne działania, które wcześniej były dostępne dopiero po otwarciu filmu z YouTube i wejściu do menu Odtwarzanie, są teraz dostępne także bezpośrednio w menu kontekstowym tego samego filmu, na przykład „Transkrybuj bieżące audio”, „Utwórz audiodeskrypcję z pomocą AI” i „Zapisz media”, co ułatwia obsługę.
 • Dodano polecenie „Kopiuj link”, dostępne także pod skrótem Ctrl+C, które kopiuje do schowka adres URL wybranego filmu, playlisty lub kanału YouTube.
 
 Wersja 0.8.1 – 2026-07-16

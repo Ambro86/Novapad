@@ -32,6 +32,9 @@ const EDGE_TRAILING_WINDOW_MS: u64 = 60;
 const PYANNOTE_SAMPLE_RATE: u32 = 16_000;
 const GEMINI_CHUNK_SECONDS: u32 = 180;
 const GEMINI_MAX_CHUNK_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const GEMINI_INLINE_TARGET_CHUNK_BYTES: u64 = 40 * 1024 * 1024;
+const GEMINI_MIN_SEGMENT_SECONDS: u32 = 30;
+const GEMINI_SEGMENT_RETRY_LIMIT: usize = 5;
 const AUDIO_DESCRIPTION_DUCKING_DB: f32 = -15.0;
 const AUDIO_DESCRIPTION_FADE_MS: u32 = 150;
 const AUDIO_DESCRIPTION_BITRATE_KBPS: u32 = 192;
@@ -896,16 +899,17 @@ fn prepare_gemini_chunks(
     cache_dir: &Path,
     cancel: &Arc<AtomicBool>,
 ) -> Result<Vec<AudioDescriptionPreparedChunk>, String> {
-    if duration_sec <= GEMINI_CHUNK_SECONDS as f64 {
-        let file_size = fs::metadata(input_path)
-            .map_err(|error| format!("Audio description: read media metadata failed: {error}"))?
-            .len();
-        if file_size == 0 || file_size >= GEMINI_MAX_CHUNK_BYTES {
-            return Err(format!(
-                "Audio description: Gemini input has unsupported size: {}",
-                input_path.display()
-            ));
-        }
+    let input_size = fs::metadata(input_path)
+        .map_err(|error| format!("Audio description: read media metadata failed: {error}"))?
+        .len();
+    if input_size == 0 {
+        return Err(format!(
+            "Audio description: Gemini input has unsupported size: {}",
+            input_path.display()
+        ));
+    }
+    if duration_sec <= GEMINI_CHUNK_SECONDS as f64 && input_size <= GEMINI_INLINE_TARGET_CHUNK_BYTES
+    {
         return Ok(vec![AudioDescriptionPreparedChunk {
             path: input_path.to_string_lossy().to_string(),
             start_sec: 0.0,
@@ -914,32 +918,112 @@ fn prepare_gemini_chunks(
     }
 
     let output_pattern = cache_dir.join("gemini_chunk_%04d.mkv");
-    crate::ffmpeg_export::segment_media_file(
-        input_path,
-        &output_pattern,
-        GEMINI_CHUNK_SECONDS,
-        1,
-        None,
-    )
-    .map_err(|error| format!("Audio description: FFmpeg chunk preparation failed: {error}"))?;
-    if cancel.load(Ordering::Relaxed) {
-        return Err("cancelled".to_string());
-    }
-
-    let mut paths = fs::read_dir(cache_dir)
-        .map_err(|error| format!("Audio description: read chunk folder failed: {error}"))?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.file_name()
+    let mut segment_seconds = duration_sec.ceil().clamp(
+        GEMINI_MIN_SEGMENT_SECONDS as f64,
+        GEMINI_CHUNK_SECONDS as f64,
+    ) as u32;
+    let mut attempt = 1usize;
+    let paths = loop {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("cancelled".to_string());
+        }
+        for entry in fs::read_dir(cache_dir)
+            .map_err(|error| format!("Audio description: read chunk folder failed: {error}"))?
+        {
+            let path = entry
+                .map_err(|error| format!("Audio description: read chunk entry failed: {error}"))?
+                .path();
+            let is_prepared_chunk = path
+                .file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| name.starts_with("gemini_chunk_") && name.ends_with(".mkv"))
-        })
-        .collect::<Vec<_>>();
-    paths.sort();
-    if paths.is_empty() {
-        return Err("Audio description: FFmpeg produced no Gemini chunks".to_string());
-    }
+                .is_some_and(|name| name.starts_with("gemini_chunk_") && name.ends_with(".mkv"));
+            if is_prepared_chunk {
+                fs::remove_file(&path).map_err(|error| {
+                    format!(
+                        "Audio description: remove stale Gemini chunk {} failed: {error}",
+                        path.display()
+                    )
+                })?;
+            }
+        }
+
+        crate::ffmpeg_export::segment_media_file(
+            input_path,
+            &output_pattern,
+            segment_seconds,
+            1,
+            None,
+        )
+        .map_err(|error| format!("Audio description: FFmpeg chunk preparation failed: {error}"))?;
+        if cancel.load(Ordering::Relaxed) {
+            return Err("cancelled".to_string());
+        }
+
+        let mut prepared_paths = fs::read_dir(cache_dir)
+            .map_err(|error| format!("Audio description: read chunk folder failed: {error}"))?
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with("gemini_chunk_") && name.ends_with(".mkv"))
+            })
+            .collect::<Vec<_>>();
+        prepared_paths.sort();
+        if prepared_paths.is_empty() {
+            return Err("Audio description: FFmpeg produced no Gemini chunks".to_string());
+        }
+
+        let max_chunk_bytes = prepared_paths
+            .iter()
+            .map(|path| {
+                fs::metadata(path)
+                    .map(|metadata| metadata.len())
+                    .map_err(|error| {
+                        format!("Audio description: read chunk metadata failed: {error}")
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .max()
+            .unwrap_or(0);
+        if max_chunk_bytes == 0 {
+            return Err("Audio description: FFmpeg produced an empty Gemini chunk".to_string());
+        }
+        if max_chunk_bytes <= GEMINI_INLINE_TARGET_CHUNK_BYTES {
+            crate::log_debug(&format!(
+                "Audio description: adaptive Gemini chunks ready segment_seconds={} max_chunk_mb={:.1}",
+                segment_seconds,
+                max_chunk_bytes as f64 / (1024.0 * 1024.0)
+            ));
+            break prepared_paths;
+        }
+
+        if attempt >= GEMINI_SEGMENT_RETRY_LIMIT || segment_seconds <= GEMINI_MIN_SEGMENT_SECONDS {
+            crate::log_debug(&format!(
+                "Audio description: adaptive Gemini chunk fallback segment_seconds={} max_chunk_mb={:.1}; Files API may be used",
+                segment_seconds,
+                max_chunk_bytes as f64 / (1024.0 * 1024.0)
+            ));
+            break prepared_paths;
+        }
+
+        let ratio = GEMINI_INLINE_TARGET_CHUNK_BYTES as f64 / max_chunk_bytes as f64;
+        let proposed = (segment_seconds as f64 * ratio * 0.82).floor() as u32;
+        let next_segment_seconds = proposed.max(GEMINI_MIN_SEGMENT_SECONDS).min(
+            segment_seconds
+                .saturating_sub(1)
+                .max(GEMINI_MIN_SEGMENT_SECONDS),
+        );
+        crate::log_debug(&format!(
+            "Audio description: adaptive Gemini chunk retry segment_seconds={} next_segment_seconds={} max_chunk_mb={:.1}",
+            segment_seconds,
+            next_segment_seconds,
+            max_chunk_bytes as f64 / (1024.0 * 1024.0)
+        ));
+        segment_seconds = next_segment_seconds;
+        attempt = attempt.saturating_add(1);
+    };
 
     let mut chunks = Vec::with_capacity(paths.len());
     let mut cursor = 0.0_f64;
@@ -2903,7 +2987,7 @@ pub fn create_audio_description(
             notify_status(
                 &mut callbacks,
                 "chunk_prepare",
-                "Creating 180-second Gemini chunks with Sonarpad FFmpeg libraries...",
+                "Preparing Gemini video chunks with Sonarpad FFmpeg libraries...",
             );
             let chunks =
                 prepare_gemini_chunks(&job.input_path, duration_sec, &analysis_cache_dir, &cancel)?;
@@ -2922,33 +3006,36 @@ pub fn create_audio_description(
     };
 
     let resume = if job.resume_checkpoint_path.is_some() {
-        let checkpoint = match load_audio_description_partial_checkpoint(&checkpoint_path) {
-            Ok(checkpoint) => checkpoint,
-            Err(error) => {
-                crate::log_if_err!(
-                    fs::remove_dir_all(&analysis_cache_dir),
-                    "Audio description cleanup operation failed"
-                );
-                return Err(error);
+        match load_audio_description_partial_checkpoint(&checkpoint_path) {
+            Ok(checkpoint)
+                if checkpoint.total_chunks == chunks.len()
+                    && (checkpoint.source_duration_sec - duration_sec).abs() <= 0.5 =>
+            {
+                Some(AudioDescriptionBridgeResume {
+                    completed_chunks: checkpoint.completed_chunks,
+                    descriptions: checkpoint.descriptions,
+                    character_glossary: checkpoint.character_glossary,
+                })
             }
-        };
-        if checkpoint.total_chunks != chunks.len()
-            || (checkpoint.source_duration_sec - duration_sec).abs() > 0.5
-        {
-            crate::log_if_err!(
-                fs::remove_dir_all(&analysis_cache_dir),
-                "Audio description cleanup operation failed"
-            );
-            return Err(
-                "Audio description: interrupted checkpoint no longer matches the prepared video"
-                    .to_string(),
-            );
+            Ok(checkpoint) => {
+                crate::log_debug(&format!(
+                    "Audio description: ignoring resume checkpoint after chunk layout change saved_chunks={} prepared_chunks={} saved_duration={:.3} prepared_duration={:.3}",
+                    checkpoint.total_chunks,
+                    chunks.len(),
+                    checkpoint.source_duration_sec,
+                    duration_sec
+                ));
+                None
+            }
+            Err(error) => {
+                crate::log_debug(&format!(
+                    "Audio description: ignoring invalid resume checkpoint {}: {}",
+                    checkpoint_path.display(),
+                    error
+                ));
+                None
+            }
         }
-        Some(AudioDescriptionBridgeResume {
-            completed_chunks: checkpoint.completed_chunks,
-            descriptions: checkpoint.descriptions,
-            character_glossary: checkpoint.character_glossary,
-        })
     } else {
         None
     };

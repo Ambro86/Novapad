@@ -125,6 +125,7 @@ Long audio transcriptions
 • Fixed transcription of long audio files: audio is now automatically divided into 15-minute parts, transcribed one part at a time and then joined again, preventing errors that could occur with long recordings.
 
 YouTube
+• The most useful actions that were previously available only after opening a YouTube video and accessing the Playback menu are now also available directly from that same video’s context menu, such as “Transcribe current audio”, “Create audio description with AI” and “Save media”, for easier use.
 • Added “Copy link”, also available with Ctrl+C, to copy the URL of the selected YouTube video, playlist or channel to the clipboard.
 
 Version 0.8.1 – 2026-07-16

@@ -2007,6 +2007,7 @@
   "weather.tomorrow": "Sutra",
   "weather.wind": "Vetar",
   "whisper.cancel_confirm": "Da li želite da otkažete transkripciju u toku?",
+  "whisper.close_confirm": "Да ли сте сигурни да желите да затворите транскрипцију?",
   "whisper.default_filename": "Transkripcija",
   "whisper.error.direct_stream_not_supported": "Transkripcija uživo/direktnog striminga još nije podržana.",
   "whisper.error.failed": "Greška transkripcije: {err}",

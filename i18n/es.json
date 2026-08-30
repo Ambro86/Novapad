@@ -2007,6 +2007,7 @@
   "weather.tomorrow": "Mañana",
   "weather.wind": "Viento",
   "whisper.cancel_confirm": "¿Quieres cancelar la transcripción en curso?",
+  "whisper.close_confirm": "¿Seguro que quieres cerrar la transcripción?",
   "whisper.default_filename": "Transcripción",
   "whisper.error.direct_stream_not_supported": "La transcripción de streaming en vivo/directo aún no es compatible.",
   "whisper.error.failed": "Error de transcripción: {err}",

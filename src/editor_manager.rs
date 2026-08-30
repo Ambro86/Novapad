@@ -1358,6 +1358,7 @@ pub struct Document {
     pub from_wikipedia: bool,
     pub from_treccani: bool,
     pub is_temporary: bool,
+    pub confirm_close_when_clean: bool,
     pub prefer_title_for_save_suggestion: bool,
     pub prefer_mpv_playback: bool,
     pub route_map: Option<RouteMapData>,
@@ -1391,6 +1392,7 @@ impl Default for Document {
             from_wikipedia: false,
             from_treccani: false,
             is_temporary: false,
+            confirm_close_when_clean: false,
             prefer_title_for_save_suggestion: false,
             prefer_mpv_playback: false,
             route_map: None,
@@ -3288,6 +3290,7 @@ pub fn new_document(hwnd: HWND) {
                 from_wikipedia: false,
                 from_treccani: false,
                 is_temporary: false,
+                confirm_close_when_clean: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
                 route_map: None,
@@ -3338,6 +3341,7 @@ pub fn ensure_audio_document_tab(hwnd: HWND, path: &Path) -> Option<usize> {
                 from_wikipedia: false,
                 from_treccani: false,
                 is_temporary: false,
+                confirm_close_when_clean: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
                 route_map: None,
@@ -3940,6 +3944,7 @@ pub fn get_or_create_rss_document(hwnd: HWND, title: &str) -> Option<HWND> {
                 from_wikipedia: false,
                 from_treccani: false,
                 is_temporary: true,
+                confirm_close_when_clean: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
                 route_map: None,
@@ -5330,27 +5335,49 @@ pub fn sync_dirty_from_edit(hwnd: HWND, index: usize) -> bool {
 }
 
 pub fn confirm_save_if_dirty_entry(hwnd: HWND, index: usize, title: &str) -> bool {
-    if !sync_dirty_from_edit(hwnd, index) {
+    let is_dirty = sync_dirty_from_edit(hwnd, index);
+    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
+
+    if is_dirty {
+        let msg = confirm_save_message(language, title);
+        let title_w = confirm_title(language);
+
+        let result = crate::show_blocking_modal_message_box(
+            hwnd,
+            crate::BlockingModalKind::DocumentSaveConfirm,
+            PCWSTR(to_wide(&msg).as_ptr()),
+            PCWSTR(to_wide(&title_w).as_ptr()),
+            MB_YESNOCANCEL | MB_ICONWARNING,
+        );
+
+        return match result {
+            IDYES => save_document_at(hwnd, index, false),
+            IDNO => true,
+            _ => false,
+        };
+    }
+
+    let confirm_close_when_clean = with_state(hwnd, |state| {
+        state
+            .docs
+            .get(index)
+            .map(|doc| doc.confirm_close_when_clean)
+            .unwrap_or(false)
+    })
+    .unwrap_or(false);
+    if !confirm_close_when_clean {
         return true;
     }
 
-    let language = with_state(hwnd, |state| state.settings.language).unwrap_or_default();
-    let msg = confirm_save_message(language, title);
+    let msg = crate::i18n::tr(language, "whisper.close_confirm");
     let title_w = confirm_title(language);
-
-    let result = crate::show_blocking_modal_message_box(
+    crate::show_blocking_modal_message_box(
         hwnd,
         crate::BlockingModalKind::DocumentSaveConfirm,
         PCWSTR(to_wide(&msg).as_ptr()),
         PCWSTR(to_wide(&title_w).as_ptr()),
-        MB_YESNOCANCEL | MB_ICONWARNING,
-    );
-
-    match result {
-        IDYES => save_document_at(hwnd, index, false),
-        IDNO => true,
-        _ => false,
-    }
+        windows::Win32::UI::WindowsAndMessaging::MB_YESNO | MB_ICONWARNING,
+    ) == IDYES
 }
 
 pub fn get_current_index(hwnd: HWND) -> usize {

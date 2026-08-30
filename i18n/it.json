@@ -2059,6 +2059,7 @@
   "weather.tomorrow": "Domani",
   "weather.wind": "Vento",
   "whisper.cancel_confirm": "Vuoi annullare la trascrizione in corso?",
+  "whisper.close_confirm": "Sei sicuro di voler chiudere la trascrizione?",
   "whisper.default_filename": "Trascrizione",
   "whisper.error.direct_stream_not_supported": "La trascrizione di streaming live/diretto non è ancora supportata.",
   "whisper.error.failed": "Errore trascrizione: {err}",

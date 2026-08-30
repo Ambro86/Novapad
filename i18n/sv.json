@@ -2007,6 +2007,7 @@
   "weather.tomorrow": "I morgon",
   "weather.wind": "Vind",
   "whisper.cancel_confirm": "Vill du avbryta den pågående transkriberingen?",
+  "whisper.close_confirm": "Är du säker på att du vill stänga transkriberingen?",
   "whisper.default_filename": "Transkription",
   "whisper.error.direct_stream_not_supported": "Transkribering av direktsändning stöds ännu inte.",
   "whisper.error.failed": "Transkriberingsfel: {err}",

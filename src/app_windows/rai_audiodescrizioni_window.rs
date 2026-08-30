@@ -158,7 +158,7 @@ fn catalog_context_actions(
                     return;
                 }
             };
-            crate::start_whisper_transcription_for_remote_media(
+            crate::start_whisper_transcription_for_remote_media_context(
                 parent,
                 resolved_url,
                 optional_media_title(&item.title),

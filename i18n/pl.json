@@ -2007,6 +2007,7 @@
   "weather.tomorrow": "Jutro",
   "weather.wind": "Wiatr",
   "whisper.cancel_confirm": "Czy chcesz anulować trwającą transkrypcję?",
+  "whisper.close_confirm": "Czy na pewno chcesz zamknąć transkrypcję?",
   "whisper.default_filename": "Transkrypcja",
   "whisper.error.direct_stream_not_supported": "Transkrypcja strumienia na żywo/bezpośredniego nie jest jeszcze obsługiwana.",
   "whisper.error.failed": "Błąd transkrypcji: {err}",

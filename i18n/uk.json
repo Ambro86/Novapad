@@ -2007,6 +2007,7 @@
   "weather.tomorrow": "Завтра",
   "weather.wind": "Вітер",
   "whisper.cancel_confirm": "Бажаєте скасувати поточну транскрипцію?",
+  "whisper.close_confirm": "Ви впевнені, що хочете закрити транскрипцію?",
   "whisper.default_filename": "Транскрипція",
   "whisper.error.direct_stream_not_supported": "Транскрипція прямого ефіру поки не підтримується.",
   "whisper.error.failed": "Помилка транскрипції: {err}",

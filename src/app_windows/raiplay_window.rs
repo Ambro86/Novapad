@@ -1,5 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicIsize, Ordering},
+};
 use windows::Win32::Foundation::HWND;
 
 use crate::app_windows::youtube_transcript_window::{
@@ -15,6 +18,124 @@ enum BrowseOutcome {
 }
 
 type RaiPlayContextTargetCache = Arc<Mutex<HashMap<String, Result<PlaybackTarget, String>>>>;
+
+static RAIPLAY_CONTEXT_TRANSCRIPTION_PENDING_PARENT: AtomicIsize = AtomicIsize::new(0);
+static RAIPLAY_CONTEXT_TRANSCRIPTION_EXIT_PARENT: AtomicIsize = AtomicIsize::new(0);
+static RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_PENDING_PARENT: AtomicIsize = AtomicIsize::new(0);
+static RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_EXIT_PARENT: AtomicIsize = AtomicIsize::new(0);
+static RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT: AtomicIsize = AtomicIsize::new(0);
+
+pub(crate) fn mark_context_transcription_started(parent: HWND) {
+    RAIPLAY_CONTEXT_TRANSCRIPTION_EXIT_PARENT.store(0, Ordering::SeqCst);
+    RAIPLAY_CONTEXT_TRANSCRIPTION_PENDING_PARENT.store(parent.0, Ordering::SeqCst);
+    crate::log_debug(&format!(
+        "RaiPlay context transcription started parent={:?}",
+        parent
+    ));
+}
+
+pub(crate) fn finish_context_transcription(parent: HWND, succeeded: bool) {
+    if RAIPLAY_CONTEXT_TRANSCRIPTION_PENDING_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+    if succeeded {
+        RAIPLAY_CONTEXT_TRANSCRIPTION_EXIT_PARENT.store(parent.0, Ordering::SeqCst);
+        crate::log_debug(&format!(
+            "RaiPlay context transcription completed: browser exit armed parent={:?}",
+            parent
+        ));
+    } else {
+        RAIPLAY_CONTEXT_TRANSCRIPTION_EXIT_PARENT.store(0, Ordering::SeqCst);
+        crate::log_debug(&format!(
+            "RaiPlay context transcription did not complete: keeping browser open parent={:?}",
+            parent
+        ));
+    }
+}
+
+fn take_context_transcription_browser_exit(parent: HWND) -> bool {
+    if RAIPLAY_CONTEXT_TRANSCRIPTION_EXIT_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        crate::log_debug(&format!(
+            "RaiPlay context transcription: closing navigation instead of restoring history parent={:?}",
+            parent
+        ));
+        true
+    } else {
+        false
+    }
+}
+
+pub(crate) fn mark_context_audio_description_started(parent: HWND) {
+    RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_EXIT_PARENT.store(0, Ordering::SeqCst);
+    RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.store(0, Ordering::SeqCst);
+    RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_PENDING_PARENT.store(parent.0, Ordering::SeqCst);
+    crate::log_debug(&format!(
+        "RaiPlay context audio description started parent={:?}",
+        parent
+    ));
+}
+
+pub(crate) fn finish_context_audio_description_download(parent: HWND, succeeded: bool) -> bool {
+    if RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_PENDING_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return false;
+    }
+    if succeeded {
+        RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_EXIT_PARENT.store(parent.0, Ordering::SeqCst);
+        RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.store(parent.0, Ordering::SeqCst);
+        crate::log_debug(&format!(
+            "RaiPlay context audio description completed: browser exit and focus protection armed parent={:?}",
+            parent
+        ));
+    } else {
+        RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_EXIT_PARENT.store(0, Ordering::SeqCst);
+        RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.store(0, Ordering::SeqCst);
+        crate::log_debug(&format!(
+            "RaiPlay context audio description did not complete: keeping browser open parent={:?}",
+            parent
+        ));
+    }
+    true
+}
+
+pub(crate) fn context_audio_description_keeps_window_foreground(parent: HWND) -> bool {
+    RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.load(Ordering::SeqCst) == parent.0
+}
+
+pub(crate) fn finish_context_audio_description_focus(parent: HWND) {
+    if RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        crate::log_debug(&format!(
+            "RaiPlay context audio description: focus protection cleared parent={:?}",
+            parent
+        ));
+    }
+}
+
+fn take_context_audio_description_browser_exit(parent: HWND) -> bool {
+    if RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_EXIT_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        crate::log_debug(&format!(
+            "RaiPlay context audio description: closing navigation instead of restoring history parent={:?}",
+            parent
+        ));
+        true
+    } else {
+        false
+    }
+}
 
 fn context_menu_label(language: Language, key: &str) -> String {
     crate::i18n::tr(language, key)
@@ -278,7 +399,7 @@ fn browse_page(
                         PlaybackTarget::DirectStream { url, .. }
                         | PlaybackTarget::Download(url) => url,
                     };
-                    crate::start_whisper_transcription_for_remote_media(
+                    crate::start_whisper_transcription_for_raiplay_context(
                         parent,
                         audio_url,
                         optional_media_title(&item.title),
@@ -439,6 +560,12 @@ fn browse_page(
                 continue;
             }
             MultilineSelectionResult::Cancelled => {
+                if take_context_audio_description_browser_exit(parent) {
+                    return BrowseOutcome::Cancelled;
+                }
+                if take_context_transcription_browser_exit(parent) {
+                    return BrowseOutcome::Cancelled;
+                }
                 if let Some((previous_page_path, previous_selected_id)) = history.pop() {
                     match raiplay::load_page(&previous_page_path) {
                         Ok(previous_page) => {

@@ -2007,6 +2007,7 @@
   "weather.tomorrow": "Zítra",
   "weather.wind": "Vítr",
   "whisper.cancel_confirm": "Chcete zrušit probíhající přepis?",
+  "whisper.close_confirm": "Opravdu chcete přepis zavřít?",
   "whisper.default_filename": "Přepis",
   "whisper.error.direct_stream_not_supported": "Přepis živého/přímého streamu zatím není podporován.",
   "whisper.error.failed": "Chyba přepisu: {err}",

@@ -2007,6 +2007,7 @@
   "weather.tomorrow": "कल",
   "weather.wind": "हवा",
   "whisper.cancel_confirm": "क्या आप प्रगति में चल रहे ट्रांसक्रिप्शन को रद्द करना चाहते हैं?",
+  "whisper.close_confirm": "क्या आप वाकई ट्रांसक्रिप्शन बंद करना चाहते हैं?",
   "whisper.default_filename": "लिप्यंतरण",
   "whisper.error.direct_stream_not_supported": "लाइव/सीधे स्ट्रीम का ट्रांसक्रिप्शन अभी समर्थित नहीं है।",
   "whisper.error.failed": "ट्रांसक्रिप्शन त्रुटि: {err}",

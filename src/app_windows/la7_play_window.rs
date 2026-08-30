@@ -1,3 +1,9 @@
+use std::collections::HashMap;
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicIsize, Ordering},
+};
+
 use crate::app_windows::youtube_transcript_window::{
     self, MultilineSearchOptions, MultilineSelectionItem, MultilineSelectionResult,
 };
@@ -6,6 +12,176 @@ use crate::tools::la7_play::{self, BrowseItem, BrowsePage, ItemKind};
 use crate::{RaiAudioOrigin, show_error, with_state};
 use windows::Win32::Foundation::HWND;
 
+type La7ContextTargetCache = Arc<Mutex<HashMap<String, Result<String, String>>>>;
+
+static LA7_CONTEXT_TRANSCRIPTION_PENDING_PARENT: AtomicIsize = AtomicIsize::new(0);
+static LA7_CONTEXT_TRANSCRIPTION_EXIT_PARENT: AtomicIsize = AtomicIsize::new(0);
+static LA7_CONTEXT_TRANSCRIPTION_FOCUS_PARENT: AtomicIsize = AtomicIsize::new(0);
+static LA7_CONTEXT_AUDIO_DESCRIPTION_PENDING_PARENT: AtomicIsize = AtomicIsize::new(0);
+static LA7_CONTEXT_AUDIO_DESCRIPTION_EXIT_PARENT: AtomicIsize = AtomicIsize::new(0);
+static LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT: AtomicIsize = AtomicIsize::new(0);
+
+pub(crate) fn mark_context_transcription_started(parent: HWND) {
+    LA7_CONTEXT_TRANSCRIPTION_EXIT_PARENT.store(0, Ordering::SeqCst);
+    LA7_CONTEXT_TRANSCRIPTION_FOCUS_PARENT.store(parent.0, Ordering::SeqCst);
+    LA7_CONTEXT_TRANSCRIPTION_PENDING_PARENT.store(parent.0, Ordering::SeqCst);
+    crate::log_debug(&format!(
+        "La7 Play context transcription started parent={:?}",
+        parent
+    ));
+}
+
+pub(crate) fn finish_context_transcription(parent: HWND, succeeded: bool) {
+    if LA7_CONTEXT_TRANSCRIPTION_PENDING_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+    LA7_CONTEXT_TRANSCRIPTION_FOCUS_PARENT.store(0, Ordering::SeqCst);
+    if succeeded {
+        LA7_CONTEXT_TRANSCRIPTION_EXIT_PARENT.store(parent.0, Ordering::SeqCst);
+        crate::log_debug(&format!(
+            "La7 Play context transcription completed: browser exit armed parent={:?}",
+            parent
+        ));
+    } else {
+        LA7_CONTEXT_TRANSCRIPTION_EXIT_PARENT.store(0, Ordering::SeqCst);
+        crate::log_debug(&format!(
+            "La7 Play context transcription did not complete parent={:?}",
+            parent
+        ));
+    }
+}
+
+pub(crate) fn context_transcription_keeps_progress_foreground(parent: HWND) -> bool {
+    LA7_CONTEXT_TRANSCRIPTION_FOCUS_PARENT.load(Ordering::SeqCst) == parent.0
+}
+
+fn take_context_transcription_browser_exit(parent: HWND) -> bool {
+    if LA7_CONTEXT_TRANSCRIPTION_EXIT_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        crate::log_debug(&format!(
+            "La7 Play context transcription: closing navigation instead of restoring history parent={:?}",
+            parent
+        ));
+        true
+    } else {
+        false
+    }
+}
+
+pub(crate) fn mark_context_audio_description_started(parent: HWND) {
+    LA7_CONTEXT_AUDIO_DESCRIPTION_EXIT_PARENT.store(0, Ordering::SeqCst);
+    LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.store(0, Ordering::SeqCst);
+    LA7_CONTEXT_AUDIO_DESCRIPTION_PENDING_PARENT.store(parent.0, Ordering::SeqCst);
+    crate::log_debug(&format!(
+        "La7 Play context audio description started parent={:?}",
+        parent
+    ));
+}
+
+pub(crate) fn finish_context_audio_description_download(parent: HWND, succeeded: bool) -> bool {
+    if LA7_CONTEXT_AUDIO_DESCRIPTION_PENDING_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return false;
+    }
+    if succeeded {
+        LA7_CONTEXT_AUDIO_DESCRIPTION_EXIT_PARENT.store(parent.0, Ordering::SeqCst);
+        LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.store(parent.0, Ordering::SeqCst);
+        crate::log_debug(&format!(
+            "La7 Play context audio description completed: browser exit and focus protection armed parent={:?}",
+            parent
+        ));
+    } else {
+        LA7_CONTEXT_AUDIO_DESCRIPTION_EXIT_PARENT.store(0, Ordering::SeqCst);
+        LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.store(0, Ordering::SeqCst);
+        crate::log_debug(&format!(
+            "La7 Play context audio description did not complete: keeping browser open parent={:?}",
+            parent
+        ));
+    }
+    true
+}
+
+pub(crate) fn context_audio_description_keeps_window_foreground(parent: HWND) -> bool {
+    LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.load(Ordering::SeqCst) == parent.0
+}
+
+pub(crate) fn finish_context_audio_description_focus(parent: HWND) {
+    if LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        crate::log_debug(&format!(
+            "La7 Play context audio description: focus protection cleared parent={:?}",
+            parent
+        ));
+    }
+}
+
+fn take_context_audio_description_browser_exit(parent: HWND) -> bool {
+    if LA7_CONTEXT_AUDIO_DESCRIPTION_EXIT_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        crate::log_debug(&format!(
+            "La7 Play context audio description: closing navigation instead of restoring history parent={:?}",
+            parent
+        ));
+        true
+    } else {
+        false
+    }
+}
+
+fn context_menu_label(language: Language, key: &str) -> String {
+    crate::i18n::tr(language, key)
+        .replace('&', "")
+        .split('\t')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+fn optional_media_title(title: &str) -> Option<String> {
+    let title = title.trim();
+    if title.is_empty() {
+        None
+    } else {
+        Some(title.to_string())
+    }
+}
+
+fn cached_context_vod_url(
+    items: &[BrowseItem],
+    selected_id: &str,
+    cache: &La7ContextTargetCache,
+) -> Option<String> {
+    if let Some(cached) = cache
+        .lock()
+        .unwrap_or_else(|err| err.into_inner())
+        .get(selected_id)
+        .cloned()
+    {
+        return cached.ok();
+    }
+    let item = items.iter().find(|item| item.id == selected_id)?;
+    if item.kind != ItemKind::Media {
+        return None;
+    }
+    let resolved = la7_play::resolve_vod(&item.target);
+    cache
+        .lock()
+        .unwrap_or_else(|err| err.into_inner())
+        .insert(selected_id.to_string(), resolved.clone());
+    resolved.ok()
+}
 pub fn open(parent: HWND) {
     let language = with_state(parent, |s| s.settings.language).unwrap_or_default();
     if language != Language::Italian {
@@ -95,6 +271,134 @@ fn browse(
                 description: x.description.clone(),
             })
             .collect();
+        let context_target_cache: La7ContextTargetCache = Arc::new(Mutex::new(HashMap::new()));
+
+        let save_items_for_enabled = page.items.clone();
+        let save_cache_for_enabled = Arc::clone(&context_target_cache);
+        let save_items_for_handler = page.items.clone();
+        let save_page_title = page.title.clone();
+        let save_cache_for_handler = Arc::clone(&context_target_cache);
+        let save_context_action =
+            crate::app_windows::interpreter_select_window::InterpreterContextAction {
+                label: context_menu_label(language, "playback.download_episode"),
+                ctrl_c_shortcut: false,
+                delete_shortcut: false,
+                children: Vec::new(),
+                enabled: Arc::new(move |selected_id: &str| {
+                    cached_context_vod_url(
+                        &save_items_for_enabled,
+                        selected_id,
+                        &save_cache_for_enabled,
+                    )
+                    .is_some()
+                }),
+                handler: Arc::new(move |selected_id: String| {
+                    let Some(item) = save_items_for_handler
+                        .iter()
+                        .find(|item| item.id == selected_id)
+                    else {
+                        return;
+                    };
+                    let Some(url) = cached_context_vod_url(
+                        &save_items_for_handler,
+                        &selected_id,
+                        &save_cache_for_handler,
+                    ) else {
+                        return;
+                    };
+                    crate::save_la7_context_media(
+                        parent,
+                        language,
+                        url,
+                        optional_media_title(&save_page_title),
+                        optional_media_title(&item.title),
+                    );
+                }),
+            };
+
+        let transcribe_items_for_enabled = page.items.clone();
+        let transcribe_cache_for_enabled = Arc::clone(&context_target_cache);
+        let transcribe_items_for_handler = page.items.clone();
+        let transcribe_cache_for_handler = Arc::clone(&context_target_cache);
+        let transcribe_context_action =
+            crate::app_windows::interpreter_select_window::InterpreterContextAction {
+                label: context_menu_label(language, "playback.transcribe_current"),
+                ctrl_c_shortcut: false,
+                delete_shortcut: false,
+                children: Vec::new(),
+                enabled: Arc::new(move |selected_id: &str| {
+                    cached_context_vod_url(
+                        &transcribe_items_for_enabled,
+                        selected_id,
+                        &transcribe_cache_for_enabled,
+                    )
+                    .is_some()
+                }),
+                handler: Arc::new(move |selected_id: String| {
+                    let Some(item) = transcribe_items_for_handler
+                        .iter()
+                        .find(|item| item.id == selected_id)
+                    else {
+                        return;
+                    };
+                    let Some(url) = cached_context_vod_url(
+                        &transcribe_items_for_handler,
+                        &selected_id,
+                        &transcribe_cache_for_handler,
+                    ) else {
+                        return;
+                    };
+                    crate::start_whisper_transcription_for_la7_context(
+                        parent,
+                        url,
+                        optional_media_title(&item.title),
+                    );
+                }),
+            };
+
+        let ad_items_for_enabled = page.items.clone();
+        let ad_cache_for_enabled = Arc::clone(&context_target_cache);
+        let ad_items_for_handler = page.items.clone();
+        let ad_page_title = page.title.clone();
+        let ad_cache_for_handler = Arc::clone(&context_target_cache);
+        let audio_description_context_action =
+            crate::app_windows::interpreter_select_window::InterpreterContextAction {
+                label: context_menu_label(language, "menu.create_audio_description"),
+                ctrl_c_shortcut: false,
+                delete_shortcut: false,
+                children: Vec::new(),
+                enabled: Arc::new(move |selected_id: &str| {
+                    cached_context_vod_url(
+                        &ad_items_for_enabled,
+                        selected_id,
+                        &ad_cache_for_enabled,
+                    )
+                    .is_some()
+                }),
+                handler: Arc::new(move |selected_id: String| {
+                    let Some(item) = ad_items_for_handler
+                        .iter()
+                        .find(|item| item.id == selected_id)
+                    else {
+                        return;
+                    };
+                    let Some(url) = cached_context_vod_url(
+                        &ad_items_for_handler,
+                        &selected_id,
+                        &ad_cache_for_handler,
+                    ) else {
+                        return;
+                    };
+                    crate::create_audio_description_from_la7_context(
+                        parent,
+                        language,
+                        url,
+                        optional_media_title(&ad_page_title),
+                        optional_media_title(&item.title),
+                    );
+                }),
+            };
+
         let result = youtube_transcript_window::select_multiline_items_with_search(
             parent,
             language,
@@ -106,7 +410,11 @@ fn browse(
                 search_button_label: crate::i18n::tr_la7_play("la7.search"),
                 show_search_edit: true,
                 secondary_action_label: None,
-                context_actions: Vec::new(),
+                context_actions: vec![
+                    save_context_action,
+                    transcribe_context_action,
+                    audio_description_context_action,
+                ],
                 right_arrow_accepts_selection: true,
                 left_arrow_closes: true,
                 escape_stops_active_player: false,
@@ -137,6 +445,11 @@ fn browse(
             }
             MultilineSelectionResult::SecondaryAction => continue,
             MultilineSelectionResult::Cancelled => {
+                if take_context_audio_description_browser_exit(parent)
+                    || take_context_transcription_browser_exit(parent)
+                {
+                    return;
+                }
                 if let Some((src, id)) = history.pop() {
                     match la7_play::load_page(&src) {
                         Ok(p) => {

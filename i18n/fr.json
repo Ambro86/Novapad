@@ -2007,6 +2007,7 @@
   "weather.tomorrow": "Demain",
   "weather.wind": "Vent",
   "whisper.cancel_confirm": "Voulez-vous annuler la transcription en cours ?",
+  "whisper.close_confirm": "Voulez-vous vraiment fermer la transcription ?",
   "whisper.default_filename": "Transcription",
   "whisper.error.direct_stream_not_supported": "La transcription en direct n'est pas encore prise en charge.",
   "whisper.error.failed": "Erreur de transcription : {err}",

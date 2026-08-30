@@ -219,8 +219,99 @@ const STREAM_DOWNLOAD_STALL_SECS: u64 = 180;
 const STREAM_POST_100_GRACE_SECS: u64 = 25;
 const STREAM_RETRY_TIMEOUT_SECS: u64 = 120;
 static YTDLP_UPDATE_CHECKED: AtomicBool = AtomicBool::new(false);
+static YOUTUBE_CONTEXT_TRANSCRIPTION_UNWIND_PARENT: AtomicIsize = AtomicIsize::new(0);
+static YOUTUBE_CONTEXT_TRANSCRIPTION_ACTIVE_PARENT: AtomicIsize = AtomicIsize::new(0);
+static YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_UNWIND_PARENT: AtomicIsize = AtomicIsize::new(0);
+static YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT: AtomicIsize = AtomicIsize::new(0);
 static PENDING_STREAM_REOPEN_CONTEXT: Mutex<Option<crate::YouTubeReturnContext>> = Mutex::new(None);
 static ACTIVE_STREAM_SAVE_CONTEXT: Mutex<Option<StreamSaveContext>> = Mutex::new(None);
+
+pub(crate) fn mark_context_transcription_started(parent: HWND) {
+    YOUTUBE_CONTEXT_TRANSCRIPTION_UNWIND_PARENT.store(parent.0, Ordering::SeqCst);
+    YOUTUBE_CONTEXT_TRANSCRIPTION_ACTIVE_PARENT.store(parent.0, Ordering::SeqCst);
+    crate::log_debug(&format!(
+        "YouTube context transcription started: suppressing selector return and editor focus parent={:?}",
+        parent
+    ));
+}
+
+pub(crate) fn context_transcription_keeps_progress_foreground(parent: HWND) -> bool {
+    YOUTUBE_CONTEXT_TRANSCRIPTION_ACTIVE_PARENT.load(Ordering::SeqCst) == parent.0
+}
+
+pub(crate) fn finish_context_transcription(parent: HWND) {
+    if YOUTUBE_CONTEXT_TRANSCRIPTION_ACTIVE_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        crate::log_debug(&format!(
+            "YouTube context transcription finished: editor focus suppression cleared parent={:?}",
+            parent
+        ));
+    }
+}
+
+fn take_context_transcription_unwind(parent: HWND) -> bool {
+    if YOUTUBE_CONTEXT_TRANSCRIPTION_UNWIND_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return false;
+    }
+    if let Ok(mut pending) = PENDING_STREAM_REOPEN_CONTEXT.lock() {
+        *pending = None;
+    }
+    crate::clear_active_youtube_return_context(parent);
+    crate::log_debug(&format!(
+        "YouTube context transcription: closing streaming selection without focusing empty editor parent={:?}",
+        parent
+    ));
+    true
+}
+
+pub(crate) fn mark_context_audio_description_started(parent: HWND) {
+    YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_UNWIND_PARENT.store(parent.0, Ordering::SeqCst);
+    YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.store(parent.0, Ordering::SeqCst);
+    crate::log_debug(&format!(
+        "YouTube context audio description: suppressing selector return and editor focus parent={:?}",
+        parent
+    ));
+}
+
+pub(crate) fn context_audio_description_keeps_window_foreground(parent: HWND) -> bool {
+    YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.load(Ordering::SeqCst) == parent.0
+}
+
+pub(crate) fn finish_context_audio_description(parent: HWND) {
+    if YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        crate::log_debug(&format!(
+            "YouTube context audio description: focus protection cleared parent={:?}",
+            parent
+        ));
+    }
+}
+
+fn take_context_audio_description_unwind(parent: HWND) -> bool {
+    if YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_UNWIND_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return false;
+    }
+    if let Ok(mut pending) = PENDING_STREAM_REOPEN_CONTEXT.lock() {
+        *pending = None;
+    }
+    crate::clear_active_youtube_return_context(parent);
+    crate::enable_window_safe(parent, true);
+    crate::log_debug(&format!(
+        "YouTube context audio description: streaming selector closed without restoring empty editor parent={:?}",
+        parent
+    ));
+    true
+}
 
 // YouTube InnerTube API constants
 const INNERTUBE_API_URL: &str = "https://www.youtube.com/youtubei/v1/player";
@@ -2741,7 +2832,8 @@ fn youtube_video_context_actions(
                 )
             });
             if let Some(path) = downloaded_path {
-                crate::start_whisper_transcription_for_media(parent, path, media_title);
+                mark_context_transcription_started(parent);
+                crate::start_whisper_transcription_for_media_context(parent, path, media_title);
             }
         }),
         children: Vec::new(),
@@ -2771,7 +2863,11 @@ fn youtube_video_context_actions(
             );
             let active_url = context.url.clone();
             with_temporary_stream_save_context(context, || {
-                download_active_youtube_for_audio_description(parent, &active_url, language);
+                download_active_youtube_for_audio_description_context(
+                    parent,
+                    &active_url,
+                    language,
+                );
             });
         }),
         children: Vec::new(),
@@ -10915,6 +11011,7 @@ pub(crate) fn download_active_streaming_video_for_audio_description(
         context,
         language,
         "stream_audio_description",
+        false,
     )
 }
 
@@ -10923,6 +11020,7 @@ fn download_stream_context_for_audio_description(
     context: StreamSaveContext,
     language: Language,
     prefix_label: &str,
+    youtube_context_menu: bool,
 ) -> bool {
     let target_dir = crate::with_state(parent, |state| state.settings.media_save_folder.clone())
         .map(|folder| folder.trim().to_string())
@@ -10972,6 +11070,9 @@ fn download_stream_context_for_audio_description(
         "stream_audio.progress_downloading",
         true,
     );
+    if youtube_context_menu && has_active_media_context_list(parent) {
+        crate::app_windows::podcast_save_window::suppress_parent_restore_on_close(progress);
+    }
     report_progress_status(
         progress,
         &i18n::tr(language, "stream_audio.progress_downloading"),
@@ -11047,6 +11148,9 @@ fn download_stream_context_for_audio_description(
                 "stream_audio.progress_downloading",
                 true,
             );
+            if youtube_context_menu && has_active_media_context_list(parent) {
+                crate::app_windows::podcast_save_window::suppress_parent_restore_on_close(progress);
+            }
             attempt = match run_ytdlp_stream_download_attempt(YtdlpDownloadRequest {
                 parent,
                 progress,
@@ -11117,7 +11221,11 @@ fn download_stream_context_for_audio_description(
         return true;
     }
 
-    crate::app_windows::audio_description_window::open_with_input(parent, target_path);
+    if youtube_context_menu {
+        crate::queue_youtube_context_audio_description(parent, target_path);
+    } else {
+        crate::app_windows::audio_description_window::open_with_input(parent, target_path);
+    }
     true
 }
 
@@ -11125,6 +11233,23 @@ pub(crate) fn download_active_youtube_for_audio_description(
     parent: HWND,
     active_url: &str,
     language: Language,
+) -> bool {
+    download_active_youtube_for_audio_description_with_mode(parent, active_url, language, false)
+}
+
+pub(crate) fn download_active_youtube_for_audio_description_context(
+    parent: HWND,
+    active_url: &str,
+    language: Language,
+) -> bool {
+    download_active_youtube_for_audio_description_with_mode(parent, active_url, language, true)
+}
+
+fn download_active_youtube_for_audio_description_with_mode(
+    parent: HWND,
+    active_url: &str,
+    language: Language,
+    youtube_context_menu: bool,
 ) -> bool {
     let Some(normalized_url) = normalize_youtube_input_for_download(active_url) else {
         return false;
@@ -11179,6 +11304,7 @@ pub(crate) fn download_active_youtube_for_audio_description(
         context,
         language,
         "youtube_audio_description",
+        youtube_context_menu,
     )
 }
 
@@ -11491,6 +11617,12 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         ) {
             Ok(Some(selection)) => selection,
             Ok(None) => {
+                if take_context_transcription_unwind(parent) {
+                    return;
+                }
+                if take_context_audio_description_unwind(parent) {
+                    return;
+                }
                 if let Some(previous_input) = dialog_data.previous_input.clone() {
                     set_pending_stream_reopen_context(Some(crate::YouTubeReturnContext {
                         input: Some(previous_input),

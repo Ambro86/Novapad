@@ -2007,6 +2007,7 @@
   "weather.tomorrow": "明天",
   "weather.wind": "风速",
   "whisper.cancel_confirm": "是否要取消正在进行的转录？",
+  "whisper.close_confirm": "确定要关闭转写文本吗？",
   "whisper.default_filename": "转录",
   "whisper.error.direct_stream_not_supported": "尚不支持实时/直播流转录。",
   "whisper.error.failed": "转录错误：{err}",

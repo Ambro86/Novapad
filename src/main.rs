@@ -291,10 +291,17 @@ const WM_EDITOR_SUMMARY_DONE: u32 = WM_APP + 43;
 const WM_REACTIVATE_MODAL_AFTER_EXTERNAL_OPEN: u32 = WM_APP + 44;
 const WM_YOUTUBE_MPV_PLAYBACK_FAILED: u32 = WM_APP + 45;
 const WM_OPEN_AUDIO_DESCRIPTION_FOR_TV_RECORDING: u32 = WM_APP + 46;
+const WM_START_CONTEXT_WHISPER_TRANSCRIPTION: u32 = WM_APP + 47;
+const WM_START_YOUTUBE_CONTEXT_AUDIO_DESCRIPTION: u32 = WM_APP + 48;
+const WM_START_RAIPLAY_CONTEXT_AUDIO_DESCRIPTION: u32 = WM_APP + 49;
+const WM_START_LA7_CONTEXT_AUDIO_DESCRIPTION: u32 = WM_APP + 50;
 const FOCUS_EDITOR_TIMER_ID: usize = 1;
 const FOCUS_EDITOR_TIMER_ID2: usize = 2;
 const FOCUS_EDITOR_TIMER_ID3: usize = 3;
 const FOCUS_EDITOR_TIMER_ID4: usize = 4;
+const YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID: usize = 55;
+const RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID: usize = 56;
+const LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID: usize = 57;
 const MPV_BASS_FOCUS_DEBUG_TIMER_ID1: usize = 8;
 const MPV_BASS_FOCUS_DEBUG_TIMER_ID2: usize = 9;
 const MPV_BASS_FOCUS_DEBUG_TIMER_ID3: usize = 10;
@@ -2493,6 +2500,8 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
             language,
             rai_origin,
             open_audio_description: false,
+            raiplay_context_audio_description: false,
+            la7_context_audio_description: false,
         });
         return;
     }
@@ -2555,6 +2564,8 @@ fn download_active_rai_la7_for_audio_description(hwnd: HWND) -> bool {
         language,
         rai_origin,
         open_audio_description: true,
+        raiplay_context_audio_description: false,
+        la7_context_audio_description: false,
     });
     true
 }
@@ -2575,6 +2586,8 @@ struct PodcastProgressDownloadRequest {
     language: Language,
     rai_origin: RaiAudioOrigin,
     open_audio_description: bool,
+    raiplay_context_audio_description: bool,
+    la7_context_audio_description: bool,
 }
 
 fn run_raiplay_context_media_action(
@@ -2609,6 +2622,8 @@ fn run_raiplay_context_media_action(
         language,
         rai_origin: RaiAudioOrigin::RaiPlay,
         open_audio_description,
+        raiplay_context_audio_description: open_audio_description,
+        la7_context_audio_description: false,
     });
 }
 
@@ -2632,6 +2647,49 @@ pub(crate) fn create_audio_description_from_raiplay_context(
     run_raiplay_context_media_action(hwnd, language, playback_target, podcast_title, title, true);
 }
 
+fn run_la7_context_media_action(
+    hwnd: HWND,
+    language: Language,
+    media_url: String,
+    podcast_title: Option<String>,
+    title: Option<String>,
+    open_audio_description: bool,
+) {
+    download_podcast_episode_with_progress(PodcastProgressDownloadRequest {
+        hwnd,
+        url: Some(media_url.clone()),
+        media_url: Some(media_url),
+        podcast_title,
+        title,
+        cache_path: None,
+        language,
+        rai_origin: RaiAudioOrigin::La7Play,
+        open_audio_description,
+        raiplay_context_audio_description: false,
+        la7_context_audio_description: open_audio_description,
+    });
+}
+
+pub(crate) fn save_la7_context_media(
+    hwnd: HWND,
+    language: Language,
+    media_url: String,
+    podcast_title: Option<String>,
+    title: Option<String>,
+) {
+    run_la7_context_media_action(hwnd, language, media_url, podcast_title, title, false);
+}
+
+pub(crate) fn create_audio_description_from_la7_context(
+    hwnd: HWND,
+    language: Language,
+    media_url: String,
+    podcast_title: Option<String>,
+    title: Option<String>,
+) {
+    run_la7_context_media_action(hwnd, language, media_url, podcast_title, title, true);
+}
+
 fn download_podcast_episode_with_progress(request: PodcastProgressDownloadRequest) {
     let PodcastProgressDownloadRequest {
         hwnd,
@@ -2643,6 +2701,8 @@ fn download_podcast_episode_with_progress(request: PodcastProgressDownloadReques
         language,
         rai_origin,
         open_audio_description,
+        raiplay_context_audio_description,
+        la7_context_audio_description,
     } = request;
     let suggested_name =
         suggested_podcast_episode_filename(podcast_title.as_deref(), title.as_deref())
@@ -2753,8 +2813,16 @@ fn download_podcast_episode_with_progress(request: PodcastProgressDownloadReques
     with_state(hwnd, |state| {
         state.podcast_save_cancel_token = Some(cancel_flag.clone());
     });
+    if raiplay_context_audio_description {
+        app_windows::raiplay_window::mark_context_audio_description_started(hwnd);
+    }
+    if la7_context_audio_description {
+        app_windows::la7_play_window::mark_context_audio_description_started(hwnd);
+    }
     open_podcast_save_progress_window(hwnd, language);
-    if !open_audio_description
+    if (!open_audio_description
+        || raiplay_context_audio_description
+        || la7_context_audio_description)
         && app_windows::youtube_transcript_window::has_active_media_context_list(hwnd)
     {
         let progress_dialog =
@@ -7038,6 +7106,176 @@ pub(crate) fn post_audio_description_for_completed_tv_recording(hwnd: HWND, path
     }
 }
 
+pub(crate) fn queue_youtube_context_audio_description(hwnd: HWND, input_path: PathBuf) {
+    app_windows::youtube_transcript_window::mark_context_audio_description_started(hwnd);
+    let selector_close_requested =
+        app_windows::interpreter_select_window::request_close_active_interpreter_selects_for_parent(
+            hwnd,
+        );
+    if !selector_close_requested {
+        log_debug(
+            "YouTube context audio description: no active interpreter selector needed closing",
+        );
+    }
+
+    let payload = DeferredYoutubeContextAudioDescription { input_path };
+    let ptr = Box::into_raw(Box::new(payload));
+    if let Err(err) = post_message_w_safe(
+        hwnd,
+        WM_START_YOUTUBE_CONTEXT_AUDIO_DESCRIPTION,
+        WPARAM(0),
+        LPARAM(ptr as isize),
+    ) {
+        log_debug(&format!(
+            "Failed to post WM_START_YOUTUBE_CONTEXT_AUDIO_DESCRIPTION: {err}"
+        ));
+        let DeferredYoutubeContextAudioDescription { input_path } = *unsafe { Box::from_raw(ptr) };
+        enable_window_safe(hwnd, true);
+        app_windows::audio_description_window::open_with_input(hwnd, input_path);
+        protect_youtube_context_audio_description_focus(hwnd);
+    }
+}
+
+fn restore_youtube_context_audio_description_focus(hwnd: HWND) -> bool {
+    if !app_windows::youtube_transcript_window::context_audio_description_keeps_window_foreground(
+        hwnd,
+    ) {
+        return false;
+    }
+
+    let window = app_windows::audio_description_window::visible_window(hwnd);
+    if window.0 != 0 && is_window_handle_valid(window) {
+        show_window_safe(window, SW_SHOW);
+        set_foreground_window_safe(window);
+        send_message_w_safe(window, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+        log_debug(&format!(
+            "YouTube context audio description: keeping creation window in foreground window={:?}",
+            window
+        ));
+    }
+    true
+}
+
+fn protect_youtube_context_audio_description_focus(hwnd: HWND) {
+    restore_youtube_context_audio_description_focus(hwnd);
+    let timer = unsafe {
+        SetTimer(
+            hwnd,
+            YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID,
+            750,
+            None,
+        )
+    };
+    if timer == 0 {
+        log_debug("Failed to set YouTube context audio-description focus-release timer");
+        app_windows::youtube_transcript_window::finish_context_audio_description(hwnd);
+    }
+}
+
+pub(crate) fn queue_raiplay_context_audio_description(hwnd: HWND, input_path: PathBuf) {
+    let payload = DeferredRaiplayContextAudioDescription { input_path };
+    let ptr = Box::into_raw(Box::new(payload));
+    if let Err(err) = post_message_w_safe(
+        hwnd,
+        WM_START_RAIPLAY_CONTEXT_AUDIO_DESCRIPTION,
+        WPARAM(0),
+        LPARAM(ptr as isize),
+    ) {
+        log_debug(&format!(
+            "Failed to post WM_START_RAIPLAY_CONTEXT_AUDIO_DESCRIPTION: {err}"
+        ));
+        let DeferredRaiplayContextAudioDescription { input_path } = *unsafe { Box::from_raw(ptr) };
+        enable_window_safe(hwnd, true);
+        app_windows::audio_description_window::open_with_input(hwnd, input_path);
+        protect_raiplay_context_audio_description_focus(hwnd);
+    }
+}
+
+fn restore_raiplay_context_audio_description_focus(hwnd: HWND) -> bool {
+    if !app_windows::raiplay_window::context_audio_description_keeps_window_foreground(hwnd) {
+        return false;
+    }
+    let window = app_windows::audio_description_window::visible_window(hwnd);
+    if window.0 != 0 && is_window_handle_valid(window) {
+        show_window_safe(window, SW_SHOW);
+        set_foreground_window_safe(window);
+        send_message_w_safe(window, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+        log_debug(&format!(
+            "RaiPlay context audio description: keeping creation window in foreground window={:?}",
+            window
+        ));
+    }
+    true
+}
+
+fn protect_raiplay_context_audio_description_focus(hwnd: HWND) {
+    restore_raiplay_context_audio_description_focus(hwnd);
+    let timer = unsafe {
+        SetTimer(
+            hwnd,
+            RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID,
+            750,
+            None,
+        )
+    };
+    if timer == 0 {
+        log_debug("Failed to set RaiPlay context audio-description focus-release timer");
+        app_windows::raiplay_window::finish_context_audio_description_focus(hwnd);
+    }
+}
+
+pub(crate) fn queue_la7_context_audio_description(hwnd: HWND, input_path: PathBuf) {
+    let payload = DeferredLa7ContextAudioDescription { input_path };
+    let ptr = Box::into_raw(Box::new(payload));
+    if let Err(err) = post_message_w_safe(
+        hwnd,
+        WM_START_LA7_CONTEXT_AUDIO_DESCRIPTION,
+        WPARAM(0),
+        LPARAM(ptr as isize),
+    ) {
+        log_debug(&format!(
+            "Failed to post WM_START_LA7_CONTEXT_AUDIO_DESCRIPTION: {err}"
+        ));
+        let DeferredLa7ContextAudioDescription { input_path } = *unsafe { Box::from_raw(ptr) };
+        enable_window_safe(hwnd, true);
+        app_windows::audio_description_window::open_with_input(hwnd, input_path);
+        protect_la7_context_audio_description_focus(hwnd);
+    }
+}
+
+fn restore_la7_context_audio_description_focus(hwnd: HWND) -> bool {
+    if !app_windows::la7_play_window::context_audio_description_keeps_window_foreground(hwnd) {
+        return false;
+    }
+    let window = app_windows::audio_description_window::visible_window(hwnd);
+    if window.0 != 0 && is_window_handle_valid(window) {
+        show_window_safe(window, SW_SHOW);
+        set_foreground_window_safe(window);
+        send_message_w_safe(window, WM_SETFOCUS, WPARAM(0), LPARAM(0));
+        log_debug(&format!(
+            "La7 Play context audio description: keeping creation window in foreground window={:?}",
+            window
+        ));
+    }
+    true
+}
+
+fn protect_la7_context_audio_description_focus(hwnd: HWND) {
+    restore_la7_context_audio_description_focus(hwnd);
+    let timer = unsafe {
+        SetTimer(
+            hwnd,
+            LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID,
+            750,
+            None,
+        )
+    };
+    if timer == 0 {
+        log_debug("Failed to set La7 Play context audio-description focus-release timer");
+        app_windows::la7_play_window::finish_context_audio_description_focus(hwnd);
+    }
+}
+
 fn open_audio_description_from_current_context(hwnd: HWND) {
     if let Some(path) = current_local_playback_media_path(hwnd)
         .filter(|path| file_handler::is_video_path(path.as_path()))
@@ -7095,6 +7333,44 @@ fn open_audio_description_from_current_context(hwnd: HWND) {
 
     log_debug("Audio description shortcut: opening empty window");
     app_windows::audio_description_window::open(hwnd);
+}
+
+fn restore_context_transcription_progress_focus(hwnd: HWND) -> bool {
+    let youtube_context =
+        app_windows::youtube_transcript_window::context_transcription_keeps_progress_foreground(
+            hwnd,
+        );
+    let la7_context =
+        app_windows::la7_play_window::context_transcription_keeps_progress_foreground(hwnd);
+    if !youtube_context && !la7_context {
+        return false;
+    }
+
+    let (progress_hwnd, transcription_in_progress) = with_state(hwnd, |state| {
+        (
+            state.transcription_progress_window,
+            state.transcription_in_progress,
+        )
+    })
+    .unwrap_or((HWND(0), false));
+
+    // The YouTube selector is closed before the deferred Whisper start message is
+    // handled. During that short handoff, suppress any stale editor-focus retry
+    // rather than flashing the empty editor in front of the upcoming progress dialog.
+    if !transcription_in_progress {
+        return true;
+    }
+
+    if progress_hwnd.0 != 0 && is_window_handle_valid(progress_hwnd) {
+        show_window_safe(progress_hwnd, SW_SHOW);
+        set_foreground_window_safe(progress_hwnd);
+        app_windows::podcast_save_window::focus_cancel_button(progress_hwnd);
+        log_debug(&format!(
+            "Context transcription: keeping Whisper progress in foreground dialog={:?}",
+            progress_hwnd
+        ));
+    }
+    true
 }
 
 pub(crate) fn restore_transcription_progress_focus_for_current_document(hwnd: HWND) -> bool {
@@ -7366,6 +7642,8 @@ fn cancel_whisper_transcription(hwnd: HWND) {
         screen_reader_speak(&msg);
     }
     // Close the progress dialog immediately and return focus to Sonarpad.
+    app_windows::la7_play_window::finish_context_transcription(hwnd, false);
+    app_windows::youtube_transcript_window::finish_context_transcription(hwnd);
     close_whisper_progress_window(hwnd);
     crate::set_foreground_window_safe(hwnd);
     crate::set_focus_safe(hwnd);
@@ -7534,16 +7812,90 @@ pub(crate) fn start_whisper_transcription_for_media(
     start_whisper_transcription_with_media(hwnd, Some((media_path, None, media_title)), false);
 }
 
-pub(crate) fn start_whisper_transcription_for_remote_media(
+fn queue_context_whisper_transcription(
+    hwnd: HWND,
+    media_path: PathBuf,
+    media_title: Option<String>,
+    close_raiplay_on_success: bool,
+    close_la7_on_success: bool,
+) {
+    // Context-menu transcription is launched from a modal media selector. Close that
+    // selector first, then start Whisper from a posted main-window message. This avoids
+    // destroying the selector from inside the transcription-completion handler, which
+    // could unwind the old streaming flow after the result document had been created.
+    let selector_close_requested =
+        app_windows::interpreter_select_window::request_close_active_interpreter_selects_for_parent(
+            hwnd,
+        );
+    if !selector_close_requested {
+        log_debug("Context transcription: no active interpreter selector needed closing");
+    }
+    let payload = DeferredWhisperTranscription {
+        media_path,
+        media_title,
+        close_raiplay_on_success,
+        close_la7_on_success,
+    };
+    let ptr = Box::into_raw(Box::new(payload));
+    if let Err(err) = post_message_w_safe(
+        hwnd,
+        WM_START_CONTEXT_WHISPER_TRANSCRIPTION,
+        WPARAM(0),
+        LPARAM(ptr as isize),
+    ) {
+        log_debug(&format!(
+            "Failed to post WM_START_CONTEXT_WHISPER_TRANSCRIPTION: {err}"
+        ));
+        let DeferredWhisperTranscription {
+            media_path,
+            media_title,
+            close_raiplay_on_success,
+            close_la7_on_success,
+        } = *unsafe { Box::from_raw(ptr) };
+        start_whisper_transcription_for_media(hwnd, media_path, media_title);
+        let started = with_state(hwnd, |state| state.transcription_in_progress).unwrap_or(false);
+        if close_raiplay_on_success && started {
+            app_windows::raiplay_window::mark_context_transcription_started(hwnd);
+        }
+        if close_la7_on_success && started {
+            app_windows::la7_play_window::mark_context_transcription_started(hwnd);
+        }
+        if !started {
+            app_windows::youtube_transcript_window::finish_context_transcription(hwnd);
+        }
+    }
+}
+
+pub(crate) fn start_whisper_transcription_for_media_context(
+    hwnd: HWND,
+    media_path: PathBuf,
+    media_title: Option<String>,
+) {
+    queue_context_whisper_transcription(hwnd, media_path, media_title, false, false);
+}
+
+pub(crate) fn start_whisper_transcription_for_remote_media_context(
     hwnd: HWND,
     media_url: String,
     media_title: Option<String>,
 ) {
-    start_whisper_transcription_with_media(
-        hwnd,
-        Some((PathBuf::from(media_url), None, media_title)),
-        false,
-    );
+    queue_context_whisper_transcription(hwnd, PathBuf::from(media_url), media_title, false, false);
+}
+
+pub(crate) fn start_whisper_transcription_for_raiplay_context(
+    hwnd: HWND,
+    media_url: String,
+    media_title: Option<String>,
+) {
+    queue_context_whisper_transcription(hwnd, PathBuf::from(media_url), media_title, true, false);
+}
+
+pub(crate) fn start_whisper_transcription_for_la7_context(
+    hwnd: HWND,
+    media_url: String,
+    media_title: Option<String>,
+) {
+    queue_context_whisper_transcription(hwnd, PathBuf::from(media_url), media_title, false, true);
 }
 
 fn start_whisper_transcription_with_media(
@@ -8050,6 +8402,9 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
     });
     prevent_sleep(false);
     let transcription_succeeded = !result.cancelled && result.error_message.is_none();
+    app_windows::raiplay_window::finish_context_transcription(hwnd, transcription_succeeded);
+    app_windows::la7_play_window::finish_context_transcription(hwnd, transcription_succeeded);
+    app_windows::youtube_transcript_window::finish_context_transcription(hwnd);
     let dismissed_media_context = transcription_succeeded
         && app_windows::youtube_transcript_window::dismiss_active_media_context_lists_for_editor(
             hwnd,
@@ -8100,6 +8455,7 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
             doc.format = FileFormat::Text(TextEncoding::Utf8);
             editor_manager::set_edit_text(doc.hwnd_edit, &result.text);
             doc.dirty = saved_path.is_none();
+            doc.confirm_close_when_clean = true;
             doc.prefer_title_for_save_suggestion = saved_path.is_none();
             editor_manager::update_tab_title(hwnd_tab, idx, &doc.title, doc.dirty);
         }
@@ -9320,6 +9676,25 @@ struct WhisperTranscriptionResult {
     error_message: Option<String>,
     completed_message: String,
     cancelled: bool,
+}
+
+struct DeferredWhisperTranscription {
+    media_path: PathBuf,
+    media_title: Option<String>,
+    close_raiplay_on_success: bool,
+    close_la7_on_success: bool,
+}
+
+struct DeferredYoutubeContextAudioDescription {
+    input_path: PathBuf,
+}
+
+struct DeferredRaiplayContextAudioDescription {
+    input_path: PathBuf,
+}
+
+struct DeferredLa7ContextAudioDescription {
+    input_path: PathBuf,
 }
 
 struct DictationResult {
@@ -11606,6 +11981,9 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     if reactivate_bdciechi_window(hwnd) {
                         return LRESULT(0);
                     }
+                    if restore_context_transcription_progress_focus(hwnd) {
+                        return LRESULT(0);
+                    }
                     if restore_transcription_progress_focus_for_current_document(hwnd) {
                         return LRESULT(0);
                     }
@@ -11711,6 +12089,36 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     }
                     return LRESULT(0);
                 }
+                if wparam.0 == LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID {
+                    kill_timer_best_effort(
+                        hwnd,
+                        LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID,
+                        "KillTimer LA7_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE",
+                    );
+                    restore_la7_context_audio_description_focus(hwnd);
+                    app_windows::la7_play_window::finish_context_audio_description_focus(hwnd);
+                    return LRESULT(0);
+                }
+                if wparam.0 == RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID {
+                    kill_timer_best_effort(
+                        hwnd,
+                        RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID,
+                        "KillTimer RAIPLAY_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE",
+                    );
+                    restore_raiplay_context_audio_description_focus(hwnd);
+                    app_windows::raiplay_window::finish_context_audio_description_focus(hwnd);
+                    return LRESULT(0);
+                }
+                if wparam.0 == YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID {
+                    kill_timer_best_effort(
+                        hwnd,
+                        YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE_TIMER_ID,
+                        "KillTimer YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_RELEASE",
+                    );
+                    restore_youtube_context_audio_description_focus(hwnd);
+                    app_windows::youtube_transcript_window::finish_context_audio_description(hwnd);
+                    return LRESULT(0);
+                }
                 if wparam.0 == FOCUS_EDITOR_TIMER_ID
                     || wparam.0 == FOCUS_EDITOR_TIMER_ID2
                     || wparam.0 == FOCUS_EDITOR_TIMER_ID3
@@ -11728,6 +12136,50 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         crate::set_foreground_window_safe(changelog_window);
                         log_foreground_snapshot(&format!(
                             "focus_timer.after_changelog.{}",
+                            wparam.0
+                        ));
+                        return LRESULT(0);
+                    }
+                    if restore_la7_context_audio_description_focus(hwnd) {
+                        log_debug(&format!(
+                            "focus timer {} suppressed because La7 Play context audio description is opening",
+                            wparam.0
+                        ));
+                        log_foreground_snapshot(&format!(
+                            "focus_timer.after_la7_context_audio_description.{}",
+                            wparam.0
+                        ));
+                        return LRESULT(0);
+                    }
+                    if restore_raiplay_context_audio_description_focus(hwnd) {
+                        log_debug(&format!(
+                            "focus timer {} suppressed because RaiPlay context audio description is opening",
+                            wparam.0
+                        ));
+                        log_foreground_snapshot(&format!(
+                            "focus_timer.after_raiplay_context_audio_description.{}",
+                            wparam.0
+                        ));
+                        return LRESULT(0);
+                    }
+                    if restore_youtube_context_audio_description_focus(hwnd) {
+                        log_debug(&format!(
+                            "focus timer {} suppressed because YouTube context audio description is opening",
+                            wparam.0
+                        ));
+                        log_foreground_snapshot(&format!(
+                            "focus_timer.after_context_audio_description.{}",
+                            wparam.0
+                        ));
+                        return LRESULT(0);
+                    }
+                    if restore_context_transcription_progress_focus(hwnd) {
+                        log_debug(&format!(
+                            "focus timer {} suppressed because YouTube context transcription is active",
+                            wparam.0
+                        ));
+                        log_foreground_snapshot(&format!(
+                            "focus_timer.after_context_transcription.{}",
                             wparam.0
                         ));
                         return LRESULT(0);
@@ -11948,6 +12400,12 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 let payload = Box::from_raw(ptr);
                 close_podcast_save_progress_window(hwnd);
                 if let Some(err) = payload.error {
+                    app_windows::raiplay_window::finish_context_audio_description_download(
+                        hwnd, false,
+                    );
+                    app_windows::la7_play_window::finish_context_audio_description_download(
+                        hwnd, false,
+                    );
                     if err == "Saving canceled." {
                         screen_reader_speak(&i18n::tr(payload.language, "podcast.save.canceled"));
                         app_windows::youtube_transcript_window::restore_active_media_context_list(
@@ -11974,10 +12432,29 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
 
                 if payload.open_audio_description {
-                    app_windows::audio_description_window::open_with_input(
-                        hwnd,
-                        payload.target_path,
-                    );
+                    let raiplay_context =
+                        app_windows::raiplay_window::finish_context_audio_description_download(
+                            hwnd, true,
+                        );
+                    let la7_context =
+                        app_windows::la7_play_window::finish_context_audio_description_download(
+                            hwnd, true,
+                        );
+                    if raiplay_context || la7_context {
+                        app_windows::youtube_transcript_window::dismiss_active_media_context_lists_for_editor(
+                            hwnd,
+                        );
+                        if la7_context {
+                            queue_la7_context_audio_description(hwnd, payload.target_path);
+                        } else {
+                            queue_raiplay_context_audio_description(hwnd, payload.target_path);
+                        }
+                    } else {
+                        app_windows::audio_description_window::open_with_input(
+                            hwnd,
+                            payload.target_path,
+                        );
+                    }
                     return LRESULT(0);
                 }
 
@@ -12099,6 +12576,67 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 let payload = Box::from_raw(ptr);
                 close_podcast_play_progress_window(hwnd);
                 show_error(hwnd, payload.language, &payload.error);
+                LRESULT(0)
+            }
+            WM_START_LA7_CONTEXT_AUDIO_DESCRIPTION => {
+                let ptr = lparam.0 as *mut DeferredLa7ContextAudioDescription;
+                if ptr.is_null() {
+                    app_windows::la7_play_window::finish_context_audio_description_focus(hwnd);
+                    return LRESULT(0);
+                }
+                let DeferredLa7ContextAudioDescription { input_path } = *Box::from_raw(ptr);
+                enable_window_safe(hwnd, true);
+                app_windows::audio_description_window::open_with_input(hwnd, input_path);
+                protect_la7_context_audio_description_focus(hwnd);
+                LRESULT(0)
+            }
+            WM_START_RAIPLAY_CONTEXT_AUDIO_DESCRIPTION => {
+                let ptr = lparam.0 as *mut DeferredRaiplayContextAudioDescription;
+                if ptr.is_null() {
+                    app_windows::raiplay_window::finish_context_audio_description_focus(hwnd);
+                    return LRESULT(0);
+                }
+                let DeferredRaiplayContextAudioDescription { input_path } = *Box::from_raw(ptr);
+                enable_window_safe(hwnd, true);
+                app_windows::audio_description_window::open_with_input(hwnd, input_path);
+                protect_raiplay_context_audio_description_focus(hwnd);
+                LRESULT(0)
+            }
+            WM_START_YOUTUBE_CONTEXT_AUDIO_DESCRIPTION => {
+                let ptr = lparam.0 as *mut DeferredYoutubeContextAudioDescription;
+                if ptr.is_null() {
+                    app_windows::youtube_transcript_window::finish_context_audio_description(hwnd);
+                    return LRESULT(0);
+                }
+                let DeferredYoutubeContextAudioDescription { input_path } = *Box::from_raw(ptr);
+                enable_window_safe(hwnd, true);
+                app_windows::audio_description_window::open_with_input(hwnd, input_path);
+                protect_youtube_context_audio_description_focus(hwnd);
+                LRESULT(0)
+            }
+            WM_START_CONTEXT_WHISPER_TRANSCRIPTION => {
+                let ptr = lparam.0 as *mut DeferredWhisperTranscription;
+                if ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let DeferredWhisperTranscription {
+                    media_path,
+                    media_title,
+                    close_raiplay_on_success,
+                    close_la7_on_success,
+                } = *Box::from_raw(ptr);
+                start_whisper_transcription_for_media(hwnd, media_path, media_title);
+                let started =
+                    with_state(hwnd, |state| state.transcription_in_progress).unwrap_or(false);
+                if close_raiplay_on_success && started {
+                    app_windows::raiplay_window::mark_context_transcription_started(hwnd);
+                }
+                if close_la7_on_success && started {
+                    app_windows::la7_play_window::mark_context_transcription_started(hwnd);
+                }
+                if !started {
+                    app_windows::youtube_transcript_window::finish_context_transcription(hwnd);
+                }
                 LRESULT(0)
             }
             WM_WHISPER_TRANSCRIPTION_DONE => {
@@ -12659,6 +13197,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     has_secondary_window_open(hwnd)
                 ));
                 log_foreground_snapshot("wm_focus_editor.before");
+                if restore_context_transcription_progress_focus(hwnd) {
+                    log_foreground_snapshot("wm_focus_editor.after_context_transcription_restore");
+                    return LRESULT(0);
+                }
                 if restore_transcription_progress_focus_for_current_document(hwnd) {
                     log_foreground_snapshot("wm_focus_editor.after_transcription_restore");
                     return LRESULT(0);
@@ -22379,6 +22921,7 @@ pub(crate) fn open_pdf_document_async(hwnd: HWND, path: &Path, from_copydata: bo
                 from_wikipedia: false,
                 from_treccani: false,
                 is_temporary: false,
+                confirm_close_when_clean: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
                 route_map: None,
@@ -22630,6 +23173,7 @@ fn handle_document_loaded(hwnd: HWND, payload: editor_manager::DocumentLoadResul
                 from_wikipedia: false,
                 from_treccani: false,
                 is_temporary: false,
+                confirm_close_when_clean: false,
                 prefer_title_for_save_suggestion: false,
                 prefer_mpv_playback: false,
                 route_map: None,

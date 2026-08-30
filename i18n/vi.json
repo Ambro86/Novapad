@@ -2007,6 +2007,7 @@
   "weather.tomorrow": "Ngày mai",
   "weather.wind": "Gió",
   "whisper.cancel_confirm": "Bạn có muốn hủy quá trình chuyển đổi đang diễn ra không?",
+  "whisper.close_confirm": "Bạn có chắc muốn đóng bản chép lời không?",
   "whisper.default_filename": "Bản ghi",
   "whisper.error.direct_stream_not_supported": "Chưa hỗ trợ chuyển đổi streaming trực tiếp.",
   "whisper.error.failed": "Lỗi chuyển đổi: {err}",

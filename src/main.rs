@@ -2502,6 +2502,8 @@ pub(crate) fn download_active_podcast_episode(hwnd: HWND) {
             open_audio_description: false,
             raiplay_context_audio_description: false,
             la7_context_audio_description: false,
+            rai_audio_context_save: false,
+            forced_save_mode: None,
         });
         return;
     }
@@ -2566,10 +2568,13 @@ fn download_active_rai_la7_for_audio_description(hwnd: HWND) -> bool {
         open_audio_description: true,
         raiplay_context_audio_description: false,
         la7_context_audio_description: false,
+        rai_audio_context_save: false,
+        forced_save_mode: None,
     });
     true
 }
 
+#[derive(Clone, Copy)]
 enum RaiPlaySaveMode {
     Mp3,
     Mp4,
@@ -2588,6 +2593,8 @@ struct PodcastProgressDownloadRequest {
     open_audio_description: bool,
     raiplay_context_audio_description: bool,
     la7_context_audio_description: bool,
+    rai_audio_context_save: bool,
+    forced_save_mode: Option<RaiPlaySaveMode>,
 }
 
 fn run_raiplay_context_media_action(
@@ -2624,6 +2631,8 @@ fn run_raiplay_context_media_action(
         open_audio_description,
         raiplay_context_audio_description: open_audio_description,
         la7_context_audio_description: false,
+        rai_audio_context_save: false,
+        forced_save_mode: None,
     });
 }
 
@@ -2667,6 +2676,8 @@ fn run_la7_context_media_action(
         open_audio_description,
         raiplay_context_audio_description: false,
         la7_context_audio_description: open_audio_description,
+        rai_audio_context_save: false,
+        forced_save_mode: None,
     });
 }
 
@@ -2690,6 +2701,29 @@ pub(crate) fn create_audio_description_from_la7_context(
     run_la7_context_media_action(hwnd, language, media_url, podcast_title, title, true);
 }
 
+pub(crate) fn save_rai_audio_description_context_media(
+    hwnd: HWND,
+    language: Language,
+    media_url: String,
+    title: Option<String>,
+) {
+    download_podcast_episode_with_progress(PodcastProgressDownloadRequest {
+        hwnd,
+        url: Some(media_url),
+        media_url: None,
+        podcast_title: None,
+        title,
+        cache_path: None,
+        language,
+        rai_origin: RaiAudioOrigin::Recenti,
+        open_audio_description: false,
+        raiplay_context_audio_description: false,
+        la7_context_audio_description: false,
+        rai_audio_context_save: true,
+        forced_save_mode: Some(RaiPlaySaveMode::Mp3),
+    });
+}
+
 fn download_podcast_episode_with_progress(request: PodcastProgressDownloadRequest) {
     let PodcastProgressDownloadRequest {
         hwnd,
@@ -2703,6 +2737,8 @@ fn download_podcast_episode_with_progress(request: PodcastProgressDownloadReques
         open_audio_description,
         raiplay_context_audio_description,
         la7_context_audio_description,
+        rai_audio_context_save,
+        forced_save_mode,
     } = request;
     let suggested_name =
         suggested_podcast_episode_filename(podcast_title.as_deref(), title.as_deref())
@@ -2728,7 +2764,9 @@ fn download_podcast_episode_with_progress(request: PodcastProgressDownloadReques
                 crate::tools::raiplay::PlaybackTarget::Download(_) => None,
             })
     });
-    let save_mode = if open_audio_description {
+    let save_mode = if let Some(save_mode) = forced_save_mode {
+        save_mode
+    } else if open_audio_description {
         RaiPlaySaveMode::Mp4
     } else {
         let Some(save_mode) =
@@ -2818,6 +2856,9 @@ fn download_podcast_episode_with_progress(request: PodcastProgressDownloadReques
     }
     if la7_context_audio_description {
         app_windows::la7_play_window::mark_context_audio_description_started(hwnd);
+    }
+    if rai_audio_context_save {
+        app_windows::rai_audiodescrizioni_window::mark_context_save_started(hwnd);
     }
     open_podcast_save_progress_window(hwnd, language);
     if (!open_audio_description
@@ -7335,6 +7376,23 @@ fn open_audio_description_from_current_context(hwnd: HWND) {
     app_windows::audio_description_window::open(hwnd);
 }
 
+fn restore_rai_audio_context_save_progress_focus(hwnd: HWND) -> bool {
+    if !app_windows::rai_audiodescrizioni_window::context_save_keeps_progress_foreground(hwnd) {
+        return false;
+    }
+    let progress_hwnd = with_state(hwnd, |state| state.podcast_save_window).unwrap_or(HWND(0));
+    if progress_hwnd.0 != 0 && is_window_handle_valid(progress_hwnd) {
+        show_window_safe(progress_hwnd, SW_SHOW);
+        set_foreground_window_safe(progress_hwnd);
+        app_windows::podcast_save_window::focus_cancel_button(progress_hwnd);
+        log_debug(&format!(
+            "Rai audiodescrizioni context save: keeping progress in foreground dialog={:?}",
+            progress_hwnd
+        ));
+    }
+    true
+}
+
 fn restore_context_transcription_progress_focus(hwnd: HWND) -> bool {
     let youtube_context =
         app_windows::youtube_transcript_window::context_transcription_keeps_progress_foreground(
@@ -7342,7 +7400,11 @@ fn restore_context_transcription_progress_focus(hwnd: HWND) -> bool {
         );
     let la7_context =
         app_windows::la7_play_window::context_transcription_keeps_progress_foreground(hwnd);
-    if !youtube_context && !la7_context {
+    let rai_audio_context =
+        app_windows::rai_audiodescrizioni_window::context_transcription_keeps_progress_foreground(
+            hwnd,
+        );
+    if !youtube_context && !la7_context && !rai_audio_context {
         return false;
     }
 
@@ -7861,6 +7923,7 @@ fn queue_context_whisper_transcription(
             app_windows::la7_play_window::mark_context_transcription_started(hwnd);
         }
         if !started {
+            app_windows::rai_audiodescrizioni_window::finish_context_transcription(hwnd);
             app_windows::youtube_transcript_window::finish_context_transcription(hwnd);
         }
     }
@@ -8404,6 +8467,7 @@ fn apply_whisper_transcription_result(hwnd: HWND, result: WhisperTranscriptionRe
     let transcription_succeeded = !result.cancelled && result.error_message.is_none();
     app_windows::raiplay_window::finish_context_transcription(hwnd, transcription_succeeded);
     app_windows::la7_play_window::finish_context_transcription(hwnd, transcription_succeeded);
+    app_windows::rai_audiodescrizioni_window::finish_context_transcription(hwnd);
     app_windows::youtube_transcript_window::finish_context_transcription(hwnd);
     let dismissed_media_context = transcription_succeeded
         && app_windows::youtube_transcript_window::dismiss_active_media_context_lists_for_editor(
@@ -12173,6 +12237,17 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                         ));
                         return LRESULT(0);
                     }
+                    if restore_rai_audio_context_save_progress_focus(hwnd) {
+                        log_debug(&format!(
+                            "focus timer {} suppressed because Rai audiodescrizioni context save is active",
+                            wparam.0
+                        ));
+                        log_foreground_snapshot(&format!(
+                            "focus_timer.after_rai_audio_context_save.{}",
+                            wparam.0
+                        ));
+                        return LRESULT(0);
+                    }
                     if restore_context_transcription_progress_focus(hwnd) {
                         log_debug(&format!(
                             "focus timer {} suppressed because YouTube context transcription is active",
@@ -12399,6 +12474,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 }
                 let payload = Box::from_raw(ptr);
                 close_podcast_save_progress_window(hwnd);
+                app_windows::rai_audiodescrizioni_window::finish_context_save(hwnd);
                 if let Some(err) = payload.error {
                     app_windows::raiplay_window::finish_context_audio_description_download(
                         hwnd, false,
@@ -12635,6 +12711,7 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                     app_windows::la7_play_window::mark_context_transcription_started(hwnd);
                 }
                 if !started {
+                    app_windows::rai_audiodescrizioni_window::finish_context_transcription(hwnd);
                     app_windows::youtube_transcript_window::finish_context_transcription(hwnd);
                 }
                 LRESULT(0)

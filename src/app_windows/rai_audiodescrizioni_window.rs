@@ -1,5 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicIsize, Ordering},
+};
 use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
@@ -32,6 +35,57 @@ const REQUEST_ID_SURNAME: usize = 8202;
 const REQUEST_ID_EMAIL: usize = 8203;
 const REQUEST_ID_OK: usize = 8204;
 const REQUEST_ID_CANCEL: usize = 8205;
+
+static RAI_AUDIO_CONTEXT_TRANSCRIPTION_PARENT: AtomicIsize = AtomicIsize::new(0);
+static RAI_AUDIO_CONTEXT_SAVE_PARENT: AtomicIsize = AtomicIsize::new(0);
+
+pub(crate) fn mark_context_transcription_started(parent: HWND) {
+    RAI_AUDIO_CONTEXT_TRANSCRIPTION_PARENT.store(parent.0, Ordering::SeqCst);
+    crate::log_debug(&format!(
+        "Rai audiodescrizioni context transcription started parent={:?}",
+        parent
+    ));
+}
+
+pub(crate) fn finish_context_transcription(parent: HWND) {
+    if RAI_AUDIO_CONTEXT_TRANSCRIPTION_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        crate::log_debug(&format!(
+            "Rai audiodescrizioni context transcription focus protection cleared parent={:?}",
+            parent
+        ));
+    }
+}
+
+pub(crate) fn context_transcription_keeps_progress_foreground(parent: HWND) -> bool {
+    RAI_AUDIO_CONTEXT_TRANSCRIPTION_PARENT.load(Ordering::SeqCst) == parent.0
+}
+
+pub(crate) fn mark_context_save_started(parent: HWND) {
+    RAI_AUDIO_CONTEXT_SAVE_PARENT.store(parent.0, Ordering::SeqCst);
+    crate::log_debug(&format!(
+        "Rai audiodescrizioni context save started parent={:?}",
+        parent
+    ));
+}
+
+pub(crate) fn finish_context_save(parent: HWND) {
+    if RAI_AUDIO_CONTEXT_SAVE_PARENT
+        .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        crate::log_debug(&format!(
+            "Rai audiodescrizioni context save focus protection cleared parent={:?}",
+            parent
+        ));
+    }
+}
+
+pub(crate) fn context_save_keeps_progress_foreground(parent: HWND) -> bool {
+    RAI_AUDIO_CONTEXT_SAVE_PARENT.load(Ordering::SeqCst) == parent.0
+}
 
 struct RequestCodeState {
     parent: HWND,
@@ -126,16 +180,11 @@ fn catalog_context_actions(
                     return;
                 }
             };
-            crate::download_podcast_episode(
+            crate::save_rai_audio_description_context_media(
                 parent,
-                Some(resolved_url),
-                None,
-                optional_media_title(&item.title),
-                None,
                 language,
-            );
-            crate::app_windows::youtube_transcript_window::restore_active_media_context_list(
-                parent,
+                resolved_url,
+                optional_media_title(&item.title),
             );
         }),
         children: Vec::new(),
@@ -158,6 +207,7 @@ fn catalog_context_actions(
                     return;
                 }
             };
+            mark_context_transcription_started(parent);
             crate::start_whisper_transcription_for_remote_media_context(
                 parent,
                 resolved_url,

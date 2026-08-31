@@ -113,6 +113,51 @@ Podcasts: Opens the Podcasts window to search and manage subscriptions.
 In the episode list, press Enter to play the episode.
 During playback, Esc stops the podcast and returns to the library.
 
+AI audio description:
+With this feature you can audio-describe any video content. As someone who loves audio description, this is a feature I care about very much, and I am releasing it to the public because it has reached a level that I consider satisfactory. There are also paid services that offer similar features; if Sonarpad is useful to you, I invite you to support my work. This feature has also been tested in real use with hundreds of films and series.
+
+Another problem addressed by Sonarpad concerns content that Gemini considers violent or sensitive. Some methods may refuse to describe entire scenes, sometimes because of false positives. Sonarpad instead tries to handle these cases by asking Gemini to phrase the description in a way that is compatible with its policies: if a detail cannot be described explicitly, it is omitted or expressed less graphically instead of giving up on the entire scene.
+
+A fundamental feature is silence management: the synthesized voice must not speak over dialogue. For this reason, as a first step Sonarpad analyzes the audio and looks for the moments in which the audio description can speak without disturbing the listening experience.
+
+The feature has been tested with hundreds of films and series, and over time many of the inaccuracies that Gemini can make have been corrected, for example synchronization between what happens on screen and the description. Naturally, the result also depends on external services, so I cannot guarantee that every description in every film will always be perfect. I continue to work on improving Sonarpad and therefore this feature as well.
+
+When you open the feature, you will find the Local media file field, initially empty, followed by the Choose video button. Activate this button with Space to select the video you want to audio-describe.
+
+After you choose the video, Sonarpad automatically fills in the path of the Destination MP3 file. With Tab you can reach this field and change the path, or use the Change destination folder button.
+
+Press Tab again to change the audio-description language. The choice is consistent with Sonarpad and includes all languages currently supported by the program.
+
+Next you will find Audio-description brevity. The default value is Detailed because, in my tests, it gives a good result especially in films with long silent scenes. You can still choose any of the other available levels.
+
+With Tab you will then find Enable extended pauses. It is disabled by default. It can be useful in films with a lot of dialogue, fast-paced scenes, or very little free space for the audio description to speak. In exceptional cases Sonarpad can briefly pause the film to insert a description that would not otherwise fit inside a silence.
+
+The Try to recognize characters and use their names check box lets Sonarpad try to say a character's name in the audio description. If it is disabled, descriptions remain more generic, for example “the man approaches” or “the woman enters”. Recognition is handled by Gemini and cannot be guaranteed in every case: similar-looking characters, unclear shots, or difficult images can cause identity mistakes.
+
+Press Tab again to find Keep the character catalog. This is especially useful when audio-describing a series because it lets Gemini preserve character descriptions and identities from one episode to the next. If no catalog exists yet, choose Create a new catalog and enter its name in the following field, for example the title of the series.
+
+Sonarpad stores character information in the catalog to improve recognition continuity. You can also start from a sample catalog created by Sonarpad, copy it into another AI, and ask it to complete the catalog with descriptions for the series you are interested in. The resulting catalog must remain in JSON format and can be copied to Documents\Sonarpad\Audiodescriptions\Catalogs. This lets you start a series with an already prepared catalog.
+
+Press Tab again to find Also save the project for future editing. Enable it when you know that you will later want to review the audio description, correct descriptions, or change the voice.
+
+The Move the video file to the Recycle Bin after the audio description check box is useful if you do not want to keep the original video after the audio-described MP3 has been created. It is disabled by default and is available when project saving is not enabled, because an editable project still needs the original video.
+
+Next you will find Gemini API key. Enter your API key here. The key can be created for free. With Tab you reach the Get API key button, which opens the Google page in your browser where, after signing in with your account, you can create the key. The procedure is normally very quick.
+
+After the API key you will find Gemini model and the Refresh model list button. In most cases you can leave the already selected model unchanged; refresh the list when you want to check which models are available for your key.
+
+Press Tab again to find Speech synthesis engine and Voice, which you can change according to your preferences.
+
+Further on you will find Modify audio-description project. This feature lets you reopen and edit a project that you previously saved. Important: to modify the project, the original video file must still be available.
+
+Next you will find Continue interrupted audio description. Sonarpad is designed not to lose work that has already been completed: if the connection drops during creation, Gemini has a problem, or the process is interrupted, Sonarpad periodically saves progress checkpoints. With this feature you can resume an unfinished job without starting again from the beginning.
+
+Finally you will find Create audio description. If you have not entered a valid Gemini API key, Sonarpad will show an error. If everything is configured correctly, the process will start. The duration depends mainly on the length and complexity of the video: processing a long film can take a considerable amount of time.
+
+Acknowledgements
+
+My thanks to Ömer Yılmaz, author of the Omni Describer project, which gave me the initial inspiration to develop Sonarpad’s AI audio-description feature. Sonarpad’s feature was subsequently developed and refined independently through extensive testing with films and TV series.
+
 Options
 The Options window allows you to customize the behavior of Sonarpad. Settings are divided into different tabs.
 General Tab

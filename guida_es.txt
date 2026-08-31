@@ -132,6 +132,52 @@ Abrir la ventana Podcasts para buscar y gestionar suscripciones.
 En la lista de episodios, pulsar Enter para reproducir el episodio.
 Durante la reproducción, Esc detiene el podcast y vuelve a la biblioteca.
  
+
+Audiodescripción con IA:
+Con esta función podéis audiodescribir cualquier contenido de vídeo. Como amante de las audiodescripciones, es una función a la que tengo mucho cariño y que publico porque ha alcanzado un nivel que considero satisfactorio. También existen servicios de pago que ofrecen funciones similares; si Sonarpad os resulta útil, os invito a apoyar mi trabajo. Además, esta función se ha probado en situaciones reales con cientos de películas y series.
+
+Otro problema que se ha abordado es el de los contenidos que Gemini considera violentos o sensibles. Algunos métodos pueden negarse a describir escenas enteras, incluso por falsos positivos. Sonarpad intenta gestionar estos casos pidiendo a Gemini que formule la descripción de una manera compatible con sus políticas: si un detalle no puede describirse explícitamente, se omite o se expresa de una forma menos cruda, en lugar de renunciar a toda la escena.
+
+Una característica fundamental es la gestión de los silencios: la voz sintetizada no debe hablar por encima de los diálogos. Por este motivo, como primera fase Sonarpad analiza el audio y busca los momentos en los que la audiodescripción puede intervenir sin molestar la escucha.
+
+La función se ha probado con cientos de películas y series y, con el tiempo, se han corregido muchas de las imprecisiones que Gemini puede cometer, por ejemplo en la sincronización entre lo que ocurre en pantalla y la descripción. Naturalmente, el resultado también depende de servicios externos y no puedo garantizar que todas las descripciones de todas las películas sean siempre perfectas. Sigo trabajando para mejorar Sonarpad y, por tanto, también esta función.
+
+Al abrir la función encontraréis el campo Archivo multimedia local, inicialmente vacío, y justo después el botón Elegir vídeo. Activad este botón con la barra espaciadora para elegir el vídeo que queréis audiodescribir.
+
+Después de elegir el vídeo, Sonarpad rellena automáticamente la ruta del Archivo MP3 de destino. Con Tab podéis llegar a este campo y cambiar la ruta, o utilizar el botón Cambiar carpeta de destino.
+
+Pulsando de nuevo Tab podéis cambiar el idioma de la audiodescripción. La selección es coherente con Sonarpad e incluye todos los idiomas compatibles actualmente con el programa.
+
+A continuación encontraréis Brevedad de la audiodescripción. El valor predeterminado es Detallada porque, en mis pruebas, ofrece un buen resultado sobre todo en películas con largas escenas silenciosas. De todos modos, podéis elegir cualquiera de los otros niveles disponibles.
+
+Con Tab encontraréis después Activar pausas ampliadas. Está desactivada de forma predeterminada. Puede ser útil en películas con mucho diálogo, escenas frenéticas o muy poco espacio libre para que hable la audiodescripción. En casos excepcionales, Sonarpad puede detener brevemente la película para insertar una descripción que no cabría dentro de un silencio.
+
+La casilla Intentar reconocer a los personajes y usar sus nombres permite a Sonarpad intentar decir el nombre del personaje durante la audiodescripción. Si está desactivada, las descripciones serán más genéricas, por ejemplo «el hombre se acerca» o «la mujer entra». El reconocimiento lo realiza Gemini y no puede garantizarse en todos los casos: personajes parecidos, planos poco claros o imágenes difíciles pueden provocar confusiones de identidad.
+
+Pulsando de nuevo Tab encontraréis Mantener el catálogo de personajes. Esta función es especialmente útil al audiodescribir una serie, porque permite a Gemini conservar las descripciones y las identidades de los personajes entre un episodio y otro. Si todavía no existe un catálogo, elegid Crear un catálogo nuevo y, en el campo siguiente, escribid su nombre, por ejemplo el título de la serie.
+
+Sonarpad guarda en el catálogo la información sobre los personajes para mejorar la continuidad del reconocimiento. También podéis partir de un catálogo de ejemplo creado por Sonarpad, copiarlo en otra IA y pedirle que lo complete con las descripciones de la serie que os interesa. El catálogo resultante debe mantenerse en formato JSON y puede copiarse en la carpeta Documents\Sonarpad\Audiodescriptions\Catalogs. Así podéis comenzar una serie con un catálogo ya preparado.
+
+Pulsando de nuevo Tab encontraréis Guardar también el proyecto para futuras modificaciones. Activadlo cuando sepáis que más adelante querréis revisar la audiodescripción, corregir las descripciones o cambiar la voz.
+
+La casilla Mover el archivo de vídeo a la Papelera después de la audiodescripción sirve si no queréis conservar el vídeo original después de crear el MP3 audiodescrito. Está desactivada de forma predeterminada y está disponible cuando no está activado el guardado del proyecto, porque un proyecto editable todavía necesita el vídeo original.
+
+Después encontraréis Clave API de Gemini. Aquí debéis introducir vuestra clave API. La clave puede crearse gratuitamente. Con Tab llegaréis al botón Obtener clave API, que abre en el navegador la página de Google donde, después de iniciar sesión con vuestra cuenta, podéis crear la clave. Normalmente es un procedimiento muy rápido.
+
+Después de la clave API encontraréis Modelo Gemini y el botón Actualizar lista de modelos. En general podéis dejar el modelo ya seleccionado; actualizad la lista cuando queráis comprobar qué modelos están disponibles para vuestra clave.
+
+Pulsando de nuevo Tab encontraréis Motor de síntesis de voz y Voz, que podéis cambiar según vuestras preferencias.
+
+Más adelante encontraréis Modificar proyecto de audiodescripción. Esta función permite volver a abrir y modificar un proyecto que habíais guardado anteriormente. Atención: para modificar el proyecto, el archivo de vídeo original debe seguir estando disponible.
+
+Después encontraréis Continuar audiodescripción interrumpida. Sonarpad está diseñado para no perder el trabajo ya realizado: si durante la creación se interrumpe la conexión, Gemini tiene un problema o el proceso se detiene, Sonarpad guarda periódicamente puntos de progreso. Con esta función podéis reanudar un trabajo iniciado sin empezar de nuevo desde el principio.
+
+Por último encontraréis Crear audiodescripción. Si no habéis introducido una clave API de Gemini válida, Sonarpad mostrará un error. Si todo está configurado correctamente, el proceso comenzará. La duración depende sobre todo de la longitud y la complejidad del vídeo: procesar una película larga puede requerir bastante tiempo.
+
+Agradecimientos
+
+Mi agradecimiento a Ömer Yılmaz, autor del proyecto Omni Describer, del que obtuve la inspiración inicial para desarrollar la función de audiodescripción con IA de Sonarpad. Posteriormente, la función de Sonarpad se desarrolló y perfeccionó de forma independiente mediante numerosas pruebas con películas y series de televisión.
+
 Opciones
 La ventana Opciones permite personalizar el comportamiento de Sonarpad. La configuración está dividida en diferentes pestañas.
 Pestaña General

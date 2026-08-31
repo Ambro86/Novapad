@@ -129,7 +129,50 @@ Otwiera okno RSS/Artykuły, pozwala dodawać źródła, rozwijać kanał i nacis
  Na liście odcinków naciśnij Enter, aby odtworzyć odcinek.
  Podczas odtwarzania Esc zatrzymuje podcast i powraca do biblioteki.
 
+Audiodeskrypcja z użyciem AI:
+Dzięki tej funkcji można przygotować audiodeskrypcję dla dowolnego materiału wideo. Jako miłośnik audiodeskrypcji bardzo cenię tę funkcję i udostępniam ją publicznie, ponieważ osiągnęła poziom, który uważam za satysfakcjonujący. Istnieją również płatne usługi oferujące podobne możliwości; jeśli Sonarpad jest dla Ciebie użyteczny, zachęcam do wsparcia mojej pracy. Funkcja była również testowana w praktyce na setkach filmów i seriali.
 
+Kolejny rozwiązany problem dotyczy treści, które Gemini uznaje za brutalne lub wrażliwe. Niektóre metody mogą odmówić opisania całych scen, czasem także z powodu fałszywych alarmów. Sonarpad stara się zamiast tego obsłużyć takie sytuacje, prosząc Gemini o sformułowanie opisu zgodnie z jego zasadami: jeśli jakiegoś szczegółu nie można opisać wprost, zostaje pominięty lub przedstawiony w mniej dosadny sposób, zamiast rezygnować z całej sceny.
+
+Podstawową cechą jest zarządzanie ciszą: głos syntetyczny nie powinien mówić jednocześnie z dialogami. Dlatego w pierwszym etapie Sonarpad analizuje dźwięk i wyszukuje momenty, w których audiodeskrypcja może zabrzmieć bez zakłócania odbioru.
+
+Funkcja została przetestowana na setkach filmów i seriali, a z czasem poprawiono wiele niedokładności, które może popełniać Gemini, na przykład synchronizację między wydarzeniami na ekranie a opisem. Oczywiście wynik zależy również od usług zewnętrznych, dlatego nie mogę zagwarantować, że każda audiodeskrypcja każdego filmu będzie zawsze idealna. Nadal jednak pracuję nad ulepszaniem Sonarpadu, a więc również tej funkcji.
+
+Po otwarciu funkcji znajdziesz początkowo puste pole Lokalny plik multimedialny, a zaraz po nim przycisk Wybierz wideo. Aktywuj przycisk spacją, aby wybrać film do audiodeskrypcji.
+
+Po wybraniu filmu Sonarpad automatycznie uzupełnia ścieżkę do Docelowego pliku MP3. Klawiszem Tab można przejść do tego pola i zmienić ścieżkę albo użyć przycisku Zmień folder docelowy.
+
+Kolejne naciśnięcie Tab pozwala zmienić język audiodeskrypcji. Lista jest zgodna z Sonarpadem i obejmuje wszystkie języki obecnie obsługiwane przez program.
+
+Następnie znajdziesz Zwięzłość audiodeskrypcji. Domyślnie wybrana jest opcja Szczegółowa, ponieważ w moich testach daje dobre wyniki zwłaszcza w filmach z długimi cichymi scenami. Możesz jednak wybrać także inne dostępne poziomy.
+
+Dalej klawiszem Tab przejdziesz do opcji Włącz rozszerzone pauzy. Domyślnie jest wyłączona. Może być przydatna w filmach z dużą ilością dialogów, dynamicznymi scenami lub bardzo małą ilością wolnego miejsca na audiodeskrypcję. W wyjątkowych sytuacjach Sonarpad może wtedy na chwilę zatrzymać film, aby wstawić opis, który nie zmieściłby się w żadnej ciszy.
+
+Pole Spróbuj rozpoznać postacie i używać ich imion pozwala Sonarpadowi próbować wypowiadać imiona bohaterów w audiodeskrypcji. Jeśli opcja jest wyłączona, opisy pozostają bardziej ogólne, na przykład „mężczyzna podchodzi” albo „kobieta wchodzi”. Rozpoznawanie wykonuje Gemini i nie można zagwarantować jego poprawności w każdej sytuacji: podobne postacie, nieczytelne ujęcia lub trudne obrazy mogą prowadzić do pomyłek tożsamości.
+
+Kolejne naciśnięcie Tab prowadzi do opcji Zachowaj katalog postaci. Jest ona szczególnie przydatna podczas audiodeskrypcji serialu, ponieważ pozwala Gemini zachować opisy i tożsamości postaci pomiędzy odcinkami. Jeśli katalog jeszcze nie istnieje, wybierz Utwórz nowy katalog i w następnym polu wpisz jego nazwę, na przykład tytuł serialu.
+
+Sonarpad zapisuje w katalogu informacje o postaciach, aby poprawić ciągłość rozpoznawania. Można również zacząć od przykładowego katalogu utworzonego przez Sonarpad, skopiować go do innej AI i poprosić o uzupełnienie opisów dla wybranego serialu. Gotowy katalog musi pozostać w formacie JSON i można go skopiować do folderu Documents\Sonarpad\Audiodescriptions\Catalogs. Dzięki temu można rozpocząć serial z już przygotowanym katalogiem.
+
+Kolejne naciśnięcie Tab prowadzi do opcji Zapisz także projekt do przyszłej edycji. Włącz ją, jeśli wiesz, że później będziesz chcieć przejrzeć audiodeskrypcję, poprawić opisy lub zmienić głos.
+
+Opcja Przenieś plik wideo do Kosza po utworzeniu audiodeskrypcji jest przeznaczona dla sytuacji, gdy nie chcesz zachować oryginalnego filmu po utworzeniu MP3 z audiodeskrypcją. Domyślnie jest wyłączona i jest dostępna, gdy zapisywanie projektu nie jest włączone, ponieważ edytowalny projekt nadal wymaga oryginalnego filmu.
+
+Następnie znajdziesz Klucz API Gemini. Wpisz tutaj swój klucz API. Klucz można utworzyć bezpłatnie. Klawiszem Tab przejdziesz do przycisku Pobierz klucz API, który otwiera w przeglądarce stronę Google, gdzie po zalogowaniu na konto możesz utworzyć klucz. Zwykle jest to bardzo szybka procedura.
+
+Po kluczu API znajdziesz Model Gemini i przycisk Odśwież listę modeli. Zwykle można pozostawić już wybrany model; odśwież listę, gdy chcesz sprawdzić modele dostępne dla Twojego klucza.
+
+Kolejne naciśnięcie Tab prowadzi do ustawień Silnik syntezy mowy i Głos, które można zmienić zgodnie z własnymi preferencjami.
+
+Dalej znajdziesz Modyfikuj projekt audiodeskrypcji. Funkcja pozwala ponownie otworzyć i zmienić wcześniej zapisany projekt. Uwaga: aby zmodyfikować projekt, oryginalny plik wideo musi nadal być dostępny.
+
+Następnie znajdziesz Kontynuuj przerwaną audiodeskrypcję. Sonarpad został zaprojektowany tak, aby nie tracić już wykonanej pracy: jeśli podczas tworzenia zerwie się połączenie, Gemini napotka problem lub proces zostanie przerwany, Sonarpad okresowo zapisuje punkty postępu. Dzięki tej funkcji można wznowić rozpoczęte zadanie bez rozpoczynania od początku.
+
+Na końcu znajdziesz Utwórz audiodeskrypcję. Jeśli nie wpisano prawidłowego klucza API Gemini, Sonarpad wyświetli błąd. Jeśli wszystko jest poprawnie skonfigurowane, proces się rozpocznie. Czas zależy przede wszystkim od długości i złożoności filmu; przetwarzanie długiego filmu może zająć sporo czasu.
+
+Podziękowania
+
+Dziękuję Ömerowi Yılmazowi, autorowi projektu Omni Describer, który był dla mnie początkową inspiracją do opracowania funkcji audiodeskrypcji z użyciem AI w Sonarpadzie. Funkcja Sonarpada była następnie rozwijana i udoskonalana niezależnie poprzez liczne testy na filmach i serialach telewizyjnych.
 
 Opcje
 Okno Opcje umożliwia dostosowanie działania programu Sonarpad. Ustawienia są podzielone na różne karty.

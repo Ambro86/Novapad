@@ -114,6 +114,51 @@ Podkasti: Otvara prozor podkasta za pretragu i upravljanje pretplatama.
 U listi epizoda, Enter pokreće reprodukciju epizode. 
 Tokom reprodukcije, Escape zaustavlja podkast i vraća te u biblioteku.
 
+Audio-deskripcija pomoću veštačke inteligencije:
+Ova funkcija omogućava da napravite audio-deskripciju za bilo koji video sadržaj. Kao neko ko veoma voli audio-deskripcije, ovoj funkciji pridajem poseban značaj i objavljujem je za sve korisnike zato što je dostigla nivo koji smatram zadovoljavajućim. Postoje i plaćene usluge koje nude slične mogućnosti; ako vam je Sonarpad koristan, možete podržati moj rad. Ova funkcija je takođe praktično testirana na stotinama filmova i serija.
+
+Još jedan rešeni problem odnosi se na sadržaj koji Gemini smatra nasilnim ili osetljivim. Neki postupci mogu odbiti da opišu čitave scene, ponekad i zbog lažno pozitivnih rezultata. Sonarpad pokušava da takve slučajeve reši tako što od Gemini-ja traži da opis formuliše u skladu sa svojim pravilima: ako neki detalj ne može da se opiše direktno, on se izostavlja ili se opisuje manje eksplicitno, umesto da se odustane od cele scene.
+
+Veoma važna osobina je upravljanje tišinama: sintetizovani glas ne sme da govori preko dijaloga. Zato Sonarpad u prvoj fazi analizira zvuk i traži trenutke u kojima audio-deskripcija može da govori bez ometanja slušanja.
+
+Funkcija je testirana na stotinama filmova i serija, a vremenom su ispravljene mnoge netačnosti koje Gemini može da napravi, na primer sinhronizacija između događaja na ekranu i opisa. Naravno, rezultat zavisi i od spoljašnjih servisa, pa ne mogu da garantujem da će svaki opis u svakom filmu uvek biti savršen. Ipak, stalno radim na unapređenju Sonarpada, a samim tim i ove funkcije.
+
+Kada otvorite funkciju, prvo ćete pronaći prazno polje Lokalni medijski fajl, a zatim dugme Izaberi video. Aktivirajte dugme tasterom Razmak da biste izabrali video za koji želite audio-deskripciju.
+
+Nakon izbora videa Sonarpad automatski popunjava putanju do odredišnog MP3 fajla. Tasterom Tab možete preći u ovo polje i promeniti putanju ili koristiti dugme Promeni odredišnu fasciklu.
+
+Sledećim pritiskom na Tab možete promeniti jezik audio-deskripcije. Spisak je usklađen sa Sonarpadom i sadrži sve jezike koje program trenutno podržava.
+
+Zatim ćete pronaći sažetost audio-deskripcije. Podrazumevana vrednost je Detaljna, jer je u mojim testovima davala dobar rezultat, posebno kod filmova sa dugim tihim scenama. Po želji možete izabrati i drugi dostupni nivo.
+
+Dalje se tasterom Tab dolazi do opcije Omogući proširene pauze. Ona je podrazumevano isključena. Može biti korisna u filmovima sa mnogo dijaloga, brzim scenama ili veoma malo slobodnog prostora za audio-deskripciju. U izuzetnim slučajevima Sonarpad može nakratko pauzirati film da bi ubacio opis koji inače ne bi mogao da stane u tišinu.
+
+Polje Pokušaj da prepoznaš likove i koristiš njihova imena omogućava Sonarpadu da u audio-deskripciji pokuša da izgovori ime lika. Ako je opcija isključena, opisi ostaju opštiji, na primer „muškarac prilazi“ ili „žena ulazi“. Prepoznavanje obavlja Gemini i njegova tačnost se ne može garantovati u svim slučajevima: slični likovi, nejasni kadrovi ili složene slike mogu dovesti do zamene identiteta.
+
+Sledećim pritiskom na Tab dolazi se do opcije Zadrži katalog likova. Ona je naročito korisna pri audio-deskripciji serije, jer omogućava Gemini-ju da sačuva opise i identitete likova između epizoda. Ako katalog još ne postoji, izaberite Napravi novi katalog i u sledeće polje unesite njegov naziv, na primer naziv serije.
+
+Sonarpad u katalogu čuva podatke o likovima da bi poboljšao kontinuitet prepoznavanja. Možete uzeti i primer kataloga koji je napravio Sonarpad, kopirati ga u drugi AI sistem i zatražiti da ga dopuni opisima serije koja vas zanima. Dobijeni katalog mora ostati u JSON formatu i može se kopirati u fasciklu Documents\Sonarpad\Audiodescriptions\Catalogs. Tako možete početi seriju sa već pripremljenim katalogom.
+
+Sledećim pritiskom na Tab dolazi se do opcije Sačuvaj i projekat za buduće izmene. Uključite je ako znate da ćete kasnije želeti da pregledate audio-deskripciju, ispravite opise ili promenite glas.
+
+Opcija Premesti video fajl u korpu nakon audio-deskripcije služi ako ne želite da zadržite originalni video nakon izrade MP3 fajla sa audio-deskripcijom. Podrazumevano je isključena i dostupna je kada čuvanje projekta nije uključeno, jer je za projekat koji se može uređivati i dalje potreban originalni video.
+
+Zatim ćete pronaći Gemini API ključ. Ovde unesite svoj API ključ. Ključ može da se napravi besplatno. Tasterom Tab dolazi se do dugmeta Preuzmi API ključ, koje u pregledaču otvara Google stranicu na kojoj, nakon prijavljivanja na nalog, možete napraviti ključ. Postupak je obično veoma brz.
+
+Posle API ključa nalaze se Gemini model i dugme Osveži listu modela. U većini slučajeva možete ostaviti već izabrani model; osvežite listu kada želite da proverite koji su modeli dostupni za vaš ključ.
+
+Sledećim pritiskom na Tab dolazi se do opcija Motor sinteze govora i Glas, koje možete promeniti prema svojim željama.
+
+Dalje se nalazi Izmeni projekat audio-deskripcije. Ova funkcija omogućava da ponovo otvorite i izmenite ranije sačuvan projekat. Važno: originalni video fajl mora i dalje biti dostupan da bi projekat mogao da se menja.
+
+Zatim se nalazi Nastavi prekinutu audio-deskripciju. Sonarpad je napravljen tako da ne gubi već obavljen posao: ako tokom izrade nestane veza, Gemini ima problem ili se proces prekine, Sonarpad periodično čuva tačke napretka. Pomoću ove funkcije možete nastaviti započeti posao bez ponovnog kretanja od početka.
+
+Na kraju se nalazi Napravi audio-deskripciju. Ako nije unet važeći Gemini API ključ, Sonarpad će prikazati grešku. Ako je sve pravilno podešeno, proces će početi. Trajanje najviše zavisi od dužine i složenosti videa; obrada dugog filma može potrajati dosta vremena.
+
+Zahvalnica
+
+Zahvaljujem Ömeru Yılmazu, autoru projekta Omni Describer, čiji mi je rad dao početnu inspiraciju za razvoj Sonarpad funkcije audio-deskripcije uz AI. Funkcija u Sonarpadu je zatim razvijana i usavršavana nezavisno, kroz brojna testiranja na filmovima i televizijskim serijama.
+
 Opcije
 Prozor Opcije omogućava prilagođavanje ponašanja programa Sonarpad. Podešavanja su podeljena u različite kartice.
 Kartica Opšte

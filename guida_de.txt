@@ -645,6 +645,51 @@ Als Shell stehen Eingabeaufforderung, PowerShell oder Codex CLI zur Verfügung.
 
 Optionen umfassen automatisches Scrollen, Entfernen von ANSI-Steuerzeichen, Signal bei Inaktivität, Verhindern des Energiesparmodus und Ansage neuer Zeilen mit NVDA.
 
+Audiodeskription mit KI:
+Mit dieser Funktion können Sie beliebige Videoinhalte mit einer Audiodeskription versehen. Da mir Audiodeskriptionen persönlich sehr wichtig sind, ist dies eine Funktion, an der mir besonders viel liegt. Ich veröffentliche sie, weil sie inzwischen ein Niveau erreicht hat, das ich für zufriedenstellend halte. Es gibt auch kostenpflichtige Dienste mit ähnlichen Funktionen; wenn Sonarpad für Sie nützlich ist, können Sie meine Arbeit gern unterstützen. Diese Funktion wurde außerdem im praktischen Einsatz mit Hunderten von Filmen und Serien getestet.
+
+Ein weiteres Problem betrifft Inhalte, die Gemini als gewalttätig oder sensibel einstuft. Manche Verfahren können sich weigern, ganze Szenen zu beschreiben, mitunter auch aufgrund von Fehlalarmen. Sonarpad versucht solche Fälle anders zu behandeln und bittet Gemini, die Beschreibung so zu formulieren, dass sie mit seinen Richtlinien vereinbar ist: Kann ein Detail nicht ausdrücklich beschrieben werden, wird es ausgelassen oder weniger drastisch formuliert, statt die gesamte Szene unbeschrieben zu lassen.
+
+Eine grundlegende Eigenschaft ist die Behandlung von Sprechpausen: Die synthetische Stimme soll nicht über Dialoge sprechen. Deshalb analysiert Sonarpad als ersten Schritt die Tonspur und sucht nach Zeitfenstern, in denen die Audiodeskription sprechen kann, ohne das Zuhören zu stören.
+
+Die Funktion wurde mit Hunderten von Filmen und Serien erprobt. Im Laufe der Entwicklung wurden viele Ungenauigkeiten korrigiert, die Gemini verursachen kann, zum Beispiel bei der Synchronisierung zwischen dem Geschehen auf dem Bildschirm und der Beschreibung. Natürlich hängt das Ergebnis auch von externen Diensten ab, daher kann ich nicht garantieren, dass jede Beschreibung in jedem Film immer perfekt ist. Ich arbeite jedoch laufend daran, Sonarpad und damit auch diese Funktion weiter zu verbessern.
+
+Wenn Sie die Funktion öffnen, finden Sie zunächst das leere Feld Lokale Mediendatei und danach die Schaltfläche Video auswählen. Aktivieren Sie diese Schaltfläche mit der Leertaste, um das Video auszuwählen, das Sie mit einer Audiodeskription versehen möchten.
+
+Nach der Auswahl trägt Sonarpad automatisch den Pfad für die MP3-Zieldatei ein. Mit Tab gelangen Sie zu diesem Feld und können den Pfad ändern oder die Schaltfläche Zielordner ändern verwenden.
+
+Drücken Sie erneut Tab, um die Sprache der Audiodeskription zu ändern. Die Auswahl entspricht Sonarpad und umfasst alle Sprachen, die das Programm derzeit unterstützt.
+
+Danach finden Sie Kürze der Audiodeskription. Standardmäßig ist Detailliert ausgewählt, weil diese Einstellung nach meinen Tests besonders bei Filmen mit längeren stillen Szenen gute Ergebnisse liefert. Sie können selbstverständlich auch eine der anderen verfügbaren Stufen wählen.
+
+Mit Tab gelangen Sie anschließend zu Erweiterte Pausen aktivieren. Diese Option ist standardmäßig ausgeschaltet. Sie kann bei Filmen mit vielen Dialogen, hektischen Szenen oder sehr wenig freiem Raum für die Audiodeskription hilfreich sein. In Ausnahmefällen kann Sonarpad den Film kurz anhalten, um eine Beschreibung einzufügen, die sonst in keine Sprechpause passen würde.
+
+Mit der Option Figuren erkennen und ihre Namen verwenden versucht Sonarpad, in der Audiodeskription den Namen einer Figur zu nennen. Ist sie deaktiviert, bleiben die Beschreibungen allgemeiner, zum Beispiel „der Mann kommt näher“ oder „die Frau betritt den Raum“. Die Erkennung wird von Gemini durchgeführt und kann nicht in jedem Fall garantiert werden: ähnlich aussehende Figuren, undeutliche Einstellungen oder schwierige Bilder können zu Verwechslungen führen.
+
+Drücken Sie erneut Tab, um Charakterkatalog beibehalten zu erreichen. Diese Funktion ist besonders nützlich bei Serien, weil Gemini dadurch Beschreibungen und Identitäten von Figuren über mehrere Folgen hinweg beibehalten kann. Gibt es noch keinen Katalog, wählen Sie Neuen Katalog erstellen und geben Sie im folgenden Feld einen Namen ein, zum Beispiel den Titel der Serie.
+
+Sonarpad speichert Informationen zu den Figuren im Katalog, um die Kontinuität der Erkennung zu verbessern. Sie können auch einen von Sonarpad erzeugten Beispielkatalog in eine andere KI kopieren und diese bitten, ihn mit Beschreibungen der gewünschten Serie zu vervollständigen. Der fertige Katalog muss im JSON-Format bleiben und kann in den Ordner Documents\Sonarpad\Audiodescriptions\Catalogs kopiert werden. So können Sie eine Serie mit einem bereits vorbereiteten Katalog beginnen.
+
+Drücken Sie erneut Tab, um Projekt auch für spätere Bearbeitung speichern zu erreichen. Aktivieren Sie diese Option, wenn Sie die Audiodeskription später noch überarbeiten, Beschreibungen korrigieren oder die Stimme ändern möchten.
+
+Die Option Videodatei nach der Audiodeskription in den Papierkorb verschieben ist für den Fall gedacht, dass Sie das Originalvideo nach der Erstellung der audiodeskribierten MP3 nicht behalten möchten. Sie ist standardmäßig ausgeschaltet und steht zur Verfügung, wenn das Speichern des Projekts nicht aktiviert ist, da ein bearbeitbares Projekt weiterhin das Originalvideo benötigt.
+
+Anschließend finden Sie Gemini-API-Schlüssel. Geben Sie hier Ihren API-Schlüssel ein. Der Schlüssel kann kostenlos erstellt werden. Mit Tab erreichen Sie die Schaltfläche API-Schlüssel abrufen, die im Browser die Google-Seite öffnet, auf der Sie nach der Anmeldung mit Ihrem Konto einen Schlüssel erstellen können. Der Vorgang ist normalerweise sehr schnell.
+
+Nach dem API-Schlüssel finden Sie Gemini-Modell und die Schaltfläche Modellliste aktualisieren. In der Regel können Sie das bereits ausgewählte Modell beibehalten; aktualisieren Sie die Liste, wenn Sie prüfen möchten, welche Modelle für Ihren Schlüssel verfügbar sind.
+
+Drücken Sie erneut Tab, um Sprachsynthese-Engine und Stimme zu erreichen. Beide können Sie nach Ihren persönlichen Vorlieben ändern.
+
+Weiter unten finden Sie Audiodeskriptionsprojekt bearbeiten. Damit können Sie ein zuvor gespeichertes Projekt erneut öffnen und verändern. Wichtig: Zum Bearbeiten des Projekts muss die ursprüngliche Videodatei weiterhin vorhanden sein.
+
+Danach finden Sie Unterbrochene Audiodeskription fortsetzen. Sonarpad ist so ausgelegt, dass bereits erledigte Arbeit nicht verloren geht: Wenn während der Erstellung die Verbindung abbricht, Gemini ein Problem hat oder der Vorgang unterbrochen wird, speichert Sonarpad regelmäßig Fortschrittspunkte. Mit dieser Funktion können Sie eine begonnene Arbeit fortsetzen, ohne wieder von vorn anfangen zu müssen.
+
+Zum Schluss finden Sie Audiodeskription erstellen. Wenn Sie keinen gültigen Gemini-API-Schlüssel eingegeben haben, zeigt Sonarpad eine Fehlermeldung an. Ist alles korrekt eingerichtet, beginnt der Vorgang. Die Dauer hängt vor allem von Länge und Komplexität des Videos ab; die Verarbeitung eines langen Films kann entsprechend viel Zeit in Anspruch nehmen.
+
+Danksagung
+
+Ein Dank geht an Ömer Yılmaz, den Autor des Projekts Omni Describer, das mich zu der ursprünglichen Idee für die Entwicklung der KI-Audiodeskriptionsfunktion von Sonarpad inspiriert hat. Die Sonarpad-Funktion wurde anschließend unabhängig weiterentwickelt und durch umfangreiche Tests mit Filmen und Fernsehserien verfeinert.
+
 27. OPTIONEN
 
 Öffnen Sie die Optionen mit Strg+Umschalt+O.

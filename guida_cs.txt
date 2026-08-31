@@ -128,6 +128,51 @@ RSS / Články: otevře okno RSS/Články, přidat zdroje, šipkou doprava rozba
  V seznamu epizod stiskněte Enter pro přehrání epizody.
  Během přehrávání Esc zastaví podcast a vrátí se do knihovny.
 
+Audiopopis pomocí AI:
+Pomocí této funkce můžete vytvořit audiopopis pro libovolný videoobsah. Jako člověku, který má audiopopisy velmi rád, mi na této funkci zvlášť záleží a zpřístupňuji ji veřejnosti, protože dosáhla úrovně, kterou považuji za uspokojivou. Existují také placené služby nabízející podobné funkce; pokud je pro vás Sonarpad užitečný, můžete podpořit mou práci. Tato funkce byla navíc prakticky testována na stovkách filmů a seriálů.
+
+Další řešený problém se týká obsahu, který Gemini považuje za násilný nebo citlivý. Některé metody mohou odmítnout popsat celé scény, někdy i kvůli falešným pozitivním výsledkům. Sonarpad se místo toho snaží tyto případy zvládnout tak, že Gemini požádá, aby popis formuloval v souladu se svými zásadami: pokud určitý detail nelze popsat výslovně, vynechá se nebo se vyjádří méně drasticky, místo aby byla zahozena celá scéna.
+
+Zásadní vlastností je práce s tichem: syntetický hlas nesmí mluvit přes dialogy. Proto Sonarpad jako první krok analyzuje zvuk a vyhledává místa, kde může audiopopis zaznít, aniž by rušil poslech.
+
+Funkce byla vyzkoušena na stovkách filmů a seriálů a postupně byly opraveny mnohé nepřesnosti, kterých se Gemini může dopouštět, například synchronizace mezi děním na obrazovce a popisem. Výsledek samozřejmě závisí i na externích službách, takže nemohu zaručit, že každý popis v každém filmu bude vždy dokonalý. Na zlepšování Sonarpadu i této funkce ale průběžně pracuji.
+
+Po otevření funkce najdete nejprve prázdné pole Místní multimediální soubor a za ním tlačítko Vybrat video. Aktivujte toto tlačítko mezerníkem a vyberte video, které chcete opatřit audiopopisem.
+
+Po výběru videa Sonarpad automaticky doplní cestu k Cílovému souboru MP3. Pomocí Tab můžete přejít do tohoto pole a cestu změnit, případně použít tlačítko Změnit cílovou složku.
+
+Dalším stiskem Tab můžete změnit jazyk audiopopisu. Nabídka odpovídá Sonarpadu a obsahuje všechny jazyky, které program v současnosti podporuje.
+
+Dále najdete Stručnost audiopopisu. Výchozí hodnota je Podrobný, protože v mých testech poskytovala dobré výsledky zejména u filmů s dlouhými tichými scénami. Můžete samozřejmě zvolit i jiné dostupné úrovně.
+
+Pomocí Tab pak najdete Povolit rozšířené pauzy. Ve výchozím nastavení je tato volba vypnutá. Může být užitečná u filmů s množstvím dialogů, rychlými scénami nebo s velmi malým prostorem pro audiopopis. Ve výjimečných případech tak může Sonarpad film krátce pozastavit a vložit popis, který by se jinak do žádného ticha nevešel.
+
+Zaškrtávací políčko Pokusit se rozpoznat postavy a používat jejich jména umožňuje Sonarpadu pokusit se v audiopopisu vyslovovat jména postav. Pokud je vypnuté, popisy zůstávají obecnější, například „muž se přibližuje“ nebo „žena vstupuje“. Rozpoznávání zajišťuje Gemini a nelze je zaručit ve všech případech: podobné postavy, nejasné záběry nebo obtížně čitelné obrazy mohou vést k záměně identity.
+
+Dalším stiskem Tab najdete Zachovat katalog postav. Tato funkce je zvlášť užitečná při audiopopisu seriálu, protože umožňuje Gemini zachovat popisy a identity postav mezi jednotlivými epizodami. Pokud katalog ještě neexistuje, zvolte Vytvořit nový katalog a do následujícího pole zadejte jeho název, například název seriálu.
+
+Sonarpad ukládá do katalogu informace o postavách, aby zlepšil návaznost rozpoznávání. Můžete také vzít ukázkový katalog vytvořený Sonarpadem, zkopírovat jej do jiné AI a požádat ji, aby jej doplnila o popisy požadovaného seriálu. Výsledný katalog musí zůstat ve formátu JSON a lze jej zkopírovat do složky Documents\Sonarpad\Audiodescriptions\Catalogs. Seriál tak můžete začít s již připraveným katalogem.
+
+Dalším stiskem Tab najdete Uložit také projekt pro budoucí úpravy. Zapněte tuto možnost, pokud víte, že budete chtít audiopopis později zkontrolovat, opravit popisy nebo změnit hlas.
+
+Volba Přesunout soubor videa do Koše po vytvoření audiopopisu je určena pro případ, kdy nechcete po vytvoření MP3 s audiopopisem uchovat původní video. Ve výchozím nastavení je vypnutá a je dostupná tehdy, když není zapnuté ukládání projektu, protože upravitelný projekt stále potřebuje původní video.
+
+Dále najdete Klíč API Gemini. Zde zadejte svůj klíč API. Klíč lze vytvořit zdarma. Pomocí Tab přejdete na tlačítko Získat klíč API, které v prohlížeči otevře stránku Google, kde po přihlášení ke svému účtu můžete klíč vytvořit. Postup je obvykle velmi rychlý.
+
+Za klíčem API najdete Model Gemini a tlačítko Aktualizovat seznam modelů. Obvykle můžete ponechat již vybraný model; seznam aktualizujte, pokud chcete zkontrolovat, které modely jsou pro váš klíč dostupné.
+
+Dalším stiskem Tab najdete Modul syntézy řeči a Hlas, které můžete změnit podle svých preferencí.
+
+Dále najdete Upravit projekt audiopopisu. Tato funkce umožňuje znovu otevřít a upravit dříve uložený projekt. Upozornění: pro úpravu projektu musí být původní video stále k dispozici.
+
+Poté najdete Pokračovat v přerušeném audiopopisu. Sonarpad je navržen tak, aby neztratil již vykonanou práci: pokud během vytváření vypadne připojení, Gemini narazí na problém nebo je proces přerušen, Sonarpad pravidelně ukládá body postupu. Pomocí této funkce můžete pokračovat v rozpracované práci, aniž byste museli začínat od začátku.
+
+Nakonec najdete Vytvořit audiopopis. Pokud jste nezadali platný klíč API Gemini, Sonarpad zobrazí chybu. Pokud je vše správně nastaveno, proces se spustí. Doba zpracování závisí především na délce a složitosti videa; u dlouhého filmu může trvat poměrně dlouho.
+
+Poděkování
+
+Děkuji Ömeru Yılmazovi, autorovi projektu Omni Describer, který mě inspiroval k prvotní myšlence vyvinout funkci audiopopisu s využitím AI v Sonarpadu. Funkce Sonarpadu byla následně vyvíjena a zdokonalována nezávisle prostřednictvím rozsáhlého testování na filmech a televizních seriálech.
+
 Možnosti
 Okno Možnosti umožňuje přizpůsobit chování programu Sonarpad. Nastavení jsou rozdělena do několika karet.
 Karta Obecné

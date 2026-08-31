@@ -113,6 +113,51 @@ Podcast'ai: atidaro langą „Podcast'ai“, kuriame galima ieškoti ir tvarkyti
 Epizodų sąraše paspauskite „Enter“, kad paleistumėte epizodą.
 Atkūrimo metu klavišas „Esc“ sustabdo podcastą ir grąžina į biblioteką.
 
+Garsinis vaizdavimas su DI:
+Naudodami šią funkciją galite sukurti garsinį vaizdavimą bet kokiam vaizdo turiniui. Kadangi pats labai mėgstu garsinį vaizdavimą, ši funkcija man ypač svarbi ir ją viešai išleidžiu todėl, kad ji pasiekė lygį, kurį laikau pakankamai geru. Yra ir mokamų paslaugų su panašiomis galimybėmis; jei Sonarpad jums naudingas, kviečiu paremti mano darbą. Ši funkcija taip pat praktiškai išbandyta su šimtais filmų ir serialų.
+
+Kita spręsta problema susijusi su turiniu, kurį Gemini laiko smurtiniu arba jautriu. Kai kurie metodai gali atsisakyti aprašyti ištisas scenas, kartais ir dėl klaidingų teigiamų rezultatų. Sonarpad stengiasi tokius atvejus valdyti prašydamas Gemini suformuluoti aprašą taip, kad jis atitiktų jo taisykles: jei konkretaus elemento negalima aprašyti tiesiogiai, jis praleidžiamas arba suformuluojamas švelniau, užuot atsisakius visos scenos.
+
+Esminė ypatybė yra tylos valdymas: sintetinis balsas neturi kalbėti ant dialogų. Todėl pirmiausia Sonarpad analizuoja garso takelį ir ieško momentų, kuriuose garsinis vaizdavimas gali skambėti netrukdydamas klausymui.
+
+Funkcija išbandyta su šimtais filmų ir serialų, o laikui bėgant ištaisyta daug netikslumų, kuriuos gali padaryti Gemini, pavyzdžiui, sinchronizacija tarp vaizdo ekrane ir aprašo. Žinoma, rezultatas priklauso ir nuo išorinių paslaugų, todėl negaliu garantuoti, kad kiekvienas kiekvieno filmo aprašas visada bus tobulas. Tačiau nuolat tobulinu Sonarpad, taigi ir šią funkciją.
+
+Atidarę funkciją pirmiausia rasite tuščią lauką Vietinis medijos failas, o po jo mygtuką Pasirinkti vaizdo įrašą. Suaktyvinkite jį tarpo klavišu ir pasirinkite vaizdo įrašą, kuriam norite sukurti garsinį vaizdavimą.
+
+Pasirinkus vaizdo įrašą, Sonarpad automatiškai užpildo Paskirties MP3 failo kelią. Naudodami Tab galite pereiti į šį lauką ir pakeisti kelią arba naudoti mygtuką Keisti paskirties aplanką.
+
+Dar kartą paspaudę Tab galite pakeisti garsinio vaizdavimo kalbą. Pasirinkimas atitinka Sonarpad ir apima visas šiuo metu programos palaikomas kalbas.
+
+Toliau rasite Garsinio vaizdavimo glaustumą. Numatytoji reikšmė yra Išsamus, nes mano bandymuose ji davė gerą rezultatą, ypač filmuose su ilgomis tyliomis scenomis. Vis dėlto galite pasirinkti ir kitą galimą lygį.
+
+Toliau su Tab rasite Įjungti išplėstines pauzes. Pagal numatytuosius nustatymus ši parinktis išjungta. Ji gali būti naudinga filmuose su daug dialogų, greitomis scenomis arba labai mažai laisvo laiko garsiniam vaizdavimui. Išimtiniais atvejais Sonarpad gali trumpam pristabdyti filmą ir įterpti aprašą, kuris kitaip netilptų į tylos tarpą.
+
+Žymimasis langelis Bandyti atpažinti veikėjus ir naudoti jų vardus leidžia Sonarpad mėginti garsiniame vaizdavime pasakyti veikėjo vardą. Jei jis išjungtas, aprašai lieka bendresni, pavyzdžiui, „vyras prieina“ arba „moteris įeina“. Atpažinimą atlieka Gemini ir jo tikslumas negali būti garantuojamas visais atvejais: panašūs veikėjai, neaiškūs kadrai ar sudėtingi vaizdai gali sukelti tapatybės klaidų.
+
+Dar kartą paspaudę Tab rasite Išlaikyti veikėjų katalogą. Tai ypač naudinga garsinant serialą, nes Gemini gali išsaugoti veikėjų aprašus ir tapatybes tarp serijų. Jei katalogo dar nėra, pasirinkite Kurti naują katalogą ir kitame lauke įveskite jo pavadinimą, pavyzdžiui, serialo pavadinimą.
+
+Sonarpad kataloge saugo informaciją apie veikėjus, kad pagerintų atpažinimo tęstinumą. Taip pat galite paimti Sonarpad sukurtą pavyzdinį katalogą, nukopijuoti jį į kitą DI ir paprašyti papildyti dominančio serialo aprašais. Gautas katalogas turi likti JSON formatu ir gali būti nukopijuotas į aplanką Documents\Sonarpad\Audiodescriptions\Catalogs. Taip serialą galima pradėti jau turint paruoštą katalogą.
+
+Dar kartą paspaudę Tab rasite Taip pat išsaugoti projektą būsimiems pakeitimams. Įjunkite šią parinktį, jei žinote, kad vėliau norėsite peržiūrėti garsinį vaizdavimą, pataisyti aprašus ar pakeisti balsą.
+
+Parinktis Perkelti vaizdo failą į Šiukšlinę po garsinio vaizdavimo skirta tada, kai po garsiniu vaizdavimu papildyto MP3 sukūrimo nenorite išsaugoti pradinio vaizdo įrašo. Pagal numatytuosius nustatymus ji išjungta ir pasiekiama, kai neįjungtas projekto išsaugojimas, nes redaguojamam projektui vis dar reikia pradinio vaizdo failo.
+
+Toliau rasite Gemini API raktą. Čia įveskite savo API raktą. Raktą galima sukurti nemokamai. Naudodami Tab pereisite prie mygtuko Gauti API raktą, kuris naršyklėje atidaro Google puslapį, kuriame prisijungę prie paskyros galite susikurti raktą. Paprastai tai trunka labai trumpai.
+
+Po API rakto rasite Gemini modelį ir mygtuką Atnaujinti modelių sąrašą. Dažniausiai galite palikti jau pasirinktą modelį; atnaujinkite sąrašą, kai norite patikrinti, kurie modeliai prieinami jūsų raktui.
+
+Dar kartą paspaudę Tab rasite Kalbos sintezės modulį ir Balsą, kuriuos galite keisti pagal savo pageidavimus.
+
+Toliau rasite Keisti garsinio vaizdavimo projektą. Ši funkcija leidžia iš naujo atidaryti ir redaguoti anksčiau išsaugotą projektą. Svarbu: projektui redaguoti pradinis vaizdo failas turi būti vis dar prieinamas.
+
+Po to rasite Tęsti nutrauktą garsinį vaizdavimą. Sonarpad sukurtas taip, kad neprarastų jau atlikto darbo: jei kūrimo metu nutrūksta ryšys, Gemini susiduria su problema arba procesas nutraukiamas, Sonarpad periodiškai išsaugo pažangos taškus. Naudodami šią funkciją galite tęsti pradėtą darbą nepradėdami iš naujo.
+
+Galiausiai rasite Kurti garsinį vaizdavimą. Jei neįvedėte galiojančio Gemini API rakto, Sonarpad parodys klaidą. Jei viskas sukonfigūruota tinkamai, procesas prasidės. Trukmė daugiausia priklauso nuo vaizdo įrašo ilgio ir sudėtingumo; ilgo filmo apdorojimas gali užtrukti nemažai laiko.
+
+Padėka
+
+Dėkoju Ömer Yılmaz, projekto „Omni Describer“ autoriui, kurio darbas suteikė man pirminį įkvėpimą sukurti Sonarpad garsinio vaizdavimo su DI funkciją. Vėliau Sonarpad funkcija buvo kuriama ir tobulinama nepriklausomai, atliekant daugybę bandymų su filmais ir televizijos serialais.
+
 Parinktys
 Langas Parinktys leidžia pritaikyti Sonarpad veikimą. Nustatymai suskirstyti į skirtingas korteles.
 Kortelė Bendrieji

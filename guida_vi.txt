@@ -129,7 +129,50 @@ Podcasts: mở cửa sổ Podcasts để tìm kiếm và quản lý đăng ký p
 Trong danh sách tập phim, nhấn Enter để phát tập đó.
 Trong khi phát, phím Esc dừng podcast và quay lại thư viện.
 
+Thuyết minh hình ảnh bằng AI:
+Với chức năng này, bạn có thể tạo thuyết minh hình ảnh cho bất kỳ nội dung video nào. Vì tôi rất yêu thích thuyết minh hình ảnh, đây là một chức năng mà tôi đặc biệt quan tâm và tôi phát hành nó cho mọi người vì nó đã đạt đến mức mà tôi cho là thỏa đáng. Cũng có những dịch vụ trả phí cung cấp chức năng tương tự; nếu Sonarpad hữu ích với bạn, bạn có thể ủng hộ công việc của tôi. Chức năng này cũng đã được thử nghiệm trong thực tế với hàng trăm bộ phim và loạt phim.
 
+Một vấn đề khác đã được xử lý liên quan đến nội dung mà Gemini cho là bạo lực hoặc nhạy cảm. Một số phương pháp có thể từ chối mô tả cả một cảnh, đôi khi do nhận diện nhầm. Sonarpad cố gắng xử lý những trường hợp này bằng cách yêu cầu Gemini diễn đạt phần mô tả theo cách phù hợp với chính sách của nó: nếu một chi tiết không thể được mô tả trực tiếp, chi tiết đó sẽ được bỏ qua hoặc diễn đạt nhẹ hơn, thay vì bỏ toàn bộ cảnh.
+
+Một đặc điểm rất quan trọng là quản lý khoảng lặng: giọng tổng hợp không được nói chồng lên lời thoại. Vì vậy, ở bước đầu tiên Sonarpad phân tích âm thanh và tìm những thời điểm mà phần thuyết minh có thể phát mà không làm ảnh hưởng đến việc nghe.
+
+Chức năng đã được thử nghiệm với hàng trăm bộ phim và loạt phim, và theo thời gian nhiều sai lệch mà Gemini có thể tạo ra đã được sửa, chẳng hạn việc đồng bộ giữa những gì xảy ra trên màn hình và phần mô tả. Tất nhiên kết quả còn phụ thuộc vào các dịch vụ bên ngoài, vì vậy tôi không thể đảm bảo mọi mô tả trong mọi bộ phim luôn hoàn hảo. Tuy vậy, tôi vẫn tiếp tục cải thiện Sonarpad và do đó cũng tiếp tục cải thiện chức năng này.
+
+Khi mở chức năng, trước tiên bạn sẽ thấy trường Tệp phương tiện cục bộ đang để trống, sau đó là nút Chọn video. Nhấn phím Cách trên nút này để chọn video mà bạn muốn tạo thuyết minh hình ảnh.
+
+Sau khi chọn video, Sonarpad tự động điền đường dẫn của Tệp MP3 đích. Dùng Tab để chuyển đến trường này và thay đổi đường dẫn, hoặc dùng nút Đổi thư mục đích.
+
+Nhấn Tab lần nữa để thay đổi ngôn ngữ thuyết minh hình ảnh. Danh sách này thống nhất với Sonarpad và bao gồm tất cả các ngôn ngữ hiện đang được chương trình hỗ trợ.
+
+Tiếp theo bạn sẽ thấy Độ ngắn của thuyết minh. Giá trị mặc định là Chi tiết vì trong các thử nghiệm của tôi nó cho kết quả tốt, đặc biệt với những bộ phim có các cảnh im lặng dài. Tuy nhiên, bạn vẫn có thể chọn các mức khác.
+
+Dùng Tab tiếp tục đến Bật khoảng dừng mở rộng. Tùy chọn này mặc định bị tắt. Nó có thể hữu ích với phim có nhiều lời thoại, cảnh diễn ra nhanh hoặc rất ít khoảng trống để phần thuyết minh phát. Trong trường hợp đặc biệt, Sonarpad có thể tạm dừng phim trong thời gian ngắn để chèn một mô tả không thể vừa trong khoảng lặng.
+
+Hộp kiểm Thử nhận diện nhân vật và dùng tên của họ cho phép Sonarpad thử đọc tên nhân vật trong phần thuyết minh. Nếu bị tắt, mô tả sẽ chung hơn, ví dụ “người đàn ông tiến lại gần” hoặc “người phụ nữ bước vào”. Việc nhận diện do Gemini thực hiện và không thể đảm bảo chính xác trong mọi trường hợp: các nhân vật giống nhau, khung hình không rõ hoặc hình ảnh khó có thể dẫn đến nhầm danh tính.
+
+Nhấn Tab lần nữa để đến Duy trì danh mục nhân vật. Chức năng này đặc biệt hữu ích khi thuyết minh một loạt phim vì Gemini có thể giữ lại mô tả và danh tính nhân vật giữa các tập. Nếu chưa có danh mục, hãy chọn Tạo danh mục mới và nhập tên ở trường tiếp theo, chẳng hạn tên của loạt phim.
+
+Sonarpad lưu thông tin về nhân vật trong danh mục để cải thiện tính liên tục của việc nhận diện. Bạn cũng có thể lấy một danh mục mẫu do Sonarpad tạo, sao chép sang một hệ thống AI khác và yêu cầu nó bổ sung các mô tả cho loạt phim bạn muốn. Danh mục cuối cùng phải giữ định dạng JSON và có thể được sao chép vào thư mục Documents\Sonarpad\Audiodescriptions\Catalogs. Nhờ vậy bạn có thể bắt đầu một loạt phim với danh mục đã chuẩn bị sẵn.
+
+Nhấn Tab lần nữa để đến Cũng lưu dự án để chỉnh sửa sau này. Hãy bật tùy chọn này nếu bạn biết rằng sau đó mình sẽ muốn xem lại phần thuyết minh, sửa mô tả hoặc thay đổi giọng.
+
+Hộp kiểm Chuyển tệp video vào Thùng rác sau khi tạo mô tả âm thanh dùng khi bạn không muốn giữ video gốc sau khi MP3 có thuyết minh đã được tạo. Tùy chọn này mặc định bị tắt và chỉ khả dụng khi không bật lưu dự án, vì một dự án có thể chỉnh sửa vẫn cần video gốc.
+
+Tiếp theo bạn sẽ thấy Khóa API Gemini. Nhập khóa API của bạn tại đây. Khóa có thể được tạo miễn phí. Dùng Tab để đến nút Lấy khóa API; nút này mở trang Google trong trình duyệt, nơi bạn có thể tạo khóa sau khi đăng nhập bằng tài khoản của mình. Thông thường quy trình này rất nhanh.
+
+Sau khóa API bạn sẽ thấy Mô hình Gemini và nút Làm mới danh sách mô hình. Thông thường bạn có thể giữ nguyên mô hình đang được chọn; hãy làm mới danh sách khi muốn kiểm tra những mô hình nào khả dụng cho khóa của mình.
+
+Nhấn Tab lần nữa để đến Công cụ tổng hợp giọng nói và Giọng, có thể thay đổi theo sở thích của bạn.
+
+Ở phần sau bạn sẽ thấy Sửa dự án thuyết minh hình ảnh. Chức năng này cho phép mở lại và chỉnh sửa một dự án đã lưu trước đó. Lưu ý: để chỉnh sửa dự án, tệp video gốc vẫn phải còn khả dụng.
+
+Tiếp theo là Tiếp tục mô tả âm thanh bị gián đoạn. Sonarpad được thiết kế để không làm mất công việc đã hoàn thành: nếu kết nối bị gián đoạn trong khi tạo, Gemini gặp sự cố hoặc tiến trình bị dừng, Sonarpad định kỳ lưu các điểm tiến độ. Với chức năng này bạn có thể tiếp tục công việc đang làm mà không phải bắt đầu lại từ đầu.
+
+Cuối cùng bạn sẽ thấy Tạo thuyết minh hình ảnh. Nếu chưa nhập khóa API Gemini hợp lệ, Sonarpad sẽ hiển thị lỗi. Nếu mọi thứ được cấu hình đúng, tiến trình sẽ bắt đầu. Thời gian phụ thuộc chủ yếu vào độ dài và độ phức tạp của video; xử lý một bộ phim dài có thể mất khá nhiều thời gian.
+
+Lời cảm ơn
+
+Xin cảm ơn Ömer Yılmaz, tác giả của dự án Omni Describer, dự án đã mang lại cho tôi nguồn cảm hứng ban đầu để phát triển tính năng thuyết minh hình ảnh bằng AI của Sonarpad. Sau đó, tính năng của Sonarpad được phát triển và hoàn thiện độc lập thông qua nhiều lần thử nghiệm với phim điện ảnh và phim truyền hình.
 
 Tùy chọn
 Cửa sổ Tùy chọn cho phép bạn tùy chỉnh cách hoạt động của Sonarpad. Các cài đặt được chia thành nhiều thẻ khác nhau.

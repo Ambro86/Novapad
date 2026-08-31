@@ -89,8 +89,12 @@ class WindowsMediaContextActionsTests(unittest.TestCase):
         self.assertIn('"playback.download_episode"', block)
         self.assertIn('"playback.transcribe_current"', block)
         self.assertNotIn('"menu.create_audio_description"', block)
-        self.assertIn("crate::download_podcast_episode(", block)
+        self.assertIn("crate::save_rai_audio_description_context_media(", block)
         self.assertIn("crate::start_whisper_transcription_for_remote_media_context", block)
+        self.assertIn("mark_context_transcription_started(parent);", block)
+        self.assertIn("context_transcription_keeps_progress_foreground", self.rai_ad)
+        self.assertIn("context_save_keeps_progress_foreground", self.rai_ad)
+        self.assertIn("restore_rai_audio_context_save_progress_focus", self.main)
 
 
     def test_media_save_returns_focus_to_originating_context_list(self):
@@ -119,10 +123,8 @@ class WindowsMediaContextActionsTests(unittest.TestCase):
             "youtube_transcript_window::has_active_media_context_list(hwnd)",
             self.main,
         )
-        self.assertRegex(
-            self.rai_ad,
-            r"youtube_transcript_window::restore_active_media_context_list\(\s*parent\s*,?\s*\);",
-        )
+        self.assertIn("save_rai_audio_description_context_media", self.rai_ad)
+        self.assertIn("restore_active_media_context_list(hwnd)", self.main)
 
     def test_media_save_progress_does_not_bounce_focus_to_editor_when_list_is_open(self):
         start = self.youtube.index("pub(crate) fn download_active_streaming_audio_media(")

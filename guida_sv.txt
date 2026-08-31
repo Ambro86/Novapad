@@ -115,6 +115,51 @@ Poddar: öppnar Podd-fönstret för att söka och hantera prenumerationer.
 I avsnittslistan, tryck på Enter för att spela upp avsnittet.
 Under uppspelning stoppar Esc podden och återgår till biblioteket.
 
+Syntolkning med AI:
+Med den här funktionen kan du skapa syntolkning för vilket videoinnehåll som helst. Eftersom jag själv tycker mycket om syntolkning är det här en funktion som betyder mycket för mig, och jag gör den tillgänglig för allmänheten eftersom den har nått en nivå som jag anser vara tillfredsställande. Det finns även betaltjänster med liknande funktioner; om Sonarpad är användbart för dig får du gärna stödja mitt arbete. Funktionen har dessutom testats i praktiken med hundratals filmer och serier.
+
+Ett annat problem som hanteras gäller innehåll som Gemini bedömer som våldsamt eller känsligt. Vissa metoder kan vägra att beskriva hela scener, ibland på grund av falska positiva träffar. Sonarpad försöker i stället hantera sådana situationer genom att be Gemini formulera beskrivningen på ett sätt som följer dess regler: om en detalj inte kan beskrivas uttryckligen utelämnas den eller uttrycks mindre grafiskt, i stället för att hela scenen lämnas utan beskrivning.
+
+En grundläggande egenskap är hanteringen av tystnader: den syntetiska rösten ska inte tala över dialogen. Därför analyserar Sonarpad först ljudet och söker efter de tidsluckor där syntolkningen kan tala utan att störa lyssningen.
+
+Funktionen har testats med hundratals filmer och serier, och med tiden har många felaktigheter som Gemini kan göra rättats, till exempel synkroniseringen mellan det som händer på skärmen och beskrivningen. Resultatet beror naturligtvis också på externa tjänster, så jag kan inte garantera att varje beskrivning i varje film alltid blir perfekt. Jag fortsätter ändå att förbättra Sonarpad och därmed också den här funktionen.
+
+När du öppnar funktionen hittar du först det tomma fältet Lokal mediefil och därefter knappen Välj video. Aktivera knappen med mellanslag för att välja den video som du vill syntolka.
+
+När videon har valts fyller Sonarpad automatiskt i sökvägen till MP3-målfilen. Med Tab kan du gå till fältet och ändra sökvägen eller använda knappen Ändra målmapp.
+
+Tryck på Tab igen för att ändra syntolkningsspråk. Listan följer Sonarpad och innehåller alla språk som programmet för närvarande stöder.
+
+Därefter hittar du Syntolkningens korthet. Standardvärdet är Detaljerad eftersom det i mina tester ger ett bra resultat, särskilt i filmer med långa tysta scener. Du kan naturligtvis välja någon av de andra tillgängliga nivåerna.
+
+Med Tab hittar du sedan Aktivera förlängda pauser. Alternativet är avstängt som standard. Det kan vara användbart i filmer med mycket dialog, snabba scener eller mycket lite ledigt utrymme för syntolkningen. I undantagsfall kan Sonarpad då pausa filmen kort för att lägga in en beskrivning som annars inte skulle få plats i en tystnad.
+
+Kryssrutan Försök känna igen karaktärer och använda deras namn låter Sonarpad försöka säga karaktärernas namn i syntolkningen. Om den är avstängd blir beskrivningarna mer generella, till exempel ”mannen närmar sig” eller ”kvinnan går in”. Igenkänningen görs av Gemini och kan inte garanteras i alla situationer: liknande personer, otydliga bilder eller svåra scener kan leda till att identiteter blandas ihop.
+
+Tryck på Tab igen för att hitta Behåll personkatalogen. Funktionen är särskilt användbar när du syntolkar en serie, eftersom Gemini då kan behålla beskrivningar och identiteter för personer mellan avsnitten. Om det ännu inte finns någon katalog väljer du Skapa en ny katalog och skriver dess namn i nästa fält, till exempel seriens titel.
+
+Sonarpad sparar information om personerna i katalogen för att förbättra kontinuiteten i igenkänningen. Du kan också utgå från en exempelkatalog som Sonarpad har skapat, kopiera den till ett annat AI-system och be det komplettera katalogen med beskrivningar för den serie du vill använda. Den färdiga katalogen måste behålla JSON-formatet och kan kopieras till mappen Documents\Sonarpad\Audiodescriptions\Catalogs. På så sätt kan du börja en serie med en redan förberedd katalog.
+
+Tryck på Tab igen för att hitta Spara även projektet för framtida redigering. Aktivera alternativet om du vet att du senare vill granska syntolkningen, rätta beskrivningar eller byta röst.
+
+Kryssrutan Flytta videofilen till papperskorgen efter syntolkningen är till för dig som inte vill behålla originalvideon efter att den syntolkade MP3-filen har skapats. Den är avstängd som standard och är tillgänglig när projektsparning inte är aktiverad, eftersom ett redigerbart projekt fortfarande behöver originalvideon.
+
+Därefter hittar du Gemini API-nyckel. Ange din API-nyckel här. Nyckeln kan skapas kostnadsfritt. Med Tab kommer du till knappen Hämta API-nyckel, som öppnar Googles sida i webbläsaren. Där kan du skapa nyckeln efter att ha loggat in på ditt konto. Förfarandet är normalt mycket snabbt.
+
+Efter API-nyckeln hittar du Gemini-modell och knappen Uppdatera modellista. I de flesta fall kan du behålla den redan valda modellen; uppdatera listan när du vill kontrollera vilka modeller som är tillgängliga för din nyckel.
+
+Tryck på Tab igen för att hitta Talsyntesmotor och Röst, som du kan ändra efter dina önskemål.
+
+Längre fram hittar du Redigera syntolkningsprojekt. Funktionen gör det möjligt att öppna och ändra ett projekt som du tidigare har sparat. Viktigt: originalvideofilen måste fortfarande finnas tillgänglig för att projektet ska kunna redigeras.
+
+Därefter hittar du Fortsätt avbruten syntolkning. Sonarpad är utformat för att inte förlora arbete som redan har gjorts: om anslutningen bryts under skapandet, Gemini får ett problem eller processen avbryts sparar Sonarpad regelbundet kontrollpunkter för framstegen. Med den här funktionen kan du återuppta ett påbörjat arbete utan att börja om från början.
+
+Till sist hittar du Skapa syntolkning. Om du inte har angett en giltig Gemini API-nyckel visar Sonarpad ett fel. Om allt är korrekt inställt startar processen. Tiden beror främst på videons längd och komplexitet; en lång film kan ta ganska lång tid att bearbeta.
+
+Tack
+
+Ett tack till Ömer Yılmaz, skaparen av projektet Omni Describer, som gav mig den ursprungliga inspirationen till att utveckla Sonarpads AI-baserade syntolkningsfunktion. Sonarpads funktion utvecklades och förbättrades därefter självständigt genom omfattande tester med filmer och tv-serier.
+
 Alternativ
 Fönstret Alternativ låter dig anpassa hur Sonarpad fungerar. Inställningarna är uppdelade i olika flikar.
 Fliken Allmänt

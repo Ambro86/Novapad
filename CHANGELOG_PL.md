@@ -1,5 +1,17 @@
 # Dziennik zmian
 
+Wersja 0.9.1 – 2026-09-01
+
+Pobieranie z YouTube
+• Naprawiono problem, przez który okna postępu pobierania z YouTube/streamingu mogły wielokrotnie wracać na pierwszy plan po przełączeniu do innej aplikacji za pomocą Alt+Tab. Pobieranie działa teraz w tle bez przejmowania fokusu.
+• Ulepszono dostępność postępu pobierania. Po powrocie do okna postępu czytniki ekranu mogą odczytać bieżący stan i procent. W przypadku playlist Sonarpad podaje także numer bieżącego elementu, łączną liczbę elementów i tytuł.
+• Naprawiono fałszywe zgłoszenia zawieszenia przez watchdog podczas długich pobrań i konwersji, gdy okno postępu nadal odpowiadało.
+• Do pobierania playlist dodano pole kombi Format. Z listy filmów można nacisnąć Tab i wybrać MP4, MP3, M4A, OPUS, OGG, WAV lub FLAC przed rozpoczęciem pobierania wielu elementów.
+• Przeorganizowano zapisywanie multimediów strumieniowych. Format i jakość są teraz wybierane podczas zapisywania, a nie w początkowym oknie wyszukiwania strumienia. „Zapisz multimedia” otwiera jedno okno Formatu i Jakości, a pobieranie playlist udostępnia oba pola kombi.
+
+Audiodeskrypcja z AI
+• Naprawiono problem, który mógł uniemożliwiać uruchomienie audiodeskrypcji z AI dla niektórych filmów MKV. Sonarpad lepiej obsługuje teraz filmy z nieregularnymi lub brakującymi znacznikami czasu.
+
 Wersja 0.9.0 – 2026-08-31
 
 Audiodeskrypcja z AI — nowa główna funkcja

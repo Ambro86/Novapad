@@ -50,8 +50,14 @@ class WindowsMediaContextActionsTests(unittest.TestCase):
         self.assertIn('"playback.download_episode"', block)
         self.assertIn('"playback.transcribe_current"', block)
         self.assertIn('"menu.create_audio_description"', block)
+        self.assertNotIn("let mut save_children", block)
+        self.assertNotIn("for format in youtube_save_media_formats()", block)
+        self.assertIn("children: Vec::new()", block)
+        formats_start = self.youtube.index("fn youtube_save_media_formats()")
+        formats_end = self.youtube.index("fn youtube_context_quality_for_format(", formats_start)
+        formats_block = self.youtube[formats_start:formats_end]
         for format_name in ["Mp4", "Mp3", "M4a", "Opus", "Ogg", "Wav", "Flac"]:
-            self.assertIn(f"StreamOutputFormat::{format_name}", block)
+            self.assertIn(f"StreamOutputFormat::{format_name}", formats_block)
         self.assertIn("download_active_streaming_audio_media(parent", block)
         self.assertIn("download_active_streaming_audio_media_for_transcription", block)
         self.assertIn("download_active_youtube_for_audio_description", block)

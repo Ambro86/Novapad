@@ -606,20 +606,21 @@ fn changelog_content(language: Language) -> String {
     match language {
         Language::Italian => include_str!("../../CHANGELOG_IT.md").to_string(),
         Language::German => include_str!("../../CHANGELOG_DE.md").to_string(),
-        Language::Ukrainian | Language::English => include_str!("../../CHANGELOG.md").to_string(),
+        Language::English => include_str!("../../CHANGELOG.md").to_string(),
+        Language::Ukrainian => include_str!("../../CHANGELOG_UK.md").to_string(),
         Language::Hindi => include_str!("../../CHANGELOG-HI.txt").to_string(),
         Language::Spanish => include_str!("../../CHANGELOG_ES.md").to_string(),
         Language::Portuguese => include_str!("../../CHANGELOG_PT.md").to_string(),
         Language::PortugueseBrazilian => include_str!("../../CHANGELOG_PT_BR.md").to_string(),
-        Language::Swedish => include_str!("../../CHANGELOG.md").to_string(),
+        Language::Swedish => include_str!("../../CHANGELOG_SV.md").to_string(),
         Language::Vietnamese => include_str!("../../CHANGELOG_VI.md").to_string(),
         Language::Czech => include_str!("../../CHANGELOG_CS.md").to_string(),
         Language::Polish => include_str!("../../CHANGELOG_PL.md").to_string(),
         Language::French => include_str!("../../CHANGELOG_FR.md").to_string(),
-        Language::Serbian => include_str!("../../CHANGELOG.md").to_string(),
-        Language::Lithuanian => include_str!("../../CHANGELOG.md").to_string(),
+        Language::Serbian => include_str!("../../CHANGELOG_SR.md").to_string(),
+        Language::Lithuanian => include_str!("../../CHANGELOG_LT.md").to_string(),
         Language::Russian => include_str!("../../CHANGELOG_RU.md").to_string(),
-        Language::Chinese => include_str!("../../CHANGELOG.md").to_string(),
+        Language::Chinese => include_str!("../../CHANGELOG_ZH.md").to_string(),
     }
 }
 

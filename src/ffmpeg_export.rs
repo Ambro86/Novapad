@@ -517,35 +517,62 @@ fn segment_format_from_path(path: &Path) -> Option<&'static str> {
     }
 }
 
+#[derive(Clone, Copy, Default)]
+struct SegmentTimestampState {
+    next_dts: Option<i64>,
+    last_dts: Option<i64>,
+}
+
 fn repair_segment_packet_timestamps(
     packet: *mut AVPacket,
-    next_timestamp: &mut Option<i64>,
+    state: &mut SegmentTimestampState,
 ) -> bool {
     if packet.is_null() {
         return false;
     }
+
+    let mut repaired = false;
     unsafe {
+        let duration = (*packet).duration.max(1);
         let pts_missing = (*packet).pts == AV_NOPTS_VALUE_I64;
         let dts_missing = (*packet).dts == AV_NOPTS_VALUE_I64;
-        if !pts_missing && !dts_missing {
-            let duration = (*packet).duration.max(1);
-            *next_timestamp = Some((*packet).pts.max((*packet).dts).saturating_add(duration));
-            return false;
+
+        if dts_missing {
+            (*packet).dts = state
+                .next_dts
+                .or_else(|| {
+                    if !pts_missing {
+                        Some((*packet).pts)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(0);
+            repaired = true;
+        }
+        if pts_missing {
+            (*packet).pts = (*packet).dts;
+            repaired = true;
         }
 
-        if pts_missing && !dts_missing {
-            (*packet).pts = (*packet).dts;
-        } else if !pts_missing && dts_missing {
-            (*packet).dts = (*packet).pts;
-        } else {
-            let timestamp = (*next_timestamp).unwrap_or(0);
-            (*packet).pts = timestamp;
-            (*packet).dts = timestamp;
+        if let Some(last_dts) = state.last_dts
+            && (*packet).dts <= last_dts
+        {
+            let shift = last_dts.saturating_add(1).saturating_sub((*packet).dts);
+            (*packet).dts = (*packet).dts.saturating_add(shift);
+            (*packet).pts = (*packet).pts.saturating_add(shift);
+            repaired = true;
         }
-        let duration = (*packet).duration.max(1);
-        *next_timestamp = Some((*packet).pts.max((*packet).dts).saturating_add(duration));
+
+        if (*packet).pts < (*packet).dts {
+            (*packet).pts = (*packet).dts;
+            repaired = true;
+        }
+
+        state.last_dts = Some((*packet).dts);
+        state.next_dts = Some((*packet).dts.saturating_add(duration));
     }
-    true
+    repaired
 }
 
 pub fn media_duration_seconds(path: &Path) -> Option<f64> {
@@ -596,6 +623,25 @@ pub fn segment_media_file(
         segment_seconds,
         start_number,
         false,
+        false,
+        progress,
+    )
+}
+
+pub(crate) fn segment_media_file_for_analysis(
+    input_path: &Path,
+    output_pattern: &Path,
+    segment_seconds: u32,
+    start_number: u32,
+    progress: Option<&mut dyn FnMut(u32)>,
+) -> Result<(), String> {
+    segment_media_file_inner(
+        input_path,
+        output_pattern,
+        segment_seconds,
+        start_number,
+        false,
+        true,
         progress,
     )
 }
@@ -612,6 +658,7 @@ pub fn segment_audio_file(
         segment_seconds,
         start_number,
         true,
+        false,
         None,
     )
 }
@@ -622,6 +669,7 @@ fn segment_media_file_inner(
     segment_seconds: u32,
     start_number: u32,
     audio_only: bool,
+    tolerate_invalid_analysis_packets: bool,
     mut progress: Option<&mut dyn FnMut(u32)>,
 ) -> Result<(), String> {
     let api = ffmpeg_api()?;
@@ -679,7 +727,8 @@ fn segment_media_file_inner(
 
     let nb_streams = crate::ffmpeg_source::av_format_context_nb_streams_safe(in_ctx) as usize;
     let mut stream_map: Vec<*mut AVStream> = vec![ptr::null_mut(); nb_streams];
-    let mut next_timestamps: Vec<Option<i64>> = vec![None; nb_streams];
+    let mut timestamp_states: Vec<SegmentTimestampState> =
+        vec![SegmentTimestampState::default(); nb_streams];
     let mut mapped_streams = 0usize;
     for (i, stream_slot) in stream_map.iter_mut().enumerate() {
         let in_stream = unsafe { *(*in_ctx).streams.add(i) };
@@ -764,6 +813,7 @@ fn segment_media_file_inner(
     }
     let mut last_pct = 0u32;
     let mut repaired_timestamp_packets = 0u64;
+    let mut skipped_invalid_analysis_packets = 0u32;
     let mut segment_write_error: Option<String> = None;
     let mut pkt = crate::ffmpeg_source::av_packet_alloc_safe(api);
     if pkt.is_null() {
@@ -794,9 +844,6 @@ fn segment_media_file_inner(
         }
         let in_stream = unsafe { *(*in_ctx).streams.add(input_index as usize) };
         let out_stream = stream_map[input_index as usize];
-        if repair_segment_packet_timestamps(pkt, &mut next_timestamps[input_index as usize]) {
-            repaired_timestamp_packets = repaired_timestamp_packets.saturating_add(1);
-        }
         if let (Some(total), Some(cb)) = (total_duration_us, progress.as_deref_mut()) {
             let pts = unsafe { (*pkt).pts };
             if total > 0 && pts != AV_NOPTS_VALUE_I64 {
@@ -827,8 +874,29 @@ fn segment_media_file_inner(
             crate::ffmpeg_source::av_stream_time_base_safe(in_stream),
             crate::ffmpeg_source::av_stream_time_base_safe(out_stream),
         );
+        let repaired_packet =
+            repair_segment_packet_timestamps(pkt, &mut timestamp_states[input_index as usize]);
+        if repaired_packet {
+            repaired_timestamp_packets = repaired_timestamp_packets.saturating_add(1);
+        }
         let write_ret = crate::ffmpeg_source::av_interleaved_write_frame_safe(api, out_ctx, pkt);
         if write_ret < 0 {
+            if tolerate_invalid_analysis_packets
+                && write_ret == -libc::EINVAL
+                && skipped_invalid_analysis_packets < 8
+            {
+                skipped_invalid_analysis_packets =
+                    skipped_invalid_analysis_packets.saturating_add(1);
+                log_debug(&format!(
+                    "FFmpeg: skipping invalid analysis packet stream={} repaired={} error={} ({})",
+                    input_index,
+                    repaired_packet,
+                    ffmpeg_error_text(api, write_ret),
+                    write_ret
+                ));
+                crate::ffmpeg_source::av_packet_unref_safe(api, pkt);
+                continue;
+            }
             segment_write_error = Some(format!(
                 "FFmpeg: segment write failed: {} ({})",
                 ffmpeg_error_text(api, write_ret),
@@ -851,6 +919,13 @@ fn segment_media_file_inner(
         log_debug(&format!(
             "FFmpeg: repaired timestamps for {} packet(s) while segmenting {}",
             repaired_timestamp_packets,
+            input_path.display()
+        ));
+    }
+    if skipped_invalid_analysis_packets > 0 {
+        log_debug(&format!(
+            "FFmpeg: skipped {} invalid packet(s) while preparing analysis chunks for {}",
+            skipped_invalid_analysis_packets,
             input_path.display()
         ));
     }

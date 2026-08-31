@@ -1,5 +1,17 @@
 # Journal des modifications
 
+Version 0.9.1 – 2026-09-01
+
+Téléchargements YouTube
+• Correction d’un problème où les fenêtres de progression des téléchargements YouTube/streaming pouvaient revenir plusieurs fois au premier plan après un passage vers une autre application avec Alt+Tab. Les téléchargements continuent maintenant en arrière-plan sans voler le focus.
+• Amélioration de l’accessibilité de la progression des téléchargements. En revenant dans la fenêtre de progression, les lecteurs d’écran peuvent lire l’état actuel et le pourcentage. Pour les playlists, Sonarpad indique aussi le numéro de l’élément en cours, le nombre total d’éléments et le titre.
+• Correction de faux signalements de blocage du watchdog pendant de longs téléchargements et conversions alors que la fenêtre de progression restait réactive.
+• Ajout d’une liste déroulante Format pour le téléchargement des playlists. Depuis la liste des vidéos, appuyez sur Tab pour choisir MP4, MP3, M4A, OPUS, OGG, WAV ou FLAC avant de lancer le téléchargement multiple.
+• Réorganisation de l’enregistrement des médias en streaming. Le format et la qualité sont maintenant choisis au moment de l’enregistrement, et non dans la fenêtre initiale de recherche de streaming. « Enregistrer le média » ouvre une seule boîte de dialogue Format/Qualité et les téléchargements de playlists proposent les deux listes déroulantes.
+
+Audiodescription avec IA
+• Correction d’un problème qui pouvait empêcher le démarrage de l’audiodescription avec IA avec certaines vidéos MKV. Sonarpad gère désormais plus fiablement les vidéos dont les horodatages sont irréguliers ou manquants.
+
 Version 0.9.0 – 2026-08-31
 
 Audiodescription avec IA — nouvelle fonction principale

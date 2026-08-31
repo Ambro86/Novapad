@@ -1,5 +1,17 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.9.1 – 2026-09-01
+
+Tải xuống YouTube
+• Đã sửa lỗi khiến cửa sổ tiến trình tải YouTube/streaming có thể liên tục trở lại phía trước sau khi chuyển sang ứng dụng khác bằng Alt+Tab. Việc tải xuống giờ tiếp tục ở chế độ nền mà không giành lại tiêu điểm.
+• Cải thiện khả năng tiếp cận của tiến trình tải xuống. Khi quay lại cửa sổ tiến trình, trình đọc màn hình có thể đọc trạng thái hiện tại và phần trăm. Với danh sách phát, Sonarpad cũng thông báo số thứ tự mục hiện tại, tổng số mục và tiêu đề.
+• Đã sửa các cảnh báo treo giả từ watchdog trong các lần tải xuống và chuyển đổi dài khi cửa sổ tiến trình vẫn phản hồi.
+• Đã thêm hộp kết hợp Định dạng cho tải xuống danh sách phát. Từ danh sách video, nhấn Tab để chọn MP4, MP3, M4A, OPUS, OGG, WAV hoặc FLAC trước khi bắt đầu tải xuống nhiều mục.
+• Đã tổ chức lại việc lưu nội dung streaming. Định dạng và chất lượng giờ được chọn khi lưu thay vì trong cửa sổ tìm kiếm streaming ban đầu. “Lưu media” mở một hộp thoại chung cho Định dạng và Chất lượng, còn tải playlist có cả hai hộp kết hợp.
+
+Mô tả âm thanh bằng AI
+• Đã sửa lỗi có thể khiến mô tả âm thanh bằng AI không khởi động với một số video MKV. Sonarpad giờ xử lý đáng tin cậy hơn các video có dấu thời gian không đều hoặc bị thiếu.
+
 Phiên bản 0.9.0 – 2026-08-31
 
 Mô tả âm thanh bằng AI — tính năng chính mới

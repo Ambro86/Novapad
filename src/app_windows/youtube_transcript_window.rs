@@ -36,19 +36,20 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW,
     CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW, DLGC_WANTARROWS, DefWindowProcW, DestroyMenu,
     DispatchMessageW, EN_CHANGE, ES_AUTOHSCROLL, ES_MULTILINE, ES_READONLY, GWLP_USERDATA,
-    GetCursorPos, GetForegroundWindow, GetParent, GetScrollInfo, GetWindowLongPtrW, HMENU,
-    HWND_TOPMOST, IDC_ARROW, IDYES, IsChild, IsDialogMessageW, IsWindow, KillTimer, LB_ADDSTRING,
-    LB_GETCURSEL, LB_RESETCONTENT, LB_SETCURSEL, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY,
-    LoadCursorW, MB_ICONQUESTION, MB_YESNO, MF_STRING, MSG, PM_REMOVE, PeekMessageW, PostMessageW,
-    RegisterClassW, SB_BOTTOM, SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION,
-    SB_THUMBTRACK, SB_TOP, SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS, SIF_RANGE, SIF_TRACKPOS,
-    SW_HIDE, SW_SHOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow,
-    SetTimer, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY,
-    TPM_RETURNCMD, TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
-    WM_CONTEXTMENU, WM_CREATE, WM_DESTROY, WM_GETDLGCODE, WM_KEYDOWN, WM_LBUTTONDOWN,
-    WM_MOUSEWHEEL, WM_NCDESTROY, WM_NEXTDLGCTL, WM_NOTIFY, WM_PAINT, WM_SETFOCUS, WM_SETFONT,
-    WM_SIZE, WM_TIMER, WM_VSCROLL, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT,
-    WS_EX_DLGMODALFRAME, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+    GetCursorPos, GetForegroundWindow, GetParent, GetScrollInfo, GetWindowLongPtrW,
+    GetWindowThreadProcessId, HMENU, HWND_TOP, HWND_TOPMOST, IDC_ARROW, IDYES, IsChild,
+    IsDialogMessageW, IsWindow, KillTimer, LB_ADDSTRING, LB_GETCURSEL, LB_RESETCONTENT,
+    LB_SETCURSEL, LBN_SELCHANGE, LBS_HASSTRINGS, LBS_NOTIFY, LoadCursorW, MB_ICONQUESTION,
+    MB_YESNO, MF_STRING, MSG, PM_REMOVE, PeekMessageW, PostMessageW, RegisterClassW, SB_BOTTOM,
+    SB_LINEDOWN, SB_LINEUP, SB_PAGEDOWN, SB_PAGEUP, SB_THUMBPOSITION, SB_THUMBTRACK, SB_TOP,
+    SB_VERT, SCROLLINFO, SIF_PAGE, SIF_POS, SIF_RANGE, SIF_TRACKPOS, SW_HIDE, SW_SHOW, SWP_NOMOVE,
+    SWP_NOSIZE, SWP_SHOWWINDOW, SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW,
+    SetWindowPos, SetWindowTextW, ShowWindow, TPM_NONOTIFY, TPM_RETURNCMD, TrackPopupMenu,
+    TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_CREATE,
+    WM_DESTROY, WM_GETDLGCODE, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MOUSEWHEEL, WM_NCDESTROY,
+    WM_NEXTDLGCTL, WM_NOTIFY, WM_PAINT, WM_SETFOCUS, WM_SETFONT, WM_SIZE, WM_TIMER, WM_VSCROLL,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_EX_DLGMODALFRAME, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::{PCWSTR, PWSTR, w};
 
@@ -75,7 +76,6 @@ const YT_ID_TIMESTAMP: usize = 9304;
 const YT_ID_OK: usize = 9305;
 const YT_ID_CANCEL: usize = 9306;
 const STREAM_ID_URL: usize = 9311;
-const STREAM_ID_FORMAT: usize = 9312;
 const STREAM_ID_OK: usize = 9313;
 const STREAM_ID_CANCEL: usize = 9314;
 const STREAM_ID_FAVORITES: usize = 9316;
@@ -83,7 +83,6 @@ const STREAM_ID_OPEN_COMMENTS: usize = 9317;
 
 #[inline]
 fn ignore_bool(_value: bool) {}
-const STREAM_ID_QUALITY: usize = 9318;
 const STREAM_TRACK_ID_COMBO: usize = 9321;
 const STREAM_TRACK_ID_OK: usize = 9322;
 const STREAM_TRACK_ID_CANCEL: usize = 9323;
@@ -93,10 +92,17 @@ const PLAYLIST_DOWNLOAD_SELECT_ID_NONE: usize = 9343;
 const PLAYLIST_DOWNLOAD_SELECT_ID_DOWNLOAD: usize = 9344;
 const PLAYLIST_DOWNLOAD_SELECT_ID_CANCEL: usize = 9345;
 const PLAYLIST_DOWNLOAD_SELECT_ID_COUNT: usize = 9346;
+const PLAYLIST_DOWNLOAD_SELECT_ID_FORMAT: usize = 9347;
+const PLAYLIST_DOWNLOAD_SELECT_ID_QUALITY: usize = 9348;
+const STREAM_SAVE_OPTIONS_ID_FORMAT: usize = 9351;
+const STREAM_SAVE_OPTIONS_ID_QUALITY: usize = 9352;
+const STREAM_SAVE_OPTIONS_ID_SAVE: usize = 9353;
+const STREAM_SAVE_OPTIONS_ID_CANCEL: usize = 9354;
 const PLAYLIST_DOWNLOAD_MAX_ATTEMPTS: usize = 3;
 const STREAM_DIALOG_CLASS_NAME: &str = "SonarpadStreamAudio";
 const STREAM_TRACK_DIALOG_CLASS_NAME: &str = "SonarpadStreamAudioTrack";
 const PLAYLIST_DOWNLOAD_SELECT_CLASS_NAME: &str = "SonarpadPlaylistDownloadSelect";
+const STREAM_SAVE_OPTIONS_CLASS_NAME: &str = "SonarpadStreamSaveOptions";
 const YOUTUBE_COMMENTS_DIALOG_CLASS_NAME: &str = "SonarpadYouTubeComments";
 const YOUTUBE_COMMENTS_VIEW_CLASS_NAME: &str = "SonarpadYouTubeCommentsView";
 const YOUTUBE_COMMENTS_INITIAL_PARENT_LIMIT: usize = 50;
@@ -2204,6 +2210,8 @@ struct PlaylistDownloadOptions {
 }
 
 type PlaylistDownloadSelectionResult = Arc<Mutex<Option<Vec<usize>>>>;
+type PlaylistDownloadFormatResult = Arc<Mutex<Option<StreamOutputFormat>>>;
+type PlaylistDownloadQualityResult = Arc<Mutex<Option<StreamQualitySelection>>>;
 type PlaylistDownloadFailure = (String, String);
 
 struct StreamCollectionPageRequest<'a> {
@@ -2266,6 +2274,11 @@ struct PlaylistDownloadSelectionInit {
     accept_label: String,
     none_selected_message: String,
     selected_count_template: String,
+    format_options: Vec<(String, StreamOutputFormat)>,
+    default_format: Option<StreamOutputFormat>,
+    default_quality: Option<StreamQualitySelection>,
+    format_result: Option<PlaylistDownloadFormatResult>,
+    quality_result: Option<PlaylistDownloadQualityResult>,
     result: PlaylistDownloadSelectionResult,
 }
 
@@ -2274,6 +2287,11 @@ struct PlaylistDownloadSelectionState {
     language: Language,
     list: HWND,
     count_label: HWND,
+    format_combo: HWND,
+    quality_combo: HWND,
+    formats: Vec<StreamOutputFormat>,
+    format_result: Option<PlaylistDownloadFormatResult>,
+    quality_result: Option<PlaylistDownloadQualityResult>,
     entry_count: usize,
     none_selected_message: String,
     selected_count_template: String,
@@ -2685,6 +2703,18 @@ fn youtube_context_menu_label(language: Language, key: &str) -> String {
         .to_string()
 }
 
+fn youtube_save_media_formats() -> [StreamOutputFormat; 7] {
+    [
+        StreamOutputFormat::Mp4,
+        StreamOutputFormat::Mp3,
+        StreamOutputFormat::M4a,
+        StreamOutputFormat::Opus,
+        StreamOutputFormat::Ogg,
+        StreamOutputFormat::Wav,
+        StreamOutputFormat::Flac,
+    ]
+}
+
 fn youtube_context_quality_for_format(
     format: StreamOutputFormat,
     options: PlaylistDownloadOptions,
@@ -2748,56 +2778,35 @@ fn youtube_video_context_actions(
         }) as Arc<dyn Fn(&str) -> bool + Send + Sync>
     };
 
-    let mut save_children = Vec::new();
-    for format in [
-        StreamOutputFormat::Mp4,
-        StreamOutputFormat::Mp3,
-        StreamOutputFormat::M4a,
-        StreamOutputFormat::Opus,
-        StreamOutputFormat::Ogg,
-        StreamOutputFormat::Wav,
-        StreamOutputFormat::Flac,
-    ] {
-        let child_entries = Arc::clone(&entries);
-        let child_entries_for_handler = Arc::clone(&entries);
-        let child_ytdlp_path = Arc::clone(&ytdlp_path);
-        let child_quality = youtube_context_quality_for_format(format, download_options);
-        save_children.push(InterpreterContextAction {
-            label: format.settings_value().to_ascii_uppercase(),
-            ctrl_c_shortcut: false,
-            delete_shortcut: false,
-            enabled: video_enabled(child_entries),
-            handler: Arc::new(move |selected: String| {
-                let Some(entry) = child_entries_for_handler
-                    .iter()
-                    .find(|entry| entry.label == selected)
-                else {
-                    return;
-                };
-                let context = youtube_selection_save_context(
-                    parent,
-                    &child_ytdlp_path,
-                    entry,
-                    format,
-                    child_quality,
-                );
-                let active_url = context.url.clone();
-                with_temporary_stream_save_context(context, || {
-                    download_active_streaming_audio_media(parent, &active_url, language);
-                });
-                restore_active_media_context_list(parent);
-            }),
-            children: Vec::new(),
-        });
-    }
-
+    let save_entries = Arc::clone(&entries);
+    let save_entries_for_handler = Arc::clone(&entries);
+    let save_ytdlp_path = Arc::clone(&ytdlp_path);
     let save_action = InterpreterContextAction {
         label: youtube_context_menu_label(language, "playback.download_episode"),
         ctrl_c_shortcut: false,
         delete_shortcut: false,
-        enabled: video_enabled(Arc::clone(&entries)),
-        handler: Arc::new(|_| {}),
-        children: save_children,
+        enabled: video_enabled(save_entries),
+        handler: Arc::new(move |selected: String| {
+            let Some(entry) = save_entries_for_handler
+                .iter()
+                .find(|entry| entry.label == selected)
+            else {
+                return;
+            };
+            let context = youtube_selection_save_context(
+                parent,
+                &save_ytdlp_path,
+                entry,
+                download_options.format,
+                download_options.quality,
+            );
+            let active_url = context.url.clone();
+            with_temporary_stream_save_context(context, || {
+                download_active_streaming_audio_media(parent, &active_url, language);
+            });
+            restore_active_media_context_list(parent);
+        }),
+        children: Vec::new(),
     };
 
     let transcribe_entries = Arc::clone(&entries);
@@ -6797,7 +6806,7 @@ enum StreamOutputFormat {
     Mp4,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum StreamQualitySelection {
     Original,
     BitrateKbps(u32),
@@ -6877,11 +6886,25 @@ struct StreamDialogState {
     url_edit: HWND,
     favorites_combo: HWND,
     favorites: Vec<StreamFavorite>,
-    format_combo: HWND,
-    quality_combo: HWND,
+    default_save_format: StreamOutputFormat,
     open_comments_button: HWND,
     ok_button: HWND,
     result: Arc<Mutex<Option<StreamDialogResult>>>,
+}
+
+struct StreamSaveOptionsInit {
+    parent: HWND,
+    language: Language,
+    initial: PlaylistDownloadOptions,
+    result: Arc<Mutex<Option<PlaylistDownloadOptions>>>,
+}
+
+struct StreamSaveOptionsState {
+    parent: HWND,
+    language: Language,
+    format_combo: HWND,
+    quality_combo: HWND,
+    result: Arc<Mutex<Option<PlaylistDownloadOptions>>>,
 }
 
 struct StreamTrackDialogInit {
@@ -6903,22 +6926,6 @@ struct StreamTrackDialogState {
 }
 
 impl StreamOutputFormat {
-    fn combo_items(language: Language) -> Vec<(String, StreamOutputFormat)> {
-        vec![
-            (
-                i18n::tr(language, "stream_audio.format.auto"),
-                StreamOutputFormat::Auto,
-            ),
-            ("mp4".to_string(), StreamOutputFormat::Mp4),
-            ("mp3".to_string(), StreamOutputFormat::Mp3),
-            ("m4a".to_string(), StreamOutputFormat::M4a),
-            ("opus".to_string(), StreamOutputFormat::Opus),
-            ("ogg".to_string(), StreamOutputFormat::Ogg),
-            ("wav".to_string(), StreamOutputFormat::Wav),
-            ("flac".to_string(), StreamOutputFormat::Flac),
-        ]
-    }
-
     fn as_audio_convert_settings(
         self,
         quality: StreamQualitySelection,
@@ -7042,44 +7049,111 @@ fn stream_quality_items(
     }
 }
 
-fn current_stream_format(state: &StreamDialogState) -> StreamOutputFormat {
-    let format_idx =
-        crate::send_message_w_safe(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-    StreamOutputFormat::combo_items(state.language)
-        .get(format_idx.max(0) as usize)
-        .map(|(_, f)| *f)
-        .unwrap_or(StreamOutputFormat::Auto)
+fn stream_save_format_items() -> Vec<(String, StreamOutputFormat)> {
+    youtube_save_media_formats()
+        .into_iter()
+        .map(|format| (format.settings_value().to_ascii_uppercase(), format))
+        .collect()
 }
 
-fn refill_stream_quality_combo(state: &StreamDialogState, keep_selection: bool) {
-    let prev_selection = if keep_selection {
-        crate::send_message_w_safe(state.quality_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0
+fn normalized_stream_save_format(
+    format: StreamOutputFormat,
+    prefer_video: bool,
+) -> StreamOutputFormat {
+    if !prefer_video && format == StreamOutputFormat::Mp4 {
+        return StreamOutputFormat::Mp3;
+    }
+    if youtube_save_media_formats().contains(&format) {
+        format
+    } else if prefer_video {
+        StreamOutputFormat::Mp4
     } else {
-        -1
-    };
-    crate::send_message_w_safe(state.quality_combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
-    let format = current_stream_format(state);
-    let items = stream_quality_items(state.language, format);
+        StreamOutputFormat::Mp3
+    }
+}
+
+fn matching_stream_quality(
+    format: StreamOutputFormat,
+    previous_format: StreamOutputFormat,
+    previous_quality: StreamQualitySelection,
+) -> StreamQualitySelection {
+    if format != previous_format {
+        return StreamQualitySelection::Original;
+    }
+    match (format, previous_quality) {
+        (StreamOutputFormat::Mp3, StreamQualitySelection::Original)
+        | (StreamOutputFormat::Mp3, StreamQualitySelection::BitrateKbps(_))
+        | (StreamOutputFormat::Mp4, StreamQualitySelection::Original)
+        | (StreamOutputFormat::Mp4, StreamQualitySelection::Mp4High)
+        | (StreamOutputFormat::Mp4, StreamQualitySelection::Mp4Medium)
+        | (StreamOutputFormat::Mp4, StreamQualitySelection::Mp4Low) => previous_quality,
+        (_, StreamQualitySelection::Original) => StreamQualitySelection::Original,
+        _ => StreamQualitySelection::Original,
+    }
+}
+
+fn set_combo_selection_for_quality(
+    combo: HWND,
+    language: Language,
+    format: StreamOutputFormat,
+    preferred: StreamQualitySelection,
+) {
+    crate::send_message_w_safe(combo, CB_RESETCONTENT, WPARAM(0), LPARAM(0));
+    let items = stream_quality_items(language, format);
     for (label, _) in &items {
         let wide = to_wide(label);
         crate::send_message_w_safe(
-            state.quality_combo,
+            combo,
             CB_ADDSTRING,
             WPARAM(0),
             LPARAM(wide.as_ptr() as isize),
         );
     }
-    let selected_idx = if prev_selection >= 0 && (prev_selection as usize) < items.len() {
-        prev_selection
-    } else {
-        0
-    };
-    crate::send_message_w_safe(
-        state.quality_combo,
-        CB_SETCURSEL,
-        WPARAM(selected_idx as usize),
-        LPARAM(0),
-    );
+    let selected = items
+        .iter()
+        .position(|(_, quality)| *quality == preferred)
+        .unwrap_or(0);
+    crate::send_message_w_safe(combo, CB_SETCURSEL, WPARAM(selected), LPARAM(0));
+}
+
+fn selected_stream_format_from_combo(
+    combo: HWND,
+    formats: &[(String, StreamOutputFormat)],
+    fallback: StreamOutputFormat,
+) -> StreamOutputFormat {
+    let index = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    formats
+        .get(index.max(0) as usize)
+        .map(|(_, format)| *format)
+        .unwrap_or(fallback)
+}
+
+fn selected_stream_quality_from_combo(
+    combo: HWND,
+    language: Language,
+    format: StreamOutputFormat,
+) -> StreamQualitySelection {
+    let index = crate::send_message_w_safe(combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    stream_quality_items(language, format)
+        .get(index.max(0) as usize)
+        .map(|(_, quality)| *quality)
+        .unwrap_or(StreamQualitySelection::Original)
+}
+
+fn persist_stream_save_format(parent: HWND, format: StreamOutputFormat) {
+    if !youtube_save_media_formats().contains(&format) {
+        return;
+    }
+    let saved = with_state(parent, |state| {
+        let new_value = format.settings_value().to_string();
+        if state.settings.stream_audio_default_format != new_value {
+            state.settings.stream_audio_default_format = new_value;
+            save_settings(state.settings.clone());
+        }
+    });
+    if saved.is_none() {
+        crate::log_debug("Failed to persist stream save format preference");
+    }
 }
 
 fn current_stream_dialog_input(state: &StreamDialogState) -> String {
@@ -7217,6 +7291,30 @@ fn update_playlist_download_selection_count(state: &PlaylistDownloadSelectionSta
     }
 }
 
+fn playlist_download_selected_format(state: &PlaylistDownloadSelectionState) -> StreamOutputFormat {
+    if state.format_combo.0 == 0 {
+        return StreamOutputFormat::Mp3;
+    }
+    let index =
+        crate::send_message_w_safe(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
+    state
+        .formats
+        .get(index.max(0) as usize)
+        .copied()
+        .unwrap_or(StreamOutputFormat::Mp3)
+}
+
+fn refill_playlist_download_quality(
+    state: &PlaylistDownloadSelectionState,
+    preferred: StreamQualitySelection,
+) {
+    if state.quality_combo.0 == 0 {
+        return;
+    }
+    let format = playlist_download_selected_format(state);
+    set_combo_selection_for_quality(state.quality_combo, state.language, format, preferred);
+}
+
 unsafe extern "system" fn playlist_download_selection_wndproc(
     hwnd: HWND,
     msg: u32,
@@ -7312,6 +7410,112 @@ fn playlist_download_selection_wndproc_inner(
                     HINSTANCE(0),
                     None,
                 );
+                let has_format_selector = !init.format_options.is_empty();
+                let (format_label, format_combo) = if has_format_selector {
+                    let label = CreateWindowExW(
+                        Default::default(),
+                        WC_STATIC,
+                        PCWSTR(
+                            to_wide(&i18n::tr(init.language, "stream_audio.format_label")).as_ptr(),
+                        ),
+                        WS_CHILD | WS_VISIBLE,
+                        16,
+                        430,
+                        90,
+                        22,
+                        hwnd,
+                        HMENU(0),
+                        HINSTANCE(0),
+                        None,
+                    );
+                    let combo = CreateWindowExW(
+                        WS_EX_CLIENTEDGE,
+                        WC_COMBOBOXW,
+                        PCWSTR::null(),
+                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                        110,
+                        426,
+                        210,
+                        180,
+                        hwnd,
+                        HMENU(PLAYLIST_DOWNLOAD_SELECT_ID_FORMAT as isize),
+                        HINSTANCE(0),
+                        None,
+                    );
+                    for (label_text, _) in &init.format_options {
+                        let wide = to_wide(label_text);
+                        SendMessageW(
+                            combo,
+                            CB_ADDSTRING,
+                            WPARAM(0),
+                            LPARAM(wide.as_ptr() as isize),
+                        );
+                    }
+                    let default_index = init
+                        .default_format
+                        .and_then(|default_format| {
+                            init.format_options
+                                .iter()
+                                .position(|(_, format)| *format == default_format)
+                        })
+                        .unwrap_or(0);
+                    SendMessageW(combo, CB_SETCURSEL, WPARAM(default_index), LPARAM(0));
+                    (label, combo)
+                } else {
+                    (HWND(0), HWND(0))
+                };
+                let (quality_label, quality_combo) = if has_format_selector {
+                    let label = CreateWindowExW(
+                        Default::default(),
+                        WC_STATIC,
+                        PCWSTR(
+                            to_wide(&i18n::tr(init.language, "stream_audio.quality_label"))
+                                .as_ptr(),
+                        ),
+                        WS_CHILD | WS_VISIBLE,
+                        16,
+                        466,
+                        90,
+                        22,
+                        hwnd,
+                        HMENU(0),
+                        HINSTANCE(0),
+                        None,
+                    );
+                    let combo = CreateWindowExW(
+                        WS_EX_CLIENTEDGE,
+                        WC_COMBOBOXW,
+                        PCWSTR::null(),
+                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                        110,
+                        462,
+                        210,
+                        210,
+                        hwnd,
+                        HMENU(PLAYLIST_DOWNLOAD_SELECT_ID_QUALITY as isize),
+                        HINSTANCE(0),
+                        None,
+                    );
+                    let selected_format = init.default_format.unwrap_or_else(|| {
+                        init.format_options
+                            .first()
+                            .map(|(_, format)| *format)
+                            .unwrap_or(StreamOutputFormat::Mp3)
+                    });
+                    let preferred_quality = init
+                        .default_quality
+                        .unwrap_or(StreamQualitySelection::Original);
+                    set_combo_selection_for_quality(
+                        combo,
+                        init.language,
+                        selected_format,
+                        preferred_quality,
+                    );
+                    (label, combo)
+                } else {
+                    (HWND(0), HWND(0))
+                };
+                let buttons_y = if has_format_selector { 500 } else { 430 };
                 let select_all = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -7324,7 +7528,7 @@ fn playlist_download_selection_wndproc_inner(
                     ),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     16,
-                    430,
+                    buttons_y,
                     130,
                     30,
                     hwnd,
@@ -7344,7 +7548,7 @@ fn playlist_download_selection_wndproc_inner(
                     ),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     152,
-                    430,
+                    buttons_y,
                     130,
                     30,
                     hwnd,
@@ -7358,7 +7562,7 @@ fn playlist_download_selection_wndproc_inner(
                     PCWSTR(to_wide(&init.accept_label).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     470,
-                    430,
+                    buttons_y,
                     94,
                     30,
                     hwnd,
@@ -7372,7 +7576,7 @@ fn playlist_download_selection_wndproc_inner(
                     PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     572,
-                    430,
+                    buttons_y,
                     94,
                     30,
                     hwnd,
@@ -7384,6 +7588,10 @@ fn playlist_download_selection_wndproc_inner(
                     instructions,
                     list,
                     count_label,
+                    format_label,
+                    format_combo,
+                    quality_label,
+                    quality_combo,
                     select_all,
                     select_none,
                     download,
@@ -7399,6 +7607,15 @@ fn playlist_download_selection_wndproc_inner(
                     language: init.language,
                     list,
                     count_label,
+                    format_combo,
+                    quality_combo,
+                    formats: init
+                        .format_options
+                        .iter()
+                        .map(|(_, format)| *format)
+                        .collect(),
+                    format_result: init.format_result.clone(),
+                    quality_result: init.quality_result.clone(),
                     entry_count: init.entries.len(),
                     none_selected_message: init.none_selected_message.clone(),
                     selected_count_template: init.selected_count_template.clone(),
@@ -7423,6 +7640,19 @@ fn playlist_download_selection_wndproc_inner(
             }
             WM_COMMAND => {
                 let cmd_id = wparam.0 & 0xffff;
+                let notify_code = (wparam.0 >> 16) & 0xffff;
+                if cmd_id == PLAYLIST_DOWNLOAD_SELECT_ID_FORMAT
+                    && notify_code == CBN_SELCHANGE as usize
+                {
+                    if with_playlist_download_selection_state(hwnd, |state| {
+                        refill_playlist_download_quality(state, StreamQualitySelection::Original);
+                    })
+                    .is_none()
+                    {
+                        crate::log_debug("Failed to refresh playlist download quality combo");
+                    }
+                    return LRESULT(0);
+                }
                 if cmd_id == PLAYLIST_DOWNLOAD_SELECT_ID_ALL {
                     if with_playlist_download_selection_state(hwnd, |state| {
                         for index in 0..state.entry_count {
@@ -7458,6 +7688,22 @@ fn playlist_download_selection_wndproc_inner(
                             show_error(hwnd, state.language, &state.none_selected_message);
                             SetFocus(state.list);
                             return false;
+                        }
+                        if state.format_combo.0 != 0 {
+                            let selected_format = playlist_download_selected_format(state);
+                            if let Some(format_result) = state.format_result.as_ref() {
+                                *format_result.lock().unwrap_or_else(|err| err.into_inner()) =
+                                    Some(selected_format);
+                            }
+                            if let Some(quality_result) = state.quality_result.as_ref() {
+                                let selected_quality = selected_stream_quality_from_combo(
+                                    state.quality_combo,
+                                    state.language,
+                                    selected_format,
+                                );
+                                *quality_result.lock().unwrap_or_else(|err| err.into_inner()) =
+                                    Some(selected_quality);
+                            }
                         }
                         *state.result.lock().unwrap_or_else(|err| err.into_inner()) =
                             Some(selected);
@@ -7544,12 +7790,19 @@ fn playlist_download_selection_wndproc_inner(
     }
 }
 
-pub(crate) fn choose_checkbox_selection_entries(
+fn choose_checkbox_selection_entries_internal(
     parent: HWND,
     language: Language,
     text: CheckboxSelectionDialogText,
     entries: Vec<String>,
-) -> Option<Vec<usize>> {
+    format_options: Vec<(String, StreamOutputFormat)>,
+    default_format: Option<StreamOutputFormat>,
+    default_quality: Option<StreamQualitySelection>,
+) -> Option<(
+    Vec<usize>,
+    Option<StreamOutputFormat>,
+    Option<StreamQualitySelection>,
+)> {
     if entries.is_empty() {
         return None;
     }
@@ -7569,6 +7822,17 @@ pub(crate) fn choose_checkbox_selection_entries(
         RegisterClassW(&wc);
     }
     let result = Arc::new(Mutex::new(None));
+    let format_result: Option<PlaylistDownloadFormatResult> = if format_options.is_empty() {
+        None
+    } else {
+        Some(Arc::new(Mutex::new(None)))
+    };
+    let quality_result: Option<PlaylistDownloadQualityResult> = if format_options.is_empty() {
+        None
+    } else {
+        Some(Arc::new(Mutex::new(None)))
+    };
+    let has_format_selector = format_result.is_some();
     let CheckboxSelectionDialogText {
         title,
         instructions,
@@ -7584,6 +7848,11 @@ pub(crate) fn choose_checkbox_selection_entries(
         accept_label,
         none_selected_message,
         selected_count_template,
+        format_options,
+        default_format,
+        default_quality,
+        format_result: format_result.clone(),
+        quality_result: quality_result.clone(),
         result: Arc::clone(&result),
     });
     let title = to_wide(&title);
@@ -7597,7 +7866,7 @@ pub(crate) fn choose_checkbox_selection_entries(
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             700,
-            520,
+            if has_format_selector { 600 } else { 520 },
             parent,
             HMENU(0),
             hinstance,
@@ -7637,22 +7906,53 @@ pub(crate) fn choose_checkbox_selection_entries(
     unsafe {
         EnableWindow(parent, true);
     }
-    {
+    let selected = {
         let guard = result.lock().unwrap_or_else(|err| err.into_inner());
         guard.clone()
-    }
+    }?;
+    let selected_format = format_result
+        .and_then(|format_result| *format_result.lock().unwrap_or_else(|err| err.into_inner()));
+    let selected_quality = quality_result
+        .and_then(|quality_result| *quality_result.lock().unwrap_or_else(|err| err.into_inner()));
+    Some((selected, selected_format, selected_quality))
+}
+
+pub(crate) fn choose_checkbox_selection_entries(
+    parent: HWND,
+    language: Language,
+    text: CheckboxSelectionDialogText,
+    entries: Vec<String>,
+) -> Option<Vec<usize>> {
+    choose_checkbox_selection_entries_internal(
+        parent,
+        language,
+        text,
+        entries,
+        Vec::new(),
+        None,
+        None,
+    )
+    .map(|(selected, _, _)| selected)
 }
 
 fn choose_playlist_download_entries(
     parent: HWND,
     language: Language,
     entries: Vec<StreamCollectionEntry>,
-) -> Option<Vec<usize>> {
+    options: PlaylistDownloadOptions,
+) -> Option<(Vec<usize>, PlaylistDownloadOptions)> {
     let display_entries = entries
         .into_iter()
         .map(|entry| format!("{}. {}", entry.position, entry.label))
         .collect();
-    choose_checkbox_selection_entries(
+    let format_options = stream_save_format_items();
+    let default_format = if youtube_save_media_formats().contains(&options.format) {
+        options.format
+    } else {
+        StreamOutputFormat::Mp3
+    };
+    let default_quality = youtube_context_quality_for_format(default_format, options);
+    let (selected, format, quality) = choose_checkbox_selection_entries_internal(
         parent,
         language,
         CheckboxSelectionDialogText {
@@ -7669,7 +7969,356 @@ fn choose_playlist_download_entries(
             ),
         },
         display_entries,
-    )
+        format_options,
+        Some(default_format),
+        Some(default_quality),
+    )?;
+    let format = format.unwrap_or(default_format);
+    let quality = quality.unwrap_or_else(|| youtube_context_quality_for_format(format, options));
+    Some((selected, PlaylistDownloadOptions { format, quality }))
+}
+
+fn selected_stream_save_options(state: &StreamSaveOptionsState) -> PlaylistDownloadOptions {
+    let formats = stream_save_format_items();
+    let format =
+        selected_stream_format_from_combo(state.format_combo, &formats, StreamOutputFormat::Mp3);
+    let quality = selected_stream_quality_from_combo(state.quality_combo, state.language, format);
+    PlaylistDownloadOptions { format, quality }
+}
+
+fn refill_stream_save_options_quality(
+    state: &StreamSaveOptionsState,
+    preferred: StreamQualitySelection,
+) {
+    let formats = stream_save_format_items();
+    let format =
+        selected_stream_format_from_combo(state.format_combo, &formats, StreamOutputFormat::Mp3);
+    set_combo_selection_for_quality(state.quality_combo, state.language, format, preferred);
+}
+
+unsafe extern "system" fn stream_save_options_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        crate::panic_guard::guard(
+            "stream_save_options_wndproc",
+            || DefWindowProcW(hwnd, msg, wparam, lparam),
+            || stream_save_options_wndproc_inner(hwnd, msg, wparam, lparam),
+        )
+    }
+}
+
+fn stream_save_options_wndproc_inner(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe {
+        match msg {
+            WM_CREATE => {
+                let create_struct = lparam.0 as *const CREATESTRUCTW;
+                let init_ptr = (*create_struct).lpCreateParams as *mut StreamSaveOptionsInit;
+                if init_ptr.is_null() {
+                    return LRESULT(0);
+                }
+                let init = Box::from_raw(init_ptr);
+                let hfont = with_state(init.parent, |state| state.hfont).unwrap_or(HFONT(0));
+                let format_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.format_label")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    20,
+                    96,
+                    22,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let format_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    120,
+                    16,
+                    260,
+                    190,
+                    hwnd,
+                    HMENU(STREAM_SAVE_OPTIONS_ID_FORMAT as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let quality_label = CreateWindowExW(
+                    Default::default(),
+                    WC_STATIC,
+                    PCWSTR(
+                        to_wide(&i18n::tr(init.language, "stream_audio.quality_label")).as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE,
+                    16,
+                    56,
+                    96,
+                    22,
+                    hwnd,
+                    HMENU(0),
+                    HINSTANCE(0),
+                    None,
+                );
+                let quality_combo = CreateWindowExW(
+                    WS_EX_CLIENTEDGE,
+                    WC_COMBOBOXW,
+                    PCWSTR::null(),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
+                    120,
+                    52,
+                    260,
+                    220,
+                    hwnd,
+                    HMENU(STREAM_SAVE_OPTIONS_ID_QUALITY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let save_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(
+                        to_wide(&youtube_context_menu_label(
+                            init.language,
+                            "playback.download_episode",
+                        ))
+                        .as_ptr(),
+                    ),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
+                    196,
+                    96,
+                    116,
+                    30,
+                    hwnd,
+                    HMENU(STREAM_SAVE_OPTIONS_ID_SAVE as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                let cancel_button = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+                    320,
+                    96,
+                    96,
+                    30,
+                    hwnd,
+                    HMENU(STREAM_SAVE_OPTIONS_ID_CANCEL as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                for control in [
+                    format_label,
+                    format_combo,
+                    quality_label,
+                    quality_combo,
+                    save_button,
+                    cancel_button,
+                ] {
+                    if control.0 != 0 && hfont.0 != 0 {
+                        SendMessageW(control, WM_SETFONT, WPARAM(hfont.0 as usize), LPARAM(1));
+                    }
+                }
+
+                let formats = stream_save_format_items();
+                for (label, _) in &formats {
+                    let wide = to_wide(label);
+                    SendMessageW(
+                        format_combo,
+                        CB_ADDSTRING,
+                        WPARAM(0),
+                        LPARAM(wide.as_ptr() as isize),
+                    );
+                }
+                let default_index = formats
+                    .iter()
+                    .position(|(_, format)| *format == init.initial.format)
+                    .unwrap_or(0);
+                SendMessageW(format_combo, CB_SETCURSEL, WPARAM(default_index), LPARAM(0));
+                set_combo_selection_for_quality(
+                    quality_combo,
+                    init.language,
+                    init.initial.format,
+                    init.initial.quality,
+                );
+
+                let state = Box::new(StreamSaveOptionsState {
+                    parent: init.parent,
+                    language: init.language,
+                    format_combo,
+                    quality_combo,
+                    result: init.result.clone(),
+                });
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
+                SetFocus(format_combo);
+                LRESULT(0)
+            }
+            WM_COMMAND => {
+                let cmd_id = wparam.0 & 0xffff;
+                let notify_code = (wparam.0 >> 16) & 0xffff;
+                if cmd_id == STREAM_SAVE_OPTIONS_ID_FORMAT && notify_code == CBN_SELCHANGE as usize
+                {
+                    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamSaveOptionsState;
+                    if !ptr.is_null() {
+                        refill_stream_save_options_quality(&*ptr, StreamQualitySelection::Original);
+                    }
+                    return LRESULT(0);
+                }
+                if cmd_id == STREAM_SAVE_OPTIONS_ID_SAVE {
+                    let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamSaveOptionsState;
+                    if !ptr.is_null() {
+                        let state = &*ptr;
+                        *state.result.lock().unwrap_or_else(|err| err.into_inner()) =
+                            Some(selected_stream_save_options(state));
+                    }
+                    crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                    return LRESULT(0);
+                }
+                if cmd_id == STREAM_SAVE_OPTIONS_ID_CANCEL || cmd_id == 2 {
+                    crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_KEYDOWN => {
+                if wparam.0 as u32 == VK_ESCAPE.0 as u32 {
+                    crate::log_if_err!(PostMessageW(
+                        hwnd,
+                        WM_COMMAND,
+                        WPARAM(STREAM_SAVE_OPTIONS_ID_CANCEL),
+                        LPARAM(0),
+                    ));
+                    return LRESULT(0);
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
+            WM_CLOSE => {
+                crate::log_if_err!(crate::destroy_window_safe(hwnd));
+                LRESULT(0)
+            }
+            WM_DESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamSaveOptionsState;
+                if !ptr.is_null() {
+                    let state = &*ptr;
+                    EnableWindow(state.parent, true);
+                    let accepted = state
+                        .result
+                        .lock()
+                        .unwrap_or_else(|err| err.into_inner())
+                        .is_some();
+                    if !accepted {
+                        SetForegroundWindow(state.parent);
+                    }
+                }
+                LRESULT(0)
+            }
+            WM_NCDESTROY => {
+                let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *mut StreamSaveOptionsState;
+                if !ptr.is_null() {
+                    SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+                    let _unused = Box::from_raw(ptr);
+                }
+                LRESULT(0)
+            }
+            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        }
+    }
+}
+
+fn choose_stream_save_options(
+    parent: HWND,
+    language: Language,
+    initial: PlaylistDownloadOptions,
+) -> Option<PlaylistDownloadOptions> {
+    let hinstance = HINSTANCE(crate::get_module_handle_raw_default());
+    let class_name = to_wide(STREAM_SAVE_OPTIONS_CLASS_NAME);
+    let wc = windows::Win32::UI::WindowsAndMessaging::WNDCLASSW {
+        hCursor: windows::Win32::UI::WindowsAndMessaging::HCURSOR(unsafe {
+            LoadCursorW(None, IDC_ARROW).unwrap_or_default().0
+        }),
+        hInstance: hinstance,
+        lpszClassName: PCWSTR(class_name.as_ptr()),
+        lpfnWndProc: Some(stream_save_options_wndproc),
+        hbrBackground: HBRUSH((COLOR_WINDOW.0 + 1) as isize),
+        ..Default::default()
+    };
+    unsafe {
+        RegisterClassW(&wc);
+    }
+    let result = Arc::new(Mutex::new(None));
+    let init = Box::new(StreamSaveOptionsInit {
+        parent,
+        language,
+        initial,
+        result: Arc::clone(&result),
+    });
+    let title = to_wide(&youtube_context_menu_label(
+        language,
+        "playback.download_episode",
+    ));
+    let init_ptr = Box::into_raw(init);
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            PCWSTR(class_name.as_ptr()),
+            PCWSTR(title.as_ptr()),
+            WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            450,
+            190,
+            parent,
+            HMENU(0),
+            hinstance,
+            Some(init_ptr.cast()),
+        )
+    };
+    if hwnd.0 == 0 {
+        unsafe {
+            let _unused_init = Box::from_raw(init_ptr);
+        }
+        return None;
+    }
+    unsafe {
+        EnableWindow(parent, false);
+    }
+    pin_stream_modal_window(hwnd);
+    let mut msg = MSG::default();
+    loop {
+        if !crate::is_window_handle_valid(hwnd) {
+            break;
+        }
+        let res = crate::get_message_w_safe(&mut msg, HWND(0), 0, 0);
+        if res.0 == 0 || res.0 == -1 {
+            break;
+        }
+        unsafe {
+            if IsDialogMessageW(hwnd, &msg).as_bool() {
+                continue;
+            }
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+    if crate::is_window_handle_valid(hwnd) {
+        crate::log_if_err!(crate::destroy_window_safe(hwnd));
+    }
+    unsafe {
+        EnableWindow(parent, true);
+    }
+    *result.lock().unwrap_or_else(|err| err.into_inner())
 }
 
 unsafe extern "system" fn stream_dialog_wndproc(
@@ -7762,64 +8411,6 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     HINSTANCE(0),
                     None,
                 );
-                let format_label = CreateWindowExW(
-                    Default::default(),
-                    WC_STATIC,
-                    PCWSTR(to_wide(&i18n::tr(init.language, "stream_audio.format_label")).as_ptr()),
-                    WS_CHILD | WS_VISIBLE,
-                    16,
-                    82,
-                    90,
-                    20,
-                    hwnd,
-                    HMENU(0),
-                    HINSTANCE(0),
-                    None,
-                );
-                let format_combo = CreateWindowExW(
-                    WS_EX_CLIENTEDGE,
-                    WC_COMBOBOXW,
-                    PCWSTR::null(),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                    110,
-                    80,
-                    210,
-                    180,
-                    hwnd,
-                    HMENU(STREAM_ID_FORMAT as isize),
-                    HINSTANCE(0),
-                    None,
-                );
-                let quality_label = CreateWindowExW(
-                    Default::default(),
-                    WC_STATIC,
-                    PCWSTR(
-                        to_wide(&i18n::tr(init.language, "stream_audio.quality_label")).as_ptr(),
-                    ),
-                    WS_CHILD | WS_VISIBLE,
-                    16,
-                    114,
-                    90,
-                    20,
-                    hwnd,
-                    HMENU(0),
-                    HINSTANCE(0),
-                    None,
-                );
-                let quality_combo = CreateWindowExW(
-                    WS_EX_CLIENTEDGE,
-                    WC_COMBOBOXW,
-                    PCWSTR::null(),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(CBS_DROPDOWNLIST as u32),
-                    110,
-                    112,
-                    210,
-                    180,
-                    hwnd,
-                    HMENU(STREAM_ID_QUALITY as isize),
-                    HINSTANCE(0),
-                    None,
-                );
                 let open_comments_button = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
@@ -7828,8 +8419,8 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     ),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     110,
-                    146,
-                    130,
+                    82,
+                    160,
                     28,
                     hwnd,
                     HMENU(STREAM_ID_OPEN_COMMENTS as isize),
@@ -7842,7 +8433,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR(to_wide(&i18n::tr(init.language, "youtube.ok")).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_DEFPUSHBUTTON as u32),
                     350,
-                    146,
+                    82,
                     90,
                     28,
                     hwnd,
@@ -7856,7 +8447,7 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     PCWSTR(to_wide(&i18n::tr(init.language, "youtube.cancel")).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     350,
-                    178,
+                    114,
                     90,
                     28,
                     hwnd,
@@ -7870,10 +8461,6 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     url_edit,
                     favorites_label,
                     favorites_combo,
-                    format_label,
-                    format_combo,
-                    quality_label,
-                    quality_combo,
                     open_comments_button,
                     ok_button,
                     cancel_button,
@@ -7883,21 +8470,6 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     }
                 }
 
-                let items = StreamOutputFormat::combo_items(init.language);
-                for (label, _) in &items {
-                    let wide = to_wide(label);
-                    SendMessageW(
-                        format_combo,
-                        CB_ADDSTRING,
-                        WPARAM(0),
-                        LPARAM(wide.as_ptr() as isize),
-                    );
-                }
-                let default_idx = items
-                    .iter()
-                    .position(|(_, format)| *format == init.default_format)
-                    .unwrap_or(0);
-                SendMessageW(format_combo, CB_SETCURSEL, WPARAM(default_idx), LPARAM(0));
                 let favorites = load_stream_favorites(init.parent);
 
                 let state = Box::new(StreamDialogState {
@@ -7906,13 +8478,11 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                     url_edit,
                     favorites_combo,
                     favorites,
-                    format_combo,
-                    quality_combo,
+                    default_save_format: init.default_format,
                     open_comments_button,
                     ok_button,
                     result: init.result.clone(),
                 });
-                refill_stream_quality_combo(&state, false);
                 refill_stream_favorites_combo(&state, Some(0));
                 update_stream_open_comments_button(&state);
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
@@ -8011,16 +8581,6 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             WM_COMMAND => {
                 let cmd_id = wparam.0 & 0xffff;
                 let notify_code = (wparam.0 >> 16) & 0xffff;
-                if cmd_id == STREAM_ID_FORMAT && notify_code == CBN_SELCHANGE as usize {
-                    if with_stream_dialog_state(hwnd, |state| {
-                        refill_stream_quality_combo(state, false);
-                    })
-                    .is_none()
-                    {
-                        crate::log_debug("Failed to refresh stream quality combo");
-                    }
-                    return LRESULT(0);
-                }
                 if cmd_id == STREAM_ID_URL && notify_code == EN_CHANGE as usize {
                     if with_stream_dialog_state(hwnd, |state| {
                         update_stream_open_comments_button(state);
@@ -8108,18 +8668,8 @@ fn stream_dialog_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
                             crate::log_debug("Screen reader speak failed");
                         }
                         let url = current_stream_dialog_input(state);
-                        let format_idx =
-                            SendMessageW(state.format_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                        let format = StreamOutputFormat::combo_items(state.language)
-                            .get(format_idx.max(0) as usize)
-                            .map(|(_, f)| *f)
-                            .unwrap_or(StreamOutputFormat::Auto);
-                        let quality_idx =
-                            SendMessageW(state.quality_combo, CB_GETCURSEL, WPARAM(0), LPARAM(0)).0;
-                        let quality = stream_quality_items(state.language, format)
-                            .get(quality_idx.max(0) as usize)
-                            .map(|(_, q)| *q)
-                            .unwrap_or(StreamQualitySelection::Original);
+                        let format = state.default_save_format;
+                        let quality = StreamQualitySelection::Original;
                         *state.result.lock().unwrap_or_else(|e| e.into_inner()) =
                             Some(StreamDialogResult {
                                 url,
@@ -8271,7 +8821,7 @@ fn show_stream_dialog(
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             470,
-            300,
+            225,
             parent,
             HMENU(0),
             hinstance,
@@ -8395,23 +8945,33 @@ fn open_progress_dialog(
         cancel: i18n::tr(language, "podcast.save.cancel"),
         cancel_confirm: i18n::tr(language, "podcast.cancel_confirm"),
     };
-    let dialog = crate::app_windows::podcast_save_window::open_with_labels(
-        parent,
-        language,
-        labels,
-        show_cancel,
-    );
+    // Long-running/cancellable stream downloads expose a focusable read-only status field.
+    // This gives screen readers the current item/status when the user returns with Alt+Tab,
+    // without changing the existing Cancel action or keyboard navigation.
+    let dialog = if show_cancel {
+        crate::app_windows::podcast_save_window::open_with_labels_and_status_field(
+            parent, language, labels, true, true,
+        )
+    } else {
+        crate::app_windows::podcast_save_window::open_with_labels(parent, language, labels, false)
+    };
     crate::log_debug(&format!(
         "stream progress dialog opened: parent={:?} dialog={:?} title_key={} status_key={} show_cancel={}",
         parent, dialog, title_key, status_key, show_cancel
     ));
     if dialog.0 != 0 {
         crate::app_windows::podcast_save_window::disable_fake_progress(dialog);
-        pin_stream_modal_window(dialog);
-        crate::app_windows::podcast_save_window::focus_cancel_button(dialog);
+        if show_cancel {
+            crate::app_windows::podcast_save_window::enable_accessible_progress_context(dialog);
+        }
+        activate_stream_progress_window(dialog);
+        if show_cancel {
+            crate::app_windows::podcast_save_window::focus_primary_control(dialog);
+        } else {
+            crate::app_windows::podcast_save_window::focus_cancel_button(dialog);
+        }
         keep_stream_progress_focus(dialog);
         std::thread::sleep(std::time::Duration::from_millis(15));
-        pin_stream_modal_window(dialog);
         keep_stream_progress_focus(dialog);
         log_stream_focus_snapshot("open_progress_dialog.after_focus", dialog);
     }
@@ -8527,6 +9087,29 @@ fn restore_stream_dialog_focus(parent: HWND) {
     log_stream_focus_snapshot("youtube_comments.closed.after_restore", parent);
 }
 
+fn activate_stream_progress_window(hwnd: HWND) {
+    if hwnd.0 == 0 {
+        return;
+    }
+    unsafe {
+        if let Err(err) = SetWindowPos(
+            hwnd,
+            HWND_TOP,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+        ) {
+            crate::log_debug(&format!(
+                "Failed to raise stream progress window {:?}: {}",
+                hwnd, err
+            ));
+        }
+    }
+    crate::set_foreground_window_safe(hwnd);
+}
+
 fn pin_stream_modal_window(hwnd: HWND) {
     if hwnd.0 == 0 {
         return;
@@ -8590,6 +9173,10 @@ fn report_progress_status(dialog: HWND, text: &str) {
 }
 
 fn pump_messages_detect_stream_cancel(parent: HWND, dialog: HWND) -> bool {
+    // Long streaming downloads/conversions temporarily run this responsive nested
+    // message pump on the UI thread. Since reaching this point means the UI is
+    // actively running (not hung), keep the watchdog heartbeat in sync with it.
+    crate::watchdog::heartbeat();
     let mut cancelled = false;
     let mut msg = MSG::default();
     unsafe {
@@ -8779,8 +9366,24 @@ fn keep_stream_progress_focus(dialog: HWND) {
         let fg = GetForegroundWindow();
         let dialog_is_foreground = fg == dialog || (fg.0 != 0 && IsChild(dialog, fg).as_bool());
         if !dialog_is_foreground {
+            // Only repair focus bounces that stay inside this Sonarpad process.  If the user
+            // deliberately Alt+Tabs to another application (or the Windows task switcher),
+            // never take foreground back from it.
+            let mut foreground_pid = 0u32;
+            if fg.0 != 0 {
+                let _thread = GetWindowThreadProcessId(fg, Some(&mut foreground_pid));
+            }
+            if foreground_pid != std::process::id() {
+                crate::log_debug(&format!(
+                    "stream focus keepalive: respecting external foreground dialog={:?} current_fg={} pid={}",
+                    dialog,
+                    describe_window_handle(fg),
+                    foreground_pid
+                ));
+                return;
+            }
             crate::log_debug(&format!(
-                "stream focus keepalive: restoring foreground dialog={:?} current_fg={}",
+                "stream focus keepalive: restoring Sonarpad foreground dialog={:?} current_fg={}",
                 dialog,
                 describe_window_handle(fg)
             ));
@@ -8795,7 +9398,7 @@ fn keep_stream_progress_focus(dialog: HWND) {
                 dialog,
                 describe_window_handle(focus)
             ));
-            crate::app_windows::podcast_save_window::focus_cancel_button(dialog);
+            crate::app_windows::podcast_save_window::focus_primary_control(dialog);
             log_stream_focus_snapshot("keep_stream_progress_focus.after_restore", dialog);
         }
     }
@@ -10754,20 +11357,29 @@ fn choose_and_download_youtube_playlist_items(
         );
         return;
     }
-    let Some(indices) = choose_playlist_download_entries(parent, language, entries.clone()) else {
+    let Some((indices, selected_options)) =
+        choose_playlist_download_entries(parent, language, entries.clone(), options)
+    else {
         return;
     };
     let selected: Vec<StreamCollectionEntry> = indices
         .into_iter()
         .filter_map(|index| entries.get(index).cloned())
         .collect();
+    persist_stream_save_format(parent, selected_options.format);
+    crate::log_debug(&format!(
+        "YouTube playlist download selection: items={} format={} quality={:?}",
+        selected.len(),
+        selected_options.format.settings_value(),
+        selected_options.quality
+    ));
     download_selected_youtube_playlist_entries(
         parent,
         language,
         ytdlp_path,
         &playlist_title,
         &selected,
-        options,
+        selected_options,
     );
 }
 
@@ -10776,9 +11388,30 @@ pub(crate) fn download_active_streaming_audio_media(
     active_url: &str,
     language: Language,
 ) -> bool {
-    let Some(context) = active_stream_save_context_for_url(active_url) else {
+    let Some(mut context) = active_stream_save_context_for_url(active_url) else {
         return false;
     };
+    let initial_format =
+        normalized_stream_save_format(context.dialog_data.format, context.prefer_video);
+    let initial_quality = matching_stream_quality(
+        initial_format,
+        context.dialog_data.format,
+        context.dialog_data.quality,
+    );
+    let Some(selected_options) = choose_stream_save_options(
+        parent,
+        language,
+        PlaylistDownloadOptions {
+            format: initial_format,
+            quality: initial_quality,
+        },
+    ) else {
+        return true;
+    };
+    context.dialog_data.format = selected_options.format;
+    context.dialog_data.quality = selected_options.quality;
+    persist_stream_save_format(parent, selected_options.format);
+    set_active_stream_save_context(context.clone());
     let target_ext = stream_save_target_ext(context.dialog_data.format);
     let suggested_full = format!("{}.{}", suggested_stream_save_name(&context), target_ext);
     let Some(target) = crate::save_podcast_episode_dialog(parent, language, &suggested_full) else {
@@ -11527,18 +12160,6 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         post_focus_editor(parent);
         return;
     };
-    let saved = {
-        with_state(parent, |state| {
-            let new_value = dialog_data.format.settings_value().to_string();
-            if state.settings.stream_audio_default_format != new_value {
-                state.settings.stream_audio_default_format = new_value;
-                save_settings(state.settings.clone());
-            }
-        })
-    };
-    if saved.is_none() {
-        crate::log_debug("Failed to persist stream output format preference");
-    }
     let input = dialog_data.url.trim().to_string();
     if input.is_empty() {
         show_error(
@@ -11863,9 +12484,9 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
                 .map(|credentials| (credentials.username.as_str(), credentials.password.as_str())),
         ) {
             Ok(()) => {
-                // Playback and download intentionally retain separate choices:
-                // mpv owns YouTube format selection, while Save keeps the
-                // user's original download format/quality and credentials.
+                // Playback and saving intentionally retain separate choices:
+                // mpv owns YouTube playback selection, while Save media asks
+                // for format/quality only when the user actually saves.
                 let save_selected_audio_format = if is_youtube {
                     None
                 } else {
@@ -12026,6 +12647,10 @@ pub fn play_streaming_audio_from_url(parent: HWND) {
         report_progress_status(progress, &downloading_status);
         crate::screen_reader_speak(&downloading_status);
         let stream_title = probe_stream_media_title(&ytdlp_path, &url);
+        if let Some(title) = stream_title.as_deref() {
+            let status_with_title = format!("{} {}", downloading_status, title);
+            report_progress_status(progress, &status_with_title);
+        }
 
         let mut progress = progress;
         let site_key = stream_auth_site_key(&url);

@@ -947,7 +947,7 @@ fn prepare_gemini_chunks(
             }
         }
 
-        crate::ffmpeg_export::segment_media_file(
+        crate::ffmpeg_export::segment_media_file_for_analysis(
             input_path,
             &output_pattern,
             segment_seconds,

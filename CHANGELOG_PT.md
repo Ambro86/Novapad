@@ -1,5 +1,17 @@
 # Changelog
 
+Versão 0.9.1 – 2026-09-01
+
+Transferências do YouTube
+• Corrigido um problema que podia fazer com que as janelas de progresso das transferências do YouTube/streaming regressassem repetidamente ao primeiro plano depois de mudar para outra aplicação com Alt+Tab. As transferências agora continuam em segundo plano sem roubar o foco.
+• Melhorada a acessibilidade do progresso das transferências. Ao regressar à janela de progresso, os leitores de ecrã podem ler o estado atual e a percentagem. Nas listas de reprodução, o Sonarpad também indica o número do item atual, o total de itens e o título.
+• Corrigidos falsos avisos de bloqueio do watchdog durante transferências e conversões longas quando a janela de progresso continuava a responder.
+• Foi adicionada uma caixa de combinação Formato aos downloads de playlists. Na lista de vídeos, prima Tab para escolher MP4, MP3, M4A, OPUS, OGG, WAV ou FLAC antes de iniciar o download múltiplo.
+• O processo de guardar multimédia em streaming foi reorganizado. O formato e a qualidade passam a ser escolhidos no momento de guardar, e não na janela inicial de pesquisa de streaming. “Guardar multimédia” abre uma única janela de Formato e Qualidade e os downloads de playlists disponibilizam ambas as caixas de combinação.
+
+Audiodescrição com IA
+• Corrigido um problema que podia impedir o início da audiodescrição com IA em alguns vídeos MKV. O Sonarpad agora lida de forma mais fiável com vídeos que têm marcas de tempo irregulares ou em falta.
+
 Versão 0.9.0 – 2026-08-31
 
 Audiodescrição com IA — nova função principal

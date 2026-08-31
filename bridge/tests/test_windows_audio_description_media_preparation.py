@@ -32,12 +32,40 @@ class WindowsAudioDescriptionMediaPreparationTests(unittest.TestCase):
             self.audio_source,
         )
 
-    def test_native_ffmpeg_repairs_missing_avi_timestamps(self):
+    def test_native_ffmpeg_repairs_missing_avi_and_mkv_timestamps(self):
         self.assertIn('"fflags", "+genpts+discardcorrupt"', self.ffmpeg_source)
+        self.assertIn("struct SegmentTimestampState", self.ffmpeg_source)
         self.assertIn("fn repair_segment_packet_timestamps", self.ffmpeg_source)
         self.assertIn("pts_missing", self.ffmpeg_source)
         self.assertIn("dts_missing", self.ffmpeg_source)
+        self.assertIn("state.last_dts", self.ffmpeg_source)
+        self.assertIn("state.next_dts", self.ffmpeg_source)
+        self.assertIn("(*packet).dts <= last_dts", self.ffmpeg_source)
+        self.assertIn("(*packet).pts < (*packet).dts", self.ffmpeg_source)
         self.assertIn("repaired_timestamp_packets", self.ffmpeg_source)
+        self.assertLess(
+            self.ffmpeg_source.index("av_packet_rescale_ts_safe"),
+            self.ffmpeg_source.index(
+                "let repaired_packet = repair_segment_packet_timestamps("
+            ),
+        )
+
+    def test_audio_description_segmentation_tolerates_bounded_invalid_mkv_packets(self):
+        self.assertIn(
+            "segment_media_file_for_analysis(",
+            self.audio_source,
+        )
+        self.assertIn(
+            "pub(crate) fn segment_media_file_for_analysis(",
+            self.ffmpeg_source,
+        )
+        self.assertIn("tolerate_invalid_analysis_packets", self.ffmpeg_source)
+        self.assertIn("write_ret == -libc::EINVAL", self.ffmpeg_source)
+        self.assertIn("skipped_invalid_analysis_packets < 8", self.ffmpeg_source)
+        self.assertIn(
+            "skipping invalid analysis packet",
+            self.ffmpeg_source,
+        )
 
     def test_segment_muxer_errors_are_not_silently_ignored(self):
         self.assertIn("segment_write_error = Some(format!", self.ffmpeg_source)

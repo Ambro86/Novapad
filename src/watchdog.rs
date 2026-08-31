@@ -24,6 +24,15 @@ pub fn exit_modal_dialog() {
     }
 }
 
+/// Aggiorna il watchdog da un message loop UI annidato o da una finestra di
+/// avanzamento che sta elaborando messaggi. Se il watchdog non è ancora
+/// inizializzato, non fa nulla.
+pub fn heartbeat() {
+    if let Some(state) = GLOBAL_WATCHDOG.get() {
+        state.heartbeat();
+    }
+}
+
 /// Stato condiviso del watchdog
 pub struct WatchdogState {
     /// Timestamp dell'ultimo heartbeat (millisecondi da UNIX epoch)

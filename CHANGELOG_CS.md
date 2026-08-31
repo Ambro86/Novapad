@@ -1,5 +1,17 @@
 # Přehled změn
 
+Verze 0.9.1 – 2026-09-01
+
+Stahování z YouTube
+• Opraven problém, kdy se okna průběhu stahování z YouTube/streamingu mohla po přepnutí do jiné aplikace pomocí Alt+Tab opakovaně vracet do popředí. Stahování nyní pokračuje na pozadí bez přebírání fokusu.
+• Zlepšena přístupnost průběhu stahování. Po návratu do okna průběhu mohou čtečky obrazovky přečíst aktuální stav a procenta. U playlistů Sonarpad také oznamuje číslo aktuální položky, celkový počet položek a název.
+• Opraveno falešné hlášení zamrznutí watchdogem během dlouhého stahování a převodu, když okno průběhu stále reagovalo.
+• Do stahování playlist byla přidána rozbalovací nabídka Formát. V seznamu videí lze klávesou Tab přejít na volbu MP4, MP3, M4A, OPUS, OGG, WAV nebo FLAC před spuštěním hromadného stahování.
+• Ukládání streamovaných médií bylo přepracováno. Formát a kvalita se nyní vybírají až při ukládání, nikoli v úvodním okně pro vyhledávání streamu. „Uložit médium“ otevře jeden dialog pro Formát a Kvalitu a stahování playlistů nabízí oba rozbalovací seznamy.
+
+Audiopopis s AI
+• Opraven problém, který mohl u některých videí MKV zabránit spuštění audiopopisu s AI. Sonarpad nyní spolehlivěji zpracovává videa s nepravidelnými nebo chybějícími časovými značkami.
+
 Verze 0.9.0 – 2026-08-31
 
 Audiopopis s AI — nová hlavní funkce

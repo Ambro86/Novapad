@@ -1,5 +1,17 @@
 # परिवर्तन सूची
 
+Version 0.9.1 – 2026-08-31
+
+YouTube डाउनलोड
+• उस समस्या को ठीक किया गया जिसमें Alt+Tab से किसी दूसरे ऐप पर जाने के बाद YouTube/streaming डाउनलोड की progress window बार-बार सामने आ जाती थी। अब डाउनलोड background में चलते रहते हैं और focus नहीं चुराते।
+• डाउनलोड progress की accessibility बेहतर की गई है। Progress window पर वापस आने पर screen reader वर्तमान status और percentage पढ़ सकता है। Playlist में Sonarpad वर्तमान item number, कुल items और title भी बताता है।
+• लंबे डाउनलोड और conversion के दौरान progress window के responsive रहने पर watchdog द्वारा गलत hang report करने की समस्या ठीक की गई。
+• Playlist डाउनलोड में Format combo box जोड़ा गया है। वीडियो सूची से Tab दबाकर bulk download शुरू करने से पहले MP4, MP3, M4A, OPUS, OGG, WAV या FLAC चुना जा सकता है।
+• Streaming media को सेव करने की प्रक्रिया को पुनर्गठित किया गया है। Format और quality अब शुरुआती streaming search window में नहीं, बल्कि सेव करते समय चुने जाते हैं। “Save media” एक ही Format/Quality dialog खोलता है और playlist download में दोनों combo box उपलब्ध हैं।
+
+AI ऑडियो विवरण
+• उस समस्या को ठीक किया गया जिसमें कुछ MKV वीडियो के साथ AI ऑडियो विवरण शुरू नहीं हो पाता था। Sonarpad अब अनियमित या गायब timestamp वाले वीडियो को अधिक विश्वसनीय तरीके से संभालता है।
+
 Version 0.9.0 – 2026-08-31
 
 AI ऑडियो विवरण — नई मुख्य सुविधा

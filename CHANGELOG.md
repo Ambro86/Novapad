@@ -1,5 +1,17 @@
 # Changelog
 
+Version 0.9.1 – 2026-09-01
+
+YouTube downloads
+• Fixed an issue where YouTube/streaming download progress windows could repeatedly return to the foreground after switching to another application with Alt+Tab. Downloads now continue in the background without stealing focus.
+• Improved accessibility of download progress. When returning to the progress window, screen readers can read the current status and percentage. For playlists, Sonarpad also reports the current item number, total number of items, and title.
+• Fixed false watchdog hang reports during long downloads and conversions when the progress window was still responsive.
+• Added a Format combo box to playlist downloads. From the video list, press Tab to choose MP4, MP3, M4A, OPUS, OGG, WAV, or FLAC before starting the bulk download.
+• Reorganized streaming media saving. Format and quality are now chosen when saving instead of in the initial streaming search window. “Save media” opens one format/quality dialog, and playlist downloads provide both Format and Quality combo boxes.
+
+AI Audio Description
+• Fixed an issue that could prevent AI Audio Description from starting with some MKV videos. Sonarpad now handles videos with irregular or missing timestamps more reliably.
+
 Version 0.9.0 – 2026-08-31
 
 AI Audio Description — major new feature

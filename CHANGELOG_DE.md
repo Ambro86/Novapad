@@ -1,5 +1,17 @@
 # Änderungsprotokoll
 
+Version 0.9.1 – 2026-09-01
+
+YouTube-Downloads
+• Ein Problem wurde behoben, durch das Fortschrittsfenster von YouTube-/Streaming-Downloads nach dem Wechsel zu einer anderen Anwendung mit Alt+Tab wiederholt in den Vordergrund zurückkehren konnten. Downloads laufen jetzt im Hintergrund weiter, ohne den Fokus zu stehlen.
+• Die Barrierefreiheit der Downloadanzeige wurde verbessert. Beim Zurückkehren zum Fortschrittsfenster können Screenreader den aktuellen Status und den Prozentsatz lesen. Bei Playlists nennt Sonarpad außerdem die Nummer des aktuellen Elements, die Gesamtzahl der Elemente und den Titel.
+• Falsche Hang-Meldungen des Watchdogs bei langen Downloads und Konvertierungen wurden behoben, wenn das Fortschrittsfenster weiterhin reagierte.
+• Für Playlist-Downloads wurde ein Kombinationsfeld „Format“ hinzugefügt. In der Videoliste kann mit Tab MP4, MP3, M4A, OPUS, OGG, WAV oder FLAC ausgewählt werden, bevor der Mehrfachdownload gestartet wird.
+• Das Speichern von Streaming-Medien wurde neu organisiert. Format und Qualität werden jetzt beim Speichern gewählt und nicht mehr im ersten Streaming-Suchfenster. „Medien speichern“ öffnet einen gemeinsamen Dialog für Format und Qualität; bei Playlist-Downloads stehen beide Kombinationsfelder zur Verfügung.
+
+KI-Audiodeskription
+• Ein Problem wurde behoben, durch das die KI-Audiodeskription bei einigen MKV-Videos nicht gestartet werden konnte. Sonarpad verarbeitet Videos mit unregelmäßigen oder fehlenden Zeitstempeln jetzt zuverlässiger.
+
 Version 0.9.0 – 2026-08-31
 
 KI-Audiodeskription — neue Hauptfunktion

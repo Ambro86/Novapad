@@ -12,11 +12,12 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     BS_DEFPUSHBUTTON, CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW,
-    ES_AUTOHSCROLL, GWLP_USERDATA, GetParent, HMENU, IDC_ARROW, IDYES, LoadCursorW, MB_ICONWARNING,
-    MB_YESNO, MSG, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer,
-    SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE,
-    WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW,
-    WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
+    ES_AUTOHSCROLL, GWLP_USERDATA, GetForegroundWindow, GetParent, HMENU, IDC_ARROW, IDYES,
+    IsChild, LoadCursorW, MB_ICONWARNING, MB_YESNO, MSG, PostMessageW, RegisterClassW,
+    SendMessageW, SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, WINDOW_STYLE,
+    WM_ACTIVATE, WM_APP, WM_CLOSE, WM_COMMAND, WM_CREATE, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS,
+    WM_SETFONT, WM_SYSKEYDOWN, WM_TIMER, WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD,
+    WS_EX_DLGMODALFRAME, WS_POPUP, WS_TABSTOP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -64,6 +65,7 @@ struct SaveState {
     show_cancel: bool,
     suppress_parent_restore: bool,
     disable_parent: bool,
+    accessible_progress_context: bool,
 }
 
 fn save_labels(language: Language) -> SaveDialogLabels {
@@ -128,6 +130,44 @@ pub fn focus_cancel_button(hwnd: HWND) {
     .is_none()
     {
         crate::log_debug("Failed to access save state for focus");
+    }
+}
+
+pub fn focus_primary_control(hwnd: HWND) {
+    if with_save_state(hwnd, |state| {
+        if state.status_field.0 != 0 {
+            crate::log_debug(&format!(
+                "podcast_save_window focusing accessible status: dialog={:?} status={:?}",
+                hwnd, state.status_field
+            ));
+            refresh_accessible_status_field(state);
+            crate::set_focus_safe(state.status_field);
+        } else if state.cancel_button.0 != 0 {
+            crate::set_focus_safe(state.cancel_button);
+        } else {
+            crate::set_focus_safe(hwnd);
+        }
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to access save state for primary focus");
+    }
+}
+
+pub fn enable_accessible_progress_context(hwnd: HWND) {
+    if with_save_state(hwnd, |state| {
+        state.accessible_progress_context = true;
+        refresh_accessible_status_field(state);
+        let title = format!("{} - {}", state.labels.title, state.status_text);
+        unsafe {
+            if let Err(err) = SetWindowTextW(hwnd, PCWSTR(to_wide(&title).as_ptr())) {
+                crate::log_debug(&format!("Failed to set accessible progress title: {}", err));
+            }
+        }
+    })
+    .is_none()
+    {
+        crate::log_debug("Failed to enable accessible progress context");
     }
 }
 
@@ -497,6 +537,7 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 show_cancel,
                 suppress_parent_restore: false,
                 disable_parent,
+                accessible_progress_context: false,
             };
             unsafe {
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(Box::new(state)) as isize);
@@ -521,6 +562,9 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             crate::log_debug(&format!("podcast_save_window WM_SETFOCUS: hwnd={:?}", hwnd));
             if with_save_state(hwnd, |state| {
                 if state.status_field.0 != 0 {
+                    if state.accessible_progress_context {
+                        refresh_accessible_status_field(state);
+                    }
                     crate::set_focus_safe(state.status_field);
                 } else if state.cancel_button.0 != 0 {
                     crate::log_debug(&format!(
@@ -535,6 +579,23 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 crate::log_debug("Failed to access save state");
             }
             LRESULT(0)
+        }
+        WM_ACTIVATE => {
+            if (wparam.0 & 0xffff) != 0 {
+                let should_focus_status = with_save_state(hwnd, |state| {
+                    if state.accessible_progress_context && state.status_field.0 != 0 {
+                        refresh_accessible_status_field(state);
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false);
+                if should_focus_status {
+                    focus_primary_control(hwnd);
+                }
+            }
+            crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_COMMAND => {
             let id = wparam.0 & 0xffff;
@@ -592,6 +653,10 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             crate::def_window_proc_w_safe(hwnd, msg, wparam, lparam)
         }
         WM_PODCAST_SAVE_PROGRESS => {
+            // This message is processed by the UI thread even when a long-running
+            // operation is using a nested message pump. Treat that as a genuine
+            // UI heartbeat so the watchdog does not report a false hang.
+            crate::watchdog::heartbeat();
             let pct = wparam.0.min(100);
             crate::log_debug(&format!(
                 "podcast_save_window progress message: hwnd={:?} pct={}",
@@ -614,6 +679,10 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
         }
         WM_TIMER => {
             if wparam.0 == SAVE_PROGRESS_TIMER_ID {
+                // A processed timer proves the progress UI is still responsive.
+                // If the UI thread really hangs, this timer cannot be dispatched
+                // and the watchdog will still detect the missing heartbeat.
+                crate::watchdog::heartbeat();
                 if with_save_state(hwnd, |state| {
                     if !state.has_real_progress
                         && state.current_pct < SAVE_PROGRESS_MAX_FAKE
@@ -646,19 +715,34 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
             LRESULT(0)
         }
         WM_NCDESTROY => {
-            let (parent, show_cancel, suppress_parent_restore, disable_parent) =
-                with_save_state(hwnd, |state| {
-                    (
-                        state.parent,
-                        state.show_cancel,
-                        state.suppress_parent_restore,
-                        state.disable_parent,
-                    )
-                })
-                .unwrap_or((HWND(0), false, false, false));
+            let (
+                parent,
+                show_cancel,
+                suppress_parent_restore,
+                disable_parent,
+                accessible_progress_context,
+            ) = with_save_state(hwnd, |state| {
+                (
+                    state.parent,
+                    state.show_cancel,
+                    state.suppress_parent_restore,
+                    state.disable_parent,
+                    state.accessible_progress_context,
+                )
+            })
+            .unwrap_or((HWND(0), false, false, false, false));
+            let foreground = unsafe { GetForegroundWindow() };
+            let progress_was_foreground = foreground == hwnd
+                || (foreground.0 != 0 && unsafe { IsChild(hwnd, foreground).as_bool() });
             crate::log_debug(&format!(
-                "podcast_save_window WM_NCDESTROY: hwnd={:?} parent={:?} show_cancel={} suppress_parent_restore={} disable_parent={}",
-                hwnd, parent, show_cancel, suppress_parent_restore, disable_parent
+                "podcast_save_window WM_NCDESTROY: hwnd={:?} parent={:?} show_cancel={} suppress_parent_restore={} disable_parent={} accessible_progress_context={} progress_was_foreground={}",
+                hwnd,
+                parent,
+                show_cancel,
+                suppress_parent_restore,
+                disable_parent,
+                accessible_progress_context,
+                progress_was_foreground
             ));
             if let Err(e) = crate::kill_timer_safe(hwnd, SAVE_PROGRESS_TIMER_ID) {
                 crate::log_debug(&format!("Failed to kill SAVE_PROGRESS_TIMER: {}", e));
@@ -669,8 +753,21 @@ fn save_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 }
                 // For transient probe/progress dialogs without cancel, avoid briefly
                 // bouncing focus back to the editor before the next modal opens.
-                if disable_parent && show_cancel && !suppress_parent_restore {
+                if disable_parent
+                    && show_cancel
+                    && !suppress_parent_restore
+                    && (!accessible_progress_context || progress_was_foreground)
+                {
                     crate::set_foreground_window_safe(parent);
+                } else if disable_parent
+                    && show_cancel
+                    && !suppress_parent_restore
+                    && accessible_progress_context
+                    && !progress_was_foreground
+                {
+                    crate::log_debug(
+                        "podcast_save_window: respecting external foreground on progress close",
+                    );
                 }
                 if let Err(_e) = crate::post_message_w_safe(
                     parent,
@@ -703,6 +800,7 @@ fn update_progress_label(state: &SaveState) {
             crate::log_debug(&format!("Failed to set label text: {}", e));
         }
         if state.status_field.0 != 0
+            && !state.accessible_progress_context
             && let Err(e) = SetWindowTextW(
                 state.status_field,
                 PCWSTR(to_wide(&state.status_text).as_ptr()),
@@ -713,10 +811,37 @@ fn update_progress_label(state: &SaveState) {
     }
 }
 
+fn refresh_accessible_status_field(state: &SaveState) {
+    if state.status_field.0 == 0 {
+        return;
+    }
+    let text = format!("{} {}%", state.status_text, state.current_pct);
+    unsafe {
+        if let Err(err) = SetWindowTextW(state.status_field, PCWSTR(to_wide(&text).as_ptr())) {
+            crate::log_debug(&format!(
+                "Failed to refresh accessible progress status: {}",
+                err
+            ));
+        }
+    }
+}
+
 pub fn set_status_text(hwnd: HWND, text: &str) {
     if with_save_state(hwnd, |state| {
         state.status_text = text.to_string();
         update_progress_label(state);
+        if state.accessible_progress_context {
+            refresh_accessible_status_field(state);
+            let title = format!("{} - {}", state.labels.title, state.status_text);
+            unsafe {
+                if let Err(err) = SetWindowTextW(hwnd, PCWSTR(to_wide(&title).as_ptr())) {
+                    crate::log_debug(&format!(
+                        "Failed to update accessible progress title: {}",
+                        err
+                    ));
+                }
+            }
+        }
     })
     .is_none()
     {

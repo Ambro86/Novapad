@@ -1,45 +1,35 @@
 # Dziennik zmian
 
-Wersja 0.8.5 – 2026-07-25
+Wersja 0.9.0 – 2026-08-31
 
-Program TV
-• Program TV wyświetla teraz audycje w wybieralnym polu kombi zamiast w liście tekstowej tylko do odczytu. Po wybraniu audycji klawisz Tab przechodzi do nowego przycisku „Wyświetl opis wybranego programu”, który pokazuje opis dostarczony przez usługę przewodnika.
+Audiodeskrypcja z AI — nowa główna funkcja
+• W Narzędzia > Multimedia dodano „Utwórz audiodeskrypcję z AI”. Sonarpad analizuje dźwięk, wyszukuje miejsca bez dialogów, generuje opisy za pomocą Gemini i używa dostępnych już silników mowy, nie mówiąc ponad dialogami.
+• Ulepszono synchronizację między tym, co dzieje się w filmie, a opisami oraz dodano automatyczne sprawdzanie czasów generowanych przez Gemini.
+• „Włącz rozszerzone pauzy” jest domyślnie wyłączone. Opcję można włączyć w materiałach z dużą liczbą dialogów lub niewielką ilością wolnego miejsca, aby umożliwić wstawianie dłuższych opisów.
+• Sonarpad może próbować rozpoznawać postacie i używać ich imion. Katalogi postaci można zachowywać między odcinkami serialu, aby poprawić ciągłość.
+• Projekt można zapisać, później poprawić opisy i ponownie wyeksportować bez ponownego generowania wszystkiego przez Gemini.
+• Jeśli proces zostanie przerwany, Sonarpad zachowuje postęp i pozwala kontynuować audiodeskrypcję. Po wyczerpaniu limitu Gemini można poczekać, zmienić model lub przerwać bez utraty ukończonej pracy.
+• Okno pozwala wybrać język, poziom szczegółowości, model Gemini, silnik mowy i głos oraz zapamiętuje używane ustawienia.
+• Moduł jest dostępny we wszystkich 17 językach Sonarpada. Podczas generowania interfejs pokazuje tylko postęp, bieżący stan i Anuluj; po zakończeniu MP3 można otworzyć bezpośrednio w wewnętrznym odtwarzaczu.
+
+E-booki i dokumenty
+• Dodano import Kindle bez DRM w formatach MOBI, AZW i AZW3, z tekstem i rozdziałami dostępnymi w edytorze i indeksie.
+• Dodano obsługę DAISY 2.02 i DAISY 3. Audiobooki DAISY korzystają z wewnętrznego odtwarzacza Sonarpada i respektują nawigację oraz granice rozdziałów.
+• Kindle i DAISY są importowane bez nadpisywania oryginalnego pliku; Kindle chronione DRM są wyraźnie odrzucane.
+• Poprawiono „Zapisz jako” dla EPUB: po wybraniu TXT lub innego formatu używane jest właściwe rozszerzenie, a oryginalny EPUB pozostaje powiązany z otwartym dokumentem.
 
 RSS i artykuły
-• Do menu kontekstowego artykułów RSS dodano „Wybierz artykuły…“. Otwiera ono to samo dostępne okno z polami wyboru, które jest używane przy pobieraniu playlist: Spacją można zaznaczać lub odznaczać wiele artykułów, klawiszem Tab przejść do Usuń i usunąć wszystkie wybrane artykuły jedną operacją.
-• RSS obsługuje teraz prawdziwe foldery. Podczas importu OPML zagnieżdżone kontenery `<outline>` są zachowywane zamiast spłaszczane, istniejące kanały są umieszczane w importowanych folderach bez duplikowania, a eksport OPML zachowuje tę samą hierarchię, również puste foldery.
-• Do menu kontekstowego RSS dodano zlokalizowane polecenie „Utwórz nowy folder” z dostępnym oknem do wpisania nazwy. Węzły folderów używają natywnego zachowania drzewa: Strzałka w prawo rozwija, Strzałka w lewo zwija; usunięcie folderu usuwa całą jego gałąź, a Ctrl+Z w jednej operacji przywraca folder, podfoldery i wszystkie zawarte kanały.
-• Kanały RSS można teraz porządkować wewnątrz bieżącego folderu poleceniami Przenieś w górę, Przenieś w dół, Przenieś na początek, Przenieś na koniec i Przenieś na pozycję; zmiana kolejności nigdy nie przenosi kanału poza jego folder.
+• Dodano wielokrotny wybór artykułów RSS, aby usuwać kilka artykułów w jednej operacji.
+• RSS obsługuje teraz prawdziwe foldery zachowywane podczas importu i eksportu OPML, w tym puste foldery.
+• Kanały można porządkować wewnątrz bieżącego folderu poleceniami Przenieś w górę, Przenieś w dół, Przenieś na początek, Przenieś na koniec i Przenieś na pozycję.
 
-Nagrania TV i audiodeskrypcje
-• Uodporniono obsługę znaczników czasu Gemini w audiodeskrypcji: błędnie zapisane znaczniki `MM:SS:ms`, np. `01:13:473`, są teraz bezstratnie normalizowane do `MM:SS.ms` przed walidacją; istniejące kontrole chunku i slotu nadal odrzucają każdy znacznik, który nie należy do bieżącej sceny.
-• Poprawiono fokus klawiatury, gdy po zakończeniu nagrania TV automatycznie otwiera się „Utwórz audiodeskrypcję z AI”: nadal aktywna pętla wyboru TV nie przechwytuje już klawiszy Tab, Spacja, strzałek ani Escape przeznaczonych dla okna audiodeskrypcji.
+Dostępność, przewodniki i interfejs
+• Przewodniki Sonarpada zostały uporządkowane i wyposażone w spis treści oraz pełny przewodnik po audiodeskrypcji z AI.
+• Naprawiono problem niemieckiego tłumaczenia, który mógł uniemożliwiać wyświetlanie okien Otwórz, Zapisz jako i innych okien wyboru plików.
 
-Formaty e-booków
-• Dodano import książek Kindle bez DRM w MOBI, AZW i AZW3, obejmujący strumienie nieskompresowane, PalmDOC i HUFF/CDIC oraz warianty MOBI 6/KF8/AZW3. Tekst, rozdziały i nagłówki są dostępne w indeksie Sonarpad.
-• Dodano DAISY 2.02 (NCC + SMIL + XHTML) i DAISY 3 (OPF + NCX + DTBook) z pakietów .daisy/ZIP, rozpakowanych publikacji i bezpośrednio otwieranych plików DAISY. Książki tylko audio używają etykiet nawigacji jako tekstu.
-• Audiobooki DAISY korzystają teraz z istniejącego wewnętrznego odtwarzacza Sonarpada: po otwarciu pojawia się spis treści DAISY, Enter odtwarza wybrany rozdział, Spacja wstrzymuje/wznawia, a Escape zamyka odtwarzacz i wraca do indeksu DAISY. Granice SMIL clipBegin/clipEnd są respektowane, a rozdział może automatycznie przechodzić między wieloma plikami audio.
-• Kindle i DAISY są importowane jako tekst edytowalny bez nadpisywania źródłowego e-booka; Zapisz używa Zapisz jako/eksportu. Kindle z DRM są jawnie odrzucane.
-• MOBI/AZW/AZW3 i DAISY dodano do okna Otwórz we wszystkich 17 językach i do skojarzeń Windows. Testy obejmują nieskompresowane/PalmDOC/HUFF-CDIC, rekursywne CDIC, MOBI 6/8, DRM oraz DAISY 2.02/3 w pakietach i po rozpakowaniu, a także bezpośrednie NCX/SMIL/DTBook.
-
-Zapisywanie i eksport plików EPUB
-• Poprawiono polecenie „Zapisz jako” dla dokumentów EPUB: po wybraniu TXT lub innego formatu stosowane jest teraz wybrane rozszerzenie zamiast pozostawiania .epub.
-• Eksport EPUB do innego formatu nie zmienia już powiązania otwartego dokumentu. Kopia jest tworzona osobno, a polecenie „Zapisz” nadal aktualizuje oryginalny EPUB otwarty z jego folderu.
-
-Nagrania radiowe
-• Dodano skrót klawisza Delete do usuwania nagrań radiowych. Sonarpad prosi teraz o potwierdzenie przed usunięciem nagrania.
-
-Dokumentacja
-• Przewodniki zostały przeorganizowane i wyposażone w spis treści, aby ułatwić korzystanie z nich.
-
-Katalog głosów Google TTS
-• Katalog głosów Google TTS do pobrania rozszerzono ze 104 do 156 pakietów oraz z 53 do 81 wariantów językowych.
-• Dodano 52 brakujące pakiety Chrome OS i Google Natural dla 28 języków, korzystając z najnowszych zweryfikowanych rewizji, adresów pobierania, sum SHA-256, rozmiarów, zależności i wewnętrznych identyfikatorów mówców z bieżącego zgodnego katalogu. Dla języka litewskiego używana jest rewizja r19 zamiast starszych pakietów r17.
-• We wszystkich językach interfejsu dodano zlokalizowane nazwy języków: asamskiego, bodo, dogri, konkani, kaszmirskiego, maithili, manipuri, odia, sanskrytu, santali i sindhi, a także nazwę kraju Bośnia i Hercegowina.
-
-Niemieckie okna wyboru plików
-• Naprawiono problem niemieckiego tłumaczenia, przez który okna Otwórz, Zapisz jako, zapisywania audiobooków, pobierania podcastów i inne okna wyboru plików nie pojawiały się, mimo że polecenie menu lub skrót klawiaturowy były wykonywane prawidłowo.
-• Filtry okien plików obsługują teraz zarówno zapisane sekwencje rozdzielające \0, jak i osadzone znaki NUL, a w przypadku błędnego tłumaczenia używają bezpiecznego filtra zastępczego. Z dziennika usunięto również nieszkodliwy fałszywy błąd pojawiający się przy otwieraniu menu Plik.
+Głosy i języki
+• Katalog głosów Google TTS do pobrania został rozszerzony ze 104 do 156 pakietów i z 53 do 81 wariantów językowych.
+• Dodano nowe pakiety Google TTS oraz zlokalizowane nazwy kolejnych języków w całym interfejsie.
 
 Wersja 0.8.4 – 2026-07-24
 

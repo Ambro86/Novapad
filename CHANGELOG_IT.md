@@ -1,76 +1,44 @@
 # Changelog
 
-Versione 0.8.5 – 2026-07-25
+Versione 0.9.0 – 2026-08-31
 
-Guida TV
-• La guida TV ora mostra i programmi in una casella combinata selezionabile invece che in un elenco di testo di sola lettura. Dopo aver scelto un programma, con Tab si raggiunge il nuovo pulsante “Visualizza la trama del programma selezionato”, che mostra la descrizione fornita dal servizio della guida.
+Audiodescrizione con IA — nuova funzione principale
+• Aggiunto in Strumenti > Multimedia il modulo “Crea audiodescrizione con IA”. Sonarpad analizza l’audio per individuare gli spazi liberi dai dialoghi, genera le descrizioni con Gemini e usa i motori vocali già presenti nel programma, evitando di parlare sopra le battute.
+• Migliorata la sincronizzazione tra ciò che accade nel video e le descrizioni, con controlli automatici sui tempi generati da Gemini.
+• “Attiva pause estese” è deselezionata per impostazione predefinita. Può essere attivata nei contenuti con molti dialoghi o poco spazio disponibile per permettere l’inserimento di descrizioni altrimenti troppo lunghe.
+• È possibile provare a riconoscere i personaggi e usare i loro nomi. I cataloghi dei personaggi possono essere mantenuti tra gli episodi di una serie per migliorare la continuità.
+• È possibile salvare il progetto, modificare in seguito le descrizioni e riesportare senza dover rigenerare tutto con Gemini.
+• Se il lavoro viene interrotto, Sonarpad conserva i progressi e permette di continuare l’audiodescrizione. In caso di quota Gemini esaurita è possibile attendere, cambiare modello oppure interrompere senza perdere il lavoro già completato.
+• La finestra permette di scegliere lingua, livello di dettaglio, modello Gemini, motore e voce e ricorda le preferenze utilizzate.
+• Il modulo è disponibile nelle 17 lingue di Sonarpad. Durante la generazione l’interfaccia mostra soltanto avanzamento, stato corrente e pulsante Annulla; al termine l’MP3 può essere aperto direttamente nel player interno.
+• “Crea audiodescrizione con IA” è disponibile anche per i video aperti tramite streaming e per i contenuti on demand compatibili di RaiPlay e La7 Play. Migliorata inoltre la gestione del focus quando la funzione viene aperta da questi menu o al termine di una registrazione TV.
+
+La7 Play e multimedia
+• Aggiunta La7 Play in Strumenti > Multimedia, con ricerca dei programmi, dirette La7 e La7 Cinema e riproduzione dei contenuti on demand non protetti nel player interno.
+• Sui contenuti La7 scaricabili il menu contestuale propone ora Salva media, Trascrivi e Crea audiodescrizione con IA. Salva media permette di scegliere tra MP3 e MP4.
+• Migliorata la gestione del focus nelle azioni contestuali di YouTube/streaming, RaiPlay e La7 Play, in modo che finestre di download, trascrizione e audiodescrizione restino correttamente in primo piano.
+• Nel modulo Rai audiodescrizioni, Salva media mostra ora una finestra di avanzamento con possibilità di annullare e Trascrivi mantiene visibile la finestra di progresso fino al completamento.
+• Aggiunto il tasto Canc per eliminare registrazioni TV e radio, con richiesta di conferma.
+
+E-book e documenti
+• Aggiunta l’importazione dei Kindle senza DRM nei formati MOBI, AZW e AZW3, con testo e capitoli disponibili nell’editor e nell’indice.
+• Aggiunto il supporto DAISY 2.02 e DAISY 3. Gli audiolibri DAISY usano il player interno di Sonarpad e rispettano la navigazione e i limiti dei capitoli.
+• Kindle e DAISY vengono importati senza sovrascrivere il file originale; i Kindle protetti da DRM vengono rifiutati esplicitamente.
+• Corretto “Salva con nome” per gli EPUB: scegliendo TXT o un altro formato viene ora usata l’estensione selezionata e l’EPUB originale resta associato al documento aperto.
 
 RSS e articoli
-• Aggiunta la voce “Seleziona articoli…” al menu contestuale degli articoli RSS. Si apre la stessa finestra accessibile con caselle di selezione già usata per il download delle playlist: con Spazio si selezionano o deselezionano più articoli, con TAB si raggiunge Elimina e tutti gli articoli scelti vengono rimossi in un’unica operazione.
-• Gli RSS ora supportano vere cartelle. Durante l’importazione OPML gli `<outline>` contenitore annidati vengono preservati invece di essere appiattiti, i feed già esistenti vengono inseriti nelle cartelle importate senza duplicazioni e l’esportazione OPML mantiene la stessa gerarchia, comprese le cartelle vuote.
-• Aggiunto al menu contestuale RSS il comando localizzato “Crea nuova cartella”, con finestra accessibile per inserire il nome. I nodi cartella usano il comportamento nativo dell’albero: Freccia destra espande, Freccia sinistra richiude; eliminando una cartella viene rimosso l’intero ramo e Ctrl+Z ripristina in un’unica operazione cartella, sottocartelle e tutti i feed contenuti.
-• Le testate RSS possono ora essere riordinate all’interno della cartella corrente con Sposta su, Sposta giù, Sposta in cima, Sposta in fondo e Sposta alla posizione; il riordino non sposta mai un feed fuori dalla propria cartella.
+• Aggiunta la selezione multipla degli articoli RSS per eliminarne più di uno in un’unica operazione.
+• Gli RSS supportano ora vere cartelle, mantenute anche durante importazione ed esportazione OPML, comprese le cartelle vuote.
+• I feed possono essere riordinati all’interno della cartella corrente con i comandi Sposta su, Sposta giù, Sposta in cima, Sposta in fondo e Sposta alla posizione.
 
-Registrazioni TV e audiodescrizioni
-• Resa più robusta la gestione dei timestamp Gemini nelle audiodescrizioni: i timestamp malformati `MM:SS:ms`, ad esempio `01:13:473`, vengono ora normalizzati senza perdita in `MM:SS.ms` prima dei controlli; gli audit esistenti di chunk e slot continuano a scartare qualsiasi timestamp che non appartenga alla scena corrente.
-• Corretto il focus da tastiera quando “Crea audiodescrizione con IA” si apre automaticamente al termine di una registrazione TV: il ciclo ancora attivo della selezione TV non intercetta più TAB, Spazio, frecce o Escape destinati alla finestra dell’audiodescrizione.
+Accessibilità, guide e interfaccia
+• La Guida TV mostra ora i programmi in una casella combinata selezionabile e permette di visualizzare la trama del programma scelto.
+• Le guide di Sonarpad sono state riorganizzate con un indice ed è stata aggiunta una guida completa alla funzione Audiodescrizione con IA.
+• Corretto un problema della traduzione tedesca che poteva impedire la comparsa delle finestre Apri, Salva con nome e di altre finestre di selezione file.
 
-Formati e-book
-• Aggiunta l'importazione nativa degli e-book Kindle senza DRM nei formati `.mobi`, `.azw` e `.azw3`, comprese le varianti MOBI non compresse, PalmDOC, i flussi di testo HUFF/CDIC legacy e l'analisi KF8/AZW3. Testo e navigazione dei capitoli vengono importati nell'editor e nell'indice di Sonarpad.
-• Aggiunto il supporto DAISY 2.02 e DAISY 3 da libri impacchettati `.daisy`/ZIP e da risorse estratte `ncc.html`, SMIL, OPF, NCX e DTBook XML. Per i titoli DAISY solo audio vengono usate come testo le etichette della navigazione.
-• Gli audiolibri DAISY usano ora il player interno già esistente di Sonarpad: aprendo il libro compare l’indice DAISY, Invio riproduce il capitolo scelto, Spazio mette in pausa/riprende, gli spostamenti restano entro il capitolo ed Esc chiude il player e torna all’indice DAISY. Vengono rispettati i limiti SMIL clipBegin/clipEnd e un capitolo può proseguire automaticamente su più file audio.
-• I documenti Kindle e DAISY vengono importati come testo modificabile senza sovrascrivere il contenitore sorgente; Salva passa quindi a Salva con nome/esportazione. I Kindle protetti da DRM vengono rifiutati esplicitamente e gli ZIP non DAISY vengono rifiutati invece di essere aperti come testo binario.
-• Aggiornati i filtri della finestra Apri in tutte le 17 lingue dell'interfaccia e le associazioni file di Windows. Aggiunti test Rust di regressione per MOBI/AZW/AZW3, flussi non compressi/PalmDOC/HUFF-CDIC, frasi CDIC ricorsive, intestazioni MOBI 6/8, rifiuto DRM, DAISY 2.02/3 impacchettati ed estratti, ingresso diretto NCC/SMIL/NCX/DTBook, navigazione solo audio, riconoscimento ZIP e filtri Apri localizzati.
-
-Creazione di audiodescrizioni
-• Il menu Riproduci propone ora “Crea audiodescrizione con IA” anche per i link video aperti tramite Riproduci audio da streaming, riutilizzando il contesto di salvataggio yt-dlp e salvando il video nella cartella Media configurata.
-• Anche i contenuti on demand di RaiPlay e La7 Play espongono lo stesso comando. Sonarpad riusa il loro esportatore MP4 esistente, salva automaticamente nella cartella Media e apre la finestra dell'audiodescrizione soltanto dopo un'esportazione riuscita. Le dirette RaiPlay e La7 restano escluse.
-• La finestra Crea audiodescrizione con IA ricorda ora lingua, livello di dettaglio, motore, voce e stato delle tre caselle. Le preferenze sono separate dalla voce generale di Sonarpad e vengono salvate immediatamente a ogni modifica.
-• Aggiunto in Strumenti > Multimedia il modulo “Crea audiodescrizione con IA”, basato su Pyannote per individuare i dialoghi, Gemini per generare i testi e i motori TTS già presenti in Sonarpad per la voce.
-• Sonarpad applica ducking, pause estese e codifica MP3 mediante le proprie librerie FFmpeg Rust, senza ffmpeg.exe o ffprobe.exe esterni.
-• La casella opzionale “Salva anche il progetto per modifiche future”, disattivata per impostazione predefinita, crea il JSON soltanto dopo un’MP3 riuscito e conserva esclusivamente le descrizioni realmente inserite, con tempi finali e descrizioni escluse separate.
-• Il nuovo comando “Modifica progetto audiodescrizione” permette di correggere i testi e riesportare. Il progetto viene aggiornato solo al termine della nuova esportazione, senza richiamare Gemini.
-• Gli MP3 delle audiodescrizioni e gli eventuali progetti JSON vengono proposti per impostazione predefinita in `Documenti\Sonarpad\Audiodescriptions`. Nella scheda Audio delle impostazioni è stata aggiunta la voce “Audiodescrizioni” alla casella combinata delle cartelle predefinite, modificabile come Audiolibri, Media e registrazioni.
-• La casella “Attiva pause estese” è selezionata per impostazione predefinita e può essere disattivata per impedire che il film venga interrotto quando una descrizione non entra in un silenzio.
-• La casella “Prova a riconoscere i personaggi e usa i loro nomi” è attiva per impostazione predefinita. Disattivandola, Gemini non crea il glossario, non trasferisce identità nominali tra i chunk e usa riferimenti generici.
-• La finestra include ora chiave API Gemini, collegamento per ottenerla, aggiornamento dell’elenco dei modelli e una scelta separata del modello dell’audiodescrizione, predefinita su `gemini-3.5-flash-lite`. La chiave resta condivisa con AI e trascrizione, mentre il modello non modifica le altre funzioni Gemini.
-• Completata la localizzazione dell’intero modulo audiodescrizione nelle 17 lingue dell’interfaccia. I prompt Gemini impongono ora la lingua scelta sia al testo narrato sia alle descrizioni del glossario; il worker controlla e corregge selettivamente entrambi, mentre gli stati di avanzamento vengono tradotti da Sonarpad tramite identificatori stabili.
-• Durante la generazione vengono nascosti file, modello, voce e gli altri controlli di configurazione: NVDA incontra soltanto barra di avanzamento, messaggio corrente e pulsante Annulla.
-• Dopo il messaggio di completamento, premendo OK l’MP3 viene aperto nel player interno di Sonarpad. Esc arresta il player e riporta alla finestra Crea audiodescrizione con IA.
-• Gli stati interni del worker relativi a caricamento, attesa, invio a Gemini, risposta, riparazione JSON e retry vengono ora tradotti da Sonarpad e non espongono più messaggi inglesi.
-• Corretto lo script PowerShell del worker: il selettore `-3.14` viene passato esplicitamente a pip e PyInstaller, evitando l’apertura accidentale della console interattiva `py`.
-• La suite dedicata contiene ora 128 test: 105 Python e 23 Rust, compresa la copertura delle 17 lingue dei prompt, della correzione linguistica del glossario, della localizzazione completa dell’interfaccia e degli stati dinamici tradotti.
-
-• Quando Gemini segnala una quota realmente esaurita, Sonarpad permette ora di provare un altro modello, continuare ad attendere oppure interrompere. Il worker resta sul chunk corrente e conserva tutto il lavoro già completato; il modello alternativo viene usato anche per i chunk successivi e registrato nel progetto finale.
-
-Salvataggio ed esportazione EPUB
-• Corretto “Salva con nome” per i documenti EPUB: scegliendo TXT o un altro formato viene ora applicata l’estensione selezionata invece di mantenere .epub.
-• L’esportazione di un EPUB in un altro formato non cambia più il documento aperto. La copia viene creata separatamente, mentre “Salva” continua ad aggiornare l’EPUB originale aperto dalla sua cartella.
-
-La Sette Play
-• Aggiunta La Sette Play, disponibile dal menu Strumenti > Multimedia quando è configurato il codice Rai Luce. L’interfaccia consente di aprire le sezioni con le frecce, cercare i programmi con il campo raggiungibile tramite Tab, guardare le dirette La7 e La7 Cinema dai canali TV di Sonarpad e rivedere i contenuti non protetti di La7.
-• I contenuti si aprono nel player interno: Spazio mette in pausa o riprende, le frecce sinistra e destra spostano la riproduzione ed Esc torna alla stessa sezione e allo stesso elemento selezionato. I contenuti on-demand che richiedono Widevine non vengono aperti.
-• “Salva media” sui contenuti di La Sette Play consente ora di scegliere tra MP3 e MP4, come già avviene in RaiPlay.
-• Corretta la ricerca dei programmi: il confronto ignora apostrofi, accenti e punteggiatura, usa anche l’indirizzo del programma e trova correttamente titoli come “L’Aria che tira”.
-• Aggiunta la scorciatoia Ctrl+L per aprire direttamente La Sette Play. La combinazione è disponibile soltanto con l’interfaccia italiana.
-• Corretta l’apertura della diretta La7 Cinema: il canale usa ora direttamente il player TV di Sonarpad, inclusi i manifest DASH e l’eventuale User-Agent configurato nel catalogo dei canali, senza essere bloccato come contenuto Widevine.
-• Riorganizzati i risultati dei programmi: aprendo un programma, come “L’Aria che tira”, vengono mostrate soltanto le puntate complete e l’archivio Rivedi LA7. Le clip, gli estratti e i singoli servizi della pagina vengono invece presentati come risultati separati nella schermata di ricerca.
-
-Gestione delle registrazioni
-• Aggiunta la scorciatoia del tasto Canc per eliminare le registrazioni TV e radio. Sonarpad ora chiede conferma prima di eliminare una registrazione.
-• Corretto il problema per cui, dopo aver chiuso con Esc il player di una registrazione TV, la finestra di conferma dell’eliminazione poteva risultare non disponibile.
-
-Guide
-• Le guide sono state riformulate e dotate di un indice per facilitarne la consultazione.
-
-Catalogo delle voci Google TTS
+Voci e lingue
 • Il catalogo delle voci Google TTS scaricabili passa da 104 a 156 pacchetti e da 53 a 81 varianti linguistiche.
-• Aggiunti i 52 pacchetti Chrome OS e Google Natural mancanti per 28 lingue, usando le revisioni più recenti verificate, gli indirizzi di download, i checksum SHA-256, le dimensioni, le dipendenze e gli identificativi interni dei parlanti del catalogo compatibile attuale. Il lituano è incluso nella revisione r19 anziché nei vecchi pacchetti r17.
-• Aggiunti in tutte le lingue dell’interfaccia i nomi localizzati di assamese, bodo, dogri, konkani, kashmiri, maithili, manipuri, odia, sanscrito, santali e sindhi, insieme al nome del paese Bosnia ed Erzegovina.
-
-Finestre dei file in lingua tedesca
-• Corretto un problema della traduzione tedesca che impediva la comparsa di Apri, Salva con nome, salvataggio degli audiolibri, download dei podcast e altre finestre di selezione dei file, anche se il comando di menu o la scorciatoia venivano eseguiti correttamente.
-• I filtri delle finestre dei file accettano ora sia i separatori \0 scritti come sequenza sia i caratteri NUL incorporati, usando un filtro sicuro se una traduzione è malformata. È stato inoltre eliminato dal log un falso errore innocuo prodotto aprendo il menu File.
+• Aggiunti nuovi pacchetti Google TTS e i nomi localizzati di altre lingue in tutte le lingue dell’interfaccia.
 
 Versione 0.8.4 – 2026-07-24
 

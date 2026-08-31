@@ -107,7 +107,7 @@ use windows::Win32::System::Diagnostics::Debug::MessageBeep;
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, LoadLibraryW};
 use windows::Win32::System::Memory::{GLOBAL_ALLOC_FLAGS, GlobalAlloc, GlobalLock, GlobalUnlock};
 use windows::Win32::System::Threading::{
-    AttachThreadInput, GetCurrentThreadId, WaitForSingleObject,
+    AttachThreadInput, GetCurrentProcessId, GetCurrentThreadId, WaitForSingleObject,
 };
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
 use windows::Win32::UI::Controls::Dialogs::{
@@ -11110,7 +11110,9 @@ fn run_app(
         }
 
         // Ferma watchdog prima di uscire
+        log_debug("Application shutdown: message loop exited");
         watchdog.stop();
+        log_debug("Application shutdown: watchdog stop requested");
 
         Ok(())
     }
@@ -14630,6 +14632,10 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_CLOSE => {
+                log_debug(&format!(
+                    "Application shutdown: WM_CLOSE received hwnd={:?}",
+                    hwnd
+                ));
                 let audio_description_window =
                     with_state(hwnd, |state| state.audio_description_window).unwrap_or(HWND(0));
                 if app_windows::audio_description_window::blocks_main_window_close(
@@ -14668,8 +14674,15 @@ fn wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESUL
                 LRESULT(0)
             }
             WM_DESTROY => {
-                if !has_other_main_windows(hwnd) {
+                let has_other = has_other_main_windows(hwnd);
+                log_debug(&format!(
+                    "Application shutdown: WM_DESTROY hwnd={:?} same_process_other_main_windows={}",
+                    hwnd, has_other
+                ));
+                if !has_other {
+                    log_debug("Application shutdown: stopping Google TTS runtime");
                     google_tts::shutdown();
+                    log_debug("Application shutdown: posting WM_QUIT");
                     PostQuitMessage(0);
                 }
                 LRESULT(0)
@@ -21458,6 +21471,11 @@ unsafe extern "system" fn enum_close_other_windows(hwnd: HWND, _lparam: LPARAM) 
                     }
                     EnumWindowsRequest::CountMainWindows { exclude, count } => {
                         if hwnd == HWND(*exclude) || !IsWindowVisible(hwnd).as_bool() {
+                            return BOOL(1);
+                        }
+                        let mut window_pid = 0u32;
+                        let _thread = GetWindowThreadProcessId(hwnd, Some(&mut window_pid));
+                        if window_pid == 0 || window_pid != GetCurrentProcessId() {
                             return BOOL(1);
                         }
                         let mut buf = [0u16; 64];

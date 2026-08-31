@@ -1,65 +1,35 @@
 # Changelog
 
-Version 0.8.5 – 2026-07-25
+Version 0.9.0 – 2026-08-31
 
-TV guide
-• The TV guide now shows programs in a selectable combo box instead of a read-only text list. After choosing a program, Tab reaches the new “View selected program plot” button, which displays the program description supplied by the guide service.
+AI Audio Description — major new feature
+• Added “Create AI Audio Description” under Tools > Multimedia. Sonarpad analyzes the audio to find spaces without dialogue, generates descriptions with Gemini, and uses the speech engines already available in Sonarpad while avoiding spoken dialogue.
+• Improved synchronization between what happens in the video and the generated descriptions, with automatic checks on Gemini timestamps.
+• “Enable extended pauses” is disabled by default. It can be enabled for content with heavy dialogue or little available space so longer descriptions can still be inserted.
+• Sonarpad can try to recognize characters and use their names. Character catalogs can be kept across episodes of a series to improve continuity.
+• Projects can be saved, edited later, and exported again without generating everything again with Gemini.
+• If the process is interrupted, Sonarpad keeps its progress and can continue the audio description. If the Gemini quota is exhausted, you can wait, switch model, or stop without losing completed work.
+• The window lets you choose language, detail level, Gemini model, speech engine, and voice, and remembers the selected preferences.
+• The module is available in all 17 Sonarpad languages. During generation the interface only exposes progress, current status, and Cancel; when finished, the MP3 can be opened directly in the internal player.
+
+E-books and documents
+• Added DRM-free Kindle import for MOBI, AZW, and AZW3, with text and chapters available in the editor and document index.
+• Added DAISY 2.02 and DAISY 3 support. DAISY audiobooks use Sonarpad’s internal player and respect chapter navigation and playback limits.
+• Kindle and DAISY files are imported without overwriting the original file; DRM-protected Kindle books are explicitly rejected.
+• Fixed EPUB “Save As”: when TXT or another format is selected, the chosen extension is now used and the original EPUB remains associated with the open document.
 
 RSS and articles
-• Added “Select articles…” to the RSS article context menu. It opens the same accessible checkbox selection window used for playlist downloads: use Space to select or deselect multiple articles, press Tab to reach Delete, then remove all selected articles in one operation.
-• RSS now supports real folders. Nested OPML `<outline>` containers are preserved during import instead of being flattened, existing feeds are moved into the imported folders without duplication, and OPML export keeps the same folder hierarchy, including empty folders.
-• Added the localized “Create new folder” command to the RSS context menu with an accessible name dialog. Folder nodes use the native tree behavior: Right Arrow expands, Left Arrow collapses; deleting a folder removes its complete branch and Ctrl+Z restores the folder, subfolders and all contained feeds in one operation.
-• RSS feeds can now be reordered inside their current folder with Move up, Move down, Move to top, Move to bottom and Move to position; reordering never moves a feed outside its folder.
+• Added multiple selection for RSS articles so several articles can be deleted in one operation.
+• RSS now supports real folders that are preserved during OPML import and export, including empty folders.
+• Feeds can be reordered inside the current folder with Move up, Move down, Move to top, Move to bottom, and Move to position.
 
-TV recordings and audio descriptions
-• Improved Gemini timestamp robustness for audio descriptions: malformed `MM:SS:ms` timestamps such as `01:13:473` are now normalized losslessly to `MM:SS.ms` before validation, while the existing chunk/slot range audits still reject timestamps that do not belong to the current scene.
-• Fixed keyboard focus after automatically opening Create audio description with AI at the end of a TV recording: the still-active TV selection loop no longer intercepts Tab, Space, arrows or Escape intended for the audio-description window.
+Accessibility, guides, and interface
+• Sonarpad guides have been reorganized with an index, and a complete guide to AI Audio Description has been added.
+• Fixed a German translation issue that could prevent Open, Save As, and other file-selection dialogs from appearing.
 
-E-book formats
-• Added native import for DRM-free Kindle e-books in `.mobi`, `.azw` and `.azw3`, including uncompressed MOBI, PalmDOC, legacy HUFF/CDIC text streams and KF8/AZW3 parsing. Text and chapter navigation are imported into Sonarpad's editor/index.
-• Added DAISY 2.02 and DAISY 3 import from packaged `.daisy`/ZIP books and extracted `ncc.html`, SMIL, OPF, NCX and DTBook XML resources. Audio-only DAISY titles fall back to their textual navigation labels.
-• DAISY audio books now use Sonarpad's existing internal player: opening a book shows its DAISY table of contents, Enter plays the selected chapter, Space pauses/resumes, seeking stays within the chapter, and Escape closes the player and returns to the DAISY index. SMIL clipBegin/clipEnd boundaries are honored and chapters may continue automatically across multiple audio files.
-• Kindle and DAISY documents are imported as editable text without overwriting their source container; Save therefore uses Save As/export. DRM-protected Kindle books are rejected explicitly, and non-DAISY ZIP archives are rejected instead of being opened as binary text.
-• Updated Open-dialog filters in all 17 interface languages and Windows file associations. Added Rust regression tests for MOBI/AZW/AZW3, uncompressed/PalmDOC/HUFF-CDIC streams, recursive CDIC phrases, MOBI 6/8 headers, DRM rejection, packaged and extracted DAISY 2.02/3, direct NCC/SMIL/NCX/DTBook entry points, audio-only navigation, ZIP sniffing and localized Open filters.
-
-Audio-description creation
-• The playback menu now offers “Create audio description with AI” for video links opened through Stream audio from URL, reusing the active yt-dlp save context and storing the downloaded video in the configured Media folder.
-• RaiPlay and La7 Play on-demand videos now expose the same command. Sonarpad reuses their existing MP4 exporter, saves automatically to the Media folder and opens the audio-description window only after a successful export. Live RaiPlay and La7 streams remain excluded.
-• The Create audio description with AI window now remembers language, detail level, engine, voice and all three checkboxes. These preferences are separate from Sonarpad’s general reading voice and are saved immediately after each change.
-• Added “Create audio description with AI” under Tools > Multimedia, using Pyannote to protect dialogue, Gemini to generate descriptions, and Sonarpad's existing TTS engines for narration.
-• Sonarpad performs ducking, extended pauses and MP3 encoding through its Rust FFmpeg libraries, without external ffmpeg.exe or ffprobe.exe files.
-• The optional “Save project for future editing” check box is off by default. Its JSON is written only after a successful MP3 and contains only descriptions actually inserted, with final output times and excluded candidates stored separately.
-• The new project editor can change description text and re-export without calling Gemini again. The JSON is updated only after the new MP3 succeeds.
-• Audio-description MP3 files and their optional JSON projects now default to `Documents\Sonarpad\Audiodescriptions`. The Audio settings tab includes an “Audio descriptions” entry in the default-folder selector, so the user can change this location consistently with Audiobooks, Media and recordings.
-• “Enable extended pauses” is selected by default and can be turned off to prevent the movie from being interrupted when a description does not fit in a silence.
-• “Try to recognize characters and use their names” is selected by default. Turning it off disables the character glossary and cross-chunk named-character continuity, so Gemini uses generic references.
-• The window now includes the Gemini API key, a link to obtain it, model-list refresh and a separate audio-description model preference defaulting to `gemini-3.5-flash-lite`. The key is shared with AI and transcription, while this model selection does not alter other Gemini features.
-• When Gemini reports a genuinely exhausted quota, Sonarpad now lets the user try another model, keep waiting, or stop. The worker remains on the current chunk and preserves completed work; the replacement model is used for later chunks and recorded in the final project.
-• Completed localization of the entire audio-description module in all 17 interface languages. Gemini prompts now explicitly constrain both narration text and character-glossary descriptions to the selected language; the worker validates and selectively corrects both, while progress messages use stable identifiers translated by Sonarpad.
-• While generation is running, file, model, voice and all other configuration controls are hidden: NVDA encounters only the progress bar, current status and Cancel button.
-• After the completion message, pressing OK opens the MP3 in Sonarpad's internal player. Escape stops the player and returns to the Create audio description with AI window.
-• Worker states for upload, waiting, Gemini submission, response parsing, JSON repair and retries are now translated by Sonarpad and no longer expose English messages.
-• Fixed the worker PowerShell script: the `-3.14` selector is passed explicitly to pip and PyInstaller, preventing the `py` interactive console from opening accidentally.
-• The dedicated suite now contains 128 tests: 105 Python tests and 23 Rust tests, including coverage for all 17 prompt languages, glossary-language correction, complete interface localization and translated dynamic progress states.
-
-EPUB saving and export
-• Fixed Save As for EPUB documents: selecting TXT or another format now applies the selected extension instead of retaining .epub.
-• Exporting an EPUB to another format no longer changes the open document association. The exported copy is created separately, while Save continues to update the original EPUB opened from its folder.
-
-Radio recordings
-• Added the Delete key shortcut for deleting radio recordings. Sonarpad now asks for confirmation before deleting a recording.
-
-Documentation
-• The guides have been reorganized and now include an index for easier consultation.
-
-Google TTS voice catalog
-• Expanded the downloadable Google TTS catalog from 104 to 156 packages and from 53 to 81 language variants.
-• Added the 52 missing Chrome OS and Google Natural packages for 28 languages, using the newest verified revisions, download addresses, SHA-256 checksums, sizes, dependencies and internal speaker identifiers from the current compatible catalog. Lithuanian is included as revision r19 instead of the older r17 packages.
-• Added localized language names for Assamese, Bodo, Dogri, Konkani, Kashmiri, Maithili, Manipuri, Odia, Sanskrit, Santali and Sindhi, together with the Bosnia and Herzegovina country label, in every Sonarpad interface language.
-
-German file dialogs
-• Fixed a German localization problem that prevented Open, Save As, audiobook saving, podcast downloads and other file-selection dialogs from appearing, even though the menu command or keyboard shortcut was correctly executed.
-• File-dialog filters now support both escaped \0 separators and embedded NUL characters, with a safe fallback for malformed translations. A harmless false error produced when opening the File menu has also been removed from the log.
+Voices and languages
+• The downloadable Google TTS catalog has grown from 104 to 156 packages and from 53 to 81 language variants.
+• Added new Google TTS packages and localized names for additional languages across the interface.
 
 Version 0.8.4 – 2026-07-24
 

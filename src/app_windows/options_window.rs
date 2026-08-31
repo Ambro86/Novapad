@@ -238,27 +238,27 @@ const OPTIONS_TAB_RSS_PODCAST: i32 = 4;
 const OPTIONS_TAB_AI_TRANSCRIPTION: i32 = 5;
 const OPTIONS_TAB_SHORTCUTS: i32 = 6;
 const OPTIONS_TAB_COUNT: i32 = 7;
-const OPTIONS_DIALOG_WIDTH: i32 = 900;
-const OPTIONS_DIALOG_HEIGHT: i32 = 760;
-const OPTIONS_TABS_X: i32 = 16;
-const OPTIONS_TABS_Y: i32 = 10;
-const OPTIONS_TABS_WIDTH: i32 = 868;
-const OPTIONS_TABS_HEIGHT: i32 = 30;
-const OPTIONS_CONTENT_TOP: i32 = 50;
-const OPTIONS_MARGIN_X: i32 = 20;
-const OPTIONS_LABEL_WIDTH: i32 = 265;
-const OPTIONS_CONTROL_X: i32 = OPTIONS_MARGIN_X + OPTIONS_LABEL_WIDTH + 16;
-const OPTIONS_CONTROL_WIDTH: i32 = 380;
-const OPTIONS_ROW_HEIGHT: i32 = 32;
-const OPTIONS_ROW_HEIGHT_COMPACT: i32 = 26;
-const OPTIONS_CHECKBOX_HEIGHT: i32 = 22;
-const OPTIONS_BUTTON_HEIGHT: i32 = 28;
-const OPTIONS_COMBO_HEIGHT: i32 = 28;
+const OPTIONS_DIALOG_WIDTH: i32 = 980;
+const OPTIONS_DIALOG_HEIGHT: i32 = 800;
+const OPTIONS_TABS_X: i32 = 18;
+const OPTIONS_TABS_Y: i32 = 12;
+const OPTIONS_TABS_WIDTH: i32 = 944;
+const OPTIONS_TABS_HEIGHT: i32 = 32;
+const OPTIONS_CONTENT_TOP: i32 = 58;
+const OPTIONS_MARGIN_X: i32 = 24;
+const OPTIONS_LABEL_WIDTH: i32 = 285;
+const OPTIONS_CONTROL_X: i32 = OPTIONS_MARGIN_X + OPTIONS_LABEL_WIDTH + 18;
+const OPTIONS_CONTROL_WIDTH: i32 = 430;
+const OPTIONS_ROW_HEIGHT: i32 = 36;
+const OPTIONS_ROW_HEIGHT_COMPACT: i32 = 30;
+const OPTIONS_CHECKBOX_HEIGHT: i32 = 24;
+const OPTIONS_BUTTON_HEIGHT: i32 = 30;
+const OPTIONS_COMBO_HEIGHT: i32 = 30;
 const OPTIONS_COMBO_DROPDOWN_HEIGHT: i32 = 180;
-const OPTIONS_EDIT_HEIGHT: i32 = 24;
-const OPTIONS_SECTION_GAP: i32 = 12;
+const OPTIONS_EDIT_HEIGHT: i32 = 26;
+const OPTIONS_SECTION_GAP: i32 = 18;
 const OPTIONS_SCROLL_LINE: i32 = 32;
-const OPTIONS_CONTENT_BOTTOM_GAP: i32 = 40;
+const OPTIONS_CONTENT_BOTTOM_GAP: i32 = 48;
 const OPTIONS_WHEEL_DELTA: i32 = 120;
 const DEFAULT_SAVE_FOLDER_AUDIOBOOK: u32 = 0;
 const DEFAULT_SAVE_FOLDER_MEDIA: u32 = 1;
@@ -13477,15 +13477,15 @@ fn layout_dialog_buttons(hwnd: HWND, ok_button: HWND, cancel_button: HWND) {
             return;
         }
     }
-    let button_y = (rect.bottom - 40).max(OPTIONS_CONTENT_TOP);
-    move_control_best_effort("options_ok", ok_button, rect.right - 200, button_y, 90, 28);
+    let button_y = (rect.bottom - 48).max(OPTIONS_CONTENT_TOP);
+    move_control_best_effort("options_ok", ok_button, rect.right - 224, button_y, 100, 30);
     move_control_best_effort(
         "options_cancel",
         cancel_button,
-        rect.right - 100,
+        rect.right - 116,
         button_y,
-        90,
-        28,
+        100,
+        30,
     );
 }
 

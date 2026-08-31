@@ -66,12 +66,12 @@ pub(crate) struct DocumentLoadResult {
 }
 const GTL_NUMCHARS: u32 = 0x0008;
 const CP_UNICODE: u32 = 1200;
-const VOICE_PANEL_PADDING: i32 = 6;
-const VOICE_PANEL_ROW_HEIGHT: i32 = 22;
-const VOICE_PANEL_SPACING: i32 = 6;
-const VOICE_PANEL_LABEL_WIDTH: i32 = 140;
+const VOICE_PANEL_PADDING: i32 = 10;
+const VOICE_PANEL_ROW_HEIGHT: i32 = 24;
+const VOICE_PANEL_SPACING: i32 = 8;
+const VOICE_PANEL_LABEL_WIDTH: i32 = 150;
 const VOICE_PANEL_COMBO_HEIGHT: i32 = 140;
-const VOICE_PANEL_BUTTON_WIDTH: i32 = 90;
+const VOICE_PANEL_BUTTON_WIDTH: i32 = 104;
 
 fn should_use_opening_quote(hwnd_edit: HWND) -> bool {
     unsafe {
@@ -4541,7 +4541,11 @@ pub fn layout_children(hwnd: HWND) {
             }
         }
 
-        let panel_offset = panel_height;
+        let panel_offset = if panel_height > 0 {
+            panel_height + 6
+        } else {
+            0
+        };
         for hwnd_edit in edit_handles {
             if hwnd_edit.0 != 0 {
                 crate::log_if_err!(MoveWindow(
@@ -5254,6 +5258,10 @@ pub fn close_document_at(hwnd: HWND, index: usize) -> bool {
 }
 
 pub fn try_close_app(hwnd: HWND) -> bool {
+    crate::log_debug(&format!(
+        "Application shutdown: try_close_app start hwnd={:?}",
+        hwnd
+    ));
     let result = with_state(hwnd, |state| {
         state
             .docs
@@ -5284,11 +5292,15 @@ pub fn try_close_app(hwnd: HWND) -> bool {
         crate::audio_player::stop_audiobook_playback(hwnd);
     }
     crate::clear_active_podcast_chapters(hwnd);
+    crate::log_debug("Application shutdown: cleaning temporary TTS artifacts");
     if let Err(e) = crate::ffmpeg_export::cleanup_tts_artifacts() {
         crate::log_debug(&e);
     }
+    crate::log_debug("Application shutdown: stopping shared dictation worker");
     crate::tools::faster_whisper_bridge::shutdown_shared_worker();
+    crate::log_debug("Application shutdown: destroying main window");
     crate::log_if_err!(crate::destroy_window_safe(hwnd));
+    crate::log_debug("Application shutdown: main-window destroy returned");
     true
 }
 

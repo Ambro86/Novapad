@@ -1,41 +1,44 @@
 # परिवर्तन सूची
 
-Version 0.8.5 – 2026-07-25
+Version 0.9.0 – 2026-08-31
 
-ऑडियो विवरण
-• ऑडियो विवरणों में Gemini timestamp संभालना अधिक मजबूत किया गया: `MM:SS:ms` जैसे गलत प्रारूप वाले timestamp, उदाहरण `01:13:473`, अब जाँच से पहले बिना सटीकता खोए `MM:SS.ms` में normalize किए जाते हैं; मौजूदा chunk और slot जाँच ऐसे timestamp को अब भी अस्वीकार करती है जो वर्तमान scene से संबंधित नहीं है।
+AI ऑडियो विवरण — नई मुख्य सुविधा
+• Tools > Multimedia में “AI से ऑडियो विवरण बनाएँ” जोड़ा गया है। Sonarpad ऑडियो का विश्लेषण करके बिना संवाद वाले स्थान खोजता है, Gemini से विवरण बनाता है और Sonarpad में पहले से उपलब्ध आवाज़ इंजनों का उपयोग करता है, ताकि संवाद के ऊपर आवाज़ न बोले।
+• वीडियो में होने वाली घटना और विवरण के बीच synchronization बेहतर किया गया है और Gemini द्वारा बनाए गए समय की स्वचालित जाँच जोड़ी गई है।
+• “Extended pauses सक्रिय करें” डिफ़ॉल्ट रूप से चयनित नहीं है। अधिक संवाद या कम खाली स्थान वाले कंटेंट में लंबे विवरण डालने के लिए इसे सक्रिय किया जा सकता है।
+• Sonarpad पात्रों को पहचानने और उनके नाम उपयोग करने की कोशिश कर सकता है। किसी series के कई episodes में continuity बेहतर करने के लिए character catalogs बनाए रखे जा सकते हैं।
+• Project को सहेजा जा सकता है, विवरण बाद में बदले जा सकते हैं और Gemini से सब कुछ दोबारा बनाए बिना फिर export किया जा सकता है।
+• यदि प्रक्रिया रुक जाए तो Sonarpad progress सुरक्षित रखता है और ऑडियो विवरण को जारी रखने देता है। Gemini quota समाप्त होने पर प्रतीक्षा, model बदलना या बिना पूरा काम खोए रोकना संभव है।
+• Window में भाषा, detail level, Gemini model, speech engine और voice चुने जा सकते हैं और Sonarpad उपयोग की गई preferences याद रखता है।
+• Module Sonarpad की सभी 17 भाषाओं में उपलब्ध है। Generation के दौरान interface केवल progress, current status और Cancel दिखाता है; पूरा होने पर MP3 सीधे internal player में खोला जा सकता है।
+• “AI से ऑडियो विवरण बनाएँ” streaming videos और RaiPlay तथा La7 Play के compatible on-demand content के लिए भी उपलब्ध है। इन menus से या TV recording के बाद function खोलते समय focus handling भी बेहतर किया गया है।
+
+La7 Play और multimedia
+• Tools > Multimedia में La7 Play जोड़ा गया है, जिसमें program search, La7 और La7 Cinema live channels तथा unprotected on-demand content का internal player में playback शामिल है।
+• Download किए जा सकने वाले La7 content के context menu में अब Save media, Transcribe और Create AI Audio Description उपलब्ध हैं। Save media में MP3 या MP4 चुना जा सकता है।
+• YouTube/streaming, RaiPlay और La7 Play context actions का focus बेहतर किया गया है ताकि download, transcription और audio-description windows सही तरह foreground में रहें।
+• Rai audio descriptions module में Save media अब cancel के साथ progress window दिखाता है और Transcribe completion तक progress window को visible रखता है।
+• TV और radio recordings हटाने के लिए Delete key जोड़ी गई है और हटाने से पहले confirmation माँगा जाता है।
+
+ई-बुक और दस्तावेज़
+• DRM-रहित Kindle के लिए MOBI, AZW और AZW3 import जोड़ा गया है; text और chapters editor और index में उपलब्ध हैं।
+• DAISY 2.02 और DAISY 3 support जोड़ा गया है। DAISY audiobooks Sonarpad के internal player का उपयोग करते हैं और chapter navigation तथा limits का पालन करते हैं।
+• Kindle और DAISY original file को overwrite किए बिना import होते हैं; DRM-protected Kindle स्पष्ट रूप से अस्वीकार किए जाते हैं।
+• EPUB के “Save As” को ठीक किया गया है: TXT या दूसरा format चुनने पर अब चुना हुआ extension उपयोग होता है और original EPUB खुले document से जुड़ा रहता है।
 
 RSS और लेख
-• RSS लेखों के संदर्भ मेनू में “लेख चुनें…” जोड़ा गया है। यह playlist download में उपयोग होने वाली उसी सुलभ checkbox चयन विंडो को खोलता है: Space से कई लेख चुनें या चयन हटाएँ, Tab से हटाएँ बटन तक जाएँ और सभी चुने हुए लेख एक ही कार्रवाई में हटाएँ।
-• RSS अब वास्तविक फ़ोल्डरों का समर्थन करता है। OPML आयात करते समय nested `<outline>` containers को flat list में बदलने के बजाय सुरक्षित रखा जाता है, पहले से मौजूद feeds को बिना duplicate बनाए imported folders में रखा जाता है और OPML export वही folder hierarchy बनाए रखता है, जिसमें खाली folders भी शामिल हैं।
-• RSS context menu में localized “नया फ़ोल्डर बनाएँ” command जोड़ा गया है, जिसमें नाम लिखने के लिए accessible dialog है। Folder nodes native tree behavior का उपयोग करते हैं: Right Arrow विस्तार करता है, Left Arrow समेटता है; किसी folder को हटाने पर उसकी पूरी branch हटती है और Ctrl+Z एक ही operation में folder, subfolders और सभी feeds को पुनर्स्थापित करता है।
-• RSS feeds को अब वर्तमान folder के भीतर Move up, Move down, Move to top, Move to bottom और Move to position से पुनः क्रमित किया जा सकता है; reordering किसी feed को उसके folder से बाहर नहीं ले जाता।
+• RSS articles के लिए multiple selection जोड़ा गया है ताकि कई articles एक ही operation में हटाए जा सकें।
+• RSS अब वास्तविक folders support करता है, जो OPML import और export के दौरान, empty folders सहित, सुरक्षित रहते हैं।
+• Feeds को current folder में Move up, Move down, Move to top, Move to bottom और Move to position से पुनः क्रमित किया जा सकता है।
 
-ई-बुक प्रारूप
-• DRM-रहित Kindle पुस्तकों के लिए MOBI, AZW और AZW3 आयात जोड़ा गया है, जिसमें uncompressed, PalmDOC और HUFF/CDIC text streams तथा MOBI 6/KF8/AZW3 variants शामिल हैं। Text, chapters और headings Sonarpad document index में उपलब्ध हैं।
-• DAISY 2.02 (NCC + SMIL + XHTML) और DAISY 3 (OPF + NCX + DTBook) का आयात .daisy/ZIP, extracted publications और सीधे खोले गए DAISY files से जोड़ा गया है। केवल-audio पुस्तकों में navigation labels को text के रूप में उपयोग किया जाता है।
-• DAISY ऑडियो पुस्तकें अब Sonarpad के मौजूदा internal player का उपयोग करती हैं: पुस्तक खोलने पर DAISY विषय-सूची दिखती है, Enter चुना अध्याय चलाता है, Space pause/resume करता है और Escape player बंद करके DAISY index पर लौटता है। SMIL clipBegin/clipEnd सीमाओं का पालन होता है और एक अध्याय कई audio files में अपने-आप जारी रह सकता है।
-• Kindle और DAISY editable text के रूप में import होते हैं, source e-book को overwrite नहीं करते; Save, Save As/export का उपयोग करता है। DRM Kindle स्पष्ट रूप से अस्वीकार किए जाते हैं।
-• MOBI/AZW/AZW3 और DAISY को सभी 17 interface भाषाओं के Open dialog और Windows associations में जोड़ा गया। Tests uncompressed/PalmDOC/HUFF-CDIC, recursive CDIC, MOBI 6/8, DRM, packaged/extracted DAISY 2.02/3 और direct NCX/SMIL/DTBook entry points को cover करते हैं।
+Accessibility, guides और interface
+• TV guide अब programs को selectable combo box में दिखाता है और selected program की plot/description दिखा सकता है।
+• Sonarpad guides को index के साथ पुनर्गठित किया गया है और AI Audio Description की पूरी guide जोड़ी गई है।
+• German translation की वह समस्या ठीक की गई है जो Open, Save As और अन्य file-selection dialogs को दिखाई देने से रोक सकती थी।
 
-EPUB सहेजना और निर्यात करना
-• EPUB दस्तावेज़ों के लिए “Save As” ठीक किया गया है: TXT या कोई अन्य प्रारूप चुनने पर अब .epub बनाए रखने के बजाय चुना गया extension लागू होता है।
-• EPUB को किसी अन्य प्रारूप में निर्यात करने पर खुला दस्तावेज़ अब मूल EPUB से अलग नहीं होता। निर्यात की गई प्रति अलग बनती है, जबकि “Save” उसी फ़ोल्डर से खोले गए मूल EPUB को अपडेट करता रहता है।
-
-रेडियो रिकॉर्डिंग
-• रेडियो रिकॉर्डिंग हटाने के लिए Delete कुंजी का शॉर्टकट जोड़ा गया है। Sonarpad अब रिकॉर्डिंग हटाने से पहले पुष्टि माँगता है।
-
-मार्गदर्शिकाएँ
-• मार्गदर्शिकाओं को पुनर्गठित किया गया है और आसान परामर्श के लिए विषय-सूची जोड़ी गई है।
-
-Google TTS आवाज़ सूची
-• डाउनलोड की जा सकने वाली Google TTS सूची को 104 से 156 पैकेज और 53 से 81 भाषा रूपों तक बढ़ाया गया है।
-• 28 भाषाओं के लिए छूटे हुए 52 Chrome OS और Google Natural पैकेज जोड़े गए हैं। इनमें वर्तमान संगत सूची की नवीनतम सत्यापित revisions, download addresses, SHA-256 checksums, sizes, dependencies और internal speaker identifiers उपयोग किए गए हैं। लिथुआनियाई के लिए पुराने r17 पैकेजों के स्थान पर r19 revision शामिल है।
-• सभी interface भाषाओं में असमिया, बोडो, डोगरी, कोंकणी, कश्मीरी, मैथिली, मणिपुरी, ओड़िया, संस्कृत, संथाली और सिंधी के स्थानीयकृत नाम तथा बोस्निया और हर्ज़ेगोविना देश का नाम जोड़ा गया है।
-
-जर्मन भाषा के फ़ाइल संवाद
-• जर्मन अनुवाद की वह समस्या ठीक की गई है जिसके कारण Open, Save As, ऑडियोबुक सहेजने, podcast डाउनलोड और अन्य फ़ाइल चयन संवाद दिखाई नहीं देते थे, जबकि menu command या keyboard shortcut सही ढंग से चल रहा था।
-• फ़ाइल संवाद के filters अब लिखे हुए \0 separators और embedded NUL characters दोनों को स्वीकार करते हैं तथा खराब translation होने पर सुरक्षित fallback filter उपयोग करते हैं। File menu खोलते समय log में आने वाली एक निरापद false error भी हटा दी गई है।
+आवाज़ें और भाषाएँ
+• Downloadable Google TTS catalog को 104 से 156 packages और 53 से 81 language variants तक बढ़ाया गया है।
+• पूरे interface में नए Google TTS packages और अतिरिक्त भाषाओं के localized names जोड़े गए हैं।
 
 Version 0.8.4 – 2026-07-24
 

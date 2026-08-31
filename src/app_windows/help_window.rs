@@ -228,8 +228,8 @@ pub fn open_readonly_text(parent: HWND, title: &str, content: &str) {
             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            640,
-            480,
+            720,
+            540,
             parent,
             None,
             hinstance,
@@ -288,8 +288,8 @@ fn open_window(parent: HWND, kind: HelpWindowKind) {
             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            640,
-            520,
+            800,
+            620,
             parent,
             None,
             hinstance,
@@ -498,15 +498,22 @@ fn help_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> L
                 let width = (lparam.0 & 0xffff) as i32;
                 let height = ((lparam.0 >> 16) & 0xffff) as i32;
                 if with_help_state(hwnd, |state| {
-                    let button_width = 90;
-                    let button_height = 28;
+                    let button_width = 100;
+                    let button_height = 30;
                     let margin = 12;
-                    let edit_height = (height - button_height - (margin * 2)).max(0);
-                    crate::log_if_err!(MoveWindow(state.edit, 0, 0, width, edit_height, true));
+                    let edit_height = (height - button_height - (margin * 3)).max(0);
+                    crate::log_if_err!(MoveWindow(
+                        state.edit,
+                        margin,
+                        margin,
+                        (width - (margin * 2)).max(0),
+                        edit_height,
+                        true,
+                    ));
                     crate::log_if_err!(MoveWindow(
                         state.ok_button,
                         width - button_width - margin,
-                        edit_height + margin,
+                        height - button_height - margin,
                         button_width,
                         button_height,
                         true,
@@ -757,18 +764,25 @@ fn readonly_text_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPA
             let width = (lparam.0 & 0xffff) as i32;
             let height = ((lparam.0 >> 16) & 0xffff) as i32;
             if with_readonly_text_state(hwnd, |state| {
-                let button_width = 90;
-                let button_height = 28;
+                let button_width = 100;
+                let button_height = 30;
                 let margin = 12;
-                let edit_height = (height - button_height - (margin * 2)).max(0);
+                let edit_height = (height - button_height - (margin * 3)).max(0);
                 crate::log_if_err!(unsafe {
-                    MoveWindow(state.edit, 0, 0, width, edit_height, true)
+                    MoveWindow(
+                        state.edit,
+                        margin,
+                        margin,
+                        (width - (margin * 2)).max(0),
+                        edit_height,
+                        true,
+                    )
                 });
                 crate::log_if_err!(unsafe {
                     MoveWindow(
                         state.ok_button,
                         width - button_width - margin,
-                        edit_height + margin,
+                        height - button_height - margin,
                         button_width,
                         button_height,
                         true,

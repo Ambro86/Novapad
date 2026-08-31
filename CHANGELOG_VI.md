@@ -1,45 +1,35 @@
 # Nhật ký thay đổi
 
-Phiên bản 0.8.5 – 2026-07-25
+Phiên bản 0.9.0 – 2026-08-31
 
-Lịch TV
-• Hướng dẫn TV giờ hiển thị các chương trình trong hộp tổ hợp có thể chọn thay vì danh sách văn bản chỉ đọc. Sau khi chọn một chương trình, phím Tab sẽ chuyển tới nút mới “Xem nội dung chương trình đã chọn”, hiển thị phần mô tả do dịch vụ lịch TV cung cấp.
+Mô tả âm thanh bằng AI — tính năng chính mới
+• Đã thêm “Tạo mô tả âm thanh bằng AI” trong Công cụ > Đa phương tiện. Sonarpad phân tích âm thanh để tìm các khoảng không có lời thoại, tạo mô tả bằng Gemini và dùng các bộ máy giọng nói đã có, tránh nói chồng lên hội thoại.
+• Cải thiện đồng bộ giữa nội dung đang xảy ra trong video và phần mô tả, đồng thời tự động kiểm tra thời gian do Gemini tạo.
+• “Bật khoảng dừng mở rộng” mặc định không được chọn. Có thể bật tùy chọn này với nội dung có nhiều hội thoại hoặc ít khoảng trống để chèn được các mô tả dài hơn.
+• Sonarpad có thể thử nhận diện nhân vật và dùng tên của họ. Danh mục nhân vật có thể được giữ giữa các tập của một loạt phim để cải thiện tính liên tục.
+• Có thể lưu dự án, chỉnh sửa mô tả sau đó và xuất lại mà không phải tạo lại toàn bộ bằng Gemini.
+• Nếu quá trình bị gián đoạn, Sonarpad giữ lại tiến độ và cho phép tiếp tục mô tả âm thanh. Khi hết hạn mức Gemini, có thể chờ, đổi mô hình hoặc dừng mà không mất phần công việc đã hoàn thành.
+• Cửa sổ cho phép chọn ngôn ngữ, mức chi tiết, mô hình Gemini, bộ máy giọng nói và giọng đọc, đồng thời ghi nhớ các tùy chọn đã dùng.
+• Mô-đun có sẵn trong cả 17 ngôn ngữ của Sonarpad. Trong lúc tạo, giao diện chỉ hiển thị tiến độ, trạng thái hiện tại và Hủy; khi hoàn tất có thể mở MP3 trực tiếp trong trình phát nội bộ.
+
+Sách điện tử và tài liệu
+• Đã thêm nhập Kindle không DRM ở các định dạng MOBI, AZW và AZW3, với văn bản và chương có trong trình soạn thảo và chỉ mục.
+• Đã thêm hỗ trợ DAISY 2.02 và DAISY 3. Sách nói DAISY dùng trình phát nội bộ của Sonarpad và tôn trọng điều hướng cũng như giới hạn chương.
+• Kindle và DAISY được nhập mà không ghi đè tệp gốc; Kindle có DRM bị từ chối rõ ràng.
+• Đã sửa “Lưu thành” cho EPUB: khi chọn TXT hoặc định dạng khác, phần mở rộng đã chọn giờ được dùng và EPUB gốc vẫn gắn với tài liệu đang mở.
 
 RSS và bài viết
-• Đã thêm “Chọn bài viết…” vào menu ngữ cảnh của bài viết RSS. Lệnh này mở cùng cửa sổ chọn có hộp kiểm dễ tiếp cận như khi tải playlist: dùng Phím cách để chọn hoặc bỏ chọn nhiều bài viết, nhấn Tab đến Xóa và xóa tất cả bài đã chọn trong một thao tác.
-• RSS giờ hỗ trợ các thư mục thực sự. Khi nhập OPML, các vùng chứa `<outline>` lồng nhau được giữ nguyên thay vì bị làm phẳng; các feed đã có được đưa vào đúng thư mục nhập mà không tạo bản sao, và khi xuất OPML Sonarpad giữ nguyên cùng cấu trúc thư mục, kể cả thư mục trống.
-• Đã thêm lệnh được bản địa hóa “Tạo thư mục mới” vào menu ngữ cảnh RSS, với hộp thoại dễ tiếp cận để nhập tên. Nút thư mục dùng hành vi cây gốc của Windows: Mũi tên phải mở rộng, Mũi tên trái thu gọn; xóa một thư mục sẽ xóa toàn bộ nhánh và Ctrl+Z khôi phục trong một thao tác thư mục, các thư mục con và mọi feed bên trong.
-• Các feed RSS giờ có thể được sắp xếp lại bên trong thư mục hiện tại bằng Di chuyển lên, Di chuyển xuống, Di chuyển lên đầu, Di chuyển xuống cuối và Di chuyển đến vị trí; việc sắp xếp không bao giờ đưa feed ra khỏi thư mục của nó.
+• Đã thêm chọn nhiều bài viết RSS để xóa nhiều bài trong một thao tác.
+• RSS giờ hỗ trợ các thư mục thực sự được giữ nguyên khi nhập và xuất OPML, kể cả thư mục trống.
+• Các feed có thể được sắp xếp lại trong thư mục hiện tại bằng Di chuyển lên, Di chuyển xuống, Di chuyển lên đầu, Di chuyển xuống cuối và Di chuyển đến vị trí.
 
-Bản ghi TV và mô tả âm thanh
-• Tăng độ chắc chắn khi xử lý timestamp Gemini cho mô tả âm thanh: timestamp sai định dạng `MM:SS:ms`, ví dụ `01:13:473`, giờ được chuẩn hóa không mất độ chính xác thành `MM:SS.ms` trước khi kiểm tra; các kiểm tra chunk và slot hiện có vẫn loại mọi timestamp không thuộc cảnh hiện tại.
-• Đã sửa tiêu điểm bàn phím khi “Tạo mô tả âm thanh bằng AI” tự động mở sau khi bản ghi TV kết thúc: vòng lặp chọn TV vẫn còn hoạt động không còn chặn Tab, Phím cách, các phím mũi tên hoặc Escape dành cho cửa sổ mô tả âm thanh.
+Khả năng tiếp cận, hướng dẫn và giao diện
+• Các hướng dẫn Sonarpad đã được sắp xếp lại với mục lục và bổ sung hướng dẫn đầy đủ về Mô tả âm thanh bằng AI.
+• Đã sửa lỗi bản dịch tiếng Đức có thể khiến Mở, Lưu thành và các hộp thoại chọn tệp khác không xuất hiện.
 
-Định dạng sách điện tử
-• Đã thêm nhập Kindle không DRM ở MOBI, AZW và AZW3, gồm luồng không nén, PalmDOC, HUFF/CDIC và các biến thể MOBI 6/KF8/AZW3. Văn bản, chương và tiêu đề có trong chỉ mục Sonarpad.
-• Đã thêm DAISY 2.02 (NCC + SMIL + XHTML) và DAISY 3 (OPF + NCX + DTBook) từ .daisy/ZIP, ấn phẩm đã giải nén và tệp DAISY mở trực tiếp. Sách chỉ có âm thanh dùng nhãn điều hướng làm văn bản.
-• Sách nói DAISY giờ dùng trình phát nội bộ hiện có của Sonarpad: khi mở sách sẽ hiện mục lục DAISY, Enter phát chương đã chọn, Space tạm dừng/tiếp tục và Escape đóng trình phát rồi quay lại mục lục DAISY. Các giới hạn SMIL clipBegin/clipEnd được tôn trọng và một chương có thể tự động tiếp tục qua nhiều tệp âm thanh.
-• Kindle và DAISY được nhập thành văn bản có thể sửa mà không ghi đè e-book nguồn; Lưu dùng Lưu thành/xuất. Kindle có DRM bị từ chối rõ ràng.
-• MOBI/AZW/AZW3 và DAISY được thêm vào hộp thoại Mở ở cả 17 ngôn ngữ và liên kết Windows. Kiểm thử bao phủ không nén/PalmDOC/HUFF-CDIC, CDIC đệ quy, MOBI 6/8, DRM, DAISY 2.02/3 đóng gói/giải nén và NCX/SMIL/DTBook trực tiếp.
-
-Lưu và xuất EPUB
-• Đã sửa lệnh “Lưu thành” cho tài liệu EPUB: khi chọn TXT hoặc định dạng khác, phần mở rộng đã chọn giờ được áp dụng thay vì vẫn giữ .epub.
-• Việc xuất EPUB sang định dạng khác không còn thay đổi liên kết của tài liệu đang mở. Bản sao được tạo riêng, còn “Lưu” tiếp tục cập nhật tệp EPUB gốc đã mở từ thư mục của nó.
-
-Bản ghi radio
-• Đã thêm phím Delete làm phím tắt để xóa các bản ghi radio. Sonarpad hiện yêu cầu xác nhận trước khi xóa một bản ghi.
-
-Tài liệu hướng dẫn
-• Các hướng dẫn đã được biên soạn lại và bổ sung mục lục để việc tra cứu thuận tiện hơn.
-
-Danh mục giọng Google TTS
-• Danh mục Google TTS có thể tải xuống được mở rộng từ 104 lên 156 gói và từ 53 lên 81 biến thể ngôn ngữ.
-• Đã thêm 52 gói Chrome OS và Google Natural còn thiếu cho 28 ngôn ngữ, dùng các bản sửa đổi mới nhất đã được xác minh, địa chỉ tải xuống, mã kiểm SHA-256, kích thước, phần phụ thuộc và mã định danh người nói nội bộ từ danh mục tương thích hiện tại. Tiếng Litva dùng bản sửa đổi r19 thay cho các gói r17 cũ.
-• Đã thêm tên bản địa hóa của tiếng Assam, Bodo, Dogri, Konkani, Kashmir, Maithili, Manipuri, Odia, Phạn, Santali và Sindhi, cùng tên quốc gia Bosnia và Herzegovina, trong mọi ngôn ngữ giao diện.
-
-Hộp thoại tệp bằng tiếng Đức
-• Đã sửa lỗi trong bản dịch tiếng Đức khiến các hộp thoại Mở, Lưu thành, lưu sách nói, tải podcast và các hộp thoại chọn tệp khác không xuất hiện, mặc dù lệnh menu hoặc phím tắt đã được thực thi đúng.
-• Bộ lọc của hộp thoại tệp giờ hỗ trợ cả dấu phân cách \0 được viết dưới dạng chuỗi và ký tự NUL nhúng, đồng thời dùng bộ lọc dự phòng an toàn nếu bản dịch bị sai định dạng. Một lỗi giả vô hại xuất hiện trong nhật ký khi mở menu Tệp cũng đã được loại bỏ.
+Giọng nói và ngôn ngữ
+• Danh mục Google TTS có thể tải xuống đã tăng từ 104 lên 156 gói và từ 53 lên 81 biến thể ngôn ngữ.
+• Đã thêm các gói Google TTS mới và tên bản địa hóa cho nhiều ngôn ngữ hơn trong toàn bộ giao diện.
 
 Phiên bản 0.8.4 – 2026-07-24
 

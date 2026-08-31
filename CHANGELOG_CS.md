@@ -1,45 +1,35 @@
 # Přehled změn
 
-Verze 0.8.5 – 2026-07-25
+Verze 0.9.0 – 2026-08-31
 
-TV program
-• TV program nyní zobrazuje pořady ve volitelném rozbalovacím poli namísto textového seznamu pouze pro čtení. Po výběru pořadu přejde Tab na nové tlačítko „Zobrazit děj vybraného pořadu“, které zobrazí popis dodaný službou TV programu.
+Audiopopis s AI — nová hlavní funkce
+• Do Nástroje > Multimédia byla přidána funkce „Vytvořit audiopopis s AI“. Sonarpad analyzuje zvuk, vyhledá místa bez dialogů, vytvoří popisy pomocí Gemini a použije již dostupné hlasové moduly, aniž by mluvil přes dialogy.
+• Byla zlepšena synchronizace mezi děním ve videu a popisy a časy vytvořené Gemini jsou automaticky kontrolovány.
+• „Povolit rozšířené pauzy“ je ve výchozím nastavení vypnuto. Lze je zapnout u obsahu s mnoha dialogy nebo malým volným prostorem, aby bylo možné vložit delší popisy.
+• Sonarpad se může pokusit rozpoznat postavy a používat jejich jména. Katalogy postav lze zachovat mezi epizodami seriálu pro lepší kontinuitu.
+• Projekt lze uložit, později upravit popisy a znovu exportovat bez nutnosti vše znovu generovat pomocí Gemini.
+• Pokud je proces přerušen, Sonarpad zachová průběh a umožní v audiopopisu pokračovat. Při vyčerpání kvóty Gemini lze čekat, změnit model nebo práci ukončit bez ztráty již dokončené části.
+• V okně lze zvolit jazyk, úroveň podrobnosti, model Gemini, hlasový modul a hlas a použité nastavení se pamatuje.
+• Modul je dostupný ve všech 17 jazycích Sonarpadu. Během generování rozhraní zobrazuje jen průběh, aktuální stav a Zrušit; po dokončení lze MP3 otevřít přímo v interním přehrávači.
+
+E-knihy a dokumenty
+• Přidán import Kindle bez DRM ve formátech MOBI, AZW a AZW3; text a kapitoly jsou dostupné v editoru a indexu.
+• Přidána podpora DAISY 2.02 a DAISY 3. Audioknihy DAISY používají interní přehrávač Sonarpadu a respektují navigaci a hranice kapitol.
+• Kindle a DAISY se importují bez přepsání původního souboru; Kindle chráněné DRM jsou výslovně odmítnuty.
+• Opraveno „Uložit jako“ pro EPUB: při volbě TXT nebo jiného formátu se nyní použije vybraná přípona a původní EPUB zůstane spojen s otevřeným dokumentem.
 
 RSS a články
-• Do kontextové nabídky článků RSS byla přidána položka „Vybrat články…“. Otevře stejné přístupné okno se zaškrtávacími políčky jako stahování playlistu: Mezerníkem lze označit nebo odznačit více článků, klávesou Tab přejít na Odstranit a všechny vybrané články smazat najednou.
-• RSS nyní podporuje skutečné složky. Při importu OPML se vnořené kontejnery `<outline>` zachovají místo zploštění, již existující kanály se bez duplicit zařadí do importovaných složek a export OPML zachová stejnou hierarchii včetně prázdných složek.
-• Do kontextové nabídky RSS byl přidán lokalizovaný příkaz „Vytvořit novou složku“ s přístupným dialogem pro zadání názvu. Uzly složek používají nativní chování stromu: Šipka doprava rozbalí, Šipka doleva sbalí; odstranění složky smaže celou její větev a Ctrl+Z v jediné operaci obnoví složku, podsložky i všechny obsažené kanály.
-• Kanály RSS lze nyní řadit uvnitř aktuální složky pomocí Přesunout nahoru, Přesunout dolů, Přesunout na začátek, Přesunout na konec a Přesunout na pozici; řazení nikdy nepřesune kanál mimo jeho složku.
+• Přidán vícenásobný výběr článků RSS, takže lze několik článků odstranit v jediné operaci.
+• RSS nyní podporuje skutečné složky zachované při importu i exportu OPML, včetně prázdných složek.
+• Kanály lze v aktuální složce řadit pomocí Přesunout nahoru, Přesunout dolů, Přesunout na začátek, Přesunout na konec a Přesunout na pozici.
 
-Televizní nahrávky a audiopopis
-• Zpřesněno zpracování časových značek Gemini pro audiopopis: chybně zapsané značky `MM:SS:ms`, například `01:13:473`, se nyní beze ztráty normalizují na `MM:SS.ms` před ověřením; stávající kontroly chunku a slotu nadále odmítnou každou značku, která nepatří do aktuální scény.
-• Opraveno zaměření klávesnice při automatickém otevření „Vytvořit audiopopis pomocí AI“ po skončení televizního nahrávání: stále aktivní smyčka výběru TV již nezachytává Tab, Mezerník, šipky ani Escape určené pro okno audiopopisu.
+Přístupnost, návody a rozhraní
+• Návody Sonarpadu byly přeorganizovány a doplněny o obsah a úplný návod k audiopopisu s AI.
+• Opraven problém německého překladu, který mohl zabránit zobrazení dialogů Otevřít, Uložit jako a dalších dialogů pro výběr souborů.
 
-Formáty e-knih
-• Přidán import Kindle knih bez DRM ve formátech MOBI, AZW a AZW3, včetně nekomprimovaných, PalmDOC a HUFF/CDIC textových proudů a variant MOBI 6/KF8/AZW3. Text, kapitoly a nadpisy jsou dostupné v indexu dokumentu Sonarpad.
-• Přidán import DAISY 2.02 (NCC + SMIL + XHTML) a DAISY 3 (OPF + NCX + DTBook) z balíčků .daisy/ZIP, rozbalených publikací i přímo otevřených souborů DAISY. U knih pouze se zvukem se použijí navigační popisky.
-• Audioknihy DAISY nyní používají stávající interní přehrávač Sonarpadu: po otevření se zobrazí obsah DAISY, Enter přehraje vybranou kapitolu, Mezerník pozastaví/pokračuje a Escape zavře přehrávač a vrátí se do obsahu DAISY. Hranice SMIL clipBegin/clipEnd jsou respektovány a kapitola může automaticky pokračovat přes více zvukových souborů.
-• Kindle a DAISY se importují jako upravitelný text bez přepsání zdrojového e-booku; Uložit používá Uložit jako/export. Kindle s DRM jsou výslovně odmítnuty.
-• MOBI/AZW/AZW3 a DAISY byly přidány do dialogu Otevřít ve všech 17 jazycích a do asociací Windows. Testy pokrývají nekomprimované/PalmDOC/HUFF-CDIC, rekurzivní CDIC, MOBI 6/8, DRM a balené/rozbalené DAISY 2.02/3 i přímé NCX/SMIL/DTBook.
-
-Ukládání a export souborů EPUB
-• Opraveno „Uložit jako“ u dokumentů EPUB: při výběru TXT nebo jiného formátu se nyní použije zvolená přípona namísto zachování .epub.
-• Export EPUB do jiného formátu již nemění vazbu otevřeného dokumentu. Exportovaná kopie se vytvoří samostatně, zatímco „Uložit“ nadále aktualizuje původní EPUB otevřený z jeho složky.
-
-Rozhlasové nahrávky
-• Byla přidána klávesa Delete jako zkratka pro odstranění rozhlasových nahrávek. Sonarpad nyní před odstraněním nahrávky požádá o potvrzení.
-
-Dokumentace
-• Příručky byly přepracovány a doplněny o obsah pro snadnější orientaci.
-
-Katalog hlasů Google TTS
+Hlasy a jazyky
 • Katalog hlasů Google TTS ke stažení byl rozšířen ze 104 na 156 balíčků a z 53 na 81 jazykových variant.
-• Bylo přidáno 52 chybějících balíčků Chrome OS a Google Natural pro 28 jazyků s nejnovějšími ověřenými revizemi, adresami ke stažení, kontrolními součty SHA-256, velikostmi, závislostmi a interními identifikátory mluvčích z aktuálního kompatibilního katalogu. Litevština používá revizi r19 namísto starších balíčků r17.
-• Ve všech jazycích rozhraní byly doplněny lokalizované názvy ásámštiny, bodo, dógrí, konkánštiny, kašmírštiny, maithilštiny, manipurštiny, odijštiny, sanskrtu, santálštiny a sindhštiny a také název země Bosna a Hercegovina.
-
-Německé dialogy pro práci se soubory
-• Opraven problém německého překladu, kvůli kterému se nezobrazovaly dialogy Otevřít, Uložit jako, ukládání audioknih, stahování podcastů a další dialogy pro výběr souborů, přestože příkaz nabídky nebo klávesová zkratka byly správně provedeny.
-• Filtry souborových dialogů nyní podporují jak zapsané oddělovače \0, tak vložené znaky NUL a při chybně vytvořeném překladu použijí bezpečný náhradní filtr. Z protokolu byla také odstraněna neškodná falešná chyba zobrazovaná při otevření nabídky Soubor.
+• Byly přidány nové balíčky Google TTS a lokalizované názvy dalších jazyků v celém rozhraní.
 
 Verze 0.8.4 – 2026-07-24
 

@@ -1,45 +1,35 @@
 # Changelog
 
-Versão 0.8.5 – 2026-07-25
+Versão 0.9.0 – 2026-08-31
 
-Guia de TV
-• O guia de TV apresenta agora os programas numa caixa combinada selecionável em vez de uma lista de texto só de leitura. Depois de escolher um programa, Tab leva ao novo botão «Ver sinopse do programa selecionado», que mostra a descrição fornecida pelo serviço do guia.
+Audiodescrição com IA — nova função principal
+• Foi adicionada a opção «Criar audiodescrição com IA» em Ferramentas > Multimédia. O Sonarpad analisa o áudio para encontrar espaços sem diálogo, gera as descrições com Gemini e utiliza os motores de voz já disponíveis, evitando falar por cima dos diálogos.
+• Foi melhorada a sincronização entre o que acontece no vídeo e as descrições, com verificações automáticas dos tempos gerados pelo Gemini.
+• «Ativar pausas prolongadas» está desmarcada por predefinição. Pode ser ativada em conteúdos com muitos diálogos ou pouco espaço disponível para permitir descrições mais longas.
+• O Sonarpad pode tentar reconhecer as personagens e utilizar os seus nomes. Os catálogos de personagens podem ser mantidos entre episódios de uma série para melhorar a continuidade.
+• É possível guardar o projeto, editar posteriormente as descrições e voltar a exportar sem ter de gerar tudo novamente com Gemini.
+• Se o processo for interrompido, o Sonarpad conserva o progresso e permite continuar a audiodescrição. Se a quota do Gemini se esgotar, é possível esperar, mudar de modelo ou interromper sem perder o trabalho já concluído.
+• A janela permite escolher idioma, nível de detalhe, modelo Gemini, motor e voz, e memoriza as preferências utilizadas.
+• O módulo está disponível nos 17 idiomas do Sonarpad. Durante a geração, a interface mostra apenas o progresso, o estado atual e Cancelar; no final, o MP3 pode ser aberto diretamente no leitor interno.
+
+Livros eletrónicos e documentos
+• Foi adicionado o import de Kindle sem DRM nos formatos MOBI, AZW e AZW3, com texto e capítulos disponíveis no editor e no índice.
+• Foi adicionado suporte para DAISY 2.02 e DAISY 3. Os audiolivros DAISY usam o leitor interno do Sonarpad e respeitam a navegação e os limites dos capítulos.
+• Kindle e DAISY são importados sem substituir o ficheiro original; os Kindle protegidos por DRM são recusados explicitamente.
+• Foi corrigido «Guardar como» para EPUB: ao escolher TXT ou outro formato, é agora usada a extensão selecionada e o EPUB original permanece associado ao documento aberto.
 
 RSS e artigos
-• Foi adicionada a opção «Selecionar artigos…» ao menu de contexto dos artigos RSS. Abre a mesma janela acessível com caixas de seleção usada no download de playlists: Espaço seleciona ou desmarca vários artigos, Tab chega a Eliminar e todos os artigos escolhidos são removidos numa única operação.
-• Os RSS passam a suportar pastas reais. Na importação OPML, os contentores `<outline>` aninhados são preservados em vez de serem achatados, os feeds já existentes são colocados nas pastas importadas sem duplicação e a exportação OPML mantém a mesma hierarquia, incluindo pastas vazias.
-• Foi adicionado ao menu de contexto RSS o comando localizado «Criar nova pasta», com uma caixa de diálogo acessível para introduzir o nome. Os nós de pasta usam o comportamento nativo da árvore: Seta para a direita expande, Seta para a esquerda recolhe; eliminar uma pasta remove todo o ramo e Ctrl+Z restaura numa única operação a pasta, as subpastas e todos os feeds contidos.
-• Os feeds RSS podem agora ser reordenados dentro da pasta atual com Mover para cima, Mover para baixo, Mover para o início, Mover para o fim e Mover para a posição; a reordenação nunca desloca um feed para fora da sua pasta.
+• Foi adicionada a seleção múltipla de artigos RSS para eliminar vários numa única operação.
+• Os RSS suportam agora pastas reais, preservadas na importação e exportação OPML, incluindo pastas vazias.
+• Os feeds podem ser reordenados dentro da pasta atual com Mover para cima, Mover para baixo, Mover para o início, Mover para o fim e Mover para a posição.
 
-Gravações de TV e audiodescrições
-• Tornada mais robusta a gestão dos timestamps do Gemini nas audiodescrições: timestamps malformados `MM:SS:ms`, por exemplo `01:13:473`, são agora normalizados sem perda para `MM:SS.ms` antes da validação; as verificações existentes de chunk e slot continuam a rejeitar qualquer timestamp que não pertença à cena atual.
-• Corrigido o foco do teclado quando «Criar audiodescrição com IA» é aberto automaticamente no fim de uma gravação de TV: o ciclo ainda ativo da seleção de TV já não interceta Tab, Espaço, setas ou Escape destinados à janela de audiodescrição.
+Acessibilidade, guias e interface
+• Os guias do Sonarpad foram reorganizados com um índice e foi adicionado um guia completo sobre Audiodescrição com IA.
+• Foi corrigido um problema da tradução alemã que podia impedir a apresentação de Abrir, Guardar como e outras janelas de seleção de ficheiros.
 
-Formatos de livros eletrónicos
-• Adicionada importação Kindle sem DRM em MOBI, AZW e AZW3, incluindo fluxos sem compressão, PalmDOC e HUFF/CDIC e variantes MOBI 6/KF8/AZW3. Texto, capítulos e títulos ficam disponíveis no índice do Sonarpad.
-• Adicionado DAISY 2.02 (NCC + SMIL + XHTML) e DAISY 3 (OPF + NCX + DTBook), a partir de .daisy/ZIP, publicações extraídas e ficheiros DAISY abertos diretamente. Livros apenas com áudio usam as etiquetas de navegação como texto.
-• Os audiolivros DAISY usam agora o leitor interno já existente do Sonarpad: ao abrir surge o índice DAISY, Enter reproduz o capítulo escolhido, Espaço pausa/retoma e Escape fecha o leitor e regressa ao índice DAISY. Os limites SMIL clipBegin/clipEnd são respeitados e um capítulo pode continuar automaticamente por vários ficheiros de áudio.
-• Kindle e DAISY são importados como texto editável sem substituir o e-book original; Guardar usa Guardar como/exportar. Kindle com DRM é rejeitado explicitamente.
-• MOBI/AZW/AZW3 e DAISY foram adicionados à janela Abrir nas 17 línguas e às associações do Windows. Os testes cobrem sem compressão/PalmDOC/HUFF-CDIC, CDIC recursivo, MOBI 6/8, DRM, DAISY 2.02/3 empacotado/extraído e entradas diretas NCX/SMIL/DTBook.
-
-Gravação e exportação de EPUB
-• Corrigido «Guardar como» nos documentos EPUB: ao escolher TXT ou outro formato, é agora aplicada a extensão selecionada em vez de se manter .epub.
-• A exportação de um EPUB para outro formato já não altera a associação do documento aberto. A cópia é criada separadamente, enquanto «Guardar» continua a atualizar o EPUB original aberto a partir da respetiva pasta.
-
-Gravações de rádio
-• Foi adicionado o atalho da tecla Delete para eliminar gravações de rádio. O Sonarpad pede agora confirmação antes de eliminar uma gravação.
-
-Documentação
-• Os guias foram reformulados e passam a incluir um índice para facilitar a consulta.
-
-Catálogo de vozes Google TTS
-• O catálogo descarregável de vozes Google TTS foi ampliado de 104 para 156 pacotes e de 53 para 81 variantes linguísticas.
-• Foram adicionados os 52 pacotes Chrome OS e Google Natural em falta para 28 idiomas, com as revisões verificadas mais recentes, endereços de transferência, somas SHA-256, tamanhos, dependências e identificadores internos dos locutores do catálogo compatível atual. O lituano usa a revisão r19 em vez dos antigos pacotes r17.
-• Foram adicionados em todos os idiomas da interface os nomes localizados de assamês, bodo, dogri, concani, caxemira, maithili, manipuri, odia, sânscrito, santali e sindi, bem como o nome do país Bósnia e Herzegovina.
-
-Janelas de ficheiros em alemão
-• Foi corrigido um problema da tradução alemã que impedia a apresentação de Abrir, Guardar como, gravação de audiolivros, transferências de podcasts e outras janelas de seleção de ficheiros, apesar de o comando de menu ou o atalho ser executado corretamente.
-• Os filtros das janelas de ficheiros aceitam agora tanto separadores \0 escritos como sequência como caracteres NUL incorporados, usando um filtro seguro quando uma tradução está malformada. Foi também removido do registo um falso erro inofensivo apresentado ao abrir o menu Ficheiro.
+Vozes e idiomas
+• O catálogo descarregável Google TTS passou de 104 para 156 pacotes e de 53 para 81 variantes linguísticas.
+• Foram adicionados novos pacotes Google TTS e nomes localizados para mais idiomas em toda a interface.
 
 Versão 0.8.4 – 2026-07-24
 

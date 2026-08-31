@@ -430,7 +430,7 @@ pub fn open(parent: HWND) {
             120,
             120,
             760,
-            620,
+            690,
             parent,
             HMENU(0),
             hinstance,

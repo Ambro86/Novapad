@@ -1,45 +1,35 @@
 # Journal des modifications
 
-Version 0.8.5 – 2026-07-25
+Version 0.9.0 – 2026-08-31
 
-Guide TV
-• Le guide TV affiche désormais les programmes dans une liste déroulante sélectionnable au lieu d’une liste de texte en lecture seule. Après avoir choisi un programme, Tab mène au nouveau bouton « Afficher le résumé du programme sélectionné », qui montre la description fournie par le service de guide.
+Audiodescription avec IA — nouvelle fonction principale
+• Ajout de « Créer une audiodescription avec IA » dans Outils > Multimédia. Sonarpad analyse l’audio pour repérer les espaces sans dialogue, génère les descriptions avec Gemini et utilise les moteurs vocaux déjà disponibles, sans parler par-dessus les dialogues.
+• Amélioration de la synchronisation entre les événements de la vidéo et les descriptions, avec des contrôles automatiques des temps générés par Gemini.
+• « Activer les pauses étendues » est désactivé par défaut. Cette option peut être activée pour les contenus très dialogués ou offrant peu d’espace afin de permettre l’insertion de descriptions plus longues.
+• Sonarpad peut essayer de reconnaître les personnages et d’utiliser leurs noms. Les catalogues de personnages peuvent être conservés entre les épisodes d’une série afin d’améliorer la continuité.
+• Il est possible d’enregistrer le projet, de modifier les descriptions plus tard et de réexporter sans tout régénérer avec Gemini.
+• Si le processus est interrompu, Sonarpad conserve la progression et permet de reprendre l’audiodescription. Si le quota Gemini est épuisé, il est possible d’attendre, de changer de modèle ou d’arrêter sans perdre le travail déjà terminé.
+• La fenêtre permet de choisir la langue, le niveau de détail, le modèle Gemini, le moteur et la voix, et mémorise les préférences utilisées.
+• Le module est disponible dans les 17 langues de Sonarpad. Pendant la génération, l’interface n’affiche que la progression, l’état courant et Annuler ; à la fin, le MP3 peut être ouvert directement dans le lecteur interne.
+
+Livres numériques et documents
+• Ajout de l’importation Kindle sans DRM aux formats MOBI, AZW et AZW3, avec texte et chapitres disponibles dans l’éditeur et l’index.
+• Ajout de la prise en charge de DAISY 2.02 et DAISY 3. Les livres audio DAISY utilisent le lecteur interne de Sonarpad et respectent la navigation et les limites des chapitres.
+• Kindle et DAISY sont importés sans écraser le fichier d’origine ; les Kindle protégés par DRM sont explicitement refusés.
+• Correction de « Enregistrer sous » pour les EPUB : lorsqu’un format TXT ou autre est choisi, l’extension sélectionnée est utilisée et l’EPUB original reste associé au document ouvert.
 
 RSS et articles
-• Ajout de « Sélectionner des articles… » au menu contextuel des articles RSS. Cette commande ouvre la même fenêtre accessible à cases à cocher que pour le téléchargement des playlists : Espace sélectionne ou désélectionne plusieurs articles, Tab mène à Supprimer et tous les articles choisis sont supprimés en une seule opération.
-• Les RSS prennent désormais en charge de véritables dossiers. Lors de l’importation OPML, les conteneurs `<outline>` imbriqués sont conservés au lieu d’être aplatis, les flux déjà présents sont rangés dans les dossiers importés sans duplication et l’exportation OPML conserve la même hiérarchie, y compris les dossiers vides.
-• Ajout de la commande localisée « Créer un nouveau dossier » au menu contextuel RSS, avec une boîte de dialogue accessible pour saisir le nom. Les nœuds de dossier utilisent le comportement natif de l’arborescence : Flèche droite développe, Flèche gauche réduit ; supprimer un dossier supprime toute sa branche et Ctrl+Z restaure en une seule opération le dossier, ses sous-dossiers et tous les flux qu’il contenait.
-• Les flux RSS peuvent maintenant être réordonnés dans leur dossier courant avec Déplacer vers le haut, Déplacer vers le bas, Déplacer en haut, Déplacer en bas et Déplacer à la position ; le réordonnancement ne déplace jamais un flux hors de son dossier.
+• Ajout de la sélection multiple des articles RSS pour en supprimer plusieurs en une seule opération.
+• RSS prend désormais en charge de véritables dossiers conservés lors de l’importation et de l’exportation OPML, y compris les dossiers vides.
+• Les flux peuvent être réordonnés dans le dossier courant avec Déplacer vers le haut, Déplacer vers le bas, Déplacer en haut, Déplacer en bas et Déplacer à la position.
 
-Enregistrements TV et audiodescriptions
-• Amélioration de la robustesse des horodatages Gemini pour les audiodescriptions : les horodatages mal formés `MM:SS:ms`, par exemple `01:13:473`, sont désormais normalisés sans perte en `MM:SS.ms` avant validation ; les contrôles existants de chunk et de créneau continuent de rejeter tout horodatage qui n’appartient pas à la scène courante.
-• Correction du focus clavier lorsque « Créer une audiodescription avec l’IA » s’ouvre automatiquement à la fin d’un enregistrement TV : la boucle de sélection TV encore active n’intercepte plus Tab, Espace, les flèches ni Échap destinés à la fenêtre d’audiodescription.
+Accessibilité, guides et interface
+• Les guides Sonarpad ont été réorganisés avec un index et un guide complet de l’Audiodescription avec IA a été ajouté.
+• Correction d’un problème de traduction allemande qui pouvait empêcher l’affichage d’Ouvrir, Enregistrer sous et d’autres fenêtres de sélection de fichiers.
 
-Formats de livres numériques
-• Ajout de l’import des Kindle sans DRM en MOBI, AZW et AZW3, avec flux non compressés, PalmDOC et HUFF/CDIC et variantes MOBI 6/KF8/AZW3. Texte, chapitres et titres apparaissent dans l’index Sonarpad.
-• Ajout de DAISY 2.02 (NCC + SMIL + XHTML) et DAISY 3 (OPF + NCX + DTBook), depuis des paquets .daisy/ZIP, des publications extraites et des fichiers DAISY ouverts directement. Les livres audio uniquement utilisent les libellés de navigation comme texte.
-• Les livres audio DAISY utilisent désormais le lecteur interne existant de Sonarpad : à l’ouverture, la table des matières DAISY apparaît, Entrée lit le chapitre choisi, Espace met en pause/reprend et Échap ferme le lecteur puis revient à l’index DAISY. Les limites SMIL clipBegin/clipEnd sont respectées et un chapitre peut se poursuivre automatiquement sur plusieurs fichiers audio.
-• Kindle et DAISY sont importés comme texte modifiable sans écraser l’e-book source ; Enregistrer utilise Enregistrer sous/exporter. Les Kindle avec DRM sont refusés explicitement.
-• MOBI/AZW/AZW3 et DAISY ont été ajoutés à Ouvrir dans les 17 langues et aux associations Windows. Les tests couvrent non compressé/PalmDOC/HUFF-CDIC, CDIC récursif, MOBI 6/8, DRM, DAISY 2.02/3 empaqueté/extrait et les entrées directes NCX/SMIL/DTBook.
-
-Enregistrement et exportation des EPUB
-• Correction de « Enregistrer sous » pour les documents EPUB : lorsque TXT ou un autre format est choisi, l’extension sélectionnée est désormais appliquée au lieu de conserver .epub.
-• L’exportation d’un EPUB vers un autre format ne modifie plus l’association du document ouvert. La copie est créée séparément, tandis que « Enregistrer » continue de mettre à jour l’EPUB original ouvert depuis son dossier.
-
-Enregistrements radio
-• Ajout de la touche Suppr comme raccourci pour supprimer les enregistrements radio. Sonarpad demande désormais une confirmation avant de supprimer un enregistrement.
-
-Documentation
-• Les guides ont été remaniés et comportent désormais un sommaire afin d’en faciliter la consultation.
-
-Catalogue des voix Google TTS
+Voix et langues
 • Le catalogue téléchargeable Google TTS passe de 104 à 156 paquets et de 53 à 81 variantes linguistiques.
-• Les 52 paquets Chrome OS et Google Natural manquants pour 28 langues ont été ajoutés avec les révisions vérifiées les plus récentes, les adresses de téléchargement, les sommes SHA-256, les tailles, les dépendances et les identifiants internes des locuteurs du catalogue compatible actuel. Le lituanien utilise la révision r19 au lieu des anciens paquets r17.
-• Les noms localisés de l’assamais, du bodo, du dogri, du konkani, du cachemiri, du maithili, du manipuri, de l’odia, du sanskrit, du santali et du sindhi, ainsi que le nom du pays Bosnie-Herzégovine, ont été ajoutés dans toutes les langues de l’interface.
-
-Boîtes de dialogue de fichiers en allemand
-• Correction d’un problème de la traduction allemande qui empêchait l’affichage d’Ouvrir, Enregistrer sous, de l’enregistrement des livres audio, du téléchargement des podcasts et d’autres boîtes de sélection de fichiers, bien que la commande de menu ou le raccourci soit correctement exécuté.
-• Les filtres des boîtes de dialogue acceptent désormais aussi bien les séparateurs \0 écrits sous forme de séquence que les caractères NUL intégrés, avec un filtre de secours sûr si une traduction est incorrecte. Une fausse erreur sans conséquence affichée dans le journal à l’ouverture du menu Fichier a également été supprimée.
+• Ajout de nouveaux paquets Google TTS et de noms localisés pour davantage de langues dans toute l’interface.
 
 Version 0.8.4 – 2026-07-24
 

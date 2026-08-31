@@ -43,12 +43,14 @@ class WindowsAudioDescriptionMediaPreparationTests(unittest.TestCase):
         self.assertIn("(*packet).dts <= last_dts", self.ffmpeg_source)
         self.assertIn("(*packet).pts < (*packet).dts", self.ffmpeg_source)
         self.assertIn("repaired_timestamp_packets", self.ffmpeg_source)
-        self.assertLess(
-            self.ffmpeg_source.index("av_packet_rescale_ts_safe"),
-            self.ffmpeg_source.index(
-                "let repaired_packet = repair_segment_packet_timestamps("
-            ),
+        segment_inner = self.ffmpeg_source.index("fn segment_media_file_inner")
+        rescale_pos = self.ffmpeg_source.index(
+            "av_packet_rescale_ts_safe", segment_inner
         )
+        repair_pos = self.ffmpeg_source.index(
+            "repair_segment_packet_timestamps(", rescale_pos
+        )
+        self.assertLess(rescale_pos, repair_pos)
 
     def test_audio_description_segmentation_tolerates_bounded_invalid_mkv_packets(self):
         self.assertIn(

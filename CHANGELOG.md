@@ -1,5 +1,13 @@
 # Changelog
 
+Version 0.9.2 – 2026-09-02
+
+AI Audio Description
+1. Fixed an issue that could cause AI Audio Description to fail during final MP3 export with videos containing multichannel audio such as 5.1. Sonarpad now automatically downmixes multichannel audio to stereo only when required for MP3 encoding, without changing mono or stereo exports.
+
+YouTube and streaming
+1. Fixed an issue where starting AI Audio Description from a video on page 2 or later of a YouTube playlist or channel could reopen the YouTube selection window and steal focus from the audio-description window. Sonarpad now closes the selector cleanly without returning to previous pages.
+
 Version 0.9.1 – 2026-09-01
 
 YouTube downloads

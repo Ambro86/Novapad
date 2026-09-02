@@ -1,5 +1,13 @@
 # Änderungsprotokoll
 
+Version 0.9.2 – 2026-09-02
+
+KI-Audiodeskription
+1. Ein Problem wurde behoben, durch das die KI-Audiodeskription beim abschließenden MP3-Export von Videos mit Mehrkanalton wie 5.1 fehlschlagen konnte. Sonarpad mischt Mehrkanalton jetzt nur dann automatisch auf Stereo herunter, wenn dies für die MP3-Kodierung erforderlich ist; Mono- und Stereo-Exporte bleiben unverändert.
+
+YouTube und Streaming
+1. Ein Problem wurde behoben, durch das beim Starten der KI-Audiodeskription für ein Video auf Seite 2 oder einer späteren Seite einer YouTube-Playlist oder eines Kanals das YouTube-Auswahlfenster erneut geöffnet werden und dem Audiodeskriptionsfenster den Fokus entziehen konnte. Sonarpad schließt die Auswahl nun korrekt, ohne zu vorherigen Seiten zurückzukehren.
+
 Version 0.9.1 – 2026-09-01
 
 YouTube-Downloads

@@ -2530,10 +2530,12 @@ pub fn change_audio_description_project_voice(
         &export_options,
         Some(&mut export_progress),
     ) {
-        crate::log_if_err!(
-            fs::remove_file(&export_target),
-            "Audio description cleanup operation failed"
-        );
+        if export_target.exists() {
+            crate::log_if_err!(
+                fs::remove_file(&export_target),
+                "Audio description cleanup operation failed"
+            );
+        }
         return if error == "cancelled" || cancel.load(Ordering::Relaxed) {
             Err(AudioDescriptionProjectVoiceError::Cancelled)
         } else {
@@ -2804,10 +2806,12 @@ pub fn reexport_audio_description_project(
         &export_options,
         Some(&mut export_progress),
     ) {
-        crate::log_if_err!(
-            fs::remove_file(&export_target),
-            "Audio description cleanup operation failed"
-        );
+        if export_target.exists() {
+            crate::log_if_err!(
+                fs::remove_file(&export_target),
+                "Audio description cleanup operation failed"
+            );
+        }
         return Err(error);
     }
     let output_metadata = fs::metadata(&export_target)
@@ -3257,10 +3261,12 @@ pub fn create_audio_description(
         Some(&mut export_progress),
     );
     if let Err(error) = export_result {
-        crate::log_if_err!(
-            fs::remove_file(&export_target),
-            "Audio description cleanup operation failed"
-        );
+        if export_target.exists() {
+            crate::log_if_err!(
+                fs::remove_file(&export_target),
+                "Audio description cleanup operation failed"
+            );
+        }
         return Err(error);
     }
     let output_metadata = fs::metadata(&export_target)

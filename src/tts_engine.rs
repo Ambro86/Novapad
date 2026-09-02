@@ -590,6 +590,12 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             crate::log_debug(&format!(
                 "TTS: shared cursor progress enabled for engine={engine_label}"
             ));
+            if tts_engine == TtsEngine::Sapi5 {
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: route selected=shared_cursor voice={} rate={} pitch={} volume={} has_tags={} has_pause={}",
+                    voice, tts_rate, tts_pitch, tts_volume, has_tags, has_pause
+                ));
+            }
         }
         queue_tts_playback_from_text(TtsQueuedPlayback {
             hwnd,
@@ -657,6 +663,10 @@ pub fn start_tts_from_caret(hwnd: HWND) {
             );
         }
         TtsEngine::Sapi5 => {
+            crate::log_debug(&format!(
+                "SAPI5 DIAG: route selected=direct voice={} rate={} pitch={} volume={}",
+                voice, tts_rate, tts_pitch, tts_volume
+            ));
             // Stop any existing playback
             stop_tts_playback(hwnd);
             let cancel = Arc::new(AtomicBool::new(false));

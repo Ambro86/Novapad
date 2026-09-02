@@ -1,5 +1,13 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.9.2 – 2026-09-02
+
+Mô tả âm thanh bằng AI
+1. Đã sửa lỗi có thể khiến mô tả âm thanh bằng AI thất bại trong bước xuất MP3 cuối cùng với các video có âm thanh đa kênh, chẳng hạn như 5.1. Sonarpad giờ tự động chuyển âm thanh đa kênh xuống stereo chỉ khi cần cho việc mã hóa MP3, không thay đổi các bản xuất mono hoặc stereo.
+
+YouTube và phát trực tuyến
+1. Đã sửa lỗi khiến khi bắt đầu mô tả âm thanh bằng AI cho video ở trang 2 hoặc các trang sau của danh sách phát hay kênh YouTube, cửa sổ chọn YouTube có thể mở lại và lấy tiêu điểm khỏi cửa sổ mô tả âm thanh. Sonarpad giờ đóng bộ chọn đúng cách mà không quay lại các trang trước.
+
 Phiên bản 0.9.1 – 2026-09-01
 
 Tải xuống YouTube

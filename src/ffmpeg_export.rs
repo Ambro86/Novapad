@@ -2063,6 +2063,12 @@ pub fn export_audio_description_mp3(
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
+    log_debug(&format!(
+        "Audio description export: staging WAV sample_rate={} channels={} final_mp3_channels={}",
+        sample_rate,
+        channels,
+        channels.min(2)
+    ));
     let mix_result = (|| -> Result<(), String> {
         let mut writer = hound::WavWriter::create(&temp_wav, wav_spec)
             .map_err(|error| format!("Audio description: create staging WAV failed: {error}"))?;
@@ -3564,6 +3570,15 @@ pub struct ConvertAudioSettings {
     pub quality: ConvertAudioQuality,
 }
 
+fn encoder_output_channels(format: ConvertAudioFormat, requested_channels: u16) -> u16 {
+    let requested_channels = requested_channels.max(1);
+    if matches!(format, ConvertAudioFormat::Mp3) {
+        requested_channels.min(2)
+    } else {
+        requested_channels
+    }
+}
+
 pub fn build_ffmpeg_args(settings: &ConvertAudioSettings) -> Vec<String> {
     match settings.format {
         ConvertAudioFormat::Mp3 => match settings.quality {
@@ -3910,7 +3925,17 @@ fn convert_audio_file_with_stream_index(
         FfmpegSource::try_new(input_path, 0, Some(pts_clock.clone()), Some(stream_index))?;
     let in_sample_rate = source.sample_rate();
     let in_channels = source.channels().max(1);
-    let out_channels = forced_channels.unwrap_or(in_channels).max(1);
+    let requested_out_channels = forced_channels.unwrap_or(in_channels).max(1);
+    // libmp3lame only supports mono/stereo. Keep every existing mono/stereo
+    // conversion untouched, but automatically downmix multichannel sources
+    // (for example 5.1 movie audio used by Audio Description) to stereo.
+    let out_channels = encoder_output_channels(settings.format, requested_out_channels);
+    if out_channels != requested_out_channels {
+        log_debug(&format!(
+            "FFmpeg MP3: downmixing {} input/output channels to stereo for libmp3lame",
+            requested_out_channels
+        ));
+    }
     let total_duration = source.total_duration();
     let total_duration_us = total_duration.and_then(|d| {
         let micros = d.as_micros();
@@ -4049,11 +4074,16 @@ fn convert_audio_file_with_stream_index(
 
     let open_ret = crate::ffmpeg_source::avcodec_open2_safe(api, codec_ctx, codec, ptr::null_mut());
     if open_ret < 0 {
+        let ffmpeg_error = ffmpeg_error_text(api, open_ret);
+        log_debug(&format!(
+            "FFmpeg: failed to open encoder format={:?} sample_rate={} channels={} bitrate={:?}: {}",
+            settings.format, out_sample_rate, out_channels, settings.quality, ffmpeg_error
+        ));
         unsafe {
             (api.avcodec_free_context)(&mut codec_ctx);
             (api.avformat_free_context)(out_ctx);
         }
-        return Err("FFmpeg: failed to open encoder".to_string());
+        return Err(format!("FFmpeg: failed to open encoder: {ffmpeg_error}"));
     }
 
     unsafe {
@@ -4521,6 +4551,15 @@ mod convert_tests {
         assert_eq!(validate_mp3_bitrate(64).unwrap(), 64);
         assert_eq!(validate_mp3_bitrate(320).unwrap(), 320);
         assert!(validate_mp3_bitrate(321).is_err());
+    }
+
+    #[test]
+    fn test_mp3_channel_policy_keeps_mono_stereo_and_downmixes_multichannel() {
+        assert_eq!(encoder_output_channels(ConvertAudioFormat::Mp3, 1), 1);
+        assert_eq!(encoder_output_channels(ConvertAudioFormat::Mp3, 2), 2);
+        assert_eq!(encoder_output_channels(ConvertAudioFormat::Mp3, 6), 2);
+        assert_eq!(encoder_output_channels(ConvertAudioFormat::Mp3, 8), 2);
+        assert_eq!(encoder_output_channels(ConvertAudioFormat::Aac, 6), 6);
     }
 
     #[test]

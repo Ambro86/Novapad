@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use windows::Win32::Foundation::VARIANT_BOOL;
 use windows::Win32::Media::Audio::{WAVE_FORMAT_PCM, WAVEFORMATEX};
@@ -43,6 +43,55 @@ const SAPI_VOICES_PATH_HKCU_STR: &str = r"HKEY_CURRENT_USER\SOFTWARE\Microsoft\S
 const ONECORE_VOICES_PATH_HKCU_STR: &str =
     r"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Speech_OneCore\Voices";
 static SAPI5_TMP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+fn next_sapi_diag_wait_threshold_ms(current: u128) -> u128 {
+    match current {
+        1_000 => 5_000,
+        5_000 => 15_000,
+        15_000 => 30_000,
+        30_000 => 60_000,
+        _ => current.saturating_add(60_000),
+    }
+}
+
+fn log_sapi_diag_wait_if_due(
+    route: &str,
+    chunk_idx: usize,
+    started: Instant,
+    status: &SPVOICESTATUS,
+    next_log_ms: &mut u128,
+) {
+    let elapsed_ms = started.elapsed().as_millis();
+    if elapsed_ms < *next_log_ms {
+        return;
+    }
+    crate::log_debug(&format!(
+        "SAPI5 DIAG: wait route={} chunk={} elapsed_ms={} running_state={} stream={} word_pos={} word_len={}",
+        route,
+        chunk_idx,
+        elapsed_ms,
+        status.dwRunningState,
+        status.ulCurrentStream,
+        status.ulInputWordPos,
+        status.ulInputWordLen
+    ));
+    *next_log_ms = next_sapi_diag_wait_threshold_ms(*next_log_ms);
+}
+
+fn log_sapi_diag_output_file(route: &str, path: &Path) {
+    match std::fs::metadata(path) {
+        Ok(metadata) => crate::log_debug(&format!(
+            "SAPI5 DIAG: output route={} path={:?} size_bytes={}",
+            route,
+            path,
+            metadata.len()
+        )),
+        Err(err) => crate::log_debug(&format!(
+            "SAPI5 DIAG: output metadata failed route={} path={:?} error={}",
+            route, path, err
+        )),
+    }
+}
 
 fn repair_wav_header_sizes_if_needed(path: &Path) -> Result<bool, String> {
     let file_size = std::fs::metadata(path).map_err(|e| e.to_string())?.len();
@@ -482,8 +531,22 @@ pub fn play_sapi(
     const HARD_PAUSE_IMMEDIATE: bool = false;
 
     std::thread::spawn(move || {
+        let thread_id = std::thread::current().id();
+        crate::log_debug(&format!(
+            "SAPI5 DIAG: playback start route=direct thread={:?} chunks={} voice={} rate={} mapped_rate={} pitch={} volume={}",
+            thread_id,
+            chunks.len(),
+            voice_name,
+            tts_rate,
+            map_sapi_rate(tts_rate),
+            tts_pitch,
+            tts_volume
+        ));
         let _com = match ComGuard::new_sta() {
-            Ok(g) => g,
+            Ok(g) => {
+                crate::log_debug("SAPI5 DIAG: playback COM initialized route=direct");
+                g
+            }
             Err(e) => {
                 crate::log_debug(&format!("SAPI playback: CoInitializeEx failed: {:?}", e));
                 return;
@@ -494,17 +557,29 @@ pub fn play_sapi(
             let voice_res: windows::core::Result<ISpVoice> =
                 crate::co_create_instance_safe(&SpVoice, None, CLSCTX_ALL);
             let voice = match voice_res {
-                Ok(v) => v,
+                Ok(v) => {
+                    crate::log_debug("SAPI5 DIAG: SpVoice created route=direct");
+                    v
+                }
                 Err(e) => {
                     crate::log_debug(&format!("SAPI playback: Failed to create SpVoice: {}", e));
                     return;
                 }
             };
 
-            if let Some(token) = find_voice_token(&voice_name)
-                && let Err(e) = voice.SetVoice(&token)
-            {
-                crate::log_debug(&format!("Failed to set SAPI5 voice: {}", e));
+            if let Some(token) = find_voice_token(&voice_name) {
+                match voice.SetVoice(&token) {
+                    Ok(()) => crate::log_debug(&format!(
+                        "SAPI5 DIAG: SetVoice ok route=direct voice={}",
+                        voice_name
+                    )),
+                    Err(e) => crate::log_debug(&format!("Failed to set SAPI5 voice: {}", e)),
+                }
+            } else {
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: voice token not found route=direct voice={}",
+                    voice_name
+                ));
             }
             if let Err(e) = voice.SetRate(map_sapi_rate(tts_rate)) {
                 crate::log_debug(&format!("Failed to set SAPI5 rate: {}", e));
@@ -520,6 +595,9 @@ pub fn play_sapi(
                         crate::log_debug(&format!("Failed to set SAPI5 audio output: {}", e));
                         None
                     } else {
+                        crate::log_debug(
+                            "SAPI5 DIAG: SetOutput ok route=direct output=SpMMAudioOut",
+                        );
                         Some(audio)
                     }
                 }
@@ -556,8 +634,10 @@ pub fn play_sapi(
             let mut paused = false;
             let mut paused_by_purge = false;
             let mut pending: VecDeque<String> = VecDeque::from(chunks);
+            let mut diagnostic_chunk_index = 0usize;
 
             while let Some(chunk) = pending.pop_front() {
+                diagnostic_chunk_index = diagnostic_chunk_index.saturating_add(1);
                 // Wait here if a pause was requested between chunks.
                 while paused {
                     if cancel.load(Ordering::Relaxed) {
@@ -616,12 +696,25 @@ pub fn play_sapi(
                 let mut last_word_stream_pos_utf16 = 0usize;
                 let mut has_word_boundary = false;
                 let chunk_wide = to_wide(&ssml);
-                if let Err(e) = voice.Speak(
+                let chunk_started = Instant::now();
+                let mut next_wait_log_ms = 1_000u128;
+                let mut status_error_logged = false;
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: Speak start route=direct chunk={} text_len={} ssml_len={}",
+                    diagnostic_chunk_index,
+                    current_chunk.len(),
+                    ssml.len()
+                ));
+                match voice.Speak(
                     PCWSTR(chunk_wide.as_ptr()),
                     (SPF_ASYNC.0 | SPF_IS_XML.0) as u32,
                     None,
                 ) {
-                    crate::log_debug(&format!("SAPI5 chunk Speak failed: {}", e));
+                    Ok(_) => crate::log_debug(&format!(
+                        "SAPI5 DIAG: Speak accepted route=direct chunk={}",
+                        diagnostic_chunk_index
+                    )),
+                    Err(e) => crate::log_debug(&format!("SAPI5 chunk Speak failed: {}", e)),
                 }
 
                 loop {
@@ -748,10 +841,35 @@ pub fn play_sapi(
                     }
 
                     let mut status = SPVOICESTATUS::default();
-                    if voice.GetStatus(&mut status, std::ptr::null_mut()).is_ok()
-                        && status.dwRunningState == SPRS_DONE.0 as u32
-                    {
-                        break;
+                    match voice.GetStatus(&mut status, std::ptr::null_mut()) {
+                        Ok(()) => {
+                            log_sapi_diag_wait_if_due(
+                                "direct",
+                                diagnostic_chunk_index,
+                                chunk_started,
+                                &status,
+                                &mut next_wait_log_ms,
+                            );
+                            if status.dwRunningState == SPRS_DONE.0 as u32 {
+                                crate::log_debug(&format!(
+                                    "SAPI5 DIAG: chunk done route=direct chunk={} elapsed_ms={} word_pos={} word_len={}",
+                                    diagnostic_chunk_index,
+                                    chunk_started.elapsed().as_millis(),
+                                    status.ulInputWordPos,
+                                    status.ulInputWordLen
+                                ));
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            if !status_error_logged {
+                                crate::log_debug(&format!(
+                                    "SAPI5 DIAG: GetStatus failed route=direct chunk={} error={}",
+                                    diagnostic_chunk_index, e
+                                ));
+                                status_error_logged = true;
+                            }
+                        }
                     }
                     std::thread::sleep(Duration::from_millis(COMMAND_POLL_MS as u64));
                 }
@@ -786,9 +904,21 @@ impl SapiVoice {
 }
 
 fn configure_sapi_voice(voice: &ISpVoice, options: &SapiExportOptions) -> Result<(), String> {
+    crate::log_debug(&format!(
+        "SAPI5 DIAG: locating voice token route=file voice={}",
+        options.voice_name
+    ));
     let voice_token = find_voice_token(options.voice_name).ok_or_else(|| {
+        crate::log_debug(&format!(
+            "SAPI5 DIAG: voice token not found route=file voice={}",
+            options.voice_name
+        ));
         "Selected SAPI voice not found. Please select a voice in Options.".to_string()
     })?;
+    crate::log_debug(&format!(
+        "SAPI5 DIAG: voice token found route=file voice={}",
+        options.voice_name
+    ));
     unsafe {
         voice
             .SetVoice(&voice_token)
@@ -797,6 +927,14 @@ fn configure_sapi_voice(voice: &ISpVoice, options: &SapiExportOptions) -> Result
     crate::log_debug(&format!(
         "SAPI: voice set. voice_name={}",
         options.voice_name
+    ));
+    crate::log_debug(&format!(
+        "SAPI5 DIAG: voice configured route=file voice={} rate={} mapped_rate={} pitch={} volume={}",
+        options.voice_name,
+        options.rate,
+        map_sapi_rate(options.rate),
+        options.pitch,
+        options.volume
     ));
     if let Err(e) = unsafe { voice.SetRate(map_sapi_rate(options.rate)) } {
         crate::log_debug(&format!("Failed to set SAPI5 rate: {}", e));
@@ -880,6 +1018,14 @@ fn speak_sapi_to_file_with_voice(
             "SAPI: is_mp3={}, output_path={:?}",
             is_mp3, options.output_path
         ));
+        crate::log_debug(&format!(
+            "SAPI5 DIAG: file render begin thread={:?} chunks={} voice={} output={:?} format={}",
+            std::thread::current().id(),
+            options.chunks.len(),
+            options.voice_name,
+            options.output_path,
+            if is_mp3 { "mp3-via-wav-parts" } else { "wav" }
+        ));
         configure_sapi_voice(voice, &options)?;
 
         let mut wfx = WAVEFORMATEX::default();
@@ -890,6 +1036,19 @@ fn speak_sapi_to_file_with_voice(
         wfx.nBlockAlign = wfx.nChannels * (wfx.wBitsPerSample / 8);
         wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * (wfx.nBlockAlign as u32);
         wfx.cbSize = 0;
+        let wav_channels = wfx.nChannels;
+        let wav_sample_rate = wfx.nSamplesPerSec;
+        let wav_bits_per_sample = wfx.wBitsPerSample;
+        let wav_block_align = wfx.nBlockAlign;
+        let wav_avg_bytes_per_sec = wfx.nAvgBytesPerSec;
+        crate::log_debug(&format!(
+            "SAPI5 DIAG: target wav format channels={} sample_rate={} bits={} block_align={} avg_bytes_per_sec={}",
+            wav_channels,
+            wav_sample_rate,
+            wav_bits_per_sample,
+            wav_block_align,
+            wav_avg_bytes_per_sec
+        ));
 
         if is_mp3 {
             let non_empty_chunks: Vec<(usize, &String)> = options
@@ -943,9 +1102,18 @@ fn speak_sapi_to_file_with_voice(
                 let part_wav = temp_root.join(format!("part_{:06}.wav", part_no));
                 let part_mp3 = temp_root.join(format!("part_{:06}.mp3", part_no));
 
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: SpFileStream create start route=mp3-part chunk={} path={:?}",
+                    *chunk_idx + 1,
+                    part_wav
+                ));
                 let stream: ISpStream =
                     crate::co_create_instance_safe(&SpFileStream, None, CLSCTX_ALL)
                         .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: SpFileStream created route=mp3-part chunk={}",
+                    *chunk_idx + 1
+                ));
                 let path_wide = to_wide(part_wav.to_str().ok_or("Invalid path")?);
                 let mut bind_ok = false;
                 let mut bind_err = String::new();
@@ -958,6 +1126,11 @@ fn speak_sapi_to_file_with_voice(
                         0,
                     ) {
                         Ok(()) => {
+                            crate::log_debug(&format!(
+                                "SAPI5 DIAG: BindToFile ok route=mp3-part chunk={} attempt={}",
+                                *chunk_idx + 1,
+                                attempt
+                            ));
                             bind_ok = true;
                             break;
                         }
@@ -975,9 +1148,17 @@ fn speak_sapi_to_file_with_voice(
                     return Err(format!("BindToFile failed: {}", bind_err));
                 }
 
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: SetOutput start route=mp3-part chunk={}",
+                    *chunk_idx + 1
+                ));
                 voice
                     .SetOutput(&stream, true)
                     .map_err(|e| format!("SetOutput failed: {}", e))?;
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: SetOutput ok route=mp3-part chunk={}",
+                    *chunk_idx + 1
+                ));
 
                 crate::log_debug(&format!(
                     "SAPI: chunk start. idx={} len={}",
@@ -986,6 +1167,14 @@ fn speak_sapi_to_file_with_voice(
                 ));
                 let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
                 let chunk_wide = to_wide(&ssml);
+                let chunk_started = Instant::now();
+                let mut next_wait_log_ms = 1_000u128;
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: Speak start route=mp3-part chunk={} text_len={} ssml_len={}",
+                    *chunk_idx + 1,
+                    chunk.len(),
+                    ssml.len()
+                ));
                 voice
                     .Speak(
                         PCWSTR(chunk_wide.as_ptr()),
@@ -993,8 +1182,17 @@ fn speak_sapi_to_file_with_voice(
                         None,
                     )
                     .map_err(|e| format!("Speak failed: {}", e))?;
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: Speak accepted route=mp3-part chunk={}",
+                    *chunk_idx + 1
+                ));
                 loop {
                     if options.cancel.load(Ordering::Relaxed) {
+                        crate::log_debug(&format!(
+                            "SAPI5 DIAG: cancellation route=mp3-part chunk={} elapsed_ms={}",
+                            *chunk_idx + 1,
+                            chunk_started.elapsed().as_millis()
+                        ));
                         if let Err(e) =
                             voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
                         {
@@ -1039,14 +1237,38 @@ fn speak_sapi_to_file_with_voice(
                     voice
                         .GetStatus(&mut status, std::ptr::null_mut())
                         .map_err(|e| format!("GetStatus failed: {}", e))?;
+                    log_sapi_diag_wait_if_due(
+                        "mp3-part",
+                        *chunk_idx + 1,
+                        chunk_started,
+                        &status,
+                        &mut next_wait_log_ms,
+                    );
                     if status.dwRunningState == SPRS_DONE.0 as u32 {
+                        crate::log_debug(&format!(
+                            "SAPI5 DIAG: synthesis done route=mp3-part chunk={} elapsed_ms={} word_pos={} word_len={}",
+                            *chunk_idx + 1,
+                            chunk_started.elapsed().as_millis(),
+                            status.ulInputWordPos,
+                            status.ulInputWordLen
+                        ));
                         break;
                     }
                     std::thread::sleep(Duration::from_millis(10));
                 }
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: stream close start route=mp3-part chunk={}",
+                    *chunk_idx + 1
+                ));
                 if let Err(e) = stream.Close() {
                     crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
+                } else {
+                    crate::log_debug(&format!(
+                        "SAPI5 DIAG: stream close ok route=mp3-part chunk={}",
+                        *chunk_idx + 1
+                    ));
                 }
+                log_sapi_diag_output_file("mp3-part", &part_wav);
                 crate::log_debug(&format!("SAPI: chunk done. idx={}", *chunk_idx + 1));
 
                 match crate::audio_utils::get_wav_data_size(&part_wav) {
@@ -1132,9 +1354,15 @@ fn speak_sapi_to_file_with_voice(
         } else {
             let wav_path = options.output_path.to_path_buf();
             crate::log_debug(&format!("SAPI: Target wav_path={:?}", wav_path));
+            crate::log_debug(&format!(
+                "SAPI5 DIAG: SpFileStream create start route=wav path={:?}",
+                wav_path
+            ));
             let stream: ISpStream = crate::co_create_instance_safe(&SpFileStream, None, CLSCTX_ALL)
                 .map_err(|e| format!("Failed to create SpFileStream: {}", e))?;
+            crate::log_debug("SAPI5 DIAG: SpFileStream created route=wav");
             let path_wide = to_wide(wav_path.to_str().ok_or("Invalid path")?);
+            crate::log_debug("SAPI5 DIAG: BindToFile start route=wav");
             stream
                 .BindToFile(
                     PCWSTR(path_wide.as_ptr()),
@@ -1144,9 +1372,12 @@ fn speak_sapi_to_file_with_voice(
                     0,
                 )
                 .map_err(|e| format!("BindToFile failed: {}", e))?;
+            crate::log_debug("SAPI5 DIAG: BindToFile ok route=wav");
+            crate::log_debug("SAPI5 DIAG: SetOutput start route=wav");
             voice
                 .SetOutput(&stream, true)
                 .map_err(|e| format!("SetOutput failed: {}", e))?;
+            crate::log_debug("SAPI5 DIAG: SetOutput ok route=wav");
 
             crate::log_debug(&format!(
                 "SAPI: entering chunk loop. chunks={}",
@@ -1172,6 +1403,14 @@ fn speak_sapi_to_file_with_voice(
                 ));
                 let ssml = mk_sapi_ssml(chunk, options.rate, options.pitch, options.volume);
                 let chunk_wide = to_wide(&ssml);
+                let chunk_started = Instant::now();
+                let mut next_wait_log_ms = 1_000u128;
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: Speak start route=wav chunk={} text_len={} ssml_len={}",
+                    i + 1,
+                    chunk.len(),
+                    ssml.len()
+                ));
                 voice
                     .Speak(
                         PCWSTR(chunk_wide.as_ptr()),
@@ -1179,8 +1418,17 @@ fn speak_sapi_to_file_with_voice(
                         None,
                     )
                     .map_err(|e| format!("Speak failed: {}", e))?;
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: Speak accepted route=wav chunk={}",
+                    i + 1
+                ));
                 loop {
                     if options.cancel.load(Ordering::Relaxed) {
+                        crate::log_debug(&format!(
+                            "SAPI5 DIAG: cancellation route=wav chunk={} elapsed_ms={}",
+                            i + 1,
+                            chunk_started.elapsed().as_millis()
+                        ));
                         if let Err(e) =
                             voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None)
                         {
@@ -1209,7 +1457,21 @@ fn speak_sapi_to_file_with_voice(
                     voice
                         .GetStatus(&mut status, std::ptr::null_mut())
                         .map_err(|e| format!("GetStatus failed: {}", e))?;
+                    log_sapi_diag_wait_if_due(
+                        "wav",
+                        i + 1,
+                        chunk_started,
+                        &status,
+                        &mut next_wait_log_ms,
+                    );
                     if status.dwRunningState == SPRS_DONE.0 as u32 {
+                        crate::log_debug(&format!(
+                            "SAPI5 DIAG: synthesis done route=wav chunk={} elapsed_ms={} word_pos={} word_len={}",
+                            i + 1,
+                            chunk_started.elapsed().as_millis(),
+                            status.ulInputWordPos,
+                            status.ulInputWordLen
+                        ));
                         break;
                     }
                     std::thread::sleep(Duration::from_millis(10));
@@ -1217,9 +1479,13 @@ fn speak_sapi_to_file_with_voice(
                 crate::log_debug(&format!("SAPI: chunk done. idx={}", i + 1));
                 progress_callback(i + 1);
             }
+            crate::log_debug("SAPI5 DIAG: stream close start route=wav");
             if let Err(e) = stream.Close() {
                 crate::log_debug(&format!("Failed to close SAPI5 stream: {}", e));
+            } else {
+                crate::log_debug("SAPI5 DIAG: stream close ok route=wav");
             }
+            log_sapi_diag_output_file("wav", &wav_path);
         }
 
         Ok(())
@@ -1243,7 +1509,13 @@ pub fn speak_sapi_to_file(
         options.output_path
     ));
     let voice = SapiVoice::new()?;
-    speak_sapi_to_file_with_voice(&voice.voice, options, &mut progress_callback)
+    crate::log_debug("SAPI5 DIAG: SpVoice created route=file");
+    let result = speak_sapi_to_file_with_voice(&voice.voice, options, &mut progress_callback);
+    match &result {
+        Ok(()) => crate::log_debug("SAPI5 DIAG: file render completed"),
+        Err(err) => crate::log_debug(&format!("SAPI5 DIAG: file render failed error={}", err)),
+    }
+    result
 }
 
 pub fn speak_sapi_to_file_with_sapi_voice(

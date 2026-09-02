@@ -1,5 +1,13 @@
 # Ändringslogg
 
+Version 0.9.2 – 2026-09-02
+
+AI-syntolkning
+1. Åtgärdade ett problem som kunde göra att AI-syntolkning misslyckades vid den slutliga MP3-exporten för videor med flerkanalsljud, till exempel 5.1. Sonarpad mixar nu automatiskt ned flerkanalsljud till stereo endast när det krävs för MP3-kodning, utan att ändra mono- eller stereoexporter.
+
+YouTube och strömning
+1. Åtgärdade ett problem där start av AI-syntolkning för en video på sida 2 eller senare i en YouTube-spellista eller kanal kunde öppna YouTube-valfönstret igen och ta fokus från syntolkningsfönstret. Sonarpad stänger nu väljaren korrekt utan att gå tillbaka till föregående sidor.
+
 Version 0.9.1 – 2026-09-01
 
 YouTube-nedladdningar

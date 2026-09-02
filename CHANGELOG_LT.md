@@ -1,5 +1,13 @@
 # Pakeitimų žurnalas
 
+Versija 0.9.2 – 2026-09-02
+
+AI garsinis vaizdavimas
+1. Ištaisyta problema, dėl kurios AI garsinis vaizdavimas galėjo nepavykti galutinio MP3 eksportavimo metu, kai vaizdo įraše yra daugiakanalis garsas, pavyzdžiui, 5.1. Dabar Sonarpad automatiškai konvertuoja daugiakanalį garsą į stereo tik tada, kai to reikia MP3 kodavimui, nekeisdamas mono ar stereo eksporto.
+
+YouTube ir srautinis turinys
+1. Ištaisyta problema, kai paleidus AI garsinį vaizdavimą vaizdo įrašui, esančiam 2-ame ar vėlesniame YouTube grojaraščio arba kanalo puslapyje, galėjo vėl atsidaryti YouTube pasirinkimo langas ir perimti fokusą iš garsinio vaizdavimo lango. Dabar Sonarpad teisingai uždaro pasirinkimo langą negrįždamas į ankstesnius puslapius.
+
 Versija 0.9.1 – 2026-09-01
 
 YouTube atsisiuntimai

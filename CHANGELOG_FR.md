@@ -1,5 +1,13 @@
 # Journal des modifications
 
+Version 0.9.2 – 2026-09-02
+
+Audiodescription par IA
+1. Correction d’un problème qui pouvait faire échouer l’audiodescription par IA lors de l’export final en MP3 avec des vidéos contenant un son multicanal, par exemple en 5.1. Sonarpad convertit désormais automatiquement le son multicanal en stéréo uniquement lorsque cela est nécessaire pour l’encodage MP3, sans modifier les exports mono ou stéréo.
+
+YouTube et streaming
+1. Correction d’un problème où le lancement de Créer une audiodescription par IA depuis une vidéo située à la page 2 ou suivante d’une playlist ou d’une chaîne YouTube pouvait rouvrir la fenêtre de sélection YouTube et retirer le focus à la fenêtre d’audiodescription. Sonarpad ferme désormais correctement le sélecteur sans revenir aux pages précédentes.
+
 Version 0.9.1 – 2026-09-01
 
 Téléchargements YouTube

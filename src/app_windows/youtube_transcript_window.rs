@@ -288,6 +288,11 @@ pub(crate) fn context_audio_description_keeps_window_foreground(parent: HWND) ->
     YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT.load(Ordering::SeqCst) == parent.0
 }
 
+fn context_stream_selector_unwind_pending(parent: HWND) -> bool {
+    YOUTUBE_CONTEXT_TRANSCRIPTION_UNWIND_PARENT.load(Ordering::SeqCst) == parent.0
+        || YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_UNWIND_PARENT.load(Ordering::SeqCst) == parent.0
+}
+
 pub(crate) fn finish_context_audio_description(parent: HWND) {
     if YOUTUBE_CONTEXT_AUDIO_DESCRIPTION_FOCUS_PARENT
         .compare_exchange(parent.0, 0, Ordering::SeqCst, Ordering::SeqCst)
@@ -6290,6 +6295,13 @@ fn choose_youtube_collection_entry(
                 .filter(|_| page == initial_page.unwrap_or(0)),
             download_options: playlist_download_options,
         }) else {
+            if context_stream_selector_unwind_pending(parent) {
+                crate::log_debug(&format!(
+                    "stream transition [collection_probe.context_unwind]: page={} returning without reopening previous page",
+                    page
+                ));
+                return Ok(None);
+            }
             if page > 0 {
                 crate::log_debug(&format!(
                     "stream transition [collection_probe.cancel_previous]: current_page={} next_page={}",
@@ -6370,7 +6382,15 @@ fn choose_youtube_collection_entry(
                         }
                         return Ok(Some(selection));
                     }
-                    None => continue,
+                    None => {
+                        if context_stream_selector_unwind_pending(parent) {
+                            crate::log_debug(
+                                "stream transition [collection_probe.nested_context_unwind]: returning without reopening parent collection",
+                            );
+                            return Ok(None);
+                        }
+                        continue;
+                    }
                 }
             }
             crate::log_debug(&format!(
@@ -6478,6 +6498,13 @@ fn choose_youtube_search_entry(
             initial_selected_label: initial_selected_label.filter(|_| page == 0),
             download_options: playlist_download_options,
         }) else {
+            if context_stream_selector_unwind_pending(parent) {
+                crate::log_debug(&format!(
+                    "stream transition [search_probe.context_unwind]: page={} returning without reopening previous page",
+                    page
+                ));
+                return Ok(None);
+            }
             if page > 0 {
                 crate::log_debug(&format!(
                     "stream transition [search_probe.cancel_previous]: current_page={} next_page={}",
@@ -6532,7 +6559,15 @@ fn choose_youtube_search_entry(
                         }
                         return Ok(Some(selection));
                     }
-                    None => continue,
+                    None => {
+                        if context_stream_selector_unwind_pending(parent) {
+                            crate::log_debug(
+                                "stream transition [search_probe.nested_context_unwind]: returning without reopening search results",
+                            );
+                            return Ok(None);
+                        }
+                        continue;
+                    }
                 }
             }
             return Ok(Some(ResolvedStreamSelection {

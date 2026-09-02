@@ -4,6 +4,7 @@ Verze 0.9.2 – 2026-09-02
 
 Audiopopis s AI
 1. Opraven problém, který mohl způsobit selhání audiopopisu s AI při závěrečném exportu do MP3 u videí s vícekanálovým zvukem, například 5.1. Sonarpad nyní automaticky převádí vícekanálový zvuk na stereo pouze tehdy, když je to nutné pro kódování MP3, aniž by měnil export mono nebo stereo zvuku.
+2. Při spuštění audiopopisu s AI u videa s více zvukovými stopami se Sonarpad nyní před zpracováním zeptá, kterou stopu použít. Přístupný rozbalovací seznam lze měnit šipkami; OK spustí audiopopis s vybranou stopou, zatímco Zrušit zavře okno audiopopisu a vrátí fokus do editoru Sonarpadu.
 
 YouTube a streamování
 1. Opraven problém, kdy při spuštění audiopopisu s AI u videa na stránce 2 nebo další stránce playlistu či kanálu YouTube mohlo dojít k opětovnému otevření okna výběru YouTube a odebrání fokusu oknu audiopopisu. Sonarpad nyní výběr správně zavře bez návratu na předchozí stránky.

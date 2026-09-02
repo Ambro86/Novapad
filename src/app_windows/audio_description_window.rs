@@ -1528,6 +1528,91 @@ fn set_controls_enabled(state: &WindowState, enabled: bool) {
     }
 }
 
+fn audio_description_track_label(
+    ordinal: usize,
+    track: &crate::ffmpeg_source::AudioStreamInfo,
+) -> String {
+    let mut names = Vec::new();
+    if let Some(title) = track
+        .title
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        names.push(title.to_string());
+    }
+    if let Some(language) = track
+        .language
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        && !names
+            .iter()
+            .any(|value| value.eq_ignore_ascii_case(language))
+    {
+        names.push(language.to_string());
+    }
+    if names.is_empty() {
+        names.push(track.codec.clone());
+    }
+    format!(
+        "{}. {} ({}; {} ch)",
+        ordinal + 1,
+        names.join(" - "),
+        track.codec,
+        track.channels.max(1)
+    )
+}
+
+fn choose_audio_description_track(
+    hwnd: HWND,
+    state: &WindowState,
+    input: &Path,
+) -> Result<Option<Option<i32>>, String> {
+    let tracks = crate::ffmpeg_source::list_audio_streams(input)
+        .map_err(|error| format!("Audio description: FFmpeg stream inspection failed: {error}"))?;
+    if tracks.len() <= 1 {
+        return Ok(Some(None));
+    }
+
+    let default_selection = tracks
+        .iter()
+        .position(|track| track.is_default)
+        .unwrap_or(0);
+    let options = tracks
+        .iter()
+        .enumerate()
+        .map(|(index, track)| audio_description_track_label(index, track))
+        .collect::<Vec<_>>();
+    crate::log_debug(&format!(
+        "Audio description: multiple audio tracks detected count={} default_selection={}",
+        tracks.len(),
+        default_selection
+    ));
+    let selected = crate::app_windows::youtube_transcript_window::choose_combo_option_dialog(
+        hwnd,
+        state.language,
+        i18n::tr(state.language, "playback.audio_track"),
+        i18n::tr(state.language, "playback.audio_track"),
+        options,
+        default_selection,
+    );
+    let Some(selected) = selected else {
+        crate::log_debug(
+            "Audio description: audio track selection cancelled; closing creation window",
+        );
+        return Ok(None);
+    };
+    let track = tracks
+        .get(selected)
+        .ok_or_else(|| "Audio description: selected audio track no longer exists".to_string())?;
+    crate::log_debug(&format!(
+        "Audio description: selected audio track stream_index={} title={:?} language={:?} codec={} channels={} default={}",
+        track.index, track.title, track.language, track.codec, track.channels, track.is_default
+    ));
+    Ok(Some(Some(track.index)))
+}
+
 fn start_job(hwnd: HWND, state: &mut WindowState) {
     let labels = labels(state.language);
     let gemini_api_key = get_text(state.gemini_api_key_edit).trim().to_string();
@@ -1573,6 +1658,19 @@ fn start_job(hwnd: HWND, state: &mut WindowState) {
             show_error(state.parent, state.language, &labels.error_same_path);
             return;
         }
+        let audio_stream_index = match choose_audio_description_track(hwnd, state, &input) {
+            Ok(Some(index)) => index,
+            Ok(None) => {
+                unsafe {
+                    crate::log_if_err!(PostMessageW(hwnd, WM_CLOSE, WPARAM(0), LPARAM(0)));
+                }
+                return;
+            }
+            Err(error) => {
+                show_error(state.parent, state.language, &error);
+                return;
+            }
+        };
         crate::app_windows::audio_description_resume_window::remember_project_folder(
             state.parent,
             &output,
@@ -1619,6 +1717,7 @@ fn start_job(hwnd: HWND, state: &mut WindowState) {
         let job = AudioDescriptionJob {
             input_path: input,
             output_path: output,
+            audio_stream_index,
             language_code: language_code(description_language).to_string(),
             tts_language: description_language,
             verbosity: selected_verbosity(state.verbosity_combo),

@@ -4,6 +4,7 @@ Verzija 0.9.2 – 2026-09-02
 
 AI audio-deskripcija
 1. Ispravljen je problem zbog kog je AI audio-deskripcija mogla da ne uspe tokom završnog izvoza u MP3 kod video zapisa sa višekanalnim zvukom, na primer 5.1. Sonarpad sada automatski pretvara višekanalni zvuk u stereo samo kada je to potrebno za MP3 kodiranje, bez promena mono ili stereo izvoza.
+2. Kada se pokrene AI audio-deskripcija za video sa više zvučnih zapisa, Sonarpad sada pre obrade traži izbor zapisa koji će se koristiti. Pristupačna kombinovana lista menja se strelicama; OK pokreće audio-deskripciju sa izabranim zapisom, dok Otkaži zatvara prozor audio-deskripcije i vraća fokus u Sonarpad editor.
 
 YouTube i strimovanje
 1. Ispravljen je problem zbog kog je pokretanje AI audio-deskripcije za video sa druge ili neke naredne stranice YouTube plejliste ili kanala moglo ponovo da otvori prozor za izbor na YouTube-u i oduzme fokus prozoru audio-deskripcije. Sonarpad sada pravilno zatvara birač bez vraćanja na prethodne stranice.

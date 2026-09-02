@@ -610,6 +610,13 @@ pub fn media_duration_secs(path: &Path) -> Option<u64> {
     media_duration_seconds(path).map(|duration| duration.ceil() as u64)
 }
 
+#[derive(Clone, Copy, Default)]
+struct SegmentMediaOptions {
+    audio_only: bool,
+    tolerate_invalid_analysis_packets: bool,
+    preferred_audio_stream_index: Option<i32>,
+}
+
 pub fn segment_media_file(
     input_path: &Path,
     output_pattern: &Path,
@@ -622,8 +629,7 @@ pub fn segment_media_file(
         output_pattern,
         segment_seconds,
         start_number,
-        false,
-        false,
+        SegmentMediaOptions::default(),
         progress,
     )
 }
@@ -633,6 +639,7 @@ pub(crate) fn segment_media_file_for_analysis(
     output_pattern: &Path,
     segment_seconds: u32,
     start_number: u32,
+    preferred_audio_stream_index: Option<i32>,
     progress: Option<&mut dyn FnMut(u32)>,
 ) -> Result<(), String> {
     segment_media_file_inner(
@@ -640,8 +647,11 @@ pub(crate) fn segment_media_file_for_analysis(
         output_pattern,
         segment_seconds,
         start_number,
-        false,
-        true,
+        SegmentMediaOptions {
+            tolerate_invalid_analysis_packets: true,
+            preferred_audio_stream_index,
+            ..SegmentMediaOptions::default()
+        },
         progress,
     )
 }
@@ -657,8 +667,10 @@ pub fn segment_audio_file(
         output_pattern,
         segment_seconds,
         start_number,
-        true,
-        false,
+        SegmentMediaOptions {
+            audio_only: true,
+            ..SegmentMediaOptions::default()
+        },
         None,
     )
 }
@@ -668,10 +680,14 @@ fn segment_media_file_inner(
     output_pattern: &Path,
     segment_seconds: u32,
     start_number: u32,
-    audio_only: bool,
-    tolerate_invalid_analysis_packets: bool,
+    options: SegmentMediaOptions,
     mut progress: Option<&mut dyn FnMut(u32)>,
 ) -> Result<(), String> {
+    let SegmentMediaOptions {
+        audio_only,
+        tolerate_invalid_analysis_packets,
+        preferred_audio_stream_index,
+    } = options;
     let api = ffmpeg_api()?;
     let input_c = CString::new(input_path.to_string_lossy().as_bytes())
         .map_err(|_| "FFmpeg: invalid input path".to_string())?;
@@ -742,9 +758,10 @@ fn segment_media_file_inner(
         let codec_type = crate::ffmpeg_source::av_codecpar_codec_type_safe(codecpar);
         let keep = if audio_only {
             codec_type == AVMediaType_AVMEDIA_TYPE_AUDIO && mapped_streams == 0
+        } else if codec_type == AVMediaType_AVMEDIA_TYPE_AUDIO {
+            preferred_audio_stream_index.is_none_or(|preferred| preferred == i as i32)
         } else {
-            codec_type == AVMediaType_AVMEDIA_TYPE_AUDIO
-                || codec_type == AVMediaType_AVMEDIA_TYPE_VIDEO
+            codec_type == AVMediaType_AVMEDIA_TYPE_VIDEO
         };
         if !keep {
             continue;
@@ -1979,6 +1996,7 @@ fn audio_description_temp_wav_path(output_path: &Path) -> PathBuf {
 pub fn export_audio_description_mp3(
     input_path: &Path,
     output_path: &Path,
+    preferred_audio_stream_index: Option<i32>,
     cues: &[AudioDescriptionMixCue],
     options: &AudioDescriptionExportOptions,
     mut progress: Option<&mut dyn FnMut(u32)>,
@@ -1990,7 +2008,7 @@ pub fn export_audio_description_mp3(
         return Err("cancelled".to_string());
     }
 
-    let mut source = FfmpegSource::try_new(input_path, 0, None, None)?;
+    let mut source = FfmpegSource::try_new(input_path, 0, None, preferred_audio_stream_index)?;
     let sample_rate = source.sample_rate().max(1);
     let channels = source.channels().max(1);
     let channel_count = channels as usize;

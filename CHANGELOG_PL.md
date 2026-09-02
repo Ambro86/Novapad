@@ -4,6 +4,7 @@ Wersja 0.9.2 – 2026-09-02
 
 Audiodeskrypcja AI
 1. Naprawiono problem, który mógł powodować błąd audiodeskrypcji AI podczas końcowego eksportu do MP3 w filmach z dźwiękiem wielokanałowym, na przykład 5.1. Sonarpad automatycznie miksuje teraz dźwięk wielokanałowy do stereo tylko wtedy, gdy jest to wymagane do kodowania MP3, bez zmiany eksportu mono lub stereo.
+2. Przy uruchamianiu audiodeskrypcji AI dla filmu zawierającego wiele ścieżek audio Sonarpad pyta teraz przed rozpoczęciem przetwarzania, której ścieżki użyć. Dostępne pole kombi można zmieniać strzałkami; OK uruchamia audiodeskrypcję z wybraną ścieżką, a Anuluj zamyka okno audiodeskrypcji i przywraca fokus do edytora Sonarpad.
 
 YouTube i strumieniowanie
 1. Naprawiono problem, przez który uruchomienie audiodeskrypcji AI dla filmu znajdującego się na stronie 2 lub dalszej playlisty albo kanału YouTube mogło ponownie otworzyć okno wyboru YouTube i odebrać fokus oknu audiodeskrypcji. Sonarpad zamyka teraz selektor prawidłowo, bez powrotu do poprzednich stron.

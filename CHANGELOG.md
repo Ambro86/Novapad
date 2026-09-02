@@ -4,6 +4,7 @@ Version 0.9.2 – 2026-09-02
 
 AI Audio Description
 1. Fixed an issue that could cause AI Audio Description to fail during final MP3 export with videos containing multichannel audio such as 5.1. Sonarpad now automatically downmixes multichannel audio to stereo only when required for MP3 encoding, without changing mono or stereo exports.
+2. When starting AI Audio Description with a video containing multiple audio tracks, Sonarpad now asks which track to use before processing. The accessible combo box can be changed with the arrow keys; OK starts the audio description with the selected track, while Cancel closes the audio-description window and returns focus to the Sonarpad editor.
 
 YouTube and streaming
 1. Fixed an issue where starting AI Audio Description from a video on page 2 or later of a YouTube playlist or channel could reopen the YouTube selection window and steal focus from the audio-description window. Sonarpad now closes the selector cleanly without returning to previous pages.

@@ -71,6 +71,7 @@ impl AudioDescriptionVerbosity {
 pub struct AudioDescriptionJob {
     pub input_path: PathBuf,
     pub output_path: PathBuf,
+    pub audio_stream_index: Option<i32>,
     pub language_code: String,
     pub tts_language: Language,
     pub verbosity: AudioDescriptionVerbosity,
@@ -117,6 +118,8 @@ struct AudioDescriptionPartialCheckpoint {
     version: u32,
     source_path: PathBuf,
     output_mp3_path: PathBuf,
+    #[serde(default)]
+    audio_stream_index: Option<i32>,
     source_file_size: u64,
     source_duration_sec: f64,
     language: Language,
@@ -648,6 +651,8 @@ pub struct AudioDescriptionProject {
     pub updated_at_utc: String,
     pub source_path: PathBuf,
     pub output_mp3_path: PathBuf,
+    #[serde(default)]
+    pub audio_stream_index: Option<i32>,
     pub source_duration_sec: f64,
     pub output_duration_sec: f64,
     pub language: Language,
@@ -813,10 +818,16 @@ fn temporary_job_dir() -> Result<PathBuf, String> {
 fn write_pyannote_wav(
     input_path: &Path,
     output_path: &Path,
+    preferred_audio_stream_index: Option<i32>,
     cancel: &Arc<AtomicBool>,
 ) -> Result<(), String> {
-    let mut source = crate::ffmpeg_source::FfmpegSource::try_new(input_path, 0, None, None)
-        .map_err(|error| format!("Audio description: FFmpeg audio decode failed: {error}"))?;
+    let mut source = crate::ffmpeg_source::FfmpegSource::try_new(
+        input_path,
+        0,
+        None,
+        preferred_audio_stream_index,
+    )
+    .map_err(|error| format!("Audio description: FFmpeg audio decode failed: {error}"))?;
     let input_rate = source.sample_rate().max(1);
     let input_channels = source.channels().max(1) as usize;
     let spec = hound::WavSpec {
@@ -897,6 +908,7 @@ fn prepare_gemini_chunks(
     input_path: &Path,
     duration_sec: f64,
     cache_dir: &Path,
+    preferred_audio_stream_index: Option<i32>,
     cancel: &Arc<AtomicBool>,
 ) -> Result<Vec<AudioDescriptionPreparedChunk>, String> {
     let input_size = fs::metadata(input_path)
@@ -908,7 +920,9 @@ fn prepare_gemini_chunks(
             input_path.display()
         ));
     }
-    if duration_sec <= GEMINI_CHUNK_SECONDS as f64 && input_size <= GEMINI_INLINE_TARGET_CHUNK_BYTES
+    if preferred_audio_stream_index.is_none()
+        && duration_sec <= GEMINI_CHUNK_SECONDS as f64
+        && input_size <= GEMINI_INLINE_TARGET_CHUNK_BYTES
     {
         return Ok(vec![AudioDescriptionPreparedChunk {
             path: input_path.to_string_lossy().to_string(),
@@ -952,6 +966,7 @@ fn prepare_gemini_chunks(
             &output_pattern,
             segment_seconds,
             1,
+            preferred_audio_stream_index,
             None,
         )
         .map_err(|error| format!("Audio description: FFmpeg chunk preparation failed: {error}"))?;
@@ -1773,6 +1788,7 @@ fn save_audio_description_partial_checkpoint(
         version: AUDIO_DESCRIPTION_PARTIAL_VERSION,
         source_path: job.input_path.clone(),
         output_mp3_path: job.output_path.clone(),
+        audio_stream_index: job.audio_stream_index,
         source_file_size,
         source_duration_sec,
         language: job.tts_language,
@@ -1859,6 +1875,7 @@ pub fn audio_description_job_from_checkpoint(
     Ok(AudioDescriptionJob {
         input_path: checkpoint.source_path,
         output_path: checkpoint.output_mp3_path,
+        audio_stream_index: checkpoint.audio_stream_index,
         language_code: checkpoint.language_code,
         tts_language: checkpoint.language,
         verbosity: AudioDescriptionVerbosity::from_bridge_value(&checkpoint.verbosity),
@@ -1945,6 +1962,7 @@ fn build_audio_description_project(
         updated_at_utc: now,
         source_path: job.input_path.clone(),
         output_mp3_path: job.output_path.clone(),
+        audio_stream_index: job.audio_stream_index,
         source_duration_sec,
         output_duration_sec,
         language: job.tts_language,
@@ -2127,6 +2145,7 @@ fn audio_description_job_from_project(project: &AudioDescriptionProject) -> Audi
     AudioDescriptionJob {
         input_path: project.source_path.clone(),
         output_path: project.output_mp3_path.clone(),
+        audio_stream_index: project.audio_stream_index,
         language_code: project.language_code.clone(),
         tts_language: project.language,
         verbosity: verbosity_from_project(&project.verbosity),
@@ -2526,6 +2545,7 @@ pub fn change_audio_description_project_voice(
     if let Err(error) = export_audio_description_mp3(
         &project.source_path,
         &export_target,
+        project.audio_stream_index,
         &mix_cues,
         &export_options,
         Some(&mut export_progress),
@@ -2802,6 +2822,7 @@ pub fn reexport_audio_description_project(
     if let Err(error) = export_audio_description_mp3(
         &project.source_path,
         &export_target,
+        project.audio_stream_index,
         &mix_cues,
         &export_options,
         Some(&mut export_progress),
@@ -2984,7 +3005,7 @@ pub fn create_audio_description(
                     "Decoding mono 16 kHz audio with Sonarpad FFmpeg libraries...",
                 );
                 let path = analysis_cache_dir.join("pyannote_input.wav");
-                write_pyannote_wav(&job.input_path, &path, &cancel)?;
+                write_pyannote_wav(&job.input_path, &path, job.audio_stream_index, &cancel)?;
                 Some(path)
             };
             notify_progress(&mut callbacks, 5);
@@ -2993,8 +3014,13 @@ pub fn create_audio_description(
                 "chunk_prepare",
                 "Preparing Gemini video chunks with Sonarpad FFmpeg libraries...",
             );
-            let chunks =
-                prepare_gemini_chunks(&job.input_path, duration_sec, &analysis_cache_dir, &cancel)?;
+            let chunks = prepare_gemini_chunks(
+                &job.input_path,
+                duration_sec,
+                &analysis_cache_dir,
+                job.audio_stream_index,
+                &cancel,
+            )?;
             notify_progress(&mut callbacks, 10);
             Ok((duration_sec, audio_wav_path, chunks))
         })();
@@ -3256,6 +3282,7 @@ pub fn create_audio_description(
     let export_result = export_audio_description_mp3(
         &job.input_path,
         &export_target,
+        job.audio_stream_index,
         &mix_cues,
         &export_options,
         Some(&mut export_progress),
@@ -3422,6 +3449,7 @@ mod tests {
         let job = AudioDescriptionJob {
             input_path: PathBuf::from("movie.mkv"),
             output_path: PathBuf::from("movie.mp3"),
+            audio_stream_index: None,
             language_code: "it".to_string(),
             tts_language: Language::Italian,
             verbosity: AudioDescriptionVerbosity::Detailed,
@@ -3466,6 +3494,7 @@ mod tests {
         let job = AudioDescriptionJob {
             input_path: PathBuf::from("movie.mkv"),
             output_path: PathBuf::from("movie.mp3"),
+            audio_stream_index: None,
             language_code: "it".to_string(),
             tts_language: Language::Italian,
             verbosity: AudioDescriptionVerbosity::Detailed,
@@ -3655,6 +3684,7 @@ mod tests {
         let job = AudioDescriptionJob {
             input_path: PathBuf::from("film.mkv"),
             output_path: PathBuf::from("film-audiodescritto.mp3"),
+            audio_stream_index: Some(2),
             language_code: "it".to_string(),
             tts_language: Language::Italian,
             verbosity: AudioDescriptionVerbosity::Detailed,
@@ -3711,6 +3741,7 @@ mod tests {
         assert!((loaded.descriptions[0].output_start_sec - 2.5).abs() < 0.001);
         assert_eq!(loaded.protected_intervals.len(), 1);
         assert_eq!(loaded.gemini_model, "gemini-3.5-flash-lite");
+        assert_eq!(loaded.audio_stream_index, Some(2));
     }
 
     #[test]
@@ -3718,6 +3749,7 @@ mod tests {
         let job = AudioDescriptionJob {
             input_path: PathBuf::from("film.mkv"),
             output_path: PathBuf::from("film.mp3"),
+            audio_stream_index: Some(3),
             language_code: "it".to_string(),
             tts_language: Language::Italian,
             verbosity: AudioDescriptionVerbosity::Detailed,
@@ -3738,13 +3770,13 @@ mod tests {
         };
         let project = build_audio_description_project(&job, 1.0, 1.0, &[], &[], &[]);
         let mut value = serde_json::to_value(project).expect("serialize");
-        value
-            .as_object_mut()
-            .expect("object")
-            .remove("recognize_characters");
+        let object = value.as_object_mut().expect("object");
+        object.remove("recognize_characters");
+        object.remove("audio_stream_index");
         let loaded: super::AudioDescriptionProject =
             serde_json::from_value(value).expect("legacy project");
         assert!(loaded.recognize_characters);
+        assert_eq!(loaded.audio_stream_index, None);
     }
 
     #[test]
@@ -3989,6 +4021,7 @@ mod tests {
         let job = AudioDescriptionJob {
             input_path: PathBuf::from("film.mkv"),
             output_path: PathBuf::from("film.mp3"),
+            audio_stream_index: None,
             language_code: "it".to_string(),
             tts_language: Language::Italian,
             verbosity: AudioDescriptionVerbosity::Detailed,
@@ -4063,6 +4096,7 @@ mod tests {
         let job = AudioDescriptionJob {
             input_path: PathBuf::from("film.mkv"),
             output_path: PathBuf::from("film.mp3"),
+            audio_stream_index: None,
             language_code: "it".to_string(),
             tts_language: Language::Italian,
             verbosity: AudioDescriptionVerbosity::Detailed,
@@ -4104,6 +4138,7 @@ mod tests {
         let job = AudioDescriptionJob {
             input_path: PathBuf::from("film.mkv"),
             output_path: PathBuf::from("film.mp3"),
+            audio_stream_index: None,
             language_code: "it".to_string(),
             tts_language: Language::Italian,
             verbosity: AudioDescriptionVerbosity::Detailed,

@@ -4,6 +4,7 @@ Versija 0.9.2 – 2026-09-02
 
 AI garsinis vaizdavimas
 1. Ištaisyta problema, dėl kurios AI garsinis vaizdavimas galėjo nepavykti galutinio MP3 eksportavimo metu, kai vaizdo įraše yra daugiakanalis garsas, pavyzdžiui, 5.1. Dabar Sonarpad automatiškai konvertuoja daugiakanalį garsą į stereo tik tada, kai to reikia MP3 kodavimui, nekeisdamas mono ar stereo eksporto.
+2. Paleidžiant DI garsinį aprašymą vaizdo įrašui su keliais garso takeliais, Sonarpad dabar prieš apdorojimą paklausia, kurį takelį naudoti. Pasiekiamą išskleidžiamąjį sąrašą galima keisti rodyklių klavišais; OK pradeda garsinį aprašymą su pasirinktu takeliu, o Atšaukti uždaro garsinio aprašymo langą ir grąžina fokusą į Sonarpad redaktorių.
 
 YouTube ir srautinis turinys
 1. Ištaisyta problema, kai paleidus AI garsinį vaizdavimą vaizdo įrašui, esančiam 2-ame ar vėlesniame YouTube grojaraščio arba kanalo puslapyje, galėjo vėl atsidaryti YouTube pasirinkimo langas ir perimti fokusą iš garsinio vaizdavimo lango. Dabar Sonarpad teisingai uždaro pasirinkimo langą negrįždamas į ankstesnius puslapius.

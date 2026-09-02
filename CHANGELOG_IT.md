@@ -4,6 +4,7 @@ Versione 0.9.2 – 2026-09-02
 
 Audiodescrizione con IA
 1. Corretto un problema che poteva far fallire l’audiodescrizione durante l’esportazione finale in MP3 con video contenenti audio multicanale, ad esempio 5.1. Sonarpad ora converte automaticamente l’audio multicanale in stereo solo quando necessario per la codifica MP3, senza modificare le esportazioni mono o stereo.
+2. Quando si avvia Crea audiodescrizione con IA con un video che contiene più tracce audio, Sonarpad ora chiede quale traccia utilizzare prima di iniziare. La casella combinata accessibile si può cambiare con le frecce; OK avvia l’audiodescrizione usando la traccia scelta, mentre Annulla chiude la finestra dell’audiodescrizione e riporta il focus all’editor di Sonarpad.
 
 YouTube e streaming
 1. Corretto un problema per cui, avviando Crea audiodescrizione con IA da un video presente nella pagina 2 o successive di una playlist o di un canale YouTube, poteva riaprirsi la finestra di selezione YouTube sottraendo il focus alla finestra dell’audiodescrizione. Sonarpad ora chiude correttamente il selettore senza tornare alle pagine precedenti.

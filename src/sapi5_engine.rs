@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
-use windows::Win32::Foundation::VARIANT_BOOL;
+use windows::Win32::Foundation::{VARIANT_BOOL, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::Media::Audio::{WAVE_FORMAT_PCM, WAVEFORMATEX};
 use windows::Win32::Media::Speech::{
     ISpEventSource, ISpMMSysAudio, ISpObjectToken, ISpObjectTokenCategory, ISpStream, ISpVoice,
@@ -23,6 +23,7 @@ use windows::Win32::Media::Speech::{
     SpObjectTokenCategory, SpVoice,
 };
 use windows::Win32::System::Com::{CLSCTX_ALL, CoTaskMemFree};
+use windows::Win32::System::Threading::WaitForSingleObject;
 use windows::core::{BSTR, GUID, Interface, PCWSTR, w};
 
 // SPDFID_WaveFormatEx: {C31ADBAE-527F-4ff5-A230-F62BB61FF70C}
@@ -1021,6 +1022,50 @@ fn speak_sapi5_to_file_via_bridge(
     Ok(())
 }
 
+fn wait_for_sapi5_file_speak_completion(
+    voice: &ISpVoice,
+    cancel: &AtomicBool,
+    route: &str,
+    chunk_index: usize,
+    chunk_started: Instant,
+) -> Result<(), String> {
+    unsafe {
+        let completion_event = voice.SpeakCompleteEvent();
+        if completion_event.is_invalid() {
+            return Err("SAPI5 file synthesis returned an invalid completion event".to_string());
+        }
+
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                if let Err(e) = voice.Speak(PCWSTR::null(), SPF_PURGEBEFORESPEAK.0 as u32, None) {
+                    crate::log_debug(&format!(
+                        "SAPI5 export purge after cancellation failed: {}",
+                        e
+                    ));
+                }
+                return Err("Cancelled".to_string());
+            }
+
+            let wait_result = WaitForSingleObject(completion_event, 25);
+            if wait_result == WAIT_OBJECT_0 {
+                crate::log_debug(&format!(
+                    "SAPI5 DIAG: Speak completed route={} chunk={} elapsed_ms={} completion=event",
+                    route,
+                    chunk_index,
+                    chunk_started.elapsed().as_millis()
+                ));
+                return Ok(());
+            }
+            if wait_result != WAIT_TIMEOUT {
+                return Err(format!(
+                    "SAPI5 file synthesis completion wait failed: {:?}",
+                    wait_result
+                ));
+            }
+        }
+    }
+}
+
 fn speak_sapi_to_file_with_voice(
     voice: &ISpVoice,
     options: SapiExportOptions,
@@ -1167,7 +1212,7 @@ fn speak_sapi_to_file_with_voice(
                 }
 
                 crate::log_debug(&format!(
-                    "SAPI5 DIAG: SetOutput start route=mp3-part chunk={} sample_rate={} mode=synchronous",
+                    "SAPI5 DIAG: SetOutput start route=mp3-part chunk={} sample_rate={} mode=async-event",
                     *chunk_idx + 1,
                     sample_rate
                 ));
@@ -1181,7 +1226,7 @@ fn speak_sapi_to_file_with_voice(
                     return Err(format!("SetOutput failed at {} Hz: {}", sample_rate, err));
                 }
                 crate::log_debug(&format!(
-                    "SAPI5 DIAG: SetOutput ok route=mp3-part chunk={} sample_rate={} mode=synchronous",
+                    "SAPI5 DIAG: SetOutput ok route=mp3-part chunk={} sample_rate={} mode=async-event",
                     *chunk_idx + 1,
                     sample_rate
                 ));
@@ -1195,15 +1240,17 @@ fn speak_sapi_to_file_with_voice(
                 let chunk_wide = to_wide(&ssml);
                 let chunk_started = Instant::now();
                 crate::log_debug(&format!(
-                    "SAPI5 DIAG: Speak start route=mp3-part chunk={} text_len={} ssml_len={} sample_rate={} mode=synchronous",
+                    "SAPI5 DIAG: Speak start route=mp3-part chunk={} text_len={} ssml_len={} sample_rate={} mode=async-event",
                     *chunk_idx + 1,
                     chunk.len(),
                     ssml.len(),
                     sample_rate
                 ));
-                if let Err(err) =
-                    voice.Speak(PCWSTR(chunk_wide.as_ptr()), SPF_IS_XML.0 as u32, None)
-                {
+                if let Err(err) = voice.Speak(
+                    PCWSTR(chunk_wide.as_ptr()),
+                    (SPF_ASYNC.0 | SPF_IS_XML.0) as u32,
+                    None,
+                ) {
                     if let Err(close_err) = stream.Close() {
                         crate::log_debug(&format!(
                             "SAPI5 DIAG: stream close after Speak failure sample_rate={} error={}",
@@ -1212,28 +1259,28 @@ fn speak_sapi_to_file_with_voice(
                     }
                     return Err(format!("Speak failed at {} Hz: {}", sample_rate, err));
                 }
-                crate::log_debug(&format!(
-                    "SAPI5 DIAG: Speak completed route=mp3-part chunk={} sample_rate={} elapsed_ms={} mode=synchronous",
+                if let Err(err) = wait_for_sapi5_file_speak_completion(
+                    voice,
+                    options.cancel.as_ref(),
+                    "mp3-part",
                     *chunk_idx + 1,
-                    sample_rate,
-                    chunk_started.elapsed().as_millis()
-                ));
-                if options.cancel.load(Ordering::Relaxed) {
-                    if let Err(e) = stream.Close() {
+                    chunk_started,
+                ) {
+                    if let Err(close_err) = stream.Close() {
                         crate::log_debug(&format!(
-                            "Failed to close SAPI5 stream after cancellation: {}",
-                            e
+                            "Failed to close SAPI5 stream after interrupted synthesis: {}",
+                            close_err
                         ));
                     }
-                    if let Err(e) = std::fs::remove_file(&part_wav)
-                        && e.kind() != std::io::ErrorKind::NotFound
+                    if let Err(remove_err) = std::fs::remove_file(&part_wav)
+                        && remove_err.kind() != std::io::ErrorKind::NotFound
                     {
                         crate::log_debug(&format!(
-                            "Failed to remove cancelled SAPI5 WAV part: {}",
-                            e
+                            "Failed to remove interrupted SAPI5 WAV part: {}",
+                            remove_err
                         ));
                     }
-                    return Err("Cancelled".to_string());
+                    return Err(err);
                 }
                 crate::log_debug(&format!(
                     "SAPI5 DIAG: stream close start route=mp3-part chunk={} sample_rate={}",
@@ -1367,19 +1414,19 @@ fn speak_sapi_to_file_with_voice(
                 sample_rate
             ));
             crate::log_debug(&format!(
-                "SAPI5 DIAG: SetOutput start route=wav sample_rate={} mode=synchronous",
+                "SAPI5 DIAG: SetOutput start route=wav sample_rate={} mode=async-event",
                 sample_rate
             ));
             voice
                 .SetOutput(&stream, false)
                 .map_err(|e| format!("SetOutput failed at {} Hz: {}", sample_rate, e))?;
             crate::log_debug(&format!(
-                "SAPI5 DIAG: SetOutput ok route=wav sample_rate={} mode=synchronous",
+                "SAPI5 DIAG: SetOutput ok route=wav sample_rate={} mode=async-event",
                 sample_rate
             ));
 
             crate::log_debug(&format!(
-                "SAPI: entering chunk loop. chunks={} sample_rate={} mode=synchronous",
+                "SAPI: entering chunk loop. chunks={} sample_rate={} mode=async-event",
                 options.chunks.len(),
                 sample_rate
             ));
@@ -1399,7 +1446,7 @@ fn speak_sapi_to_file_with_voice(
                     continue;
                 }
                 crate::log_debug(&format!(
-                    "SAPI: chunk start. idx={} len={} sample_rate={} mode=synchronous",
+                    "SAPI: chunk start. idx={} len={} sample_rate={} mode=async-event",
                     i + 1,
                     chunk.len(),
                     sample_rate
@@ -1408,15 +1455,17 @@ fn speak_sapi_to_file_with_voice(
                 let chunk_wide = to_wide(&ssml);
                 let chunk_started = Instant::now();
                 crate::log_debug(&format!(
-                    "SAPI5 DIAG: Speak start route=wav chunk={} text_len={} ssml_len={} sample_rate={} mode=synchronous",
+                    "SAPI5 DIAG: Speak start route=wav chunk={} text_len={} ssml_len={} sample_rate={} mode=async-event",
                     i + 1,
                     chunk.len(),
                     ssml.len(),
                     sample_rate
                 ));
-                if let Err(err) =
-                    voice.Speak(PCWSTR(chunk_wide.as_ptr()), SPF_IS_XML.0 as u32, None)
-                {
+                if let Err(err) = voice.Speak(
+                    PCWSTR(chunk_wide.as_ptr()),
+                    (SPF_ASYNC.0 | SPF_IS_XML.0) as u32,
+                    None,
+                ) {
                     if let Err(close_err) = stream.Close() {
                         crate::log_debug(&format!(
                             "SAPI5 DIAG: stream close after Speak failure sample_rate={} error={}",
@@ -1433,12 +1482,29 @@ fn speak_sapi_to_file_with_voice(
                     }
                     return Err(format!("Speak failed at {} Hz: {}", sample_rate, err));
                 }
-                crate::log_debug(&format!(
-                    "SAPI5 DIAG: Speak completed route=wav chunk={} sample_rate={} elapsed_ms={} mode=synchronous",
+                if let Err(err) = wait_for_sapi5_file_speak_completion(
+                    voice,
+                    options.cancel.as_ref(),
+                    "wav",
                     i + 1,
-                    sample_rate,
-                    chunk_started.elapsed().as_millis()
-                ));
+                    chunk_started,
+                ) {
+                    if let Err(close_err) = stream.Close() {
+                        crate::log_debug(&format!(
+                            "Failed to close SAPI5 stream after interrupted synthesis: {}",
+                            close_err
+                        ));
+                    }
+                    if let Err(remove_err) = std::fs::remove_file(&wav_path)
+                        && remove_err.kind() != std::io::ErrorKind::NotFound
+                    {
+                        crate::log_debug(&format!(
+                            "Failed to remove interrupted SAPI5 WAV: {}",
+                            remove_err
+                        ));
+                    }
+                    return Err(err);
+                }
                 crate::log_debug(&format!("SAPI: chunk done. idx={}", i + 1));
                 progress_callback(i + 1);
             }

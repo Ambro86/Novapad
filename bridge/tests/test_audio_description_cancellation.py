@@ -43,7 +43,8 @@ class AudioDescriptionCancellationTests(unittest.TestCase):
         self.assertIn("async_sleep_with_cancellation", TTS)
         self.assertIn("SPF_ASYNC.0 | SPF_IS_XML.0", SAPI5)
         self.assertIn("SAPI5 export purge after cancellation failed", SAPI5)
-        self.assertIn("status.dwRunningState == SPRS_DONE.0 as u32", SAPI5)
+        self.assertIn("SpeakCompleteEvent()", SAPI5)
+        self.assertIn("WaitForSingleObject(completion_event, 25)", SAPI5)
 
     def test_user_cancel_is_logged_as_normal_control_flow_without_critical_traceback(self):
         cancel_start = DESCRIBER.index("except gemini.GeminiRetryCancelledError as e:")

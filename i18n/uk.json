@@ -34,6 +34,7 @@
   "audio_description.error.voice": "Виберіть голос синтеза мовлення.",
   "audio_description.extended": "Включить расширенные паузы: в исключительных случаях приостанавливать фильм, если опис не помещается в тишу",
   "audio_description.gemini_api_key": "Ключ API Gemini:",
+  "audio_description.show_api_key": "Показати ключ API",
   "audio_description.gemini_error_models": "Не вдалося загрузить модели Gemini: {error}",
   "audio_description.gemini_get_key": "Получить ключ API...",
   "audio_description.gemini_loading_models": "Завантаження моделей Gemini...",

@@ -278,6 +278,10 @@ pub(crate) fn split_voice_tag_spans(
     let mut cursor = 0usize;
     let mut pending_len = 0usize;
     let mut current_override: Option<VoiceOverride> = None;
+    // Dialogue voice tags inserted automatically by Sonarpad are playback
+    // metadata, not characters that exist in the editor. Keep track of those
+    // tags so cursor offsets remain relative to the user's original text.
+    let mut current_voice_tag_is_synthetic = false;
 
     let mut i = 0usize;
     let bytes = lower.as_bytes();
@@ -305,12 +309,21 @@ pub(crate) fn split_voice_tag_spans(
                         ));
                     }
                 }
-                let tag_len = utf16_len(&text[i..end]);
-                pending_len += tag_len;
+                let tag_text = &text[i..end];
+                let tag_len = utf16_len(tag_text);
                 if is_open {
                     let tag_inner = text[i + "<voice".len()..end - 1].trim();
+                    let is_synthetic_dialogue_tag = tag_inner.contains("sonarpad-dialogue=\"1\"");
+                    if !is_synthetic_dialogue_tag {
+                        pending_len += tag_len;
+                    }
+                    current_voice_tag_is_synthetic = is_synthetic_dialogue_tag;
                     current_override = parse_voice_tag_override(tag_inner, default_engine);
                 } else {
+                    if !current_voice_tag_is_synthetic {
+                        pending_len += tag_len;
+                    }
+                    current_voice_tag_is_synthetic = false;
                     current_override = None;
                 }
                 cursor = end;
@@ -7501,6 +7514,22 @@ mod tests {
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0].0, "\"Ciao & mondo\"");
         assert!(spans[0].1.is_some());
+    }
+
+    #[test]
+    fn synthetic_dialogue_voice_tags_do_not_advance_editor_cursor_offsets() {
+        let input = r#"<voice engine="edge" voice="it-IT-DiegoNeural" sonarpad-dialogue="1">"Ciao"</voice> dopo"#;
+        let spans = split_voice_tag_spans(input, TtsEngine::Edge);
+        let total_original_len: usize = spans.iter().map(|span| span.2).sum();
+        assert_eq!(total_original_len, utf16_len("\"Ciao\" dopo"));
+    }
+
+    #[test]
+    fn explicit_voice_tags_still_advance_editor_cursor_offsets() {
+        let input = r#"<voice engine="edge" voice="it-IT-DiegoNeural">"Ciao"</voice> dopo"#;
+        let spans = split_voice_tag_spans(input, TtsEngine::Edge);
+        let total_original_len: usize = spans.iter().map(|span| span.2).sum();
+        assert_eq!(total_original_len, utf16_len(input));
     }
 
     #[test]

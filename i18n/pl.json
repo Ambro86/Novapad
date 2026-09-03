@@ -34,6 +34,7 @@
   "audio_description.error.voice": "Wybierz głos syntezy mowy.",
   "audio_description.extended": "Włącz rozszerzone pauzy: zatrzymaj film w wyjątkowych przypadkach, gdy opis nie mieści się w ciszy",
   "audio_description.gemini_api_key": "Klucz API Gemini:",
+  "audio_description.show_api_key": "Pokaż klucz API",
   "audio_description.gemini_error_models": "Nie udało się wczytać modeli Gemini: {error}",
   "audio_description.gemini_get_key": "Uzyskaj klucz API...",
   "audio_description.gemini_loading_models": "Wczytywanie modeli Gemini...",

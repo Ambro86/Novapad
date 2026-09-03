@@ -34,6 +34,7 @@
   "audio_description.error.voice": "Chọn một giọng tổng hợp.",
   "audio_description.extended": "Bật khoảng dừng mở rộng: tạm dừng phim trong trường hợp đặc biệt khi phần mô tả không vừa khoảng lặng",
   "audio_description.gemini_api_key": "Khóa API Gemini:",
+  "audio_description.show_api_key": "Hiển thị khóa API",
   "audio_description.gemini_error_models": "Không thể tải các mô hình Gemini: {error}",
   "audio_description.gemini_get_key": "Lấy khóa API...",
   "audio_description.gemini_loading_models": "Đang tải các mô hình Gemini...",

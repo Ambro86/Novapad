@@ -1,5 +1,14 @@
 # Changelog
 
+Version 0.9.3 – 2026-09-03
+
+SAPI5 voices
+1. Fixed an issue where some local SAPI5 voices could fail to speak when cursor movement was enabled, during multi-voice reading, or while creating audiobooks/MP3 files. SAPI5 file synthesis now uses the synchronous SAPI path that Windows handles reliably, while normal direct playback remains unchanged.
+2. Fixed cursor position during multi-voice dialogue reading. Voice tags inserted automatically by Sonarpad for dialogue are now treated only as playback metadata and no longer as characters in the editor, so pausing/resuming with F4 or stopping/restarting with F6 no longer moves the cursor ahead of the real text. Single-voice reading and explicit <voice> tags in documents remain unchanged.
+
+AI Audio Description
+1. Added a “Show API key” checkbox immediately after the Gemini API key field. It is disabled by default; when enabled, it temporarily reveals the full key so users can verify that it was pasted completely, while reopening the window always returns the key to hidden mode.
+
 Version 0.9.2 – 2026-09-02
 
 AI Audio Description

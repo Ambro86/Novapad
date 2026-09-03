@@ -1,5 +1,14 @@
 # Journal des modifications
 
+Version 0.9.3 – 2026-09-03
+
+Voix SAPI5
+1. Correction d’un problème qui pouvait empêcher certaines voix SAPI5 locales de parler lorsque le déplacement du curseur était activé, pendant la lecture à plusieurs voix ou lors de la création de livres audio/MP3. La synthèse SAPI5 vers un fichier utilise désormais le chemin synchrone correctement géré par Windows, tandis que la lecture directe normale reste inchangée.
+2. Correction de la position du curseur pendant la lecture des dialogues avec plusieurs voix. Les balises de voix ajoutées automatiquement par Sonarpad pour les dialogues sont désormais traitées uniquement comme des métadonnées de lecture et non comme des caractères présents dans l’éditeur, ce qui évite que le curseur avance trop loin après F4 ou F6. La lecture à une seule voix et les balises <voice> écrites explicitement dans les documents restent inchangées.
+
+Audiodescription avec IA
+1. Ajout de la case « Afficher la clé API » juste après le champ de la clé API Gemini. Elle est désactivée par défaut ; lorsqu’elle est activée, elle affiche temporairement la clé complète afin de vérifier qu’elle a été collée entièrement. À la réouverture de la fenêtre, la clé est de nouveau masquée.
+
 Version 0.9.2 – 2026-09-02
 
 Audiodescription par IA

@@ -1,5 +1,14 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.9.3 – 2026-09-03
+
+Giọng SAPI5
+1. Đã sửa lỗi khiến một số giọng SAPI5 cục bộ có thể không phát tiếng khi bật di chuyển con trỏ, khi đọc bằng nhiều giọng hoặc khi tạo sách nói/MP3. Việc tổng hợp SAPI5 ra tệp giờ sử dụng đường dẫn đồng bộ mà Windows xử lý ổn định, trong khi phát trực tiếp thông thường vẫn không thay đổi.
+2. Đã sửa vị trí con trỏ khi đọc hội thoại bằng nhiều giọng. Các thẻ giọng nói do Sonarpad tự động chèn cho hội thoại giờ chỉ được xem là siêu dữ liệu phát lại, không còn được tính là ký tự trong trình soạn thảo, vì vậy sau F4 hoặc F6 con trỏ không còn nhảy lên trước văn bản thật. Việc đọc bằng một giọng và các thẻ <voice> được viết rõ trong tài liệu vẫn không thay đổi.
+
+Mô tả âm thanh bằng AI
+1. Đã thêm hộp kiểm “Hiển thị khóa API” ngay sau trường khóa API Gemini. Theo mặc định hộp này tắt; khi bật, toàn bộ khóa sẽ tạm thời được hiển thị để người dùng kiểm tra xem khóa đã được dán đầy đủ hay chưa. Khi mở lại cửa sổ, khóa luôn được ẩn trở lại.
+
 Phiên bản 0.9.2 – 2026-09-02
 
 Mô tả âm thanh bằng AI

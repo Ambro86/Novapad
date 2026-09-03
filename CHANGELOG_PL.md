@@ -1,5 +1,14 @@
 # Dziennik zmian
 
+Wersja 0.9.3 – 2026-09-03
+
+Głosy SAPI5
+1. Naprawiono problem, przez który niektóre lokalne głosy SAPI5 mogły nie mówić przy włączonym przesuwaniu kursora, podczas czytania wieloma głosami lub przy tworzeniu audiobooków/MP3. Synteza SAPI5 do pliku korzysta teraz z trybu synchronicznego, który Windows obsługuje prawidłowo, a zwykłe bezpośrednie odtwarzanie pozostaje bez zmian.
+2. Poprawiono pozycję kursora podczas wielogłosowego czytania dialogów. Znaczniki głosu automatycznie wstawiane przez Sonarpad dla dialogów są teraz traktowane wyłącznie jako metadane odtwarzania, a nie jako znaki w edytorze, dzięki czemu po F4 lub F6 kursor nie przeskakuje przed rzeczywisty tekst. Czytanie jednym głosem oraz jawne znaczniki <voice> w dokumentach pozostają bez zmian.
+
+Audiodeskrypcja z AI
+1. Dodano pole wyboru „Pokaż klucz API” bezpośrednio po polu klucza API Gemini. Domyślnie jest wyłączone; po włączeniu tymczasowo pokazuje cały klucz, aby można było sprawdzić, czy został wklejony w całości. Po ponownym otwarciu okna klucz jest znów ukryty.
+
 Wersja 0.9.2 – 2026-09-02
 
 Audiodeskrypcja AI

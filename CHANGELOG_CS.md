@@ -1,5 +1,14 @@
 # Přehled změn
 
+Verze 0.9.3 – 2026-09-03
+
+Hlasy SAPI5
+1. Opraven problém, kvůli kterému některé místní hlasy SAPI5 nemusely mluvit při zapnutém posouvání kurzoru, při čtení více hlasy nebo při vytváření audioknih/MP3. Syntéza SAPI5 do souboru nyní používá synchronní cestu, kterou Windows spolehlivě zpracovává, zatímco běžné přímé přehrávání zůstává beze změny.
+2. Opravena poloha kurzoru při čtení dialogů více hlasy. Hlasové značky, které Sonarpad automaticky vkládá pro dialogy, se nyní považují pouze za metadata přehrávání a ne za znaky v editoru, takže po F4 nebo F6 kurzor nepřeskočí před skutečný text. Čtení jedním hlasem a explicitní značky <voice> v dokumentu zůstávají beze změny.
+
+Audiopopis s AI
+1. Bezprostředně za pole klíče API Gemini bylo přidáno zaškrtávací políčko „Zobrazit klíč API“. Ve výchozím nastavení je vypnuté; po zapnutí dočasně zobrazí celý klíč, aby bylo možné ověřit, že byl vložen celý. Po opětovném otevření okna je klíč znovu skrytý.
+
 Verze 0.9.2 – 2026-09-02
 
 Audiopopis s AI

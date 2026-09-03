@@ -34,6 +34,7 @@
   "audio_description.error.voice": "Pasirinkite kalbos sintezės balsą.",
   "audio_description.extended": "Įjungti išplėstines pauzes: išimtiniais atvejais pristabdyti filmą, kai aprašas netelpa tyloje",
   "audio_description.gemini_api_key": "Gemini API raktas:",
+  "audio_description.show_api_key": "Rodyti API raktą",
   "audio_description.gemini_error_models": "Nepavyko įkelti Gemini modelių: {error}",
   "audio_description.gemini_get_key": "Gauti API raktą...",
   "audio_description.gemini_loading_models": "Įkeliami Gemini modeliai...",

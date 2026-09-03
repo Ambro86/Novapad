@@ -34,6 +34,7 @@
   "audio_description.error.voice": "वाक् संश्लेषण की आवाज़ चुनें।",
   "audio_description.extended": "विस्तारित विराम सक्षम करें: जब वर्णन मौन में न समाए तो असाधारण स्थिति में फ़िल्म रोकें",
   "audio_description.gemini_api_key": "Gemini API कुंजी:",
+  "audio_description.show_api_key": "API कुंजी दिखाएँ",
   "audio_description.gemini_error_models": "Gemini मॉडल लोड नहीं हो सके: {error}",
   "audio_description.gemini_get_key": "API कुंजी प्राप्त करें...",
   "audio_description.gemini_loading_models": "Gemini मॉडल लोड हो रहे हैं...",

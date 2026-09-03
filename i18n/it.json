@@ -34,6 +34,7 @@
   "audio_description.error.voice": "Seleziona una voce di sintesi vocale.",
   "audio_description.extended": "Attiva pause estese: interrompi il film in casi eccezionali quando la descrizione non entra in un silenzio",
   "audio_description.gemini_api_key": "Chiave API Gemini:",
+  "audio_description.show_api_key": "Mostra chiave API",
   "audio_description.gemini_error_models": "Impossibile caricare i modelli Gemini: {error}",
   "audio_description.gemini_get_key": "Ottieni chiave API...",
   "audio_description.gemini_loading_models": "Caricamento dei modelli Gemini...",

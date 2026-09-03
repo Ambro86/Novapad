@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::thread;
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT};
+use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH, HFONT, InvalidateRect};
 use windows::Win32::UI::Controls::Dialogs::{
     GetOpenFileNameW, GetSaveFileNameW, OFN_EXPLORER, OFN_FILEMUSTEXIST, OFN_HIDEREADONLY,
     OFN_OVERWRITEPROMPT, OFN_PATHMUSTEXIST, OPENFILENAMEW,
@@ -73,6 +73,8 @@ const ID_CHARACTER_CATALOG: usize = 9671;
 const ID_CHARACTER_CATALOG_NAME: usize = 9672;
 const ID_CONTINUE_INTERRUPTED: usize = 9673;
 const ID_DELETE_VIDEO_AFTER: usize = 9674;
+const ID_GEMINI_SHOW_API_KEY: usize = 9675;
+const EM_SETPASSWORDCHAR: u32 = 0x00CC;
 
 const WM_AD_PROGRESS: u32 = WM_APP + 188;
 const WM_AD_STATUS: u32 = WM_APP + 189;
@@ -109,6 +111,7 @@ struct Labels {
     delete_video_after: String,
     modify_project: String,
     gemini_api_key: String,
+    gemini_show_api_key: String,
     gemini_get_key: String,
     gemini_model: String,
     gemini_refresh_models: String,
@@ -164,6 +167,7 @@ struct WindowState {
     save_project_checkbox: HWND,
     delete_video_after_checkbox: HWND,
     gemini_api_key_edit: HWND,
+    gemini_show_api_key_checkbox: HWND,
     gemini_model_label: HWND,
     gemini_model_combo: HWND,
     gemini_refresh_models_button: HWND,
@@ -489,6 +493,7 @@ fn labels(language: Language) -> Labels {
         delete_video_after: i18n::tr(language, "audio_description.delete_video_after"),
         modify_project: i18n::tr(language, "audio_description.modify_project"),
         gemini_api_key: i18n::tr(language, "audio_description.gemini_api_key"),
+        gemini_show_api_key: i18n::tr(language, "audio_description.show_api_key"),
         gemini_get_key: i18n::tr(language, "audio_description.gemini_get_key"),
         gemini_model: i18n::tr(language, "audio_description.gemini_model"),
         gemini_refresh_models: i18n::tr(language, "audio_description.gemini_refresh_models"),
@@ -987,6 +992,22 @@ fn engine_combo_index(engine: TtsEngine) -> usize {
 
 fn checkbox_checked(control: HWND) -> bool {
     unsafe { SendMessageW(control, BM_GETCHECK, WPARAM(0), LPARAM(0)).0 == BST_CHECKED.0 as isize }
+}
+
+fn update_gemini_api_key_visibility(state: &WindowState) {
+    let show = checkbox_checked(state.gemini_show_api_key_checkbox);
+    let password_char = if show { 0 } else { '*' as usize };
+    unsafe {
+        SendMessageW(
+            state.gemini_api_key_edit,
+            EM_SETPASSWORDCHAR,
+            WPARAM(password_char),
+            LPARAM(0),
+        );
+        if !InvalidateRect(state.gemini_api_key_edit, None, true).as_bool() {
+            crate::log_debug("Audio description: failed to redraw Gemini API key field");
+        }
+    }
 }
 
 fn selected_voice_name(state: &WindowState) -> Option<String> {
@@ -2280,14 +2301,34 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     HINSTANCE(0),
                     None,
                 );
+                let gemini_show_api_key_checkbox = CreateWindowExW(
+                    Default::default(),
+                    WC_BUTTON,
+                    PCWSTR(to_wide(&labels.gemini_show_api_key).as_ptr()),
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(BS_AUTOCHECKBOX as u32),
+                    446,
+                    418,
+                    220,
+                    24,
+                    hwnd,
+                    HMENU(ID_GEMINI_SHOW_API_KEY as isize),
+                    HINSTANCE(0),
+                    None,
+                );
+                SendMessageW(
+                    gemini_show_api_key_checkbox,
+                    BM_SETCHECK,
+                    WPARAM(0),
+                    LPARAM(0),
+                );
                 let gemini_get_key_button = CreateWindowExW(
                     Default::default(),
                     WC_BUTTON,
                     PCWSTR(to_wide(&labels.gemini_get_key).as_ptr()),
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                     446,
-                    418,
-                    203,
+                    446,
+                    220,
                     28,
                     hwnd,
                     HMENU(ID_GEMINI_GET_KEY as isize),
@@ -2504,6 +2545,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     save_project_checkbox,
                     delete_video_after_checkbox,
                     gemini_api_key_edit,
+                    gemini_show_api_key_checkbox,
                     gemini_get_key_button,
                     gemini_model_combo,
                     gemini_refresh_models_button,
@@ -2539,6 +2581,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                     save_project_checkbox,
                     delete_video_after_checkbox,
                     gemini_api_key_edit,
+                    gemini_show_api_key_checkbox,
                     gemini_model_label,
                     gemini_model_combo,
                     gemini_refresh_models_button,
@@ -2574,6 +2617,7 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                         save_project_checkbox,
                         delete_video_after_checkbox,
                         gemini_api_key_edit,
+                        gemini_show_api_key_checkbox,
                         gemini_get_key_button,
                         gemini_model_combo,
                         gemini_refresh_models_button,
@@ -2649,6 +2693,9 @@ fn window_proc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LR
                             set_path(state.output, &path);
                             SetForegroundWindow(hwnd);
                         }
+                    }
+                    ID_GEMINI_SHOW_API_KEY if !state.running => {
+                        update_gemini_api_key_visibility(state);
                     }
                     ID_GEMINI_GET_KEY if !state.running => {
                         crate::app_windows::options_window::open_gemini_api_key_page();

@@ -1,5 +1,14 @@
 # Changelog
 
+Versión 0.9.3 – 2026-09-03
+
+Voces SAPI5
+1. Corregido un problema por el que algunas voces SAPI5 locales podían no hablar con el movimiento del cursor activado, durante la lectura con varias voces o al crear audiolibros/MP3. La síntesis SAPI5 a archivo usa ahora la ruta síncrona que Windows gestiona correctamente, mientras que la reproducción directa normal permanece sin cambios.
+2. Corregida la posición del cursor durante la lectura de diálogos con varias voces. Las etiquetas de voz insertadas automáticamente por Sonarpad para los diálogos ahora se tratan solo como metadatos de reproducción y ya no como caracteres del editor, evitando que tras F4 o F6 el cursor salte por delante del texto real. La lectura con una sola voz y las etiquetas <voice> escritas explícitamente en los documentos no cambian.
+
+Audiodescripción con IA
+1. Añadida la casilla “Mostrar clave API” inmediatamente después del campo de la clave API de Gemini. Está desactivada de forma predeterminada; al activarla muestra temporalmente la clave completa para comprobar que se haya pegado entera. Al volver a abrir la ventana, la clave aparece siempre oculta.
+
 Versión 0.9.2 – 2026-09-02
 
 Audiodescripción con IA

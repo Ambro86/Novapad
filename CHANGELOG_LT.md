@@ -1,5 +1,14 @@
 # Pakeitimų žurnalas
 
+Versija 0.9.3 – 2026-09-03
+
+SAPI5 balsai
+1. Ištaisyta problema, dėl kurios kai kurie vietiniai SAPI5 balsai galėjo nekalbėti, kai įjungtas žymeklio judėjimas, naudojant kelių balsų skaitymą arba kuriant garsines knygas / MP3. SAPI5 sintezė į failą dabar naudoja sinchroninį kelią, kurį Windows patikimai apdoroja, o įprastas tiesioginis atkūrimas lieka nepakeistas.
+2. Ištaisyta žymeklio padėtis skaitant dialogus keliais balsais. Sonarpad automatiškai dialogams įterpiamos balso žymos dabar laikomos tik atkūrimo metaduomenimis, o ne redaktoriaus simboliais, todėl po F4 arba F6 žymeklis nebeperšoka į priekį už tikrojo teksto. Skaitymas vienu balsu ir dokumente aiškiai įrašytos <voice> žymos lieka nepakeistos.
+
+DI garso aprašymas
+1. Iškart po „Gemini“ API rakto lauku pridėtas žymimasis langelis „Rodyti API raktą“. Pagal numatytuosius nustatymus jis išjungtas; įjungus visas raktas laikinai parodomas, kad būtų galima patikrinti, ar jis įklijuotas visas. Iš naujo atidarius langą raktas vėl paslepiamas.
+
 Versija 0.9.2 – 2026-09-02
 
 AI garsinis vaizdavimas

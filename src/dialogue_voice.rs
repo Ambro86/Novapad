@@ -363,17 +363,20 @@ pub fn apply_dialogue_tags(text: &str, cfg: &DialogueVoiceConfig) -> String {
         cfg.secondary_voice
     ));
 
-    let build_open_tag =
-        |engine: TtsEngine, voice_name: &str, rate: i32, pitch: i32, volume: i32| {
-            format!(
-                "<voice engine=\"{}\" voice=\"{}\" rate=\"{}\" pitch=\"{}\" volume=\"{}\">",
-                engine_to_key(engine),
-                xml_escape_attr(voice_name),
-                rate,
-                pitch,
-                volume
-            )
-        };
+    let build_open_tag = |engine: TtsEngine,
+                          voice_name: &str,
+                          rate: i32,
+                          pitch: i32,
+                          volume: i32| {
+        format!(
+            "<voice engine=\"{}\" voice=\"{}\" rate=\"{}\" pitch=\"{}\" volume=\"{}\" sonarpad-dialogue=\"1\">",
+            engine_to_key(engine),
+            xml_escape_attr(voice_name),
+            rate,
+            pitch,
+            volume
+        )
+    };
     let close_tag = "</voice>";
     let use_secondary = cfg.use_secondary_voice && !cfg.secondary_voice.trim().is_empty();
     let secondary_voice = cfg.secondary_voice.trim();

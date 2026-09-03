@@ -1,5 +1,12 @@
 # Ändringslogg
 
+Version 0.9.4 – 2026-09-04
+
+AI-ljudbeskrivning
+1. Åtgärdade ett problem med Matroska/WebM-videor som innehåller en ovanligt hög intern starttidsstämpel och som kunde stoppa skapandet av ljudbeskrivningen med felet ”invalid Gemini chunk timeline”. Sonarpad normaliserar nu källfilens och Gemini-segmentens längd endast när detta avvikande tidsstämpelmönster upptäcks, medan vanliga videor och det redan fungerande ljudbeskrivningsbeteendet förblir oförändrade.
+2. Duckingen för ljudbeskrivningen har förbättrats för en mer naturlig mix. Originalljudet sänks nu mjukt redan innan rösten börjar och återgår mer gradvis till normal nivå efter beskrivningen; beskrivningar som ligger mycket nära varandra behåller en stabil bakgrundsnivå så att ljudet inte höjs och sänks upprepade gånger.
+
+
 Version 0.9.3 – 2026-09-03
 
 SAPI5-röster

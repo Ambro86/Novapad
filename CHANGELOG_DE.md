@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+Version 0.9.4 – 2026-09-04
+
+KI-Audiodeskription
+1. Ein Problem mit Matroska-/WebM-Videos wurde behoben, die einen ungewöhnlich hohen internen Startzeitstempel enthalten und die Erstellung der Audiodeskription mit dem Fehler „invalid Gemini chunk timeline“ abbrechen konnten. Sonarpad normalisiert nun die Dauer der Quelldatei und der Gemini-Chunks nur dann, wenn dieses anomale Zeitstempelmuster erkannt wird; normale Videos und das bereits funktionierende Verhalten der Audiodeskription bleiben unverändert.
+2. Das Ducking der Audiodeskription wurde für eine natürlichere Mischung verbessert. Der Originalton wird nun bereits vor Beginn der Stimme sanft abgesenkt und nach der Beschreibung allmählicher auf den normalen Pegel zurückgeführt; bei dicht aufeinanderfolgenden Beschreibungen bleibt der Hintergrundpegel stabil, sodass wiederholtes Absenken und Anheben vermieden wird.
+
+
 Version 0.9.3 – 2026-09-03
 
 SAPI5-Stimmen

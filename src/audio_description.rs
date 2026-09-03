@@ -35,8 +35,10 @@ const GEMINI_MAX_CHUNK_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const GEMINI_INLINE_TARGET_CHUNK_BYTES: u64 = 40 * 1024 * 1024;
 const GEMINI_MIN_SEGMENT_SECONDS: u32 = 30;
 const GEMINI_SEGMENT_RETRY_LIMIT: usize = 5;
-const AUDIO_DESCRIPTION_DUCKING_DB: f32 = -15.0;
-const AUDIO_DESCRIPTION_FADE_MS: u32 = 150;
+const AUDIO_DESCRIPTION_DUCKING_DB: f32 = -12.0;
+const AUDIO_DESCRIPTION_FADE_MS: u32 = 280;
+const AUDIO_DESCRIPTION_PRE_DUCK_MS: u32 = 180;
+const AUDIO_DESCRIPTION_RELEASE_MS: u32 = 600;
 const AUDIO_DESCRIPTION_BITRATE_KBPS: u32 = 192;
 const MAX_CHARACTER_DESCRIPTION_CHARS: usize = 2_000;
 const AUDIO_DESCRIPTION_PARTIAL_FORMAT: &str = "sonarpad-audio-description-partial";
@@ -904,6 +906,67 @@ fn write_pyannote_wav(
     Ok(())
 }
 
+fn normalize_audio_description_source_duration(
+    path: &Path,
+    measured_duration_sec: f64,
+    format_start_sec: f64,
+) -> f64 {
+    if !measured_duration_sec.is_finite() || measured_duration_sec <= 0.0 {
+        return measured_duration_sec;
+    }
+    let is_matroska = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("mkv") || extension.eq_ignore_ascii_case("webm")
+        });
+    if !is_matroska
+        || !format_start_sec.is_finite()
+        || format_start_sec <= GEMINI_CHUNK_SECONDS as f64
+        || measured_duration_sec <= format_start_sec
+    {
+        return measured_duration_sec;
+    }
+
+    // Matroska/WebM can report format duration as the absolute end timestamp
+    // when the source starts far from zero. Sonarpad needs the local media span
+    // for its analysis timeline, not that container clock value.
+    let local_span_sec = measured_duration_sec - format_start_sec;
+    if local_span_sec > 0.001 {
+        local_span_sec
+    } else {
+        measured_duration_sec
+    }
+}
+
+fn normalize_prepared_gemini_chunk_duration(
+    measured_duration_sec: f64,
+    format_start_sec: f64,
+    segment_seconds: u32,
+) -> f64 {
+    let expected_sec = segment_seconds.max(1) as f64;
+    if !measured_duration_sec.is_finite() || measured_duration_sec <= 0.0 {
+        return expected_sec;
+    }
+
+    // Some Matroska chunks produced from sources with a very large non-zero
+    // start_time expose AVFormatContext.duration as an absolute end timestamp
+    // instead of a local duration. Only normalize that unmistakable case;
+    // ordinary media, including files with small offsets, keeps the historical
+    // duration path unchanged.
+    if format_start_sec.is_finite()
+        && format_start_sec > expected_sec * 4.0
+        && measured_duration_sec > format_start_sec
+    {
+        let local_span_sec = measured_duration_sec - format_start_sec;
+        if local_span_sec > 0.001 && local_span_sec <= expected_sec * 4.0 {
+            return local_span_sec;
+        }
+    }
+
+    measured_duration_sec
+}
+
 fn prepare_gemini_chunks(
     input_path: &Path,
     duration_sec: f64,
@@ -1056,9 +1119,24 @@ fn prepare_gemini_chunks(
                 path.display()
             ));
         }
-        let measured = crate::ffmpeg_export::media_duration_seconds(&path)
-            .unwrap_or(GEMINI_CHUNK_SECONDS as f64)
-            .max(0.001);
+        let (raw_measured, format_start_sec) =
+            crate::ffmpeg_export::media_duration_and_start_seconds(&path)
+                .unwrap_or((segment_seconds as f64, 0.0));
+        let measured = normalize_prepared_gemini_chunk_duration(
+            raw_measured,
+            format_start_sec,
+            segment_seconds,
+        )
+        .max(0.001);
+        if (measured - raw_measured).abs() > 0.001 {
+            crate::log_debug(&format!(
+                "Audio description: normalized Gemini chunk duration {} raw={:.3}s start_time={:.3}s local={:.3}s",
+                path.display(),
+                raw_measured,
+                format_start_sec,
+                measured
+            ));
+        }
         let start_sec = cursor;
         let end_sec = if index + 1 == path_count {
             duration_sec
@@ -1922,8 +2000,13 @@ fn build_audio_description_project(
                 (None, None, tts_duration_sec)
             } else {
                 (
-                    Some((output_start_sec - 0.150).max(0.0)),
-                    Some(output_end_sec + 0.150),
+                    Some(
+                        (output_start_sec
+                            - (AUDIO_DESCRIPTION_FADE_MS + AUDIO_DESCRIPTION_PRE_DUCK_MS) as f64
+                                / 1000.0)
+                            .max(0.0),
+                    ),
+                    Some(output_end_sec + AUDIO_DESCRIPTION_RELEASE_MS as f64 / 1000.0),
                     0.0,
                 )
             };
@@ -2976,10 +3059,25 @@ pub fn create_audio_description(
     let analysis_cache_dir = temporary_job_dir()?;
     let preparation_result =
         (|| -> Result<(f64, Option<PathBuf>, Vec<AudioDescriptionPreparedChunk>), String> {
-            let duration_sec = crate::ffmpeg_export::media_duration_seconds(&job.input_path)
-                .ok_or_else(|| {
-                    "Audio description: FFmpeg could not read media duration".to_string()
-                })?;
+            let (raw_duration_sec, format_start_sec) =
+                crate::ffmpeg_export::media_duration_and_start_seconds(&job.input_path)
+                    .ok_or_else(|| {
+                        "Audio description: FFmpeg could not read media duration".to_string()
+                    })?;
+            let duration_sec = normalize_audio_description_source_duration(
+                &job.input_path,
+                raw_duration_sec,
+                format_start_sec,
+            );
+            if (duration_sec - raw_duration_sec).abs() > 0.001 {
+                crate::log_debug(&format!(
+                    "Audio description: normalized source duration raw={:.3}s start_time={:.3}s local={:.3}s path={}",
+                    raw_duration_sec,
+                    format_start_sec,
+                    duration_sec,
+                    job.input_path.display()
+                ));
+            }
             if duration_sec <= 0.0 {
                 return Err("Audio description: selected media is empty".to_string());
             }
@@ -3405,16 +3503,77 @@ mod tests {
         audio_description_tts_error_is_empty_output, build_audio_description_project, choose_slot,
         delete_audio_description_project_description,
         load_audio_description_character_catalog_context, load_audio_description_project,
-        merge_catalog_characters, merge_catalog_description, normalize_catalog_characters,
-        save_audio_description_character_catalog, save_audio_description_project,
-        schedule_synthesized_descriptions, scheduled_duration_sec, trim_edge_trailing_silence,
-        validate_audio_description_project_edit_duration,
+        merge_catalog_characters, merge_catalog_description,
+        normalize_audio_description_source_duration, normalize_catalog_characters,
+        normalize_prepared_gemini_chunk_duration, save_audio_description_character_catalog,
+        save_audio_description_project, schedule_synthesized_descriptions, scheduled_duration_sec,
+        trim_edge_trailing_silence, validate_audio_description_project_edit_duration,
     };
     use crate::settings::{DictionaryEntry, Language, TtsEngine};
     use crate::tools::audio_description_bridge::{BridgeCharacter, BridgeInterval};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn audio_description_source_duration_normalizes_large_matroska_clock_offset() {
+        let normalized = normalize_audio_description_source_duration(
+            Path::new("movie.mkv"),
+            37_234.103,
+            31_234.103,
+        );
+        assert!((normalized - 6_000.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn audio_description_source_duration_keeps_other_containers_unchanged() {
+        assert_eq!(
+            normalize_audio_description_source_duration(
+                Path::new("movie.mp4"),
+                6_000.0,
+                31_234.103,
+            ),
+            6_000.0
+        );
+    }
+
+    #[test]
+    fn audio_description_source_duration_keeps_small_matroska_offsets_unchanged() {
+        assert_eq!(
+            normalize_audio_description_source_duration(Path::new("movie.mkv"), 6_002.0, 2.0),
+            6_002.0
+        );
+    }
+
+    #[test]
+    fn gemini_chunk_duration_keeps_normal_zero_based_media_unchanged() {
+        assert_eq!(
+            normalize_prepared_gemini_chunk_duration(51.125, 0.0, 51),
+            51.125
+        );
+    }
+
+    #[test]
+    fn gemini_chunk_duration_keeps_duration_semantics_with_large_start_time() {
+        assert_eq!(
+            normalize_prepared_gemini_chunk_duration(51.125, 31_234.103, 51),
+            51.125
+        );
+    }
+
+    #[test]
+    fn gemini_chunk_duration_normalizes_absolute_end_timestamp_from_large_start_time() {
+        let normalized = normalize_prepared_gemini_chunk_duration(31_285.228, 31_234.103, 51);
+        assert!((normalized - 51.125).abs() < 0.001);
+    }
+
+    #[test]
+    fn gemini_chunk_duration_does_not_rewrite_small_timestamp_offsets() {
+        assert_eq!(
+            normalize_prepared_gemini_chunk_duration(120.0, 2.0, 51),
+            120.0
+        );
+    }
 
     #[test]
     fn empty_tts_validation_rejects_silent_pcm_and_accepts_voice_signal() {

@@ -1,5 +1,12 @@
 # Nhật ký thay đổi
 
+Phiên bản 0.9.4 – 2026-09-04
+
+Mô tả âm thanh bằng AI
+1. Đã sửa lỗi với video Matroska/WebM có dấu thời gian bắt đầu nội bộ cao bất thường, có thể làm quá trình tạo mô tả âm thanh dừng lại với lỗi “invalid Gemini chunk timeline”. Sonarpad giờ chỉ chuẩn hóa thời lượng của tệp nguồn và các đoạn Gemini khi phát hiện kiểu dấu thời gian bất thường này, còn video thông thường và cách hoạt động mô tả âm thanh vốn đã ổn định vẫn không thay đổi.
+2. Cải thiện ducking của mô tả âm thanh để bản trộn nghe tự nhiên hơn. Âm thanh gốc giờ được giảm nhẹ trước khi giọng mô tả bắt đầu và trở lại mức bình thường một cách từ từ sau phần mô tả; các đoạn mô tả nằm rất gần nhau sẽ giữ mức nền ổn định, tránh việc âm lượng liên tục hạ xuống rồi tăng lên.
+
+
 Phiên bản 0.9.3 – 2026-09-03
 
 Giọng SAPI5

@@ -606,6 +606,42 @@ pub fn media_duration_seconds(path: &Path) -> Option<f64> {
     }
 }
 
+pub(crate) fn media_duration_and_start_seconds(path: &Path) -> Option<(f64, f64)> {
+    let api = ffmpeg_api().ok()?;
+    let input_c = CString::new(path.to_string_lossy().as_bytes()).ok()?;
+    let mut in_ctx: *mut AVFormatContext = ptr::null_mut();
+    let open_ret = crate::ffmpeg_source::avformat_open_input_safe(
+        api,
+        &mut in_ctx,
+        input_c.as_ptr(),
+        ptr::null_mut(),
+        ptr::null_mut(),
+    );
+    if open_ret < 0 || in_ctx.is_null() {
+        return None;
+    }
+    let stream_info_ret =
+        crate::ffmpeg_source::avformat_find_stream_info_safe(api, in_ctx, ptr::null_mut());
+    if stream_info_ret < 0 {
+        log_debug(&format!(
+            "FFmpeg: media timing stream info failed with code {}",
+            stream_info_ret
+        ));
+    }
+    let duration = unsafe { (*in_ctx).duration };
+    let start_time = unsafe { (*in_ctx).start_time };
+    crate::ffmpeg_source::avformat_close_input_safe(api, &mut in_ctx);
+    if duration <= 0 {
+        return None;
+    }
+    let start_seconds = if start_time != AV_NOPTS_VALUE_I64 {
+        start_time as f64 / 1_000_000.0
+    } else {
+        0.0
+    };
+    Some((duration as f64 / 1_000_000.0, start_seconds))
+}
+
 pub fn media_duration_secs(path: &Path) -> Option<u64> {
     media_duration_seconds(path).map(|duration| duration.ceil() as u64)
 }
@@ -1934,15 +1970,22 @@ fn merge_audio_description_intervals(
     merged
 }
 
+fn audio_description_smooth_fade(position: f32) -> f32 {
+    let position = position.clamp(0.0, 1.0);
+    0.5 - 0.5 * (std::f32::consts::PI * position).cos()
+}
+
 fn audio_description_duck_gain(
     frame: u64,
     intervals: &[(u64, u64)],
     cursor: &mut usize,
-    fade_frames: u64,
+    attack_frames: u64,
+    preduck_frames: u64,
+    release_frames: u64,
     duck_gain: f32,
 ) -> f32 {
     while let Some((_, end)) = intervals.get(*cursor) {
-        if frame > end.saturating_add(fade_frames) {
+        if frame > end.saturating_add(release_frames) {
             *cursor = cursor.saturating_add(1);
         } else {
             break;
@@ -1951,19 +1994,23 @@ fn audio_description_duck_gain(
     let Some((start, end)) = intervals.get(*cursor).copied() else {
         return 1.0;
     };
-    if fade_frames > 0 && frame < start {
-        let fade_start = start.saturating_sub(fade_frames);
-        if frame >= fade_start {
-            let position = (frame - fade_start) as f32 / fade_frames as f32;
-            return 1.0 + (duck_gain - 1.0) * position.clamp(0.0, 1.0);
+
+    let full_duck_start = start.saturating_sub(preduck_frames);
+    if attack_frames > 0 && frame < full_duck_start {
+        let attack_start = full_duck_start.saturating_sub(attack_frames);
+        if frame >= attack_start {
+            let position = (frame - attack_start) as f32 / attack_frames as f32;
+            let eased = audio_description_smooth_fade(position);
+            return 1.0 + (duck_gain - 1.0) * eased;
         }
     }
-    if frame >= start && frame <= end {
+    if frame >= full_duck_start && frame <= end {
         return duck_gain;
     }
-    if fade_frames > 0 && frame > end && frame <= end.saturating_add(fade_frames) {
-        let position = (frame - end) as f32 / fade_frames as f32;
-        return duck_gain + (1.0 - duck_gain) * position.clamp(0.0, 1.0);
+    if release_frames > 0 && frame > end && frame <= end.saturating_add(release_frames) {
+        let position = (frame - end) as f32 / release_frames as f32;
+        let eased = audio_description_smooth_fade(position);
+        return duck_gain + (1.0 - duck_gain) * eased;
     }
     1.0
 }
@@ -2059,9 +2106,15 @@ pub fn export_audio_description_mp3(
         .cloned()
         .collect();
     let duck_gain = 10_f32.powf(options.ducking_db.min(0.0) / 20.0);
-    let fade_frames = (sample_rate as u64)
+    let attack_frames = (sample_rate as u64)
         .saturating_mul(options.fade_ms as u64)
         .saturating_div(1000);
+    // Professional audio-description envelope.  `fade_ms` remains the stored
+    // attack value for project compatibility; pre-duck and release scale with
+    // it so older projects keep their relative timing while new projects use
+    // 280 ms attack, 180 ms pre-duck and 600 ms release.
+    let preduck_frames = attack_frames.saturating_mul(9).saturating_div(14);
+    let release_frames = attack_frames.saturating_mul(15).saturating_div(7);
     let duck_intervals = merge_audio_description_intervals(
         normal_cues
             .iter()
@@ -2071,7 +2124,9 @@ pub fn export_audio_description_mp3(
                 (start_frame, start_frame.saturating_add(cue_frames))
             })
             .collect(),
-        fade_frames,
+        attack_frames
+            .saturating_add(preduck_frames)
+            .saturating_add(release_frames),
     );
 
     let temp_wav = audio_description_temp_wav_path(output_path);
@@ -2174,7 +2229,9 @@ pub fn export_audio_description_mp3(
                     frame,
                     &duck_intervals,
                     &mut duck_cursor,
-                    fade_frames,
+                    attack_frames,
+                    preduck_frames,
+                    release_frames,
                     duck_gain,
                 );
             }
@@ -2278,8 +2335,15 @@ mod audio_description_export_tests {
             .iter()
             .enumerate()
             .map(|(frame, sample)| {
-                let gain =
-                    audio_description_duck_gain(frame as u64, &intervals, &mut cursor, 25, 0.2);
+                let gain = audio_description_duck_gain(
+                    frame as u64,
+                    &intervals,
+                    &mut cursor,
+                    25,
+                    10,
+                    50,
+                    0.2,
+                );
                 let narration = if (140..160).contains(&frame) {
                     0.25
                 } else {
@@ -2298,24 +2362,47 @@ mod audio_description_export_tests {
     }
 
     #[test]
-    fn duck_gain_uses_linear_fades() {
+    fn duck_gain_uses_preduck_and_smooth_asymmetric_fades() {
         let intervals = vec![(100, 200)];
         let mut cursor = 0;
+        // 25-frame attack starts at frame 65 and reaches full duck 10 frames
+        // before narration begins.
         assert!(
-            (audio_description_duck_gain(50, &intervals, &mut cursor, 25, 0.2) - 1.0).abs() < 0.001
-        );
-        assert!(
-            (audio_description_duck_gain(100, &intervals, &mut cursor, 25, 0.2) - 0.2).abs()
+            (audio_description_duck_gain(64, &intervals, &mut cursor, 25, 10, 50, 0.2) - 1.0).abs()
                 < 0.001
         );
         assert!(
-            (audio_description_duck_gain(200, &intervals, &mut cursor, 25, 0.2) - 0.2).abs()
+            (audio_description_duck_gain(90, &intervals, &mut cursor, 25, 10, 50, 0.2) - 0.2).abs()
                 < 0.001
         );
         assert!(
-            (audio_description_duck_gain(225, &intervals, &mut cursor, 25, 0.2) - 1.0).abs()
+            (audio_description_duck_gain(100, &intervals, &mut cursor, 25, 10, 50, 0.2) - 0.2)
+                .abs()
                 < 0.001
         );
+        assert!(
+            (audio_description_duck_gain(200, &intervals, &mut cursor, 25, 10, 50, 0.2) - 0.2)
+                .abs()
+                < 0.001
+        );
+        // Mid-release remains exactly halfway between ducked and full gain,
+        // while the cosine curve makes the edges gentler than a linear fade.
+        assert!(
+            (audio_description_duck_gain(225, &intervals, &mut cursor, 25, 10, 50, 0.2) - 0.6)
+                .abs()
+                < 0.001
+        );
+        assert!(
+            (audio_description_duck_gain(250, &intervals, &mut cursor, 25, 10, 50, 0.2) - 1.0)
+                .abs()
+                < 0.001
+        );
+
+        let mut cursor = 0;
+        let quarter_attack =
+            audio_description_duck_gain(71, &intervals, &mut cursor, 25, 10, 50, 0.2);
+        let linear_quarter = 1.0 + (0.2 - 1.0) * (6.0 / 25.0);
+        assert!(quarter_attack > linear_quarter);
     }
 }
 

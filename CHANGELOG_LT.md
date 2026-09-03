@@ -1,5 +1,12 @@
 # Pakeitimų žurnalas
 
+Versija 0.9.4 – 2026-09-04
+
+DI garso aprašymas
+1. Ištaisyta problema su Matroska/WebM vaizdo įrašais, kuriuose yra neįprastai didelė vidinė pradžios laiko žyma ir dėl kurios garso aprašymo kūrimas galėjo sustoti su klaida „invalid Gemini chunk timeline“. Sonarpad dabar normalizuoja šaltinio failo ir Gemini dalių trukmę tik aptikęs šį neįprastą laiko žymų modelį, todėl įprasti vaizdo įrašai ir jau veikiantis garso aprašymo elgesys lieka nepakeisti.
+2. Patobulintas garso aprašymo ducking, kad galutinis miksas skambėtų natūraliau. Originalus garsas dabar švelniai pritildomas dar prieš prasidedant balsui ir po aprašymo palaipsniui grąžinamas į įprastą lygį; labai arti viena kitos esančios aprašo frazės išlaiko stabilų foninį lygį, todėl garsas nebesvyruoja pirmyn ir atgal.
+
+
 Versija 0.9.3 – 2026-09-03
 
 SAPI5 balsai

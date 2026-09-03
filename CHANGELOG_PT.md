@@ -1,5 +1,12 @@
 # Changelog
 
+Versão 0.9.4 – 2026-09-04
+
+Audiodescrição com IA
+1. Corrigido um problema com vídeos Matroska/WebM que contêm uma marca temporal inicial interna invulgarmente elevada e que podia interromper a geração da audiodescrição com o erro “invalid Gemini chunk timeline”. O Sonarpad passa agora a normalizar a duração do ficheiro de origem e dos segmentos Gemini apenas quando este padrão anómalo de marcas temporais é detetado, mantendo inalterados os vídeos normais e o comportamento da audiodescrição que já funcionava.
+2. Melhorado o ducking da audiodescrição para obter uma mistura mais natural. O áudio original passa agora a baixar suavemente antes de a voz começar e regressa de forma gradual ao nível normal depois da descrição; quando existem descrições muito próximas, o nível de fundo mantém-se estável, evitando sucessivas descidas e subidas de volume.
+
+
 Versão 0.9.3 – 2026-09-03
 
 Vozes SAPI5

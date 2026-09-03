@@ -1,5 +1,12 @@
 # Changelog
 
+Version 0.9.4 – 2026-09-04
+
+AI Audio Description
+1. Fixed an issue with Matroska/WebM videos that contain an unusually large internal start timestamp and could stop audio-description generation with “invalid Gemini chunk timeline”. Sonarpad now normalizes the source and Gemini chunk durations only when this anomalous timestamp pattern is detected, while normal videos and existing audio-description behavior remain unchanged.
+2. Improved audio-description ducking for a more natural mix. The original soundtrack now lowers smoothly before the narration begins and returns more gradually afterward; closely spaced descriptions keep a stable background level instead of repeatedly raising and lowering the soundtrack.
+
+
 Version 0.9.3 – 2026-09-03
 
 SAPI5 voices

@@ -1,5 +1,12 @@
 # Dziennik zmian
 
+Wersja 0.9.4 – 2026-09-04
+
+Audiodeskrypcja z AI
+1. Naprawiono problem z filmami Matroska/WebM zawierającymi nietypowo wysoki wewnętrzny znacznik czasu rozpoczęcia, który mógł zatrzymać generowanie audiodeskrypcji z błędem „invalid Gemini chunk timeline”. Sonarpad normalizuje teraz czas trwania pliku źródłowego i fragmentów Gemini tylko po wykryciu tego nietypowego układu znaczników czasu, pozostawiając zwykłe filmy oraz dotychczas działające zachowanie audiodeskrypcji bez zmian.
+2. Ulepszono ducking audiodeskrypcji, aby miks brzmiał bardziej naturalnie. Oryginalny dźwięk jest teraz płynnie ściszany jeszcze przed rozpoczęciem głosu i stopniowo wraca do normalnego poziomu po zakończeniu opisu; przy opisach znajdujących się bardzo blisko siebie poziom tła pozostaje stabilny, bez ciągłego ściszania i podgłaśniania.
+
+
 Wersja 0.9.3 – 2026-09-03
 
 Głosy SAPI5

@@ -3,11 +3,16 @@
 Version 0.9.3 – 2026-09-03
 
 SAPI5-röster
-1. Åtgärdade ett problem där vissa lokala SAPI5-röster kunde bli tysta när markörförflyttning var aktiverad, vid läsning med flera röster eller när ljudböcker/MP3-filer skapades. SAPI5-syntes till fil använder nu den synkrona väg som Windows hanterar tillförlitligt, medan vanlig direkt uppspelning är oförändrad.
+1. Åtgärdade ett problem där vissa lokala SAPI5-röster kunde vara tysta när markörförflyttning var aktiverad, vid uppläsning med flera röster eller när ljudböcker/MP3-filer skapades. Sonarpad använder nu en SAPI5-filsynthesväg som fungerar tillförlitligt i Windows och fortfarande kan avbrytas under syntesen, medan vanlig direkt uppspelning är oförändrad.
 2. Markörens position vid dialogläsning med flera röster har korrigerats. Rösttaggar som Sonarpad automatiskt lägger in för dialog behandlas nu endast som uppspelningsmetadata och inte som tecken i redigeraren, så markören hoppar inte längre framför den verkliga texten efter F4 eller F6. Läsning med en enda röst och uttryckliga <voice>-taggar i dokument förblir oförändrade.
 
 AI-ljudbeskrivning
 1. Kryssrutan ”Visa API-nyckel” har lagts till direkt efter fältet för Gemini API-nyckeln. Den är avstängd som standard; när den aktiveras visas hela nyckeln tillfälligt så att det går att kontrollera att den klistrades in komplett. När fönstret öppnas igen är nyckeln alltid dold.
+
+Podcaster och Wikipedia
+1. Efter att en podcastinspelning har sparats frågar Sonarpad nu om mappen som innehåller den sparade filen ska öppnas, på samma sätt som efter sparning av YouTube-/strömmande media.
+2. När ytterligare en Wikipedia-artikel importeras till en redigerare som redan innehåller text läggs den nya artikeln nu till sist i stället för att infogas överst. Markören placeras i början av den nyimporterade artikeln.
+
 
 Version 0.9.2 – 2026-09-02
 
@@ -17,7 +22,6 @@ AI-syntolkning
 
 YouTube och strömning
 1. Åtgärdade ett problem där start av AI-syntolkning för en video på sida 2 eller senare i en YouTube-spellista eller kanal kunde öppna YouTube-valfönstret igen och ta fokus från syntolkningsfönstret. Sonarpad stänger nu väljaren korrekt utan att gå tillbaka till föregående sidor.
-
 Version 0.9.1 – 2026-09-01
 
 YouTube-nedladdningar

@@ -27,19 +27,20 @@ use windows::Win32::UI::Controls::{
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     EnableWindow, SetFocus, VK_CONTROL, VK_ESCAPE, VK_SHIFT,
 };
+use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::{
     BM_CLICK, BM_GETCHECK, BM_SETCHECK, BS_AUTOCHECKBOX, BS_DEFPUSHBUTTON, BS_GROUPBOX,
     CB_ADDSTRING, CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST,
     CREATESTRUCTW, CW_USEDEFAULT, CreateWindowExW, DefWindowProcW, DestroyWindow, EN_CHANGE,
     GWLP_USERDATA, GetDlgItem, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, HMENU,
-    IDC_ARROW, IDOK, KillTimer, LB_ADDSTRING, LB_GETCARETINDEX, LB_GETCOUNT, LB_GETSEL,
+    IDC_ARROW, IDOK, IDYES, KillTimer, LB_ADDSTRING, LB_GETCARETINDEX, LB_GETCOUNT, LB_GETSEL,
     LB_RESETCONTENT, LB_SETSEL, LBN_SELCHANGE, LBS_MULTIPLESEL, LBS_NOINTEGRALHEIGHT, LBS_NOTIFY,
-    LoadCursorW, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MSG,
-    MessageBoxW, PostMessageW, RegisterClassW, SendMessageW, SetForegroundWindow, SetTimer,
-    SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE, WM_CLOSE, WM_COMMAND, WM_CREATE,
-    WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT, WM_TIMER, WNDCLASSW, WS_CAPTION,
-    WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-    WS_VSCROLL,
+    LoadCursorW, MB_ICONERROR, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MB_YESNO,
+    MSG, MessageBoxW, PostMessageW, RegisterClassW, SW_SHOWNORMAL, SendMessageW,
+    SetForegroundWindow, SetTimer, SetWindowLongPtrW, SetWindowTextW, ShowWindow, WINDOW_STYLE,
+    WM_CLOSE, WM_COMMAND, WM_CREATE, WM_DESTROY, WM_KEYDOWN, WM_NCDESTROY, WM_SETFOCUS, WM_SETFONT,
+    WM_TIMER, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_EX_CONTROLPARENT, WS_SYSMENU,
+    WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
 };
 use windows::core::PCWSTR;
 
@@ -94,6 +95,7 @@ enum ActiveMonitorKind {
 struct PodcastSaveResult {
     success: bool,
     message: String,
+    saved_folder: Option<PathBuf>,
 }
 
 pub fn handle_navigation(hwnd: HWND, msg: &MSG) -> bool {
@@ -1689,17 +1691,46 @@ fn podcast_wndproc_inner(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -
                     };
                     let title_w = to_wide(&title);
                     let msg_w = to_wide(&result.message);
-                    let flags = if result.success {
-                        MB_OK | MB_ICONINFORMATION
+                    if result.success {
+                        let open_label =
+                            i18n::tr(state.language, "podcasts.save_confirm_open_folder");
+                        let prompt = format!("{}\n\n{}?", result.message, open_label);
+                        let prompt_w = to_wide(&prompt);
+                        let response = MessageBoxW(
+                            hwnd,
+                            PCWSTR(prompt_w.as_ptr()),
+                            PCWSTR(title_w.as_ptr()),
+                            MB_YESNO | MB_ICONINFORMATION,
+                        );
+                        if response == IDYES
+                            && let Some(folder) = result.saved_folder.as_ref()
+                        {
+                            let folder_w = to_wide(&folder.to_string_lossy());
+                            let verb_w = to_wide("open");
+                            let open_result = ShellExecuteW(
+                                hwnd,
+                                PCWSTR(verb_w.as_ptr()),
+                                PCWSTR(folder_w.as_ptr()),
+                                PCWSTR::null(),
+                                PCWSTR::null(),
+                                SW_SHOWNORMAL,
+                            );
+                            if open_result.0 as isize <= 32 {
+                                crate::log_debug(&format!(
+                                    "Podcast recording: failed to open save folder path={} code={}",
+                                    folder.to_string_lossy(),
+                                    open_result.0
+                                ));
+                            }
+                        }
                     } else {
-                        MB_OK | MB_ICONERROR
-                    };
-                    MessageBoxW(
-                        hwnd,
-                        PCWSTR(msg_w.as_ptr()),
-                        PCWSTR(title_w.as_ptr()),
-                        flags,
-                    );
+                        MessageBoxW(
+                            hwnd,
+                            PCWSTR(msg_w.as_ptr()),
+                            PCWSTR(title_w.as_ptr()),
+                            MB_OK | MB_ICONERROR,
+                        );
+                    }
                 })
                 .is_none()
                 {
@@ -2863,6 +2894,7 @@ fn stop_recording_action(state: &mut PodcastState, hwnd: HWND) {
     }
     let cancel_flag = Arc::new(AtomicBool::new(false));
     state.save_cancel = Some(cancel_flag.clone());
+    let saved_folder = selected_save_folder(state);
     if let Some(recorder) = state.recorder.take() {
         update_status_text(state, RecorderStatus::Saving);
         let language = state.language;
@@ -2891,12 +2923,14 @@ fn stop_recording_action(state: &mut PodcastState, hwnd: HWND) {
                     notify = Some(PodcastSaveResult {
                         success: false,
                         message: err,
+                        saved_folder: None,
                     });
                 }
             } else {
                 notify = Some(PodcastSaveResult {
                     success: true,
                     message: i18n::tr(language, "podcast.saved"),
+                    saved_folder: Some(saved_folder),
                 });
             }
             if let Some(payload) = notify {

@@ -3,11 +3,16 @@
 Verze 0.9.3 – 2026-09-03
 
 Hlasy SAPI5
-1. Opraven problém, kvůli kterému některé místní hlasy SAPI5 nemusely mluvit při zapnutém posouvání kurzoru, při čtení více hlasy nebo při vytváření audioknih/MP3. Syntéza SAPI5 do souboru nyní používá synchronní cestu, kterou Windows spolehlivě zpracovává, zatímco běžné přímé přehrávání zůstává beze změny.
+1. Opraven problém, kvůli kterému některé místní hlasy SAPI5 nemusely mluvit při zapnutém posouvání kurzoru, při čtení více hlasy nebo při vytváření audioknih/MP3. Sonarpad nyní používá cestu syntézy SAPI5 do souboru, která ve Windows spolehlivě funguje a zároveň umožňuje syntézu zrušit; běžné přímé přehrávání zůstává beze změny.
 2. Opravena poloha kurzoru při čtení dialogů více hlasy. Hlasové značky, které Sonarpad automaticky vkládá pro dialogy, se nyní považují pouze za metadata přehrávání a ne za znaky v editoru, takže po F4 nebo F6 kurzor nepřeskočí před skutečný text. Čtení jedním hlasem a explicitní značky <voice> v dokumentu zůstávají beze změny.
 
 Audiopopis s AI
 1. Bezprostředně za pole klíče API Gemini bylo přidáno zaškrtávací políčko „Zobrazit klíč API“. Ve výchozím nastavení je vypnuté; po zapnutí dočasně zobrazí celý klíč, aby bylo možné ověřit, že byl vložen celý. Po opětovném otevření okna je klíč znovu skrytý.
+
+Podcasty a Wikipedie
+1. Po uložení nahrávky podcastu se Sonarpad nyní zeptá, zda má otevřít složku obsahující uložený soubor, stejně jako po uložení médií z YouTube/streamingu.
+2. Při importu dalšího článku z Wikipedie do editoru, který už obsahuje text, se nový článek nyní přidá na konec místo vložení na začátek. Kurzor se umístí na začátek nově importovaného článku.
+
 
 Verze 0.9.2 – 2026-09-02
 
@@ -17,7 +22,6 @@ Audiopopis s AI
 
 YouTube a streamování
 1. Opraven problém, kdy při spuštění audiopopisu s AI u videa na stránce 2 nebo další stránce playlistu či kanálu YouTube mohlo dojít k opětovnému otevření okna výběru YouTube a odebrání fokusu oknu audiopopisu. Sonarpad nyní výběr správně zavře bez návratu na předchozí stránky.
-
 Verze 0.9.1 – 2026-09-01
 
 Stahování z YouTube

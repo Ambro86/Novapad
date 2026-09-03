@@ -3,11 +3,16 @@
 Wersja 0.9.3 – 2026-09-03
 
 Głosy SAPI5
-1. Naprawiono problem, przez który niektóre lokalne głosy SAPI5 mogły nie mówić przy włączonym przesuwaniu kursora, podczas czytania wieloma głosami lub przy tworzeniu audiobooków/MP3. Synteza SAPI5 do pliku korzysta teraz z trybu synchronicznego, który Windows obsługuje prawidłowo, a zwykłe bezpośrednie odtwarzanie pozostaje bez zmian.
+1. Naprawiono problem, przez który niektóre lokalne głosy SAPI5 mogły nie mówić przy włączonym przesuwaniu kursora, podczas czytania wieloma głosami lub tworzenia audiobooków/MP3. Sonarpad używa teraz ścieżki syntezy SAPI5 do pliku, która działa niezawodnie w Windows i nadal pozwala anulować syntezę, a zwykłe odtwarzanie bezpośrednie pozostaje bez zmian.
 2. Poprawiono pozycję kursora podczas wielogłosowego czytania dialogów. Znaczniki głosu automatycznie wstawiane przez Sonarpad dla dialogów są teraz traktowane wyłącznie jako metadane odtwarzania, a nie jako znaki w edytorze, dzięki czemu po F4 lub F6 kursor nie przeskakuje przed rzeczywisty tekst. Czytanie jednym głosem oraz jawne znaczniki <voice> w dokumentach pozostają bez zmian.
 
 Audiodeskrypcja z AI
 1. Dodano pole wyboru „Pokaż klucz API” bezpośrednio po polu klucza API Gemini. Domyślnie jest wyłączone; po włączeniu tymczasowo pokazuje cały klucz, aby można było sprawdzić, czy został wklejony w całości. Po ponownym otwarciu okna klucz jest znów ukryty.
+
+Podcasty i Wikipedia
+1. Po zapisaniu nagrania podcastu Sonarpad pyta teraz, czy otworzyć folder zawierający zapisany plik, tak jak po zapisywaniu multimediów z YouTube/streamingu.
+2. Gdy kolejny artykuł z Wikipedii jest importowany do edytora zawierającego już tekst, nowy artykuł jest teraz dodawany na końcu zamiast na początku. Kursor zostaje ustawiony na początku nowo zaimportowanego artykułu.
+
 
 Wersja 0.9.2 – 2026-09-02
 
@@ -17,7 +22,6 @@ Audiodeskrypcja AI
 
 YouTube i strumieniowanie
 1. Naprawiono problem, przez który uruchomienie audiodeskrypcji AI dla filmu znajdującego się na stronie 2 lub dalszej playlisty albo kanału YouTube mogło ponownie otworzyć okno wyboru YouTube i odebrać fokus oknu audiodeskrypcji. Sonarpad zamyka teraz selektor prawidłowo, bez powrotu do poprzednich stron.
-
 Wersja 0.9.1 – 2026-09-01
 
 Pobieranie z YouTube

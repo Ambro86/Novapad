@@ -3,11 +3,16 @@
 Version 0.9.3 – 2026-09-03
 
 SAPI5-Stimmen
-1. Ein Problem wurde behoben, durch das einige lokale SAPI5-Stimmen bei aktiviertem Cursor-Folgen, beim Lesen mit mehreren Stimmen oder beim Erstellen von Hörbüchern/MP3-Dateien stumm bleiben konnten. Die SAPI5-Dateisynthese verwendet nun den synchronen SAPI-Pfad, den Windows zuverlässig verarbeitet; die normale direkte Wiedergabe bleibt unverändert.
+1. Ein Problem wurde behoben, durch das einige lokale SAPI5-Stimmen bei aktiviertem Cursor-Folgen, beim Lesen mit mehreren Stimmen oder beim Erstellen von Hörbüchern/MP3-Dateien stumm bleiben konnten. Sonarpad verwendet nun einen SAPI5-Dateisyntheseweg, der unter Windows zuverlässig funktioniert und weiterhin abgebrochen werden kann; die normale direkte Wiedergabe bleibt unverändert.
 2. Die Cursorposition bei der mehrstimmigen Dialogwiedergabe wurde korrigiert. Von Sonarpad automatisch für Dialoge eingefügte Sprach-Tags werden jetzt nur noch als Wiedergabemetadaten behandelt und nicht mehr als Zeichen im Editor, sodass der Cursor nach F4 oder F6 nicht mehr vor den tatsächlichen Text springt. Einsprachige Wiedergabe und ausdrücklich im Dokument vorhandene <voice>-Tags bleiben unverändert.
 
 KI-Audiodeskription
 1. Direkt hinter dem Feld für den Gemini-API-Schlüssel wurde das Kontrollkästchen „API-Schlüssel anzeigen“ hinzugefügt. Es ist standardmäßig deaktiviert; beim Aktivieren wird der vollständige Schlüssel vorübergehend sichtbar, damit geprüft werden kann, ob er vollständig eingefügt wurde. Beim erneuten Öffnen des Fensters ist der Schlüssel wieder verborgen.
+
+Podcasts und Wikipedia
+1. Nach dem Speichern einer Podcast-Aufnahme fragt Sonarpad jetzt, ob der Ordner mit der gespeicherten Datei geöffnet werden soll, wie bereits beim Speichern von YouTube-/Streaming-Medien.
+2. Wird ein weiterer Wikipedia-Artikel in einen Editor importiert, der bereits Text enthält, wird der neue Artikel jetzt am Ende angefügt statt am Anfang eingefügt. Der Cursor wird an den Anfang des neu importierten Artikels gesetzt.
+
 
 Version 0.9.2 – 2026-09-02
 
@@ -17,7 +22,6 @@ KI-Audiodeskription
 
 YouTube und Streaming
 1. Ein Problem wurde behoben, durch das beim Starten der KI-Audiodeskription für ein Video auf Seite 2 oder einer späteren Seite einer YouTube-Playlist oder eines Kanals das YouTube-Auswahlfenster erneut geöffnet werden und dem Audiodeskriptionsfenster den Fokus entziehen konnte. Sonarpad schließt die Auswahl nun korrekt, ohne zu vorherigen Seiten zurückzukehren.
-
 Version 0.9.1 – 2026-09-01
 
 YouTube-Downloads

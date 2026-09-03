@@ -9,7 +9,7 @@ use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Gdi::{COLOR_WINDOW, HBRUSH};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Accessibility::NotifyWinEvent;
-use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXSETSEL};
+use windows::Win32::UI::Controls::RichEdit::{CHARRANGE, EM_EXGETSEL, EM_EXSETSEL};
 use windows::Win32::UI::Controls::{
     EM_LIMITTEXT, EM_SCROLLCARET, EM_SETSEL, WC_COMBOBOXW, WC_LISTBOXW, WC_STATIC,
 };
@@ -1322,22 +1322,49 @@ fn apply_import_text(parent: HWND, text: &str) -> bool {
     }
     let cleaned = normalize_to_crlf(text);
     let existing = get_edit_text(hwnd_edit);
-    let combined = if existing.is_empty() {
-        cleaned
+    let article_start = if existing.is_empty() {
+        let wide = to_wide_normalized(&cleaned);
+        unsafe {
+            SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
+            SendMessageW(
+                hwnd_edit,
+                crate::accessibility::EM_REPLACESEL,
+                WPARAM(1),
+                LPARAM(wide.as_ptr() as isize),
+            );
+        }
+        0
     } else {
-        format!("{cleaned}\r\n\r\n{existing}")
+        let separator = to_wide_normalized("\r\n\r\n");
+        let article = to_wide_normalized(&cleaned);
+        let mut insertion = CHARRANGE { cpMin: 0, cpMax: 0 };
+        unsafe {
+            SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(usize::MAX), LPARAM(-1));
+            SendMessageW(
+                hwnd_edit,
+                crate::accessibility::EM_REPLACESEL,
+                WPARAM(1),
+                LPARAM(separator.as_ptr() as isize),
+            );
+            SendMessageW(
+                hwnd_edit,
+                EM_EXGETSEL,
+                WPARAM(0),
+                LPARAM(&mut insertion as *mut _ as isize),
+            );
+            SendMessageW(
+                hwnd_edit,
+                crate::accessibility::EM_REPLACESEL,
+                WPARAM(1),
+                LPARAM(article.as_ptr() as isize),
+            );
+        }
+        insertion.cpMin
     };
-    let wide = to_wide_normalized(&combined);
-    unsafe {
-        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
-        SendMessageW(
-            hwnd_edit,
-            crate::accessibility::EM_REPLACESEL,
-            WPARAM(1),
-            LPARAM(wide.as_ptr() as isize),
-        );
-    }
-    let cr = CHARRANGE { cpMin: 0, cpMax: 0 };
+    let cr = CHARRANGE {
+        cpMin: article_start,
+        cpMax: article_start,
+    };
     unsafe {
         SendMessageW(
             hwnd_edit,
@@ -1345,7 +1372,12 @@ fn apply_import_text(parent: HWND, text: &str) -> bool {
             WPARAM(0),
             LPARAM(&cr as *const _ as isize),
         );
-        SendMessageW(hwnd_edit, EM_SETSEL, WPARAM(0), LPARAM(0));
+        SendMessageW(
+            hwnd_edit,
+            EM_SETSEL,
+            WPARAM(article_start as usize),
+            LPARAM(article_start as isize),
+        );
         SendMessageW(hwnd_edit, EM_SCROLLCARET, WPARAM(0), LPARAM(0));
         NotifyWinEvent(
             windows::Win32::UI::WindowsAndMessaging::EVENT_OBJECT_VALUECHANGE,

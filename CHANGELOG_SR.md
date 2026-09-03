@@ -3,11 +3,16 @@
 Verzija 0.9.3 – 2026-09-03
 
 SAPI5 glasovi
-1. Ispravljen je problem zbog kog neki lokalni SAPI5 glasovi nisu govorili kada je uključeno pomeranje kursora, tokom čitanja sa više glasova ili pri pravljenju audio-knjiga/MP3 datoteka. SAPI5 sinteza u datoteku sada koristi sinhroni put koji Windows pouzdano obrađuje, dok normalna direktna reprodukcija ostaje nepromenjena.
+1. Ispravljen je problem zbog kojeg neki lokalni SAPI5 glasovi nisu govorili kada je uključeno pomeranje kursora, tokom čitanja sa više glasova ili pri pravljenju audio-knjiga/MP3 fajlova. Sonarpad sada koristi pouzdanu SAPI5 sintezu u fajl na Windowsu koja i dalje može da se otkaže tokom sinteze, dok direktno čitanje ostaje nepromenjeno.
 2. Исправљен је положај курсора током читања дијалога са више гласова. Ознаке гласа које Sonarpad аутоматски додаје за дијалоге сада се третирају само као метаподаци репродукције, а не као знакови у уређивачу, па курсор после F4 или F6 више не прескаче испред стварног текста. Читање једним гласом и изричито уписане <voice> ознаке у документима остају непромењени.
 
 Аудио-дескрипција уз AI
 1. Одмах после поља за Gemini API кључ додато је поље „Прикажи API кључ“. Подразумевано је искључено; када се укључи, цео кључ се привремено приказује како би могло да се провери да ли је налепљен у целости. При поновном отварању прозора кључ је поново сакривен.
+
+Podkasti i Wikipedia
+1. Posle čuvanja snimka podkasta, Sonarpad sada pita da li treba otvoriti fasciklu koja sadrži sačuvanu datoteku, kao što već radi posle čuvanja YouTube/streaming medija.
+2. Kada se novi Wikipedia članak uveze u editor koji već sadrži tekst, sada se dodaje na kraj umesto na početak. Kursor se postavlja na početak upravo uvezenog članka.
+
 
 Verzija 0.9.2 – 2026-09-02
 
@@ -17,7 +22,6 @@ AI audio-deskripcija
 
 YouTube i strimovanje
 1. Ispravljen je problem zbog kog je pokretanje AI audio-deskripcije za video sa druge ili neke naredne stranice YouTube plejliste ili kanala moglo ponovo da otvori prozor za izbor na YouTube-u i oduzme fokus prozoru audio-deskripcije. Sonarpad sada pravilno zatvara birač bez vraćanja na prethodne stranice.
-
 Verzija 0.9.1 – 2026-09-01
 
 YouTube preuzimanja

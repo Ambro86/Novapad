@@ -3,11 +3,16 @@
 Version 0.9.3 – 2026-09-03
 
 Voix SAPI5
-1. Correction d’un problème qui pouvait empêcher certaines voix SAPI5 locales de parler lorsque le déplacement du curseur était activé, pendant la lecture à plusieurs voix ou lors de la création de livres audio/MP3. La synthèse SAPI5 vers un fichier utilise désormais le chemin synchrone correctement géré par Windows, tandis que la lecture directe normale reste inchangée.
+1. Correction d’un problème qui pouvait empêcher certaines voix SAPI5 locales de parler lorsque le déplacement du curseur était activé, pendant la lecture à plusieurs voix ou lors de la création de livres audio/MP3. Sonarpad utilise désormais une méthode de synthèse SAPI5 vers un fichier fiable sous Windows et qui peut toujours être annulée, tandis que la lecture directe normale reste inchangée.
 2. Correction de la position du curseur pendant la lecture des dialogues avec plusieurs voix. Les balises de voix ajoutées automatiquement par Sonarpad pour les dialogues sont désormais traitées uniquement comme des métadonnées de lecture et non comme des caractères présents dans l’éditeur, ce qui évite que le curseur avance trop loin après F4 ou F6. La lecture à une seule voix et les balises <voice> écrites explicitement dans les documents restent inchangées.
 
 Audiodescription avec IA
 1. Ajout de la case « Afficher la clé API » juste après le champ de la clé API Gemini. Elle est désactivée par défaut ; lorsqu’elle est activée, elle affiche temporairement la clé complète afin de vérifier qu’elle a été collée entièrement. À la réouverture de la fenêtre, la clé est de nouveau masquée.
+
+Podcasts et Wikipédia
+1. Après l’enregistrement d’un podcast, Sonarpad demande désormais s’il faut ouvrir le dossier contenant le fichier enregistré, comme c’est déjà le cas après l’enregistrement de médias YouTube/streaming.
+2. Lorsqu’un autre article Wikipédia est importé dans un éditeur qui contient déjà du texte, le nouvel article est désormais ajouté à la fin au lieu d’être inséré en haut. Le curseur est placé au début du nouvel article importé.
+
 
 Version 0.9.2 – 2026-09-02
 
@@ -17,7 +22,6 @@ Audiodescription par IA
 
 YouTube et streaming
 1. Correction d’un problème où le lancement de Créer une audiodescription par IA depuis une vidéo située à la page 2 ou suivante d’une playlist ou d’une chaîne YouTube pouvait rouvrir la fenêtre de sélection YouTube et retirer le focus à la fenêtre d’audiodescription. Sonarpad ferme désormais correctement le sélecteur sans revenir aux pages précédentes.
-
 Version 0.9.1 – 2026-09-01
 
 Téléchargements YouTube

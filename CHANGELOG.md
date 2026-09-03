@@ -3,11 +3,16 @@
 Version 0.9.3 – 2026-09-03
 
 SAPI5 voices
-1. Fixed an issue where some local SAPI5 voices could fail to speak when cursor movement was enabled, during multi-voice reading, or while creating audiobooks/MP3 files. SAPI5 file synthesis now uses the synchronous SAPI path that Windows handles reliably, while normal direct playback remains unchanged.
+1. Fixed an issue where some local SAPI5 voices could fail to speak when cursor movement was enabled, during multi-voice reading, or while creating audiobooks/MP3 files. Sonarpad now uses a SAPI5 file-synthesis path that works reliably on Windows and still allows synthesis to be cancelled, while normal direct playback remains unchanged.
 2. Fixed cursor position during multi-voice dialogue reading. Voice tags inserted automatically by Sonarpad for dialogue are now treated only as playback metadata and no longer as characters in the editor, so pausing/resuming with F4 or stopping/restarting with F6 no longer moves the cursor ahead of the real text. Single-voice reading and explicit <voice> tags in documents remain unchanged.
 
 AI Audio Description
 1. Added a “Show API key” checkbox immediately after the Gemini API key field. It is disabled by default; when enabled, it temporarily reveals the full key so users can verify that it was pasted completely, while reopening the window always returns the key to hidden mode.
+
+Podcasts and Wikipedia
+1. After saving a podcast recording, Sonarpad now asks whether to open the folder containing the saved file, matching the behavior already used after saving YouTube/streaming media.
+2. When another Wikipedia article is imported into an editor that already contains text, the new article is now appended at the end instead of being inserted at the top. The cursor is positioned at the beginning of the newly imported article.
+
 
 Version 0.9.2 – 2026-09-02
 
@@ -17,7 +22,6 @@ AI Audio Description
 
 YouTube and streaming
 1. Fixed an issue where starting AI Audio Description from a video on page 2 or later of a YouTube playlist or channel could reopen the YouTube selection window and steal focus from the audio-description window. Sonarpad now closes the selector cleanly without returning to previous pages.
-
 Version 0.9.1 – 2026-09-01
 
 YouTube downloads

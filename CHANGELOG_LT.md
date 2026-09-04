@@ -5,6 +5,7 @@ Versija 0.9.4 – 2026-09-04
 DI garso aprašymas
 1. Ištaisyta problema su Matroska/WebM vaizdo įrašais, kuriuose yra neįprastai didelė vidinė pradžios laiko žyma ir dėl kurios garso aprašymo kūrimas galėjo sustoti su klaida „invalid Gemini chunk timeline“. Sonarpad dabar normalizuoja šaltinio failo ir Gemini dalių trukmę tik aptikęs šį neįprastą laiko žymų modelį, todėl įprasti vaizdo įrašai ir jau veikiantis garso aprašymo elgesys lieka nepakeisti.
 2. Patobulintas garso aprašymo ducking, kad galutinis miksas skambėtų natūraliau. Originalus garsas dabar švelniai pritildomas dar prieš prasidedant balsui ir po aprašymo palaipsniui grąžinamas į įprastą lygį; labai arti viena kitos esančios aprašo frazės išlaiko stabilų foninį lygį, todėl garsas nebesvyruoja pirmyn ir atgal.
+3. Ištaisyta problema, dėl kurios galutinis garso aprašymo eksportas galėjo nepavykti su kai kuriais AVI failais ir kitais šaltiniais, turinčiais 5.1 / daugiakanalį garsą, kai dekodavimas baigdavosi nepilnu persipynusiu garso kadru. Sonarpad dabar saugiai papildo tik tą paskutinį dalinį kadrą tiksliai tiek tylos mėginių, kiek būtina; jau pilni kadrai ir įprasti mono, stereo ar daugiakanaliai failai lieka nepakeisti.
 
 
 Versija 0.9.3 – 2026-09-03

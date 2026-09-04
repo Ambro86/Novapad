@@ -2023,6 +2023,16 @@ fn mix_audio_description_sample(
     (original_sample * film_gain + narration_sample).clamp(-1.0, 1.0)
 }
 
+fn audio_description_wav_padding_samples(samples_written: u64, channels: u16) -> u16 {
+    let channels = channels.max(1) as u64;
+    let remainder = samples_written % channels;
+    if remainder == 0 {
+        0
+    } else {
+        (channels - remainder) as u16
+    }
+}
+
 fn audio_description_temp_wav_path(output_path: &Path) -> PathBuf {
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -2156,6 +2166,7 @@ pub fn export_audio_description_mp3(
         let mut pending_pauses: VecDeque<PreparedAudioDescriptionCue> = pause_cues.into();
         let mut active_pause: Option<ActiveCue> = None;
         let mut source_sample_index = 0_u64;
+        let mut written_samples = 0_u64;
         let mut duck_cursor = 0_usize;
         let mut current_film_gain = 1.0_f32;
         let mut last_reported = 0_u32;
@@ -2185,6 +2196,7 @@ pub fn export_audio_description_mp3(
                         .map_err(|error| {
                             format!("Audio description: staging WAV write failed: {error}")
                         })?;
+                    written_samples = written_samples.saturating_add(1);
                     continue;
                 }
                 active_pause = None;
@@ -2240,6 +2252,7 @@ pub fn export_audio_description_mp3(
             writer
                 .write_sample((mixed * i16::MAX as f32).round() as i16)
                 .map_err(|error| format!("Audio description: staging WAV write failed: {error}"))?;
+            written_samples = written_samples.saturating_add(1);
             source_sample_index = source_sample_index.saturating_add(1);
 
             if let Some(total) = total_source_samples {
@@ -2250,6 +2263,18 @@ pub fn export_audio_description_mp3(
                         callback(pct);
                     }
                 }
+            }
+        }
+        let padding_samples = audio_description_wav_padding_samples(written_samples, channels);
+        if padding_samples > 0 {
+            log_debug(&format!(
+                "Audio description export: incomplete final frame (written_samples={} channels={}); padding {} silent sample(s)",
+                written_samples, channels, padding_samples
+            ));
+            for _ in 0..padding_samples {
+                writer.write_sample(0_i16).map_err(|error| {
+                    format!("Audio description: staging WAV padding failed: {error}")
+                })?;
             }
         }
         writer
@@ -4649,6 +4674,23 @@ mod convert_tests {
     use std::path::PathBuf;
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn test_audio_description_wav_padding_is_noop_for_complete_frames() {
+        assert_eq!(audio_description_wav_padding_samples(0, 6), 0);
+        assert_eq!(audio_description_wav_padding_samples(6, 6), 0);
+        assert_eq!(audio_description_wav_padding_samples(12_000, 6), 0);
+        assert_eq!(audio_description_wav_padding_samples(4_000, 2), 0);
+    }
+
+    #[test]
+    fn test_audio_description_wav_padding_only_completes_final_frame() {
+        assert_eq!(audio_description_wav_padding_samples(12_001, 6), 5);
+        assert_eq!(audio_description_wav_padding_samples(12_002, 6), 4);
+        assert_eq!(audio_description_wav_padding_samples(12_005, 6), 1);
+        assert_eq!(audio_description_wav_padding_samples(4_001, 2), 1);
+        assert_eq!(audio_description_wav_padding_samples(99, 1), 0);
+    }
 
     #[test]
     fn test_validate_mp3_bitrate() {

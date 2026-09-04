@@ -5,6 +5,7 @@ Version 0.9.4 – 2026-09-04
 AI-ljudbeskrivning
 1. Åtgärdade ett problem med Matroska/WebM-videor som innehåller en ovanligt hög intern starttidsstämpel och som kunde stoppa skapandet av ljudbeskrivningen med felet ”invalid Gemini chunk timeline”. Sonarpad normaliserar nu källfilens och Gemini-segmentens längd endast när detta avvikande tidsstämpelmönster upptäcks, medan vanliga videor och det redan fungerande ljudbeskrivningsbeteendet förblir oförändrade.
 2. Duckingen för ljudbeskrivningen har förbättrats för en mer naturlig mix. Originalljudet sänks nu mjukt redan innan rösten börjar och återgår mer gradvis till normal nivå efter beskrivningen; beskrivningar som ligger mycket nära varandra behåller en stabil bakgrundsnivå så att ljudet inte höjs och sänks upprepade gånger.
+3. Åtgärdade ett problem som kunde göra att den slutliga exporten av ljudbeskrivningen misslyckades för vissa AVI-filer och andra källor med 5.1-/flerkanalsljud när avkodningen slutade med en ofullständig interfolierad ljudram. Sonarpad fyller nu säkert ut endast den sista ofullständiga ramen med exakt så många tysta sampel som behövs; redan kompletta ramar och vanliga mono-, stereo- eller flerkanalsfiler förblir oförändrade.
 
 
 Version 0.9.3 – 2026-09-03

@@ -5,6 +5,7 @@ Versione 0.9.4 – 2026-09-04
 Audiodescrizione con IA
 1. Corretto un problema con i video Matroska/WebM che contengono un timestamp iniziale interno insolitamente elevato e che potevano interrompere la generazione dell’audiodescrizione con l’errore “invalid Gemini chunk timeline”. Sonarpad ora normalizza la durata del file sorgente e dei chunk Gemini solo quando rileva questo schema anomalo di timestamp, lasciando invariati i video normali e il comportamento dell’audiodescrizione già funzionante.
 2. Migliorato il ducking dell’audiodescrizione per ottenere un mix più naturale. L’audio originale ora si abbassa in modo morbido prima dell’inizio della voce e torna gradualmente al livello normale dopo la descrizione; le descrizioni molto ravvicinate mantengono inoltre un livello di fondo stabile, evitando continui abbassamenti e rialzi.
+3. Corretto un problema che poteva far fallire l’esportazione finale dell’audiodescrizione con alcuni file AVI e altre sorgenti con audio 5.1/multicanale, quando la decodifica terminava con un frame audio interlacciato incompleto. Sonarpad ora completa in modo sicuro solo l’ultimo frame parziale con i campioni silenziosi strettamente necessari; i frame già completi e i normali file mono, stereo o multicanale restano invariati.
 
 
 Versione 0.9.3 – 2026-09-03

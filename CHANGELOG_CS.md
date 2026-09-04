@@ -5,6 +5,7 @@ Verze 0.9.4 – 2026-09-04
 Audiopopis s AI
 1. Opraven problém s videi Matroska/WebM, která obsahují neobvykle vysoké interní počáteční časové razítko a mohla zastavit vytváření audiopopisu chybou „invalid Gemini chunk timeline“. Sonarpad nyní normalizuje délku zdrojového souboru a segmentů Gemini pouze při zjištění tohoto neobvyklého vzoru časových razítek, takže běžná videa a dosavadní funkční chování audiopopisu zůstávají beze změny.
 2. Vylepšen ducking audiopopisu pro přirozenější výsledný mix. Původní zvuk se nyní plynule ztiší ještě před začátkem hlasu a po skončení popisu se postupně vrací na běžnou úroveň; u popisů, které následují těsně po sobě, zůstává úroveň pozadí stabilní a nedochází k opakovanému zeslabování a zesilování.
+3. Opraven problém, který mohl způsobit selhání závěrečného exportu audiopopisu u některých souborů AVI a dalších zdrojů se zvukem 5.1/vícekanálovým zvukem, pokud dekódování skončilo neúplným prokládaným zvukovým rámcem. Sonarpad nyní bezpečně doplní pouze tento poslední částečný rámec nezbytným počtem tichých vzorků; již úplné rámce a běžné mono, stereo i vícekanálové soubory zůstávají beze změny.
 
 
 Verze 0.9.3 – 2026-09-03
